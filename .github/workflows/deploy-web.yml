@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: 20 # Set this to the node version to use
+  NODE_VERSION: 20.11 # Set this to the node version to use
 
 jobs:
   # Build job
@@ -33,23 +33,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.2.0
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-          run_install: false
-
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build web app
-        run: pnpm --filter @eurora/web build
+        run: pnpm turbo run build --filter @eurora/web
 
       - name: Create CNAME file
         run: echo "eurora-labs.com" > apps/web/dist/CNAME
