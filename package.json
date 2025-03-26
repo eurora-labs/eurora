@@ -1,0 +1,58 @@
+{
+	"name": "root",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "turbo run build",
+		"build:desktop": "turbo run build --filter @eurora/desktop",
+		"dev": "turbo run dev",
+		"lint": "turbo run //#globallint --no-daemon",
+		"format": "prettier --write .",
+		"check-types": "turbo run check-types",
+		"serve:monolith": ". ./.venv/bin/activate && uvicorn main:app --reload --app-dir=backend/apps/monolith/monolith",
+		"start:monolith": ". ./.venv/bin/activate && python backend/apps/monolith/monolith/main.py",
+		"dev:desktop": "pnpm tauri dev",
+		"tauri": "tauri",
+		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
+		"commit": "cz",
+		"proto:compile": ". ./.venv/bin/activate && pnpm proto:python && pnpm proto:typescript",
+		"proto:python": "python scripts/proto/compile_python.py",
+		"proto:typescript": "python scripts/proto/compile_typescript.py",
+		"test:e2e": "cd apps/desktop && pnpm test:e2e"
+	},
+	"devDependencies": {
+		"@commitlint/cli": "^19.7.1",
+		"@commitlint/config-conventional": "^19.7.1",
+		"@commitlint/cz-commitlint": "^19.6.1",
+		"@tauri-apps/cli": "^2.2.7",
+		"commitizen": "^4.3.1",
+		"cz-conventional-changelog": "^3.3.0",
+		"husky": "^9.1.7",
+		"inquirer": "^9.3.7",
+		"prettier": "^3.5.1",
+		"prettier-plugin-svelte": "^3.3.3",
+		"tailwindcss": "^3.4.17",
+		"ts-proto": "^2.6.1",
+		"turbo": "^2.4.4"
+	},
+	"packageManager": "pnpm@10.2.0",
+	"engines": {
+		"node": ">=20.11"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"esbuild"
+		]
+	},
+	"config": {
+		"commitizen": {
+			"path": "./node_modules/cz-conventional-changelog"
+		}
+	},
+	"husky": {
+		"hooks": {
+			"prepare-commit-msg": "exec < /dev/tty && npx cz --hook || true"
+		}
+	}
+}

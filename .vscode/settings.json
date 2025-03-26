@@ -1,0 +1,30 @@
+{
+	"eslint.workingDirectories": [
+		{
+			"mode": "auto"
+		}
+	],
+	"cSpell.words": [
+		"AUTOINCREMENT",
+		"dotenv",
+		"eurora",
+		"hmpbdoleeoankjfjcogiohcfojknnkdd",
+		"Katex",
+		"numpy",
+		"oneshot",
+		"opencv",
+		"protoc",
+		"protol",
+		"pybase",
+		"rusqlite",
+		"Tauri",
+		"thiserror"
+	],
+	"protoc": {
+		"options": ["--proto_path=proto"]
+	},
+	"python-envs.pythonProjects": [],
+	"[svelte]": {
+		"editor.defaultFormatter": "svelte.svelte-vscode"
+	}
+}

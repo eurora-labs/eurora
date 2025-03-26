@@ -1,0 +1,39 @@
+{
+	"name": "@eurora/proto",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "src/index.ts",
+	"typings": "./index.d.ts",
+	"private": true,
+	"devDependencies": {
+		"@bufbuild/buf": "^1.50.0",
+		"@bufbuild/protobuf": "^2.2.3",
+		"@bufbuild/protoc-gen-es": "^2.2.3",
+		"@eurora/eslint-config": "workspace:*",
+		"@eurora/typescript-config": "workspace:*",
+		"typescript": "^5.7.3",
+		"rxjs": "^7.8.2"
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"default": "./src/index.ts"
+		},
+		"./tauri_ipc": {
+			"types": "./src/lib/tauri_ipc.ts",
+			"default": "./src/lib/tauri_ipc.ts"
+		},
+		"./questions_service": {
+			"types": "./src/lib/questions_service.ts",
+			"default": "./src/lib/questions_service.ts"
+		},
+		"./shared": {
+			"types": "./src/lib/shared.ts",
+			"default": "./src/lib/shared.ts"
+		},
+		"./native_messaging": {
+			"types": "./src/lib/native_messaging.ts",
+			"default": "./src/lib/native_messaging.ts"
+		}
+	}
+}
