@@ -1,0 +1,88 @@
+[package]
+name = "eur-tauri"
+version = "0.1.0"
+edition = "2024"
+authors = ["Eurora <andreroelofsai@gmail.com>"]
+publish = false
+
+[lib]
+doctest = false
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[[bin]]
+name = "eur-tauri"
+path = "src/main.rs"
+test = false
+
+[build-dependencies]
+tauri-build = { version = "2.0.3", features = [] }
+
+[dependencies]
+anyhow = "1.0.95"
+backtrace = { version = "0.3.74", optional = true }
+console-subscriber = "0.4.1"
+reqwest = { version = "0.12.9", features = ["json"] }
+serde.workspace = true
+serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
+tauri = { version = "^2.1.1", features = ["unstable"] }
+tauri-plugin-dialog = "2.2.0"
+tauri-plugin-fs = "2.0.3"
+tauri-plugin-http = "2.2.0"
+tauri-plugin-log = "2.2.0"
+tauri-plugin-os = "2.2.0"
+tauri-plugin-process = "2.2.0"
+tauri-plugin-shell = "2.2.0"
+tauri-plugin-single-instance = "2.2.0"
+tauri-plugin-store = "2.2.0"
+tauri-plugin-updater = "2.3.0"
+tauri-plugin-window-state = "2.2.0"
+
+parking_lot.workspace = true
+log = "^0.4"
+# The features here optimize for performance.
+tokio = { workspace = true, features = ["rt-multi-thread", "parking_lot"] }
+tokio-stream = { workspace = true }
+tracing.workspace = true
+tracing-appender = "0.2.3"
+tracing-subscriber.workspace = true
+tracing-forest = { version = "0.1.6" }
+open = "5"
+url = "2.5.4"
+dirs = "6.0.0"
+eur-proto = { path = "../../proto/eur-proto" }
+eur-timeline = { path = "../eur-timeline" }
+eur-client-questions = { path = "../../proto/eur-client-questions" }
+eur-client-grpc = { path = "../../proto/eur-client-grpc" }
+eur-conversation = { path = "../eur-conversation" }
+eur-native-messaging = { path = "../eur-native-messaging" }
+eur-openai = { path = "../../common/eur-openai" }
+chrono = { workspace = true }
+defer = "0.2.1"
+futures = { workspace = true }
+tonic = { workspace = true }
+async-mutex = "1.4.0"
+sentry = { version = "0.36.0" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+tauri-plugin-trafficlights-positioner = { git = "https://github.com/gitbutlerapp/tauri-plugin-trafficlights-positioner", branch = "v2" }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
+
+[lints.clippy]
+all = "deny"
+perf = "deny"
+correctness = "deny"
+
+[features]
+default = ["custom-protocol", "devtools"]
+## A forwarding to all crates that have windows-specific adjustments for testing on non-Windows.
+windows = []
+devtools = ["tauri/devtools"]
+
+# this feature is used used for production builds where `devPath` points to the filesystem
+# DO NOT remove this
+custom-protocol = ["tauri/custom-protocol"]
+
+error-context = ["dep:backtrace"]

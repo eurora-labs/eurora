@@ -1,0 +1,12 @@
+{
+    "extends": [
+        "@eurora/typescript-config/svelte",
+        "./.svelte-kit/tsconfig.json"
+    ],
+    "compilerOptions": {
+        "paths": {
+            "@eurora/ui": ["./src/"],
+            "@eurora/ui/*": ["./src/*"]
+        }
+    }
+}

@@ -1,0 +1,49 @@
+syntax = "proto3";
+package ipc;
+
+import "shared.proto";
+
+service TauriIPC {
+    rpc GatherState(stream StateRequest) returns (stream StateResponse) {}
+}
+
+message StateRequest {}
+
+message StateResponse {
+    oneof state {
+        ProtoYoutubeState youtube = 2;
+        ProtoArticleState article = 3;
+        ProtoPdfState pdf = 4;
+    }
+}
+
+message ProtoTranscriptLine {
+    string text = 1;
+    float start = 2;
+    float duration = 3;
+}
+
+
+message ProtoYoutubeState {
+    string url = 1;
+    string title = 2;
+    repeated ProtoTranscriptLine transcript = 3;
+    float current_time = 4;
+    shared.ProtoImage video_frame = 5;
+}
+
+message ProtoArticleState {
+    string url = 1;
+    string title = 2;
+    string content = 3;
+    string selectedText = 4;
+}
+
+message ProtoPdfState {
+    string url = 1;
+    string title = 2;
+    string content = 3;
+    string selectedText = 4;
+}
+
+

@@ -1,0 +1,24 @@
+{
+	"extends": ["@eurora/typescript-config/svelte"],
+	"compilerOptions": {
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"target": "ESNext",
+		"lib": ["es6", "dom"],
+		"strict": false,
+		"noPropertyAccessFromIndexSignature": true,
+		"allowImportingTsExtensions": true,
+		"emitDeclarationOnly": true,
+		"emitDecoratorMetadata": false,
+		"allowJs": true,
+		"checkJs": true,
+		"allowSyntheticDefaultImports": true,
+		"composite": false,
+		"declaration": true,
+		"declarationMap": true,
+		"paths": {
+			"@eurora/youtube-transcripts": ["./src/index.ts"],
+			"@eurora/youtube-transcripts/*": ["./src/*"]
+		}
+	}
+}

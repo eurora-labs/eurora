@@ -1,0 +1,28 @@
+[package]
+name = "eur-native-messaging"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eur-proto = { path = "../../proto/eur-proto" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+dirs = { workspace = true }
+tokio = { workspace = true }
+once_cell = { workspace = true }
+tonic = { workspace = true }
+prost = { workspace = true }
+futures = { workspace = true }
+tokio-stream = { workspace = true }
+base64 = "0.22.1"
+ctrlc = "3.4.2"
+h2 = "0.3.24"
+sentry = { version = "0.36.0" }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+
+[build-dependencies]
+tonic-build = { workspace = true }

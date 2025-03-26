@@ -1,0 +1,7 @@
+[package]
+name = "eur-util"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eur-proto = { path = "../../proto/eur-proto" }
