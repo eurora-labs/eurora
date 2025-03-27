@@ -68,7 +68,7 @@
 
 	<!-- Feature Highlights -->
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-		<Card.Root class="p-6">
+		<Card.Root class="p-3 md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<Brain class="w-6 h-6 text-purple-600" />
@@ -86,7 +86,7 @@
 				</Button> -->
 			</Card.Content>
 		</Card.Root>
-        <Card.Root class="p-6">
+        <Card.Root class="p-3 md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<KeyRound class="w-6 h-6 text-purple-600" />
@@ -104,7 +104,7 @@
 			</Card.Content>
 		</Card.Root>
 
-		<Card.Root class="p-6">
+		<Card.Root class="p-3 md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<Shield class="w-6 h-6 text-purple-600" />
@@ -423,7 +423,7 @@
 
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-        <Card.Root class="p-6">
+        <Card.Root class=" md:p-6">
             <Card.Header>
              <div class="flex items-center gap-2">
                  <Brain class="w-6 h-6 text-purple-600" />
@@ -447,7 +447,7 @@
                          </div>
                      </Card.Content>
                  </Card.Root>
-  <Card.Root class="p-6">
+  <Card.Root class=" md:p-6">
    <Card.Header>
     <div class="flex items-center gap-2">
     	<Github class="w-6 h-6 text-purple-600" />
@@ -473,7 +473,7 @@
    </Card.Content>
   </Card.Root>
 
-  <Card.Root class="p-6">
+  <Card.Root class=" md:p-6">
    <Card.Header>
     <div class="flex items-center gap-2">
     	<Code class="w-6 h-6 text-purple-600" />
@@ -501,7 +501,7 @@
 
   
 
-		<Card.Root class="p-6">
+		<Card.Root class="p-3 md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<Shield class="w-6 h-6 text-purple-600" />
@@ -526,7 +526,7 @@
 			</Card.Content>
 		</Card.Root>
 
-		<Card.Root class="p-6">
+		<Card.Root class="md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<Zap class="w-6 h-6 text-purple-600" />
@@ -552,7 +552,7 @@
 			</Card.Content>
 		</Card.Root>
 
-		<Card.Root class="p-6">
+		<Card.Root class="md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<Globe class="w-6 h-6 text-purple-600" />
@@ -580,7 +580,7 @@
 	</div>
 
 	<div class="mb-16">
-		<Card.Root class="p-6">
+		<Card.Root class=" md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<Layers class="w-6 h-6 text-purple-600" />
@@ -634,7 +634,7 @@
 	</div>
 
 	<div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-		<Card.Root class="p-6">
+		<Card.Root class="md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<MessageSquare class="w-6 h-6 text-purple-600" />
@@ -677,7 +677,7 @@
 			</Card.Content>
 		</Card.Root>
 
-		<Card.Root class="p-6">
+		<Card.Root class="md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<Code class="w-6 h-6 text-purple-600" />
@@ -710,7 +710,7 @@
 		</Card.Root>
 	</div>
 
-	<Card.Root class="p-6">
+	<Card.Root class="p-3 md:p-6">
 		<Card.Header>
 			<div class="flex items-center gap-2">
 				<Sparkles class="w-6 h-6 text-purple-600" />
