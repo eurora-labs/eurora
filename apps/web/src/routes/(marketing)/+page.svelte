@@ -1,6 +1,6 @@
 
 <script lang="ts">
-	import { Card, Button, VideoCard, Sheet, buttonVariants, Input, Label } from '@eurora/ui';
+	import { Card, Button, VideoCard, Sheet, buttonVariants, Skeleton, Input, Label } from '@eurora/ui';
 	import { ArrowRight, Brain, Shield, Zap, Globe, MessageSquare, KeyRound } from 'lucide-svelte';
 	import IntroModule from './intro_module.svelte';
 
@@ -24,12 +24,12 @@
                   >Sign Up</Sheet.Trigger
                 >
                 <Sheet.Content side="right">
-                  <Sheet.Header>
+                  <!-- <Sheet.Header>
                     <Sheet.Title>Edit profile</Sheet.Title>
                     <Sheet.Description>
                       Make changes to your profile here. Click save when you're done.
                     </Sheet.Description>
-                  </Sheet.Header>
+                  </Sheet.Header> -->
                   <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
                   <!-- <div class="hs-form-frame" data-region="na2" data-form-id="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" data-portal-id="242150186"></div> -->
                   <!-- <div class="grid gap-4 py-4">
@@ -43,9 +43,10 @@
                     </div>
                   </div> -->
                   <Sheet.Footer>
-                    <Sheet.Close class={buttonVariants({ variant: "outline" })}
+                    <Skeleton class="h-10 w-full" />
+                    <!-- <Sheet.Close class={buttonVariants({ variant: "outline" })}
                       >Save changes</Sheet.Close
-                    >
+                    > -->
                   </Sheet.Footer>
                 </Sheet.Content>
               </Sheet.Root>
