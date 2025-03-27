@@ -1,9 +1,14 @@
 <script lang="ts">
 	// Removed Input import as we're using a custom div
 	import { onMount } from 'svelte';
-	import { Mic, ScrollText, Youtube, TvMinimalPlay } from 'lucide-svelte';
+	import { Mic, ScrollText, Youtube, TvMinimalPlay, Globe } from 'lucide-svelte';
 	import { Card, Button, Input } from '@eurora/ui';
-	import { SiYoutube, SiApple } from '@icons-pack/svelte-simple-icons';
+	import { Sheet, ScrollArea, Skeleton } from '@eurora/ui';
+	import { buttonVariants } from '@eurora/ui';
+    import WaitlistForm from './waitlist_form.svelte';
+
+    import { SiYoutube } from '@icons-pack/svelte-simple-icons';
+
 
 	// Typing animation configuration
 	const instantTyping = false;
@@ -14,7 +19,7 @@
 	const cardDelay = instantTyping ? 0 : 50; // milliseconds between cards
 
 	const firstCardDelay = typingSpeed * (firstPart.length + secondPart.length) + typingSpeed;
-	const totalCards = 5;
+	const totalCards = 3;
 	const tagLineDelay = instantTyping ? 0 : firstCardDelay + cardDelay * (totalCards - 1) + 50;
 
 	let inputValue = '';
@@ -69,29 +74,12 @@
 	});
 </script>
 
-<div class="h-screen">
-	<div class="mx-auto px-4 pt-6" style="height: 75vh;">
+<div style="height: 100vh;">
+	<div class="mx-auto px-4 pt-6" style="height: 55vh;">
 		<div class="grid grid-cols-12 gap-6">
-			<!-- First row with cards 1, 2 and input box -->
-			<div class="col-span-12 grid grid-cols-12 gap-6 mb-6">
-				{#if visibleCards.includes(1)}
-					<div class="col-span-4 card-entrance">
-						<Card.Root class="w-full aspect-video">
-							<Card.Content class="flex flex-col items-center justify-center h-full">
-								<!-- <div class="w-full h-10 bg-purple-600 rounded-md mb-4 max-w-xs mx-auto"></div> -->
-								<div class="flex justify-center items-center">
-									<!-- <SiYoutube size={128} color="purple" /> -->
-									<TvMinimalPlay size={128} color="purple" />
-									<!-- <TvMinimalPlay /> -->
-									<!-- <ScrollText size={128} /> -->
-								</div>
-							</Card.Content>
-						</Card.Root>
-					</div>
-				{/if}
-
-				<!-- Input box in the middle -->
-				<div class="pt-16 col-span-4 {!visibleCards.length ? 'col-start-5' : ''}">
+			<!-- Input box centered in the first row -->
+			<div class="col-span-12 flex justify-center mb-4">
+				<div class="w-3/4">
 					<div class="relative animate-grow">
 						<div
 							class="py-6 px-4 shadow-lg rounded-md border border-gray-300 bg-white w-full flex items-center"
@@ -105,42 +93,46 @@
 						</div>
 					</div>
 				</div>
+			</div>
 
-				{#if visibleCards.includes(2)}
+			<!-- Three cards in a row below the input box -->
+			<div class="col-span-12 grid grid-cols-12 gap-6">
+				{#if visibleCards.includes(1)}
 					<div class="col-span-4 card-entrance">
 						<Card.Root class="w-full aspect-video">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
-								<!-- <div class="w-full h-10 bg-purple-600 rounded-md mb-4 max-w-xs mx-auto"></div> -->
 								<div class="flex justify-center items-center">
-									<!-- <SiYoutube size={128} /> -->
-									<ScrollText size={128} />
+									<!-- <TvMinimalPlay size={128} color="purple" /> -->
+                                     <SiYoutube color="rgb(147 51 234 / var(--tw-text-opacity, 1))" size={64}  />
 								</div>
+                                <Card.Title>YouTube Videos</Card.Title>
 							</Card.Content>
 						</Card.Root>
 					</div>
 				{/if}
-			</div>
-
-			<!-- Second row with cards 3, 4 and 5 -->
-			<div class="col-span-12 grid grid-cols-12 gap-6 mb-6">
+				
+				{#if visibleCards.includes(2)}
+					<div class="col-span-4 card-entrance">
+						<Card.Root class="w-full aspect-video">
+							<Card.Content class="flex flex-col items-center justify-center h-full">
+								<div class="flex justify-center items-center">
+									<ScrollText class="text-purple-600" size={64} />
+								</div>
+                                <Card.Title>PDF Documents</Card.Title>
+							</Card.Content>
+						</Card.Root>
+					</div>
+				{/if}
+				
 				{#if visibleCards.includes(3)}
 					<div class="col-span-4 card-entrance">
 						<Card.Root class="w-full aspect-video">
-							<Card.Content>Desktop Screenshot 3</Card.Content>
-						</Card.Root>
-					</div>
-				{/if}
-				{#if visibleCards.includes(4)}
-					<div class="col-span-4 col-start-5 card-entrance">
-						<Card.Root class="w-full aspect-video">
-							<Card.Content>Desktop Screenshot 4</Card.Content>
-						</Card.Root>
-					</div>
-				{/if}
-				{#if visibleCards.includes(5)}
-					<div class="col-span-4 col-start-9 card-entrance">
-						<Card.Root class="w-full aspect-video">
-							<Card.Content>Desktop Screenshot 5</Card.Content>
+							<Card.Content class="flex flex-col items-center justify-center h-full">
+								<div class="flex justify-center items-center">
+									<Globe class="text-purple-600" size={64} />
+								</div>
+                                <Card.Title>Any Other Websites</Card.Title>
+							</Card.Content>
 						</Card.Root>
 					</div>
 				{/if}
@@ -150,14 +142,13 @@
 
 	{#if showTagLine}
 		<div class="text-center mt-24 card-entrance" bind:this={taglineComponent}>
-			<h1 class="text-4xl font-bold mb-4">AI for Humans</h1>
 			<Button
 				class="px-6 py-3"
 				onclick={(e) => {
 					const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
 					// const buttonRect = (e.target as HTMLElement).getBoundingClientRect();
 					window.scrollTo({
-						top: window.scrollY + taglineRect.top,
+						top: window.scrollY + taglineRect.top + 150,
 						behavior: 'smooth'
 					});
 				}}
@@ -165,6 +156,49 @@
 				Learn More
 			</Button>
 		</div>
+        <!-- <div class="text-center" bind:this={taglineComponent}>
+            <h1 class="text-5xl font-bold mb-6">Intelligence Without Compromise</h1>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+                Eurora is a fully Open Source AI assistant that understands context, respects your privacy, and works across
+                all your devices. Experience AI on your own terms.
+            </p>
+            <div class="flex justify-center gap-4">
+                <Sheet.Root>
+                    <Sheet.Trigger class={buttonVariants({ variant: "default" })}
+                      >Join Waitlist</Sheet.Trigger
+                    >
+                    <Sheet.Content side="right">
+                     
+                      <ScrollArea class="h-screen">
+                        <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
+                      </ScrollArea>
+                      
+                      <Sheet.Footer>
+                        <Skeleton class="w-full h-screen" />
+                        <Skeleton class="w-full h-screen" />
+                        <Skeleton class="w-full h-screen" />
+                       
+                      </Sheet.Footer>
+                    </Sheet.Content>
+                  </Sheet.Root>
+
+                  <Button
+				class="px-6 py-3"
+                variant="outline"
+				onclick={(e) => {
+					const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
+					// const buttonRect = (e.target as HTMLElement).getBoundingClientRect();
+					window.scrollTo({
+						top: window.scrollY + taglineRect.top - 100,
+						behavior: 'smooth'
+					});
+				}}
+			>
+				Learn More
+			</Button>
+                
+            </div>
+        </div> -->
 	{/if}
 </div>
 
