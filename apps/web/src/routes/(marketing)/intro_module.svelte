@@ -5,7 +5,8 @@
 	import { Card, Button, Input } from '@eurora/ui';
 	import { Sheet, ScrollArea, Skeleton } from '@eurora/ui';
 	import { buttonVariants } from '@eurora/ui';
-    import WaitlistForm from './waitlist_form.svelte';
+    // import WaitlistForm from './waitlist_form.svelte';
+    import JoinWaitlist from './join_waitlist.svelte';
 
     import { SiYoutube } from '@icons-pack/svelte-simple-icons';
 
@@ -74,7 +75,7 @@
 	});
 </script>
 
-<div style="height: 100vh;">
+<div class="h-screen">
 	<div class="mx-auto px-4 pt-6" style="height: 55vh;">
 		<div class="grid grid-cols-12 gap-6">
 			<!-- Input box centered in the first row -->
@@ -142,13 +143,34 @@
 
 	{#if showTagLine}
 		<div class="text-center mt-24 card-entrance" bind:this={taglineComponent}>
+			<h1 class="text-4xl font-bold mb-4">AI on your own terms</h1>
+            <JoinWaitlist />
+            <!-- <Sheet.Root>
+                <Sheet.Trigger class={buttonVariants({ variant: "default" })}
+                  >Join Waitlist</Sheet.Trigger
+                >
+                <Sheet.Content side="right">
+                 
+                  <ScrollArea class="h-screen">
+                    <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
+                  </ScrollArea>
+                  
+                  <Sheet.Footer>
+                    <Skeleton class="w-full h-screen" />
+                    <Skeleton class="w-full h-screen" />
+                    <Skeleton class="w-full h-screen" />
+                   
+                  </Sheet.Footer>
+                </Sheet.Content>
+              </Sheet.Root> -->
 			<Button
 				class="px-6 py-3"
+                variant="outline"
 				onclick={(e) => {
 					const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
 					// const buttonRect = (e.target as HTMLElement).getBoundingClientRect();
 					window.scrollTo({
-						top: window.scrollY + taglineRect.top + 150,
+						top: window.scrollY + taglineRect.top + 100,
 						behavior: 'smooth'
 					});
 				}}

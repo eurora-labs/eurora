@@ -41,7 +41,7 @@
 			Eurora is a fully Open Source AI assistant that understands context, respects your privacy, and works across
 			all your devices. Experience AI on your own terms.
 		</p>
-		<div class="flex justify-center gap-4">
+		<!-- <div class="flex justify-center gap-4">
             <Sheet.Root>
                 <Sheet.Trigger class={buttonVariants({ variant: "default" })}
                   >Join Waitlist</Sheet.Trigger
@@ -61,7 +61,7 @@
                 </Sheet.Content>
               </Sheet.Root>
 			
-		</div>
+		</div> -->
 	</div>
 
 	<!-- Feature Highlights -->
