@@ -43,7 +43,9 @@
                     </div>
                   </div> -->
                   <Sheet.Footer>
-                    <Skeleton class="h-10 w-full" />
+                    <Skeleton class="w-full h-screen" />
+                    <Skeleton class="w-full h-screen" />
+                    <Skeleton class="w-full h-screen" />
                     <!-- <Sheet.Close class={buttonVariants({ variant: "outline" })}
                       >Save changes</Sheet.Close
                     > -->
