@@ -10,6 +10,9 @@
 
     import { SiYoutube } from '@icons-pack/svelte-simple-icons';
 
+	// Animation state tracking
+	let typingComplete = false;
+	let showCursor = false;
 
 	// Typing animation configuration
 	const instantTyping = false;
@@ -17,11 +20,7 @@
 	const secondPart = 'this';
 	const typingSpeed = instantTyping ? 0 : 150; // milliseconds per character
 	const initialDelay = instantTyping ? 0 : 50; // milliseconds before typing starts
-	const cardDelay = instantTyping ? 0 : 50; // milliseconds between cards
-
-	const firstCardDelay = typingSpeed * (firstPart.length + secondPart.length) + typingSpeed;
-	const totalCards = 3;
-	const tagLineDelay = instantTyping ? 0 : firstCardDelay + cardDelay * (totalCards - 1) + 50;
+	const cardStaggerDelay = instantTyping ? 0 : 200; // milliseconds between cards (increased for better visual effect)
 
 	let inputValue = '';
 	let purpleText = '';
@@ -29,12 +28,37 @@
 	let taglineComponent: HTMLElement | null = null;
 
 	// Simplified cards array without position data
+	const totalCards = 3;
 	const cards = Array.from({ length: totalCards }, (_, i) => ({
 		id: i + 1,
-		delay: firstCardDelay + (i + 1) * cardDelay
+		visible: false,
+		animationDelay: i * cardStaggerDelay + 'ms'
 	}));
 
 	let visibleCards: number[] = [];
+
+	// Function to start the card sequence
+	function startCardSequence() {
+		// Show cursor briefly after typing completes
+		showCursor = true;
+		setTimeout(() => {
+			showCursor = false;
+			
+			// Start showing cards with staggered animation
+			let delay = 300; // Initial delay after typing completes
+			
+			cards.forEach((card, index) => {
+				setTimeout(() => {
+					visibleCards = [...visibleCards, card.id];
+				}, delay + index * cardStaggerDelay);
+			});
+			
+			// Show tagline after all cards are visible
+			setTimeout(() => {
+				showTagLine = true;
+			}, delay + cards.length * cardStaggerDelay + 400);
+		}, 800); // Show cursor for 800ms
+	}
 
 	onMount(() => {
 		setTimeout(() => {
@@ -55,23 +79,13 @@
 
 						if (currentIndex === secondPart.length) {
 							clearInterval(secondTypingInterval);
+							typingComplete = true;
+							startCardSequence();
 						}
 					}, typingSpeed);
 				}
 			}, typingSpeed);
 		}, initialDelay);
-
-		// Add cards sequentially
-		cards.forEach((card) => {
-			setTimeout(() => {
-				visibleCards = [...visibleCards, card.id];
-			}, card.delay);
-		});
-
-		// Add tagline delay
-		setTimeout(() => {
-			showTagLine = true;
-		}, tagLineDelay);
 	});
 </script>
 
@@ -89,6 +103,9 @@
 							<div class="flex-grow">
 								<span class="text-black">{inputValue}</span>
 								<span class="text-purple-600">{purpleText}</span>
+								{#if showCursor}
+									<span class="cursor-blink">|</span>
+								{/if}
 							</div>
 							<Mic class="h-8 w-8 text-gray-400" />
 						</div>
@@ -99,40 +116,39 @@
 			<!-- Three cards in a row below the input box -->
 			<div class="col-span-12 grid grid-cols-12 gap-6">
 				{#if visibleCards.includes(1)}
-					<div class="col-span-4 card-entrance">
-						<Card.Root class="w-full aspect-video">
+					<div class="col-span-4 card-entrance" style="--animation-delay: 0ms;">
+						<Card.Root class="w-full aspect-video card-content">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
-								<div class="flex justify-center items-center">
-									<!-- <TvMinimalPlay size={128} color="purple" /> -->
-                                     <SiYoutube color="rgb(147 51 234 / var(--tw-text-opacity, 1))" size={64}  />
+								<div class="flex justify-center items-center icon-animation">
+									<SiYoutube color="rgb(147 51 234 / var(--tw-text-opacity, 1))" size={64} />
 								</div>
-                                <Card.Title>YouTube Videos</Card.Title>
+                                <Card.Title class="title-animation">YouTube Videos</Card.Title>
 							</Card.Content>
 						</Card.Root>
 					</div>
 				{/if}
 				
 				{#if visibleCards.includes(2)}
-					<div class="col-span-4 card-entrance">
-						<Card.Root class="w-full aspect-video">
+					<div class="col-span-4 card-entrance" style="--animation-delay: {cards[1].animationDelay};">
+						<Card.Root class="w-full aspect-video card-content">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
-								<div class="flex justify-center items-center">
+								<div class="flex justify-center items-center icon-animation">
 									<ScrollText class="text-purple-600" size={64} />
 								</div>
-                                <Card.Title>PDF Documents</Card.Title>
+                                <Card.Title class="title-animation">PDF Documents</Card.Title>
 							</Card.Content>
 						</Card.Root>
 					</div>
 				{/if}
 				
 				{#if visibleCards.includes(3)}
-					<div class="col-span-4 card-entrance">
-						<Card.Root class="w-full aspect-video">
+					<div class="col-span-4 card-entrance" style="--animation-delay: {cards[2].animationDelay};">
+						<Card.Root class="w-full aspect-video card-content">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
-								<div class="flex justify-center items-center">
+								<div class="flex justify-center items-center icon-animation">
 									<Globe class="text-purple-600" size={64} />
 								</div>
-                                <Card.Title>Any Other Websites</Card.Title>
+                                <Card.Title class="title-animation">Any Other Websites</Card.Title>
 							</Card.Content>
 						</Card.Root>
 					</div>
@@ -142,9 +158,11 @@
 	</div>
 
 	{#if showTagLine}
-		<div class="text-center mt-24 card-entrance" bind:this={taglineComponent}>
-			<h1 class="text-4xl font-bold mb-4">AI On Your Own Terms</h1>
-            <JoinWaitlist />
+		<div class="text-center mt-24 tagline-entrance" bind:this={taglineComponent}>
+			<h1 class="text-4xl font-bold mb-4 fade-in-up">AI On Your Own Terms</h1>
+            <div class="fade-in-up" style="--animation-delay: 200ms;">
+                <JoinWaitlist />
+            </div>
             <!-- <Sheet.Root>
                 <Sheet.Trigger class={buttonVariants({ variant: "default" })}
                   >Join Waitlist</Sheet.Trigger
@@ -163,20 +181,21 @@
                   </Sheet.Footer>
                 </Sheet.Content>
               </Sheet.Root> -->
-			<Button
-				class="px-6 py-3"
-                variant="outline"
-				onclick={(e) => {
-					const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
-					// const buttonRect = (e.target as HTMLElement).getBoundingClientRect();
-					window.scrollTo({
-						top: window.scrollY + taglineRect.top + 100,
-						behavior: 'smooth'
-					});
-				}}
-			>
-				Learn More
-			</Button>
+			<div class="fade-in-up" style="--animation-delay: 400ms;">
+				<Button
+					class="px-6 py-3 mt-4"
+					variant="outline"
+					onclick={(e) => {
+						const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
+						window.scrollTo({
+							top: window.scrollY + taglineRect.top + 100,
+							behavior: 'smooth'
+						});
+					}}
+				>
+					Learn More
+				</Button>
+			</div>
 		</div>
         <!-- <div class="text-center" bind:this={taglineComponent}>
             <h1 class="text-5xl font-bold mb-6">Intelligence Without Compromise</h1>
@@ -225,7 +244,7 @@
 </div>
 
 <style>
-	/* Optional: Add a blinking cursor animation */
+	/* Cursor blinking animation */
 	@keyframes blink {
 		0%,
 		100% {
@@ -236,10 +255,15 @@
 		}
 	}
 
-	:global(.animate-blink) {
-		animation: blink 1s infinite;
+	.cursor-blink {
+		display: inline-block;
+		color: #9333ea; /* Purple color to match the theme */
+		animation: blink 0.8s infinite;
+		font-weight: 300;
+		margin-left: 2px;
 	}
 
+	/* Input box grow animation */
 	@keyframes grow {
 		from {
 			transform: scale(0.2);
@@ -250,22 +274,91 @@
 	}
 
 	.animate-grow {
-		animation: grow var(--animation-duration) ease-in-out;
+		animation: grow var(--animation-duration) cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
 
 	:global(.animate-grow) {
-		--animation-duration: 300ms;
+		--animation-duration: 400ms;
 	}
 
+	/* Card entrance animation with staggered delay */
 	.card-entrance {
 		opacity: 0;
-		transform: translateY(20px);
-		animation: slideIn 0.5s ease-out forwards;
-		/* Add transition for smoother repositioning if needed */
-		transition: all 0.3s ease-out;
+		transform: translateY(30px) scale(0.95);
+		animation: slideIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+		animation-delay: var(--animation-delay, 0ms);
 	}
 
 	@keyframes slideIn {
+		0% {
+			opacity: 0;
+			transform: translateY(30px) scale(0.95);
+		}
+		100% {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+
+	/* Card content animations */
+	.card-content {
+		box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+		transition: all 0.3s ease;
+	}
+
+	.card-content:hover {
+		transform: translateY(-5px);
+		box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+	}
+
+	.icon-animation {
+		opacity: 0;
+		transform: scale(0.8);
+		animation: fadeScale 0.5s ease-out forwards;
+		animation-delay: calc(var(--animation-delay, 0ms) + 100ms);
+	}
+
+	.title-animation {
+		opacity: 0;
+		transform: translateY(10px);
+		animation: fadeUp 0.5s ease-out forwards;
+		animation-delay: calc(var(--animation-delay, 0ms) + 200ms);
+	}
+
+	@keyframes fadeScale {
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	@keyframes fadeUp {
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	/* Tagline animations */
+	.tagline-entrance {
+		opacity: 0;
+		animation: fadeIn 0.8s ease-out forwards;
+	}
+
+	.fade-in-up {
+		opacity: 0;
+		transform: translateY(20px);
+		animation: fadeInUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+		animation-delay: var(--animation-delay, 0ms);
+	}
+
+	@keyframes fadeIn {
+		to {
+			opacity: 1;
+		}
+	}
+
+	@keyframes fadeInUp {
 		to {
 			opacity: 1;
 			transform: translateY(0);
