@@ -1,3 +1,3 @@
 import Root from './system-chat-message.svelte';
 
-export { Root as SystemChatMessage };  
+export { Root as SystemChatMessage };

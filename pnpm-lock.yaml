@@ -38,6 +38,9 @@ importers:
       prettier-plugin-svelte:
         specifier: ^3.3.3
         version: 3.3.3(prettier@3.5.1)(svelte@5.22.6)
+      prettier-plugin-tailwindcss:
+        specifier: ^0.6.11
+        version: 0.6.11(prettier-plugin-svelte@3.3.3(prettier@3.5.1)(svelte@5.22.6))(prettier@3.5.1)
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.17
@@ -9187,6 +9190,12 @@ snapshots:
       prettier: 3.5.1
     optionalDependencies:
       prettier-plugin-svelte: 3.3.3(prettier@3.5.1)(svelte@5.20.2)
+
+  prettier-plugin-tailwindcss@0.6.11(prettier-plugin-svelte@3.3.3(prettier@3.5.1)(svelte@5.22.6))(prettier@3.5.1):
+    dependencies:
+      prettier: 3.5.1
+    optionalDependencies:
+      prettier-plugin-svelte: 3.3.3(prettier@3.5.1)(svelte@5.22.6)
 
   prettier@3.5.1: {}
 
