@@ -5,21 +5,22 @@
 		}
 	],
 	"cSpell.words": [
-		"AUTOINCREMENT",
-		"dotenv",
-		"eurora",
-		"hmpbdoleeoankjfjcogiohcfojknnkdd",
-		"Katex",
-		"numpy",
-		"oneshot",
-		"opencv",
-		"protoc",
-		"protol",
-		"pybase",
-		"rusqlite",
-		"Tauri",
-		"thiserror"
-	],
+        "AUTOINCREMENT",
+        "dotenv",
+        "eurora",
+        "hmpbdoleeoankjfjcogiohcfojknnkdd",
+        "Katex",
+        "numpy",
+        "oneshot",
+        "opencv",
+        "protoc",
+        "protol",
+        "pybase",
+        "rusqlite",
+        "Tauri",
+        "thiserror",
+        "Waitlist"
+    ],
 	"protoc": {
 		"options": ["--proto_path=proto"]
 	},
