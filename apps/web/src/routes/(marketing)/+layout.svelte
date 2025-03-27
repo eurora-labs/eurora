@@ -35,7 +35,7 @@
 >
 	<div class="flex items-center gap-2">
 		<Button variant="link" href="/" class="no-underline">
-			<EurIcons.EuroraLogo />
+			<EurIcons.EuroraLogo style="width: 2rem; height: 2rem;" />
 			<span class="text-lg font-semibold no-underline">Eurora</span>
 		</Button>
 	</div>
