@@ -41,12 +41,12 @@
 	</div>
 
 	<div class="flex items-center gap-4">
-		<!-- <Button variant="ghost" href="/download">Download</Button>
+		<Button variant="ghost" href="/download">Download</Button>
 		<Button variant="ghost" href="/features">Features</Button>
 		<Button variant="ghost" href="/pricing">Pricing</Button>
 		<Button variant="ghost" href="/about">About Us</Button>
 		<Button variant="ghost" href="/privacy">Privacy</Button>
-		<Button variant="ghost" href="/contact">Contact</Button> -->
+		<Button variant="ghost" href="/contact">Contact</Button>
 		<JoinWaitlist />
 		<Button variant="ghost" size="icon" href="https://github.com/Eurora-Labs/eurora">
 			<SiGithub />
