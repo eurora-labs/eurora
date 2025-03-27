@@ -3,6 +3,7 @@
 	import { SiGithub } from '@icons-pack/svelte-simple-icons';
 	import { Button, EurIcons, Alert } from '@eurora/ui';
 	import { Terminal, X, ShieldAlert } from 'lucide-svelte';
+    import JoinWaitlist from './join_waitlist.svelte';
 
 	const { children } = $props();
 
@@ -46,6 +47,7 @@
 		<Button variant="ghost" href="/about">About Us</Button>
 		<Button variant="ghost" href="/privacy">Privacy</Button>
 		<Button variant="ghost" href="/contact">Contact</Button> -->
+		<JoinWaitlist />
 		<Button variant="ghost" size="icon" href="https://github.com/Eurora-Labs/eurora">
 			<SiGithub />
 		</Button>
