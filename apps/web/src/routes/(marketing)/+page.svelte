@@ -1,7 +1,12 @@
+
 <script lang="ts">
-	import { Card, Button, VideoCard } from '@eurora/ui';
+	import { Card, Button, VideoCard, Sheet, buttonVariants, Input, Label } from '@eurora/ui';
 	import { ArrowRight, Brain, Shield, Zap, Globe, MessageSquare, KeyRound } from 'lucide-svelte';
 	import IntroModule from './intro_module.svelte';
+
+    import WaitlistForm from './waitlist_form.svelte';
+
+ 
 </script>
 
 <div class="container mx-auto px-4 py-16 max-w-5xl">
@@ -14,10 +19,40 @@
 			all your devices. Experience AI on your own terms.
 		</p>
 		<div class="flex justify-center gap-4">
-			<Button href="/download" size="lg" class="px-6">
+            <Sheet.Root>
+                <Sheet.Trigger class={buttonVariants({ variant: "default" })}
+                  >Sign Up</Sheet.Trigger
+                >
+                <Sheet.Content side="right">
+                  <Sheet.Header>
+                    <Sheet.Title>Edit profile</Sheet.Title>
+                    <Sheet.Description>
+                      Make changes to your profile here. Click save when you're done.
+                    </Sheet.Description>
+                  </Sheet.Header>
+                  <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
+                  <!-- <div class="hs-form-frame" data-region="na2" data-form-id="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" data-portal-id="242150186"></div> -->
+                  <!-- <div class="grid gap-4 py-4">
+                    <div class="grid grid-cols-4 items-center gap-4">
+                      <Label for="name" class="text-right">Name</Label>
+                      <Input id="name" value="Pedro Duarte" class="col-span-3" />
+                    </div>
+                    <div class="grid grid-cols-4 items-center gap-4">
+                      <Label for="username" class="text-right">Username</Label>
+                      <Input id="username" value="@peduarte" class="col-span-3" />
+                    </div>
+                  </div> -->
+                  <Sheet.Footer>
+                    <Sheet.Close class={buttonVariants({ variant: "outline" })}
+                      >Save changes</Sheet.Close
+                    >
+                  </Sheet.Footer>
+                </Sheet.Content>
+              </Sheet.Root>
+			<!-- <Button href="/download" size="lg" class="px-6">
 				Get Started
 				<ArrowRight class="ml-2 h-5 w-5" />
-			</Button>
+			</Button> -->
 			<Button href="/features" variant="outline" size="lg" class="px-6">Learn More</Button>
 		</div>
 	</div>
