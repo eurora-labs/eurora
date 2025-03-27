@@ -86,16 +86,16 @@
 	});
 </script>
 
-<div class="h-screen">
-	<div class="mx-auto px-4 pt-6" style="height: 55vh;">
+<div class="min-h-screen">
+	<div class="mx-auto px-4 pt-6" style="min-height: 55vh;">
 		<div class="grid grid-cols-12 gap-6">
 			<!-- Input box centered in the first row -->
 			<div class="col-span-12 flex justify-center mb-4">
-				<div class="w-3/4">
+				<div class="w-full md:w-3/4">
 					<div class="relative animate-grow">
 						<div
-							class="py-6 px-4 shadow-lg rounded-md border border-gray-300 bg-white w-full flex items-center"
-							style="font-size: 54px; height: 131px;"
+							class="py-4 md:py-6 px-3 md:px-4 shadow-lg rounded-md border border-gray-300 bg-white w-full flex items-center"
+							style="font-size: clamp(28px, 5vw, 54px); min-height: 80px; height: auto;"
 						>
 							<div class="flex-grow">
 								<span class="text-black">{inputValue}</span>
@@ -111,9 +111,9 @@
 			</div>
 
 			<!-- Three cards in a row below the input box -->
-			<div class="col-span-12 grid grid-cols-12 gap-6">
+			<div class="col-span-12 grid grid-cols-1 md:grid-cols-12 gap-6">
 				{#if visibleCards.includes(1)}
-					<div class="col-span-4 card-entrance" style="--animation-delay: 0ms;">
+					<div class="col-span-12 md:col-span-4 card-entrance mb-4 md:mb-0" style="--animation-delay: 0ms;">
 						<Card.Root class="w-full aspect-video card-content">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
 								<div class="flex justify-center items-center icon-animation">
@@ -126,7 +126,7 @@
 				{/if}
 				
 				{#if visibleCards.includes(2)}
-					<div class="col-span-4 card-entrance" style="--animation-delay: {cards[1].animationDelay};">
+					<div class="col-span-12 md:col-span-4 card-entrance mb-4 md:mb-0" style="--animation-delay: {cards[1].animationDelay};">
 						<Card.Root class="w-full aspect-video card-content">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
 								<div class="flex justify-center items-center icon-animation">
@@ -139,7 +139,7 @@
 				{/if}
 				
 				{#if visibleCards.includes(3)}
-					<div class="col-span-4 card-entrance" style="--animation-delay: {cards[2].animationDelay};">
+					<div class="col-span-12 md:col-span-4 card-entrance" style="--animation-delay: {cards[2].animationDelay};">
 						<Card.Root class="w-full aspect-video card-content">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
 								<div class="flex justify-center items-center icon-animation">
@@ -155,8 +155,8 @@
 	</div>
 
 	{#if showTagLine}
-		<div class="text-center mt-24 tagline-entrance" bind:this={taglineComponent}>
-			<h1 class="text-4xl font-bold mb-4 fade-in-up">AI On Your Own Terms</h1>
+		<div class="text-center mt-12 md:mt-24 tagline-entrance px-4 hidden md:block" bind:this={taglineComponent}>
+			<h1 class="text-3xl md:text-4xl font-bold mb-4 fade-in-up">AI On Your Own Terms</h1>
             <div class="fade-in-up" style="--animation-delay: 200ms;">
                 <JoinWaitlist />
             </div>
@@ -178,9 +178,9 @@
                   </Sheet.Footer>
                 </Sheet.Content>
               </Sheet.Root> -->
-			<div class="fade-in-up" style="--animation-delay: 400ms;">
+			<div class="fade-in-up hidden md:block" style="--animation-delay: 400ms;">
 				<Button
-					class="px-6 py-3 mt-4"
+					class="px-4 py-2 md:px-6 md:py-3 mt-4 w-full sm:w-auto"
 					variant="outline"
 					onclick={(e) => {
 						const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
@@ -241,6 +241,24 @@
 </div>
 
 <style>
+	/* Mobile-first responsive design */
+	@media (max-width: 768px) {
+		.card-entrance {
+			/* Adjust animation timing for mobile */
+			animation-duration: 0.5s;
+		}
+		
+		/* Ensure cards have proper spacing on mobile */
+		:global(.card-content) {
+			margin-bottom: 1rem;
+		}
+		
+		/* Adjust icon size for mobile */
+		:global(.icon-animation svg) {
+			transform: scale(0.9);
+		}
+	}
+	
 	/* Cursor blinking animation */
 	@keyframes blink {
 		0%,
