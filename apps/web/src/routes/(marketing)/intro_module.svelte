@@ -143,7 +143,7 @@
 
 	{#if showTagLine}
 		<div class="text-center mt-24 card-entrance" bind:this={taglineComponent}>
-			<h1 class="text-4xl font-bold mb-4">AI on your own terms</h1>
+			<h1 class="text-4xl font-bold mb-4">AI On Your Own Terms</h1>
             <JoinWaitlist />
             <!-- <Sheet.Root>
                 <Sheet.Trigger class={buttonVariants({ variant: "default" })}
