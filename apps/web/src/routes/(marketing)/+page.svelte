@@ -1,16 +1,39 @@
 
 <script lang="ts">
 	import { Card, Button, VideoCard, Sheet, buttonVariants, Skeleton, Input, Label, ScrollArea } from '@eurora/ui';
-	import { ArrowRight, Brain, Shield, Zap, Globe, MessageSquare, KeyRound } from 'lucide-svelte';
+	import { ArrowRight, Brain, Shield, Zap, Globe, MessageSquare, KeyRound, Mic } from 'lucide-svelte';
 	import IntroModule from './intro_module.svelte';
 
     import WaitlistForm from './waitlist_form.svelte';
 
+    let inputValue = $state('');
+    let purpleText = $state('');
+
+    // Typing animation configuration
+	const instantTyping = false;
+	const firstPart = 'Explain ';
+	const secondPart = 'this';
+	const typingSpeed = instantTyping ? 0 : 150; // milliseconds per character
+	const initialDelay = instantTyping ? 0 : 50; // milliseconds before typing starts
  
 </script>
 
 <div class="container mx-auto px-4 py-16 max-w-5xl">
 	<!-- <IntroModule /> -->
+    <!-- <div class="pt-16 col-span-4">
+        <div class="relative animate-grow">
+            <div
+                class="py-6 px-4 shadow-lg rounded-md border border-gray-300 bg-white w-full flex items-center"
+                style="font-size: 54px; height: 131px;"
+            >
+                <div class="flex-grow">
+                    <span class="text-black">{inputValue}</span>
+                    <span class="text-purple-600">{purpleText}</span>
+                </div>
+                <Mic class="h-8 w-8 text-gray-400" />
+            </div>
+        </div>
+    </div> -->
 	<!-- Hero Section -->
 	<div class="text-center mb-16">
 		<h1 class="text-5xl font-bold mb-6">Intelligence Without Compromise</h1>
@@ -21,7 +44,7 @@
 		<div class="flex justify-center gap-4">
             <Sheet.Root>
                 <Sheet.Trigger class={buttonVariants({ variant: "default" })}
-                  >Sign Up</Sheet.Trigger
+                  >Join Waitlist</Sheet.Trigger
                 >
                 <Sheet.Content side="right">
                   <!-- <Sheet.Header>
@@ -58,7 +81,7 @@
 				Get Started
 				<ArrowRight class="ml-2 h-5 w-5" />
 			</Button> -->
-			<Button href="/features" variant="outline" size="lg" class="px-6">Learn More</Button>
+			<!-- <Button href="/features" variant="outline" size="lg" class="px-6">Learn More</Button> -->
 		</div>
 	</div>
 
@@ -148,7 +171,45 @@
 				alignment="left"
 			>
 				<VideoCard.Header>
-					<VideoCard.Title>One Click To Infinity</VideoCard.Title>
+					<VideoCard.Title>One Click To AI</VideoCard.Title>
+					<VideoCard.Description>
+						<!-- Eurora can analyze and understand video content, allowing you to ask questions about
+						what you're watching in real-time. -->
+                        Eurora uses a single interface to help with anything and everything you need.
+					</VideoCard.Description>
+				</VideoCard.Header>
+			</VideoCard.Content>
+		</VideoCard.Card>
+	</div>
+
+    <div class="mb-16">
+		<VideoCard.Card class="mx-auto aspect-[2/1] max-w-5xl mb-8">
+			<VideoCard.Content
+				mp4Src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+				class="aspect-[2/1]"
+				alignment="right"
+			>
+				<VideoCard.Header>
+					<VideoCard.Title>Up to 98% faster responses</VideoCard.Title>
+					<VideoCard.Description>
+						<!-- Eurora can analyze and understand video content, allowing you to ask questions about
+						what you're watching in real-time. -->
+                        Eurora uses a single interface to help with anything and everything you need.
+					</VideoCard.Description>
+				</VideoCard.Header>
+			</VideoCard.Content>
+		</VideoCard.Card>
+	</div>
+
+    <div class="mb-16">
+		<VideoCard.Card class="mx-auto aspect-[2/1] max-w-5xl mb-8">
+			<VideoCard.Content
+				mp4Src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+				class="aspect-[2/1]"
+				alignment="left"
+			>
+				<VideoCard.Header>
+					<VideoCard.Title>Use your own LLM's</VideoCard.Title>
 					<VideoCard.Description>
 						<!-- Eurora can analyze and understand video content, allowing you to ask questions about
 						what you're watching in real-time. -->
@@ -251,6 +312,7 @@
 			
 		</div>
 	</div>
+    
 
 	<!-- Testimonials -->
 	<div class="mb-16">
@@ -322,3 +384,51 @@
 		</Card.Content>
 	</Card.Root>
 </div>
+<style>
+	/* Optional: Add a blinking cursor animation */
+	@keyframes blink {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0;
+		}
+	}
+
+	:global(.animate-blink) {
+		animation: blink 1s infinite;
+	}
+
+	@keyframes grow {
+		from {
+			transform: scale(0.2);
+		}
+		to {
+			transform: scale(1);
+		}
+	}
+
+	.animate-grow {
+		animation: grow var(--animation-duration) ease-in-out;
+	}
+
+	:global(.animate-grow) {
+		--animation-duration: 300ms;
+	}
+
+	.card-entrance {
+		opacity: 0;
+		transform: translateY(20px);
+		animation: slideIn 0.5s ease-out forwards;
+		/* Add transition for smoother repositioning if needed */
+		transition: all 0.3s ease-out;
+	}
+
+	@keyframes slideIn {
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+</style>

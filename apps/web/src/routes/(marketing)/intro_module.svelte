@@ -6,7 +6,7 @@
 	import { SiYoutube, SiApple } from '@icons-pack/svelte-simple-icons';
 
 	// Typing animation configuration
-	const instantTyping = true;
+	const instantTyping = false;
 	const firstPart = 'Explain ';
 	const secondPart = 'this';
 	const typingSpeed = instantTyping ? 0 : 150; // milliseconds per character

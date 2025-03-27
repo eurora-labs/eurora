@@ -22,12 +22,18 @@
 	bind:this={ref}
 	class={cn(
 		'flex gap-0 overflow-hidden p-0',
-		alignment === 'right' ? 'flex-row-reverse' : 'flex-row',
+		/* Mobile: column layout with text at top, video at bottom */
+		'flex-col gap-6',
+		/* Desktop: row layout */
+		alignment === 'right'
+			? 'md:flex-row-reverse md:gap-0'
+			: 'md:flex-row md:gap-0',
 		className
 	)}
 	{...restProps}
 >
-	<div class="h-full w-3/5 overflow-hidden rounded-[104px]">
+	<!-- Video content - first in DOM order but appears second (bottom) on mobile -->
+	<div class="w-full md:w-3/5 overflow-hidden rounded-[24px] md:rounded-[104px] order-2 md:order-1 h-[250px] md:h-full">
 		<video class="h-full w-full object-cover" controls>
 			{#if webmSrc}
 				<source src={webmSrc} type="video/webm" />
@@ -38,7 +44,9 @@
 			Your browser does not support the video tag.
 		</video>
 	</div>
-	<div class="flex w-2/5 items-center justify-center px-8">
+	
+	<!-- Text content - second in DOM order but appears first (top) on mobile -->
+	<div class="flex w-full md:w-2/5 items-start md:items-center justify-center px-4 md:px-8 order-1 md:order-2">
 		<div class="flex w-full flex-col space-y-4">
 			{@render children?.()}
 		</div>
