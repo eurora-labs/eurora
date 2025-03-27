@@ -14,11 +14,11 @@
 			all your devices. Experience AI on your own terms.
 		</p>
 		<div class="flex justify-center gap-4">
-			<Button href="/download" size="lg" class="px-6">
+			<Button href="/eurora/download" size="lg" class="px-6">
 				Get Started
 				<ArrowRight class="ml-2 h-5 w-5" />
 			</Button>
-			<Button href="/features" variant="outline" size="lg" class="px-6">Learn More</Button>
+			<Button href="/eurora/features" variant="outline" size="lg" class="px-6">Learn More</Button>
 		</div>
 	</div>
 
@@ -36,7 +36,7 @@
 					Eurora understands context and remembers previous conversations, providing more accurate
 					and relevant responses than traditional AI assistants.
 				</p>
-				<Button variant="link" href="/features" class="p-0">
+				<Button variant="link" href="/eurora/features" class="p-0">
 					Learn more
 					<ArrowRight class="ml-1 h-4 w-4" />
 				</Button>
@@ -74,7 +74,7 @@
 					Use Eurora across all your devices with perfect synchronization. Available on Windows,
 					macOS, Linux, iOS, Android, and as browser extensions.
 				</p>
-				<Button variant="link" href="/download" class="p-0">
+				<Button variant="link" href="/eurora/download" class="p-0">
 					Learn more
 					<ArrowRight class="ml-1 h-4 w-4" />
 				</Button>
@@ -257,8 +257,8 @@
 				Join thousands of users who are already experiencing the future of AI assistance.
 			</p>
 			<div class="flex justify-center gap-4">
-				<Button href="/download" size="lg" class="px-8">Download Now</Button>
-				<Button href="/pricing" variant="outline" size="lg" class="px-8">View Pricing</Button>
+				<Button href="/eurora/download" size="lg" class="px-8">Download Now</Button>
+				<Button href="/eurora/pricing" variant="outline" size="lg" class="px-8">View Pricing</Button>
 			</div>
 		</Card.Content>
 	</Card.Root>
