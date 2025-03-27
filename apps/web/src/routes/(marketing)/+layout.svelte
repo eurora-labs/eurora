@@ -7,7 +7,7 @@
 
 	const { children } = $props();
 
-	let showAlert = $state(true);
+	let showAlert = $state(false);
 
 	function dismissAlert() {
 		showAlert = false;
