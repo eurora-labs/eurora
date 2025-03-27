@@ -39,25 +39,22 @@
 
 	// Function to start the card sequence
 	function startCardSequence() {
-		// Show cursor briefly after typing completes
-		showCursor = true;
-		setTimeout(() => {
-			showCursor = false;
-			
-			// Start showing cards with staggered animation
-			let delay = 300; // Initial delay after typing completes
-			
-			cards.forEach((card, index) => {
-				setTimeout(() => {
-					visibleCards = [...visibleCards, card.id];
-				}, delay + index * cardStaggerDelay);
-			});
-			
-			// Show tagline after all cards are visible
+		// Show cursor and keep it visible forever
+		// showCursor = true;
+		
+		// Start showing cards with staggered animation
+		let delay = 300; // Initial delay after typing completes
+		
+		cards.forEach((card, index) => {
 			setTimeout(() => {
-				showTagLine = true;
-			}, delay + cards.length * cardStaggerDelay + 400);
-		}, 800); // Show cursor for 800ms
+				visibleCards = [...visibleCards, card.id];
+			}, delay + index * cardStaggerDelay);
+		});
+		
+		// Show tagline after all cards are visible
+		setTimeout(() => {
+			showTagLine = true;
+		}, delay + cards.length * cardStaggerDelay + 400);
 	}
 
 	onMount(() => {
@@ -258,7 +255,7 @@
 	.cursor-blink {
 		display: inline-block;
 		color: #9333ea; /* Purple color to match the theme */
-		animation: blink 0.8s infinite;
+		animation: blink 1.5s infinite;
 		font-weight: 300;
 		margin-left: 2px;
 	}
