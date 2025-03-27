@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Card, Button, VideoCard } from '@eurora/ui';
-	import { ArrowRight, Brain, Shield, Zap, Globe, MessageSquare } from 'lucide-svelte';
+	import { ArrowRight, Brain, Shield, Zap, Globe, MessageSquare, KeyRound } from 'lucide-svelte';
 	import IntroModule from './intro_module.svelte';
 </script>
 
@@ -10,7 +10,7 @@
 	<div class="text-center mb-16">
 		<h1 class="text-5xl font-bold mb-6">Intelligence Without Compromise</h1>
 		<p class="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-			Eurora is an AI assistant that understands context, respects your privacy, and works across
+			Eurora is a fully Open Source AI assistant that understands context, respects your privacy, and works across
 			all your devices. Experience AI on your own terms.
 		</p>
 		<div class="flex justify-center gap-4">
@@ -42,6 +42,23 @@
 				</Button>
 			</Card.Content>
 		</Card.Root>
+        <Card.Root class="p-6">
+			<Card.Header>
+				<div class="flex items-center gap-2">
+					<KeyRound class="w-6 h-6 text-purple-600" />
+					<Card.Title>Fully Open Source</Card.Title>
+				</div>
+			</Card.Header>
+			<Card.Content>
+				<p class="text-gray-600 mb-4">
+					Eurora is gives you full access to the code that runs on your device and handles your data. You can even run both the app and server on your own hardware as well as connect LLM's of your choosing.
+				</p>
+				<Button variant="link" href="/open-source" class="p-0">
+					Learn more
+					<ArrowRight class="ml-1 h-4 w-4" />
+				</Button>
+			</Card.Content>
+		</Card.Root>
 
 		<Card.Root class="p-6">
 			<Card.Header>
@@ -62,7 +79,7 @@
 			</Card.Content>
 		</Card.Root>
 
-		<Card.Root class="p-6">
+		<!-- <Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<Globe class="w-6 h-6 text-purple-600" />
@@ -79,7 +96,7 @@
 					<ArrowRight class="ml-1 h-4 w-4" />
 				</Button>
 			</Card.Content>
-		</Card.Root>
+		</Card.Root> -->
 	</div>
 
 	<!-- Video Showcase -->
@@ -91,10 +108,11 @@
 				alignment="left"
 			>
 				<VideoCard.Header>
-					<VideoCard.Title>ASK QUESTIONS ABOUT ANY VIDEO YOU ARE WATCHING</VideoCard.Title>
+					<VideoCard.Title>One Click To Infinity</VideoCard.Title>
 					<VideoCard.Description>
-						Eurora can analyze and understand video content, allowing you to ask questions about
-						what you're watching in real-time.
+						<!-- Eurora can analyze and understand video content, allowing you to ask questions about
+						what you're watching in real-time. -->
+                        Eurora uses a single interface to help with anything and everything you need.
 					</VideoCard.Description>
 				</VideoCard.Header>
 			</VideoCard.Content>
@@ -105,6 +123,48 @@
 	<div class="mb-16">
 		<h2 class="text-3xl font-bold text-center mb-8">How People Use Eurora</h2>
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card.Root class="p-6">
+				<Card.Header>
+					<Card.Title>For Learning</Card.Title>
+					<Card.Description>Enhance your education and skill development</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<ul class="space-y-3 mb-4">
+						<li class="flex items-start">
+							<div
+								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
+							>
+								<span class="text-purple-600 text-xs">✓</span>
+							</div>
+							<span>Get instant explanations on complex topics</span>
+						</li>
+						<li class="flex items-start">
+							<div
+								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
+							>
+								<span class="text-purple-600 text-xs">✓</span>
+							</div>
+							<span>Get real-time translation of live lectures</span>
+						</li>
+						<li class="flex items-start">
+							<div
+								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
+							>
+								<span class="text-purple-600 text-xs">✓</span>
+							</div>
+							<span>Visualize homework problems and assignments</span>
+						</li>
+						<li class="flex items-start">
+							<div
+								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
+							>
+								<span class="text-purple-600 text-xs">✓</span>
+							</div>
+							<span>Ask how new knowledge relates to previous concepts you've learned </span>
+						</li>
+					</ul>
+				</Card.Content>
+			</Card.Root>
 			<Card.Root class="p-6">
 				<Card.Header>
 					<Card.Title>For Work</Card.Title>
@@ -112,6 +172,14 @@
 				</Card.Header>
 				<Card.Content>
 					<ul class="space-y-3 mb-4">
+						<li class="flex items-start">
+							<div
+								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
+							>
+								<span class="text-purple-600 text-xs">✓</span>
+							</div>
+							<span>Ask question about any document you're reading</span>
+						</li>
 						<li class="flex items-start">
 							<div
 								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
@@ -126,15 +194,7 @@
 							>
 								<span class="text-purple-600 text-xs">✓</span>
 							</div>
-							<span>Draft emails and professional communications</span>
-						</li>
-						<li class="flex items-start">
-							<div
-								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
-							>
-								<span class="text-purple-600 text-xs">✓</span>
-							</div>
-							<span>Analyze data and generate reports</span>
+							<span>Get short description of the work you did yesterday</span>
 						</li>
 						<li class="flex items-start">
 							<div
@@ -148,48 +208,7 @@
 				</Card.Content>
 			</Card.Root>
 
-			<Card.Root class="p-6">
-				<Card.Header>
-					<Card.Title>For Learning</Card.Title>
-					<Card.Description>Enhance your education and skill development</Card.Description>
-				</Card.Header>
-				<Card.Content>
-					<ul class="space-y-3 mb-4">
-						<li class="flex items-start">
-							<div
-								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
-							>
-								<span class="text-purple-600 text-xs">✓</span>
-							</div>
-							<span>Get explanations on complex topics</span>
-						</li>
-						<li class="flex items-start">
-							<div
-								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
-							>
-								<span class="text-purple-600 text-xs">✓</span>
-							</div>
-							<span>Practice language learning with conversations</span>
-						</li>
-						<li class="flex items-start">
-							<div
-								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
-							>
-								<span class="text-purple-600 text-xs">✓</span>
-							</div>
-							<span>Get help with homework and assignments</span>
-						</li>
-						<li class="flex items-start">
-							<div
-								class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mr-2 mt-0.5"
-							>
-								<span class="text-purple-600 text-xs">✓</span>
-							</div>
-							<span>Create study guides and flashcards</span>
-						</li>
-					</ul>
-				</Card.Content>
-			</Card.Root>
+			
 		</div>
 	</div>
 
