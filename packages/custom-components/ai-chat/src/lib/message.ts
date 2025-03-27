@@ -1,4 +1,4 @@
 export default interface Message {
-    role: 'user' | 'system';
-    content: string;
+	role: 'user' | 'system';
+	content: string;
 }

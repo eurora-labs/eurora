@@ -20,10 +20,10 @@ limitations under the License.
 // viewer is not displaying any PDF files. Otherwise the tabs would close, which
 // is quite disruptive (crbug.com/511670).
 chrome.runtime.onUpdateAvailable.addListener(function () {
-    chrome.tabs.query({ url: chrome.runtime.getURL('*') }, (tabs) => {
-        if (tabs?.length) {
-            return;
-        }
-        chrome.runtime.reload();
-    });
+	chrome.tabs.query({ url: chrome.runtime.getURL('*') }, (tabs) => {
+		if (tabs?.length) {
+			return;
+		}
+		chrome.runtime.reload();
+	});
 });
