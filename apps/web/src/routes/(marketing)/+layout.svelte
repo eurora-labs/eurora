@@ -49,7 +49,7 @@
 		<Button variant="ghost" size="icon">
 			<SiGithub />
 		</Button>
-		<Button variant="default" href="/download">Get Eurora</Button>
+		<Button variant="default" href="/eurora/download">Get Eurora</Button>
 	</div>
 </div>
 
