@@ -18,9 +18,9 @@
  
 </script>
 
-<div class="container mx-auto px-4 py-16 max-w-5xl">
-	<!-- <IntroModule /> -->
-    <!-- <div class="pt-16 col-span-4">
+<div class="container mx-auto px-4 pb-16 max-w-5xl">
+	<IntroModule />
+    <!-- <div class="pt-16 col-span-4">s
         <div class="relative animate-grow">
             <div
                 class="py-6 px-4 shadow-lg rounded-md border border-gray-300 bg-white w-full flex items-center"
@@ -47,41 +47,20 @@
                   >Join Waitlist</Sheet.Trigger
                 >
                 <Sheet.Content side="right">
-                  <!-- <Sheet.Header>
-                    <Sheet.Title>Edit profile</Sheet.Title>
-                    <Sheet.Description>
-                      Make changes to your profile here. Click save when you're done.
-                    </Sheet.Description>
-                  </Sheet.Header> -->
+                 
                   <ScrollArea class="h-screen">
                     <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
                   </ScrollArea>
-                  <!-- <div class="hs-form-frame" data-region="na2" data-form-id="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" data-portal-id="242150186"></div> -->
-                  <!-- <div class="grid gap-4 py-4">
-                    <div class="grid grid-cols-4 items-center gap-4">
-                      <Label for="name" class="text-right">Name</Label>
-                      <Input id="name" value="Pedro Duarte" class="col-span-3" />
-                    </div>
-                    <div class="grid grid-cols-4 items-center gap-4">
-                      <Label for="username" class="text-right">Username</Label>
-                      <Input id="username" value="@peduarte" class="col-span-3" />
-                    </div>
-                  </div> -->
+                  
                   <Sheet.Footer>
                     <Skeleton class="w-full h-screen" />
                     <Skeleton class="w-full h-screen" />
                     <Skeleton class="w-full h-screen" />
-                    <!-- <Sheet.Close class={buttonVariants({ variant: "outline" })}
-                      >Save changes</Sheet.Close
-                    > -->
+                   
                   </Sheet.Footer>
                 </Sheet.Content>
               </Sheet.Root>
-			<!-- <Button href="/download" size="lg" class="px-6">
-				Get Started
-				<ArrowRight class="ml-2 h-5 w-5" />
-			</Button> -->
-			<!-- <Button href="/features" variant="outline" size="lg" class="px-6">Learn More</Button> -->
+			
 		</div>
 	</div>
 
