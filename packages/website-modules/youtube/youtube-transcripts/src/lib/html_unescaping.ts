@@ -7,8 +7,8 @@
  */
 
 export function unescape(str: string): string {
-    // Quick version using a temporary textarea
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = str;
-    return textarea.value;
+	// Quick version using a temporary textarea
+	const textarea = document.createElement('textarea');
+	textarea.innerHTML = str;
+	return textarea.value;
 }
