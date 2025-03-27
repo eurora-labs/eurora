@@ -423,14 +423,66 @@
 
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-		<Card.Root class="p-6">
-			<Card.Header>
-				<div class="flex items-center gap-2">
-					<Brain class="w-6 h-6 text-purple-600" />
-					<Card.Title>Advanced AI Understanding</Card.Title>
-				</div>
-				<Card.Description>Eurora understands context like never before</Card.Description>
-			</Card.Header>
+  <Card.Root class="p-6">
+   <Card.Header>
+    <div class="flex items-center gap-2">
+    	<Github class="w-6 h-6 text-purple-600" />
+    	<Card.Title>Fully Open Source Hosting</Card.Title>
+    </div>
+    <Card.Description>Host Eurora on your own infrastructure</Card.Description>
+   </Card.Header>
+   <Card.Content>
+    <p class="text-gray-600 mb-4">
+    	Eurora is completely open source and can be self-hosted by individuals or companies.
+    	Take full control of your AI assistant by running it on your own hardware, ensuring
+    	complete data sovereignty and customization options.
+    </p>
+    <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+    	<h4 class="font-medium mb-2">Hosting Benefits:</h4>
+    	<ul class="list-disc pl-5 space-y-1 text-gray-600">
+    		<li>Complete control over your data and infrastructure</li>
+    		<li>Customizable deployment options for individuals and enterprises</li>
+    		<li>No vendor lock-in or subscription fees</li>
+    		<li>Community-supported deployment guides and documentation</li>
+    	</ul>
+    </div>
+   </Card.Content>
+  </Card.Root>
+
+  <Card.Root class="p-6">
+   <Card.Header>
+    <div class="flex items-center gap-2">
+    	<Code class="w-6 h-6 text-purple-600" />
+    	<Card.Title>Built with Rust</Card.Title>
+    </div>
+    <Card.Description>Maximum security and safety by design</Card.Description>
+   </Card.Header>
+   <Card.Content>
+    <p class="text-gray-600 mb-4">
+    	Eurora is written in Rust, a language designed for performance, reliability, and security.
+    	This implementation choice ensures memory safety, eliminates common vulnerabilities, and
+    	provides robust protection for your sensitive data.
+    </p>
+    <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+    	<h4 class="font-medium mb-2">Rust Advantages:</h4>
+    	<ul class="list-disc pl-5 space-y-1 text-gray-600">
+    		<li>Memory safety without garbage collection</li>
+    		<li>Thread safety to prevent data races</li>
+    		<li>Zero-cost abstractions for optimal performance</li>
+    		<li>Comprehensive compile-time checks to catch errors early</li>
+    	</ul>
+    </div>
+   </Card.Content>
+  </Card.Root>
+
+  <Card.Root class="p-6">
+   <Card.Header>
+    <div class="flex items-center gap-2">
+    	<Brain class="w-6 h-6 text-purple-600" />
+    	<Card.Title>Advanced AI Understanding</Card.Title>
+    </div>
+    <Card.Description>Eurora understands context like never before</Card.Description>
+   </Card.Header>
 			<Card.Content>
 				<p class="text-gray-600 mb-4">
 					Eurora's advanced AI models can understand complex queries, remember context from previous
@@ -467,7 +519,6 @@
 					<h4 class="font-medium mb-2">Privacy Features:</h4>
 					<ul class="list-disc pl-5 space-y-1 text-gray-600">
 						<li>Local processing for sensitive information</li>
-						<li>End-to-end encryption for all data transmissions</li>
 						<li>Granular permission controls for data sharing</li>
 						<li>Option to delete conversation history at any time</li>
 					</ul>
@@ -535,46 +586,46 @@
 					<Layers class="w-6 h-6 text-purple-600" />
 					<Card.Title>Powerful Integrations</Card.Title>
 				</div>
-				<Card.Description>Connect with your favorite tools and services</Card.Description>
+				<Card.Description>Seamless access to your files and productivity tools</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<p class="text-gray-600 mb-6">
-					Eurora seamlessly integrates with the tools and services you already use, making it a
-					central hub for your digital life. From productivity apps to creative tools, Eurora
-					enhances your workflow without disrupting it.
+					Eurora seamlessly integrates with your file storage systems and productivity tools, giving you
+					instant access to your content wherever it lives. Whether your files are stored in the cloud or
+					on your device, Eurora can search, analyze, and help you work with them efficiently.
 				</p>
 
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 					<div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-						<h4 class="font-medium mb-2">Productivity</h4>
+						<h4 class="font-medium mb-2">File Storage</h4>
+						<ul class="list-disc pl-5 space-y-1 text-gray-600">
+							<li>Local device storage</li>
+							<li>Google Drive</li>
+							<li>Dropbox</li>
+							<li>OneDrive</li>
+							<li>iCloud</li>
+						</ul>
+					</div>
+
+					<div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+						<h4 class="font-medium mb-2">Productivity Apps</h4>
+						<ul class="list-disc pl-5 space-y-1 text-gray-600">
+							<li>Notion</li>
+							<li>Obsidian</li>
+							<li>Evernote</li>
+							<li>OneNote</li>
+							<li>Roam Research</li>
+						</ul>
+					</div>
+
+					<div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+						<h4 class="font-medium mb-2">Workspace Tools</h4>
 						<ul class="list-disc pl-5 space-y-1 text-gray-600">
 							<li>Google Workspace</li>
 							<li>Microsoft Office</li>
-							<li>Notion</li>
 							<li>Slack</li>
 							<li>Trello & Asana</li>
-						</ul>
-					</div>
-
-					<div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-						<h4 class="font-medium mb-2">Creative Tools</h4>
-						<ul class="list-disc pl-5 space-y-1 text-gray-600">
-							<li>Adobe Creative Cloud</li>
-							<li>Figma</li>
-							<li>Canva</li>
-							<li>Midjourney</li>
-							<li>DaVinci Resolve</li>
-						</ul>
-					</div>
-
-					<div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-						<h4 class="font-medium mb-2">Development</h4>
-						<ul class="list-disc pl-5 space-y-1 text-gray-600">
-							<li>VS Code</li>
-							<li>GitHub</li>
-							<li>GitLab</li>
-							<li>JetBrains IDEs</li>
-							<li>Terminal environments</li>
+							<li>Airtable</li>
 						</ul>
 					</div>
 				</div>
