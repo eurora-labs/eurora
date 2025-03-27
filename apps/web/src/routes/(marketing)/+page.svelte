@@ -1,6 +1,6 @@
 
 <script lang="ts">
-	import { Card, Button, VideoCard, Sheet, buttonVariants, Skeleton, Input, Label } from '@eurora/ui';
+	import { Card, Button, VideoCard, Sheet, buttonVariants, Skeleton, Input, Label, ScrollArea } from '@eurora/ui';
 	import { ArrowRight, Brain, Shield, Zap, Globe, MessageSquare, KeyRound } from 'lucide-svelte';
 	import IntroModule from './intro_module.svelte';
 
@@ -30,7 +30,9 @@
                       Make changes to your profile here. Click save when you're done.
                     </Sheet.Description>
                   </Sheet.Header> -->
-                  <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
+                  <ScrollArea class="h-screen">
+                    <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
+                  </ScrollArea>
                   <!-- <div class="hs-form-frame" data-region="na2" data-form-id="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" data-portal-id="242150186"></div> -->
                   <!-- <div class="grid gap-4 py-4">
                     <div class="grid grid-cols-4 items-center gap-4">
