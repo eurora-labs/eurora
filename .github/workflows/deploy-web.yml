@@ -3,10 +3,10 @@ name: Deploy Web to GitHub Pages
 on:
   # Runs on pushes targeting the main branch
   push:
-    branches: ["main"]
+    branches: ['main']
     paths:
-      - "apps/web/**"
-      - ".github/workflows/deploy-web.yml"
+      - 'apps/web/**'
+      - '.github/workflows/deploy-web.yml'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -19,7 +19,7 @@ permissions:
 
 # Allow only one concurrent deployment
 concurrency:
-  group: "pages"
+  group: 'pages'
   cancel-in-progress: true
 
 env:

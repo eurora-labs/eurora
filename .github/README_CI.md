@@ -13,6 +13,7 @@ The `publish.yaml` workflow is responsible for building and publishing the deskt
 - **From Nightly Build**: Triggered by the completion of the "Nightly build" workflow.
 
 The workflow performs the following steps:
+
 1. Builds the SvelteKit frontend
 2. Builds the Tauri app for multiple platforms (macOS, Linux, Windows)
 3. Signs the binaries (if signing keys are provided)
@@ -23,12 +24,14 @@ The workflow performs the following steps:
 ### Nightly Build
 
 The `nightly-build.yml` workflow is a simple trigger for the Publish workflow with the "nightly" channel. It runs:
+
 - Every day at 2am
 - When manually triggered
 
 ### E2E Tests Webdriver
 
 The `test-e2e-webdriver.yml` workflow runs end-to-end tests using WebdriverIO. It is triggered:
+
 - On pull requests to the main branch
 - When manually triggered
 
@@ -37,6 +40,7 @@ The `test-e2e-webdriver.yml` workflow runs end-to-end tests using WebdriverIO. I
 ### init-env-node
 
 This action sets up the Node.js environment for the workflows, including:
+
 - Installing pnpm
 - Setting up Node.js with the version specified in .nvmrc
 - Installing dependencies

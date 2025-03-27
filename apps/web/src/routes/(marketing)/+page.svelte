@@ -95,7 +95,7 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="text-gray-600 mb-4">
-					Eurora is gives you full access to the code that runs on your device and handles your data. You can even run both the app and server on your own hardware as well as connect LLM's of your choosing.
+					Eurora gives you full access to the code that runs on your device and handles your data. You can even run both the app and server on your own hardware as well as connect LLM's of your choosing.
 				</p>
 				<!-- <Button variant="link" href="/open-source" class="p-0">
 					Learn more
@@ -423,6 +423,30 @@
 
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+        <Card.Root class="p-6">
+            <Card.Header>
+             <div class="flex items-center gap-2">
+                 <Brain class="w-6 h-6 text-purple-600" />
+                 <Card.Title>Advanced AI Understanding</Card.Title>
+             </div>
+             <Card.Description>Supercharged context for lightning-fast responses</Card.Description>
+            </Card.Header>
+                     <Card.Content>
+                         <p class="text-gray-600 mb-4">
+                             Eurora's intelligent context utilization delivers responses up to 98% faster than traditional AI
+                             assistants, while maintaining exceptional accuracy and relevance to your specific needs.
+                         </p>
+                         <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+                             <h4 class="font-medium mb-2">Context Advantages:</h4>
+                             <ul class="list-disc pl-5 space-y-1 text-gray-600">
+                                 <li>Accelerated response times with smart context prioritization</li>
+                                 <li>Efficient processing of previous interactions for near-instant answers</li>
+                                 <li>Contextual memory that reduces redundant information processing</li>
+                                 <li>Adaptive learning system that gets faster the more you use it</li>
+                             </ul>
+                         </div>
+                     </Card.Content>
+                 </Card.Root>
   <Card.Root class="p-6">
    <Card.Header>
     <div class="flex items-center gap-2">
@@ -475,31 +499,7 @@
    </Card.Content>
   </Card.Root>
 
-  <Card.Root class="p-6">
-   <Card.Header>
-    <div class="flex items-center gap-2">
-    	<Brain class="w-6 h-6 text-purple-600" />
-    	<Card.Title>Advanced AI Understanding</Card.Title>
-    </div>
-    <Card.Description>Eurora understands context like never before</Card.Description>
-   </Card.Header>
-			<Card.Content>
-				<p class="text-gray-600 mb-4">
-					Eurora's advanced AI models can understand complex queries, remember context from previous
-					conversations, and provide more accurate and relevant responses than traditional AI
-					assistants.
-				</p>
-				<div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-					<h4 class="font-medium mb-2">Key Capabilities:</h4>
-					<ul class="list-disc pl-5 space-y-1 text-gray-600">
-						<li>Natural language understanding with contextual awareness</li>
-						<li>Memory of previous interactions for more coherent conversations</li>
-						<li>Understanding of complex instructions with multiple steps</li>
-						<li>Ability to learn from your preferences over time</li>
-					</ul>
-				</div>
-			</Card.Content>
-		</Card.Root>
+  
 
 		<Card.Root class="p-6">
 			<Card.Header>
@@ -747,7 +747,7 @@
     
 
 	<!-- Testimonials -->
-	<div class="mb-16">
+	<div class="mb-16 p-6 hidden">
 		<h2 class="text-3xl font-bold text-center mb-8">
 			What Our Users Say About Intelligence Without Compromise
 		</h2>
@@ -755,14 +755,13 @@
 			<Card.Root class="p-6">
 				<Card.Content>
 					<p class="text-gray-600 italic mb-4">
-						"Eurora has completely transformed how I work. The privacy-first approach means I can
-						use AI without worrying about my sensitive data."
+						"Eurora has given me a newfound confidence in my ability to use AI. It's like having a personal tutor that can explain complex topics in a way that makes sense."
 					</p>
 					<div class="flex items-center">
 						<div class="w-10 h-10 rounded-full bg-gray-200 mr-3"></div>
 						<div>
-							<p class="font-medium">Sarah Johnson</p>
-							<p class="text-sm text-gray-500">Product Manager</p>
+							<p class="font-medium">Andre Compton</p>
+							<p class="text-sm text-gray-500">Data Analyst</p>
 						</div>
 					</div>
 				</Card.Content>
@@ -803,7 +802,7 @@
 	</div>
 
 	<!-- Call to Action -->
-	<Card.Root class="p-8 bg-purple-50 border-none">
+	<Card.Root class="p-8 bg-purple-50 border-none hidden">
 		<Card.Content class="text-center">
 			<h2 class="text-3xl font-bold mb-4">Ready to Experience Intelligence Without Compromise?</h2>
 			<p class="text-xl text-gray-600 max-w-2xl mx-auto mb-6">

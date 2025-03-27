@@ -5,673 +5,693 @@
 // source: tauri_ipc.proto
 
 /* eslint-disable */
-import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { Observable } from "rxjs";
-import { map } from "rxjs/operators";
-import { ProtoImage } from "./shared.js";
+import { BinaryReader, BinaryWriter } from '@bufbuild/protobuf/wire';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { ProtoImage } from './shared.js';
 
-export const protobufPackage = "ipc";
+export const protobufPackage = 'ipc';
 
-export interface StateRequest {
-}
+export interface StateRequest {}
 
 export interface StateResponse {
-  youtube?: ProtoYoutubeState | undefined;
-  article?: ProtoArticleState | undefined;
-  pdf?: ProtoPdfState | undefined;
+	youtube?: ProtoYoutubeState | undefined;
+	article?: ProtoArticleState | undefined;
+	pdf?: ProtoPdfState | undefined;
 }
 
 export interface ProtoTranscriptLine {
-  text: string;
-  start: number;
-  duration: number;
+	text: string;
+	start: number;
+	duration: number;
 }
 
 export interface ProtoYoutubeState {
-  url: string;
-  title: string;
-  transcript: ProtoTranscriptLine[];
-  currentTime: number;
-  videoFrame: ProtoImage | undefined;
+	url: string;
+	title: string;
+	transcript: ProtoTranscriptLine[];
+	currentTime: number;
+	videoFrame: ProtoImage | undefined;
 }
 
 export interface ProtoArticleState {
-  url: string;
-  title: string;
-  content: string;
-  selectedText: string;
+	url: string;
+	title: string;
+	content: string;
+	selectedText: string;
 }
 
 export interface ProtoPdfState {
-  url: string;
-  title: string;
-  content: string;
-  selectedText: string;
+	url: string;
+	title: string;
+	content: string;
+	selectedText: string;
 }
 
 function createBaseStateRequest(): StateRequest {
-  return {};
+	return {};
 }
 
 export const StateRequest: MessageFns<StateRequest> = {
-  encode(_: StateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    return writer;
-  },
+	encode(_: StateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+		return writer;
+	},
 
-  decode(input: BinaryReader | Uint8Array, length?: number): StateRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStateRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+	decode(input: BinaryReader | Uint8Array, length?: number): StateRequest {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		let end = length === undefined ? reader.len : reader.pos + length;
+		const message = createBaseStateRequest();
+		while (reader.pos < end) {
+			const tag = reader.uint32();
+			switch (tag >>> 3) {
+			}
+			if ((tag & 7) === 4 || tag === 0) {
+				break;
+			}
+			reader.skip(tag & 7);
+		}
+		return message;
+	},
 
-  fromJSON(_: any): StateRequest {
-    return {};
-  },
+	fromJSON(_: any): StateRequest {
+		return {};
+	},
 
-  toJSON(_: StateRequest): unknown {
-    const obj: any = {};
-    return obj;
-  },
+	toJSON(_: StateRequest): unknown {
+		const obj: any = {};
+		return obj;
+	},
 
-  create<I extends Exact<DeepPartial<StateRequest>, I>>(base?: I): StateRequest {
-    return StateRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<StateRequest>, I>>(_: I): StateRequest {
-    const message = createBaseStateRequest();
-    return message;
-  },
+	create<I extends Exact<DeepPartial<StateRequest>, I>>(base?: I): StateRequest {
+		return StateRequest.fromPartial(base ?? ({} as any));
+	},
+	fromPartial<I extends Exact<DeepPartial<StateRequest>, I>>(_: I): StateRequest {
+		const message = createBaseStateRequest();
+		return message;
+	}
 };
 
 function createBaseStateResponse(): StateResponse {
-  return { youtube: undefined, article: undefined, pdf: undefined };
+	return { youtube: undefined, article: undefined, pdf: undefined };
 }
 
 export const StateResponse: MessageFns<StateResponse> = {
-  encode(message: StateResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.youtube !== undefined) {
-      ProtoYoutubeState.encode(message.youtube, writer.uint32(18).fork()).join();
-    }
-    if (message.article !== undefined) {
-      ProtoArticleState.encode(message.article, writer.uint32(26).fork()).join();
-    }
-    if (message.pdf !== undefined) {
-      ProtoPdfState.encode(message.pdf, writer.uint32(34).fork()).join();
-    }
-    return writer;
-  },
+	encode(message: StateResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+		if (message.youtube !== undefined) {
+			ProtoYoutubeState.encode(message.youtube, writer.uint32(18).fork()).join();
+		}
+		if (message.article !== undefined) {
+			ProtoArticleState.encode(message.article, writer.uint32(26).fork()).join();
+		}
+		if (message.pdf !== undefined) {
+			ProtoPdfState.encode(message.pdf, writer.uint32(34).fork()).join();
+		}
+		return writer;
+	},
 
-  decode(input: BinaryReader | Uint8Array, length?: number): StateResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStateResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
+	decode(input: BinaryReader | Uint8Array, length?: number): StateResponse {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		let end = length === undefined ? reader.len : reader.pos + length;
+		const message = createBaseStateResponse();
+		while (reader.pos < end) {
+			const tag = reader.uint32();
+			switch (tag >>> 3) {
+				case 2: {
+					if (tag !== 18) {
+						break;
+					}
 
-          message.youtube = ProtoYoutubeState.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
+					message.youtube = ProtoYoutubeState.decode(reader, reader.uint32());
+					continue;
+				}
+				case 3: {
+					if (tag !== 26) {
+						break;
+					}
 
-          message.article = ProtoArticleState.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
+					message.article = ProtoArticleState.decode(reader, reader.uint32());
+					continue;
+				}
+				case 4: {
+					if (tag !== 34) {
+						break;
+					}
 
-          message.pdf = ProtoPdfState.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+					message.pdf = ProtoPdfState.decode(reader, reader.uint32());
+					continue;
+				}
+			}
+			if ((tag & 7) === 4 || tag === 0) {
+				break;
+			}
+			reader.skip(tag & 7);
+		}
+		return message;
+	},
 
-  fromJSON(object: any): StateResponse {
-    return {
-      youtube: isSet(object.youtube) ? ProtoYoutubeState.fromJSON(object.youtube) : undefined,
-      article: isSet(object.article) ? ProtoArticleState.fromJSON(object.article) : undefined,
-      pdf: isSet(object.pdf) ? ProtoPdfState.fromJSON(object.pdf) : undefined,
-    };
-  },
+	fromJSON(object: any): StateResponse {
+		return {
+			youtube: isSet(object.youtube) ? ProtoYoutubeState.fromJSON(object.youtube) : undefined,
+			article: isSet(object.article) ? ProtoArticleState.fromJSON(object.article) : undefined,
+			pdf: isSet(object.pdf) ? ProtoPdfState.fromJSON(object.pdf) : undefined
+		};
+	},
 
-  toJSON(message: StateResponse): unknown {
-    const obj: any = {};
-    if (message.youtube !== undefined) {
-      obj.youtube = ProtoYoutubeState.toJSON(message.youtube);
-    }
-    if (message.article !== undefined) {
-      obj.article = ProtoArticleState.toJSON(message.article);
-    }
-    if (message.pdf !== undefined) {
-      obj.pdf = ProtoPdfState.toJSON(message.pdf);
-    }
-    return obj;
-  },
+	toJSON(message: StateResponse): unknown {
+		const obj: any = {};
+		if (message.youtube !== undefined) {
+			obj.youtube = ProtoYoutubeState.toJSON(message.youtube);
+		}
+		if (message.article !== undefined) {
+			obj.article = ProtoArticleState.toJSON(message.article);
+		}
+		if (message.pdf !== undefined) {
+			obj.pdf = ProtoPdfState.toJSON(message.pdf);
+		}
+		return obj;
+	},
 
-  create<I extends Exact<DeepPartial<StateResponse>, I>>(base?: I): StateResponse {
-    return StateResponse.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<StateResponse>, I>>(object: I): StateResponse {
-    const message = createBaseStateResponse();
-    message.youtube = (object.youtube !== undefined && object.youtube !== null)
-      ? ProtoYoutubeState.fromPartial(object.youtube)
-      : undefined;
-    message.article = (object.article !== undefined && object.article !== null)
-      ? ProtoArticleState.fromPartial(object.article)
-      : undefined;
-    message.pdf = (object.pdf !== undefined && object.pdf !== null) ? ProtoPdfState.fromPartial(object.pdf) : undefined;
-    return message;
-  },
+	create<I extends Exact<DeepPartial<StateResponse>, I>>(base?: I): StateResponse {
+		return StateResponse.fromPartial(base ?? ({} as any));
+	},
+	fromPartial<I extends Exact<DeepPartial<StateResponse>, I>>(object: I): StateResponse {
+		const message = createBaseStateResponse();
+		message.youtube =
+			object.youtube !== undefined && object.youtube !== null
+				? ProtoYoutubeState.fromPartial(object.youtube)
+				: undefined;
+		message.article =
+			object.article !== undefined && object.article !== null
+				? ProtoArticleState.fromPartial(object.article)
+				: undefined;
+		message.pdf =
+			object.pdf !== undefined && object.pdf !== null
+				? ProtoPdfState.fromPartial(object.pdf)
+				: undefined;
+		return message;
+	}
 };
 
 function createBaseProtoTranscriptLine(): ProtoTranscriptLine {
-  return { text: "", start: 0, duration: 0 };
+	return { text: '', start: 0, duration: 0 };
 }
 
 export const ProtoTranscriptLine: MessageFns<ProtoTranscriptLine> = {
-  encode(message: ProtoTranscriptLine, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.text !== "") {
-      writer.uint32(10).string(message.text);
-    }
-    if (message.start !== 0) {
-      writer.uint32(21).float(message.start);
-    }
-    if (message.duration !== 0) {
-      writer.uint32(29).float(message.duration);
-    }
-    return writer;
-  },
+	encode(message: ProtoTranscriptLine, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+		if (message.text !== '') {
+			writer.uint32(10).string(message.text);
+		}
+		if (message.start !== 0) {
+			writer.uint32(21).float(message.start);
+		}
+		if (message.duration !== 0) {
+			writer.uint32(29).float(message.duration);
+		}
+		return writer;
+	},
 
-  decode(input: BinaryReader | Uint8Array, length?: number): ProtoTranscriptLine {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseProtoTranscriptLine();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
+	decode(input: BinaryReader | Uint8Array, length?: number): ProtoTranscriptLine {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		let end = length === undefined ? reader.len : reader.pos + length;
+		const message = createBaseProtoTranscriptLine();
+		while (reader.pos < end) {
+			const tag = reader.uint32();
+			switch (tag >>> 3) {
+				case 1: {
+					if (tag !== 10) {
+						break;
+					}
 
-          message.text = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
+					message.text = reader.string();
+					continue;
+				}
+				case 2: {
+					if (tag !== 21) {
+						break;
+					}
 
-          message.start = reader.float();
-          continue;
-        }
-        case 3: {
-          if (tag !== 29) {
-            break;
-          }
+					message.start = reader.float();
+					continue;
+				}
+				case 3: {
+					if (tag !== 29) {
+						break;
+					}
 
-          message.duration = reader.float();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+					message.duration = reader.float();
+					continue;
+				}
+			}
+			if ((tag & 7) === 4 || tag === 0) {
+				break;
+			}
+			reader.skip(tag & 7);
+		}
+		return message;
+	},
 
-  fromJSON(object: any): ProtoTranscriptLine {
-    return {
-      text: isSet(object.text) ? globalThis.String(object.text) : "",
-      start: isSet(object.start) ? globalThis.Number(object.start) : 0,
-      duration: isSet(object.duration) ? globalThis.Number(object.duration) : 0,
-    };
-  },
+	fromJSON(object: any): ProtoTranscriptLine {
+		return {
+			text: isSet(object.text) ? globalThis.String(object.text) : '',
+			start: isSet(object.start) ? globalThis.Number(object.start) : 0,
+			duration: isSet(object.duration) ? globalThis.Number(object.duration) : 0
+		};
+	},
 
-  toJSON(message: ProtoTranscriptLine): unknown {
-    const obj: any = {};
-    if (message.text !== "") {
-      obj.text = message.text;
-    }
-    if (message.start !== 0) {
-      obj.start = message.start;
-    }
-    if (message.duration !== 0) {
-      obj.duration = message.duration;
-    }
-    return obj;
-  },
+	toJSON(message: ProtoTranscriptLine): unknown {
+		const obj: any = {};
+		if (message.text !== '') {
+			obj.text = message.text;
+		}
+		if (message.start !== 0) {
+			obj.start = message.start;
+		}
+		if (message.duration !== 0) {
+			obj.duration = message.duration;
+		}
+		return obj;
+	},
 
-  create<I extends Exact<DeepPartial<ProtoTranscriptLine>, I>>(base?: I): ProtoTranscriptLine {
-    return ProtoTranscriptLine.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ProtoTranscriptLine>, I>>(object: I): ProtoTranscriptLine {
-    const message = createBaseProtoTranscriptLine();
-    message.text = object.text ?? "";
-    message.start = object.start ?? 0;
-    message.duration = object.duration ?? 0;
-    return message;
-  },
+	create<I extends Exact<DeepPartial<ProtoTranscriptLine>, I>>(base?: I): ProtoTranscriptLine {
+		return ProtoTranscriptLine.fromPartial(base ?? ({} as any));
+	},
+	fromPartial<I extends Exact<DeepPartial<ProtoTranscriptLine>, I>>(
+		object: I
+	): ProtoTranscriptLine {
+		const message = createBaseProtoTranscriptLine();
+		message.text = object.text ?? '';
+		message.start = object.start ?? 0;
+		message.duration = object.duration ?? 0;
+		return message;
+	}
 };
 
 function createBaseProtoYoutubeState(): ProtoYoutubeState {
-  return { url: "", title: "", transcript: [], currentTime: 0, videoFrame: undefined };
+	return { url: '', title: '', transcript: [], currentTime: 0, videoFrame: undefined };
 }
 
 export const ProtoYoutubeState: MessageFns<ProtoYoutubeState> = {
-  encode(message: ProtoYoutubeState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.url !== "") {
-      writer.uint32(10).string(message.url);
-    }
-    if (message.title !== "") {
-      writer.uint32(18).string(message.title);
-    }
-    for (const v of message.transcript) {
-      ProtoTranscriptLine.encode(v!, writer.uint32(26).fork()).join();
-    }
-    if (message.currentTime !== 0) {
-      writer.uint32(37).float(message.currentTime);
-    }
-    if (message.videoFrame !== undefined) {
-      ProtoImage.encode(message.videoFrame, writer.uint32(42).fork()).join();
-    }
-    return writer;
-  },
+	encode(message: ProtoYoutubeState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+		if (message.url !== '') {
+			writer.uint32(10).string(message.url);
+		}
+		if (message.title !== '') {
+			writer.uint32(18).string(message.title);
+		}
+		for (const v of message.transcript) {
+			ProtoTranscriptLine.encode(v!, writer.uint32(26).fork()).join();
+		}
+		if (message.currentTime !== 0) {
+			writer.uint32(37).float(message.currentTime);
+		}
+		if (message.videoFrame !== undefined) {
+			ProtoImage.encode(message.videoFrame, writer.uint32(42).fork()).join();
+		}
+		return writer;
+	},
 
-  decode(input: BinaryReader | Uint8Array, length?: number): ProtoYoutubeState {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseProtoYoutubeState();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
+	decode(input: BinaryReader | Uint8Array, length?: number): ProtoYoutubeState {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		let end = length === undefined ? reader.len : reader.pos + length;
+		const message = createBaseProtoYoutubeState();
+		while (reader.pos < end) {
+			const tag = reader.uint32();
+			switch (tag >>> 3) {
+				case 1: {
+					if (tag !== 10) {
+						break;
+					}
 
-          message.url = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
+					message.url = reader.string();
+					continue;
+				}
+				case 2: {
+					if (tag !== 18) {
+						break;
+					}
 
-          message.title = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
+					message.title = reader.string();
+					continue;
+				}
+				case 3: {
+					if (tag !== 26) {
+						break;
+					}
 
-          message.transcript.push(ProtoTranscriptLine.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
+					message.transcript.push(ProtoTranscriptLine.decode(reader, reader.uint32()));
+					continue;
+				}
+				case 4: {
+					if (tag !== 37) {
+						break;
+					}
 
-          message.currentTime = reader.float();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
+					message.currentTime = reader.float();
+					continue;
+				}
+				case 5: {
+					if (tag !== 42) {
+						break;
+					}
 
-          message.videoFrame = ProtoImage.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+					message.videoFrame = ProtoImage.decode(reader, reader.uint32());
+					continue;
+				}
+			}
+			if ((tag & 7) === 4 || tag === 0) {
+				break;
+			}
+			reader.skip(tag & 7);
+		}
+		return message;
+	},
 
-  fromJSON(object: any): ProtoYoutubeState {
-    return {
-      url: isSet(object.url) ? globalThis.String(object.url) : "",
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
-      transcript: globalThis.Array.isArray(object?.transcript)
-        ? object.transcript.map((e: any) => ProtoTranscriptLine.fromJSON(e))
-        : [],
-      currentTime: isSet(object.currentTime) ? globalThis.Number(object.currentTime) : 0,
-      videoFrame: isSet(object.videoFrame) ? ProtoImage.fromJSON(object.videoFrame) : undefined,
-    };
-  },
+	fromJSON(object: any): ProtoYoutubeState {
+		return {
+			url: isSet(object.url) ? globalThis.String(object.url) : '',
+			title: isSet(object.title) ? globalThis.String(object.title) : '',
+			transcript: globalThis.Array.isArray(object?.transcript)
+				? object.transcript.map((e: any) => ProtoTranscriptLine.fromJSON(e))
+				: [],
+			currentTime: isSet(object.currentTime) ? globalThis.Number(object.currentTime) : 0,
+			videoFrame: isSet(object.videoFrame) ? ProtoImage.fromJSON(object.videoFrame) : undefined
+		};
+	},
 
-  toJSON(message: ProtoYoutubeState): unknown {
-    const obj: any = {};
-    if (message.url !== "") {
-      obj.url = message.url;
-    }
-    if (message.title !== "") {
-      obj.title = message.title;
-    }
-    if (message.transcript?.length) {
-      obj.transcript = message.transcript.map((e) => ProtoTranscriptLine.toJSON(e));
-    }
-    if (message.currentTime !== 0) {
-      obj.currentTime = message.currentTime;
-    }
-    if (message.videoFrame !== undefined) {
-      obj.videoFrame = ProtoImage.toJSON(message.videoFrame);
-    }
-    return obj;
-  },
+	toJSON(message: ProtoYoutubeState): unknown {
+		const obj: any = {};
+		if (message.url !== '') {
+			obj.url = message.url;
+		}
+		if (message.title !== '') {
+			obj.title = message.title;
+		}
+		if (message.transcript?.length) {
+			obj.transcript = message.transcript.map((e) => ProtoTranscriptLine.toJSON(e));
+		}
+		if (message.currentTime !== 0) {
+			obj.currentTime = message.currentTime;
+		}
+		if (message.videoFrame !== undefined) {
+			obj.videoFrame = ProtoImage.toJSON(message.videoFrame);
+		}
+		return obj;
+	},
 
-  create<I extends Exact<DeepPartial<ProtoYoutubeState>, I>>(base?: I): ProtoYoutubeState {
-    return ProtoYoutubeState.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ProtoYoutubeState>, I>>(object: I): ProtoYoutubeState {
-    const message = createBaseProtoYoutubeState();
-    message.url = object.url ?? "";
-    message.title = object.title ?? "";
-    message.transcript = object.transcript?.map((e) => ProtoTranscriptLine.fromPartial(e)) || [];
-    message.currentTime = object.currentTime ?? 0;
-    message.videoFrame = (object.videoFrame !== undefined && object.videoFrame !== null)
-      ? ProtoImage.fromPartial(object.videoFrame)
-      : undefined;
-    return message;
-  },
+	create<I extends Exact<DeepPartial<ProtoYoutubeState>, I>>(base?: I): ProtoYoutubeState {
+		return ProtoYoutubeState.fromPartial(base ?? ({} as any));
+	},
+	fromPartial<I extends Exact<DeepPartial<ProtoYoutubeState>, I>>(object: I): ProtoYoutubeState {
+		const message = createBaseProtoYoutubeState();
+		message.url = object.url ?? '';
+		message.title = object.title ?? '';
+		message.transcript = object.transcript?.map((e) => ProtoTranscriptLine.fromPartial(e)) || [];
+		message.currentTime = object.currentTime ?? 0;
+		message.videoFrame =
+			object.videoFrame !== undefined && object.videoFrame !== null
+				? ProtoImage.fromPartial(object.videoFrame)
+				: undefined;
+		return message;
+	}
 };
 
 function createBaseProtoArticleState(): ProtoArticleState {
-  return { url: "", title: "", content: "", selectedText: "" };
+	return { url: '', title: '', content: '', selectedText: '' };
 }
 
 export const ProtoArticleState: MessageFns<ProtoArticleState> = {
-  encode(message: ProtoArticleState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.url !== "") {
-      writer.uint32(10).string(message.url);
-    }
-    if (message.title !== "") {
-      writer.uint32(18).string(message.title);
-    }
-    if (message.content !== "") {
-      writer.uint32(26).string(message.content);
-    }
-    if (message.selectedText !== "") {
-      writer.uint32(34).string(message.selectedText);
-    }
-    return writer;
-  },
+	encode(message: ProtoArticleState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+		if (message.url !== '') {
+			writer.uint32(10).string(message.url);
+		}
+		if (message.title !== '') {
+			writer.uint32(18).string(message.title);
+		}
+		if (message.content !== '') {
+			writer.uint32(26).string(message.content);
+		}
+		if (message.selectedText !== '') {
+			writer.uint32(34).string(message.selectedText);
+		}
+		return writer;
+	},
 
-  decode(input: BinaryReader | Uint8Array, length?: number): ProtoArticleState {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseProtoArticleState();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
+	decode(input: BinaryReader | Uint8Array, length?: number): ProtoArticleState {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		let end = length === undefined ? reader.len : reader.pos + length;
+		const message = createBaseProtoArticleState();
+		while (reader.pos < end) {
+			const tag = reader.uint32();
+			switch (tag >>> 3) {
+				case 1: {
+					if (tag !== 10) {
+						break;
+					}
 
-          message.url = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
+					message.url = reader.string();
+					continue;
+				}
+				case 2: {
+					if (tag !== 18) {
+						break;
+					}
 
-          message.title = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
+					message.title = reader.string();
+					continue;
+				}
+				case 3: {
+					if (tag !== 26) {
+						break;
+					}
 
-          message.content = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
+					message.content = reader.string();
+					continue;
+				}
+				case 4: {
+					if (tag !== 34) {
+						break;
+					}
 
-          message.selectedText = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+					message.selectedText = reader.string();
+					continue;
+				}
+			}
+			if ((tag & 7) === 4 || tag === 0) {
+				break;
+			}
+			reader.skip(tag & 7);
+		}
+		return message;
+	},
 
-  fromJSON(object: any): ProtoArticleState {
-    return {
-      url: isSet(object.url) ? globalThis.String(object.url) : "",
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
-      content: isSet(object.content) ? globalThis.String(object.content) : "",
-      selectedText: isSet(object.selectedText) ? globalThis.String(object.selectedText) : "",
-    };
-  },
+	fromJSON(object: any): ProtoArticleState {
+		return {
+			url: isSet(object.url) ? globalThis.String(object.url) : '',
+			title: isSet(object.title) ? globalThis.String(object.title) : '',
+			content: isSet(object.content) ? globalThis.String(object.content) : '',
+			selectedText: isSet(object.selectedText) ? globalThis.String(object.selectedText) : ''
+		};
+	},
 
-  toJSON(message: ProtoArticleState): unknown {
-    const obj: any = {};
-    if (message.url !== "") {
-      obj.url = message.url;
-    }
-    if (message.title !== "") {
-      obj.title = message.title;
-    }
-    if (message.content !== "") {
-      obj.content = message.content;
-    }
-    if (message.selectedText !== "") {
-      obj.selectedText = message.selectedText;
-    }
-    return obj;
-  },
+	toJSON(message: ProtoArticleState): unknown {
+		const obj: any = {};
+		if (message.url !== '') {
+			obj.url = message.url;
+		}
+		if (message.title !== '') {
+			obj.title = message.title;
+		}
+		if (message.content !== '') {
+			obj.content = message.content;
+		}
+		if (message.selectedText !== '') {
+			obj.selectedText = message.selectedText;
+		}
+		return obj;
+	},
 
-  create<I extends Exact<DeepPartial<ProtoArticleState>, I>>(base?: I): ProtoArticleState {
-    return ProtoArticleState.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ProtoArticleState>, I>>(object: I): ProtoArticleState {
-    const message = createBaseProtoArticleState();
-    message.url = object.url ?? "";
-    message.title = object.title ?? "";
-    message.content = object.content ?? "";
-    message.selectedText = object.selectedText ?? "";
-    return message;
-  },
+	create<I extends Exact<DeepPartial<ProtoArticleState>, I>>(base?: I): ProtoArticleState {
+		return ProtoArticleState.fromPartial(base ?? ({} as any));
+	},
+	fromPartial<I extends Exact<DeepPartial<ProtoArticleState>, I>>(object: I): ProtoArticleState {
+		const message = createBaseProtoArticleState();
+		message.url = object.url ?? '';
+		message.title = object.title ?? '';
+		message.content = object.content ?? '';
+		message.selectedText = object.selectedText ?? '';
+		return message;
+	}
 };
 
 function createBaseProtoPdfState(): ProtoPdfState {
-  return { url: "", title: "", content: "", selectedText: "" };
+	return { url: '', title: '', content: '', selectedText: '' };
 }
 
 export const ProtoPdfState: MessageFns<ProtoPdfState> = {
-  encode(message: ProtoPdfState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.url !== "") {
-      writer.uint32(10).string(message.url);
-    }
-    if (message.title !== "") {
-      writer.uint32(18).string(message.title);
-    }
-    if (message.content !== "") {
-      writer.uint32(26).string(message.content);
-    }
-    if (message.selectedText !== "") {
-      writer.uint32(34).string(message.selectedText);
-    }
-    return writer;
-  },
+	encode(message: ProtoPdfState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+		if (message.url !== '') {
+			writer.uint32(10).string(message.url);
+		}
+		if (message.title !== '') {
+			writer.uint32(18).string(message.title);
+		}
+		if (message.content !== '') {
+			writer.uint32(26).string(message.content);
+		}
+		if (message.selectedText !== '') {
+			writer.uint32(34).string(message.selectedText);
+		}
+		return writer;
+	},
 
-  decode(input: BinaryReader | Uint8Array, length?: number): ProtoPdfState {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseProtoPdfState();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
+	decode(input: BinaryReader | Uint8Array, length?: number): ProtoPdfState {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		let end = length === undefined ? reader.len : reader.pos + length;
+		const message = createBaseProtoPdfState();
+		while (reader.pos < end) {
+			const tag = reader.uint32();
+			switch (tag >>> 3) {
+				case 1: {
+					if (tag !== 10) {
+						break;
+					}
 
-          message.url = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
+					message.url = reader.string();
+					continue;
+				}
+				case 2: {
+					if (tag !== 18) {
+						break;
+					}
 
-          message.title = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
+					message.title = reader.string();
+					continue;
+				}
+				case 3: {
+					if (tag !== 26) {
+						break;
+					}
 
-          message.content = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
+					message.content = reader.string();
+					continue;
+				}
+				case 4: {
+					if (tag !== 34) {
+						break;
+					}
 
-          message.selectedText = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
+					message.selectedText = reader.string();
+					continue;
+				}
+			}
+			if ((tag & 7) === 4 || tag === 0) {
+				break;
+			}
+			reader.skip(tag & 7);
+		}
+		return message;
+	},
 
-  fromJSON(object: any): ProtoPdfState {
-    return {
-      url: isSet(object.url) ? globalThis.String(object.url) : "",
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
-      content: isSet(object.content) ? globalThis.String(object.content) : "",
-      selectedText: isSet(object.selectedText) ? globalThis.String(object.selectedText) : "",
-    };
-  },
+	fromJSON(object: any): ProtoPdfState {
+		return {
+			url: isSet(object.url) ? globalThis.String(object.url) : '',
+			title: isSet(object.title) ? globalThis.String(object.title) : '',
+			content: isSet(object.content) ? globalThis.String(object.content) : '',
+			selectedText: isSet(object.selectedText) ? globalThis.String(object.selectedText) : ''
+		};
+	},
 
-  toJSON(message: ProtoPdfState): unknown {
-    const obj: any = {};
-    if (message.url !== "") {
-      obj.url = message.url;
-    }
-    if (message.title !== "") {
-      obj.title = message.title;
-    }
-    if (message.content !== "") {
-      obj.content = message.content;
-    }
-    if (message.selectedText !== "") {
-      obj.selectedText = message.selectedText;
-    }
-    return obj;
-  },
+	toJSON(message: ProtoPdfState): unknown {
+		const obj: any = {};
+		if (message.url !== '') {
+			obj.url = message.url;
+		}
+		if (message.title !== '') {
+			obj.title = message.title;
+		}
+		if (message.content !== '') {
+			obj.content = message.content;
+		}
+		if (message.selectedText !== '') {
+			obj.selectedText = message.selectedText;
+		}
+		return obj;
+	},
 
-  create<I extends Exact<DeepPartial<ProtoPdfState>, I>>(base?: I): ProtoPdfState {
-    return ProtoPdfState.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ProtoPdfState>, I>>(object: I): ProtoPdfState {
-    const message = createBaseProtoPdfState();
-    message.url = object.url ?? "";
-    message.title = object.title ?? "";
-    message.content = object.content ?? "";
-    message.selectedText = object.selectedText ?? "";
-    return message;
-  },
+	create<I extends Exact<DeepPartial<ProtoPdfState>, I>>(base?: I): ProtoPdfState {
+		return ProtoPdfState.fromPartial(base ?? ({} as any));
+	},
+	fromPartial<I extends Exact<DeepPartial<ProtoPdfState>, I>>(object: I): ProtoPdfState {
+		const message = createBaseProtoPdfState();
+		message.url = object.url ?? '';
+		message.title = object.title ?? '';
+		message.content = object.content ?? '';
+		message.selectedText = object.selectedText ?? '';
+		return message;
+	}
 };
 
 export interface TauriIPC {
-  GatherState(request: Observable<StateRequest>): Observable<StateResponse>;
+	GatherState(request: Observable<StateRequest>): Observable<StateResponse>;
 }
 
-export const TauriIPCServiceName = "ipc.TauriIPC";
+export const TauriIPCServiceName = 'ipc.TauriIPC';
 export class TauriIPCClientImpl implements TauriIPC {
-  private readonly rpc: Rpc;
-  private readonly service: string;
-  constructor(rpc: Rpc, opts?: { service?: string }) {
-    this.service = opts?.service || TauriIPCServiceName;
-    this.rpc = rpc;
-    this.GatherState = this.GatherState.bind(this);
-  }
-  GatherState(request: Observable<StateRequest>): Observable<StateResponse> {
-    const data = request.pipe(map((request) => StateRequest.encode(request).finish()));
-    const result = this.rpc.bidirectionalStreamingRequest(this.service, "GatherState", data);
-    return result.pipe(map((data) => StateResponse.decode(new BinaryReader(data))));
-  }
+	private readonly rpc: Rpc;
+	private readonly service: string;
+	constructor(rpc: Rpc, opts?: { service?: string }) {
+		this.service = opts?.service || TauriIPCServiceName;
+		this.rpc = rpc;
+		this.GatherState = this.GatherState.bind(this);
+	}
+	GatherState(request: Observable<StateRequest>): Observable<StateResponse> {
+		const data = request.pipe(map((request) => StateRequest.encode(request).finish()));
+		const result = this.rpc.bidirectionalStreamingRequest(this.service, 'GatherState', data);
+		return result.pipe(map((data) => StateResponse.decode(new BinaryReader(data))));
+	}
 }
 
 interface Rpc {
-  request(service: string, method: string, data: Uint8Array): Promise<Uint8Array>;
-  clientStreamingRequest(service: string, method: string, data: Observable<Uint8Array>): Promise<Uint8Array>;
-  serverStreamingRequest(service: string, method: string, data: Uint8Array): Observable<Uint8Array>;
-  bidirectionalStreamingRequest(service: string, method: string, data: Observable<Uint8Array>): Observable<Uint8Array>;
+	request(service: string, method: string, data: Uint8Array): Promise<Uint8Array>;
+	clientStreamingRequest(
+		service: string,
+		method: string,
+		data: Observable<Uint8Array>
+	): Promise<Uint8Array>;
+	serverStreamingRequest(service: string, method: string, data: Uint8Array): Observable<Uint8Array>;
+	bidirectionalStreamingRequest(
+		service: string,
+		method: string,
+		data: Observable<Uint8Array>
+	): Observable<Uint8Array>;
 }
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+	? T
+	: T extends globalThis.Array<infer U>
+		? globalThis.Array<DeepPartial<U>>
+		: T extends ReadonlyArray<infer U>
+			? ReadonlyArray<DeepPartial<U>>
+			: T extends {}
+				? { [K in keyof T]?: DeepPartial<T[K]> }
+				: Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+export type Exact<P, I extends P> = P extends Builtin
+	? P
+	: P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function isSet(value: any): boolean {
-  return value !== null && value !== undefined;
+	return value !== null && value !== undefined;
 }
 
 export interface MessageFns<T> {
-  encode(message: T, writer?: BinaryWriter): BinaryWriter;
-  decode(input: BinaryReader | Uint8Array, length?: number): T;
-  fromJSON(object: any): T;
-  toJSON(message: T): unknown;
-  create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
-  fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+	encode(message: T, writer?: BinaryWriter): BinaryWriter;
+	decode(input: BinaryReader | Uint8Array, length?: number): T;
+	fromJSON(object: any): T;
+	toJSON(message: T): unknown;
+	create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+	fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
 }
