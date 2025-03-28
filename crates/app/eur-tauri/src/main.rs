@@ -98,6 +98,12 @@ fn main() {
                         main_window.open_devtools();
                         // launcher_window.open_devtools();
                     }
+                    
+                    // Ensure launcher is hidden on startup for Windows
+                    #[cfg(target_os = "windows")]
+                    {
+                        launcher_window.hide().expect("Failed to hide launcher window on startup");
+                    }
 
                     let app_handle = tauri_app.handle();
                     let transcript_state = Arc::new(Mutex::new(None::<String>));
@@ -176,6 +182,11 @@ fn main() {
                     // Listen for window focus events
                     let launcher_label = launcher_window.label().to_string();
                     let app_handle_clone = app_handle.clone();
+                    
+                    // We'll use a different approach for Windows
+                    
+                    // Keep the window-specific handler for Linux
+                    #[cfg(target_os = "linux")]
                     launcher_window.on_window_event(move |event| {
                         if let tauri::WindowEvent::Focused(false) = event {
                             if let Some(launcher) = app_handle_clone.get_window(&launcher_label) {
@@ -216,7 +227,18 @@ fn main() {
                             .remove(window.label());
                     }
                     tauri::WindowEvent::Focused(false) => {
-                        // println!("Window focused: {}", window.label());
+                        // Handle launcher window focus loss for Windows
+                        #[cfg(not(target_os = "linux"))]
+                        {
+                            // Check if this is the launcher window
+                            if window.label() == "launcher" {
+                                window.hide().expect("Failed to hide launcher window");
+                                // Emit an event to clear the conversation when launcher is hidden
+                                window
+                                    .emit("launcher_closed", ())
+                                    .expect("Failed to emit launcher_closed event");
+                            }
+                        }
                     }
 
                     _ => {}
@@ -259,7 +281,11 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 return;
             };
             if is_visible {
+                // Hide the launcher window and emit the closed event
                 launcher.hide().expect("Failed to hide launcher window");
+                launcher
+                    .emit("launcher_closed", ())
+                    .expect("Failed to emit launcher_closed event");
             } else {
                 // Get cursor position and center launcher on that screen
                 if let Ok(cursor_position) = launcher.cursor_position() {
@@ -292,17 +318,19 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                         }
                     }
                 }
+                
+                // Only show the launcher if it was previously hidden
+                launcher.show().expect("Failed to show launcher window");
+                
+                // Add a small delay before setting focus
+                let launcher_clone = launcher.clone();
+                tauri::async_runtime::spawn(async move {
+                    sleep(Duration::from_millis(1000)).await;
+                    launcher_clone
+                        .set_focus()
+                        .expect("Failed to focus launcher window");
+                });
             }
-
-            launcher.show().expect("Failed to show launcher window");
-            // Add a small delay before setting focus
-            let launcher_clone = launcher.clone();
-            tauri::async_runtime::spawn(async move {
-                sleep(Duration::from_millis(1000)).await;
-                launcher_clone
-                    .set_focus()
-                    .expect("Failed to focus launcher window");
-            });
         })
         .build()
 }
@@ -950,3 +978,4 @@ async fn check_grpc_server_connection(server_address: Option<String>) -> Result<
         }
     }
 }
+
