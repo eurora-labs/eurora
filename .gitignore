@@ -301,3 +301,6 @@ extensions/chromium/pdfjs/*
 extensions/chromium/contentstyle.css
 
 *.sqlite
+
+*.exe
+*.d

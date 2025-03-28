@@ -121,8 +121,10 @@ fn main() {
                     // Initialize storage with a database in the app's data directory
                     let app_data_dir = app_handle.path().app_data_dir().unwrap();
                     std::fs::create_dir_all(&app_data_dir).unwrap();
+                    // let db_path =
+                    //     "/home/andre/Projects/eurora/svelte-app/eur_personal_database.sqlite";
                     let db_path =
-                        "/home/andre/Projects/eurora/svelte-app/eur_personal_database.sqlite";
+                        "C:\\Users\\chaos\\Documents\\GitHub\\eurora\\eur_personal_database.sqlite";
                     app_handle.manage(conversation_storage.clone());
 
                     tauri::async_runtime::spawn(async move {
@@ -160,7 +162,7 @@ fn main() {
                     {
                         // println!("Setting up global shortcut");
                         let super_space_shortcut =
-                            Shortcut::new(Some(Modifiers::SUPER), Code::Space);
+                            Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
 
                         let launcher_label = launcher_window.label().to_string();
 
