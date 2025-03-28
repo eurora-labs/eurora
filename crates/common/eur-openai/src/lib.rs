@@ -66,7 +66,7 @@ use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
-use openai_api_rs::v1::common::GPT4_O_2024_08_06;
+use openai_api_rs::v1::common::GPT4_O_LATEST;
 
 pub struct OpenAI {
     client: OpenAIClient,
@@ -147,7 +147,7 @@ impl OpenAI {
             });
         }
 
-        let req = ChatCompletionRequest::new(GPT4_O_2024_08_06.to_string(), chat_messages).stream(true);
+        let req = ChatCompletionRequest::new(GPT4_O_LATEST.to_string(), chat_messages).stream(true);
 
         self.client
             .chat_completion_stream(req)
@@ -200,7 +200,7 @@ impl OpenAI {
             });
         }
 
-        let req = ChatCompletionRequest::new(GPT4_O_2024_08_06.to_string(), chat_messages).stream(true);
+        let req = ChatCompletionRequest::new(GPT4_O_LATEST.to_string(), chat_messages).stream(true);
 
         self.client
             .chat_completion_stream(req)
@@ -253,7 +253,7 @@ impl OpenAI {
             });
         }
 
-        let req = ChatCompletionRequest::new(GPT4_O_2024_08_06.to_string(), chat_messages).stream(true);
+        let req = ChatCompletionRequest::new(GPT4_O_LATEST.to_string(), chat_messages).stream(true);
 
         self.client
             .chat_completion_stream(req)
@@ -263,7 +263,7 @@ impl OpenAI {
 
     pub async fn send_message_to_llm(&mut self, messages: Vec<String>) -> String {
         let req = ChatCompletionRequest::new(
-            GPT4_O_2024_08_06.to_string(),
+            GPT4_O_LATEST.to_string(),
             vec![chat_completion::ChatCompletionMessage {
                 role: chat_completion::MessageRole::user,
                 content: chat_completion::Content::Text(messages.join("\n")),
