@@ -7,8 +7,8 @@ export default defineConfig({
 	plugins: [debounceReload(), sveltekit()],
 
 	server: {
-		port: 1420,
-		strictPort: true,
+		port: 1419,
+		strictPort: false,
 		fs: {
 			strict: false
 		}
