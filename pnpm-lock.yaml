@@ -867,6 +867,9 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
+      '@eurora/katex':
+        specifier: workspace:*
+        version: link:../custom-components/katex
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
