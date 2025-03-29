@@ -84,9 +84,9 @@ fn main() {
             let builder = tauri::Builder::default()
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
-                    let main_window =
-                        create_window(tauri_app.handle(), "main", "index.html".into())
-                            .expect("Failed to create main window");
+                    // let main_window =
+                    //     create_window(tauri_app.handle(), "main", "index.html".into())
+                    //         .expect("Failed to create main window");
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
@@ -95,7 +95,7 @@ fn main() {
 
                     #[cfg(debug_assertions)]
                     {
-                        main_window.open_devtools();
+                        // main_window.open_devtools();
                         // launcher_window.open_devtools();
                     }
                     
