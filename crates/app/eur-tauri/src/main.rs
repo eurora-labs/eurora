@@ -51,6 +51,13 @@ fn create_shared_openai_client() -> SharedOpenAIClient {
     Arc::new(async_mutex::Mutex::new(Some(eur_openai::OpenAI::new())))
 }
 
+fn get_db_path(app_handle: &tauri::AppHandle) -> String {
+    let base_path = app_handle.path().app_data_dir().unwrap();
+    let db_path = base_path.join("Eurora").join("personal_database.sqlite");
+    std::fs::create_dir_all(&base_path).unwrap();
+    db_path.to_string_lossy().to_string()
+}
+
 #[tauri::command]
 async fn resize_launcher_window(window: tauri::Window, height: u32) -> Result<(), String> {
     if let Some(launcher) = window.get_window("launcher") {
@@ -119,10 +126,7 @@ fn main() {
                     let current_conversation = create_shared_current_conversation();
 
                     // Initialize storage with a database in the app's data directory
-                    let app_data_dir = app_handle.path().app_data_dir().unwrap();
-                    std::fs::create_dir_all(&app_data_dir).unwrap();
-                    let db_path =
-                        "/home/andre/Projects/eurora/svelte-app/eur_personal_database.sqlite";
+                    let db_path = get_db_path(&app_handle);
                     app_handle.manage(conversation_storage.clone());
 
                     tauri::async_runtime::spawn(async move {
