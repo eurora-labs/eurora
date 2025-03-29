@@ -3,7 +3,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '@eurora/ui/utils.js';
 
-	// import { Katex } from '@eurora/katex';
+	import { Katex } from '@eurora/katex';
 
 	let {
 		ref = $bindable(null),
@@ -32,8 +32,8 @@
 							class="text-message relative flex min-h-8 w-full flex-col items-end gap-2 whitespace-normal break-words text-start [.text-message+&]:mt-5"
 						>
 							<div class="flex w-full flex-col gap-1 first:pt-[3px] empty:hidden">
-								<!-- <Katex math={text} finishRendering={() => {}} /> -->
-								{text}
+								<Katex math={text} finishRendering={() => {}} />
+								<!-- {text} -->
 							</div>
 						</div>
 					</div>
