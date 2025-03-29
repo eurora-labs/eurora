@@ -12,12 +12,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Native messaging connection management
 function connectToNativeHost() {
 	try {
-		nativePort = chrome.runtime.connectNative('com.eurora.app.dev');
+		nativePort = chrome.runtime.connectNative('com.eurora.app');
 
 		nativePort.onMessage.addListener((response) => {
 			// Broadcast responses to all content scripts
 			chrome.tabs.query({}, (tabs) => {
 				tabs.forEach((tab) => {
+					console.log('Sending message to tab', tab.id);
+					console.log('Response', response);
 					chrome.tabs.sendMessage(tab.id!, {
 						type: 'NATIVE_RESPONSE',
 						payload: response
