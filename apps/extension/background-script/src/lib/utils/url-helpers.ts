@@ -25,7 +25,7 @@ export function isYouTubeVideoUrl(url: string): boolean {
  */
 export function isPdfUrl(url: string): boolean {
 	try {
-		return url.startsWith('chrome-extension://hmpbdoleeoankjfjcogiohcfojknnkdd/');
+		return url.startsWith('chrome-extension://fehjhfpjcdhgecfdfiphdfcpcomefjkj/');
 	} catch (e) {
 		console.error('Invalid URL:', e);
 		return false;
