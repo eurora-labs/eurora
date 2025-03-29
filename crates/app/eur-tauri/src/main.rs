@@ -53,8 +53,8 @@ fn create_shared_openai_client() -> SharedOpenAIClient {
 
 fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     let base_path = app_handle.path().app_data_dir().unwrap();
-    let db_path = base_path.join("Eurora").join("personal_database.sqlite");
     std::fs::create_dir_all(&base_path).unwrap();
+    let db_path = base_path.join("personal_database.sqlite");
     db_path.to_string_lossy().to_string()
 }
 
@@ -127,6 +127,7 @@ fn main() {
 
                     // Initialize storage with a database in the app's data directory
                     let db_path = get_db_path(&app_handle);
+
                     app_handle.manage(conversation_storage.clone());
 
                     tauri::async_runtime::spawn(async move {
