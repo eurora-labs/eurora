@@ -160,7 +160,7 @@ fn main() {
                     {
                         // println!("Setting up global shortcut");
                         let super_space_shortcut =
-                            Shortcut::new(Some(Modifiers::SUPER), Code::Space);
+                            Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
 
                         let launcher_label = launcher_window.label().to_string();
 
