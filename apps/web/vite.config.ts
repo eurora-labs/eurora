@@ -6,7 +6,8 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	resolve: {
 		alias: {
-			'@eurora/ui': path.resolve(__dirname, '../../packages/ui/src')
+			'@eurora/ui': path.resolve(__dirname, '../../packages/ui/src'),
+			'@eurora/katex': path.resolve(__dirname, '../../packages/custom-components/katex/src/lib/index.ts')
 		}
 	}
 });

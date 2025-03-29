@@ -11,7 +11,7 @@ function connectToNativeHost(): Promise<boolean> {
 	return new Promise((resolve) => {
 		try {
 			console.log('Connecting to native host...');
-			nativePort = chrome.runtime.connectNative('com.eurora.app.dev');
+			nativePort = chrome.runtime.connectNative('com.eurora.app');
 
 			nativePort.onMessage.addListener((response) => {
 				console.log('Received response from native host:', response);
@@ -19,6 +19,8 @@ function connectToNativeHost(): Promise<boolean> {
 				// Broadcast response to all tabs
 				chrome.tabs.query({}, (tabs) => {
 					tabs.forEach((tab) => {
+						console.log('Sending message to tab', tab.id);
+						console.log('Response', response);
 						if (tab.id) {
 							chrome.tabs.sendMessage(tab.id, {
 								type: 'NATIVE_RESPONSE',
@@ -88,6 +90,8 @@ function forwardToNativeHost(payload: any, tabId?: number) {
 }
 
 function sendMessageToNativeHost(payload: any, tabId?: number) {
+	console.log('Sending message to native host:', payload);
+	console.log('Native port:', nativePort);
 	try {
 		// Format the message according to the native messaging protocol
 		const nativeMessage = {
