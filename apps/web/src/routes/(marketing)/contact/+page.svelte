@@ -59,7 +59,7 @@
 							<Mail class="w-5 h-5 text-purple-600 mt-1" />
 							<div>
 								<h3 class="font-medium">Email</h3>
-								<p class="text-gray-600">contact@eurora.com</p>
+								<p class="text-gray-600">contact@eurora-labs.com</p>
 							</div>
 						</div>
 						<div class="flex items-start space-x-3">
