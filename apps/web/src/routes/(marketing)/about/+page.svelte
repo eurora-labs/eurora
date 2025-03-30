@@ -55,8 +55,7 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							15+ years in tech leadership, previously VP of Product at TechCorp and founder of
-							PrivacyFirst.
+							Just the best person all around
 						</p>
 					</div>
 					<div>
@@ -96,8 +95,7 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Former AI Research Lead at OpenMind, contributed to multiple open-source ML
-							frameworks.
+							Former Head of Technology at Cuebric, developed state-of-the-art AI systems for biggest companies in the world.
 						</p>
 					</div>
 					<div>
