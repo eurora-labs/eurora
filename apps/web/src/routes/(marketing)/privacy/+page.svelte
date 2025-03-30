@@ -212,7 +212,7 @@
 					<h3 class="text-lg font-medium mb-2">10. Contact Us</h3>
 					<p>
 						If you have any questions about this Privacy Policy, please contact us at
-						privacy@eurora.com.
+						privacy@eurora-labs.com.
 					</p>
 				</div>
 			</div>
