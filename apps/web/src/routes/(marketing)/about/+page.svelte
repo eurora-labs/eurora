@@ -28,7 +28,7 @@
 				around.
 			</p>
 			<p class="text-gray-600">
-				Founded in 2023, our team brings together expertise in artificial intelligence, privacy
+				Founded in 2025, our team brings together expertise in artificial intelligence, privacy
 				engineering, and user experience design to build the next generation of AI assistants that
 				you can truly trust.
 			</p>
@@ -55,14 +55,14 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Just the best person all around
+							Demonstrated breadth of experience from sales to management, driving new product adoption and revenue growth with over 30 years of experience working for manufacturers such as Apple, Adobe, Avid, DDN Storage and Northrop Grumman. 
 						</p>
 					</div>
 					<div>
 						<h3 class="font-medium flex items-center gap-2">
 							<GraduationCap class="w-4 h-4 text-purple-600" /> Education
 						</h3>
-						<p class="text-gray-600">MBA from Stanford, BS in Computer Science from MIT.</p>
+						<p class="text-gray-600">MBA from Pepperdine University, BS in Business Administration with a minor in Finance from the University of Southern California.</p>
 					</div>
 					<div class="flex justify-center gap-3 mt-4">
 						<Button variant="ghost" size="icon" class="h-8 w-8">
@@ -95,7 +95,7 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Former Head of Technology at Cuebric, developed state-of-the-art AI systems for biggest companies in the world.
+							Founder and CTO of Eurora Labs, previously Head of Engineering and Machine Learning at Cuebric. Led development of award-winning AI solutions, specializing in software architecture, machine learning, and computer vision.
 						</p>
 					</div>
 					<div>
@@ -103,7 +103,7 @@
 							<GraduationCap class="w-4 h-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
-							PhD in Machine Learning from UC Berkeley, MS in Computer Science from Carnegie Mellon.
+							BS in Computer Science from Avans University of Applied Sciences; graduate studies in AI at Maastricht University.
 						</p>
 					</div>
 					<div class="flex justify-center gap-3 mt-4">
