@@ -44,7 +44,7 @@
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
 					<div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div>
-					<Card.Title>Sarah Johnson</Card.Title>
+					<Card.Title>Laura Thommen</Card.Title>
 					<p class="text-purple-600 font-medium">Chief Executive Officer</p>
 				</div>
 			</Card.Header>
@@ -85,7 +85,7 @@
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
 					<div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div>
-					<Card.Title>Michael Chen</Card.Title>
+					<Card.Title>Andre Roelofs</Card.Title>
 					<p class="text-purple-600 font-medium">Chief Technology Officer</p>
 				</div>
 			</Card.Header>
@@ -128,7 +128,7 @@
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
 					<div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div>
-					<Card.Title>Emily Rodriguez</Card.Title>
+					<Card.Title>Linda Rosner</Card.Title>
 					<p class="text-purple-600 font-medium">Chief Operations Officer</p>
 				</div>
 			</Card.Header>

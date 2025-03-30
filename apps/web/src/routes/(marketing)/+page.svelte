@@ -17,7 +17,6 @@
 	const secondPart = 'this';
 	const typingSpeed = instantTyping ? 0 : 150; // milliseconds per character
 	const initialDelay = instantTyping ? 0 : 50; // milliseconds before typing starts
- 
 </script>
 
 <div class="container mx-auto px-4 pb-16 max-w-5xl">
