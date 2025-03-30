@@ -34,9 +34,9 @@
 	style="top: {showAlert ? 'var(--alert-height, 40px)' : '0'};"
 >
 	<div class="flex items-center gap-2">
-		<Button variant="link" href="/" class="no-underline">
+		<Button variant="link" href="/" class="decoration-transparent">
 			<EurIcons.EuroraLogo style="width: 2rem; height: 2rem;" />
-			<span class="text-lg font-semibold no-underline">Eurora Labs</span>
+			<span class="text-lg font-semibolde">Eurora Labs</span>
 		</Button>
 	</div>
 
@@ -64,4 +64,6 @@
 	:global(body) {
 		padding-top: 1rem;
 	}
+
+
 </style>
