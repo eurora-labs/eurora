@@ -282,7 +282,7 @@
 					<Button variant="outline" class="w-full">Schedule a Demo</Button>
 					<Button variant="outline" class="w-full">Contact Sales</Button>
 					<p class="text-sm text-gray-500 text-center mt-2">
-						Or email us at <span class="text-purple-600">sales@eurora.com</span>
+						Or email us at <span class="text-purple-600">sales@eurora-labs.com</span>
 					</p>
 				</div>
 			</Card.Content>
