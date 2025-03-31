@@ -52,7 +52,7 @@
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
 		"katex": "^0.16.21",
-		"lucide-svelte": "^0.484.0",
+		"lucide-svelte": "^0.486.0",
 		"postcss-nesting": "^13.0.1",
 		"postcss-pxtorem": "^6.1.0",
 		"prettier": "^3.5.3",
@@ -62,8 +62,8 @@
 		"svelte-check": "^4.1.4",
 		"tinykeys": "^2.1.0",
 		"typescript": "^5.8.2",
-		"typescript-eslint": "^8.28.0",
-		"vite": "^6.2.3",
-		"vitest": "^3.0.6"
+		"typescript-eslint": "^8.29.0",
+		"vite": "^6.2.4",
+		"vitest": "^3.1.1"
 	}
 }
