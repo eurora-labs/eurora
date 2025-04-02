@@ -137,8 +137,7 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							10+ years in operations and scaling startups, previously COO at DataSecure and
-							Director at TechScale.
+							Co-founder of ArtisansPR, with deep expertise in media, entertainment, and tech communications. Serves on HPA’s Awards Committee and formerly chaired SMPTE Hollywood’s Board. Founding Board Member of EIPMA and frequent panel moderator for NAB, SMPTE, and others.
 						</p>
 					</div>
 					<div>
@@ -146,7 +145,7 @@
 							<GraduationCap class="w-4 h-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
-							MBA from Harvard Business School, BA in Business Administration from UCLA.
+							BA in Theater from UCLA.
 						</p>
 					</div>
 					<div class="flex justify-center gap-3 mt-4">
