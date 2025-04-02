@@ -18,23 +18,23 @@ test = false
 tauri-build = { version = "2.0.3", features = [] }
 
 [dependencies]
-anyhow = "1.0.95"
+anyhow = "1.0.97"
 backtrace = { version = "0.3.74", optional = true }
 console-subscriber = "0.4.1"
-reqwest = { version = "0.12.9", features = ["json"] }
+reqwest = { version = "0.12.15", features = ["json"] }
 serde.workspace = true
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
-tauri = { version = "^2.1.1", features = ["unstable"] }
+tauri = { version = "^2.4.1", features = ["unstable"] }
 tauri-plugin-dialog = "2.2.0"
 tauri-plugin-fs = "2.0.3"
-tauri-plugin-http = "2.2.0"
-tauri-plugin-log = "2.2.0"
-tauri-plugin-os = "2.2.0"
+tauri-plugin-http = "2.4.2"
+tauri-plugin-log = "2.3.1"
+tauri-plugin-os = "2.2.1"
 tauri-plugin-process = "2.2.0"
 tauri-plugin-shell = "2.2.0"
 tauri-plugin-single-instance = "2.2.0"
 tauri-plugin-store = "2.2.0"
-tauri-plugin-updater = "2.3.0"
+tauri-plugin-updater = "2.6.1"
 tauri-plugin-window-state = "2.2.0"
 
 parking_lot.workspace = true
@@ -60,8 +60,8 @@ chrono = { workspace = true }
 defer = "0.2.1"
 futures = { workspace = true }
 tonic = { workspace = true }
-async-mutex = "1.4.0"
-sentry = { version = "0.36.0" }
+async-mutex = "1.4.1"
+sentry = { version = "0.37.0" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-trafficlights-positioner = { git = "https://github.com/gitbutlerapp/tauri-plugin-trafficlights-positioner", branch = "v2" }

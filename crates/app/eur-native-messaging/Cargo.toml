@@ -18,8 +18,8 @@ futures = { workspace = true }
 tokio-stream = { workspace = true }
 base64 = "0.22.1"
 ctrlc = "3.4.2"
-h2 = "0.3.24"
-sentry = { version = "0.36.0" }
+h2 = "0.4.8"
+sentry = { version = "0.37.0" }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
