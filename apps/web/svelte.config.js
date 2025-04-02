@@ -15,8 +15,8 @@ const config = {
 			assets: 'dist',
 			fallback: null,
 			precompress: true,
-			strict: true,
-		})
+			strict: true
+		}),
 	},
 	compilerOptions: {
 		css: 'injected',
