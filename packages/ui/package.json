@@ -28,6 +28,7 @@
 
 	},
 	"devDependencies": {
+		"@eurora/katex": "workspace:*",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@sveltejs/adapter-static": "^3.0.8",
