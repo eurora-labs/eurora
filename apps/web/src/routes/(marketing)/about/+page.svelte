@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { Card, Button } from '@eurora/ui';
 	import { Users, Briefcase, GraduationCap, Mail, Github, Linkedin } from 'lucide-svelte';
+    import laura_thommen_img from '$lib/images/avatars/laura_thommen.jpg';
+    import andre_roelofs_img from '$lib/images/avatars/andre_roelofs.jpg';
 </script>
 
 <div class="container mx-auto px-4 py-16 max-w-5xl">
@@ -43,7 +45,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
-					<img src="/images/avatars/laura_thommen.jpg" alt="Laura Thommen" class="w-32 h-32 rounded-full object-cover mb-4" />
+					<img src={laura_thommen_img} alt="Laura Thommen" class="w-32 h-32 rounded-full object-cover mb-4" />
 
 					<!-- <div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div> -->
 					<Card.Title>Laura Thommen</Card.Title>
@@ -85,7 +87,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
-					<img src="/images/avatars/andre_roelofs.jpg" alt="Andre Roelofs" class="w-32 h-32 rounded-full object-cover mb-4" />
+					<img src={andre_roelofs_img} alt="Andre Roelofs" class="w-32 h-32 rounded-full object-cover mb-4" />
 					<Card.Title>Andre Roelofs</Card.Title>
 					<p class="text-purple-600 font-medium">Chief Technology Officer</p>
 				</div>
