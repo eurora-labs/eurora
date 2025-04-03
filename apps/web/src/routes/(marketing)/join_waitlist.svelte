@@ -2,11 +2,12 @@
     import { Sheet, ScrollArea, Skeleton } from '@eurora/ui';
     import { buttonVariants } from '@eurora/ui';
     import WaitlistForm from './waitlist_form.svelte';
+
 </script>
 
 <Sheet.Root>
     <Sheet.Trigger class={buttonVariants({ variant: "default" })}
-      >Join Waitlist</Sheet.Trigger
+      >Enterprise Contact</Sheet.Trigger
     >
     <Sheet.Content side="right">
      
