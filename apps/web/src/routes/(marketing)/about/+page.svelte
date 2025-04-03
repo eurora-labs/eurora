@@ -131,8 +131,8 @@
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
 					<div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div>
-					<Card.Title>Linda Rosner</Card.Title>
-					<p class="text-purple-600 font-medium">Chief Operations Officer</p>
+					<Card.Title>PLACEHOLDER</Card.Title>
+					<p class="text-purple-600 font-medium">PLACEHOLDER</p>
 				</div>
 			</Card.Header>
 			<Card.Content>
@@ -142,7 +142,7 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Co-founder of ArtisansPR, with deep expertise in media, entertainment, and tech communications. Serves on HPA’s Awards Committee and formerly chaired SMPTE Hollywood’s Board. Founding Board Member of EIPMA and frequent panel moderator for NAB, SMPTE, and others.
+							PLACEHOLDER
 						</p>
 					</div>
 					<div>
@@ -150,7 +150,7 @@
 							<GraduationCap class="w-4 h-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
-							BA in Theater from UCLA.
+							PLACEHOLDER
 						</p>
 					</div>
 					<div class="flex justify-center gap-3 mt-4">
