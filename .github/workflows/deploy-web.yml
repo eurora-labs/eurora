@@ -33,6 +33,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Pull Git LFS files
+        run: git lfs pull
+
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
