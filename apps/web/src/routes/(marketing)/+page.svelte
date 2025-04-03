@@ -7,9 +7,11 @@
     // import { SiGithub, SiLinkedin} from '@icons-pack/svelte-simple-icons';  
 
     import WaitlistForm from './waitlist_form.svelte';
+    import JoinWaitlist from './join_waitlist.svelte';
 
     let inputValue = $state('');
     let purpleText = $state('');
+    let formSubmitted = $state(false);
 
     // Typing animation configuration
 	const instantTyping = false;
@@ -17,11 +19,82 @@
 	const secondPart = 'this';
 	const typingSpeed = instantTyping ? 0 : 150; // milliseconds per character
 	const initialDelay = instantTyping ? 0 : 50; // milliseconds before typing starts
+
+    let emailField = $state('');
+
+    function submitEmail() {
+        fetch("https://api.hsforms.com/submissions/v3/integration/submit/242150186/7b08711a-8657-42a0-932c-0d2c4dbbc0f9", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                fields: [
+                {
+                    name: "email",
+                    value: emailField  // replace with your form data
+                }
+                ],
+                context: {
+                pageUri: window.location.href,
+                pageName: document.title
+                }
+            })
+        })
+        .then(() => {
+            formSubmitted = true;
+        })
+        .catch(error => {
+            console.error("Error submitting form:", error);
+        });
+    }
  
 </script>
 
 <div class="container mx-auto px-4 pb-16 max-w-5xl">
-	<IntroModule />
+	<!-- Title and Subtitle -->
+	<div class="text-center my-12 h-screen mx-auto">
+	    <h1 class="mx-48 pt-16 text-5xl font-bold mb-6 text-purple-600 leading-[60px]">Your Open Source AI Assistant</h1>
+		<p class="text-xl mx-48 font-medium text-gray-500 mb-8">Eurora is a fully Open Source AI Assistant that understands context, respects your privacy, and works across all your devices. Experience AI on your own terms.</p>
+            <div class="flex flex-col justify-center h-[calc(100vh-350px)]">
+                {#if !formSubmitted}
+                    <form class="flex flex-col md:flex-row w-full max-w-lg mx-auto items-center space-y-4 md:space-y-0 md:space-x-4">
+                        <div class="relative w-full text-lg">
+                            <Mail class="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400 h-5 w-5" />
+                            <Input bind:value={emailField}
+                                type="email"
+                                placeholder="Enter your email"
+                                class="pl-10 py-6 rounded-lg text-sm border-2 border-purple-100 focus:border-purple-400 shadow-sm hover:shadow-md transition-all duration-200"
+                            />
+                        </div>
+                        <!-- <div class="w-full mx-auto py-6 px-8 text-sm font-medium transition-colors">
+                            <JoinWaitlist/>
+                        </div> -->
+
+                        <Button
+                            type="submit"
+                            onclick={submitEmail}
+                            class="w-full mx-auto md:w-auto py-6 px-8 text-sm font-medium transition-colors duration-200 rounded-lg shadow-md hover:shadow-lg"
+                        >
+                            Join Waitlist
+                        </Button>
+                    </form>
+                {:else}
+                    <div class="text-center w-full max-w-lg mx-auto">
+                        <h3 class="text-2xl font-bold text-purple-600 mb-4">Thanks for your interest!</h3>
+                        <p class="text-gray-600">We'll keep you updated on our progress and let you know when Eurora is ready.</p>
+                    </div>
+                {/if}
+            </div>
+		<!-- <div class="flex justify-center w-1/3 mx-auto">
+            <Input  type="email" placeholder="Enter your email"/>
+			<Button size="lg" class="px-8" variant="primary">
+				<ArrowRight class="mr-2 h-5 w-5" />
+				Download Now
+			</Button>
+		</div> -->
+	</div>
+	<!-- <IntroModule /> -->
     <!-- <div class="pt-16 col-span-4">s
         <div class="relative animate-grow">
             <div
