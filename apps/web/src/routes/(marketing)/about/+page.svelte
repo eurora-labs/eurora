@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { Card, Button } from '@eurora/ui';
 	import { Users, Briefcase, GraduationCap, Mail, Github, Linkedin } from 'lucide-svelte';
-    import laura_thommen_img from '$lib/images/avatars/laura_thommen.jpg';
-    import andre_roelofs_img from '$lib/images/avatars/andre_roelofs.jpg';
+    // Use static images instead of importing from lib
+    const laura_thommen_img = '/images/avatars/laura_thommen.jpg';
+    const andre_roelofs_img = '/images/avatars/andre_roelofs.jpg';
 </script>
 
 <div class="container mx-auto px-4 py-16 max-w-5xl">
