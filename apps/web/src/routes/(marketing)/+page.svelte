@@ -53,9 +53,9 @@
 
 <div class="container mx-auto px-4 pb-16 max-w-5xl">
 	<!-- Title and Subtitle -->
-	<div class="text-center my-12 h-screen mx-auto">
-	    <h1 class="mx-48 pt-16 text-5xl font-bold mb-6 text-purple-600 leading-[60px]">Your Open Source AI Assistant</h1>
-		<p class="text-xl mx-48 font-medium text-gray-500 mb-8">Eurora is a fully Open Source AI Assistant that understands context, respects your privacy, and works across all your devices. Experience AI on your own terms.</p>
+	<div class="text-center my-16 md:my-24 mx-auto">
+	    <h1 class="mx-4 md:mx-48 pt-16 text-5xl font-bold mb-6 text-purple-600 leading-[60px]">Your Open Source AI Assistant</h1>
+		<p class="text-xl mx-4 md:mx-48 font-medium text-gray-500 mb-8">Eurora is a fully Open Source AI Assistant that understands context, respects your privacy, and works across all your devices. Experience AI on your own terms.</p>
             <div class="flex flex-col justify-center h-[calc(100vh-350px)]">
                 {#if !formSubmitted}
                     <form class="flex flex-col md:flex-row w-full max-w-lg mx-auto items-center space-y-4 md:space-y-0 md:space-x-4">
