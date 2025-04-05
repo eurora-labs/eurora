@@ -4,6 +4,7 @@
     // Use static images instead of importing from lib
     const laura_thommen_img = '/images/avatars/laura_thommen.jpg';
     const andre_roelofs_img = '/images/avatars/andre_roelofs.jpg';
+    const linda_rosner_img = '/images/avatars/linda_rosner.jpg';
 </script>
 
 <div class="container mx-auto px-4 py-16 max-w-5xl">
@@ -130,9 +131,10 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
-					<div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div>
-					<Card.Title>PLACEHOLDER</Card.Title>
-					<p class="text-purple-600 font-medium">PLACEHOLDER</p>
+					<img src={linda_rosner_img} alt="Laura Thommen" class="w-32 h-32 rounded-full object-cover mb-4" />
+
+					<Card.Title>Linda Rosner</Card.Title>
+					<p class="text-purple-600 font-medium">Chief Operations Officer</p>
 				</div>
 			</Card.Header>
 			<Card.Content>
@@ -142,7 +144,7 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							PLACEHOLDER
+							Co-founder of ArtisansPR, with deep expertise in media, entertainment, and tech communications. Serves on HPA’s Awards Committee and formerly chaired SMPTE Hollywood’s Board. Founding Board Member of EIPMA and frequent panel moderator for NAB, SMPTE, and others.
 						</p>
 					</div>
 					<div>
@@ -150,7 +152,7 @@
 							<GraduationCap class="w-4 h-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
-							PLACEHOLDER
+							BA in Theater from UCLA.
 						</p>
 					</div>
 					<div class="flex justify-center gap-3 mt-4">
