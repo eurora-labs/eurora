@@ -14,34 +14,34 @@ gix = { git = "https://github.com/GitoxideLabs/gitoxide", rev = "b4fe425a1a78237
 ] }
 gix-testtools = "0.15.0"
 insta = "1.41.1"
-uuid = { version = "1.11.0", features = ["v4", "serde"] }
+uuid = { version = "1.16.0", features = ["v4", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0.9"
-tokio = { version = "1.42.0", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 keyring = { version = "3.6.1", features = [
     "apple-native",
     "windows-native",
     "linux-native",
     "crypto-rust",
 ] }
-anyhow = "1.0.95"
+anyhow = "1.0.97"
 parking_lot = "0.12.3"
 futures = { version = "0.3.31"}
 toml = "0.8.13"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
-tempfile = "3.14"
+tempfile = "3.19"
 rand = "0.9.0"
 chrono = { version = "0.4.40", features = ["serde"] }
 tonic = "0.12.3"
 prost = "0.13.5"
 prost-types = "0.13.5"
 http-body = "1.0.1"
-http-body-util = "0.1.0"
+http-body-util = "0.1.3"
 tonic-build = "0.12.3"
 dirs = "6.0"
 log = "0.4"
-once_cell = "1.17"
+once_cell = "1.21"
 tokio-stream = "0.1"
 serde_json = "1.0"
 
