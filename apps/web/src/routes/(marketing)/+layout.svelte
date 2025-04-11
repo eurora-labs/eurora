@@ -44,7 +44,7 @@
 		<!-- <Button variant="ghost" href="/download">Download</Button> -->
 		<!-- <Button variant="ghost" href="/features">Features</Button> -->
 		<!-- <Button variant="ghost" href="/pricing">Pricing</Button> -->
-		<!-- <Button variant="ghost" href="/about">About Us</Button> -->
+		<Button variant="ghost" href="/about">About Us</Button>
 		<!-- <Button variant="ghost" href="/privacy">Privacy</Button> -->
 		<!-- <Button variant="ghost" href="/contact">Contact</Button> -->
 		<JoinWaitlist />

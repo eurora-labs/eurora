@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { Card, Button } from '@eurora/ui';
 	import { Users, Briefcase, GraduationCap, Mail, Github, Linkedin } from 'lucide-svelte';
+    // Use static images instead of importing from lib
+    const laura_thommen_img = '/images/avatars/laura_thommen.jpg';
+    const andre_roelofs_img = '/images/avatars/andre_roelofs.jpg';
+    const linda_rosner_img = '/images/avatars/linda_rosner.jpg';
 </script>
 
 <div class="container mx-auto px-4 py-16 max-w-5xl">
@@ -43,7 +47,9 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
-					<div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div>
+					<img src={laura_thommen_img} alt="Laura Thommen" class="w-32 h-32 rounded-full object-cover mb-4" />
+
+					<!-- <div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div> -->
 					<Card.Title>Laura Thommen</Card.Title>
 					<p class="text-purple-600 font-medium">Chief Executive Officer</p>
 				</div>
@@ -83,7 +89,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
-					<div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div>
+					<img src={andre_roelofs_img} alt="Andre Roelofs" class="w-32 h-32 rounded-full object-cover mb-4" />
 					<Card.Title>Andre Roelofs</Card.Title>
 					<p class="text-purple-600 font-medium">Chief Technology Officer</p>
 				</div>
@@ -125,7 +131,8 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
-					<div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div>
+					<img src={linda_rosner_img} alt="Laura Thommen" class="w-32 h-32 rounded-full object-cover mb-4" />
+
 					<Card.Title>Linda Rosner</Card.Title>
 					<p class="text-purple-600 font-medium">Chief Operations Officer</p>
 				</div>
@@ -137,8 +144,7 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							10+ years in operations and scaling startups, previously COO at DataSecure and
-							Director at TechScale.
+							Co-founder of ArtisansPR, with deep expertise in media, entertainment, and tech communications. Serves on HPA’s Awards Committee and formerly chaired SMPTE Hollywood’s Board. Founding Board Member of EIPMA and frequent panel moderator for NAB, SMPTE, and others.
 						</p>
 					</div>
 					<div>
@@ -146,7 +152,7 @@
 							<GraduationCap class="w-4 h-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
-							MBA from Harvard Business School, BA in Business Administration from UCLA.
+							BA in Theater from UCLA.
 						</p>
 					</div>
 					<div class="flex justify-center gap-3 mt-4">

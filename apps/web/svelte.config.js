@@ -16,7 +16,11 @@ const config = {
 			fallback: null,
 			precompress: true,
 			strict: true
-		})
+		}),
+		paths: {
+			// Ensure assets are loaded correctly on GitHub Pages
+			assets: ''
+		}
 	},
 	compilerOptions: {
 		css: 'injected',
