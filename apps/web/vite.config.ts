@@ -7,7 +7,10 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			'@eurora/ui': path.resolve(__dirname, '../../packages/ui/src'),
-			'@eurora/katex': path.resolve(__dirname, '../../packages/custom-components/katex/src/lib/index.ts')
+			'@eurora/katex': path.resolve(
+				__dirname,
+				'../../packages/custom-components/katex/src/lib/index.ts'
+			)
 		}
 	}
 });

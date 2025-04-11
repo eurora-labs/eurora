@@ -26,7 +26,6 @@
 	"dependencies": {
 		"@eurora/ui": "workspace:*",
 		"@eurora/katex": "workspace:*"
-
 	},
 	"devDependencies": {
 		"@eurora/eslint-config": "workspace:*",
