@@ -88,6 +88,15 @@ impl OpenAI {
             .unwrap();
         Self { client }
     }
+    
+    /// Creates a new OpenAI client with the provided API key
+    pub fn with_api_key(api_key: &str) -> Self {
+        let client = OpenAIClient::builder()
+            .with_api_key(api_key.to_string())
+            .build()
+            .unwrap();
+        Self { client }
+    }
 
     pub async fn video_question(
         &mut self,
