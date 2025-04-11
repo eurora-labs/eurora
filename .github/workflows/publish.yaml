@@ -72,7 +72,7 @@ jobs:
       - name: Compile Protobuf
         run: pnpm proto:typescript
       - name: Build SvelteKit
-        run: pnpm build -- --mode ${{ env.vitemode }}
+        run: pnpm build:desktop -- --mode ${{ env.vitemode }}
         env:
           SENTRY_RELEASE: ${{ env.version }}
       - uses: actions/upload-artifact@v4
