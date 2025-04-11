@@ -2,7 +2,7 @@
  * Page detection utilities
  */
 
-import { isYouTubeVideoUrl } from './url-helpers.ts';
+import { isYouTubeVideoUrl } from './url-helpers.js';
 
 /**
  * Common news and blog domains
