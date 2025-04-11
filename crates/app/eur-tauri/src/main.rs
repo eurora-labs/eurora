@@ -2,6 +2,7 @@
     all(windows, not(test), not(debug_assertions)),
     windows_subsystem = "windows"
 )]
+mod keyring_service;
 
 use eur_client_grpc::client_builder;
 use eur_client_questions::QuestionsClient;
@@ -12,6 +13,7 @@ use eur_proto::questions_service::ProtoChatMessage;
 use eur_tauri::{WindowState, create_launcher, create_window};
 use eur_timeline::{BrowserState, Timeline};
 use futures::StreamExt;
+use keyring_service::{ApiKeyStatus, KeyringService};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
@@ -28,6 +30,7 @@ type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedOpenAIClient = Arc<async_mutex::Mutex<Option<eur_openai::OpenAI>>>;
 type SharedConversationStorage = Arc<async_mutex::Mutex<Option<ConversationStorage>>>;
 type SharedCurrentConversation = Arc<Mutex<Option<Conversation>>>;
+type SharedKeyringService = Arc<KeyringService>;
 
 fn create_shared_conversation_storage() -> SharedConversationStorage {
     Arc::new(async_mutex::Mutex::new(None))
@@ -48,7 +51,11 @@ fn create_shared_timeline() -> SharedTimeline {
 }
 
 fn create_shared_openai_client() -> SharedOpenAIClient {
-    Arc::new(async_mutex::Mutex::new(Some(eur_openai::OpenAI::new())))
+    Arc::new(async_mutex::Mutex::new(None))
+}
+
+fn create_shared_keyring_service() -> SharedKeyringService {
+    Arc::new(KeyringService::new())
 }
 
 fn get_db_path(app_handle: &tauri::AppHandle) -> String {
@@ -67,6 +74,43 @@ async fn resize_launcher_window(window: tauri::Window, height: u32) -> Result<()
         }));
     }
     Ok(())
+}
+
+#[tauri::command]
+async fn check_api_key_exists(keyring_service: tauri::State<'_, SharedKeyringService>) -> Result<ApiKeyStatus, String> {
+    let has_key = keyring_service.has_api_key();
+    Ok(ApiKeyStatus { has_key })
+}
+
+#[tauri::command]
+async fn save_api_key(
+    keyring_service: tauri::State<'_, SharedKeyringService>,
+    api_key: String,
+) -> Result<(), String> {
+    keyring_service
+        .set_api_key(&api_key)
+        .map_err(|e| format!("Failed to save API key: {}", e))
+}
+
+#[tauri::command]
+async fn initialize_openai_client(
+    app_handle: tauri::AppHandle,
+    keyring_service: tauri::State<'_, SharedKeyringService>,
+) -> Result<bool, String> {
+    // Get the API key from keyring
+    let api_key = keyring_service
+        .get_api_key()
+        .map_err(|e| format!("Failed to get API key: {}", e))?;
+    
+    // Initialize the OpenAI client with the API key
+    let openai_client = eur_openai::OpenAI::with_api_key(&api_key);
+    
+    // Store the client in the app state
+    let state: tauri::State<SharedOpenAIClient> = app_handle.state();
+    let mut guard = state.lock().await;
+    *guard = Some(openai_client);
+    
+    Ok(true)
 }
 
 fn main() {
@@ -123,8 +167,30 @@ fn main() {
                     // Initialize the timeline and start collection
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
+// Create the keyring service
+let keyring_service = create_shared_keyring_service();
+app_handle.manage(keyring_service.clone());
 
-                    let openai_client = create_shared_openai_client();
+// Create the OpenAI client (initially None, will be initialized after API key check)
+let openai_client = create_shared_openai_client();
+app_handle.manage(openai_client.clone());
+
+// Check if API key exists and initialize OpenAI client if it does
+let keyring_clone = keyring_service.clone();
+let app_handle_clone = app_handle.clone();
+tauri::async_runtime::spawn(async move {
+    if keyring_clone.has_api_key() {
+        if let Ok(api_key) = keyring_clone.get_api_key() {
+            let client = eur_openai::OpenAI::with_api_key(&api_key);
+            let state: tauri::State<SharedOpenAIClient> = app_handle_clone.state();
+            let mut guard = state.lock().await;
+            *guard = Some(client);
+            info!("OpenAI client initialized with API key from keyring");
+        }
+    } else {
+        info!("No API key found in keyring, OpenAI client not initialized");
+    }
+});
                     app_handle.manage(openai_client.clone());
 
                     // Initialize conversation storage
@@ -171,7 +237,7 @@ fn main() {
                     {
                         // println!("Setting up global shortcut");
                         let super_space_shortcut =
-                            Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+                            Shortcut::new(Some(Modifiers::SUPER), Code::Space);
 
                         let launcher_label = launcher_window.label().to_string();
 
@@ -259,6 +325,9 @@ fn main() {
                     get_current_conversation,
                     switch_conversation,
                     list_conversations,
+                    check_api_key_exists,
+                    save_api_key,
+                    initialize_openai_client,
                 ])
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
