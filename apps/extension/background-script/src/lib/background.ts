@@ -1,27 +1,27 @@
 // Background script for tab tracking and content script initialization
-import { isYouTubeVideoUrl } from './utils/url-helpers.js';
-import { isArticlePage } from './utils/page-detection.ts';
+import {
+	ContentScriptContext,
+	YouTubeStrategy,
+	ArticleStrategy,
+	PdfStrategy
+} from './strategies/index.js';
 
+// Create and configure the content script context
+const contentScriptContext = new ContentScriptContext();
+
+// Register all available strategies
+contentScriptContext.registerStrategy(new YouTubeStrategy());
+contentScriptContext.registerStrategy(new PdfStrategy());
+// Register the article strategy as the default strategy
+contentScriptContext.registerStrategy(new ArticleStrategy(), true);
+
+// Listen for tab updates
 chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
+	// Only process when the page is fully loaded and has a URL
 	if (changeInfo.status !== 'complete' || !tab.url) return;
 
-	if (tab.url.includes('youtube.com/watch')) {
-		const queryParameters = tab.url.split('?')[1];
-		const urlParameters = new URLSearchParams(queryParameters);
-
-		console.log('YouTube page loaded, sending message to tab', tabId);
-
-		chrome.tabs.sendMessage(tabId, {
-			type: 'NEW',
-			videoId: urlParameters.get('v')
-		});
-	} else if (isArticlePage(tab.url)) {
-		console.log('Article page detected, initializing article watcher', tabId);
-
-		chrome.tabs.sendMessage(tabId, {
-			type: 'NEW_ARTICLE'
-		});
-	}
+	// Process the tab with the appropriate strategy
+	contentScriptContext.processTab(tabId, tab.url);
 });
 
 // Lifecycle handlers
@@ -29,4 +29,4 @@ chrome.runtime.onInstalled.addListener((details) => {
 	console.log('Extension installed or updated:', details.reason);
 });
 
-console.log('Background script initialized');
+console.log('Background script initialized with Strategy Pattern');
