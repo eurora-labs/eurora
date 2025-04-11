@@ -17,15 +17,13 @@
 		"test:unit": "vitest",
 		"ui:add": "pnpm dlx shadcn-svelte@next add"
 	},
-    "dependencies": {
+	"dependencies": {
 		"@eurora/katex": "workspace:*"
-
-    },
+	},
 	"peerDependencies": {
 		"lucide-svelte": "^0.487.0",
 		"svelte": "^5.0.0",
 		"@eurora/katex": "workspace:*"
-
 	},
 	"devDependencies": {
 		"@eurora/katex": "workspace:*",
