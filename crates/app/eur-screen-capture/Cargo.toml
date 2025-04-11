@@ -6,12 +6,12 @@ authors = ["Eurora <eurora@company.com>"]
 description = "Screen and window capture utility using xcap"
 
 [dependencies]
-xcap = "0.3.3"
-tokio = { version = "1.32.0", features = ["full"] }
+xcap = "0.4.1"
+tokio = { version = "1.44.2", features = ["full"] }
 image = { version = "0.25", features = ["jpeg"] }
-anyhow = "1.0.75"
+anyhow = "1.0.97"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.17"
-ctrlc = "3.4.0"
+ctrlc = "3.4.6"
 chrono = "0.4.31"
-sysinfo = "0.29.0"
+sysinfo = "0.33.1"

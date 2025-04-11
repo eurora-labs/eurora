@@ -17,7 +17,7 @@ prost = { workspace = true }
 futures = { workspace = true }
 tokio-stream = { workspace = true }
 base64 = "0.22.1"
-ctrlc = "3.4.2"
+ctrlc = "3.4.6"
 h2 = "0.4.8"
 sentry = { version = "0.37.0" }
 
