@@ -167,8 +167,6 @@ else
 fi
 
 # Experimental build of all packages
-pnpm build
-
 
 # build the app with release config
 tauri build \
