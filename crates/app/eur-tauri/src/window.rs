@@ -127,3 +127,27 @@ pub fn create(
     .build()?;
     Ok(window)
 }
+#[cfg(target_os = "macos")]
+pub fn create_launcher(
+    handle: &AppHandle,
+    label: &str,
+    window_relative_url: String,
+) -> tauri::Result<tauri::WebviewWindow> {
+    let window = tauri::WebviewWindowBuilder::new(
+        handle,
+        label,
+        tauri::WebviewUrl::External(Url::parse("http://localhost:1420/launcher").unwrap()),
+    )
+    .resizable(false)
+    .inner_size(575.0, 50.0)
+    .disable_drag_drop_handler()
+    .decorations(false)
+    .always_on_top(true)
+    .center()
+    .title_bar_style(tauri::TitleBarStyle::Overlay)
+    .hidden_title(true)
+    .visible(false)
+    .build()?;
+
+    Ok(window)
+}
