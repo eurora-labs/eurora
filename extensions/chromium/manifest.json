@@ -3,7 +3,7 @@
 	"description": "Eurora Chrome Extension",
 	"version": "0.0.8",
 	"manifest_version": 3,
-	"homepage_url": "https://github.com/Eurora-Labs/chrome-extension",
+	"homepage_url": "https://eurora-labs.com",
 	"background": {
 		"service_worker": "scripts/background/main.js"
 	},
