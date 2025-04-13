@@ -5,7 +5,6 @@ import path from 'path';
 export default defineConfig({
     plugins: [sveltekit()],
     build: {
-        outDir: path.join(__dirname, '../../../extensions/chromium/pages/popup'),
         emptyOutDir: true,
         reportCompressedSize: true,
         commonjsOptions: {
