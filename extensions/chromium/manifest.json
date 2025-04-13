@@ -35,15 +35,8 @@
 			"resources": [
 				"scripts/background/*",
 				"scripts/content/assets/*",
-				"content/web/viewer.html",
-				"pages/options/*",
 				"pages/popup/*",
 
-				"content/web/viewer.html",
-				"pdfjs/viewer/*",
-				"pdfjs/*",
-				"pdfjs/viewer/assets/*",
-				"pdfjs-lib/*",
 				"http:/*",
 				"https:/*",
 				"file:/*",
