@@ -22,14 +22,14 @@ const config = {
 			// assets: 'build',
 			// fallback: 'index.html',
 			fallback: null,
-			precompress: false,
+			precompress: true,
             strict: false,
             // manifest: 'manifest.json'
             
         }),
         appDir: 'app',
         paths: {
-            relative: false,
+            relative: true,
         },
         csp: {
             directives: {
