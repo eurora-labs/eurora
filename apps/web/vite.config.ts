@@ -2,6 +2,8 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import path from 'path';
 
+console.log(path.resolve(__dirname, '../../packages/ui/src'));
+
 export default defineConfig({
 	plugins: [sveltekit()],
 	resolve: {
