@@ -24,7 +24,7 @@ const config = {
 			fallback: null,
 			precompress: false,
             strict: false,
-            manifest: 'manifest.json'
+            // manifest: 'manifest.json'
             
         }),
         appDir: 'app',
