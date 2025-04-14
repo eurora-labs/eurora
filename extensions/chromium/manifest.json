@@ -61,15 +61,11 @@
 	},
 	"incognito": "split",
 	"permissions": [
-		"alarms",
-		"declarativeNetRequestWithHostAccess",
 		"activeTab",
-		"scripting",
 		"nativeMessaging",
-		"webRequest",
 		"tabs",
-		"webNavigation",
-		"storage"
+		"storage",
+		"scripting"
 	],
 	"host_permissions": ["<all_urls>"]
 }
