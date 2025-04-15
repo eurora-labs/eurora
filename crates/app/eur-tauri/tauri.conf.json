@@ -33,7 +33,7 @@
                 "fragmentPaths": [
                     "fragment.wxs"
                 ],
-                "componentRefs": ["MyFragmentRegistryEntries"]
+                "componentRefs": ["MyFragmentRegistryEntries", "NativeMessagingHostJson"]
             }
 		},
 		"linux": {
