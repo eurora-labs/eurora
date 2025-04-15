@@ -3,7 +3,7 @@
     <Fragment>
         <!-- Define the directory structure for C:\Program Files\Eurora Labs\Eurora\ -->
         <DirectoryRef Id="TARGETDIR">
-            <Directory Id="ProgramFilesFolder">
+            <Directory Id="ProgramFiles64Folder">
                 <Directory Id="EuroraLabsFolder" Name="Eurora Labs">
                     <Directory Id="EuroraFolder" Name="Eurora">
                         <!-- Component to copy the native-messaging-host.json file to the target location -->
