@@ -36,12 +36,12 @@
         </DirectoryRef>
 
         <!-- Define the feature that includes our components -->
-        <Feature Id="NativeMessagingFeature"
+        <!-- <Feature Id="NativeMessagingFeature"
                 Title="Chrome Native Messaging Support"
                 Level="1"
                 Description="Installs support for Chrome extension native messaging">
             <ComponentRef Id="NativeMessagingHostJson" />
             <ComponentRef Id="MyFragmentRegistryEntries" />
-        </Feature>
+        </Feature> -->
     </Fragment>
 </Wix>
