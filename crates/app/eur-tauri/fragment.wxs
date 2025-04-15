@@ -7,7 +7,7 @@
                 <Directory Id="EuroraLabsFolder" Name="Eurora Labs">
                     <Directory Id="EuroraFolder" Name="Eurora">
                         <!-- Component to copy the native-messaging-host.json file to the target location -->
-                        <Component Id="NativeMessagingHostJson" Guid="*" Feature="NativeMessagingFeature">
+                        <Component Id="NativeMessagingHostJson" Guid="*">
                             <File Id="NativeMessagingHostJsonFile"
                                 Name="com.eurora.app.json"
                                 Source="D:\a\eurora\eurora\extensions\chromium\native-messaging-host.json"
@@ -18,7 +18,7 @@
             </Directory>
 
             <!-- Registry component -->
-            <Component Id="MyFragmentRegistryEntries" Guid="*" Feature="NativeMessagingFeature">
+            <Component Id="MyFragmentRegistryEntries" Guid="*">
                 <RegistryKey
                 Root="HKCU"
                 Key="Software\Google\Chrome\NativeMessagingHosts\com.eurora.app"
