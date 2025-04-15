@@ -1,44 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Fragment>
-    <DirectoryRef Id="TARGETDIR">
         <!-- Define the directory structure for C:\Program Files\Eurora Labs\Eurora\ -->
-        <Directory Id="ProgramFilesFolder">
-            <Directory Id="EuroraLabsFolder" Name="Eurora Labs">
-                <Directory Id="EuroraFolder" Name="Eurora">
-                    <!-- Component to copy the native-messaging-host.json file to the target location -->
-                    <Component Id="NativeMessagingHostJson" Guid="*">
-                        <File Id="NativeMessagingHostJsonFile"
-                              Name="com.eurora.app.json"
-                              Source="extensions\chromium\native-messaging-host.json"
-                              KeyPath="yes" />
-                    </Component>
+        <DirectoryRef Id="TARGETDIR">
+            <Directory Id="ProgramFilesFolder">
+                <Directory Id="EuroraLabsFolder" Name="Eurora Labs">
+                    <Directory Id="EuroraFolder" Name="Eurora">
+                        <!-- Component to copy the native-messaging-host.json file to the target location -->
+                        <Component Id="NativeMessagingHostJson" Guid="*" Feature="NativeMessagingFeature">
+                            <File Id="NativeMessagingHostJsonFile"
+                                Name="com.eurora.app.json"
+                                Source="extensions\chromium\native-messaging-host.json"
+                                KeyPath="yes" />
+                        </Component>
+                    </Directory>
                 </Directory>
             </Directory>
-        </Directory>
 
-        <!-- Registry component -->
-        <Component Id="MyFragmentRegistryEntries" Guid="*">
-            <RegistryKey
-            Root="HKCU"
-            Key="Software\Google\Chrome\NativeMessagingHosts\com.eurora.app"
-            Action="createAndRemoveOnUninstall"
-            >
-                <!-- values to persist on the registry -->
-                <RegistryValue
-                    Type="string"
-                    Name="NativeMessagingManifestLocation"
-                    Value="C:\Program Files\Eurora Labs\Eurora\com.eurora.app.json"
-                    KeyPath="yes"
-                />
-            </RegistryKey>
-        </Component>
-    </DirectoryRef>
+            <!-- Registry component -->
+            <Component Id="MyFragmentRegistryEntries" Guid="*" Feature="NativeMessagingFeature">
+                <RegistryKey
+                Root="HKCU"
+                Key="Software\Google\Chrome\NativeMessagingHosts\com.eurora.app"
+                Action="createAndRemoveOnUninstall"
+                >
+                    <!-- values to persist on the registry -->
+                    <RegistryValue
+                        Type="string"
+                        Name="NativeMessagingManifestLocation"
+                        Value="C:\Program Files\Eurora Labs\Eurora\com.eurora.app.json"
+                        KeyPath="yes"
+                    />
+                </RegistryKey>
+            </Component>
+        </DirectoryRef>
 
-    <!-- Reference the component in a feature to ensure it's installed -->
-    <ComponentGroup Id="NativeMessagingComponents">
-        <ComponentRef Id="NativeMessagingHostJson" />
-        <ComponentRef Id="MyFragmentRegistryEntries" />
-    </ComponentGroup>
+        <!-- Define the feature that includes our components -->
+        <Feature Id="NativeMessagingFeature"
+                Title="Chrome Native Messaging Support"
+                Level="1"
+                Description="Installs support for Chrome extension native messaging">
+            <ComponentRef Id="NativeMessagingHostJson" />
+            <ComponentRef Id="MyFragmentRegistryEntries" />
+        </Feature>
     </Fragment>
 </Wix>
