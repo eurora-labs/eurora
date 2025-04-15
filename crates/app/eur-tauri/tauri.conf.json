@@ -28,7 +28,12 @@
 			"icons/dev/icon.ico"
 		],
 		"windows": {
-			"certificateThumbprint": null
+			"certificateThumbprint": null,
+            "wix": {
+                "fragmentPaths": [
+                    "./fragment.wxs"
+                ]
+            }
 		},
 		"linux": {
 			"rpm": {
