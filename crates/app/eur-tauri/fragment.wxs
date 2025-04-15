@@ -1,15 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Fragment>
-        <ComponentGroup Id="MyRegistryKeys" Directory="APPLICATIONFOLDER">
-            <Component Id="RegistryKeys" Guid="a44841a1-d491-4338-acf2-ed566f196d33">
-                <RegistryKey 
-                    Root="HKCU" 
-                    Key="Software\Google\Chrome\NativeMessagingHosts\com.eurora.app"
-                >
-                <RegistryValue Type="string" Value="[APPLICATIONFOLDER]com.eurora.app.json" />
-                </RegistryKey>
-            </Component>
-        </ComponentGroup>
+        <DirectoryRef Id="TARGETDIR">
+      <!-- groups together the registry entries to be installed -->
+      <!-- Note the unique `Id` we provide here -->
+      <Component Id="MyFragmentRegistryEntries" Guid="*">
+        <!-- the registry key will be under
+       HKEY_CURRENT_USER\Software\MyCompany\MyApplicationName -->
+        <!-- Tauri uses the second portion of the
+       bundle identifier as the `MyCompany` name
+       (e.g. `tauri-apps` in `com.tauri-apps.test`)  -->
+        <RegistryKey
+          Root="HKCU"
+          Key="Software\Google\Chrome\NativeMessagingHosts\com.eurora.app"
+          Action="createAndRemoveOnUninstall"
+        >
+          <!-- values to persist on the registry -->
+          <RegistryValue
+            Type="string" 
+            Name="NativeMessagingManifestLocation"
+            Value="[APPLICATIONFOLDER]com.eurora.app.json"
+            KeyPath="yes"
+          />
+          <RegistryValue Type="string" Value="Default Value" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+      
     </Fragment>
 </Wix>
