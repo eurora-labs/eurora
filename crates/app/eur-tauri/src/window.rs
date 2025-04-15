@@ -92,10 +92,12 @@ pub fn create_launcher(
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,
-        tauri::WebviewUrl::App(window_relative_url.into()),
+        // tauri::WebviewUrl::App(window_relative_url.into()),
 
-        // tauri::WebviewUrl::External(Url::parse("http://localhost:1420/launcher").unwrap()),
-        // tauri::WebviewUrl::External(Url::parse(&format!("{}/launcher", window_relative_url)).unwrap()),
+        #[cfg(debug_assertions)]
+        tauri::WebviewUrl::External(Url::parse("http://localhost:1420/launcher").unwrap()),
+        #[cfg(not(debug_assertions))]
+        tauri::WebviewUrl::External(Url::parse("http://tauri.localhost/launcher").unwrap()),
     )
     .resizable(false)
     .inner_size(575.0, 50.0)
@@ -140,7 +142,11 @@ pub fn create_launcher(
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,
-        tauri::WebviewUrl::External(Url::parse(&format!("{}/launcher", window_relative_url)).unwrap()),
+        // tauri::WebviewUrl::External(Url::parse(&format!("{}/launcher", window_relative_url)).unwrap()),
+        #[cfg(debug_assertions)]
+        tauri::WebviewUrl::External(Url::parse("http://localhost:1420/launcher").unwrap()),
+        #[cfg(not(debug_assertions))]
+        tauri::WebviewUrl::External(Url::parse("http://tauri.localhost/launcher").unwrap()),
     )
     .resizable(false)
     .inner_size(575.0, 50.0)
