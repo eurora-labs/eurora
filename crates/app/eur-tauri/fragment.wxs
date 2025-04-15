@@ -3,9 +3,9 @@
     <Fragment>
         <!-- Define the directory structure for C:\Program Files\Eurora Labs\Eurora\ -->
         <DirectoryRef Id="TARGETDIR">
-            <Directory Id="ProgramFiles64Folder">
+            <!-- <Directory Id="ProgramFiles64Folder">
                 <Directory Id="EuroraLabsFolder" Name="Eurora Labs">
-                    <Directory Id="EuroraFolder" Name="Eurora">
+                    <Directory Id="EuroraFolder" Name="Eurora"> -->
                         <!-- Component to copy the native-messaging-host.json file to the target location -->
                         <Component Id="NativeMessagingHostJson" Guid="*">
                             <File Id="NativeMessagingHostJsonFile"
@@ -13,9 +13,9 @@
                                 Source="D:\a\eurora\eurora\extensions\chromium\native-messaging-host.json"
                                 KeyPath="yes" />
                         </Component>
-                    </Directory>
+                    <!-- </Directory>
                 </Directory>
-            </Directory>
+            </Directory> -->
 
             <!-- Registry component -->
             <Component Id="MyFragmentRegistryEntries" Guid="*">
