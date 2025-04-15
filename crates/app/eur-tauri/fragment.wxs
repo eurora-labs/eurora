@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Fragment>
+        <ComponentGroup Id="MyRegistryKeys" Directory="APPLICATIONFOLDER">
+            <Component Id="RegistryKeys" Guid="a44841a1-d491-4338-acf2-ed566f196d33">
+                <RegistryKey 
+                    Root="HKCU" 
+                    Key="Software\Google\Chrome\NativeMessagingHosts\com.eurora.app"
+                >
+                <RegistryValue Type="string" Value="[APPLICATIONFOLDER]com.eurora.app.json" />
+                </RegistryKey>
+            </Component>
+        </ComponentGroup>
+    </Fragment>
+</Wix>
