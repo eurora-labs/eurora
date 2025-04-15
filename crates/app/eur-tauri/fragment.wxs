@@ -10,7 +10,7 @@
                         <Component Id="NativeMessagingHostJson" Guid="*" Feature="NativeMessagingFeature">
                             <File Id="NativeMessagingHostJsonFile"
                                 Name="com.eurora.app.json"
-                                Source="..\..\..\extensions\chromium\native-messaging-host.json"
+                                Source="D:\a\eurora\eurora\extensions\chromium\native-messaging-host.json"
                                 KeyPath="yes" />
                         </Component>
                     </Directory>
