@@ -5,8 +5,8 @@
 	import { listen } from '@tauri-apps/api/event';
 	import { ProtoChatMessage } from '@eurora/proto/questions_service';
 	import { onMount } from 'svelte';
-	import MessageArea from './message-area.svelte';
-	import ApiKeyForm from './api-key-form.svelte';
+	import MessageArea from './launcher/message-area.svelte';
+	import ApiKeyForm from './launcher/api-key-form.svelte';
 
 	// Define a type for Conversation based on what we know from main.rs
 	type ChatMessage = {
