@@ -298,14 +298,73 @@ function install_native_messaging_host() {
 		# For Windows, we need to create registry entries
 		# This would typically be done by the installer, but we'll include the commands here
 		# Note: This requires administrative privileges to run
-		info "  - On Windows, the native messaging host manifest is installed via registry"
-		info "  - The installer should run the following commands:"
-		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Google\\Chrome\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"C:\\Program Files\\Eurora\\com.eurora.app.json\" /f"
-		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Chromium\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"C:\\Program Files\\Eurora\\com.eurora.app.json\" /f"
-		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Edge\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"C:\\Program Files\\Eurora\\com.eurora.app.json\" /f"
 		
-		# Also create the manifest file in the installation directory
-		info "  - The manifest file should be placed at: C:\\Program Files\\Eurora\\com.eurora.app.json"
+		# Define the manifest path
+		local MANIFEST_PATH="C:\\Program Files\\Eurora\\com.eurora.app.json"
+		
+		# Add registry keys for Chrome, Chromium, Edge, and Brave
+		info "  - Adding registry keys for native messaging host..."
+		
+		# For current user (HKCU)
+		info "  - Adding registry key for Chrome (current user)..."
+		cmd.exe /c "REG ADD \"HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"$MANIFEST_PATH\" /f"
+		if [ $? -eq 0 ]; then
+			info "    Successfully added Chrome registry key"
+		else
+			info "    Failed to add Chrome registry key"
+		fi
+		
+		info "  - Adding registry key for Chromium (current user)..."
+		cmd.exe /c "REG ADD \"HKCU\\Software\\Chromium\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"$MANIFEST_PATH\" /f"
+		if [ $? -eq 0 ]; then
+			info "    Successfully added Chromium registry key"
+		else
+			info "    Failed to add Chromium registry key"
+		fi
+		
+		info "  - Adding registry key for Microsoft Edge (current user)..."
+		cmd.exe /c "REG ADD \"HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"$MANIFEST_PATH\" /f"
+		if [ $? -eq 0 ]; then
+			info "    Successfully added Microsoft Edge registry key"
+		else
+			info "    Failed to add Microsoft Edge registry key"
+		fi
+		
+		info "  - Adding registry key for Brave Browser (current user)..."
+		cmd.exe /c "REG ADD \"HKCU\\Software\\BraveSoftware\\Brave-Browser\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"$MANIFEST_PATH\" /f"
+		if [ $? -eq 0 ]; then
+			info "    Successfully added Brave Browser registry key"
+		else
+			info "    Failed to add Brave Browser registry key"
+		fi
+		
+		# Note about system-wide installation
+		info "  - Note: System-wide installation (HKLM) requires administrative privileges"
+		info "    To add system-wide registry keys, run the following commands as administrator:"
+		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Google\\Chrome\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"$MANIFEST_PATH\" /f"
+		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Chromium\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"$MANIFEST_PATH\" /f"
+		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Edge\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"$MANIFEST_PATH\" /f"
+		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\BraveSoftware\\Brave-Browser\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"$MANIFEST_PATH\" /f"
+		# Create the manifest file in the installation directory
+		info "  - Creating manifest file at: $MANIFEST_PATH"
+		
+		# Get the path to the native-messaging-host.json template
+		local TEMPLATE_PATH="$PWD/../extensions/chromium/native-messaging-host.json"
+		
+		# Create the manifest content with the correct binary path for Windows
+		local WINDOWS_BINARY_PATH="C:\\Program Files\\Eurora\\eur-native-messaging.exe"
+		local MANIFEST_CONTENT=$(cat "$TEMPLATE_PATH" | sed "s|\"path\": \".*\"|\"path\": \"$WINDOWS_BINARY_PATH\"|")
+		
+		# Create a temporary file with the manifest content
+		echo "$MANIFEST_CONTENT" > "$TMP_DIR/com.eurora.app.json"
+		
+		# Copy the manifest file to the installation directory
+		# Note: This would typically be done by the installer
+		info "  - The manifest file content has been prepared and should be installed to:"
+		info "    $MANIFEST_PATH"
+		info "  - Manifest content:"
+		info "$(cat "$TMP_DIR/com.eurora.app.json")"
+		info "  - The manifest file should be placed at: $MANIFEST_PATH"
 	fi
 }
 
