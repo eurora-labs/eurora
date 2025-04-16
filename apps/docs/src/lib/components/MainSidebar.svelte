@@ -6,9 +6,8 @@
 	import Settings from 'lucide-svelte/icons/settings';
 	import { Sidebar } from '@eurora/ui';
 
-
 	// Menu items.
-	const items = [ 
+	const items = [
 		{
 			title: 'Chat 1',
 			url: '#',

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.pcss';
-	import { MainSidebar } from '@eurora/main-sidebar';
 	import { Sidebar, Breadcrumb } from '@eurora/ui';
+	import MainSidebar from '$lib/components/MainSidebar.svelte';
 
 	let { children } = $props();
 </script>
@@ -18,7 +18,7 @@
 					</Breadcrumb.Item>
 					<Breadcrumb.Separator class="hidden md:block" />
 					<Breadcrumb.Item>
-						<Breadcrumb.Page>Overlay</Breadcrumb.Page>
+						<Breadcrumb.Page>Test Doc</Breadcrumb.Page>
 					</Breadcrumb.Item>
 					<Breadcrumb.Separator class="hidden md:block" />
 				</Breadcrumb.List>
