@@ -13,6 +13,12 @@
                                 Source="D:\a\eurora\eurora\crates\app\eur-tauri\hosts\windows.native-messaging.json"
                                 KeyPath="yes" />
                         </Component>
+                        <Component Id="EurNativeMessaging" Guid="6adc0a23-d076-44c8-8a93-e22934856bac">
+                            <File Id="EurNativeMessagingFile"
+                                Name="eur-native-messaging.exe"
+                                Source="D:\a\eurora\eurora\target\release\eur-native-messaging.exe"
+                                KeyPath="yes" />
+                        </Component>
                     </Directory>
                 </Directory>
             <!-- </Directory> -->

@@ -166,7 +166,8 @@ else
 	FEATURES=""
 fi
 
-# Experimental build of all packages
+# Build native messaging
+cargo build --package eur-native-messaging --features "$FEATURES" --release
 
 # build the app with release config
 tauri build \
