@@ -18,15 +18,12 @@
 		"ui:add": "pnpm dlx shadcn-svelte@next add"
 	},
 	"dependencies": {
-		"@eurora/katex": "workspace:*"
 	},
 	"peerDependencies": {
 		"lucide-svelte": "^0.488.0",
-		"svelte": "^5.0.0",
-		"@eurora/katex": "workspace:*"
+		"svelte": "^5.0.0"
 	},
 	"devDependencies": {
-		"@eurora/katex": "workspace:*",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@sveltejs/adapter-static": "^3.0.8",
