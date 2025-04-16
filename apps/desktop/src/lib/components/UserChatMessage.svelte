@@ -32,7 +32,7 @@
 							<div class="w-full">
 								<div class="flex w-full flex-col items-end gap-1 empty:hidden rtl:items-start">
 									<div
-										class="bg-token-message-surface relative max-w-[70%] rounded-3xl px-5 py-2.5"
+										class="relative max-w-[70%] rounded-3xl bg-token-message-surface px-5 py-2.5"
 									>
 										<div class="whitespace-pre-wrap">
 											{@render children?.()}
