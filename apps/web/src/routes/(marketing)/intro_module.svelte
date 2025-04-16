@@ -1,14 +1,14 @@
 <script lang="ts">
 	// Removed Input import as we're using a custom div
 	import { onMount } from 'svelte';
-	import { Mic, ScrollText, Youtube, TvMinimalPlay, Globe } from 'lucide-svelte';
+	import { Mic, ScrollText, Youtube, TvMinimalPlay, Globe } from '@lucide/svelte';
 	import { Card, Button, Input } from '@eurora/ui';
 	import { Sheet, ScrollArea, Skeleton } from '@eurora/ui';
 	import { buttonVariants } from '@eurora/ui';
-    // import WaitlistForm from './waitlist_form.svelte';
-    import JoinWaitlist from './join_waitlist.svelte';
+	// import WaitlistForm from './waitlist_form.svelte';
+	import JoinWaitlist from './join_waitlist.svelte';
 
-    import { SiYoutube } from '@icons-pack/svelte-simple-icons';
+	import { SiYoutube } from '@icons-pack/svelte-simple-icons';
 
 	// Animation state tracking
 	let typingComplete = false;
@@ -41,20 +41,26 @@
 	function startCardSequence() {
 		// Show cursor and keep it visible forever
 		// showCursor = true;
-		
+
 		// Start showing cards with staggered animation
 		let delay = 300; // Initial delay after typing completes
-		
+
 		cards.forEach((card, index) => {
-			setTimeout(() => {
-				visibleCards = [...visibleCards, card.id];
-			}, delay + index * cardStaggerDelay);
+			setTimeout(
+				() => {
+					visibleCards = [...visibleCards, card.id];
+				},
+				delay + index * cardStaggerDelay
+			);
 		});
-		
+
 		// Show tagline after all cards are visible
-		setTimeout(() => {
-			showTagLine = true;
-		}, delay + cards.length * cardStaggerDelay + 400);
+		setTimeout(
+			() => {
+				showTagLine = true;
+			},
+			delay + cards.length * cardStaggerDelay + 400
+		);
 	}
 
 	onMount(() => {
@@ -113,39 +119,48 @@
 			<!-- Three cards in a row below the input box -->
 			<div class="col-span-12 grid grid-cols-1 md:grid-cols-12 gap-6">
 				{#if visibleCards.includes(1)}
-					<div class="col-span-12 md:col-span-4 card-entrance mb-4 md:mb-0" style="--animation-delay: 0ms;">
+					<div
+						class="col-span-12 md:col-span-4 card-entrance mb-4 md:mb-0"
+						style="--animation-delay: 0ms;"
+					>
 						<Card.Root class="w-full aspect-video card-content">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
 								<div class="flex justify-center items-center icon-animation">
 									<SiYoutube color="rgb(147 51 234 / var(--tw-text-opacity, 1))" size={64} />
 								</div>
-                                <Card.Title class="title-animation">YouTube Videos</Card.Title>
+								<Card.Title class="title-animation">YouTube Videos</Card.Title>
 							</Card.Content>
 						</Card.Root>
 					</div>
 				{/if}
-				
+
 				{#if visibleCards.includes(2)}
-					<div class="col-span-12 md:col-span-4 card-entrance mb-4 md:mb-0" style="--animation-delay: {cards[1].animationDelay};">
+					<div
+						class="col-span-12 md:col-span-4 card-entrance mb-4 md:mb-0"
+						style="--animation-delay: {cards[1].animationDelay};"
+					>
 						<Card.Root class="w-full aspect-video card-content">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
 								<div class="flex justify-center items-center icon-animation">
 									<ScrollText class="text-purple-600" size={64} />
 								</div>
-                                <Card.Title class="title-animation">PDF Documents</Card.Title>
+								<Card.Title class="title-animation">PDF Documents</Card.Title>
 							</Card.Content>
 						</Card.Root>
 					</div>
 				{/if}
-				
+
 				{#if visibleCards.includes(3)}
-					<div class="col-span-12 md:col-span-4 card-entrance" style="--animation-delay: {cards[2].animationDelay};">
+					<div
+						class="col-span-12 md:col-span-4 card-entrance"
+						style="--animation-delay: {cards[2].animationDelay};"
+					>
 						<Card.Root class="w-full aspect-video card-content">
 							<Card.Content class="flex flex-col items-center justify-center h-full">
 								<div class="flex justify-center items-center icon-animation">
 									<Globe class="text-purple-600" size={64} />
 								</div>
-                                <Card.Title class="title-animation">Any Other Websites</Card.Title>
+								<Card.Title class="title-animation">Any Other Websites</Card.Title>
 							</Card.Content>
 						</Card.Root>
 					</div>
@@ -155,12 +170,15 @@
 	</div>
 
 	{#if showTagLine}
-		<div class="text-center mt-12 md:mt-24 tagline-entrance px-4 hidden md:block" bind:this={taglineComponent}>
+		<div
+			class="text-center mt-12 md:mt-24 tagline-entrance px-4 hidden md:block"
+			bind:this={taglineComponent}
+		>
 			<h1 class="text-3xl md:text-4xl font-bold mb-4 fade-in-up">AI On Your Own Terms</h1>
-            <div class="fade-in-up" style="--animation-delay: 200ms;">
-                <JoinWaitlist />
-            </div>
-            <!-- <Sheet.Root>
+			<div class="fade-in-up" style="--animation-delay: 200ms;">
+				<JoinWaitlist />
+			</div>
+			<!-- <Sheet.Root>
                 <Sheet.Trigger class={buttonVariants({ variant: "default" })}
                   >Join Waitlist</Sheet.Trigger
                 >
@@ -194,7 +212,7 @@
 				</Button>
 			</div>
 		</div>
-        <!-- <div class="text-center" bind:this={taglineComponent}>
+		<!-- <div class="text-center" bind:this={taglineComponent}>
             <h1 class="text-5xl font-bold mb-6">Intelligence Without Compromise</h1>
             <p class="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
                 Eurora is a fully Open Source AI assistant that understands context, respects your privacy, and works across
@@ -247,18 +265,18 @@
 			/* Adjust animation timing for mobile */
 			animation-duration: 0.5s;
 		}
-		
+
 		/* Ensure cards have proper spacing on mobile */
 		:global(.card-content) {
 			margin-bottom: 1rem;
 		}
-		
+
 		/* Adjust icon size for mobile */
 		:global(.icon-animation svg) {
 			transform: scale(0.9);
 		}
 	}
-	
+
 	/* Cursor blinking animation */
 	@keyframes blink {
 		0%,
