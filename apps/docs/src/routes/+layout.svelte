@@ -1,5 +1,7 @@
 <script lang="ts">
-	import '../../app.pcss';
+	import '../app.pcss';
+	import { MainSidebar } from '@eurora/main-sidebar';
+
 	let { children } = $props();
 </script>
 
