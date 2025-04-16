@@ -194,10 +194,6 @@ importers:
         version: 3.1.1(@types/debug@4.1.12)(@types/node@22.13.14)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.29.2)(yaml@2.7.0)
 
   apps/docs:
-    dependencies:
-      '@eurora/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
     devDependencies:
       '@eurora/eslint-config':
         specifier: workspace:*
@@ -208,6 +204,9 @@ importers:
       '@sveltejs/adapter-auto':
         specifier: ^3.3.1
         version: 3.3.1(@sveltejs/kit@2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))
+      '@sveltejs/adapter-static':
+        specifier: ^3.0.8
+        version: 3.0.8(@sveltejs/kit@2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))
       '@sveltejs/kit':
         specifier: ^2.20.7
         version: 2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0))

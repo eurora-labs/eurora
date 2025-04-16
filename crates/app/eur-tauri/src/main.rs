@@ -234,7 +234,7 @@ tauri::async_runtime::spawn(async move {
                     });
 
                     #[cfg(desktop)]
-                    {
+                    { 
                         // println!("Setting up global shortcut");
                         let super_space_shortcut =
                             Shortcut::new(Some(Modifiers::SUPER), Code::Space);
