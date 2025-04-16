@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ConversationItem from './conversation-item.svelte';
-	import SendHorizontal from 'lucide-svelte/icons/send-horizontal';
+	import SendHorizontal from '@lucide/svelte/icons/send-horizontal';
 	import type Message from './message.js';
 	import { Button, Textarea } from '@eurora/ui';
 
