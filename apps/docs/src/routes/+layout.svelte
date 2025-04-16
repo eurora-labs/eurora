@@ -6,7 +6,7 @@
 	let { children } = $props();
 </script>
 
-<Sidebar.Provider class="min-h-min" open={false}>
+<Sidebar.Provider class="min-h-min" open={true}>
 	<MainSidebar />
 	<Sidebar.Inset class="min-h-min">
 		<header class="flex h-16 shrink-0 items-center gap-2 border-b px-4">
