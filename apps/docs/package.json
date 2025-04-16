@@ -16,8 +16,6 @@
 		"test:unit": "vitest"
 	},
 	"dependencies": {
-		"@eurora/ui": "workspace:*",
-		"@eurora/main-sidebar": "workspace:*"
 	},
 	"devDependencies": {
 		"@eurora/eslint-config": "workspace:*",
