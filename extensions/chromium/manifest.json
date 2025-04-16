@@ -61,14 +61,8 @@
 	},
 	"incognito": "split",
 	"permissions": [
-		"alarms",
-		"declarativeNetRequestWithHostAccess",
-		"activeTab",
-		"scripting",
 		"nativeMessaging",
-		"webRequest",
 		"tabs",
-		"webNavigation",
 		"storage"
 	],
 	"host_permissions": ["<all_urls>"]
