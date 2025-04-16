@@ -201,6 +201,9 @@ importers:
       '@eurora/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      lucide-svelte:
+        specifier: ^0.488.0
+        version: 0.488.0(svelte@5.26.3)
     devDependencies:
       '@eurora/eslint-config':
         specifier: workspace:*
