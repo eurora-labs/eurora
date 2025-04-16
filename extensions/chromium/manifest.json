@@ -60,10 +60,6 @@
 		"128": "icons/icon-128x128.png"
 	},
 	"incognito": "split",
-	"permissions": [
-		"nativeMessaging",
-		"tabs",
-		"storage"
-	],
+	"permissions": ["nativeMessaging", "tabs", "storage"],
 	"host_permissions": ["<all_urls>"]
 }
