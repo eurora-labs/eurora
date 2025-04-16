@@ -1,5 +1,5 @@
 {
-	"name": "docs",
+	"name": "@eurora/docs",
 	"version": "0.0.1",
 	"private": true,
 	"type": "module",
@@ -16,12 +16,14 @@
 		"test:unit": "vitest"
 	},
 	"dependencies": {
-		"@eurora/ui": "workspace:*"
+		"@eurora/ui": "workspace:*",
+		"@eurora/main-sidebar": "workspace:*"
 	},
 	"devDependencies": {
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@sveltejs/adapter-auto": "^3.3.1",
+		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.20.4",
 		"@sveltejs/vite-plugin-svelte": "^5.0.3",
 		"eslint": "^9.24.0",
