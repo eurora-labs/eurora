@@ -12,8 +12,6 @@ export * as VideoCard from './custom-components/ui/video-card/index.js';
 export * as EurIcons from './custom-icons/index.js';
 export { ScrollArea } from './components/ui/scroll-area/index.js';
 export { Separator } from './components/ui/separator/index.js';
-export { UserChatMessage } from './custom-components/ui/user-chat-message/index.js';
-export { SystemChatMessage } from './custom-components/ui/system-chat-message/index.js';
 export * as Alert from './components/ui/alert/index.js';
 export * as Sheet from './components/ui/sheet/index.js';
 export { Skeleton } from './components/ui/skeleton/index.js';
