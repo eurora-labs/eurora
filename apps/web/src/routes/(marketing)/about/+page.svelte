@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { Card, Button } from '@eurora/ui';
-	import { Users, Briefcase, GraduationCap, Mail, Github, Linkedin } from 'lucide-svelte';
-    // Use static images instead of importing from lib
-    const laura_thommen_img = '/images/avatars/laura_thommen.jpg';
-    const andre_roelofs_img = '/images/avatars/andre_roelofs.jpg';
-    const linda_rosner_img = '/images/avatars/linda_rosner.jpg';
+	import { Users, Briefcase, GraduationCap, Mail, Github, Linkedin } from '@lucide/svelte';
+	// Use static images instead of importing from lib
+	const laura_thommen_img = '/images/avatars/laura_thommen.jpg';
+	const andre_roelofs_img = '/images/avatars/andre_roelofs.jpg';
+	const linda_rosner_img = '/images/avatars/linda_rosner.jpg';
 </script>
 
 <div class="container mx-auto px-4 py-16 max-w-5xl">
@@ -47,7 +47,11 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
-					<img src={laura_thommen_img} alt="Laura Thommen" class="w-32 h-32 rounded-full object-cover mb-4" />
+					<img
+						src={laura_thommen_img}
+						alt="Laura Thommen"
+						class="w-32 h-32 rounded-full object-cover mb-4"
+					/>
 
 					<!-- <div class="w-32 h-32 rounded-full bg-gray-200 mb-4"></div> -->
 					<Card.Title>Laura Thommen</Card.Title>
@@ -61,14 +65,19 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Demonstrated breadth of experience from sales to management, driving new product adoption and revenue growth with over 30 years of experience working for manufacturers such as Apple, Adobe, Avid, DDN Storage and Northrop Grumman. 
+							Demonstrated breadth of experience from sales to management, driving new product
+							adoption and revenue growth with over 30 years of experience working for manufacturers
+							such as Apple, Adobe, Avid, DDN Storage and Northrop Grumman.
 						</p>
 					</div>
 					<div>
 						<h3 class="font-medium flex items-center gap-2">
 							<GraduationCap class="w-4 h-4 text-purple-600" /> Education
 						</h3>
-						<p class="text-gray-600">MBA from Pepperdine University, BS in Business Administration with a minor in Finance from the University of Southern California.</p>
+						<p class="text-gray-600">
+							MBA from Pepperdine University, BS in Business Administration with a minor in Finance
+							from the University of Southern California.
+						</p>
 					</div>
 					<div class="flex justify-center gap-3 mt-4">
 						<Button variant="ghost" size="icon" class="h-8 w-8">
@@ -89,7 +98,11 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
-					<img src={andre_roelofs_img} alt="Andre Roelofs" class="w-32 h-32 rounded-full object-cover mb-4" />
+					<img
+						src={andre_roelofs_img}
+						alt="Andre Roelofs"
+						class="w-32 h-32 rounded-full object-cover mb-4"
+					/>
 					<Card.Title>Andre Roelofs</Card.Title>
 					<p class="text-purple-600 font-medium">Chief Technology Officer</p>
 				</div>
@@ -101,7 +114,9 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Founder and CTO of Eurora Labs, previously Head of Engineering and Machine Learning at Cuebric. Led development of award-winning AI solutions, specializing in software architecture, machine learning, and computer vision.
+							Founder and CTO of Eurora Labs, previously Head of Engineering and Machine Learning at
+							Cuebric. Led development of award-winning AI solutions, specializing in software
+							architecture, machine learning, and computer vision.
 						</p>
 					</div>
 					<div>
@@ -109,7 +124,8 @@
 							<GraduationCap class="w-4 h-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
-							BS in Computer Science from Avans University of Applied Sciences; graduate studies in AI at Maastricht University.
+							BS in Computer Science from Avans University of Applied Sciences; graduate studies in
+							AI at Maastricht University.
 						</p>
 					</div>
 					<div class="flex justify-center gap-3 mt-4">
@@ -131,7 +147,11 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex flex-col items-center mb-4">
-					<img src={linda_rosner_img} alt="Laura Thommen" class="w-32 h-32 rounded-full object-cover mb-4" />
+					<img
+						src={linda_rosner_img}
+						alt="Laura Thommen"
+						class="w-32 h-32 rounded-full object-cover mb-4"
+					/>
 
 					<Card.Title>Linda Rosner</Card.Title>
 					<p class="text-purple-600 font-medium">Chief Operations Officer</p>
@@ -144,16 +164,17 @@
 							<Briefcase class="w-4 h-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Co-founder of ArtisansPR, with deep expertise in media, entertainment, and tech communications. Serves on HPA’s Awards Committee and formerly chaired SMPTE Hollywood’s Board. Founding Board Member of EIPMA and frequent panel moderator for NAB, SMPTE, and others.
+							Co-founder of ArtisansPR, with deep expertise in media, entertainment, and tech
+							communications. Serves on HPA’s Awards Committee and formerly chaired SMPTE
+							Hollywood’s Board. Founding Board Member of EIPMA and frequent panel moderator for
+							NAB, SMPTE, and others.
 						</p>
 					</div>
 					<div>
 						<h3 class="font-medium flex items-center gap-2">
 							<GraduationCap class="w-4 h-4 text-purple-600" /> Education
 						</h3>
-						<p class="text-gray-600">
-							BA in Theater from UCLA.
-						</p>
+						<p class="text-gray-600">BA in Theater from UCLA.</p>
 					</div>
 					<div class="flex justify-center gap-3 mt-4">
 						<Button variant="ghost" size="icon" class="h-8 w-8">

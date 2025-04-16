@@ -3,8 +3,8 @@
 	import { Sidebar } from '@eurora/ui';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
 	import { Breadcrumb } from '@eurora/ui';
-	import X from 'lucide-svelte/icons/x';
-	import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
+	import X from '@lucide/svelte/icons/x';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 	import { Button } from '@eurora/ui';
 	let { children } = $props();
 </script>
