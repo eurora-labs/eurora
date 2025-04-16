@@ -28,7 +28,7 @@
 				: 'absolute inset-0 flex flex-col items-center justify-center'}
 		>
 			{#if !hasMessages}
-				<h2 class="text-foreground mb-4 text-center text-2xl font-semibold">
+				<h2 class="mb-4 text-center text-2xl font-semibold text-foreground">
 					What can I help you with?
 				</h2>
 			{/if}

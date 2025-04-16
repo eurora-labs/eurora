@@ -3,15 +3,15 @@ import { defineConfig } from 'vite';
 import path from 'path';
 
 export default defineConfig({
-    plugins: [sveltekit()],
-    build: {
-        emptyOutDir: true,
-        reportCompressedSize: true,
-        commonjsOptions: {
-            transformMixedEsModules: true
-        },
-        cssCodeSplit: true,
-    },
+	plugins: [sveltekit()],
+	build: {
+		emptyOutDir: true,
+		reportCompressedSize: true,
+		commonjsOptions: {
+			transformMixedEsModules: true
+		},
+		cssCodeSplit: true
+	},
 	resolve: {
 		alias: {
 			'@eurora/ui': path.resolve(__dirname, '../../../packages/ui/src'),

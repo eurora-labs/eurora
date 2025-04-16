@@ -13,9 +13,9 @@
 
 		math = math.replace(/\\\(/g, '$$').replace(/\\\)/g, '$$');
 
-        math = math.replace("```", "$$") 
+		math = math.replace('```', '$$');
 
-		console.log('changed math', math); 
+		console.log('changed math', math);
 
 		const file = await unified()
 			.use(remarkParse)

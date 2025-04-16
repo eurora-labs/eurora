@@ -13,7 +13,7 @@
 	// Event emitter for when the API key is saved
 	// const dispatch = createEventDispatcher();
 
-    let {saved} = $props();
+	let { saved } = $props();
 
 	// Check if API key exists on mount
 	onMount(async () => {
@@ -39,14 +39,14 @@
 		try {
 			// Save the API key to the keyring
 			await invoke('save_api_key', { apiKey });
-			
+
 			// Initialize the OpenAI client with the new key
 			await invoke('initialize_openai_client');
-			
+
 			// Update state and notify parent
 			hasApiKey = true;
-            saved(true);
-            saved();
+			saved(true);
+			saved();
 			// dispatch('saved', true);
 			// dispatch('saved');
 		} catch (err) {
@@ -58,23 +58,19 @@
 	}
 </script>
 
-<div class="w-full max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+<div class="mx-auto w-full max-w-md rounded-lg bg-white p-6 shadow-md">
 	<div class="mb-4">
-		<h2 class="text-xl font-bold mb-2">Welcome to Eurora</h2>
+		<h2 class="mb-2 text-xl font-bold">Welcome to Eurora</h2>
 		<p class="text-gray-600">
-			Please enter your OpenAI API key to get started. Your key will be stored securely in your system's keyring.
+			Please enter your OpenAI API key to get started. Your key will be stored securely in your
+			system's keyring.
 		</p>
 	</div>
-	
+
 	<div class="mb-6">
 		<form on:submit|preventDefault={saveApiKey} class="space-y-4">
 			<div class="space-y-2">
-				<Input
-					type="password"
-					placeholder="sk-..."
-					bind:value={apiKey}
-					class="w-full"
-				/>
+				<Input type="password" placeholder="sk-..." bind:value={apiKey} class="w-full" />
 				{#if error}
 					<p class="text-sm text-red-500">{error}</p>
 				{/if}
@@ -84,11 +80,11 @@
 			</div>
 		</form>
 	</div>
-	
+
 	<div class="flex justify-end">
-        <Button disabled={isLoading} onclick={() => saveApiKey()}>
-{isLoading ? 'Saving...' : 'Save API Key'}
-        </Button>
+		<Button disabled={isLoading} onclick={() => saveApiKey()}>
+			{isLoading ? 'Saving...' : 'Save API Key'}
+		</Button>
 		<!-- <button
 			class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded disabled:opacity-50"
 			disabled={isLoading}
