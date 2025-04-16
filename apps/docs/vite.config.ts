@@ -6,11 +6,7 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	resolve: {
 		alias: {
-			'@eurora/ui': path.resolve(__dirname, '../../packages/ui/src'),
-			'@eurora/main-sidebar': path.resolve(
-				__dirname,
-				'../../packages/custom-components/main-sidebar/src/lib/index.ts'
-			),
+			'@eurora/ui': path.resolve(__dirname, '../../packages/ui/src')
 		}
 	}
 });

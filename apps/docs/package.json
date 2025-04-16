@@ -17,7 +17,6 @@
 	},
 	"dependencies": {
 		"@eurora/ui": "workspace:*",
-		"@eurora/main-sidebar": "workspace:*",
 		"lucide-svelte": "^0.488.0"
 	},
 	"devDependencies": {
