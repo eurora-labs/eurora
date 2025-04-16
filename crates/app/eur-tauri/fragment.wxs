@@ -2,7 +2,7 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Fragment>
         <!-- Define the directory structure for C:\Program Files\Eurora Labs\Eurora\ -->
-        <DirectoryRef Id="TARGETDIR">
+        <DirectoryRef Id="TARGETDIR" Name="TARGETDIR">
             <!-- <Directory Id="ProgramFiles64Folder">
                 <Directory Id="EuroraLabsFolder" Name="Eurora Labs">
                     <Directory Id="EuroraFolder" Name="Eurora"> -->
@@ -10,7 +10,7 @@
                         <Component Id="NativeMessagingHostJson" Guid="8c7ca6a7-77b0-4738-aaa5-9ba9b4a509fe">
                             <File Id="NativeMessagingHostJsonFile"
                                 Name="[TARGETDIR]com.eurora.app.json"
-                                Source="D:\a\eurora\eurora\extensions\chromium\native-messaging-host.json"
+                                Source=".\hosts\windows.native-messaging.json"
                                 KeyPath="yes" />
                         </Component>
                     <!-- </Directory>
