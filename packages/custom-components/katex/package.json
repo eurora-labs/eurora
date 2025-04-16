@@ -28,25 +28,25 @@
 		}
 	},
 	"peerDependencies": {
-		"svelte": "^5.0.0"
+		"svelte": "^5.27.0"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^4.0.0",
 		"@eurora/typescript-config": "workspace:*",
 		"@sveltejs/adapter-static": "^3.0.8",
-		"@sveltejs/kit": "^2.20.4",
-		"@sveltejs/package": "^2.0.0",
+		"@sveltejs/kit": "^2.20.7",
+		"@sveltejs/package": "^2.3.11",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
-		"publint": "^0.3.10",
+		"publint": "^0.3.12",
 		"rehype-katex": "^7.0.1",
 		"rehype-stringify": "^10.0.1",
 		"remark-math": "^6.0.0",
 		"remark-parse": "^11.0.0",
 		"remark-rehype": "^11.1.2",
-		"svelte": "^5.0.0",
-		"svelte-check": "^4.0.0",
+		"svelte": "^5.27.0",
+		"svelte-check": "^4.1.6",
 		"typescript": "^5.8.3",
 		"unified": "^11.0.5",
 		"vite": "^6.2.6",
