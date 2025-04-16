@@ -33,8 +33,7 @@
                     <!-- values to persist on the registry -->
                     <RegistryValue
                         Type="string"
-                        Name="NativeMessagingManifestLocation"
-                        Value="C:\Program Files\Eurora Labs\Eurora\com.eurora.app.json"
+                        Value="C:\\Eurora Labs\\Eurora\\com.eurora.app.json"
                         KeyPath="yes"
                     />
                 </RegistryKey>
