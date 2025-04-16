@@ -237,7 +237,7 @@ tauri::async_runtime::spawn(async move {
                     {
                         // println!("Setting up global shortcut");
                         let super_space_shortcut =
-                            Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+                            Shortcut::new(Some(Modifiers::SUPER), Code::Space);
 
                         let launcher_label = launcher_window.label().to_string();
 
