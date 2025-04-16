@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '@eurora/ui/global.pcss';
 	import { Sidebar } from '@eurora/ui';
-	import { MainSidebar } from '@eurora/main-sidebar';
+	import MainSidebar from '$lib/components/MainSidebar.svelte';
 	import { Breadcrumb } from '@eurora/ui';
 	import X from 'lucide-svelte/icons/x';
 	import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
@@ -18,7 +18,7 @@
 </Sidebar.Provider> -->
 
 <Sidebar.Provider class="min-h-min" open={false}>
-	<MainSidebar />  
+	<MainSidebar />
 	<Sidebar.Inset class="min-h-min">
 		<header class="flex h-16 shrink-0 items-center gap-2 border-b px-4">
 			<Sidebar.Trigger class="-ml-1" />
