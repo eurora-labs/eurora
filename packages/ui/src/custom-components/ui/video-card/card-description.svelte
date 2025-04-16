@@ -13,7 +13,7 @@
 
 <p
 	bind:this={ref}
-	class={cn('text-muted-foreground text-[20px] font-[400]', className)}
+	class={cn('text-[20px] font-[400] text-muted-foreground', className)}
 	{...restProps}
 >
 	{@render children?.()}

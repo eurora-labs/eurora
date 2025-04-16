@@ -68,22 +68,22 @@
 	// Add global keydown event listener when component is mounted
 	onMount(() => {
 		document.addEventListener('keydown', handleEscapeKey);
-		
+
 		// Check if API key exists
 		checkApiKey();
-		
+
 		// Clean up event listener when component is unmounted
 		return () => {
 			document.removeEventListener('keydown', handleEscapeKey);
 		};
 	});
-	
+
 	// Function to check if API key exists
 	async function checkApiKey() {
 		try {
 			const result: { has_key: boolean } = await invoke('check_api_key_exists');
 			hasApiKey = result.has_key;
-			
+
 			// If API key exists, initialize the OpenAI client
 			if (hasApiKey) {
 				await invoke('initialize_openai_client');
@@ -143,13 +143,13 @@
 						data: {
 							message: string;
 						};
-				}
+				  }
 				| {
 						event: 'append';
 						data: {
 							chunk: string;
 						};
-				};
+				  };
 
 			const onEvent = new Channel<DownloadEvent>();
 			onEvent.onmessage = (message) => {
@@ -225,12 +225,12 @@
 			console.error('Failed to switch conversation:', error);
 		}
 	}
-	
+
 	// Handle API key saved event
 	function onApiKeySaved() {
 		hasApiKey = true;
 		// Resize the window after API key is saved
-		invoke('resize_launcher_window', { height: 500 }).catch(error => {
+		invoke('resize_launcher_window', { height: 500 }).catch((error) => {
 			console.error('Failed to resize window:', error);
 		});
 	}
@@ -238,43 +238,43 @@
 
 <div class="flex h-screen flex-col">
 	{#if isCheckingApiKey}
-		<div class="flex items-center justify-center h-full">
+		<div class="flex h-full items-center justify-center">
 			<p class="text-gray-500">Checking API key...</p>
 		</div>
 	{:else if !hasApiKey}
-		<div class="flex items-center justify-center h-full">
+		<div class="flex h-full items-center justify-center">
 			<ApiKeyForm saved={() => onApiKeySaved()} />
 		</div>
 	{:else}
-	<!-- Fixed header with textarea -->
-	<div class="flex-none p-2">
-		<Textarea
-			bind:ref={inputRef}
-			class="h-10 w-full text-[34px] leading-[34px]"
-			style="font-size: 34px;"
-			onkeydown={handleKeydown}
-		/>
-	</div>
-	<!-- Recent conversations list -->
-	{#if conversations.length > 0 && messages.length === 0}
-		<ScrollArea class="h-72 w-full overflow-y-hidden rounded-md">
-			<div class="p-4">
-				{#each conversations.slice(0, 5) as conversation}
-					<Button
-						variant="link"
-						class="mx-auto w-full justify-start overflow-hidden"
-						onclick={async () => await switchConversation(conversation.id)}
-					>
-						{conversation.title}
-					</Button>
-					<Separator class="my-2" />
-				{/each}
-			</div>
-		</ScrollArea>
-	{/if}
+		<!-- Fixed header with textarea -->
+		<div class="flex-none p-2">
+			<Textarea
+				bind:ref={inputRef}
+				class="h-10 w-full text-[34px] leading-[34px]"
+				style="font-size: 34px;"
+				onkeydown={handleKeydown}
+			/>
+		</div>
+		<!-- Recent conversations list -->
+		{#if conversations.length > 0 && messages.length === 0}
+			<ScrollArea class="h-72 w-full overflow-y-hidden rounded-md">
+				<div class="p-4">
+					{#each conversations.slice(0, 5) as conversation}
+						<Button
+							variant="link"
+							class="mx-auto w-full justify-start overflow-hidden"
+							onclick={async () => await switchConversation(conversation.id)}
+						>
+							{conversation.title}
+						</Button>
+						<Separator class="my-2" />
+					{/each}
+				</div>
+			</ScrollArea>
+		{/if}
 
-	<!-- Messages container with auto-scroll -->
-	<!-- <div bind:this={messagesContainer} class="flex flex-1 flex-col overflow-y-auto p-2">
+		<!-- Messages container with auto-scroll -->
+		<!-- <div bind:this={messagesContainer} class="flex flex-1 flex-col overflow-y-auto p-2">
 		{#if statusCode}
 			<div class="mt-4 text-center text-xl">
 				{statusCode}
@@ -295,7 +295,7 @@
 			</div>
 		{/each}
 	</div> -->
-	<MessageArea {messages} />
+		<MessageArea {messages} />
 	{/if}
 </div>
 
