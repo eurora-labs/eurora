@@ -194,6 +194,13 @@ importers:
         version: 3.1.1(@types/debug@4.1.12)(@types/node@22.13.14)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.29.2)(yaml@2.7.0)
 
   apps/docs:
+    dependencies:
+      '@eurora/main-sidebar':
+        specifier: workspace:*
+        version: link:../../packages/custom-components/main-sidebar
+      '@eurora/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
     devDependencies:
       '@eurora/eslint-config':
         specifier: workspace:*
@@ -208,7 +215,7 @@ importers:
         specifier: ^3.0.8
         version: 3.0.8(@sveltejs/kit@2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))
       '@sveltejs/kit':
-        specifier: ^2.20.7
+        specifier: ^2.20.4
         version: 2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^5.0.3
@@ -223,10 +230,10 @@ importers:
         specifier: ^3.3.3
         version: 3.3.3(prettier@3.5.3)(svelte@5.26.3)
       svelte:
-        specifier: ^5.26.3
+        specifier: ^5.26.1
         version: 5.26.3
       svelte-check:
-        specifier: ^4.1.6
+        specifier: ^4.1.5
         version: 4.1.6(picomatch@4.0.2)(svelte@5.26.3)(typescript@5.8.3)
       tslib:
         specifier: ^2.8.1
@@ -919,10 +926,6 @@ importers:
   packages/typescript-config: {}
 
   packages/ui:
-    dependencies:
-      '@eurora/katex':
-        specifier: workspace:*
-        version: link:../custom-components/katex
     devDependencies:
       '@eslint/compat':
         specifier: ^1.2.8
