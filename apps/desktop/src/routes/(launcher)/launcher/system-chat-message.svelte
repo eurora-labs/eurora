@@ -33,7 +33,6 @@
 						>
 							<div class="flex w-full flex-col gap-1 first:pt-[3px] empty:hidden">
 								<Katex math={text} finishRendering={() => {}} />
-								<!-- {text} -->
 							</div>
 						</div>
 					</div>
