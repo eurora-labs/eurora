@@ -1,91 +1,131 @@
-
 <script lang="ts">
-	import { Card, Button, VideoCard, Sheet, buttonVariants, Skeleton, Input, Label, ScrollArea } from '@eurora/ui';
-	import { ArrowRight, Brain, Shield, Zap, Globe, MessageSquare, KeyRound, Mic, Briefcase, GraduationCap, Mail, Linkedin, Github, Layers, Code, Sparkles } from 'lucide-svelte';
+	import {
+		Card,
+		Button,
+		VideoCard,
+		Sheet,
+		buttonVariants,
+		Skeleton,
+		Input,
+		Label,
+		ScrollArea
+	} from '@eurora/ui';
+	import {
+		ArrowRight,
+		Brain,
+		Shield,
+		Zap,
+		Globe,
+		MessageSquare,
+		KeyRound,
+		Mic,
+		Briefcase,
+		GraduationCap,
+		Mail,
+		Linkedin,
+		Github,
+		Layers,
+		Code,
+		Sparkles
+	} from '@lucide/svelte';
 	import IntroModule from './intro_module.svelte';
 
-    // import { SiGithub, SiLinkedin} from '@icons-pack/svelte-simple-icons';  
+	// import { SiGithub, SiLinkedin} from '@icons-pack/svelte-simple-icons';
 
-    import WaitlistForm from './waitlist_form.svelte';
-    import JoinWaitlist from './join_waitlist.svelte';
+	import WaitlistForm from './waitlist_form.svelte';
+	import JoinWaitlist from './join_waitlist.svelte';
 
-    let inputValue = $state('');
-    let purpleText = $state('');
-    let formSubmitted = $state(false);
+	let inputValue = $state('');
+	let purpleText = $state('');
+	let formSubmitted = $state(false);
 
-    // Typing animation configuration
+	// Typing animation configuration
 	const instantTyping = false;
 	const firstPart = 'Explain ';
 	const secondPart = 'this';
 	const typingSpeed = instantTyping ? 0 : 150; // milliseconds per character
 	const initialDelay = instantTyping ? 0 : 50; // milliseconds before typing starts
 
-    let emailField = $state('');
+	let emailField = $state('');
 
-    function submitEmail() {
-        fetch("https://api.hsforms.com/submissions/v3/integration/submit/242150186/7b08711a-8657-42a0-932c-0d2c4dbbc0f9", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                fields: [
-                {
-                    name: "email",
-                    value: emailField  // replace with your form data
-                }
-                ],
-                context: {
-                pageUri: window.location.href,
-                pageName: document.title
-                }
-            })
-        })
-        .then(() => {
-            formSubmitted = true;
-        })
-        .catch(error => {
-            console.error("Error submitting form:", error);
-        });
-    }
- 
+	function submitEmail() {
+		fetch(
+			'https://api.hsforms.com/submissions/v3/integration/submit/242150186/7b08711a-8657-42a0-932c-0d2c4dbbc0f9',
+			{
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					fields: [
+						{
+							name: 'email',
+							value: emailField // replace with your form data
+						}
+					],
+					context: {
+						pageUri: window.location.href,
+						pageName: document.title
+					}
+				})
+			}
+		)
+			.then(() => {
+				formSubmitted = true;
+			})
+			.catch((error) => {
+				console.error('Error submitting form:', error);
+			});
+	}
 </script>
 
 <div class="container mx-auto px-4 pb-16 max-w-5xl">
 	<!-- Title and Subtitle -->
 	<div class="text-center my-16 md:my-24 mx-auto">
-	    <h1 class="mx-4 md:mx-48 pt-16 text-5xl font-bold mb-6 text-purple-600 leading-[60px]">Your Open Source AI Assistant</h1>
-		<p class="text-xl mx-4 md:mx-48 font-medium text-gray-500 mb-8">Eurora is a fully Open Source AI Assistant that understands context, respects your privacy, and works across all your devices. Experience AI on your own terms.</p>
-            <div class="flex flex-col justify-center h-[calc(100vh-350px)]">
-                {#if !formSubmitted}
-                    <form class="flex flex-col md:flex-row w-full max-w-lg mx-auto items-center space-y-4 md:space-y-0 md:space-x-4">
-                        <div class="relative w-full text-lg">
-                            <Mail class="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400 h-5 w-5" />
-                            <Input bind:value={emailField}
-                                type="email"
-                                placeholder="Enter your email"
-                                class="pl-10 py-6 rounded-lg text-sm border-2 border-purple-100 focus:border-purple-400 shadow-sm hover:shadow-md transition-all duration-200"
-                            />
-                        </div>
-                        <!-- <div class="w-full mx-auto py-6 px-8 text-sm font-medium transition-colors">
+		<h1 class="mx-4 md:mx-48 pt-16 text-5xl font-bold mb-6 text-purple-600 leading-[60px]">
+			Your Open Source AI Assistant
+		</h1>
+		<p class="text-xl mx-4 md:mx-48 font-medium text-gray-500 mb-8">
+			Eurora is a fully Open Source AI Assistant that understands context, respects your privacy,
+			and works across all your devices. Experience AI on your own terms.
+		</p>
+		<div class="flex flex-col justify-center h-[calc(100vh-350px)]">
+			{#if !formSubmitted}
+				<form
+					class="flex flex-col md:flex-row w-full max-w-lg mx-auto items-center space-y-4 md:space-y-0 md:space-x-4"
+				>
+					<div class="relative w-full text-lg">
+						<Mail
+							class="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400 h-5 w-5"
+						/>
+						<Input
+							bind:value={emailField}
+							type="email"
+							placeholder="Enter your email"
+							class="pl-10 py-6 rounded-lg text-sm border-2 border-purple-100 focus:border-purple-400 shadow-sm hover:shadow-md transition-all duration-200"
+						/>
+					</div>
+					<!-- <div class="w-full mx-auto py-6 px-8 text-sm font-medium transition-colors">
                             <JoinWaitlist/>
                         </div> -->
 
-                        <Button
-                            type="submit"
-                            onclick={submitEmail}
-                            class="w-full mx-auto md:w-auto py-6 px-8 text-sm font-medium transition-colors duration-200 rounded-lg shadow-md hover:shadow-lg"
-                        >
-                            Join Waitlist
-                        </Button>
-                    </form>
-                {:else}
-                    <div class="text-center w-full max-w-lg mx-auto">
-                        <h3 class="text-2xl font-bold text-purple-600 mb-4">Thanks for your interest!</h3>
-                        <p class="text-gray-600">We'll keep you updated on our progress and let you know when Eurora is ready.</p>
-                    </div>
-                {/if}
-            </div>
+					<Button
+						type="submit"
+						onclick={submitEmail}
+						class="w-full mx-auto md:w-auto py-6 px-8 text-sm font-medium transition-colors duration-200 rounded-lg shadow-md hover:shadow-lg"
+					>
+						Join Waitlist
+					</Button>
+				</form>
+			{:else}
+				<div class="text-center w-full max-w-lg mx-auto">
+					<h3 class="text-2xl font-bold text-purple-600 mb-4">Thanks for your interest!</h3>
+					<p class="text-gray-600">
+						We'll keep you updated on our progress and let you know when Eurora is ready.
+					</p>
+				</div>
+			{/if}
+		</div>
 		<!-- <div class="flex justify-center w-1/3 mx-auto">
             <Input  type="email" placeholder="Enter your email"/>
 			<Button size="lg" class="px-8" variant="primary">
@@ -95,7 +135,7 @@
 		</div> -->
 	</div>
 	<!-- <IntroModule /> -->
-    <!-- <div class="pt-16 col-span-4">s
+	<!-- <div class="pt-16 col-span-4">s
         <div class="relative animate-grow">
             <div
                 class="py-6 px-4 shadow-lg rounded-md border border-gray-300 bg-white w-full flex items-center"
@@ -113,8 +153,8 @@
 	<div class="text-center mb-16">
 		<h1 class="text-5xl font-bold mb-6">Intelligence Without Compromise</h1>
 		<p class="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-			Eurora is a fully Open Source AI assistant that understands context, respects your privacy, and works across
-			all your devices. Experience AI on your own terms.
+			Eurora is a fully Open Source AI assistant that understands context, respects your privacy,
+			and works across all your devices. Experience AI on your own terms.
 		</p>
 		<!-- <div class="flex justify-center gap-4">
             <Sheet.Root>
@@ -159,7 +199,7 @@
 				</Button> -->
 			</Card.Content>
 		</Card.Root>
-        <Card.Root class="p-3 md:p-6">
+		<Card.Root class="p-3 md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
 					<KeyRound class="w-6 h-6 text-purple-600" />
@@ -168,7 +208,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="text-gray-600 mb-4">
-					Eurora gives you full access to the code that runs on your device and handles your data. You can even run both the app and server on your own hardware as well as connect LLM's of your choosing.
+					Eurora gives you full access to the code that runs on your device and handles your data.
+					You can even run both the app and server on your own hardware as well as connect LLM's of
+					your choosing.
 				</p>
 				<!-- <Button variant="link" href="/open-source" class="p-0">
 					Learn more
@@ -272,7 +314,7 @@
 	<div class="mb-16">
 		<h2 class="text-3xl font-bold text-center mb-8">How People Use Eurora</h2>
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card.Root class="p-6">
+			<Card.Root class="p-6">
 				<Card.Header>
 					<Card.Title>For Learning</Card.Title>
 					<Card.Description>Enhance your education and skill development</Card.Description>
@@ -356,94 +398,88 @@
 					</ul>
 				</Card.Content>
 			</Card.Root>
-
-			
 		</div>
 	</div>
 
-    
+	<h2 class="text-3xl font-bold mb-8">Features</h2>
 
-    <h2 class="text-3xl font-bold mb-8">Features</h2>
+	<div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+		<Card.Root class=" md:p-6">
+			<Card.Header>
+				<div class="flex items-center gap-2">
+					<Brain class="w-6 h-6 text-purple-600" />
+					<Card.Title>Advanced AI Understanding</Card.Title>
+				</div>
+				<Card.Description>Supercharged context for lightning-fast responses</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<p class="text-gray-600 mb-4">
+					Eurora's intelligent context utilization delivers responses up to 98% faster than
+					traditional AI assistants, while maintaining exceptional accuracy and relevance to your
+					specific needs.
+				</p>
+				<div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+					<h4 class="font-medium mb-2">Context Advantages:</h4>
+					<ul class="list-disc pl-5 space-y-1 text-gray-600">
+						<li>Accelerated response times with smart context prioritization</li>
+						<li>Efficient processing of previous interactions for near-instant answers</li>
+						<li>Contextual memory that reduces redundant information processing</li>
+						<li>Adaptive learning system that gets faster the more you use it</li>
+					</ul>
+				</div>
+			</Card.Content>
+		</Card.Root>
+		<Card.Root class=" md:p-6">
+			<Card.Header>
+				<div class="flex items-center gap-2">
+					<Github class="w-6 h-6 text-purple-600" />
+					<Card.Title>Fully Open Source Hosting</Card.Title>
+				</div>
+				<Card.Description>Host Eurora on your own infrastructure</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<p class="text-gray-600 mb-4">
+					Eurora is completely open source and can be self-hosted by individuals or companies. Take
+					full control of your AI assistant by running it on your own hardware, ensuring complete
+					data sovereignty and customization options.
+				</p>
+				<div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+					<h4 class="font-medium mb-2">Hosting Benefits:</h4>
+					<ul class="list-disc pl-5 space-y-1 text-gray-600">
+						<li>Complete control over your data and infrastructure</li>
+						<li>Customizable deployment options for individuals and enterprises</li>
+						<li>No vendor lock-in or subscription fees</li>
+						<li>Community-supported deployment guides and documentation</li>
+					</ul>
+				</div>
+			</Card.Content>
+		</Card.Root>
 
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-        <Card.Root class=" md:p-6">
-            <Card.Header>
-             <div class="flex items-center gap-2">
-                 <Brain class="w-6 h-6 text-purple-600" />
-                 <Card.Title>Advanced AI Understanding</Card.Title>
-             </div>
-             <Card.Description>Supercharged context for lightning-fast responses</Card.Description>
-            </Card.Header>
-                     <Card.Content>
-                         <p class="text-gray-600 mb-4">
-                             Eurora's intelligent context utilization delivers responses up to 98% faster than traditional AI
-                             assistants, while maintaining exceptional accuracy and relevance to your specific needs.
-                         </p>
-                         <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-                             <h4 class="font-medium mb-2">Context Advantages:</h4>
-                             <ul class="list-disc pl-5 space-y-1 text-gray-600">
-                                 <li>Accelerated response times with smart context prioritization</li>
-                                 <li>Efficient processing of previous interactions for near-instant answers</li>
-                                 <li>Contextual memory that reduces redundant information processing</li>
-                                 <li>Adaptive learning system that gets faster the more you use it</li>
-                             </ul>
-                         </div>
-                     </Card.Content>
-                 </Card.Root>
-  <Card.Root class=" md:p-6">
-   <Card.Header>
-    <div class="flex items-center gap-2">
-    	<Github class="w-6 h-6 text-purple-600" />
-    	<Card.Title>Fully Open Source Hosting</Card.Title>
-    </div>
-    <Card.Description>Host Eurora on your own infrastructure</Card.Description>
-   </Card.Header>
-   <Card.Content>
-    <p class="text-gray-600 mb-4">
-    	Eurora is completely open source and can be self-hosted by individuals or companies.
-    	Take full control of your AI assistant by running it on your own hardware, ensuring
-    	complete data sovereignty and customization options.
-    </p>
-    <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-    	<h4 class="font-medium mb-2">Hosting Benefits:</h4>
-    	<ul class="list-disc pl-5 space-y-1 text-gray-600">
-    		<li>Complete control over your data and infrastructure</li>
-    		<li>Customizable deployment options for individuals and enterprises</li>
-    		<li>No vendor lock-in or subscription fees</li>
-    		<li>Community-supported deployment guides and documentation</li>
-    	</ul>
-    </div>
-   </Card.Content>
-  </Card.Root>
-
-  <Card.Root class=" md:p-6">
-   <Card.Header>
-    <div class="flex items-center gap-2">
-    	<Code class="w-6 h-6 text-purple-600" />
-    	<Card.Title>Built with Rust</Card.Title>
-    </div>
-    <Card.Description>Maximum security and safety by design</Card.Description>
-   </Card.Header>
-   <Card.Content>
-    <p class="text-gray-600 mb-4">
-    	Eurora is written in Rust, a language designed for performance, reliability, and security.
-    	This implementation choice ensures memory safety, eliminates common vulnerabilities, and
-    	provides robust protection for your sensitive data.
-    </p>
-    <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-    	<h4 class="font-medium mb-2">Rust Advantages:</h4>
-    	<ul class="list-disc pl-5 space-y-1 text-gray-600">
-    		<li>Memory safety without garbage collection</li>
-    		<li>Thread safety to prevent data races</li>
-    		<li>Zero-cost abstractions for optimal performance</li>
-    		<li>Comprehensive compile-time checks to catch errors early</li>
-    	</ul>
-    </div>
-   </Card.Content>
-  </Card.Root>
-
-  
+		<Card.Root class=" md:p-6">
+			<Card.Header>
+				<div class="flex items-center gap-2">
+					<Code class="w-6 h-6 text-purple-600" />
+					<Card.Title>Built with Rust</Card.Title>
+				</div>
+				<Card.Description>Maximum security and safety by design</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<p class="text-gray-600 mb-4">
+					Eurora is written in Rust, a language designed for performance, reliability, and security.
+					This implementation choice ensures memory safety, eliminates common vulnerabilities, and
+					provides robust protection for your sensitive data.
+				</p>
+				<div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+					<h4 class="font-medium mb-2">Rust Advantages:</h4>
+					<ul class="list-disc pl-5 space-y-1 text-gray-600">
+						<li>Memory safety without garbage collection</li>
+						<li>Thread safety to prevent data races</li>
+						<li>Zero-cost abstractions for optimal performance</li>
+						<li>Comprehensive compile-time checks to catch errors early</li>
+					</ul>
+				</div>
+			</Card.Content>
+		</Card.Root>
 
 		<Card.Root class="p-3 md:p-6">
 			<Card.Header>
@@ -534,9 +570,10 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="text-gray-600 mb-6">
-					Eurora seamlessly integrates with your file storage systems and productivity tools, giving you
-					instant access to your content wherever it lives. Whether your files are stored in the cloud or
-					on your device, Eurora can search, analyze, and help you work with them efficiently.
+					Eurora seamlessly integrates with your file storage systems and productivity tools, giving
+					you instant access to your content wherever it lives. Whether your files are stored in the
+					cloud or on your device, Eurora can search, analyze, and help you work with them
+					efficiently.
 				</p>
 
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -688,7 +725,6 @@
 			</div>
 		</Card.Content>
 	</Card.Root>
-    
 
 	<!-- Testimonials -->
 	<div class="mb-16 p-6 hidden">
@@ -699,7 +735,8 @@
 			<Card.Root class="p-6">
 				<Card.Content>
 					<p class="text-gray-600 italic mb-4">
-						"Eurora has given me a newfound confidence in my ability to use AI. It's like having a personal tutor that can explain complex topics in a way that makes sense."
+						"Eurora has given me a newfound confidence in my ability to use AI. It's like having a
+						personal tutor that can explain complex topics in a way that makes sense."
 					</p>
 					<div class="flex items-center">
 						<div class="w-10 h-10 rounded-full bg-gray-200 mr-3"></div>
@@ -759,6 +796,7 @@
 		</Card.Content>
 	</Card.Root>
 </div>
+
 <style>
 	/* Optional: Add a blinking cursor animation */
 	@keyframes blink {

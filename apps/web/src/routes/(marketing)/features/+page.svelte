@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Card, Button } from '@eurora/ui';
-	import { Sparkles, Brain, Shield, Zap, Globe, Layers, MessageSquare, Code } from 'lucide-svelte';
+	import { Sparkles, Brain, Shield, Zap, Globe, Layers, MessageSquare, Code } from '@lucide/svelte';
 </script>
 
 <div class="container mx-auto px-4 py-16 max-w-5xl">

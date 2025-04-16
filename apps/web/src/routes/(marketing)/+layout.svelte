@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Euro } from 'lucide-svelte';
+	import { Euro } from '@lucide/svelte';
 	import { SiGithub } from '@icons-pack/svelte-simple-icons';
 	import { Button, EurIcons, Alert } from '@eurora/ui';
-	import { Terminal, X, ShieldAlert } from 'lucide-svelte';
-    import JoinWaitlist from './join_waitlist.svelte';
+	import { Terminal, X, ShieldAlert } from '@lucide/svelte';
+	import JoinWaitlist from './join_waitlist.svelte';
 
 	const { children } = $props();
 
@@ -20,12 +20,13 @@
 	>
 		<Alert.Root class="flex-1 flex items-center">
 			<ShieldAlert class="size-4" />
-			<Alert.Title>Heads up!</Alert.Title> 
-			<Alert.Description>All existing text on this website is placeholder and doesn't represent anything about the product, it's features, the team behind it, or any other factual information.</Alert.Description>
+			<Alert.Title>Heads up!</Alert.Title>
+			<Alert.Description
+				>All existing text on this website is placeholder and doesn't represent anything about the
+				product, it's features, the team behind it, or any other factual information.</Alert.Description
+			>
 		</Alert.Root>
-		<Button variant="destructive" class="ml-2" onclick={dismissAlert}>
-			Dismiss
-		</Button>
+		<Button variant="destructive" class="ml-2" onclick={dismissAlert}>Dismiss</Button>
 	</div>
 {/if}
 
@@ -64,6 +65,4 @@
 	:global(body) {
 		padding-top: 1rem;
 	}
-
-
 </style>

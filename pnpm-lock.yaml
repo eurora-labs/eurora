@@ -78,6 +78,9 @@ importers:
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@lucide/svelte':
+        specifier: ^0.488.0
+        version: 0.488.0(svelte@5.26.3)
       '@playwright/test':
         specifier: ^1.51.1
         version: 1.51.1
@@ -150,9 +153,6 @@ importers:
       katex:
         specifier: ^0.16.22
         version: 0.16.22
-      lucide-svelte:
-        specifier: ^0.488.0
-        version: 0.488.0(svelte@5.26.3)
       postcss-nesting:
         specifier: ^13.0.1
         version: 13.0.1(postcss@8.5.3)
@@ -195,7 +195,7 @@ importers:
       '@eurora/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      lucide-svelte:
+      '@lucide/svelte':
         specifier: ^0.488.0
         version: 0.488.0(svelte@5.26.3)
     devDependencies:
@@ -517,6 +517,9 @@ importers:
       '@icons-pack/svelte-simple-icons':
         specifier: ^5.0.0
         version: 5.0.0(@sveltejs/kit@2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)
+      '@lucide/svelte':
+        specifier: ^0.488.0
+        version: 0.488.0(svelte@5.26.3)
       '@sveltejs/adapter-auto':
         specifier: ^4.0.0
         version: 4.0.0(@sveltejs/kit@2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))
@@ -532,9 +535,6 @@ importers:
       eslint:
         specifier: ^9.24.0
         version: 9.24.0(jiti@2.4.2)
-      lucide-svelte:
-        specifier: ^0.488.0
-        version: 0.488.0(svelte@5.26.3)
       perfect-arrows:
         specifier: ^0.3.7
         version: 0.3.7
@@ -584,6 +584,9 @@ importers:
       '@icons-pack/svelte-simple-icons':
         specifier: ^5.0.0
         version: 5.0.0(@sveltejs/kit@2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)
+      '@lucide/svelte':
+        specifier: ^0.488.0
+        version: 0.488.0(svelte@5.26.3)
       '@sveltejs/adapter-auto':
         specifier: ^4.0.0
         version: 4.0.0(@sveltejs/kit@2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.26.3)(vite@6.2.6(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))
@@ -599,9 +602,6 @@ importers:
       eslint:
         specifier: ^9.24.0
         version: 9.24.0(jiti@2.4.2)
-      lucide-svelte:
-        specifier: ^0.488.0
-        version: 0.488.0(svelte@5.26.3)
       perfect-arrows:
         specifier: ^0.3.7
         version: 0.3.7
@@ -638,7 +638,7 @@ importers:
       '@eurora/ui':
         specifier: workspace:*
         version: link:../../ui
-      lucide-svelte:
+      '@lucide/svelte':
         specifier: ^0.488.0
         version: 0.488.0(svelte@5.26.3)
     devDependencies:
@@ -848,6 +848,9 @@ importers:
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@lucide/svelte':
+        specifier: ^0.488.0
+        version: 0.488.0(svelte@5.26.3)
       '@playwright/test':
         specifier: ^1.51.1
         version: 1.51.1
@@ -908,9 +911,6 @@ importers:
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
-      lucide-svelte:
-        specifier: ^0.488.0
-        version: 0.488.0(svelte@5.26.3)
       postcss-import:
         specifier: ^16.1.0
         version: 16.1.0(postcss@8.5.3)
@@ -1524,6 +1524,11 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.25':
     resolution: {integrity: sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ==}
+
+  '@lucide/svelte@0.488.0':
+    resolution: {integrity: sha512-i8TFY+vOVci2J/UhaeF1Yj25NOL8UJ27hf+/CexvfIyLSdgid3zHwh0iVf+DlWpAsXXJl2rQ5Cl5g/qfMbfOHw==}
+    peerDependencies:
+      svelte: ^5
 
   '@microsoft/api-extractor-model@7.30.5':
     resolution: {integrity: sha512-0ic4rcbcDZHz833RaTZWTGu+NpNgrxVNjVaor0ZDUymfDFzjA/Uuk8hYziIUIOEOSTfmIQqyzVwlzxZxPe7tOA==}
@@ -3693,11 +3698,6 @@ packages:
     resolution: {integrity: sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==}
     engines: {node: '>=10'}
 
-  lucide-svelte@0.488.0:
-    resolution: {integrity: sha512-omPkrOTn0bTZBqiC7fCDt2YGeR1iWGcEV814K8u0owUtFI57JwTTOfGnuiB8qdf3I4hBixiBXVigCQ1m0NIFwQ==}
-    peerDependencies:
-      svelte: ^3 || ^4 || ^5.0.0-next.42
-
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
     hasBin: true
@@ -5594,6 +5594,10 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
+
+  '@lucide/svelte@0.488.0(svelte@5.26.3)':
+    dependencies:
+      svelte: 5.26.3
 
   '@microsoft/api-extractor-model@7.30.5(@types/node@22.13.14)':
     dependencies:
@@ -7840,10 +7844,6 @@ snapshots:
   lru-cache@6.0.0:
     dependencies:
       yallist: 4.0.0
-
-  lucide-svelte@0.488.0(svelte@5.26.3):
-    dependencies:
-      svelte: 5.26.3
 
   lz-string@1.5.0: {}
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Card, Button, Input } from '@eurora/ui';
-	import { Mail, Phone, MapPin } from 'lucide-svelte';
+	import { Mail, Phone, MapPin } from '@lucide/svelte';
 </script>
 
 <div class="container mx-auto px-4 py-16 max-w-5xl">
