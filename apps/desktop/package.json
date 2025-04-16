@@ -19,7 +19,6 @@
 	"dependencies": {
 		"@eurora/ai-chat": "workspace:*",
 		"@eurora/katex": "workspace:*",
-		"@eurora/main-sidebar": "workspace:*",
 		"@eurora/proto": "workspace:*",
 		"@eurora/ui": "workspace:*"
 	},
