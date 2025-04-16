@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ScrollArea, Card } from '@eurora/ui';
-    import SystemChatMessage from './system-chat-message.svelte';
-    import UserChatMessage from './user-chat-message.svelte';
+	import SystemChatMessage from '$lib/components/SystemChatMessage.svelte';
+	import UserChatMessage from '$lib/components/UserChatMessage.svelte';
 
 	import { ProtoChatMessage } from '@eurora/proto/questions_service';
 

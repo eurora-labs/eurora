@@ -18,7 +18,7 @@
 </Sidebar.Provider> -->
 
 <Sidebar.Provider class="min-h-min" open={false}>
-	<MainSidebar />
+	<MainSidebar />  
 	<Sidebar.Inset class="min-h-min">
 		<header class="flex h-16 shrink-0 items-center gap-2 border-b px-4">
 			<Sidebar.Trigger class="-ml-1" />
