@@ -926,6 +926,10 @@ importers:
   packages/typescript-config: {}
 
   packages/ui:
+    dependencies:
+      '@eurora/katex':
+        specifier: workspace:*
+        version: link:../custom-components/katex
     devDependencies:
       '@eslint/compat':
         specifier: ^1.2.8
