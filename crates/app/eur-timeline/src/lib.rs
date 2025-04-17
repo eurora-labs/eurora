@@ -19,6 +19,9 @@ use tracing::{debug, error, info};
 pub mod browser_state;
 pub use browser_state::*;
 
+pub mod activity;
+pub use activity::*;
+
 // Custom serialization for ImageBuffer
 mod image_serde {
     use super::*;
@@ -83,6 +86,9 @@ pub struct Fragment {
 
 /// Timeline store that holds fragments of system state over time
 pub struct Timeline {
+    /// The activities stored in the timeline
+    activities: Arc<RwLock<Vec<Activity>>>,
+
     /// The fragments stored in the timeline
     fragments: Arc<RwLock<Vec<Fragment>>>,
 
@@ -100,6 +106,7 @@ impl Timeline {
     /// Create a new timeline with the specified capacity
     pub fn new(capacity: usize, interval_seconds: u64) -> Self {
         Self {
+            activities: Arc::new(RwLock::new(Vec::new())),
             fragments: Arc::new(RwLock::new(Vec::with_capacity(capacity))),
             capacity,
             interval_seconds,
