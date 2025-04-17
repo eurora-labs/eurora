@@ -34,12 +34,6 @@ type SharedConversationStorage = Arc<async_mutex::Mutex<Option<ConversationStora
 type SharedCurrentConversation = Arc<Mutex<Option<Conversation>>>;
 type SharedKeyringService = Arc<KeyringService>;
 
-use x11rb::{
-    connection::Connection,
-    protocol::xproto::{AtomEnum, ChangeWindowAttributesAux, EventMask},
-    rust_connection::RustConnection,
-};
-
 fn create_shared_conversation_storage() -> SharedConversationStorage {
     Arc::new(async_mutex::Mutex::new(None))
 }
@@ -64,70 +58,6 @@ fn create_shared_openai_client() -> SharedOpenAIClient {
 
 fn create_shared_keyring_service() -> SharedKeyringService {
     Arc::new(KeyringService::new())
-}
-
-fn spawn_focus_watcher() {
-    std::thread::spawn(move || {
-        // 1) connect to X11
-        let (conn, screen_num) =
-            RustConnection::connect(None).expect("Failed to connect to X server");
-        let screen = &conn.setup().roots[screen_num];
-        let root = screen.root;
-
-        // 2) intern the atoms we need
-        let net_active_win = conn
-            .intern_atom(false, b"_NET_ACTIVE_WINDOW")
-            .unwrap()
-            .reply()
-            .unwrap()
-            .atom;
-        let wm_class = conn
-            .intern_atom(false, b"WM_CLASS")
-            .unwrap()
-            .reply()
-            .unwrap()
-            .atom;
-
-        // 3) listen for property change events on the root window
-        conn.change_window_attributes(
-            root,
-            &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
-        )
-        .unwrap();
-        conn.flush().unwrap();
-
-        // 4) event loop
-        loop {
-            let ev = conn.wait_for_event().unwrap();
-            if let x11rb::protocol::Event::PropertyNotify(evt) = ev {
-                if evt.atom == net_active_win {
-                    // property changed: read the new active window
-                    if let Ok(reply) = conn
-                        .get_property(false, root, net_active_win, AtomEnum::WINDOW, 0, 1)
-                        .unwrap()
-                        .reply()
-                    {
-                        if let Some(win) = reply.value32().and_then(|mut v| v.next()) {
-                            // now query the WM_CLASS property on that window
-                            if let Ok(class_reply) = conn
-                                .get_property(false, win, wm_class, AtomEnum::STRING, 0, u32::MAX)
-                                .unwrap()
-                                .reply()
-                            {
-                                if let Ok(raw) = String::from_utf8(class_reply.value) {
-                                    // WM_CLASS is two null‐terminated strings: instance\0class\0
-                                    let parts: Vec<&str> =
-                                        raw.split('\0').filter(|s| !s.is_empty()).collect();
-                                    let class_name = parts.get(1).unwrap_or(&"");
-                                    println!("Focused application: {}", class_name);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    });
 }
 
 fn get_db_path(app_handle: &tauri::AppHandle) -> String {
