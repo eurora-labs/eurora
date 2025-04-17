@@ -59,20 +59,22 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
                         process_name(&conn, win, net_wm_pid).unwrap_or_else(|_| "<unknown>".into());
 
                     // Extract and save the window icon
-                    let icon_path = match extract_and_save_icon(&conn, win, net_wm_icon, &proc) {
-                        Ok(path) => path,
-                        Err(e) => {
-                            eprintln!("Failed to extract icon: {}", e);
-                            // Use a default icon path or just the process name if icon extraction fails
-                            proc.clone()
-                        }
-                    };
+                    let icon_data = get_icon_data(&conn, win, net_wm_icon);
+                    // let icon_path = match extract_and_save_icon(&conn, win, net_wm_icon, &proc) {
+                    //     Ok(path) => path,
+                    //     Err(e) => {
+                    //         eprintln!("Failed to extract icon: {}", e);
+                    //         // Use a default icon path or just the process name if icon extraction fails
+                    //         proc.clone()
+                    //     }
+                    // };
 
                     // Create a new activity for the focused window
                     let activity_name = format!("{}: {}", proc, title);
                     let activity = super::Activity::new(
                         activity_name,
-                        icon_path, // Use the path to the saved icon
+                        // icon_path, // Use the path to the saved icon
+                        "".into(), // Use the path to the saved icon
                         super::ActivityType::Application,
                     );
 
