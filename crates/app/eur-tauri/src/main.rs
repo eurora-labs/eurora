@@ -1062,7 +1062,7 @@ async fn check_grpc_server_connection(server_address: Option<String>) -> Result<
     }
 }
 
-use eur_timeline::activity::{Activity, ActivityType};
+use eur_timeline::activity::Activity;
 
 #[tauri::command]
 async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<Activity>, String> {
