@@ -33,7 +33,7 @@
 
 	type Activity = {
 		name: string;
-		icon: string;
+		icon: Uint8Array;
 		activity_type: ActivityType;
 		start: string; // ISO date string
 		end: string | null; // ISO date string or null
