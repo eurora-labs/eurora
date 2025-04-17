@@ -148,6 +148,26 @@ fn process_name<C: Connection>(conn: &C, window: u32, net_wm_pid: u32) -> Result
     Ok(name.trim_end_matches('\n').to_owned())
 }
 
+fn get_icon_data<C: Connection>(conn: &C, window: u32, net_wm_icon: u32) -> Result<Vec<u32>> {
+    let reply = conn
+        .get_property(
+            false,
+            window,
+            net_wm_icon,
+            AtomEnum::CARDINAL,
+            0,
+            u32::MAX / 4, // Limit size to avoid huge icons
+        )?
+        .reply()?;
+
+    if reply.value_len == 0 {
+        return Err(anyhow::anyhow!("No icon data available"));
+    }
+
+    // The icon data is an array of 32-bit values
+    Ok(reply.value32().unwrap().collect())
+}
+
 /// Extract the window icon and save it to a file
 fn extract_and_save_icon<C: Connection>(
     conn: &C,
@@ -168,25 +188,7 @@ fn extract_and_save_icon<C: Connection>(
         return Ok(icon_path.to_string_lossy().into_owned());
     }
 
-    // Get the icon data from the window
-    let reply = conn
-        .get_property(
-            false,
-            window,
-            net_wm_icon,
-            AtomEnum::CARDINAL,
-            0,
-            u32::MAX / 4, // Limit size to avoid huge icons
-        )?
-        .reply()?;
-
-    if reply.value_len == 0 {
-        return Err(anyhow::anyhow!("No icon data available"));
-    }
-
-    // The icon data is an array of 32-bit values
-    // The first two values are width and height, followed by ARGB pixel data
-    let icon_data = reply.value32().unwrap().collect::<Vec<u32>>();
+    let icon_data = get_icon_data(conn, window, net_wm_icon)?;
 
     if icon_data.len() < 2 {
         return Err(anyhow::anyhow!("Invalid icon data"));
