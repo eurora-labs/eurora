@@ -20,3 +20,4 @@ parking_lot = "0.12.1"
 eur-screen-capture = { path = "../eur-screen-capture" }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
+x11rb = "0.13.1"
