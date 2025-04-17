@@ -1069,6 +1069,14 @@ async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<Activity>, 
     let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
     let timeline = timeline_state.inner();
 
-    // Get the activities from the timeline
-    Ok(timeline.get_activities())
+    // Get all activities from the timeline
+    let mut activities = timeline.get_activities();
+
+    // Sort activities by start time (most recent first)
+    activities.sort_by(|a, b| b.start.cmp(&a.start));
+
+    // Limit to the 5 most recent activities to avoid cluttering the UI
+    let limited_activities = activities.into_iter().take(5).collect();
+
+    Ok(limited_activities)
 }
