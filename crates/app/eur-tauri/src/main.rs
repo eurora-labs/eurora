@@ -24,6 +24,8 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use tauri_plugin_log::{Target, TargetKind};
 use tokio::time::{Duration, sleep};
 
+mod focus_tracker;
+
 use tracing::{error, info};
 type SharedTimeline = Arc<Timeline>;
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
@@ -31,6 +33,12 @@ type SharedOpenAIClient = Arc<async_mutex::Mutex<Option<eur_openai::OpenAI>>>;
 type SharedConversationStorage = Arc<async_mutex::Mutex<Option<ConversationStorage>>>;
 type SharedCurrentConversation = Arc<Mutex<Option<Conversation>>>;
 type SharedKeyringService = Arc<KeyringService>;
+
+use x11rb::{
+    connection::Connection,
+    protocol::xproto::{AtomEnum, ChangeWindowAttributesAux, EventMask},
+    rust_connection::RustConnection,
+};
 
 fn create_shared_conversation_storage() -> SharedConversationStorage {
     Arc::new(async_mutex::Mutex::new(None))
@@ -58,6 +66,70 @@ fn create_shared_keyring_service() -> SharedKeyringService {
     Arc::new(KeyringService::new())
 }
 
+fn spawn_focus_watcher() {
+    std::thread::spawn(move || {
+        // 1) connect to X11
+        let (conn, screen_num) =
+            RustConnection::connect(None).expect("Failed to connect to X server");
+        let screen = &conn.setup().roots[screen_num];
+        let root = screen.root;
+
+        // 2) intern the atoms we need
+        let net_active_win = conn
+            .intern_atom(false, b"_NET_ACTIVE_WINDOW")
+            .unwrap()
+            .reply()
+            .unwrap()
+            .atom;
+        let wm_class = conn
+            .intern_atom(false, b"WM_CLASS")
+            .unwrap()
+            .reply()
+            .unwrap()
+            .atom;
+
+        // 3) listen for property change events on the root window
+        conn.change_window_attributes(
+            root,
+            &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
+        )
+        .unwrap();
+        conn.flush().unwrap();
+
+        // 4) event loop
+        loop {
+            let ev = conn.wait_for_event().unwrap();
+            if let x11rb::protocol::Event::PropertyNotify(evt) = ev {
+                if evt.atom == net_active_win {
+                    // property changed: read the new active window
+                    if let Ok(reply) = conn
+                        .get_property(false, root, net_active_win, AtomEnum::WINDOW, 0, 1)
+                        .unwrap()
+                        .reply()
+                    {
+                        if let Some(win) = reply.value32().and_then(|mut v| v.next()) {
+                            // now query the WM_CLASS property on that window
+                            if let Ok(class_reply) = conn
+                                .get_property(false, win, wm_class, AtomEnum::STRING, 0, u32::MAX)
+                                .unwrap()
+                                .reply()
+                            {
+                                if let Ok(raw) = String::from_utf8(class_reply.value) {
+                                    // WM_CLASS is two null‐terminated strings: instance\0class\0
+                                    let parts: Vec<&str> =
+                                        raw.split('\0').filter(|s| !s.is_empty()).collect();
+                                    let class_name = parts.get(1).unwrap_or(&"");
+                                    println!("Focused application: {}", class_name);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
 fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     let base_path = app_handle.path().app_data_dir().unwrap();
     std::fs::create_dir_all(&base_path).unwrap();
@@ -77,7 +149,9 @@ async fn resize_launcher_window(window: tauri::Window, height: u32) -> Result<()
 }
 
 #[tauri::command]
-async fn check_api_key_exists(keyring_service: tauri::State<'_, SharedKeyringService>) -> Result<ApiKeyStatus, String> {
+async fn check_api_key_exists(
+    keyring_service: tauri::State<'_, SharedKeyringService>,
+) -> Result<ApiKeyStatus, String> {
     let has_key = keyring_service.has_api_key();
     Ok(ApiKeyStatus { has_key })
 }
@@ -101,15 +175,15 @@ async fn initialize_openai_client(
     let api_key = keyring_service
         .get_api_key()
         .map_err(|e| format!("Failed to get API key: {}", e))?;
-    
+
     // Initialize the OpenAI client with the API key
     let openai_client = eur_openai::OpenAI::with_api_key(&api_key);
-    
+
     // Store the client in the app state
     let state: tauri::State<SharedOpenAIClient> = app_handle.state();
     let mut guard = state.lock().await;
     *guard = Some(openai_client);
-    
+
     Ok(true)
 }
 
@@ -149,11 +223,13 @@ fn main() {
                         // main_window.open_devtools();
                         // launcher_window.open_devtools();
                     }
-                    
+
                     // Ensure launcher is hidden on startup for Windows
                     #[cfg(target_os = "windows")]
                     {
-                        launcher_window.hide().expect("Failed to hide launcher window on startup");
+                        launcher_window
+                            .hide()
+                            .expect("Failed to hide launcher window on startup");
                     }
 
                     let app_handle = tauri_app.handle();
@@ -167,30 +243,31 @@ fn main() {
                     // Initialize the timeline and start collection
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
-// Create the keyring service
-let keyring_service = create_shared_keyring_service();
-app_handle.manage(keyring_service.clone());
+                    // Create the keyring service
+                    let keyring_service = create_shared_keyring_service();
+                    app_handle.manage(keyring_service.clone());
 
-// Create the OpenAI client (initially None, will be initialized after API key check)
-let openai_client = create_shared_openai_client();
-app_handle.manage(openai_client.clone());
+                    // Create the OpenAI client (initially None, will be initialized after API key check)
+                    let openai_client = create_shared_openai_client();
+                    app_handle.manage(openai_client.clone());
 
-// Check if API key exists and initialize OpenAI client if it does
-let keyring_clone = keyring_service.clone();
-let app_handle_clone = app_handle.clone();
-tauri::async_runtime::spawn(async move {
-    if keyring_clone.has_api_key() {
-        if let Ok(api_key) = keyring_clone.get_api_key() {
-            let client = eur_openai::OpenAI::with_api_key(&api_key);
-            let state: tauri::State<SharedOpenAIClient> = app_handle_clone.state();
-            let mut guard = state.lock().await;
-            *guard = Some(client);
-            info!("OpenAI client initialized with API key from keyring");
-        }
-    } else {
-        info!("No API key found in keyring, OpenAI client not initialized");
-    }
-});
+                    // Check if API key exists and initialize OpenAI client if it does
+                    let keyring_clone = keyring_service.clone();
+                    let app_handle_clone = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if keyring_clone.has_api_key() {
+                            if let Ok(api_key) = keyring_clone.get_api_key() {
+                                let client = eur_openai::OpenAI::with_api_key(&api_key);
+                                let state: tauri::State<SharedOpenAIClient> =
+                                    app_handle_clone.state();
+                                let mut guard = state.lock().await;
+                                *guard = Some(client);
+                                info!("OpenAI client initialized with API key from keyring");
+                            }
+                        } else {
+                            info!("No API key found in keyring, OpenAI client not initialized");
+                        }
+                    });
                     app_handle.manage(openai_client.clone());
 
                     // Initialize conversation storage
@@ -234,7 +311,7 @@ tauri::async_runtime::spawn(async move {
                     });
 
                     #[cfg(desktop)]
-                    { 
+                    {
                         // println!("Setting up global shortcut");
                         let super_space_shortcut =
                             Shortcut::new(Some(Modifiers::SUPER), Code::Space);
@@ -251,9 +328,9 @@ tauri::async_runtime::spawn(async move {
                     // Listen for window focus events
                     let launcher_label = launcher_window.label().to_string();
                     let app_handle_clone = app_handle.clone();
-                    
+
                     // We'll use a different approach for Windows
-                    
+
                     // Keep the window-specific handler for Linux
                     #[cfg(target_os = "linux")]
                     launcher_window.on_window_event(move |event| {
@@ -390,10 +467,10 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                         }
                     }
                 }
-                
+
                 // Only show the launcher if it was previously hidden
                 launcher.show().expect("Failed to show launcher window");
-                
+
                 // Add a small delay before setting focus
                 let launcher_clone = launcher.clone();
                 tauri::async_runtime::spawn(async move {
@@ -1050,4 +1127,3 @@ async fn check_grpc_server_connection(server_address: Option<String>) -> Result<
         }
     }
 }
-
