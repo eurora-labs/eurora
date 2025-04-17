@@ -332,7 +332,7 @@ fn main() {
                     ask_video_question,
                     continue_conversation,
                     check_grpc_server_connection,
-                    get_activities,
+                    list_activities,
                     get_current_conversation,
                     switch_conversation,
                     list_conversations,
