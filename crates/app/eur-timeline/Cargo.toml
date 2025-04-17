@@ -10,6 +10,7 @@ eur-proto = { path = "../../proto/eur-proto" }
 image = "0.25.6"
 eur-native-messaging = { path = "../eur-native-messaging" }
 anyhow = "1.0.97"
+base64 = "0.21.7"
 chrono = { version = "0.4.40", features = ["serde"] }
 tokio = { version = "1.44.2", features = ["full"] }
 tracing = "0.1.40"
