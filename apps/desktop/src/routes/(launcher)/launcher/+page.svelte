@@ -327,7 +327,7 @@
 					<div class="icon-container mr-1 h-4 w-4">
 						<!-- <canvas class="activity-icon" width="16" height="16" use:renderIcon={activity.icon}
 						></canvas> -->
-						<img src={activity.icon} />
+						<img src={activity.icon} alt="Activity Icon" />
 					</div>
 				{:else if activity.activity_type === 'Article'}
 					📄
