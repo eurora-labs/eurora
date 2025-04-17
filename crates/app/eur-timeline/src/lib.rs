@@ -161,6 +161,7 @@ impl Timeline {
 
     pub fn add_activity(&self, activity: Activity) {
         let mut activities = self.activities.write();
+        // eprintln!("Adding activity: {:?}", activity);
         activities.push(activity);
     }
 
