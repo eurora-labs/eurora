@@ -2,6 +2,10 @@
 
 ```mermaid
 classDiagram
+    Timeline --> Activity: creates on desktop focus change
+    Activity --> ActivitySnapshot: creates every 3 seconds
+    Activity --> ActivityAsset: creates on init()
+
     class Timeline {
         activities: Vec&lt;Activity>
     }
@@ -16,6 +20,7 @@ classDiagram
         +assets: Vec&lt;ActivityAsset>
 
         +new(name: String, icon: String, process_name: String)
+        -registerAssetStrategy()
 
     }
 
@@ -35,7 +40,5 @@ classDiagram
         +created_at: u64
     }
 
-    Timeline --> Activity: creates on desktop focus change
-    Activity --> ActivitySnapshot: creates every 3 seconds
-    Activity --> ActivityAsset: creates on init()
+
 ```
