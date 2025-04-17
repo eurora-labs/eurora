@@ -8,6 +8,8 @@
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
 
+	import { X } from '@lucide/svelte';
+
 	// Define a type for Conversation based on what we know from main.rs
 	type ChatMessage = {
 		id: string;
@@ -284,6 +286,7 @@
 					📌
 				{/if}
 				{activity.name}
+				<Button size="icon" variant="ghost"><X /></Button>
 			</Badge>
 		{/each}
 		{#if activities.length === 0}
