@@ -5,7 +5,6 @@
 	import { listen } from '@tauri-apps/api/event';
 	import { ProtoChatMessage } from '@eurora/proto/questions_service';
 	import { onMount } from 'svelte';
-	import type { Action } from 'svelte/action';
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
 
@@ -263,56 +262,6 @@
 			console.error('Failed to resize window:', error);
 		});
 	}
-
-	// Action to render icon from ARGB data
-	const renderIcon: Action<HTMLCanvasElement, Uint8Array> = (canvas, iconData) => {
-		if (!iconData || iconData.length === 0) return;
-
-		// Determine if we have ARGB data with the right size
-		// Assuming icon is 16x16 pixels (1024 bytes for ARGB)
-		const width = 16;
-		const height = 16;
-
-		if (iconData.length !== width * height * 4) {
-			console.warn(
-				`Icon data length (${iconData.length}) doesn't match expected size for ${width}x${height} ARGB image`
-			);
-			return;
-		}
-
-		const ctx = canvas.getContext('2d');
-		if (!ctx) return;
-
-		// Create ImageData from the ARGB bytes
-		const imageData = ctx.createImageData(width, height);
-		const data = imageData.data;
-
-		// Convert ARGB to RGBA (web canvas format)
-		for (let i = 0; i < iconData.length; i += 4) {
-			// ARGB to RGBA conversion
-			const alpha = iconData[i]; // A
-			const red = iconData[i + 1]; // R
-			const green = iconData[i + 2]; // G
-			const blue = iconData[i + 3]; // B
-
-			// Set RGBA values (canvas uses RGBA format)
-			const j = i;
-			data[j] = red; // R
-			data[j + 1] = green; // G
-			data[j + 2] = blue; // B
-			data[j + 3] = alpha; // A
-		}
-
-		// Put the image data on the canvas
-		ctx.putImageData(imageData, 0, 0);
-
-		// Clean up function when component is destroyed
-		return {
-			destroy() {
-				// No cleanup needed for canvas
-			}
-		};
-	};
 </script>
 
 <div class="flex h-screen flex-col">
@@ -325,8 +274,6 @@
 			>
 				{#if activity.icon && activity.icon.length > 0}
 					<div class="icon-container mr-1 h-4 w-4">
-						<!-- <canvas class="activity-icon" width="16" height="16" use:renderIcon={activity.icon}
-						></canvas> -->
 						<img src={activity.icon} alt="Activity Icon" />
 					</div>
 				{:else if activity.activity_type === 'Article'}
@@ -391,28 +338,6 @@
 			</ScrollArea>
 		{/if}
 
-		<!-- Messages container with auto-scroll -->
-		<!-- <div bind:this={messagesContainer} class="flex flex-1 flex-col overflow-y-auto p-2">
-		{#if statusCode}
-			<div class="mt-4 text-center text-xl">
-				{statusCode}
-			</div>
-		{/if}
-
-		{#each messages as message, i}
-			<div
-				class="message-item mt-4 flex {message.role === 'user' ? 'justify-end' : 'justify-start'}"
-			>
-				<div
-					class="max-w-[80%] rounded-lg p-3 text-xl {message.role === 'user'
-						? 'bg-blue-100 text-blue-900'
-						: 'bg-gray-100 text-gray-900'}"
-				>
-					<Katex math={message.content} finishRendering={() => {}} />
-				</div>
-			</div>
-		{/each}
-	</div> -->
 		<MessageArea {messages} />
 	{/if}
 </div>
