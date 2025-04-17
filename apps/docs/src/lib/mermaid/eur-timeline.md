@@ -1,4 +1,4 @@
-````mermaid
+```mermaid
 classDiagram
     class EurTimeline {
         activities: Vec&lt;Activity>
@@ -38,4 +38,4 @@ classDiagram
     Activity --> ActivityAsset: creates on init()
 
 
-````
+```
