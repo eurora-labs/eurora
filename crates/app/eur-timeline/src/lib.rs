@@ -24,6 +24,9 @@ pub use activity::*;
 
 pub mod focus_tracker;
 
+pub mod asset_strategy;
+pub use asset_strategy::*;
+
 // Custom serialization for ImageBuffer
 mod image_serde {
     use super::*;
