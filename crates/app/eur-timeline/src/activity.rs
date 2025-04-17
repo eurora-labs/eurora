@@ -40,9 +40,8 @@ pub struct Activity {
     /// Icon representing the activity
     pub icon: String,
 
-    /// Type of activity
-    #[serde(rename = "type")]
-    pub activity_type: ActivityType,
+    /// Process name of the activity
+    pub process_name: String,
 
     /// Start time (Unix timestamp)
     pub start: DateTime<Utc>,
@@ -59,13 +58,13 @@ pub struct Activity {
 
 impl Activity {
     /// Create a new activity
-    pub fn new(name: String, icon: String, activity_type: ActivityType) -> Self {
+    pub fn new(name: String, icon: String, process_name: String) -> Self {
         let now = chrono::Utc::now();
 
         Self {
             name,
             icon,
-            activity_type,
+            process_name,
             start: now,
             end: None, // Will be set when the activity ends
             snapshots: Vec::new(),
