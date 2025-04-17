@@ -1,6 +1,6 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
-	import { Textarea, ScrollArea, Separator, Button } from '@eurora/ui';
+	import { Textarea, ScrollArea, Separator, Button, Badge } from '@eurora/ui';
 	import { invoke, Channel } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import { ProtoChatMessage } from '@eurora/proto/questions_service';
@@ -26,6 +26,17 @@
 		updated_at: number;
 	};
 
+	// Define Activity type based on the Rust struct
+	type ActivityType = 'Article' | 'Application' | 'Browser' | 'Document' | 'Video' | 'Custom';
+
+	type Activity = {
+		name: string;
+		icon: string;
+		activity_type: ActivityType;
+		start: string; // ISO date string
+		end: string | null; // ISO date string or null
+	};
+
 	let inputRef = $state<HTMLTextAreaElement | null>(null);
 	let transcript = $state<string | null>(null);
 	const messages = $state<ProtoChatMessage[]>([]);
@@ -35,6 +46,7 @@
 	let hasApiKey = $state(false);
 	let isCheckingApiKey = $state(true);
 	let currentConversationId = $state<string | null>(null);
+	const activities = $state<Activity[]>([]);
 
 	// Set up event listener for chat responses
 	listen<string>('chat_response', (event) => {
@@ -72,11 +84,25 @@
 		// Check if API key exists
 		checkApiKey();
 
+		// Load activities
+		loadActivities();
+
 		// Clean up event listener when component is unmounted
 		return () => {
 			document.removeEventListener('keydown', handleEscapeKey);
 		};
 	});
+
+	// Function to load activities from the backend
+	async function loadActivities() {
+		try {
+			const result = await invoke('list_activities');
+			activities.splice(0, activities.length, ...(result as Activity[]));
+			console.log('Loaded activities:', activities);
+		} catch (error) {
+			console.error('Failed to load activities:', error);
+		}
+	}
 
 	// Function to check if API key exists
 	async function checkApiKey() {
@@ -237,6 +263,38 @@
 </script>
 
 <div class="flex h-screen flex-col">
+	<div class="flex flex-wrap gap-2 p-2">
+		{#each activities as activity}
+			<Badge
+				variant="outline"
+				class="flex items-center gap-1"
+				title={`${activity.name} - Started: ${new Date(activity.start).toLocaleTimeString()}`}
+			>
+				{#if activity.activity_type === 'Article'}
+					📄
+				{:else if activity.activity_type === 'Video'}
+					🎬
+				{:else if activity.activity_type === 'Browser'}
+					🌐
+				{:else if activity.activity_type === 'Document'}
+					📑
+				{:else if activity.activity_type === 'Application'}
+					💻
+				{:else}
+					📌
+				{/if}
+				{activity.name}
+			</Badge>
+		{/each}
+		{#if activities.length === 0}
+			<Badge variant="outline">No recent activities</Badge>
+		{/if}
+	</div>
+	<Button
+		onclick={() => {
+			loadActivities();
+		}}>Reload Activities</Button
+	>
 	{#if isCheckingApiKey}
 		<div class="flex h-full items-center justify-center">
 			<p class="text-gray-500">Checking API key...</p>
