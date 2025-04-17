@@ -9,11 +9,11 @@
 	async function renderKatex(elem: HTMLElement, math: string) {
 		console.log('math', math);
 
-		math = math.replace(/\\\[/g, '$').replace(/\\\]/g, '$');
+		math = math.replace(/\\\[/g, '$$$').replace(/\\\]/g, '$$$');
 
 		math = math.replace(/\\\(/g, '$$').replace(/\\\)/g, '$$');
 
-		math = math.replace('```', '$$');
+		// math = math.replace('```', '$$');
 
 		console.log('changed math', math);
 
