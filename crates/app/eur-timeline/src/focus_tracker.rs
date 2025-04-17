@@ -77,7 +77,7 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
                     let activity = super::Activity::new(
                         activity_name,
                         icon_base64, // Use the base64 encoded PNG
-                        super::ActivityType::Application,
+                        proc,
                     );
 
                     // Add the activity to the timeline

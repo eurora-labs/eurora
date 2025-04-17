@@ -34,7 +34,7 @@
 	type Activity = {
 		name: string;
 		icon: string;
-		activity_type: ActivityType;
+		process_name: string;
 		start: string; // ISO date string
 		end: string | null; // ISO date string or null
 	};
@@ -276,16 +276,6 @@
 					<div class="icon-container mr-1 h-4 w-4">
 						<img src={activity.icon} alt="Activity Icon" />
 					</div>
-				{:else if activity.activity_type === 'Article'}
-					📄
-				{:else if activity.activity_type === 'Video'}
-					🎬
-				{:else if activity.activity_type === 'Browser'}
-					🌐
-				{:else if activity.activity_type === 'Document'}
-					📑
-				{:else if activity.activity_type === 'Application'}
-					💻
 				{:else}
 					📌
 				{/if}
