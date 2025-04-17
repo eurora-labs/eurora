@@ -332,6 +332,7 @@ fn main() {
                     ask_video_question,
                     continue_conversation,
                     check_grpc_server_connection,
+                    get_activities,
                     get_current_conversation,
                     switch_conversation,
                     list_conversations,
@@ -1059,4 +1060,15 @@ async fn check_grpc_server_connection(server_address: Option<String>) -> Result<
             Err(error_msg)
         }
     }
+}
+
+use eur_timeline::activity::{Activity, ActivityType};
+
+#[tauri::command]
+async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<Activity>, String> {
+    let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
+    let timeline = timeline_state.inner();
+
+    // Get the activities from the timeline
+    Ok(timeline.get_activities())
 }
