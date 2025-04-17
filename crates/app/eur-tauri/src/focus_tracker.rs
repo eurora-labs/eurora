@@ -32,6 +32,7 @@ fn track_focus() -> Result<()> {
     // Atoms we’ll need
     let net_active_window = atom(&conn, b"_NET_ACTIVE_WINDOW")?;
     let net_wm_name = atom(&conn, b"_NET_WM_NAME")?;
+    let net_wm_pid = atom(&conn, b"_NET_WM_PID")?;
     let utf8_string = atom(&conn, b"UTF8_STRING")?;
 
     // Ask X to send us property‑change events on the root window
@@ -47,9 +48,13 @@ fn track_focus() -> Result<()> {
             // Has the active window changed?
             if atom == net_active_window {
                 if let Some(win) = active_window(&conn, root_window_id, net_active_window)? {
-                    if let Ok(name) = window_name(&conn, win, net_wm_name, utf8_string) {
-                        println!("▶ Currently focused: {name}");
-                    }
+                    let title = window_name(&conn, win, net_wm_name, utf8_string)?;
+                    let proc =
+                        process_name(&conn, win, net_wm_pid).unwrap_or_else(|_| "<unknown>".into());
+                    println!("▶ {proc}: {title}");
+                    // if let Ok(name) = window_name(&conn, win, net_wm_name, utf8_string) {
+                    //     println!("▶ Currently focused: {name}");
+                    // }
                 }
             }
         }
@@ -101,4 +106,21 @@ fn window_name<C: Connection>(
         )?
         .reply()?;
     Ok(String::from_utf8_lossy(&reply.value).into_owned())
+}
+
+fn process_name<C: Connection>(conn: &C, window: u32, net_wm_pid: u32) -> Result<String> {
+    // fetch the PID stored in _NET_WM_PID
+    let reply: GetPropertyReply = conn
+        .get_property(false, window, net_wm_pid, AtomEnum::CARDINAL, 0, 1)?
+        .reply()?;
+    let pid = reply.value32().and_then(|mut v| v.next()).unwrap();
+
+    // read /proc/<pid>/comm  (single line: executable name)
+    let name = std::fs::read_to_string(format!("/proc/{pid}/comm"))
+        .or_else(|_| {
+            std::fs::read_link(format!("/proc/{pid}/exe")).map(|p| p.to_string_lossy().into())
+        })
+        .unwrap();
+
+    Ok(name.trim_end_matches('\n').to_owned())
 }
