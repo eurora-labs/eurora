@@ -10,17 +10,6 @@ use serde_json::Value as JsonValue;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSession {}
 
-/// Types of activities
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ActivityType {
-    Article,
-    Application,
-    Browser,
-    Document,
-    Video,
-    Custom,
-}
-
 /// Types of assets
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AssetType {
