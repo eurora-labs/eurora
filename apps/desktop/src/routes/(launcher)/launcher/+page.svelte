@@ -28,9 +28,6 @@
 		updated_at: number;
 	};
 
-	// Define Activity type based on the Rust struct
-	type ActivityType = 'Article' | 'Application' | 'Browser' | 'Document' | 'Video' | 'Custom';
-
 	type Activity = {
 		name: string;
 		icon: string;
