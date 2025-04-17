@@ -22,6 +22,8 @@ pub use browser_state::*;
 pub mod activity;
 pub use activity::*;
 
+pub mod focus_tracker;
+
 // Custom serialization for ImageBuffer
 mod image_serde {
     use super::*;
@@ -84,6 +86,9 @@ pub struct Fragment {
     // pub metadata: serde_json::Value,
 }
 
+/// A reference to a Timeline that can be safely shared between threads
+pub type TimelineRef = Arc<Timeline>;
+
 /// Timeline store that holds fragments of system state over time
 pub struct Timeline {
     /// The activities stored in the timeline
@@ -112,6 +117,17 @@ impl Timeline {
             interval_seconds,
             browser_collector: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Create a shareable reference to this Timeline
+    pub fn clone_ref(&self) -> TimelineRef {
+        Arc::new(Timeline {
+            activities: Arc::clone(&self.activities),
+            fragments: Arc::clone(&self.fragments),
+            capacity: self.capacity,
+            interval_seconds: self.interval_seconds,
+            browser_collector: Arc::clone(&self.browser_collector),
+        })
     }
 
     /// Get a fragment from the specified number of seconds ago
@@ -143,12 +159,25 @@ impl Timeline {
         fragments.last().cloned()
     }
 
+    pub fn add_activity(&self, activity: Activity) {
+        let mut activities = self.activities.write();
+        activities.push(activity);
+    }
+
+    pub fn get_activities(&self) -> Vec<Activity> {
+        let activities = self.activities.read();
+        activities.clone()
+    }
+
     /// Start the timeline collection process
     pub async fn start_collection(&self) -> Result<()> {
         info!(
             "Starting timeline collection every {} seconds",
             self.interval_seconds
         );
+
+        // Start the focus tracker
+        focus_tracker::spawn(self);
 
         let fragments = Arc::clone(&self.fragments);
         let browser_collector = Arc::clone(&self.browser_collector);

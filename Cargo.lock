@@ -1790,6 +1790,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-subscriber",
+ "x11rb",
 ]
 
 [[package]]
