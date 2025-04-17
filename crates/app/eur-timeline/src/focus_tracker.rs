@@ -74,7 +74,7 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
                     let activity = super::Activity::new(
                         activity_name,
                         // icon_path, // Use the path to the saved icon
-                        "".into(), // Use the path to the saved icon
+                        icon_data.unwrap_or_else(|_| vec![]), // Use the icon data directly
                         super::ActivityType::Application,
                     );
 
@@ -150,7 +150,7 @@ fn process_name<C: Connection>(conn: &C, window: u32, net_wm_pid: u32) -> Result
     Ok(name.trim_end_matches('\n').to_owned())
 }
 
-fn get_icon_data<C: Connection>(conn: &C, window: u32, net_wm_icon: u32) -> Result<Vec<u32>> {
+fn get_icon_data<C: Connection>(conn: &C, window: u32, net_wm_icon: u32) -> Result<Vec<u8>> {
     let reply = conn
         .get_property(
             false,
@@ -167,7 +167,7 @@ fn get_icon_data<C: Connection>(conn: &C, window: u32, net_wm_icon: u32) -> Resu
     }
 
     // The icon data is an array of 32-bit values
-    Ok(reply.value32().unwrap().collect())
+    Ok(reply.value8().unwrap().collect())
 }
 
 /// Extract the window icon and save it to a file
