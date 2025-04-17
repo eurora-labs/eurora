@@ -4,13 +4,15 @@
 //! from different sources. It provides a flexible way to switch between
 //! different asset retrieval strategies at runtime.
 
+use crate::activity::{ActivityAsset, AssetType};
 use anyhow::Result;
+use serde_json;
 use std::sync::Arc;
 
 /// The AssetStrategy trait defines the interface for all asset retrieval strategies.
 pub trait AssetStrategy: Send + Sync {
     /// Execute the strategy to retrieve assets.
-    fn execute(&self) -> Result<Vec<u8>>;
+    fn execute(&self) -> Result<ActivityAsset>;
 }
 
 /// BrowserStrategy implements the AssetStrategy trait for retrieving assets from browsers.
@@ -26,10 +28,16 @@ impl BrowserStrategy {
 }
 
 impl AssetStrategy for BrowserStrategy {
-    fn execute(&self) -> Result<Vec<u8>> {
+    fn execute(&self) -> Result<ActivityAsset> {
         // Basic implementation - will be expanded later
-        // For now, just return an empty vector
-        Ok(Vec::new())
+        // In a real implementation, this would retrieve actual browser data
+        let data = serde_json::json!({
+            "url": "https://example.com",
+            "title": "Example Website",
+            "content": "Example content from browser"
+        });
+
+        Ok(ActivityAsset::new(data, crate::activity::AssetType::Custom))
     }
 }
 
@@ -52,21 +60,26 @@ impl AssetContext {
 
     /// Set the strategy based on the process name.
     pub fn set_strategy_by_process_name(&mut self, process_name: &str) {
-        match process_name {
-            "browser" => {
+        match process_name.to_lowercase().as_str() {
+            "browser" | "chrome" | "firefox" | "safari" | "edge" | "opera" => {
                 let strategy = Arc::new(BrowserStrategy::new());
                 self.set_strategy(strategy);
             }
             // Add more strategies as needed
+            // For example, you could add strategies for different applications
+            // "pdf_viewer" => { ... }
+            // "video_player" => { ... }
             _ => {
-                // Default to no strategy
-                self.strategy = None;
+                // For unknown process names, default to browser strategy for now
+                // In a production environment, you might want to log this or handle differently
+                let strategy = Arc::new(BrowserStrategy::new());
+                self.set_strategy(strategy);
             }
         }
     }
 
     /// Retrieve assets using the current strategy.
-    pub fn retrieve_assets(&self) -> Result<Vec<u8>> {
+    pub fn retrieve_assets(&self) -> Result<ActivityAsset> {
         match &self.strategy {
             Some(strategy) => strategy.execute(),
             None => Err(anyhow::anyhow!("No strategy set")),
