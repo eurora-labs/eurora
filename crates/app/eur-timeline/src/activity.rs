@@ -38,7 +38,7 @@ pub struct Activity {
     pub name: String,
 
     /// Icon representing the activity
-    pub icon: Vec<u8>,
+    pub icon: String,
 
     /// Type of activity
     #[serde(rename = "type")]
@@ -59,7 +59,7 @@ pub struct Activity {
 
 impl Activity {
     /// Create a new activity
-    pub fn new(name: String, icon: Vec<u8>, activity_type: ActivityType) -> Self {
+    pub fn new(name: String, icon: String, activity_type: ActivityType) -> Self {
         let now = chrono::Utc::now();
 
         Self {
