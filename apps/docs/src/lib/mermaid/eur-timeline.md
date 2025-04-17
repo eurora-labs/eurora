@@ -1,19 +1,21 @@
+# Timeline Class Diagram
+
 ```mermaid
 classDiagram
-    class EurTimeline {
+    class Timeline {
         activities: Vec&lt;Activity>
     }
 
     class Activity {
         +name: String
         +icon: String
-        +type: Enum
+        +process_name: String
         +start: u64
         +end: u64
         +snapshots: Vec&lt;ActivitySnapshot>
         +assets: Vec&lt;ActivityAsset>
 
-        +new(name: String, icon: String, type: Enum)
+        +new(name: String, icon: String, process_name: String)
 
     }
 
@@ -33,9 +35,7 @@ classDiagram
         +created_at: u64
     }
 
-    EurTimeline --> Activity: creates on desktop focus change
+    Timeline --> Activity: creates on desktop focus change
     Activity --> ActivitySnapshot: creates every 3 seconds
     Activity --> ActivityAsset: creates on init()
-
-
 ```
