@@ -9,6 +9,8 @@ classDiagram
         -strategy: AssetStrategy
 
         +setStrategy(strategy: AssetStrategy)
+        +setStrategyByProcessName(process_name: String)
+        
         +retrieveAssets()
     }
 
