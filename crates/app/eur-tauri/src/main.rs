@@ -143,6 +143,9 @@ fn main() {
                     //     create_window(tauri_app.handle(), "main", "index.html".into())
                     //         .expect("Failed to create main window");
 
+                    // Start the focus tracker
+                    focus_tracker::spawn();
+
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
                         create_launcher(tauri_app.handle(), "launcher", "index.html".into())
