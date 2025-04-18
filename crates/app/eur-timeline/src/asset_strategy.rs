@@ -20,6 +20,27 @@ pub struct BrowserStrategy {
     // Fields will be added as needed
 }
 
+pub struct YouTubeStrategy {
+    // Fields will be added as needed
+}
+
+impl AssetStrategy for YouTubeStrategy {
+    // Implement the YouTube strategy here
+    fn execute(&self) -> Result<ActivityAsset> {
+        // Placeholder implementation
+        let data = serde_json::json!({
+            "video_id": "12345",
+            "title": "Example Video",
+            "description": "Example description from YouTube"
+        });
+
+        Ok(ActivityAsset::new(
+            data,
+            crate::activity::AssetType::Youtube,
+        ))
+    }
+}
+
 impl BrowserStrategy {
     /// Create a new BrowserStrategy.
     pub fn new() -> Self {
