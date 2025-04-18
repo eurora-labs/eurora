@@ -1,11 +1,10 @@
 use anyhow::Result;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{self, StateRequest, StateResponse};
-use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState};
-use eur_proto::shared::ProtoImage;
+use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, mpsc};
-use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
+use tokio_stream::{StreamExt, wrappers::ReceiverStream};
 use tonic::Streaming;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -6,11 +6,11 @@ mod keyring_service;
 
 use eur_client_grpc::client_builder;
 use eur_client_questions::QuestionsClient;
-use eur_conversation::{Asset, ChatMessage, Conversation, ConversationStorage, conversation};
+use eur_conversation::{Asset, ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
-use eur_tauri::{WindowState, create_launcher, create_window};
+use eur_tauri::{WindowState, create_launcher};
 use eur_timeline::{BrowserState, Timeline};
 use futures::StreamExt;
 use keyring_service::{ApiKeyStatus, KeyringService};

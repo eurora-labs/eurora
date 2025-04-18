@@ -11,7 +11,6 @@ use x11rb::{
         },
     },
     rust_connection::RustConnection,
-    wrapper::ConnectionExt as _,
 };
 
 pub fn spawn() {

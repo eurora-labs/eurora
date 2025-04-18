@@ -1,9 +1,7 @@
 use anyhow::{Context, Result};
 use base64::{Engine as _, engine::general_purpose};
 use image::{ImageBuffer, Rgba};
-use std::fs::create_dir_all;
 use std::io::Cursor;
-use std::path::Path;
 use std::thread;
 
 use x11rb::{
