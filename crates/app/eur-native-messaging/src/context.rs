@@ -3,7 +3,7 @@ pub use eur_proto::ipc::{
     ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState,
 };
 pub use eur_proto::native_messaging::ProtoNativeYoutubeState;
-pub use eur_proto::shared::{ProtoImage, ProtoImageFormat};
+pub use eur_proto::shared::ProtoImage;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
