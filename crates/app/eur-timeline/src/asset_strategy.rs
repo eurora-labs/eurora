@@ -4,7 +4,7 @@
 //! from different sources. It provides a flexible way to switch between
 //! different asset retrieval strategies at runtime.
 
-use crate::activity::{ActivityAsset, AssetType};
+use crate::activity::ActivityAsset;
 use anyhow::Result;
 use serde_json;
 use std::sync::Arc;
