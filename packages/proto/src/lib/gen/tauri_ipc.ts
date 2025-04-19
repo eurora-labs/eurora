@@ -625,8 +625,8 @@ export const ProtoPdfState: MessageFns<ProtoPdfState> = {
 };
 
 export interface TauriIPC {
-  GatherState(request: Observable<StateRequest>): Observable<StateResponse>;
   GetState(request: StateRequest): Promise<StateResponse>;
+  GetStateStreaming(request: Observable<StateRequest>): Observable<StateResponse>;
 }
 
 export const TauriIPCServiceName = "ipc.TauriIPC";
@@ -636,19 +636,19 @@ export class TauriIPCClientImpl implements TauriIPC {
   constructor(rpc: Rpc, opts?: { service?: string }) {
     this.service = opts?.service || TauriIPCServiceName;
     this.rpc = rpc;
-    this.GatherState = this.GatherState.bind(this);
     this.GetState = this.GetState.bind(this);
+    this.GetStateStreaming = this.GetStateStreaming.bind(this);
   }
-  GatherState(request: Observable<StateRequest>): Observable<StateResponse> {
-    const data = request.pipe(map((request) => StateRequest.encode(request).finish()));
-    const result = this.rpc.bidirectionalStreamingRequest(this.service, "GatherState", data);
-    return result.pipe(map((data) => StateResponse.decode(new BinaryReader(data))));
-  }
-
   GetState(request: StateRequest): Promise<StateResponse> {
     const data = StateRequest.encode(request).finish();
     const promise = this.rpc.request(this.service, "GetState", data);
     return promise.then((data) => StateResponse.decode(new BinaryReader(data)));
+  }
+
+  GetStateStreaming(request: Observable<StateRequest>): Observable<StateResponse> {
+    const data = request.pipe(map((request) => StateRequest.encode(request).finish()));
+    const result = this.rpc.bidirectionalStreamingRequest(this.service, "GetStateStreaming", data);
+    return result.pipe(map((data) => StateResponse.decode(new BinaryReader(data))));
   }
 }
 
