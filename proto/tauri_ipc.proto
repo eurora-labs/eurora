@@ -4,7 +4,9 @@ package ipc;
 import "shared.proto";
 
 service TauriIPC {
-    rpc GatherState(stream StateRequest) returns (stream StateResponse) {}
+    rpc GetState(StateRequest) returns (StateResponse) {}
+    rpc GetStateStreaming(stream StateRequest) returns (stream StateResponse) {}
+
 }
 
 message StateRequest {}

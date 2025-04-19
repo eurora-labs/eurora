@@ -62,7 +62,7 @@ impl BrowserCollector {
         let request_stream = ReceiverStream::new(rx);
 
         // Create a persistent bidirectional stream
-        let result = client.gather_state(request_stream).await?;
+        let result = client.get_state_streaming(request_stream).await?;
         let stream = result.into_inner();
 
         // Send initial request to get first state
@@ -133,7 +133,7 @@ impl BrowserCollector {
         let request_stream = ReceiverStream::new(rx);
 
         // Create a new persistent bidirectional stream
-        let result = new_client.gather_state(request_stream).await?;
+        let result = new_client.get_state_streaming(request_stream).await?;
         let new_stream = result.into_inner();
 
         // Update the client

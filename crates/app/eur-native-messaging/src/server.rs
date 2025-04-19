@@ -148,12 +148,18 @@ impl TauriIpcServer {
 
 #[tonic::async_trait]
 impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
-    type GatherStateStream = ResponseStream;
+    type GetStateStreamingStream = ResponseStream;
 
-    async fn gather_state(
+    async fn get_state(&self, req: Request<StateRequest>) -> IpcResult<StateResponse> {
+        // This function is not used in the current implementation
+        // but can be implemented if needed
+        Err(Status::unimplemented("Not implemented"))
+    }
+
+    async fn get_state_streaming(
         &self,
         req: Request<Streaming<StateRequest>>,
-    ) -> IpcResult<Self::GatherStateStream> {
+    ) -> IpcResult<Self::GetStateStreamingStream> {
         let mut in_stream = req.into_inner();
         let (tx, rx) = mpsc::channel(128); // Increased buffer size to match example
         let server_clone = self.clone();
@@ -234,7 +240,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         });
 
         Ok(Response::new(
-            Box::pin(mapped_stream) as Self::GatherStateStream
+            Box::pin(mapped_stream) as Self::GetStateStreamingStream
         ))
     }
 }
