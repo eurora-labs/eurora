@@ -6,8 +6,13 @@
 
 use crate::activity::ActivityAsset;
 use anyhow::Result;
+use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
+use eur_proto::ipc::{self, StateRequest, StateResponse};
 use serde_json;
 use std::sync::Arc;
+use tokio::sync::{Mutex, mpsc};
+use tokio_stream::{StreamExt, wrappers::ReceiverStream};
+use tonic::Streaming;
 
 /// The AssetStrategy trait defines the interface for all asset retrieval strategies.
 pub trait AssetStrategy: Send + Sync {
@@ -17,12 +22,17 @@ pub trait AssetStrategy: Send + Sync {
 
 /// BrowserStrategy implements the AssetStrategy trait for retrieving assets from browsers.
 pub struct BrowserStrategy {
-    // Fields will be added as needed
+    /// The channel used for communication with the native messaging host.
+    client: Mutex<TauriIpcClient<Channel>>,
+    stream: Mutex<Streaming<StateResponse>>,
+    request_tx: mpsc::Sender<StateRequest>,
 }
 
 pub struct YouTubeStrategy {
     // Fields will be added as needed
 }
+
+pub struct ArticleStrategy {}
 
 impl AssetStrategy for YouTubeStrategy {
     // Implement the YouTube strategy here
@@ -41,10 +51,45 @@ impl AssetStrategy for YouTubeStrategy {
     }
 }
 
+impl AssetStrategy for ArticleStrategy {
+    // Implement the Article strategy here
+    fn execute(&self) -> Result<ActivityAsset> {
+        // Placeholder implementation
+        let data = serde_json::json!({
+            "url": "https://example.com",
+            "title": "Example Article",
+            "content": "Example content from article"
+        });
+
+        Ok(ActivityAsset::new(
+            data,
+            crate::activity::AssetType::Article,
+        ))
+    }
+}
+
 impl BrowserStrategy {
     /// Create a new BrowserStrategy.
-    pub fn new() -> Self {
-        Self {}
+    pub async fn new() -> Result<Self> {
+        let mut client = create_grpc_ipc_client().await?;
+
+        // Create a channel for requests
+        let (tx, rx) = mpsc::channel::<StateRequest>(32);
+        // Convert receiver to a stream that can be used with gRPC
+        let request_stream = ReceiverStream::new(rx);
+
+        // Create a persistent bidirectional stream
+        let result = client.get_state_streaming(request_stream).await?;
+        let stream = result.into_inner();
+
+        // Send initial request to get first state
+        tx.send(StateRequest {}).await?;
+
+        Ok(Self {
+            client: Mutex::new(client),
+            stream: Mutex::new(stream),
+            request_tx: tx,
+        })
     }
 }
 
