@@ -8,11 +8,11 @@ pub struct BrowserStrategy {
 
 impl BrowserStrategy {
     /// Create a new BrowserStrategy with the given name
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, icon: String, process_name: String) -> Self {
         Self {
             name,
-            icon: String::new(),
-            process_name: String::new(),
+            icon,
+            process_name,
         }
     }
 }
