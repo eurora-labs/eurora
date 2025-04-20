@@ -1601,10 +1601,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "eur-native-messaging",
  "eur-proto",
  "image",
+ "serde",
  "serde_json",
  "tokio",
+ "tokio-stream",
+ "tonic",
  "tracing",
 ]
 
@@ -1743,6 +1747,7 @@ dependencies = [
  "console-subscriber",
  "defer",
  "dirs",
+ "eur-activity",
  "eur-client-grpc",
  "eur-client-questions",
  "eur-conversation",

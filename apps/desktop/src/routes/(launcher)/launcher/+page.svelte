@@ -28,12 +28,12 @@
 		updated_at: number;
 	};
 
-	type Activity = {
+	type DisplayAsset = {
 		name: string;
 		icon: string;
-		process_name: string;
-		start: string; // ISO date string
-		end: string | null; // ISO date string or null
+		// process_name: string;
+		// start: string; // ISO date string
+		// end: string | null; // ISO date string or null
 	};
 
 	let inputRef = $state<HTMLTextAreaElement | null>(null);
@@ -45,7 +45,7 @@
 	let hasApiKey = $state(false);
 	let isCheckingApiKey = $state(true);
 	let currentConversationId = $state<string | null>(null);
-	const activities = $state<Activity[]>([]);
+	const displayAssets = $state<DisplayAsset[]>([]);
 
 	// Set up event listener for chat responses
 	listen<string>('chat_response', (event) => {
@@ -96,8 +96,8 @@
 	async function loadActivities() {
 		try {
 			const result = await invoke('list_activities');
-			activities.splice(0, activities.length, ...(result as Activity[]));
-			console.log('Loaded activities:', activities);
+			displayAssets.splice(0, displayAssets.length, ...(result as DisplayAsset[]));
+			console.log('Loaded activities:', displayAssets);
 		} catch (error) {
 			console.error('Failed to load activities:', error);
 		}
@@ -263,24 +263,25 @@
 
 <div class="flex h-screen flex-col">
 	<div class="flex flex-wrap gap-2 p-2">
-		{#each activities as activity}
-			<Badge
+		{#each displayAssets as asset}
+			<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
+				<!-- <Badge
 				variant="outline"
 				class="flex items-center gap-1"
 				title={`${activity.name} - Started: ${new Date(activity.start).toLocaleTimeString()}`}
-			>
-				{#if activity.icon && activity.icon.length > 0}
+			> -->
+				{#if asset.icon && asset.icon.length > 0}
 					<div class="icon-container mr-1 h-4 w-4">
-						<img src={activity.icon} alt="Activity Icon" />
+						<img src={asset.icon} alt="Activity Icon" />
 					</div>
 				{:else}
 					📌
 				{/if}
-				{activity.name}
+				{asset.name}
 				<Button size="icon" variant="ghost"><X /></Button>
 			</Badge>
 		{/each}
-		{#if activities.length === 0}
+		{#if displayAssets.length === 0}
 			<Badge variant="outline">No recent activities</Badge>
 		{/if}
 	</div>
