@@ -9,6 +9,7 @@ description = "Timeline storage for capturing system state over time"
 eur-proto = { path = "../../proto/eur-proto" }
 image = "0.25.6"
 eur-native-messaging = { path = "../eur-native-messaging" }
+eur-activity = { path = "../eur-activity" }
 anyhow = "1.0.97"
 base64 = "0.21.7"
 chrono = { version = "0.4.40", features = ["serde"] }
