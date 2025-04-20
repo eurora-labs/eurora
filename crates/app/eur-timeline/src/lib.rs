@@ -200,7 +200,11 @@ impl Timeline {
         activities
             .iter()
             .map(|activity| {
-                Activity::new(activity.name.to_string(), "".to_string(), "".to_string())
+                Activity::new(
+                    activity.name.to_string(),
+                    activity.icon.to_string(),
+                    activity.process_name.to_string(),
+                )
             })
             .collect()
     }

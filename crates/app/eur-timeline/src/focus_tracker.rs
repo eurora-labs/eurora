@@ -81,7 +81,8 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
                     // );
                     let mut s = String::from("");
                     // Create an instance of BrowserStrategy with a name
-                    let browser_strategy = BrowserStrategy::new(format!("{}: {}", proc, title));
+                    let browser_strategy =
+                        BrowserStrategy::new(format!("{}: {}", proc, title), icon_base64, proc);
                     timeline.start_collection_activity(browser_strategy, &mut s);
 
                     // let activity_strategy =
