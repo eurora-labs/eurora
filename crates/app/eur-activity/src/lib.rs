@@ -16,16 +16,10 @@ use tokio::time;
 use tracing::{debug, error, info};
 
 pub mod browser_activity;
-pub mod default_strategy;
-pub mod strategy_registry;
-pub mod strategy_selector;
-pub mod strategy_wrapper;
+pub mod strategy_factory;
 
 pub use browser_activity::{BrowserStrategy, BrowserStrategyFactory};
-pub use default_strategy::DefaultStrategyFactory;
-pub use strategy_registry::StrategyRegistry;
-pub use strategy_selector::select_strategy_for_process;
-pub use strategy_wrapper::StrategyWrapper;
+pub use strategy_factory::{DefaultStrategyFactory, select_strategy_for_process};
 
 #[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {
