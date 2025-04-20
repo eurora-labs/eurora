@@ -24,7 +24,9 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use tauri_plugin_log::{Target, TargetKind};
 use tokio::time::{Duration, sleep};
 
-mod focus_tracker;
+// mod focus_tracker;
+
+use eur_timeline::focus_tracker;
 
 use tracing::{error, info};
 type SharedTimeline = Arc<Timeline>;
@@ -144,7 +146,6 @@ fn main() {
                     //         .expect("Failed to create main window");
 
                     // Start the focus tracker
-                    focus_tracker::spawn();
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
@@ -176,6 +177,9 @@ fn main() {
                     // Initialize the timeline and start collection
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
+
+                    // focus_tracker::spawn(&timeline.clone());
+
                     // Create the keyring service
                     let keyring_service = create_shared_keyring_service();
                     app_handle.manage(keyring_service.clone());
@@ -1062,10 +1066,10 @@ async fn check_grpc_server_connection(server_address: Option<String>) -> Result<
     }
 }
 
+use eur_activity::DisplayAsset;
 use eur_timeline::activity::Activity;
-
 #[tauri::command]
-async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<Activity>, String> {
+async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<DisplayAsset>, String> {
     let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
     let timeline = timeline_state.inner();
 
@@ -1074,7 +1078,7 @@ async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<Activity>, 
     let mut activities = timeline.get_activities_temp();
 
     // Sort activities by start time (most recent first)
-    activities.sort_by(|a, b| b.start.cmp(&a.start));
+    // activities.sort_by(|a, b| b.start.cmp(&a.start));
 
     // Limit to the 5 most recent activities to avoid cluttering the UI
     let limited_activities = activities.into_iter().take(5).collect();
