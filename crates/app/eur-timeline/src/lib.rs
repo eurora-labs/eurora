@@ -28,7 +28,7 @@ pub mod asset_strategy;
 pub use asset_strategy::*;
 
 use eur_activity;
-use eur_activity::ActivityStrategy;
+use eur_activity::{ActivityStrategy, DisplayAsset};
 
 // Custom serialization for ImageBuffer
 mod image_serde {
@@ -190,32 +190,29 @@ impl Timeline {
         activities.clone()
     }
 
-    pub fn get_activities_temp(&self) -> Vec<Activity> {
+    pub fn get_activities_temp(&self) -> Vec<DisplayAsset> {
         let activities = self.activities_temp.read();
 
         // Print length of activities
         eprintln!("Activities length: {}", activities.len());
 
-        // For each name, create an activity
+        // For each activity, create DisplayAssets for each of its assets and flatten into a single vector
         activities
             .iter()
-            .map(|activity| {
-                Activity::new(
-                    activity.name.to_string(),
-                    activity.icon.to_string(),
-                    activity.process_name.to_string(),
-                )
-            })
-            .collect()
+            .flat_map(|activity| activity.get_display_assets())
+            .collect::<Vec<DisplayAsset>>()
     }
 
-    pub fn start_collection_activity<T: ActivityStrategy>(
+    pub async fn start_collection_activity<T: ActivityStrategy>(
         &self,
-        activity_strategy: T,
+        mut activity_strategy: T,
         s: &mut String,
     ) {
         // Retrieve initial assets from the activity
-        let assets = activity_strategy.retrieve_assets().unwrap_or(Vec::new());
+        let assets = activity_strategy
+            .retrieve_assets()
+            .await
+            .unwrap_or(Vec::new());
 
         // Create a new activity
         let activity = eur_activity::Activity::new(
@@ -325,6 +322,8 @@ impl Timeline {
 
         // Start the focus tracker
         focus_tracker::spawn(self);
+
+        return Ok(());
 
         let fragments = Arc::clone(&self.fragments);
         let browser_collector = Arc::clone(&self.browser_collector);
