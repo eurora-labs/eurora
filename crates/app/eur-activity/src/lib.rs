@@ -15,7 +15,10 @@ use tokio::time;
 use tracing::{debug, error, info};
 
 pub mod browser_activity;
+pub mod strategy_selector;
+
 pub use browser_activity::BrowserStrategy;
+pub use strategy_selector::select_strategy_for_process;
 
 #[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {

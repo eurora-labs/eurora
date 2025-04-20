@@ -16,7 +16,7 @@ use x11rb::{
     rust_connection::RustConnection,
 };
 
-use eur_activity::BrowserStrategy;
+use eur_activity::select_strategy_for_process;
 
 pub fn spawn(timeline: &super::Timeline) {
     // Clone the reference to the timeline for the thread
@@ -82,17 +82,19 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
                     //     proc,
                     // );
                     let mut s = String::from("");
-                    // Create an instance of BrowserStrategy with a name
                     // Create a runtime to execute the async code
                     let rt = tokio::runtime::Runtime::new().unwrap();
                     rt.block_on(async {
-                        let browser_strategy =
-                            BrowserStrategy::new(format!("{}: {}", proc, title), icon_base64, proc)
-                                .await
-                                .unwrap();
-                        timeline
-                            .start_collection_activity(browser_strategy, &mut s)
-                            .await;
+                        // Select the appropriate strategy based on the process name
+                        let strategy = select_strategy_for_process(
+                            &proc,
+                            format!("{}: {}", proc, title),
+                            icon_base64.clone(),
+                        )
+                        .await
+                        .unwrap();
+
+                        timeline.start_collection_activity(strategy, &mut s).await;
                     });
 
                     // let activity_strategy =
@@ -235,6 +237,8 @@ fn convert_icon_to_base64(icon_data: &[u32]) -> Result<String> {
     // Add the data URL prefix
     Ok(format!("data:image/png;base64,{}", base64_png))
 }
+
+// The strategy selection logic has been moved to the eur_activity crate
 
 // / Extract the window icon and save it to a file
 // fn extract_and_save_icon<C: Connection>(
