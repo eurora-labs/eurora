@@ -18,3 +18,4 @@ tracing = "0.1.40"
 anyhow = "1.0.80"
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
+async-trait = "0.1.77"

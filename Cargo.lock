@@ -1600,6 +1600,7 @@ name = "eur-activity"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "eur-native-messaging",
  "eur-proto",
