@@ -193,14 +193,11 @@ impl Timeline {
     pub fn get_activities_temp(&self) -> Vec<DisplayAsset> {
         let activities = self.activities_temp.read();
 
-        // Print length of activities
-        eprintln!("Activities length: {}", activities.len());
+        if activities.is_empty() {
+            return Vec::new();
+        }
 
-        // For each activity, create DisplayAssets for each of its assets and flatten into a single vector
-        activities
-            .iter()
-            .flat_map(|activity| activity.get_display_assets())
-            .collect::<Vec<DisplayAsset>>()
+        activities.last().unwrap().get_display_assets()
     }
 
     pub async fn start_collection_activity<T: ActivityStrategy>(
