@@ -16,6 +16,8 @@ use x11rb::{
     rust_connection::RustConnection,
 };
 
+use eur_activity::BrowserStrategy;
+
 pub fn spawn(timeline: &super::Timeline) {
     // Clone the reference to the timeline for the thread
     let timeline = timeline.clone_ref();
@@ -72,14 +74,21 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
 
                     // Create a new activity for the focused window
                     let activity_name = format!("{}: {}", proc, title);
-                    let activity = super::Activity::new(
-                        activity_name,
-                        icon_base64, // Use the base64 encoded PNG
-                        proc,
-                    );
+                    // let activity = super::Activity::new(
+                    //     activity_name,
+                    //     icon_base64, // Use the base64 encoded PNG
+                    //     proc,
+                    // );
+                    let mut s = String::from("");
+                    // Create an instance of BrowserStrategy with a name
+                    let browser_strategy = BrowserStrategy::new(format!("{}: {}", proc, title));
+                    timeline.start_collection_activity(browser_strategy, &mut s);
 
-                    // Add the activity to the timeline
-                    timeline.add_activity(activity);
+                    // let activity_strategy =
+                    //     ActivityStrategy::new(activity.clone(), timeline.clone_ref());
+
+                    // // Add the activity to the timeline
+                    // timeline.add_activity(activity);
                 }
             }
         }

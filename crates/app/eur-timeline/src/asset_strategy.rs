@@ -32,6 +32,8 @@ pub struct YouTubeStrategy {
 
 pub struct ArticleStrategy {}
 
+pub struct PdfStrategy {}
+
 impl AssetStrategy for YouTubeStrategy {
     // Implement the YouTube strategy here
     fn execute(&self) -> Result<ActivityAsset> {
@@ -63,6 +65,20 @@ impl AssetStrategy for ArticleStrategy {
             data,
             crate::activity::AssetType::Article,
         ))
+    }
+}
+
+impl AssetStrategy for PdfStrategy {
+    // Implement the PDF strategy here
+    fn execute(&self) -> Result<ActivityAsset> {
+        // Placeholder implementation
+        let data = serde_json::json!({
+            "url": "https://example.com/document.pdf",
+            "title": "Example PDF",
+            "content": "Example content from PDF"
+        });
+
+        Ok(ActivityAsset::new(data, crate::activity::AssetType::Custom))
     }
 }
 
