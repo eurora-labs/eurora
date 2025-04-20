@@ -1,5 +1,6 @@
-use crate::{ActivityAsset, ActivityStrategy, DisplayAsset};
+use crate::{ActivityAsset, ActivityStrategy, DisplayAsset, StrategyFactory};
 use anyhow::Result;
+use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{
     self, ProtoArticleState, ProtoPdfState, ProtoYoutubeState, StateRequest, StateResponse,
@@ -181,6 +182,7 @@ impl BrowserStrategy {
     }
 }
 
+#[async_trait]
 impl ActivityStrategy for BrowserStrategy {
     async fn retrieve_assets(&mut self) -> Result<Vec<Box<dyn crate::ActivityAsset>>> {
         // Send a request to get the latest state
@@ -244,5 +246,54 @@ impl ActivityStrategy for BrowserStrategy {
 
     fn get_process_name(&self) -> &String {
         &self.process_name
+    }
+}
+
+/// Factory for creating BrowserStrategy instances
+pub struct BrowserStrategyFactory;
+
+impl BrowserStrategyFactory {
+    /// Create a new BrowserStrategyFactory
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// List of browser process names that this factory supports
+    fn supported_browsers() -> Vec<&'static str> {
+        vec![
+            "firefox",
+            "firefox-bin",
+            "firefox-esr",
+            "chrome",
+            "chromium",
+            "chromium-browser",
+            "brave",
+            "brave-browser",
+            "opera",
+            "vivaldi",
+            "edge",
+            "msedge",
+            "safari",
+        ]
+    }
+}
+
+#[async_trait]
+impl StrategyFactory for BrowserStrategyFactory {
+    fn supports_process(&self, process_name: &str) -> bool {
+        let process_lower = process_name.to_lowercase();
+        Self::supported_browsers()
+            .iter()
+            .any(|&browser| process_lower == browser)
+    }
+
+    async fn create_strategy(
+        &self,
+        process_name: &str,
+        display_name: String,
+        icon: String,
+    ) -> Result<Box<dyn ActivityStrategy>> {
+        let strategy = BrowserStrategy::new(display_name, icon, process_name.to_string()).await?;
+        Ok(Box::new(strategy))
     }
 }

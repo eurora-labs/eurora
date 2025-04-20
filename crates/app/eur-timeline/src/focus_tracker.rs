@@ -74,6 +74,11 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
 
                     eprintln!("▶ {proc}: {title}");
 
+                    if proc == "eur-tauri" {
+                        // Skip the eur-tauri process itself
+                        continue;
+                    }
+
                     // Create a new activity for the focused window
                     // let activity_name = format!("{}: {}", proc, title);
                     // let activity = super::Activity::new(
