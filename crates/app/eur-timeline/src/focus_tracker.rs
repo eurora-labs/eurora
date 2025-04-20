@@ -72,8 +72,10 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
                         Err(_) => String::new(), // Empty string if no icon data
                     };
 
+                    eprintln!("▶ {proc}: {title}");
+
                     // Create a new activity for the focused window
-                    let activity_name = format!("{}: {}", proc, title);
+                    // let activity_name = format!("{}: {}", proc, title);
                     // let activity = super::Activity::new(
                     //     activity_name,
                     //     icon_base64, // Use the base64 encoded PNG
@@ -81,9 +83,17 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
                     // );
                     let mut s = String::from("");
                     // Create an instance of BrowserStrategy with a name
-                    let browser_strategy =
-                        BrowserStrategy::new(format!("{}: {}", proc, title), icon_base64, proc);
-                    timeline.start_collection_activity(browser_strategy, &mut s);
+                    // Create a runtime to execute the async code
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.block_on(async {
+                        let browser_strategy =
+                            BrowserStrategy::new(format!("{}: {}", proc, title), icon_base64, proc)
+                                .await
+                                .unwrap();
+                        timeline
+                            .start_collection_activity(browser_strategy, &mut s)
+                            .await;
+                    });
 
                     // let activity_strategy =
                     //     ActivityStrategy::new(activity.clone(), timeline.clone_ref());

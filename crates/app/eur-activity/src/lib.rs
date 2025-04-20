@@ -7,6 +7,7 @@
 use anyhow::{Context, Result};
 // use eur_timeline::TimelineRef;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,8 +17,22 @@ use tracing::{debug, error, info};
 pub mod browser_activity;
 pub use browser_activity::BrowserStrategy;
 
+#[derive(Serialize, Deserialize)]
+pub struct DisplayAsset {
+    pub name: String,
+    pub icon: String,
+}
+
+impl DisplayAsset {
+    pub fn new(name: String, icon: String) -> Self {
+        Self { name, icon }
+    }
+}
+
 pub trait ActivityAsset: Send + Sync {
-    fn get_display(&self) -> serde_json::Value;
+    fn get_name(&self) -> &String;
+    fn get_icon(&self) -> Option<&String>;
+    // fn get_display(&self) -> DisplayAsset;
 }
 pub struct Activity {
     /// Name of the activity
@@ -58,6 +73,22 @@ impl Activity {
             assets,
         }
     }
+
+    pub fn get_display_assets(&self) -> Vec<DisplayAsset> {
+        self.assets
+            .iter()
+            .filter_map(|asset| {
+                if let Some(icon) = asset.get_icon() {
+                    Some(DisplayAsset::new(asset.get_name().clone(), icon.clone()))
+                } else {
+                    Some(DisplayAsset::new(
+                        asset.get_name().clone(),
+                        self.icon.clone(),
+                    ))
+                }
+            })
+            .collect()
+    }
 }
 
 /// Activity trait defines methods that must be implemented by activities
@@ -67,7 +98,7 @@ pub trait ActivityStrategy: Send + Sync {
     ///
     /// This method is called once when collection starts to gather
     /// initial assets related to the activity.
-    fn retrieve_assets(&self) -> Result<Vec<Box<dyn ActivityAsset>>>;
+    async fn retrieve_assets(&mut self) -> Result<Vec<Box<dyn ActivityAsset>>>;
 
     /// Gather the current state of the activity
     ///
