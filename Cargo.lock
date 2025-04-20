@@ -1596,6 +1596,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-activity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "eur-proto",
+ "image",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "eur-client-grpc"
 version = "0.0.0"
 dependencies = [
@@ -1779,6 +1792,7 @@ dependencies = [
  "anyhow",
  "base64 0.21.7",
  "chrono",
+ "eur-activity",
  "eur-native-messaging",
  "eur-proto",
  "eur-screen-capture",
