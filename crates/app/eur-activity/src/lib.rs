@@ -6,6 +6,7 @@
 
 use anyhow::{Context, Result};
 // use eur_timeline::TimelineRef;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -15,10 +16,16 @@ use tokio::time;
 use tracing::{debug, error, info};
 
 pub mod browser_activity;
+pub mod default_strategy;
+pub mod strategy_registry;
 pub mod strategy_selector;
+pub mod strategy_wrapper;
 
-pub use browser_activity::BrowserStrategy;
+pub use browser_activity::{BrowserStrategy, BrowserStrategyFactory};
+pub use default_strategy::DefaultStrategyFactory;
+pub use strategy_registry::StrategyRegistry;
 pub use strategy_selector::select_strategy_for_process;
+pub use strategy_wrapper::StrategyWrapper;
 
 #[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {
@@ -96,6 +103,7 @@ impl Activity {
 
 /// Activity trait defines methods that must be implemented by activities
 /// that can be tracked and reported.
+#[async_trait]
 pub trait ActivityStrategy: Send + Sync {
     /// Retrieve assets associated with this activity
     ///
@@ -116,6 +124,21 @@ pub trait ActivityStrategy: Send + Sync {
     fn get_icon(&self) -> &String;
     /// Get process name of the activity
     fn get_process_name(&self) -> &String;
+}
+
+/// Strategy factory trait for creating activity strategies
+#[async_trait]
+pub trait StrategyFactory: Send + Sync {
+    /// Returns true if this factory can create a strategy for the given process
+    fn supports_process(&self, process_name: &str) -> bool;
+
+    /// Create a new strategy instance for the given process
+    async fn create_strategy(
+        &self,
+        process_name: &str,
+        display_name: String,
+        icon: String,
+    ) -> Result<Box<dyn ActivityStrategy>>;
 }
 
 /// ActivityReporter handles the collection and reporting of activity data
