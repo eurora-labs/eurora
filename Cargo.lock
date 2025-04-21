@@ -1710,6 +1710,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-prompt-kit"
+version = "0.1.0"
+dependencies = [
+ "image",
+]
+
+[[package]]
 name = "eur-proto"
 version = "0.1.0"
 dependencies = [
