@@ -711,6 +711,8 @@ async fn ask_video_question(
 
     let mut title: Option<String> = None;
 
+    let messages = timeline.construct_asset_messages();
+
     // Collect a new fragment from the timeline
     let content_data: BrowserState = {
         let fragment = timeline

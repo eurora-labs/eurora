@@ -6,6 +6,7 @@
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use eur_prompt_kit::Message;
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -198,6 +199,17 @@ impl Timeline {
         }
 
         activities.last().unwrap().get_display_assets()
+    }
+
+    pub fn construct_asset_messages(&self) -> Vec<Message> {
+        let activities = self.activities_temp.read();
+        let last_activity = activities.last().unwrap();
+
+        last_activity
+            .assets
+            .iter()
+            .map(|asset| asset.construct_message())
+            .collect()
     }
 
     pub async fn start_collection_activity<T: ActivityStrategy>(
