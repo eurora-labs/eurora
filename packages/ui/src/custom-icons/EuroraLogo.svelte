@@ -26,14 +26,13 @@
 	width={size}
 	height={size}
 	fill="none"
-	stroke={color}
 	stroke-width={strokeWidth}
 	stroke-linecap="round"
 	stroke-linejoin="round"
 	aria-label={ariaLabel}
 	preserveAspectRatio="xMidYMid"
 	aria-describedby={hasDescription ? ariaDescribedby : undefined}
-	viewBox="0 0 32 32"
+	viewBox="0 0 8 8"
 >
 	{#if title?.id && title.title}
 		<title id={title.id}>{title.title}</title>
@@ -41,14 +40,15 @@
 	{#if desc?.id && desc.desc}
 		<desc id={desc.id}>{desc.desc}</desc>
 	{/if}
-	<defs id="defs11">
+	<defs id="defs27273">
+		<!-- Background radial gradient -->
 		<linearGradient
 			id="linearGradient12"
 			x1="-7.9197998"
 			x2="13.276"
 			y1="-22.497999"
 			y2="-22.497999"
-			gradientTransform="matrix(1.1330982,0,0,1.135195,-1.6568437,3.3675398)"
+			gradientTransform="matrix(1.1330982,0,0,1.135195,-11.923032,-34.521349)"
 			gradientUnits="userSpaceOnUse"
 		>
 			<stop stop-color="#9369de" offset="0" id="stop2" style="stop-color:#9f7ae1;stop-opacity:1;" />
@@ -66,54 +66,59 @@
 			/>
 			<stop stop-color="#0f89ff" offset="1" id="stop8" style="stop-color:#0f89ff;stop-opacity:1;" />
 		</linearGradient>
-	</defs>
-	<g
-		transform="matrix(1.3405063,0,0,1.3459073,-6.1785688,-3.9305535)"
-		id="g15"
-		style="display:inline;stroke:none;stroke-width:0.372245;stroke-dasharray:none;stroke-opacity:1"
-	>
-		<ellipse
-			transform="matrix(-0.62559098,0.78015122,-0.78507343,-0.61940271,0,0)"
-			cx="1.3776516"
-			cy="-22.17215"
-			rx="12.008981"
-			ry="11.813949"
-			fill="url(#linearGradient12)"
-			style="display:inline;fill:url(#linearGradient12);stroke:none;stroke-width:0.372251;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
-			id="ellipse13"
-			mask="none"
-			clip-path="none"
+		<!-- Light drop‑shadow for the facets -->
+		<filter id="shadow" x="-0.093270048" y="-0.09077815" width="1.1865381" height="1.2023492">
+			<feOffset in="SourceAlpha" dy="0.6" result="off" id="feOffset27260" />
+			<feGaussianBlur in="off" stdDeviation="0.8" result="blur" id="feGaussianBlur27262" />
+			<feColorMatrix
+				in="blur"
+				type="matrix"
+				values="0 0 0 0 0                               0 0 0 0 0                               0 0 0 0 0                               0 0 0 0.25 0"
+				result="shadow"
+				id="feColorMatrix27264"
+			/>
+			<feMerge id="feMerge27270">
+				<feMergeNode in="shadow" id="feMergeNode27266" />
+				<feMergeNode in="SourceGraphic" id="feMergeNode27268" />
+			</feMerge>
+		</filter>
+		<linearGradient
+			xlink:href="#linearGradient12"
+			id="linearGradient46190"
+			x1="-9.2661877"
+			y1="-21.888889"
+			x2="20.733812"
+			y2="-21.888889"
+			gradientUnits="userSpaceOnUse"
+			gradientTransform="matrix(0.25000001,0,0,0.25000001,0.20982314,0.02830523)"
 		/>
-	</g>
+	</defs>
+	<!-- ─── BACKGROUND ───────────────────────────────────────────────────────── -->
+	<circle
+		cx="1.6432759"
+		cy="-5.4439158"
+		r="3.75"
+		fill="url(#linearGradient12)"
+		id="circle27275"
+		style="fill:url(#linearGradient46190);fill-opacity:1;stroke-width:0.25"
+		transform="rotate(120.32114)"
+	/>
+	<!-- ─── FACETS ───────────────────────────────────────────────────────────── -->
 	<g
-		transform="matrix(0.93457371,0,0,0.99714182,1.2590407,-0.24936295)"
 		stroke="#ffffff"
-		stroke-dashoffset="25.624"
+		stroke-width="1.4"
 		stroke-linecap="round"
 		stroke-linejoin="round"
-		id="g23"
-		style="stroke:#ffffff;stroke-width:1.55412;stroke-dasharray:none;stroke-opacity:1"
+		fill="none"
+		filter="url(#shadow)"
+		id="g27283"
+		transform="matrix(0.25,0,0,0.25,-0.11787365,0.16683126)"
 	>
-		<path
-			d="m 12.751266,1.0269795 7.98907,21.0567415 10.911276,1.399117 z"
-			fill="#1d90ff"
-			stroke-width="2.18477"
-			style="display:inline;fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:1.55412;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke markers fill"
-			id="path17"
-		/>
-		<path
-			d="m 12.751266,1.0269795 7.989292,21.0567415 c 0,0 -17.1712447,7.789338 -17.1712447,7.789338 z"
-			fill="#cab7fa"
-			stroke-width="2.18477"
-			style="display:inline;fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:1.55412;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke markers fill"
-			id="path19"
-		/>
-		<path
-			d="M 3.8648648,29.814872 20.893294,22.086661 31.713647,23.474788 Z"
-			fill="#a01fef"
-			stroke-width="2.16709"
-			style="display:inline;fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:1.55412;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke markers fill"
-			id="path21"
-		/>
+		<!-- top‑left to top‑right to mid‑right triangle -->
+		<path d="m 12.75,1.02 7.99,21.06 10.92,1.4 z" id="path27277" />
+		<!-- top‑left to mid‑right to bottom‑left triangle -->
+		<path d="m 12.75,1.02 7.99,21.06 -17.17,7.8 z" id="path27279" />
+		<!-- bottom‑left to mid‑right to mid‑right‑end triangle -->
+		<path d="m 3.57,29.88 17.17,-7.8 10.92,1.4 z" id="path27281" />
 	</g>
 </svg>
