@@ -19,6 +19,7 @@ tauri-build = { version = "2.0.3", features = [] }
 
 [dependencies]
 anyhow = "1.0.97"
+eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 backtrace = { version = "0.3.74", optional = true }
 console-subscriber = "0.4.1"
 keyring = "2.3.2"
