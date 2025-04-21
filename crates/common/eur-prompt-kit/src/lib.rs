@@ -13,19 +13,20 @@ pub enum Role {
     User,
 }
 
-pub struct TextContent {
-    prefix: String,
-    body: String,
-    suffix: String,
+pub enum ImageSource {
+    DynamicImage(DynamicImage),
+    Bytes(Vec<u8>),
+    Path(std::path::PathBuf),
+    Uri(String),
 }
 
 pub struct ImageContent {
-    text: Option<TextContent>,
-    image: DynamicImage,
+    text: Option<String>,
+    image_source: ImageSource,
 }
 
 pub enum MessageContent {
-    Text(TextContent),
+    Text(String),
     Image(ImageContent),
 }
 
