@@ -25,6 +25,12 @@ struct YoutubeAsset {
     // video_frame: Vec<u8>,
 }
 
+struct ArticleAsset {
+    pub url: String,
+    pub title: String,
+    pub content: String,
+}
+
 impl From<ProtoYoutubeState> for YoutubeAsset {
     fn from(youtube: ProtoYoutubeState) -> Self {
         YoutubeAsset {
@@ -45,6 +51,17 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
     }
 }
 
+impl From<ProtoArticleState> for ArticleAsset {
+    fn from(article: ProtoArticleState) -> Self {
+        ArticleAsset {
+            url: article.url,
+            // title: article.title,
+            title: "article asset".to_string(),
+            content: article.content,
+        }
+    }
+}
+
 impl ActivityAsset for YoutubeAsset {
     // fn get_display(&self) -> DisplayAsset {
     //     DisplayAsset {
@@ -53,6 +70,16 @@ impl ActivityAsset for YoutubeAsset {
     //     }
     // }
 
+    fn get_name(&self) -> &String {
+        &self.title
+    }
+
+    fn get_icon(&self) -> Option<&String> {
+        None
+    }
+}
+
+impl ActivityAsset for ArticleAsset {
     fn get_name(&self) -> &String {
         &self.title
     }
@@ -201,6 +228,10 @@ impl ActivityStrategy for BrowserStrategy {
                     eprintln!("Collected Youtube state");
                     return Ok(vec![Box::new(YoutubeAsset::from(youtube.clone()))]);
                     // return Ok(Some(BrowserState::Youtube(youtube.clone())));
+                }
+                Some(ipc::state_response::State::Article(article)) => {
+                    eprintln!("Collected Article state");
+                    return Ok(vec![Box::new(ArticleAsset::from(article.clone()))]);
                 }
                 // Some(ipc::state_response::State::Article(article)) => {
                 //     eprintln!("Collected Article state");
