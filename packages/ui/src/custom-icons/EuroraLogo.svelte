@@ -77,9 +77,9 @@
 		id="g23"
 	>
 		<path
-			d="m 13.990226,1.6823576 6.431347,18.3761824 8.783776,1.221007 z"
+			d="m 13.856199,1.7584077 6.487083,18.3028393 8.859899,1.216133 z"
 			fill="#1d90ff"
-			stroke-width="1.83122"
+			stroke-width="1.83546"
 			style="paint-order:stroke markers fill"
 			id="path17"
 		/>
