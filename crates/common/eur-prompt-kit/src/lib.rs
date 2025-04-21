@@ -1,7 +1,7 @@
 use image::DynamicImage;
 
 pub enum LLMService {
-    OpnAI,
+    OpenAI,
     Anthropic,
     Google,
     Eurora,
