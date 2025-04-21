@@ -32,7 +32,7 @@
 	aria-label={ariaLabel}
 	preserveAspectRatio="xMidYMid"
 	aria-describedby={hasDescription ? ariaDescribedby : undefined}
-	viewBox="0 0 8 8"
+	viewBox="0 0 32 32"
 >
 	{#if title?.id && title.title}
 		<title id={title.id}>{title.title}</title>
@@ -40,85 +40,62 @@
 	{#if desc?.id && desc.desc}
 		<desc id={desc.id}>{desc.desc}</desc>
 	{/if}
-	<defs id="defs27273">
-		<!-- Background radial gradient -->
+	<defs id="defs11">
 		<linearGradient
 			id="linearGradient12"
 			x1="-7.9197998"
 			x2="13.276"
 			y1="-22.497999"
 			y2="-22.497999"
-			gradientTransform="matrix(1.1330982,0,0,1.135195,-11.923032,-34.521349)"
+			gradientTransform="matrix(1.1331,0,0,1.1352,-1.2995,3.0828)"
 			gradientUnits="userSpaceOnUse"
 		>
-			<stop stop-color="#9369de" offset="0" id="stop2" style="stop-color:#9f7ae1;stop-opacity:1;" />
-			<stop
-				stop-color="#5d5de5"
-				offset="0.39556"
-				id="stop4"
-				style="stop-color:#6565e6;stop-opacity:1;"
-			/>
-			<stop
-				stop-color="#3679f2"
-				offset="0.80444002"
-				id="stop6"
-				style="stop-color:#3679f2;stop-opacity:1;"
-			/>
+			<stop stop-color="#9369de" offset="0" id="stop2" />
+			<stop stop-color="#5d5de5" offset=".39556" id="stop4" />
+			<stop stop-color="#3679f2" offset=".80444" id="stop6" />
 			<stop stop-color="#0f89ff" offset="1" id="stop8" style="stop-color:#0f89ff;stop-opacity:1;" />
 		</linearGradient>
-		<!-- Light drop‑shadow for the facets -->
-		<filter id="shadow" x="-0.093270048" y="-0.09077815" width="1.1865381" height="1.2023492">
-			<feOffset in="SourceAlpha" dy="0.6" result="off" id="feOffset27260" />
-			<feGaussianBlur in="off" stdDeviation="0.8" result="blur" id="feGaussianBlur27262" />
-			<feColorMatrix
-				in="blur"
-				type="matrix"
-				values="0 0 0 0 0                               0 0 0 0 0                               0 0 0 0 0                               0 0 0 0.25 0"
-				result="shadow"
-				id="feColorMatrix27264"
-			/>
-			<feMerge id="feMerge27270">
-				<feMergeNode in="shadow" id="feMergeNode27266" />
-				<feMergeNode in="SourceGraphic" id="feMergeNode27268" />
-			</feMerge>
-		</filter>
-		<linearGradient
-			xlink:href="#linearGradient12"
-			id="linearGradient46190"
-			x1="-9.2661877"
-			y1="-21.888889"
-			x2="20.733812"
-			y2="-21.888889"
-			gradientUnits="userSpaceOnUse"
-			gradientTransform="matrix(0.25000001,0,0,0.25000001,0.20982314,0.02830523)"
-		/>
 	</defs>
-	<!-- ─── BACKGROUND ───────────────────────────────────────────────────────── -->
-	<circle
-		cx="1.6432759"
-		cy="-5.4439158"
-		r="3.75"
-		fill="url(#linearGradient12)"
-		id="circle27275"
-		style="fill:url(#linearGradient46190);fill-opacity:1;stroke-width:0.25"
-		transform="rotate(120.32114)"
-	/>
-	<!-- ─── FACETS ───────────────────────────────────────────────────────────── -->
+	<g transform="matrix(1.3406,0,0,1.3459,-6.1616,-4.5108)" id="g15">
+		<ellipse
+			transform="matrix(-0.62559,0.78015,-0.78507,-0.6194,0,0)"
+			cx="1.735"
+			cy="-22.457001"
+			rx="12.009"
+			ry="11.814"
+			fill="url(#linearGradient12)"
+			style="fill:url(#linearGradient12);paint-order:stroke fill markers"
+			id="ellipse13"
+		/>
+	</g>
 	<g
+		transform="matrix(1.032,0,0,1.0158,-0.55783,-0.33903)"
 		stroke="#ffffff"
-		stroke-width="1.4"
+		stroke-dashoffset="25.624"
 		stroke-linecap="round"
 		stroke-linejoin="round"
-		fill="none"
-		filter="url(#shadow)"
-		id="g27283"
-		transform="matrix(0.25,0,0,0.25,-0.11787365,0.16683126)"
+		id="g23"
 	>
-		<!-- top‑left to top‑right to mid‑right triangle -->
-		<path d="m 12.75,1.02 7.99,21.06 10.92,1.4 z" id="path27277" />
-		<!-- top‑left to mid‑right to bottom‑left triangle -->
-		<path d="m 12.75,1.02 7.99,21.06 -17.17,7.8 z" id="path27279" />
-		<!-- bottom‑left to mid‑right to mid‑right‑end triangle -->
-		<path d="m 3.57,29.88 17.17,-7.8 10.92,1.4 z" id="path27281" />
+		<path
+			d="m 13.990226,1.6823576 6.431347,18.3761824 8.783776,1.221007 z"
+			fill="#1d90ff"
+			stroke-width="1.83122"
+			style="paint-order:stroke markers fill"
+			id="path17"
+		/>
+		<path
+			d="m 13.804953,1.8109616 6.303161,18.5186894 c 0,0 -13.5472744,6.850459 -13.5472744,6.850459 z"
+			fill="#cab7fa"
+			stroke-width="1.81987"
+			style="paint-order:stroke markers fill"
+			id="path19"
+		/>
+		<path
+			d="m 6.793392,27.120689 13.708261,-6.913534 8.710624,1.241796 z"
+			fill="#a01fef"
+			stroke-width="1.83905"
+			style="paint-order:stroke markers fill"
+			id="path21"
+		/>
 	</g>
 </svg>
