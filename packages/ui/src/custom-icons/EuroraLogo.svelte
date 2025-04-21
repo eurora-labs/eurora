@@ -33,7 +33,7 @@
 	aria-label={ariaLabel}
 	preserveAspectRatio="xMidYMid"
 	aria-describedby={hasDescription ? ariaDescribedby : undefined}
-	viewBox="0 0 18 18"
+	viewBox="0 0 32 32"
 >
 	{#if title?.id && title.title}
 		<title id={title.id}>{title.title}</title>
@@ -41,15 +41,79 @@
 	{#if desc?.id && desc.desc}
 		<desc id={desc.id}>{desc.desc}</desc>
 	{/if}
-	<defs
-		><clipPath id="a"><path d="M6.9766 5.4375h19.359v19.531H6.9766z" /></clipPath><clipPath id="b"
-			><path d="M6.9766 5.4375h12.023v19.531H6.9766z" /></clipPath
-		><clipPath id="c"><path d="M13 5.4375h13.336v15.562H13z" /></clipPath></defs
-	><g clip-path="url(#a)" transform="matrix(.9315 0 0 .9216 -6.4985 -5.0112)"
-		><path fill="#a020ef" d="m13.328 5.4375 12.973 15.273-19.324 4.3359z" /></g
-	><g clip-path="url(#b)" transform="matrix(.9315 0 0 .9216 -6.4985 -5.0112)"
-		><path fill="#c9b6fa" d="M18.844 19.645 6.977 25.0473l6.3516-19.609z" /></g
-	><g clip-path="url(#c)" transform="matrix(.9315 0 0 .9216 -6.4985 -5.0112)"
-		><path fill="#1d90ff" d="m26.301 20.711-7.457-1.0625-5.5156-14.211z" /></g
+	<defs id="defs11">
+		<linearGradient
+			id="linearGradient12"
+			x1="-7.9197998"
+			x2="13.276"
+			y1="-22.497999"
+			y2="-22.497999"
+			gradientTransform="matrix(1.1330982,0,0,1.135195,-1.6568437,3.3675398)"
+			gradientUnits="userSpaceOnUse"
+		>
+			<stop stop-color="#9369de" offset="0" id="stop2" style="stop-color:#9f7ae1;stop-opacity:1;" />
+			<stop
+				stop-color="#5d5de5"
+				offset="0.39556"
+				id="stop4"
+				style="stop-color:#6565e6;stop-opacity:1;"
+			/>
+			<stop
+				stop-color="#3679f2"
+				offset="0.80444002"
+				id="stop6"
+				style="stop-color:#3679f2;stop-opacity:1;"
+			/>
+			<stop stop-color="#0f89ff" offset="1" id="stop8" style="stop-color:#0f89ff;stop-opacity:1;" />
+		</linearGradient>
+	</defs>
+	<g
+		transform="matrix(1.3405063,0,0,1.3459073,-6.1785688,-3.9305535)"
+		id="g15"
+		style="display:inline;stroke:none;stroke-width:0.372245;stroke-dasharray:none;stroke-opacity:1"
 	>
+		<ellipse
+			transform="matrix(-0.62559098,0.78015122,-0.78507343,-0.61940271,0,0)"
+			cx="1.3776516"
+			cy="-22.17215"
+			rx="12.008981"
+			ry="11.813949"
+			fill="url(#linearGradient12)"
+			style="display:inline;fill:url(#linearGradient12);stroke:none;stroke-width:0.372251;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
+			id="ellipse13"
+			mask="none"
+			clip-path="none"
+		/>
+	</g>
+	<g
+		transform="matrix(0.93457371,0,0,0.99714182,1.2590407,-0.24936295)"
+		stroke="#ffffff"
+		stroke-dashoffset="25.624"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		id="g23"
+		style="stroke:#ffffff;stroke-width:1.55412;stroke-dasharray:none;stroke-opacity:1"
+	>
+		<path
+			d="m 12.751266,1.0269795 7.98907,21.0567415 10.911276,1.399117 z"
+			fill="#1d90ff"
+			stroke-width="2.18477"
+			style="display:inline;fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:1.55412;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke markers fill"
+			id="path17"
+		/>
+		<path
+			d="m 12.751266,1.0269795 7.989292,21.0567415 c 0,0 -17.1712447,7.789338 -17.1712447,7.789338 z"
+			fill="#cab7fa"
+			stroke-width="2.18477"
+			style="display:inline;fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:1.55412;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke markers fill"
+			id="path19"
+		/>
+		<path
+			d="M 3.8648648,29.814872 20.893294,22.086661 31.713647,23.474788 Z"
+			fill="#a01fef"
+			stroke-width="2.16709"
+			style="display:inline;fill:none;fill-opacity:1;stroke:#ffffff;stroke-width:1.55412;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke markers fill"
+			id="path21"
+		/>
+	</g>
 </svg>
