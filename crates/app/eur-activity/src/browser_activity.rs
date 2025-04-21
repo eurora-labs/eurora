@@ -10,6 +10,8 @@ use tokio::sync::{Mutex, mpsc};
 use tokio_stream::{StreamExt, wrappers::ReceiverStream};
 use tonic::Streaming;
 
+use eur_prompt_kit::{Message, MessageContent, Role};
+
 #[derive(Debug, Clone)]
 struct TranscriptLine {
     text: String,
@@ -77,6 +79,21 @@ impl ActivityAsset for YoutubeAsset {
     fn get_icon(&self) -> Option<&String> {
         None
     }
+
+    fn construct_message(&self) -> Message {
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(format!(
+                "I am watching a video and have a question about it. \
+                Here's the transcript of the video: \n {}",
+                self.transcript
+                    .iter()
+                    .map(|line| format!("{} ({}s)", line.text, line.start))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            )),
+        }
+    }
 }
 
 impl ActivityAsset for ArticleAsset {
@@ -86,6 +103,17 @@ impl ActivityAsset for ArticleAsset {
 
     fn get_icon(&self) -> Option<&String> {
         None
+    }
+
+    fn construct_message(&self) -> Message {
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(format!(
+                "I am reading an article and have a question about it. \
+                Here's the text content of the article: \n {}",
+                self.content
+            )),
+        }
     }
 }
 

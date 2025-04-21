@@ -8,13 +8,13 @@ use anyhow::{Context, Result};
 // use eur_timeline::TimelineRef;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use eur_prompt_kit::Message;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time;
 use tracing::{debug, error, info};
-
 pub mod browser_activity;
 pub mod strategy_factory;
 
@@ -36,6 +36,9 @@ impl DisplayAsset {
 pub trait ActivityAsset: Send + Sync {
     fn get_name(&self) -> &String;
     fn get_icon(&self) -> Option<&String>;
+
+    fn construct_message(&self) -> Message;
+
     // fn get_display(&self) -> DisplayAsset;
 }
 pub struct Activity {
