@@ -527,7 +527,7 @@ async fn continue_conversation(
         let mut complete_response = String::new();
 
         // Send the question to the OpenAI API
-        let mut stream = client.video_question(messages, youtube_state).await?;
+        let mut stream = client.video_question_old(messages, youtube_state).await?;
 
         channel
             .send(DownloadEvent::Message { message: "" })
@@ -802,7 +802,7 @@ async fn ask_video_question(
 
     let mut complete_response = String::new();
 
-    let mut stream = client.video_question_temp(messages).await?;
+    let mut stream = client.video_question(messages).await?;
 
     channel
         .send(DownloadEvent::Message { message: "" })
