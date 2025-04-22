@@ -9,6 +9,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use eur_prompt_kit::Message;
+use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 pub mod browser_activity;
 pub mod default_activity;
@@ -37,6 +38,13 @@ pub trait ActivityAsset: Send + Sync {
 
     // fn get_display(&self) -> DisplayAsset;
 }
+
+pub trait ActivitySnapshot: Send + Sync {
+    fn get_screenshot(&self) -> Option<DynamicImage>;
+    fn get_updated_at(&self) -> u64;
+    fn get_created_at(&self) -> u64;
+}
+
 pub struct Activity {
     /// Name of the activity
     pub name: String,
@@ -54,7 +62,7 @@ pub struct Activity {
     pub end: Option<DateTime<Utc>>,
 
     // /// Snapshots of the activity
-    // pub snapshots: Vec<ActivitySnapshot>,
+    pub snapshots: Vec<Box<dyn ActivitySnapshot>>,
     /// Assets associated with the activity
     pub assets: Vec<Box<dyn ActivityAsset>>,
 }
@@ -74,6 +82,7 @@ impl Activity {
             start: Utc::now(),
             end: None,
             assets,
+            snapshots: Vec::new(),
         }
     }
 
@@ -254,7 +263,7 @@ pub trait StrategyFactory: Send + Sync {
 
 #[cfg(test)]
 mod tests {
-    
+
     use std::sync::{Arc, Mutex};
 
     // A simple implementation of the Activity trait for testing
