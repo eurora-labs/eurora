@@ -24,8 +24,8 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-gen/*
-!gen/.gitkeep
+src/lib/gen/*
+!src/lib/gen/.gitkeep
 
 # gen/*
 # !gen/.gitkeep
