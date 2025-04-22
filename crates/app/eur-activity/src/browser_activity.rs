@@ -5,12 +5,15 @@ use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{
     self, ProtoArticleState, ProtoPdfState, ProtoYoutubeState, StateRequest, StateResponse,
 };
+// We don't need the alias anymore
+use eur_proto::shared::ProtoImageFormat; // Import the format enum
 
+use image::DynamicImage;
 use tokio::sync::{Mutex, mpsc};
 use tokio_stream::{StreamExt, wrappers::ReceiverStream};
 use tonic::Streaming;
 
-use eur_prompt_kit::{Message, MessageContent, Role, TextContent};
+use eur_prompt_kit::{ImageContent, Message, MessageContent, Role, TextContent};
 
 #[derive(Debug, Clone)]
 struct TranscriptLine {
@@ -24,7 +27,7 @@ struct YoutubeAsset {
     pub title: String,
     pub transcript: Vec<TranscriptLine>,
     pub current_time: f32,
-    // video_frame: Vec<u8>,
+    pub video_frame: DynamicImage,
 }
 
 struct ArticleAsset {
@@ -34,11 +37,11 @@ struct ArticleAsset {
 }
 
 impl From<ProtoYoutubeState> for YoutubeAsset {
-    fn from(youtube: ProtoYoutubeState) -> Self {
+    fn from(state: ProtoYoutubeState) -> Self {
         YoutubeAsset {
-            url: youtube.url,
+            url: state.url,
             title: "transcript asset".to_string(),
-            transcript: youtube
+            transcript: state
                 .transcript
                 .into_iter()
                 .map(|line| TranscriptLine {
@@ -47,8 +50,30 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
                     duration: line.duration,
                 })
                 .collect(),
-            current_time: youtube.current_time,
-            // video_frame: youtube.video_frame,
+            current_time: state.current_time,
+            video_frame: {
+                let proto_image = state.video_frame.unwrap();
+                // Directly load the image using the logic from eur-proto's From impl
+                match ProtoImageFormat::try_from(proto_image.format).unwrap_or_default() {
+                    ProtoImageFormat::Png => image::load_from_memory_with_format(
+                        &proto_image.data,
+                        image::ImageFormat::Png,
+                    )
+                    .expect("Failed to load PNG image from proto"),
+                    ProtoImageFormat::Jpeg => image::load_from_memory_with_format(
+                        &proto_image.data,
+                        image::ImageFormat::Jpeg,
+                    )
+                    .expect("Failed to load JPEG image from proto"),
+                    ProtoImageFormat::Webp => image::load_from_memory_with_format(
+                        &proto_image.data,
+                        image::ImageFormat::WebP,
+                    )
+                    .expect("Failed to load WebP image from proto"),
+                    _ => image::load_from_memory(&proto_image.data)
+                        .expect("Failed to load image from proto"),
+                }
+            },
         }
     }
 }
@@ -83,8 +108,8 @@ impl ActivityAsset for YoutubeAsset {
     fn construct_message(&self) -> Message {
         Message {
             role: Role::User,
-            content: MessageContent::Text(TextContent {
-                text: format!(
+            content: MessageContent::Image(ImageContent {
+                text: Some(format!(
                     "I am watching a video and have a question about it. \
                 Here's the transcript of the video: \n {}",
                     self.transcript
@@ -92,7 +117,8 @@ impl ActivityAsset for YoutubeAsset {
                         .map(|line| format!("{} ({}s)", line.text, line.start))
                         .collect::<Vec<_>>()
                         .join("\n")
-                ),
+                )),
+                image: self.video_frame.clone(),
             }),
         }
     }
