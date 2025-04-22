@@ -4,18 +4,14 @@
 //! It defines the Activity trait and the ActivityReporter struct, which
 //! can be used to collect data from activities and store it in a timeline.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 // use eur_timeline::TimelineRef;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use eur_prompt_kit::Message;
 use serde::{Deserialize, Serialize};
-use serde_json;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::time;
-use tracing::{debug, error, info};
 pub mod browser_activity;
+pub mod default_activity;
 pub mod strategy_factory;
 
 pub use browser_activity::{BrowserStrategy, BrowserStrategyFactory};
@@ -258,7 +254,7 @@ pub trait StrategyFactory: Send + Sync {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     use std::sync::{Arc, Mutex};
 
     // A simple implementation of the Activity trait for testing

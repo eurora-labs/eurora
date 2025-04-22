@@ -7,12 +7,10 @@
 use crate::activity::ActivityAsset;
 use anyhow::Result;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
-use eur_proto::ipc::{self, StateRequest, StateResponse};
+use eur_proto::ipc::{self, StateRequest};
 use serde_json;
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
-use tokio_stream::{StreamExt, wrappers::ReceiverStream};
-use tonic::Streaming;
+use tokio::sync::Mutex;
 
 /// The AssetStrategy trait defines the interface for all asset retrieval strategies.
 pub trait AssetStrategy: Send + Sync {
@@ -216,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_asset_context() {
-        let mut context = AssetContext::new();
+        let context = AssetContext::new();
 
         // Test with no strategy
         let result = context.retrieve_assets();
