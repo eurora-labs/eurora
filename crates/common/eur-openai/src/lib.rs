@@ -2,7 +2,7 @@ use base64::prelude::*;
 use base64::{Engine as _, engine::general_purpose};
 use config::{Config, Environment, File};
 use dotenv::dotenv;
-use eur_prompt_kit::{ImageContent, Message, MessageContent, Role};
+use eur_prompt_kit::{Message, MessageContent, Role};
 use eur_util::flatten_transcript_with_highlight;
 use futures::Stream;
 use image;

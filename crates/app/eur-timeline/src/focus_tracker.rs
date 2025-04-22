@@ -7,14 +7,13 @@ use std::thread;
 use x11rb::{
     connection::Connection,
     protocol::{
-        ErrorKind, Event,
+        Event,
         xproto::{
-            AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, GetPropertyReply,
+            AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask,
             PropertyNotifyEvent,
         },
     },
     rust_connection::RustConnection,
-    x11_utils::X11Error,
 };
 
 use eur_activity::select_strategy_for_process;
