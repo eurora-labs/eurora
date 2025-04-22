@@ -14,12 +14,12 @@ pub enum Role {
     Assistant,
 }
 
-pub enum ImageSource {
-    DynamicImage(DynamicImage),
-    Bytes(Vec<u8>),
-    Path(std::path::PathBuf),
-    Uri(String),
-}
+// pub enum ImageSource {
+//     DynamicImage(DynamicImage),
+//     Bytes(Vec<u8>),
+//     Path(std::path::PathBuf),
+//     Uri(String),
+// }
 
 pub struct TextContent {
     pub text: String,
@@ -27,7 +27,7 @@ pub struct TextContent {
 
 pub struct ImageContent {
     pub text: Option<String>,
-    pub image_source: ImageSource,
+    pub image: DynamicImage,
 }
 
 pub enum MessageContent {
