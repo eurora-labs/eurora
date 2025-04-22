@@ -1700,6 +1700,7 @@ dependencies = [
  "base64 0.22.1",
  "config",
  "dotenv",
+ "eur-prompt-kit",
  "eur-proto",
  "eur-util",
  "futures",

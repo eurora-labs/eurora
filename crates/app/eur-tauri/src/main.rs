@@ -714,47 +714,47 @@ async fn ask_video_question(
     let messages = timeline.construct_asset_messages();
 
     // Collect a new fragment from the timeline
-    let content_data: BrowserState = {
-        let fragment = timeline
-            .collect_new_fragment()
-            .await
-            .map_err(|e| format!("Failed to collect new fragment: {}", e))?;
+    // let content_data: BrowserState = {
+    //     let fragment = timeline
+    //         .collect_new_fragment()
+    //         .await
+    //         .map_err(|e| format!("Failed to collect new fragment: {}", e))?;
 
-        let browser_state = fragment
-            .browser_state
-            .ok_or_else(|| "No browser state in the newly collected fragment".to_string())?;
+    //     let browser_state = fragment
+    //         .browser_state
+    //         .ok_or_else(|| "No browser state in the newly collected fragment".to_string())?;
 
-        match browser_state {
-            BrowserState::Youtube(youtube_state) => {
-                let proto_youtube: ProtoYoutubeState = youtube_state.clone();
-                eprintln!(
-                    "YouTube content detected from timeline: {:?}",
-                    youtube_state.title
-                );
-                eprintln!("URL: {}", youtube_state.url);
-                title = Some(youtube_state.title.clone());
-                Some(BrowserState::Youtube(proto_youtube))
-            }
-            BrowserState::Article(article_state) => {
-                let proto_article: ProtoArticleState = article_state.clone();
-                eprintln!(
-                    "Article content detected from timeline: {:?}",
-                    article_state.title
-                );
-                eprintln!("URL: {}", article_state.url);
-                title = Some(article_state.title.clone());
-                Some(BrowserState::Article(proto_article))
-            }
-            BrowserState::Pdf(pdf_state) => {
-                let proto_pdf: ProtoPdfState = pdf_state.clone();
-                eprintln!("PDF content detected from timeline: {:?}", pdf_state.title);
-                eprintln!("URL: {}", pdf_state.url);
-                title = Some(pdf_state.title.clone());
-                Some(BrowserState::Pdf(proto_pdf))
-            }
-        }
-    }
-    .ok_or_else(|| "No content available in timeline".to_string())?;
+    //     match browser_state {
+    //         BrowserState::Youtube(youtube_state) => {
+    //             let proto_youtube: ProtoYoutubeState = youtube_state.clone();
+    //             eprintln!(
+    //                 "YouTube content detected from timeline: {:?}",
+    //                 youtube_state.title
+    //             );
+    //             eprintln!("URL: {}", youtube_state.url);
+    //             title = Some(youtube_state.title.clone());
+    //             Some(BrowserState::Youtube(proto_youtube))
+    //         }
+    //         BrowserState::Article(article_state) => {
+    //             let proto_article: ProtoArticleState = article_state.clone();
+    //             eprintln!(
+    //                 "Article content detected from timeline: {:?}",
+    //                 article_state.title
+    //             );
+    //             eprintln!("URL: {}", article_state.url);
+    //             title = Some(article_state.title.clone());
+    //             Some(BrowserState::Article(proto_article))
+    //         }
+    //         BrowserState::Pdf(pdf_state) => {
+    //             let proto_pdf: ProtoPdfState = pdf_state.clone();
+    //             eprintln!("PDF content detected from timeline: {:?}", pdf_state.title);
+    //             eprintln!("URL: {}", pdf_state.url);
+    //             title = Some(pdf_state.title.clone());
+    //             Some(BrowserState::Pdf(proto_pdf))
+    //         }
+    //     }
+    // }
+    // .ok_or_else(|| "No content available in timeline".to_string())?;
 
     let state: tauri::State<SharedOpenAIClient> = app_handle.state();
     let mut guard = state.lock().await;
@@ -780,227 +780,232 @@ async fn ask_video_question(
         storage.save_conversation(&conversation).unwrap();
 
         // Create a new asset with the browser state
-        let browser_state_json = serde_json::to_value(&content_data)
-            .map_err(|e| format!("Failed to serialize browser state: {}", e))?;
+        // let browser_state_json = serde_json::to_value(&content_data)
+        // .map_err(|e| format!("Failed to serialize browser state: {}", e))?;
 
         // Add the asset to the conversation
-        storage
-            .save_asset(&Asset::new(
-                conversation.id.clone(),
-                content_data.content_type().to_string(),
-                browser_state_json,
-            ))
-            .unwrap();
+        // storage
+        //     .save_asset(&Asset::new(
+        //         conversation.id.clone(),
+        //         content_data.content_type().to_string(),
+        //         browser_state_json,
+        //     ))
+        //     .unwrap();
     }
 
-    if content_data.content_type() == "youtube" {
-        // Collect the complete response
-        let mut complete_response = String::new();
+    let mut complete_response = String::new();
 
-        let mut stream = client
-            .video_question(
-                vec![ProtoChatMessage {
-                    role: "user".to_string(),
-                    content: question.clone(),
-                }],
-                content_data.youtube().unwrap(),
-            )
-            .await?;
-        channel
-            .send(DownloadEvent::Message { message: "" })
-            .map_err(|e| format!("Failed to send response: {e}"))?;
+    let mut stream = client.video_question_temp(messages).await?;
 
-        while let Some(Ok(chunk)) = stream.next().await {
-            for message in chunk.choices {
-                let Some(message) = message.delta.content else {
-                    continue;
-                };
-                // Append to the complete response
-                complete_response.push_str(&message);
+    // if content_data.content_type() == "youtube" {
+    //     // Collect the complete response
+    //     let mut complete_response = String::new();
 
-                channel
-                    .send(DownloadEvent::Append { chunk: &message })
-                    .map_err(|e| format!("Failed to send response: {e}"))?;
-            }
-        }
+    //     let mut stream = client
+    //         .video_question(
+    //             vec![ProtoChatMessage {
+    //                 role: "user".to_string(),
+    //                 content: question.clone(),
+    //             }],
+    //             content_data.youtube().unwrap(),
+    //         )
+    //         .await?;
+    //     channel
+    //         .send(DownloadEvent::Message { message: "" })
+    //         .map_err(|e| format!("Failed to send response: {e}"))?;
 
-        // After the stream ends, add the complete response as a ChatMessage to the conversation
-        if !complete_response.is_empty() {
-            // Get the conversation storage
-            let storage_state: tauri::State<SharedConversationStorage> = app_handle.state();
-            let storage_guard = storage_state.lock().await;
-            let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
+    //     while let Some(Ok(chunk)) = stream.next().await {
+    //         for message in chunk.choices {
+    //             let Some(message) = message.delta.content else {
+    //                 continue;
+    //             };
+    //             // Append to the complete response
+    //             complete_response.push_str(&message);
 
-            // Get the current conversation
-            let conversation = if conversation_id == "NEW" {
-                // If this is a new conversation, we need to get it by the most recent one
-                let conversations = storage.list_conversations().unwrap();
-                if conversations.is_empty() {
-                    return Err("No conversations found".to_string());
-                }
-                conversations[0].clone()
-            } else {
-                // Otherwise, get the conversation by ID
-                storage.get_conversation(&conversation_id).unwrap()
-            };
+    //             channel
+    //                 .send(DownloadEvent::Append { chunk: &message })
+    //                 .map_err(|e| format!("Failed to send response: {e}"))?;
+    //         }
+    //     }
 
-            // Create a new ChatMessage with the assistant's response
-            let chat_message =
-                ChatMessage::new(None, "assistant".to_string(), complete_response, true);
+    //     // After the stream ends, add the complete response as a ChatMessage to the conversation
+    //     if !complete_response.is_empty() {
+    //         // Get the conversation storage
+    //         let storage_state: tauri::State<SharedConversationStorage> = app_handle.state();
+    //         let storage_guard = storage_state.lock().await;
+    //         let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
-            // Add the message to the conversation and save it
-            let mut updated_conversation = conversation.clone();
-            updated_conversation
-                .add_message(chat_message)
-                .map_err(|e| e.to_string())?;
-            storage.save_conversation(&updated_conversation).unwrap();
+    //         // Get the current conversation
+    //         let conversation = if conversation_id == "NEW" {
+    //             // If this is a new conversation, we need to get it by the most recent one
+    //             let conversations = storage.list_conversations().unwrap();
+    //             if conversations.is_empty() {
+    //                 return Err("No conversations found".to_string());
+    //             }
+    //             conversations[0].clone()
+    //         } else {
+    //             // Otherwise, get the conversation by ID
+    //             storage.get_conversation(&conversation_id).unwrap()
+    //         };
 
-            eprintln!(
-                "Added assistant response to conversation {}",
-                updated_conversation.id
-            );
-        }
+    //         // Create a new ChatMessage with the assistant's response
+    //         let chat_message =
+    //             ChatMessage::new(None, "assistant".to_string(), complete_response, true);
 
-        Ok("test".into())
-    } else if content_data.content_type() == "article" {
-        let mut complete_response = String::new();
+    //         // Add the message to the conversation and save it
+    //         let mut updated_conversation = conversation.clone();
+    //         updated_conversation
+    //             .add_message(chat_message)
+    //             .map_err(|e| e.to_string())?;
+    //         storage.save_conversation(&updated_conversation).unwrap();
 
-        let mut stream = client
-            .article_question(
-                vec![ProtoChatMessage {
-                    role: "user".to_string(),
-                    content: question.clone(),
-                }],
-                content_data.article().unwrap(),
-            )
-            .await?;
-        channel
-            .send(DownloadEvent::Message { message: "" })
-            .map_err(|e| format!("Failed to send response: {e}"))?;
+    //         eprintln!(
+    //             "Added assistant response to conversation {}",
+    //             updated_conversation.id
+    //         );
+    //     }
 
-        while let Some(Ok(chunk)) = stream.next().await {
-            for message in chunk.choices {
-                let Some(message) = message.delta.content else {
-                    continue;
-                };
-                // Append to the complete response
-                complete_response.push_str(&message);
+    //     Ok("test".into())
+    // } else if content_data.content_type() == "article" {
+    //     let mut complete_response = String::new();
 
-                channel
-                    .send(DownloadEvent::Append { chunk: &message })
-                    .map_err(|e| format!("Failed to send response: {e}"))?;
-            }
-        }
+    //     let mut stream = client
+    //         .article_question(
+    //             vec![ProtoChatMessage {
+    //                 role: "user".to_string(),
+    //                 content: question.clone(),
+    //             }],
+    //             content_data.article().unwrap(),
+    //         )
+    //         .await?;
+    //     channel
+    //         .send(DownloadEvent::Message { message: "" })
+    //         .map_err(|e| format!("Failed to send response: {e}"))?;
 
-        // After the stream ends, add the complete response as a ChatMessage to the conversation
-        if !complete_response.is_empty() {
-            // Get the conversation storage
-            let storage_state: tauri::State<SharedConversationStorage> = app_handle.state();
-            let storage_guard = storage_state.lock().await;
-            let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
+    //     while let Some(Ok(chunk)) = stream.next().await {
+    //         for message in chunk.choices {
+    //             let Some(message) = message.delta.content else {
+    //                 continue;
+    //             };
+    //             // Append to the complete response
+    //             complete_response.push_str(&message);
 
-            // Get the current conversation
-            let conversation = if conversation_id == "NEW" {
-                // If this is a new conversation, we need to get it by the most recent one
-                let conversations = storage.list_conversations().unwrap();
-                if conversations.is_empty() {
-                    return Err("No conversations found".to_string());
-                }
-                conversations[0].clone()
-            } else {
-                // Otherwise, get the conversation by ID
-                storage.get_conversation(&conversation_id).unwrap()
-            };
+    //             channel
+    //                 .send(DownloadEvent::Append { chunk: &message })
+    //                 .map_err(|e| format!("Failed to send response: {e}"))?;
+    //         }
+    //     }
 
-            // Create a new ChatMessage with the assistant's response
-            let chat_message =
-                ChatMessage::new(None, "assistant".to_string(), complete_response, true);
+    //     // After the stream ends, add the complete response as a ChatMessage to the conversation
+    //     if !complete_response.is_empty() {
+    //         // Get the conversation storage
+    //         let storage_state: tauri::State<SharedConversationStorage> = app_handle.state();
+    //         let storage_guard = storage_state.lock().await;
+    //         let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
-            // Add the message to the conversation and save it
-            let mut updated_conversation = conversation.clone();
-            updated_conversation
-                .add_message(chat_message)
-                .map_err(|e| e.to_string())?;
-            storage.save_conversation(&updated_conversation).unwrap();
+    //         // Get the current conversation
+    //         let conversation = if conversation_id == "NEW" {
+    //             // If this is a new conversation, we need to get it by the most recent one
+    //             let conversations = storage.list_conversations().unwrap();
+    //             if conversations.is_empty() {
+    //                 return Err("No conversations found".to_string());
+    //             }
+    //             conversations[0].clone()
+    //         } else {
+    //             // Otherwise, get the conversation by ID
+    //             storage.get_conversation(&conversation_id).unwrap()
+    //         };
 
-            eprintln!(
-                "Added assistant response to conversation {}",
-                updated_conversation.id
-            );
-        }
+    //         // Create a new ChatMessage with the assistant's response
+    //         let chat_message =
+    //             ChatMessage::new(None, "assistant".to_string(), complete_response, true);
 
-        Ok("test".into())
-    } else if content_data.content_type() == "pdf" {
-        let mut complete_response = String::new();
+    //         // Add the message to the conversation and save it
+    //         let mut updated_conversation = conversation.clone();
+    //         updated_conversation
+    //             .add_message(chat_message)
+    //             .map_err(|e| e.to_string())?;
+    //         storage.save_conversation(&updated_conversation).unwrap();
 
-        let mut stream = client
-            .pdf_question(
-                vec![ProtoChatMessage {
-                    role: "user".to_string(),
-                    content: question.clone(),
-                }],
-                content_data.pdf().unwrap(),
-            )
-            .await?;
-        channel
-            .send(DownloadEvent::Message { message: "" })
-            .map_err(|e| format!("Failed to send response: {e}"))?;
+    //         eprintln!(
+    //             "Added assistant response to conversation {}",
+    //             updated_conversation.id
+    //         );
+    //     }
 
-        while let Some(Ok(chunk)) = stream.next().await {
-            for message in chunk.choices {
-                let Some(message) = message.delta.content else {
-                    continue;
-                };
-                // Append to the complete response
-                complete_response.push_str(&message);
+    //     Ok("test".into())
+    // } else if content_data.content_type() == "pdf" {
+    //     let mut complete_response = String::new();
 
-                channel
-                    .send(DownloadEvent::Append { chunk: &message })
-                    .map_err(|e| format!("Failed to send response: {e}"))?;
-            }
-        }
+    //     let mut stream = client
+    //         .pdf_question(
+    //             vec![ProtoChatMessage {
+    //                 role: "user".to_string(),
+    //                 content: question.clone(),
+    //             }],
+    //             content_data.pdf().unwrap(),
+    //         )
+    //         .await?;
+    //     channel
+    //         .send(DownloadEvent::Message { message: "" })
+    //         .map_err(|e| format!("Failed to send response: {e}"))?;
 
-        // After the stream ends, add the complete response as a ChatMessage to the conversation
-        if !complete_response.is_empty() {
-            // Get the conversation storage
-            let storage_state: tauri::State<SharedConversationStorage> = app_handle.state();
-            let storage_guard = storage_state.lock().await;
-            let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
+    //     while let Some(Ok(chunk)) = stream.next().await {
+    //         for message in chunk.choices {
+    //             let Some(message) = message.delta.content else {
+    //                 continue;
+    //             };
+    //             // Append to the complete response
+    //             complete_response.push_str(&message);
 
-            // Get the current conversation
-            let conversation = if conversation_id == "NEW" {
-                // If this is a new conversation, we need to get it by the most recent one
-                let conversations = storage.list_conversations().unwrap();
-                if conversations.is_empty() {
-                    return Err("No conversations found".to_string());
-                }
-                conversations[0].clone()
-            } else {
-                // Otherwise, get the conversation by ID
-                storage.get_conversation(&conversation_id).unwrap()
-            };
+    //             channel
+    //                 .send(DownloadEvent::Append { chunk: &message })
+    //                 .map_err(|e| format!("Failed to send response: {e}"))?;
+    //         }
+    //     }
 
-            // Create a new ChatMessage with the assistant's response
-            let chat_message =
-                ChatMessage::new(None, "assistant".to_string(), complete_response, true);
+    //     // After the stream ends, add the complete response as a ChatMessage to the conversation
+    //     if !complete_response.is_empty() {
+    //         // Get the conversation storage
+    //         let storage_state: tauri::State<SharedConversationStorage> = app_handle.state();
+    //         let storage_guard = storage_state.lock().await;
+    //         let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
-            // Add the message to the conversation and save it
-            let mut updated_conversation = conversation.clone();
-            updated_conversation
-                .add_message(chat_message)
-                .map_err(|e| e.to_string())?;
-            storage.save_conversation(&updated_conversation).unwrap();
+    //         // Get the current conversation
+    //         let conversation = if conversation_id == "NEW" {
+    //             // If this is a new conversation, we need to get it by the most recent one
+    //             let conversations = storage.list_conversations().unwrap();
+    //             if conversations.is_empty() {
+    //                 return Err("No conversations found".to_string());
+    //             }
+    //             conversations[0].clone()
+    //         } else {
+    //             // Otherwise, get the conversation by ID
+    //             storage.get_conversation(&conversation_id).unwrap()
+    //         };
 
-            eprintln!(
-                "Added assistant response to conversation {}",
-                updated_conversation.id
-            );
-        }
+    //         // Create a new ChatMessage with the assistant's response
+    //         let chat_message =
+    //             ChatMessage::new(None, "assistant".to_string(), complete_response, true);
 
-        Ok("test".into())
-    } else {
-        return Err("No content available in timeline".to_string());
-    }
+    //         // Add the message to the conversation and save it
+    //         let mut updated_conversation = conversation.clone();
+    //         updated_conversation
+    //             .add_message(chat_message)
+    //             .map_err(|e| e.to_string())?;
+    //         storage.save_conversation(&updated_conversation).unwrap();
+
+    //         eprintln!(
+    //             "Added assistant response to conversation {}",
+    //             updated_conversation.id
+    //         );
+    //     }
+
+    //     Ok("test".into())
+    // } else {
+    //     return Err("No content available in timeline".to_string());
+    // }
+    return Err("No content available in timeline".to_string());
 }
 
 #[tauri::command]
