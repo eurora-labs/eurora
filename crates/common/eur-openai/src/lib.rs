@@ -102,7 +102,7 @@ impl OpenAI {
         Self { client }
     }
 
-    pub async fn video_question_temp(
+    pub async fn video_question(
         &mut self,
         messages: Vec<Message>,
     ) -> Result<impl Stream<Item = Result<ChatCompletionResponseForStream, APIError>>, String> {
@@ -195,7 +195,7 @@ impl OpenAI {
             .map_err(|e| format!("Failed to create chat completion stream: {}", e))
     }
 
-    pub async fn video_question(
+    pub async fn video_question_old(
         &mut self,
         messages: Vec<ProtoChatMessage>,
         state: ProtoYoutubeState,
