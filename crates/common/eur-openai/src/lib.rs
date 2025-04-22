@@ -1,6 +1,7 @@
 use base64::prelude::*;
 use config::{Config, Environment, File};
 use dotenv::dotenv;
+use eur_prompt_kit::Message;
 use eur_util::flatten_transcript_with_highlight;
 use futures::Stream;
 use openai_api_rs::v1::chat_completion::ChatCompletionResponseForStream;
@@ -88,7 +89,7 @@ impl OpenAI {
             .unwrap();
         Self { client }
     }
-    
+
     /// Creates a new OpenAI client with the provided API key
     pub fn with_api_key(api_key: &str) -> Self {
         let client = OpenAIClient::builder()
@@ -96,6 +97,14 @@ impl OpenAI {
             .build()
             .unwrap();
         Self { client }
+    }
+
+    pub async fn video_question_temp(
+        &mut self,
+        messages: Vec<Message>,
+        // ) -> Result<impl Stream<Item = Result<ChatCompletionResponseForStream, APIError>>, String> {
+    ) -> Result<String, String> {
+        Ok("".to_string())
     }
 
     pub async fn video_question(

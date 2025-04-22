@@ -15,3 +15,4 @@ tokio = { workspace = true }
 futures-util = "0.3"
 futures = "0.3"
 eur-util = { path = "../eur-util" }
+eur-prompt-kit = { path = "../eur-prompt-kit" }
