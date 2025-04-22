@@ -11,6 +11,7 @@ pub enum LLMService {
 pub enum Role {
     System,
     User,
+    Assistant,
 }
 
 pub enum ImageSource {
@@ -20,13 +21,17 @@ pub enum ImageSource {
     Uri(String),
 }
 
+pub struct TextContent {
+    pub text: String,
+}
+
 pub struct ImageContent {
-    text: Option<String>,
-    image_source: ImageSource,
+    pub text: Option<String>,
+    pub image_source: ImageSource,
 }
 
 pub enum MessageContent {
-    Text(String),
+    Text(TextContent),
     Image(ImageContent),
 }
 

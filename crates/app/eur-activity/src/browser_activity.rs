@@ -10,7 +10,7 @@ use tokio::sync::{Mutex, mpsc};
 use tokio_stream::{StreamExt, wrappers::ReceiverStream};
 use tonic::Streaming;
 
-use eur_prompt_kit::{Message, MessageContent, Role};
+use eur_prompt_kit::{Message, MessageContent, Role, TextContent};
 
 #[derive(Debug, Clone)]
 struct TranscriptLine {
@@ -83,15 +83,17 @@ impl ActivityAsset for YoutubeAsset {
     fn construct_message(&self) -> Message {
         Message {
             role: Role::User,
-            content: MessageContent::Text(format!(
-                "I am watching a video and have a question about it. \
+            content: MessageContent::Text(TextContent {
+                text: format!(
+                    "I am watching a video and have a question about it. \
                 Here's the transcript of the video: \n {}",
-                self.transcript
-                    .iter()
-                    .map(|line| format!("{} ({}s)", line.text, line.start))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            )),
+                    self.transcript
+                        .iter()
+                        .map(|line| format!("{} ({}s)", line.text, line.start))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                ),
+            }),
         }
     }
 }
@@ -108,11 +110,13 @@ impl ActivityAsset for ArticleAsset {
     fn construct_message(&self) -> Message {
         Message {
             role: Role::User,
-            content: MessageContent::Text(format!(
-                "I am reading an article and have a question about it. \
+            content: MessageContent::Text(TextContent {
+                text: format!(
+                    "I am reading an article and have a question about it. \
                 Here's the text content of the article: \n {}",
-                self.content
-            )),
+                    self.content
+                ),
+            }),
         }
     }
 }

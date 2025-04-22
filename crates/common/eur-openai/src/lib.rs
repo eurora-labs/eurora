@@ -1,10 +1,12 @@
 use base64::prelude::*;
 use config::{Config, Environment, File};
 use dotenv::dotenv;
-use eur_prompt_kit::Message;
+use eur_prompt_kit::{ImageContent, ImageSource, Message, MessageContent, Role};
 use eur_util::flatten_transcript_with_highlight;
 use futures::Stream;
-use openai_api_rs::v1::chat_completion::ChatCompletionResponseForStream;
+use openai_api_rs::v1::chat_completion::{
+    self, ChatCompletionRequest, ChatCompletionResponseForStream,
+};
 use openai_api_rs::v1::error::APIError;
 use serde::Deserialize;
 use std::sync::OnceLock;
@@ -66,7 +68,6 @@ impl Settings {
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
 use openai_api_rs::v1::api::OpenAIClient;
-use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
 use openai_api_rs::v1::common::GPT4_O_LATEST;
 
 pub struct OpenAI {
@@ -102,9 +103,92 @@ impl OpenAI {
     pub async fn video_question_temp(
         &mut self,
         messages: Vec<Message>,
-        // ) -> Result<impl Stream<Item = Result<ChatCompletionResponseForStream, APIError>>, String> {
-    ) -> Result<String, String> {
-        Ok("".to_string())
+    ) -> Result<impl Stream<Item = Result<ChatCompletionResponseForStream, APIError>>, String> {
+        if messages.is_empty() {
+            return Err("Messages cannot be empty".to_string());
+        }
+
+        let mut openai_messages = Vec::new();
+
+        // Process the first message (assumed to be image + text)
+        let first_message = &messages[0];
+        // if let MessageContent::Image(image_content) = &first_message.content {
+        if let MessageContent::Text(image_content) = &first_message.content {
+            // let image_base64 = match &image_content.image_source {
+            //     ImageSource::Bytes(bytes) => BASE64_STANDARD.encode(bytes),
+            //     // TODO: Handle other ImageSource variants if needed
+            //     _ => return Err("Unsupported ImageSource type for video_question_temp".to_string()),
+            // };
+
+            // let image_url = format!("data:image/jpeg;base64,{image_base64}"); // Assuming JPEG
+
+            let mut content_parts = vec![];
+
+            // Add text part if present
+            // if let Some(text) = &image_content.text {
+            if let text = &image_content.text {
+                content_parts.push(chat_completion::ImageUrl {
+                    r#type: chat_completion::ContentType::text,
+                    text: Some(text.clone()),
+                    image_url: None,
+                });
+            }
+
+            // Add image part
+            // content_parts.push(chat_completion::ImageUrl {
+            //     r#type: chat_completion::ContentType::image_url,
+            //     text: None,
+            //     image_url: Some(chat_completion::ImageUrlType { url: image_url }),
+            // });
+
+            openai_messages.push(chat_completion::ChatCompletionMessage {
+                role: match first_message.role {
+                    Role::User => chat_completion::MessageRole::user,
+                    Role::System => chat_completion::MessageRole::system,
+                    Role::Assistant => chat_completion::MessageRole::assistant, // Should not happen for first message usually
+                },
+                content: chat_completion::Content::ImageUrl(content_parts),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
+            });
+        } else {
+            return Err("First message must be of type MessageContent::Image".to_string());
+        }
+
+        // Process subsequent messages (conversation history)
+        for message in messages.iter().skip(1) {
+            match &message.content {
+                MessageContent::Text(text_message) => {
+                    openai_messages.push(chat_completion::ChatCompletionMessage {
+                        role: match message.role {
+                            Role::User => chat_completion::MessageRole::user,
+                            Role::Assistant => chat_completion::MessageRole::assistant,
+                            Role::System => chat_completion::MessageRole::system, // Less common in history
+                        },
+                        content: chat_completion::Content::Text(text_message.text.clone()),
+                        name: None,
+                        tool_calls: None,
+                        tool_call_id: None,
+                    });
+                }
+                MessageContent::Image(_) => {
+                    // Handle or return error if subsequent messages contain images,
+                    // as standard chat history usually doesn't mix images like this.
+                    return Err(
+                        "Subsequent messages cannot contain images in this context".to_string()
+                    );
+                }
+            }
+        }
+
+        let req =
+            ChatCompletionRequest::new(GPT4_O_LATEST.to_string(), openai_messages).stream(true);
+
+        self.client
+            .chat_completion_stream(req)
+            .await
+            .map_err(|e| format!("Failed to create chat completion stream: {}", e))
     }
 
     pub async fn video_question(
