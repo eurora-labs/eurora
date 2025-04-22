@@ -709,9 +709,16 @@ async fn ask_video_question(
     let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
     let timeline = timeline_state.inner();
 
-    let mut title: Option<String> = None;
+    let mut title: Option<String> = Some("Test".to_string());
 
-    let messages = timeline.construct_asset_messages();
+    let mut messages = timeline.construct_asset_messages();
+
+    messages.push(eur_prompt_kit::Message {
+        role: eur_prompt_kit::Role::User,
+        content: eur_prompt_kit::MessageContent::Text(eur_prompt_kit::TextContent {
+            text: question.clone(),
+        }),
+    });
 
     // Collect a new fragment from the timeline
     // let content_data: BrowserState = {
@@ -797,6 +804,62 @@ async fn ask_video_question(
 
     let mut stream = client.video_question_temp(messages).await?;
 
+    channel
+        .send(DownloadEvent::Message { message: "" })
+        .map_err(|e| format!("Failed to send response: {e}"))?;
+
+    while let Some(Ok(chunk)) = stream.next().await {
+        for message in chunk.choices {
+            let Some(message) = message.delta.content else {
+                continue;
+            };
+            // Append to the complete response
+            complete_response.push_str(&message);
+
+            channel
+                .send(DownloadEvent::Append { chunk: &message })
+                .map_err(|e| format!("Failed to send response: {e}"))?;
+        }
+    }
+
+    // After the stream ends, add the complete response as a ChatMessage to the conversation
+    if !complete_response.is_empty() {
+        // Get the conversation storage
+        let storage_state: tauri::State<SharedConversationStorage> = app_handle.state();
+        let storage_guard = storage_state.lock().await;
+        let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
+
+        // Get the current conversation
+        let conversation = if conversation_id == "NEW" {
+            // If this is a new conversation, we need to get it by the most recent one
+            let conversations = storage.list_conversations().unwrap();
+            if conversations.is_empty() {
+                return Err("No conversations found".to_string());
+            }
+            conversations[0].clone()
+        } else {
+            // Otherwise, get the conversation by ID
+            storage.get_conversation(&conversation_id).unwrap()
+        };
+
+        // Create a new ChatMessage with the assistant's response
+        let chat_message = ChatMessage::new(None, "assistant".to_string(), complete_response, true);
+
+        // Add the message to the conversation and save it
+        let mut updated_conversation = conversation.clone();
+        updated_conversation
+            .add_message(chat_message)
+            .map_err(|e| e.to_string())?;
+        storage.save_conversation(&updated_conversation).unwrap();
+
+        eprintln!(
+            "Added assistant response to conversation {}",
+            updated_conversation.id
+        );
+    }
+
+    Ok("test".into())
+
     // if content_data.content_type() == "youtube" {
     //     // Collect the complete response
     //     let mut complete_response = String::new();
@@ -814,19 +877,19 @@ async fn ask_video_question(
     //         .send(DownloadEvent::Message { message: "" })
     //         .map_err(|e| format!("Failed to send response: {e}"))?;
 
-    //     while let Some(Ok(chunk)) = stream.next().await {
-    //         for message in chunk.choices {
-    //             let Some(message) = message.delta.content else {
-    //                 continue;
-    //             };
-    //             // Append to the complete response
-    //             complete_response.push_str(&message);
+    // while let Some(Ok(chunk)) = stream.next().await {
+    //     for message in chunk.choices {
+    //         let Some(message) = message.delta.content else {
+    //             continue;
+    //         };
+    //         // Append to the complete response
+    //         complete_response.push_str(&message);
 
-    //             channel
-    //                 .send(DownloadEvent::Append { chunk: &message })
-    //                 .map_err(|e| format!("Failed to send response: {e}"))?;
-    //         }
+    //         channel
+    //             .send(DownloadEvent::Append { chunk: &message })
+    //             .map_err(|e| format!("Failed to send response: {e}"))?;
     //     }
+    // }
 
     //     // After the stream ends, add the complete response as a ChatMessage to the conversation
     //     if !complete_response.is_empty() {
@@ -1005,7 +1068,7 @@ async fn ask_video_question(
     // } else {
     //     return Err("No content available in timeline".to_string());
     // }
-    return Err("No content available in timeline".to_string());
+    // return Err("No content available in timeline".to_string());
 }
 
 #[tauri::command]
