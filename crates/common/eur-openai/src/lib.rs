@@ -1,17 +1,19 @@
 use base64::prelude::*;
+use base64::{Engine as _, engine::general_purpose};
 use config::{Config, Environment, File};
 use dotenv::dotenv;
-use eur_prompt_kit::{ImageContent, ImageSource, Message, MessageContent, Role};
+use eur_prompt_kit::{ImageContent, Message, MessageContent, Role};
 use eur_util::flatten_transcript_with_highlight;
 use futures::Stream;
+use image;
 use openai_api_rs::v1::chat_completion::{
     self, ChatCompletionRequest, ChatCompletionResponseForStream,
 };
 use openai_api_rs::v1::error::APIError;
 use serde::Deserialize;
+use std::io::Cursor;
 use std::sync::OnceLock;
 use thiserror::Error;
-
 #[derive(Error, Debug)]
 pub enum ConfigError {
     #[error("Failed to load configuration: {0}")]
@@ -112,21 +114,23 @@ impl OpenAI {
 
         // Process the first message (assumed to be image + text)
         let first_message = &messages[0];
-        // if let MessageContent::Image(image_content) = &first_message.content {
-        if let MessageContent::Text(image_content) = &first_message.content {
-            // let image_base64 = match &image_content.image_source {
-            //     ImageSource::Bytes(bytes) => BASE64_STANDARD.encode(bytes),
-            //     // TODO: Handle other ImageSource variants if needed
-            //     _ => return Err("Unsupported ImageSource type for video_question_temp".to_string()),
-            // };
+        if let MessageContent::Image(image_content) = &first_message.content {
+            // if let MessageContent::Text(image_content) = &first_message.content {
+            let mut image_data: Vec<u8> = Vec::new();
+            image_content
+                .image
+                .write_to(&mut Cursor::new(&mut image_data), image::ImageFormat::Png)
+                .unwrap();
 
-            // let image_url = format!("data:image/jpeg;base64,{image_base64}"); // Assuming JPEG
+            let image_base64 = general_purpose::STANDARD.encode(image_data);
+
+            let image_url = format!("data:image/jpeg;base64,{image_base64}"); // Assuming JPEG
 
             let mut content_parts = vec![];
 
             // Add text part if present
-            // if let Some(text) = &image_content.text {
-            if let text = &image_content.text {
+            if let Some(text) = &image_content.text {
+                // if let text = &image_content.text {
                 content_parts.push(chat_completion::ImageUrl {
                     r#type: chat_completion::ContentType::text,
                     text: Some(text.clone()),
@@ -135,11 +139,11 @@ impl OpenAI {
             }
 
             // Add image part
-            // content_parts.push(chat_completion::ImageUrl {
-            //     r#type: chat_completion::ContentType::image_url,
-            //     text: None,
-            //     image_url: Some(chat_completion::ImageUrlType { url: image_url }),
-            // });
+            content_parts.push(chat_completion::ImageUrl {
+                r#type: chat_completion::ContentType::image_url,
+                text: None,
+                image_url: Some(chat_completion::ImageUrlType { url: image_url }),
+            });
 
             openai_messages.push(chat_completion::ChatCompletionMessage {
                 role: match first_message.role {

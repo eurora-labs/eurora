@@ -1705,6 +1705,7 @@ dependencies = [
  "eur-util",
  "futures",
  "futures-util",
+ "image",
  "openai-api-rs",
  "serde",
  "thiserror 2.0.12",
