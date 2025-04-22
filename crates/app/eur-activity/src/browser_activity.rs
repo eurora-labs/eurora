@@ -1,4 +1,4 @@
-use crate::{ActivityAsset, ActivityStrategy, DisplayAsset, StrategyFactory};
+use crate::{ActivityAsset, ActivityStrategy, StrategyFactory};
 use anyhow::Result;
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
