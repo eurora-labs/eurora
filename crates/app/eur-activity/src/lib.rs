@@ -39,8 +39,6 @@ pub trait ActivityAsset: Send + Sync {
 }
 
 pub trait ActivitySnapshot: Send + Sync {
-    fn get_screenshot(&self) -> Option<DynamicImage>;
-
     fn construct_message(&self) -> Message;
 
     fn get_updated_at(&self) -> u64;
@@ -158,6 +156,13 @@ pub trait ActivityStrategy: Send + Sync {
     /// This method is called once when collection starts to gather
     /// initial assets related to the activity.
     async fn retrieve_assets(&mut self) -> Result<Vec<Box<dyn ActivityAsset>>>;
+
+    /// Retrieve snapshots associated with this activity
+    ///
+    /// This method is called periodically to gather snapshots of the
+    /// activity. The returned snapshots should represent the
+    /// current state of the activity.
+    async fn retrieve_snapshots(&mut self) -> Result<Vec<Box<dyn ActivitySnapshot>>>;
 
     /// Gather the current state of the activity
     ///

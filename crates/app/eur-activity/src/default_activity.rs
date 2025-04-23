@@ -1,4 +1,4 @@
-use crate::{ActivityAsset, ActivityStrategy};
+use crate::{ActivityAsset, ActivitySnapshot, ActivityStrategy};
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -34,6 +34,10 @@ impl ActivityStrategy for DefaultStrategy {
     async fn retrieve_assets(&mut self) -> Result<Vec<Box<dyn ActivityAsset>>> {
         Ok(vec![])
     }
+    async fn retrieve_snapshots(&mut self) -> Result<Vec<Box<dyn ActivitySnapshot>>> {
+        Ok(vec![])
+    }
+
     fn gather_state(&self) -> String {
         String::new()
     }

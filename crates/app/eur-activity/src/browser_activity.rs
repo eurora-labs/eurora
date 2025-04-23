@@ -1,4 +1,4 @@
-use crate::{ActivityAsset, ActivityStrategy};
+use crate::{ActivityAsset, ActivitySnapshot, ActivityStrategy};
 use anyhow::Result;
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
@@ -87,13 +87,6 @@ impl From<ProtoArticleState> for ArticleAsset {
 }
 
 impl ActivityAsset for YoutubeAsset {
-    // fn get_display(&self) -> DisplayAsset {
-    //     DisplayAsset {
-    //         name: self.title.clone(),
-    //         icon: "".to_string(),
-    //     }
-    // }
-
     fn get_name(&self) -> &String {
         &self.title
     }
@@ -141,6 +134,56 @@ impl ActivityAsset for ArticleAsset {
                 ),
             }),
         }
+    }
+}
+
+struct ArticleSnapshot {
+    pub highlight: Option<String>,
+}
+
+impl ActivitySnapshot for ArticleSnapshot {
+    fn construct_message(&self) -> Message {
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(TextContent {
+                text: format!(
+                    "I highlighted the following text: \n {}",
+                    self.highlight.clone().unwrap_or_default()
+                ),
+            }),
+        }
+    }
+
+    fn get_updated_at(&self) -> u64 {
+        todo!()
+    }
+
+    fn get_created_at(&self) -> u64 {
+        todo!()
+    }
+}
+
+struct YoutubeSnapshot {
+    pub video_frame: DynamicImage,
+}
+
+impl ActivitySnapshot for YoutubeSnapshot {
+    fn construct_message(&self) -> Message {
+        Message {
+            role: Role::User,
+            content: MessageContent::Image(ImageContent {
+                text: None,
+                image: self.video_frame.clone(),
+            }),
+        }
+    }
+
+    fn get_updated_at(&self) -> u64 {
+        todo!()
+    }
+
+    fn get_created_at(&self) -> u64 {
+        todo!()
     }
 }
 
@@ -256,6 +299,11 @@ impl ActivityStrategy for BrowserStrategy {
             }
         }
 
+        // Return empty vector if no matching state was found
+        Ok(vec![])
+    }
+
+    async fn retrieve_snapshots(&mut self) -> Result<Vec<Box<dyn crate::ActivitySnapshot>>> {
         // Return empty vector if no matching state was found
         Ok(vec![])
     }
