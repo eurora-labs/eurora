@@ -7,8 +7,12 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use multi_key_map::MultiKeyMap;
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tracing::info;
+
+/// Global strategy registry that is initialized only once
+static REGISTRY: Lazy<StrategyRegistry> = Lazy::new(StrategyRegistry::default);
 
 /// Type alias for strategy creation functions
 type StrategyCreator =
@@ -143,9 +147,6 @@ pub async fn select_strategy_for_process(
     display_name: String,
     icon: String,
 ) -> Result<Box<dyn ActivityStrategy>> {
-    // Create a default registry with all built-in strategies
-    let registry = StrategyRegistry::default();
-
     // Log the process name
     info!("Selecting strategy for process: {}", process_name);
 
@@ -159,8 +160,9 @@ pub async fn select_strategy_for_process(
         return Ok(Box::new(strategy) as Box<dyn ActivityStrategy>);
     }
 
-    // For non-browser processes, use the registry
-    registry
+    // For non-browser processes, use the global registry
+    // This avoids recreating the registry on each call
+    REGISTRY
         .set_strategy(process_name, display_name, icon)
         .await
         .context(format!(

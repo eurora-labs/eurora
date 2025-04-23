@@ -1607,6 +1607,7 @@ dependencies = [
  "eur-proto",
  "image",
  "multi_key_map",
+ "once_cell",
  "serde",
  "serde_json",
  "tokio",
