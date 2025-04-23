@@ -57,7 +57,7 @@ impl StrategyRegistry {
         self.default_creator = Some(creator);
     }
 
-    /// Create a strategy for the given process
+    /// Set a strategy for the given process
     ///
     /// # Arguments
     /// * `process_name` - The name of the process
@@ -66,7 +66,7 @@ impl StrategyRegistry {
     ///
     /// # Returns
     /// A Box<dyn ActivityStrategy> if a suitable strategy is found, or an error if no strategy supports the process
-    pub async fn create_strategy(
+    pub async fn set_strategy(
         &self,
         process_name: &str,
         display_name: String,
@@ -105,24 +105,9 @@ impl StrategyRegistry {
             ))
         });
 
-        registry.register(
-            vec![
-                "firefox",
-                "firefox-bin",
-                "firefox-esr",
-                "chrome",
-                "chromium",
-                "chromium-browser",
-                "brave",
-                "brave-browser",
-                "opera",
-                "vivaldi",
-                "edge",
-                "msedge",
-                "safari",
-            ],
-            browser_creator,
-        );
+        // Use the BrowserStrategy's supported processes list
+        let browser_processes = BrowserStrategy::get_supported_processes();
+        registry.register(browser_processes, browser_creator);
 
         // Set default strategy creator as fallback
         let default_creator: StrategyCreator = Arc::new(|process_name, display_name, icon| {
@@ -164,23 +149,8 @@ pub async fn select_strategy_for_process(
     // Log the process name
     info!("Selecting strategy for process: {}", process_name);
 
-    // Check if this is a browser process
-    let is_browser = [
-        "firefox",
-        "firefox-bin",
-        "firefox-esr",
-        "chrome",
-        "chromium",
-        "chromium-browser",
-        "brave",
-        "brave-browser",
-        "opera",
-        "vivaldi",
-        "edge",
-        "msedge",
-        "safari",
-    ]
-    .contains(&process_name);
+    // Check if this is a browser process using the BrowserStrategy's supported processes
+    let is_browser = BrowserStrategy::get_supported_processes().contains(&process_name);
 
     // If it's a browser process, create a BrowserStrategy directly
     if is_browser {
@@ -191,7 +161,7 @@ pub async fn select_strategy_for_process(
 
     // For non-browser processes, use the registry
     registry
-        .create_strategy(process_name, display_name, icon)
+        .set_strategy(process_name, display_name, icon)
         .await
         .context(format!(
             "Failed to select strategy for process: {}",

@@ -37,10 +37,4 @@ impl ActivityStrategy for DefaultStrategy {
     fn gather_state(&self) -> String {
         String::new()
     }
-
-    fn get_supported_processes(&self) -> Vec<String> {
-        panic!(
-            "DefaultStrategy does not support any processes and should be registered separately as a fallback."
-        );
-    }
 }

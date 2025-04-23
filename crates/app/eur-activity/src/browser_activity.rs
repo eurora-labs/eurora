@@ -1,4 +1,4 @@
-use crate::{ActivityAsset, ActivityStrategy, StrategyFactory};
+use crate::{ActivityAsset, ActivityStrategy};
 use anyhow::Result;
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
@@ -194,6 +194,25 @@ pub struct BrowserStrategy {
 }
 
 impl BrowserStrategy {
+    /// Returns a static list of process names supported by this strategy
+    pub fn get_supported_processes() -> Vec<&'static str> {
+        vec![
+            "firefox",
+            "firefox-bin",
+            "firefox-esr",
+            "chrome",
+            "chromium",
+            "chromium-browser",
+            "brave",
+            "brave-browser",
+            "opera",
+            "vivaldi",
+            "edge",
+            "msedge",
+            "safari",
+        ]
+    }
+
     /// Create a new BrowserStrategy with the given name
     pub async fn new(name: String, icon: String, process_name: String) -> Result<Self> {
         let mut client = create_grpc_ipc_client().await?;
@@ -335,67 +354,5 @@ impl ActivityStrategy for BrowserStrategy {
 
     fn get_process_name(&self) -> &String {
         &self.process_name
-    }
-
-    fn get_supported_processes(&self) -> Vec<String> {
-        vec![
-            "firefox".to_string(),
-            "chrome".to_string(),
-            "brave".to_string(),
-            "opera".to_string(),
-            "vivaldi".to_string(),
-            "edge".to_string(),
-            "msedge".to_string(),
-            "safari".to_string(),
-        ]
-    }
-}
-
-/// Factory for creating BrowserStrategy instances
-pub struct BrowserStrategyFactory;
-
-impl BrowserStrategyFactory {
-    /// Create a new BrowserStrategyFactory
-    pub fn new() -> Self {
-        Self
-    }
-
-    /// List of browser process names that this factory supports
-    fn supported_browsers() -> Vec<&'static str> {
-        vec![
-            "firefox",
-            "firefox-bin",
-            "firefox-esr",
-            "chrome",
-            "chromium",
-            "chromium-browser",
-            "brave",
-            "brave-browser",
-            "opera",
-            "vivaldi",
-            "edge",
-            "msedge",
-            "safari",
-        ]
-    }
-}
-
-#[async_trait]
-impl StrategyFactory for BrowserStrategyFactory {
-    fn supports_process(&self, process_name: &str) -> bool {
-        let process_lower = process_name.to_lowercase();
-        Self::supported_browsers()
-            .iter()
-            .any(|&browser| process_lower == browser)
-    }
-
-    async fn create_strategy(
-        &self,
-        process_name: &str,
-        display_name: String,
-        icon: String,
-    ) -> Result<Box<dyn ActivityStrategy>> {
-        let strategy = BrowserStrategy::new(display_name, icon, process_name.to_string()).await?;
-        Ok(Box::new(strategy))
     }
 }

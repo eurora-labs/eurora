@@ -126,24 +126,9 @@ pub trait ActivityStrategy: Send + Sync {
     fn get_icon(&self) -> &String;
     /// Get process name of the activity
     fn get_process_name(&self) -> &String;
-
-    fn get_supported_processes(&self) -> Vec<String>;
 }
 
 /// Strategy factory trait for creating activity strategies
-#[async_trait]
-pub trait StrategyFactory: Send + Sync {
-    /// Returns true if this factory can create a strategy for the given process
-    fn supports_process(&self, process_name: &str) -> bool;
-
-    /// Create a new strategy instance for the given process
-    async fn create_strategy(
-        &self,
-        process_name: &str,
-        display_name: String,
-        icon: String,
-    ) -> Result<Box<dyn ActivityStrategy>>;
-}
 
 /// ActivityReporter handles the collection and reporting of activity data
 ///
