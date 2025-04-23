@@ -3,8 +3,8 @@
 //! This module provides functionality for tracking and reporting activities.
 //! It defines the Activity trait and the ActivityReporter struct, which
 //! can be used to collect data from activities and store it in a timeline.
+use tracing::info;
 
-use anyhow::Result;
 // use eur_timeline::TimelineRef;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -13,10 +13,9 @@ use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 pub mod browser_activity;
 pub mod default_activity;
-pub mod strategy_factory;
-
+use anyhow::{Context, Result};
 pub use browser_activity::BrowserStrategy;
-pub use strategy_factory::{StrategyRegistry, select_strategy_for_process};
+use default_activity::DefaultStrategy;
 
 #[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {
@@ -101,6 +100,50 @@ impl Activity {
             })
             .collect()
     }
+}
+
+/// Select the appropriate strategy based on the process name
+///
+/// This function is a convenience wrapper around StrategyRegistry::create_strategy.
+///
+/// # Arguments
+/// * `process_name` - The name of the process
+/// * `display_name` - The display name to use for the activity
+/// * `icon` - The icon data as a base64 encoded string
+///
+/// # Returns
+/// A Box<dyn ActivityStrategy> if a suitable strategy is found, or an error if no strategy supports the process
+pub async fn select_strategy_for_process(
+    process_name: &str,
+    display_name: String,
+    icon: String,
+) -> Result<Box<dyn ActivityStrategy>> {
+    // Log the process name
+    info!("Selecting strategy for process: {}", process_name);
+
+    // Check if this is a browser process
+    if BrowserStrategy::get_supported_processes().contains(&process_name) {
+        // For browser processes, create the BrowserStrategy directly
+        // This avoids the need to block on an async function
+        info!(
+            "Creating BrowserStrategy for browser process: {}",
+            process_name
+        );
+        let strategy = BrowserStrategy::new(process_name.to_string(), display_name, icon)
+            .await
+            .context(format!(
+                "Failed to create browser strategy for process: {}",
+                process_name
+            ))?;
+        return Ok(Box::new(strategy) as Box<dyn ActivityStrategy>);
+    }
+
+    return DefaultStrategy::new(display_name, icon, process_name.to_string())
+        .context(format!(
+            "Failed to create default strategy for process: {}",
+            process_name
+        ))
+        .map(|strategy| Box::new(strategy) as Box<dyn ActivityStrategy>);
 }
 
 /// Activity trait defines methods that must be implemented by activities
