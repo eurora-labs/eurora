@@ -100,8 +100,8 @@ interface EurImage extends Partial<ProtoImage> {
 			if (player) {
 				player.currentTime = value;
 			}
-		} else if (type === 'GENERATE_YOUTUBE_REPORT') {
-			console.log('Generating YouTube report for video ID:', msgVideoId || videoId);
+		} else if (type === 'GENERATE_ASSETS') {
+			console.log('Generating assets for YouTube video');
 			try {
 				// Get current timestamp
 				const currentTime = getCurrentVideoTime();
