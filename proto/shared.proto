@@ -5,7 +5,7 @@ package shared;
 enum ProtoImageFormat {
     JPEG = 0;
     PNG = 1;
-    WEBM = 2;
+    WEBP = 2;
     RAW = 3;
 }
 
