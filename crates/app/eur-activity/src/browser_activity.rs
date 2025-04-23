@@ -336,6 +336,19 @@ impl ActivityStrategy for BrowserStrategy {
     fn get_process_name(&self) -> &String {
         &self.process_name
     }
+
+    fn get_supported_processes(&self) -> Vec<String> {
+        vec![
+            "firefox".to_string(),
+            "chrome".to_string(),
+            "brave".to_string(),
+            "opera".to_string(),
+            "vivaldi".to_string(),
+            "edge".to_string(),
+            "msedge".to_string(),
+            "safari".to_string(),
+        ]
+    }
 }
 
 /// Factory for creating BrowserStrategy instances

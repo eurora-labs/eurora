@@ -126,6 +126,8 @@ pub trait ActivityStrategy: Send + Sync {
     fn get_icon(&self) -> &String;
     /// Get process name of the activity
     fn get_process_name(&self) -> &String;
+
+    fn get_supported_processes(&self) -> Vec<String>;
 }
 
 /// Strategy factory trait for creating activity strategies
