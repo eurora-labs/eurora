@@ -1,124 +1,63 @@
-//! Default strategy module
+//! Strategy module
 //!
-//! This module provides a default strategy factory that can be used as a fallback
-//! for processes that don't match any specific strategy.
+//! This module provides a minimal approach to strategy selection using MultiKeyMap.
 
-use crate::{ActivityAsset, ActivityStrategy, StrategyFactory};
+use crate::{
+    ActivityStrategy, browser_activity::BrowserStrategy, default_activity::DefaultStrategy,
+};
 use anyhow::{Context, Result};
-use async_trait::async_trait;
+use multi_key_map::MultiKeyMap;
 use std::sync::Arc;
 use tracing::info;
 
-/// Factory for creating default strategy instances
-///
-/// This factory always returns true for supports_process, making it suitable
-/// as a fallback for processes that don't match any specific strategy.
-pub struct DefaultStrategyFactory {
-    /// The factory to delegate to for creating the actual strategy
-    delegate: Box<dyn StrategyFactory>,
-}
-
-impl DefaultStrategyFactory {
-    /// Create a new DefaultStrategyFactory with the given delegate
-    ///
-    /// # Arguments
-    /// * `delegate` - The factory to delegate to for creating the actual strategy
-    pub fn new<F>(delegate: F) -> Self
-    where
-        F: StrategyFactory + 'static,
-    {
-        Self {
-            delegate: Box::new(delegate),
-        }
-    }
-}
-
-#[async_trait]
-impl StrategyFactory for DefaultStrategyFactory {
-    /// Always returns true, making this factory suitable as a fallback
-    fn supports_process(&self, _process_name: &str) -> bool {
-        true
-    }
-
-    /// Delegates to the wrapped factory to create a strategy
-    async fn create_strategy(
-        &self,
-        process_name: &str,
-        display_name: String,
-        icon: String,
-    ) -> Result<Box<dyn ActivityStrategy>> {
-        info!("Using default strategy for process: {}", process_name);
-        self.delegate
-            .create_strategy(process_name, display_name, icon)
-            .await
-    }
-}
-
-pub struct StrategyWrapper {
-    inner: Box<dyn ActivityStrategy>,
-}
-
-impl StrategyWrapper {
-    /// Create a new StrategyWrapper around a boxed ActivityStrategy
-    pub fn new(inner: Box<dyn ActivityStrategy>) -> Self {
-        Self { inner }
-    }
-}
-
-#[async_trait]
-impl ActivityStrategy for StrategyWrapper {
-    async fn retrieve_assets(&mut self) -> Result<Vec<Box<dyn ActivityAsset>>> {
-        self.inner.retrieve_assets().await
-    }
-
-    fn gather_state(&self) -> String {
-        self.inner.gather_state()
-    }
-
-    fn get_name(&self) -> &String {
-        self.inner.get_name()
-    }
-
-    fn get_icon(&self) -> &String {
-        self.inner.get_icon()
-    }
-
-    fn get_process_name(&self) -> &String {
-        self.inner.get_process_name()
-    }
-}
+/// Type alias for strategy creation functions
+type StrategyCreator =
+    Arc<dyn Fn(&str, String, String) -> Result<Box<dyn ActivityStrategy>> + Send + Sync>;
 
 /// Registry for activity strategies
 ///
-/// This struct maintains a list of strategy factories that can be used to create
-/// strategy instances for specific processes.
+/// This struct maintains a map of process names to strategy creators
+/// and provides methods for registering and creating strategies.
 pub struct StrategyRegistry {
-    factories: Vec<Arc<dyn StrategyFactory>>,
+    // Map from process name to strategy creator
+    strategies: MultiKeyMap<String, StrategyCreator>,
+    // Default strategy creator to use when no specific strategy is found
+    default_creator: Option<StrategyCreator>,
 }
 
 impl StrategyRegistry {
     /// Create a new empty strategy registry
     pub fn new() -> Self {
         Self {
-            factories: Vec::new(),
+            strategies: MultiKeyMap::new(),
+            default_creator: None,
         }
     }
 
-    /// Register a strategy factory
+    /// Register a strategy creator for specific process names
     ///
     /// # Arguments
-    /// * `factory` - The strategy factory to register
-    pub fn register<F>(&mut self, factory: F)
+    /// * `process_names` - List of process names this strategy supports
+    /// * `creator` - Function that creates a strategy for these processes
+    pub fn register<I, S>(&mut self, process_names: I, creator: StrategyCreator)
     where
-        F: StrategyFactory + 'static,
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
     {
-        self.factories.push(Arc::new(factory));
+        for name in process_names {
+            self.strategies.insert(name.into(), Arc::clone(&creator));
+        }
     }
 
-    /// Select a strategy for the given process
+    /// Set the default strategy creator to use when no specific strategy is found
     ///
-    /// This method iterates through all registered factories and returns the first
-    /// strategy that supports the given process.
+    /// # Arguments
+    /// * `creator` - Function that creates a default strategy
+    pub fn set_default(&mut self, creator: StrategyCreator) {
+        self.default_creator = Some(creator);
+    }
+
+    /// Create a strategy for the given process
     ///
     /// # Arguments
     /// * `process_name` - The name of the process
@@ -127,23 +66,25 @@ impl StrategyRegistry {
     ///
     /// # Returns
     /// A Box<dyn ActivityStrategy> if a suitable strategy is found, or an error if no strategy supports the process
-    pub async fn select_strategy(
+    pub async fn create_strategy(
         &self,
         process_name: &str,
         display_name: String,
         icon: String,
     ) -> Result<Box<dyn ActivityStrategy>> {
-        // Find the first factory that supports this process
-        for factory in &self.factories {
-            if factory.supports_process(process_name) {
-                return factory
-                    .create_strategy(process_name, display_name, icon)
-                    .await
-                    .context("Failed to create strategy");
-            }
+        // Try to find a creator for this process
+        if let Some(creator) = self.strategies.get(process_name) {
+            return creator(process_name, display_name, icon).context("Failed to create strategy");
         }
 
-        // If no factory supports this process, return an error
+        // If no creator was found, try the default creator
+        if let Some(default_creator) = &self.default_creator {
+            info!("Using default strategy for process: {}", process_name);
+            return default_creator(process_name, display_name, icon)
+                .context("Failed to create default strategy");
+        }
+
+        // If no strategy supports this process, return an error
         Err(anyhow::anyhow!(
             "No strategy found for process: {}",
             process_name
@@ -151,29 +92,50 @@ impl StrategyRegistry {
     }
 
     /// Create a default registry with all built-in strategies
-    ///
-    /// This method creates a new registry and registers all built-in strategies.
-    /// It also registers a DefaultStrategyFactory as a fallback for processes
-    /// that don't match any specific strategy.
     pub fn default() -> Self {
-        use crate::browser_activity::BrowserStrategyFactory;
-        use crate::strategy_factory::DefaultStrategyFactory;
-
         let mut registry = Self::new();
 
-        // Register specific strategies first
-        registry.register(BrowserStrategyFactory::new());
-        // Register other built-in strategies here
+        // Register browser strategy for browser processes
+        // We can't use block_on inside an async context, so we'll create a placeholder strategy
+        // that will be replaced with the real strategy when select_strategy_for_process is called
+        let browser_creator: StrategyCreator = Arc::new(|process_name, display_name, icon| {
+            // Return a placeholder that will be replaced with the real strategy
+            Err(anyhow::anyhow!(
+                "BrowserStrategy requires async initialization"
+            ))
+        });
 
-        // Register the default strategy factory as a fallback
-        // This should be registered last so it only matches if no other strategy does
-        registry.register(DefaultStrategyFactory::new(BrowserStrategyFactory::new()));
+        registry.register(
+            vec![
+                "firefox",
+                "firefox-bin",
+                "firefox-esr",
+                "chrome",
+                "chromium",
+                "chromium-browser",
+                "brave",
+                "brave-browser",
+                "opera",
+                "vivaldi",
+                "edge",
+                "msedge",
+                "safari",
+            ],
+            browser_creator,
+        );
+
+        // Set default strategy creator as fallback
+        let default_creator: StrategyCreator = Arc::new(|process_name, display_name, icon| {
+            let strategy = DefaultStrategy::new(display_name, icon, process_name.to_string())?;
+            Ok(Box::new(strategy))
+        });
+
+        registry.set_default(default_creator);
 
         registry
     }
 }
 
-// Implement Default trait for StrategyRegistry
 impl Default for StrategyRegistry {
     fn default() -> Self {
         Self::default()
@@ -182,8 +144,7 @@ impl Default for StrategyRegistry {
 
 /// Select the appropriate strategy based on the process name
 ///
-/// This function uses the StrategyRegistry to find and create the most appropriate
-/// strategy for tracking the given process.
+/// This function is a convenience wrapper around StrategyRegistry::create_strategy.
 ///
 /// # Arguments
 /// * `process_name` - The name of the process
@@ -191,35 +152,49 @@ impl Default for StrategyRegistry {
 /// * `icon` - The icon data as a base64 encoded string
 ///
 /// # Returns
-/// A StrategyWrapper that implements ActivityStrategy and delegates to the selected strategy
+/// A Box<dyn ActivityStrategy> if a suitable strategy is found, or an error if no strategy supports the process
 pub async fn select_strategy_for_process(
     process_name: &str,
     display_name: String,
     icon: String,
-) -> Result<StrategyWrapper> {
+) -> Result<Box<dyn ActivityStrategy>> {
     // Create a default registry with all built-in strategies
     let registry = StrategyRegistry::default();
 
     // Log the process name
     info!("Selecting strategy for process: {}", process_name);
 
-    // Use the registry to select a strategy
-    let strategy = registry
-        .select_strategy(process_name, display_name, icon)
+    // Check if this is a browser process
+    let is_browser = [
+        "firefox",
+        "firefox-bin",
+        "firefox-esr",
+        "chrome",
+        "chromium",
+        "chromium-browser",
+        "brave",
+        "brave-browser",
+        "opera",
+        "vivaldi",
+        "edge",
+        "msedge",
+        "safari",
+    ]
+    .contains(&process_name);
+
+    // If it's a browser process, create a BrowserStrategy directly
+    if is_browser {
+        let strategy = BrowserStrategy::new(display_name, icon, process_name.to_string()).await?;
+
+        return Ok(Box::new(strategy) as Box<dyn ActivityStrategy>);
+    }
+
+    // For non-browser processes, use the registry
+    registry
+        .create_strategy(process_name, display_name, icon)
         .await
         .context(format!(
             "Failed to select strategy for process: {}",
             process_name
-        ))?;
-
-    // Wrap the strategy in a StrategyWrapper
-    Ok(StrategyWrapper::new(strategy))
-}
-
-#[cfg(test)]
-mod tests {
-    
-
-    // Tests would be added here
-    // Note: These would need to be async tests
+        ))
 }

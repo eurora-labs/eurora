@@ -15,8 +15,8 @@ pub mod browser_activity;
 pub mod default_activity;
 pub mod strategy_factory;
 
-pub use browser_activity::{BrowserStrategy, BrowserStrategyFactory};
-pub use strategy_factory::{DefaultStrategyFactory, select_strategy_for_process};
+pub use browser_activity::BrowserStrategy;
+pub use strategy_factory::{StrategyRegistry, select_strategy_for_process};
 
 #[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {
