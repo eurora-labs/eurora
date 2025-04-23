@@ -5,13 +5,10 @@ use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{
     self, ProtoArticleState, ProtoPdfState, ProtoYoutubeState, StateRequest, StateResponse,
 };
-// We don't need the alias anymore
-use eur_proto::shared::ProtoImageFormat; // Import the format enum
+use eur_proto::shared::ProtoImageFormat;
 
 use image::DynamicImage;
-use tokio::sync::{Mutex, mpsc};
-use tokio_stream::{StreamExt, wrappers::ReceiverStream};
-use tonic::Streaming;
+use tokio::sync::Mutex;
 
 use eur_prompt_kit::{ImageContent, Message, MessageContent, Role, TextContent};
 
@@ -185,8 +182,6 @@ impl BrowserState {
 }
 pub struct BrowserStrategy {
     client: Mutex<TauriIpcClient<Channel>>,
-    stream: Mutex<Streaming<StateResponse>>,
-    request_tx: mpsc::Sender<StateRequest>,
 
     name: String,
     icon: String,
@@ -215,69 +210,14 @@ impl BrowserStrategy {
 
     /// Create a new BrowserStrategy with the given name
     pub async fn new(name: String, icon: String, process_name: String) -> Result<Self> {
-        let mut client = create_grpc_ipc_client().await?;
-
-        // Create a channel for requests
-        let (tx, rx) = mpsc::channel::<StateRequest>(32);
-        // Convert receiver to a stream that can be used with gRPC
-        let request_stream = ReceiverStream::new(rx);
-
-        // Create a persistent bidirectional stream
-        let result = client.get_state_streaming(request_stream).await?;
-        let stream = result.into_inner();
-
-        // Send initial request to get first state
-        tx.send(StateRequest {}).await?;
+        let client = create_grpc_ipc_client().await?;
 
         Ok(Self {
             name,
             icon,
             process_name,
             client: Mutex::new(client),
-            stream: Mutex::new(stream),
-            request_tx: tx,
         })
-    }
-
-    /// Recreate the stream if it has ended
-    async fn recreate_stream(&mut self) -> Result<()> {
-        eprintln!("Recreating stream");
-
-        // Create a new client
-        let mut new_client = create_grpc_ipc_client().await?;
-
-        // Create a new channel for requests
-        let (tx, rx) = mpsc::channel::<StateRequest>(32);
-        let request_stream = ReceiverStream::new(rx);
-
-        // Create a new persistent bidirectional stream
-        let result = new_client.get_state_streaming(request_stream).await?;
-        let new_stream = result.into_inner();
-
-        // Update the client
-        {
-            let mut client_lock = self.client.lock().await;
-            *client_lock = new_client;
-        }
-
-        // Update the stream
-        {
-            let mut stream_lock = self.stream.lock().await;
-            *stream_lock = new_stream;
-        }
-
-        // Send an initial request through the new channel
-        tx.send(StateRequest {}).await.map_err(|e| {
-            anyhow::anyhow!("Failed to send initial request after recreation: {}", e)
-        })?;
-
-        // Update the request_tx
-        // NOTE: In a proper implementation, request_tx should be behind a Mutex
-        // For now, we're replacing it directly which isn't thread-safe
-        // Consider updating the design to make this field a Mutex<mpsc::Sender<StateRequest>>
-        self.request_tx = tx;
-
-        Ok(())
     }
 
     /// Get the raw client if needed for other operations
@@ -289,54 +229,34 @@ impl BrowserStrategy {
 #[async_trait]
 impl ActivityStrategy for BrowserStrategy {
     async fn retrieve_assets(&mut self) -> Result<Vec<Box<dyn crate::ActivityAsset>>> {
-        // Send a request to get the latest state
-        self.request_tx
-            .send(StateRequest {})
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to send state request: {}", e))?;
+        // Get the client
+        let mut client = self.client.lock().await.clone();
 
-        // Get the response
-        let mut stream_lock = self.stream.lock().await;
+        // Make a direct gRPC call to get the state
+        let request = StateRequest {};
+        let response = client.get_state(request).await?;
+        let state_response = response.into_inner();
 
-        // Try to get a message from the stream
-        match stream_lock.message().await {
-            Ok(Some(state_response)) => match &state_response.state {
-                Some(ipc::state_response::State::Youtube(youtube)) => {
-                    eprintln!("Collected Youtube state");
-                    return Ok(vec![Box::new(YoutubeAsset::from(youtube.clone()))]);
-                    // return Ok(Some(BrowserState::Youtube(youtube.clone())));
-                }
-                Some(ipc::state_response::State::Article(article)) => {
-                    eprintln!("Collected Article state");
-                    return Ok(vec![Box::new(ArticleAsset::from(article.clone()))]);
-                }
-                // Some(ipc::state_response::State::Article(article)) => {
-                //     eprintln!("Collected Article state");
-                //     return Ok(Some(BrowserState::Article(article.clone())));
-                // }
-                // Some(ipc::state_response::State::Pdf(pdf)) => {
-                //     eprintln!("Collected Pdf state");
-                //     return Ok(Some(BrowserState::Pdf(pdf.clone())));
-                // }
-                _ => {}
-            },
-            Ok(None) => {
-                // Stream ended unexpectedly
-                eprintln!("Stream ended unexpectedly, recreating...");
-                drop(stream_lock); // Release the lock before creating a new stream
-                self.recreate_stream().await?;
+        // Process the response
+        match &state_response.state {
+            Some(ipc::state_response::State::Youtube(youtube)) => {
+                eprintln!("Collected Youtube state");
+                return Ok(vec![Box::new(YoutubeAsset::from(youtube.clone()))]);
             }
-            Err(e) => {
-                // Error reading from stream
-                eprintln!("Error reading from stream: {}, recreating...", e);
-                drop(stream_lock);
-                self.recreate_stream().await?;
-                return Err(anyhow::anyhow!("Stream error: {}", e));
+            Some(ipc::state_response::State::Article(article)) => {
+                eprintln!("Collected Article state");
+                return Ok(vec![Box::new(ArticleAsset::from(article.clone()))]);
+            }
+            Some(ipc::state_response::State::Pdf(_pdf)) => {
+                eprintln!("Collected Pdf state (not implemented yet)");
+                // PDF handling could be implemented here if needed
+            }
+            None => {
+                eprintln!("No state received from browser");
             }
         }
 
-        // Ok(None)
-        // Implementation for retrieving assets
+        // Return empty vector if no matching state was found
         Ok(vec![])
     }
 
