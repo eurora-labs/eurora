@@ -21,3 +21,4 @@ tonic = { workspace = true }
 async-trait = "0.1.77"
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 multi_key_map = "0.3.0"
+once_cell = "1.19.0"
