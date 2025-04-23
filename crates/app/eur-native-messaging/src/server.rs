@@ -150,10 +150,21 @@ impl TauriIpcServer {
 impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
     type GetStateStreamingStream = ResponseStream;
 
-    async fn get_state(&self, req: Request<StateRequest>) -> IpcResult<StateResponse> {
-        // This function is not used in the current implementation
-        // but can be implemented if needed
-        Err(Status::unimplemented("Not implemented"))
+    async fn get_state(&self, _req: Request<StateRequest>) -> IpcResult<StateResponse> {
+        eprintln!("Received get_state request");
+
+        // Send GENERATE_REPORT request via native messaging
+        match self.send_native_message("GENERATE_REPORT", json!({})).await {
+            Ok(response) => {
+                // Convert JSON response to StateResponse proto
+                let state_response = JSONToProtoConverter::convert(&response);
+                Ok(Response::new(state_response.unwrap()))
+            }
+            Err(e) => {
+                eprintln!("Error in native messaging: {}", e);
+                Err(Status::internal(format!("Native messaging error: {}", e)))
+            }
+        }
     }
 
     async fn get_state_streaming(
