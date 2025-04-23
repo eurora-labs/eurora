@@ -6,8 +6,6 @@ interface ArticleState extends Partial<ProtoArticleState> {
 
 (() => {
 	console.log('Article Watcher content script loaded');
-	// let article = new Readability(document).parse();
-	// console.log('Article:', article);
 
 	// Listen for messages from the extension
 	chrome.runtime.onMessage.addListener((obj, sender, response) => {
@@ -18,7 +16,7 @@ interface ArticleState extends Partial<ProtoArticleState> {
 				// article = new Readability(document).parse();
 				// console.log('New article:', article);
 				break;
-			case 'GENERATE_ARTICLE_REPORT':
+			case 'GENERATE_ASSETS':
 				console.log('Generating article report for URL:', window.location.href);
 
 				// Prepare report data
@@ -37,30 +35,6 @@ interface ArticleState extends Partial<ProtoArticleState> {
 			default:
 				response();
 		}
-		// if (type === 'NEW') {
-		// 	article = new Readability(document).parse();
-		// }
-
-		// if (type === 'GENERATE_ARTICLE_REPORT') {
-		// 	console.log('Generating article report for URL:', window.location.href);
-
-		// 	// Prepare report data
-		// 	const reportData: ArticleState = {
-		// 		type: 'ARTICLE_STATE',
-		// 		url: window.location.href,
-		// 		title: document.title,
-		// 		content: article?.content
-		// 	};
-
-		// 	// Send response back to background script
-		// 	response(reportData);
-		// 	return true; // Important: indicates we'll send response asynchronously
-		// }
-
-		// // For non-async handlers
-		// if (type !== 'GENERATE_ARTICLE_REPORT') {
-		// 	response();
-		// }
 	});
 
 	/**
