@@ -6,11 +6,14 @@
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use eur_activity::BrowserStrategy;
+use eur_prompt_kit::Message;
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::runtime::Handle; // Added import
 use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 use tokio::time;
@@ -18,6 +21,17 @@ use tracing::{debug, error, info};
 
 pub mod browser_state;
 pub use browser_state::*;
+
+pub mod activity;
+pub use activity::*;
+
+pub mod focus_tracker;
+
+pub mod asset_strategy;
+pub use asset_strategy::AssetStrategy;
+
+use eur_activity;
+use eur_activity::{ActivityStrategy, DisplayAsset};
 
 // Custom serialization for ImageBuffer
 mod image_serde {
@@ -81,8 +95,20 @@ pub struct Fragment {
     // pub metadata: serde_json::Value,
 }
 
+/// A reference to a Timeline that can be safely shared between threads
+pub type TimelineRef = Arc<Timeline>;
+
 /// Timeline store that holds fragments of system state over time
 pub struct Timeline {
+    /// The activities stored in the timeline
+    activities: Arc<RwLock<Vec<Activity>>>,
+
+    /// The activities stored in the timeline (temporary)
+    activities_temp: Arc<RwLock<Vec<eur_activity::Activity>>>,
+
+    /// The activities new stored in the timeline
+    // activities_new: Arc<RwLock<Vec<ActivityStrategy>>>,
+
     /// The fragments stored in the timeline
     fragments: Arc<RwLock<Vec<Fragment>>>,
 
@@ -99,12 +125,28 @@ pub struct Timeline {
 impl Timeline {
     /// Create a new timeline with the specified capacity
     pub fn new(capacity: usize, interval_seconds: u64) -> Self {
-        Self {
+        // Browser strategy registration is now handled within eur_activity::REGISTRY initialization.
+        info!("Timeline created.");
+        Timeline {
+            activities: Arc::new(RwLock::new(Vec::new())),
+            activities_temp: Arc::new(RwLock::new(Vec::new())),
             fragments: Arc::new(RwLock::new(Vec::with_capacity(capacity))),
             capacity,
             interval_seconds,
             browser_collector: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Create a shareable reference to this Timeline
+    pub fn clone_ref(&self) -> TimelineRef {
+        Arc::new(Timeline {
+            activities: Arc::clone(&self.activities),
+            activities_temp: Arc::clone(&self.activities_temp),
+            fragments: Arc::clone(&self.fragments),
+            capacity: self.capacity,
+            interval_seconds: self.interval_seconds,
+            browser_collector: Arc::clone(&self.browser_collector),
+        })
     }
 
     /// Get a fragment from the specified number of seconds ago
@@ -136,12 +178,165 @@ impl Timeline {
         fragments.last().cloned()
     }
 
+    pub fn add_activity(&self, activity: Activity) {
+        let mut activities = self.activities.write();
+        // eprintln!("Adding activity: {:?}", activity);
+        activities.push(activity);
+    }
+
+    pub fn add_activity_temp(&self, activity: eur_activity::Activity) {
+        let mut activities = self.activities_temp.write();
+        // eprintln!("Adding activity: {:?}", activity);
+        activities.push(activity.into());
+    }
+
+    pub fn get_activities(&self) -> Vec<Activity> {
+        let activities = self.activities.read();
+        activities.clone()
+    }
+
+    pub fn get_activities_temp(&self) -> Vec<DisplayAsset> {
+        let activities = self.activities_temp.read();
+
+        if activities.is_empty() {
+            return Vec::new();
+        }
+
+        activities.last().unwrap().get_display_assets()
+    }
+
+    pub fn construct_asset_messages(&self) -> Vec<Message> {
+        let activities = self.activities_temp.read();
+        let last_activity = activities.last().unwrap();
+
+        last_activity
+            .assets
+            .iter()
+            .map(|asset| asset.construct_message())
+            .collect()
+    }
+
+    pub async fn start_collection_activity(
+        &self,
+        mut activity_strategy: Box<dyn ActivityStrategy>,
+        s: &mut String,
+    ) {
+        // Retrieve initial assets from the activity
+        let assets = activity_strategy
+            .retrieve_assets()
+            .await
+            .unwrap_or(Vec::new());
+
+        // Create a new activity
+        let activity = eur_activity::Activity::new(
+            activity_strategy.get_name().to_string(),
+            activity_strategy.get_icon().to_string(),
+            activity_strategy.get_process_name().to_string(),
+            assets,
+        );
+
+        // Add the activity to the timeline
+        self.add_activity_temp(activity);
+
+        eprintln!("Activity added: ");
+
+        // // Create an Arc to share the activity between threads
+        // let activity = Arc::new(activity_strategy);
+
+        // // Clone references for the async task
+        // // let activity_clone = Arc::clone(&activity);
+
+        // // Spawn a tokio task to periodically gather state
+        // tokio::spawn(async move {
+        //     // Create an interval timer that ticks every 3 seconds
+        //     let mut interval = time::interval(Duration::from_secs(3));
+
+        //     // Create a single activity in the timeline that we'll update with snapshots
+        //     let process_name = "activity-reporter";
+        //     let activity_name = "Monitored Activity";
+        //     let icon = "📊"; // Using an emoji as a simple icon
+
+        //     let mut timeline_activity = eur_timeline::activity::Activity::new(
+        //         activity_name.to_string(),
+        //         icon.to_string(),
+        //         process_name.to_string(),
+        //     );
+
+        //     // Add the initial activity to the timeline
+        //     timeline_clone.add_activity(timeline_activity.clone());
+
+        //     // Run indefinitely, collecting state at each interval
+        //     loop {
+        //         // Wait for the next interval tick
+        //         interval.tick().await;
+
+        //         // Gather the current state from the activity
+        //         let state = match std::panic::catch_unwind(|| activity_clone.gather_state()) {
+        //             Ok(state) => state,
+        //             Err(e) => {
+        //                 error!("Error gathering state: {:?}", e);
+        //                 "Error gathering state".to_string()
+        //             }
+        //         };
+
+        //         // Log the gathered state (for debugging)
+        //         debug!("Gathered state: {}", state);
+
+        //         // Create a timestamp for this snapshot
+        //         let now = chrono::Utc::now().timestamp() as u64;
+
+        //         // Create a new activity snapshot with the gathered state
+        //         let snapshot = eur_timeline::activity::ActivitySnapshot {
+        //             session: eur_timeline::activity::AppSession {},
+        //             screenshot: None,
+        //             updated_at: now,
+        //             created_at: now,
+        //         };
+
+        //         // Create a JSON representation of the state
+        //         let state_json = serde_json::json!({
+        //             "state": state,
+        //             "timestamp": now,
+        //         });
+
+        //         // Create an asset from the state
+        //         let asset = eur_timeline::activity::ActivityAsset::new(
+        //             state_json,
+        //             eur_timeline::activity::AssetType::Custom,
+        //         );
+
+        //         // Get the activities from the timeline
+        //         let activities = timeline_clone.get_activities();
+
+        //         // Find our activity and update it with the new snapshot and asset
+        //         // In a real implementation, you would use a more robust way to identify the activity
+        //         for mut activity in activities {
+        //             if activity.process_name == process_name {
+        //                 activity.add_snapshot(snapshot.clone());
+        //                 activity.add_asset(asset.clone());
+
+        //                 // Update the activity in the timeline
+        //                 // Note: In a real implementation, you would need a proper way to update
+        //                 // an existing activity in the timeline, possibly through a method like
+        //                 // timeline.update_activity(activity)
+        //                 break;
+        //             }
+        //         }
+        //     }
+        // });
+    }
+
     /// Start the timeline collection process
     pub async fn start_collection(&self) -> Result<()> {
         info!(
             "Starting timeline collection every {} seconds",
             self.interval_seconds
         );
+
+        // Start the focus tracker
+        focus_tracker::spawn(self);
+
+        return Ok(());
 
         let fragments = Arc::clone(&self.fragments);
         let browser_collector = Arc::clone(&self.browser_collector);
