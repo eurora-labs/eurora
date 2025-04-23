@@ -19,6 +19,7 @@ tauri-build = { version = "2.0.3", features = [] }
 
 [dependencies]
 anyhow = "1.0.97"
+eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 backtrace = { version = "0.3.74", optional = true }
 console-subscriber = "0.4.1"
 keyring = "2.3.2"
@@ -37,6 +38,7 @@ tauri-plugin-single-instance = "2.2.3"
 tauri-plugin-store = "2.2.0"
 tauri-plugin-updater = "2.7.0"
 tauri-plugin-window-state = "2.2.2"
+x11rb = "0.13.1"
 
 parking_lot.workspace = true
 log = "^0.4"
@@ -63,6 +65,7 @@ futures = { workspace = true }
 tonic = { workspace = true }
 async-mutex = "1.4.1"
 sentry = { version = "0.37.0" }
+eur-activity = { path = "../eur-activity" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-trafficlights-positioner = { git = "https://github.com/gitbutlerapp/tauri-plugin-trafficlights-positioner", branch = "v2" }
