@@ -212,9 +212,9 @@ impl Timeline {
             .collect()
     }
 
-    pub async fn start_collection_activity<T: ActivityStrategy>(
+    pub async fn start_collection_activity(
         &self,
-        mut activity_strategy: T,
+        mut activity_strategy: Box<dyn ActivityStrategy>,
         s: &mut String,
     ) {
         // Retrieve initial assets from the activity
