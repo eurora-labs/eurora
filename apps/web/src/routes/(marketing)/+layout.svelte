@@ -36,7 +36,7 @@
 >
 	<div class="flex items-center gap-2">
 		<Button variant="link" href="/" class="decoration-transparent">
-			<EurIcons.EuroraLogo style="width: 2rem; height: 2rem;" />
+			<EurIcons.EuroraLogo style="width: 3rem; height: 3rem;" />
 			<span class="text-lg font-semibolde">Eurora Labs</span>
 		</Button>
 	</div>

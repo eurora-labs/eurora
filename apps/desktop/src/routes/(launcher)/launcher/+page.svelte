@@ -1,12 +1,14 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
-	import { Textarea, ScrollArea, Separator, Button } from '@eurora/ui';
+	import { Textarea, ScrollArea, Separator, Button, Badge } from '@eurora/ui';
 	import { invoke, Channel } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import { ProtoChatMessage } from '@eurora/proto/questions_service';
 	import { onMount } from 'svelte';
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
+
+	import { X } from '@lucide/svelte';
 
 	// Define a type for Conversation based on what we know from main.rs
 	type ChatMessage = {
@@ -26,6 +28,14 @@
 		updated_at: number;
 	};
 
+	type DisplayAsset = {
+		name: string;
+		icon: string;
+		// process_name: string;
+		// start: string; // ISO date string
+		// end: string | null; // ISO date string or null
+	};
+
 	let inputRef = $state<HTMLTextAreaElement | null>(null);
 	let transcript = $state<string | null>(null);
 	const messages = $state<ProtoChatMessage[]>([]);
@@ -35,6 +45,7 @@
 	let hasApiKey = $state(false);
 	let isCheckingApiKey = $state(true);
 	let currentConversationId = $state<string | null>(null);
+	const displayAssets = $state<DisplayAsset[]>([]);
 
 	// Set up event listener for chat responses
 	listen<string>('chat_response', (event) => {
@@ -72,11 +83,25 @@
 		// Check if API key exists
 		checkApiKey();
 
+		// Load activities
+		loadActivities();
+
 		// Clean up event listener when component is unmounted
 		return () => {
 			document.removeEventListener('keydown', handleEscapeKey);
 		};
 	});
+
+	// Function to load activities from the backend
+	async function loadActivities() {
+		try {
+			const result = await invoke('list_activities');
+			displayAssets.splice(0, displayAssets.length, ...(result as DisplayAsset[]));
+			console.log('Loaded activities:', displayAssets);
+		} catch (error) {
+			console.error('Failed to load activities:', error);
+		}
+	}
 
 	// Function to check if API key exists
 	async function checkApiKey() {
@@ -237,6 +262,34 @@
 </script>
 
 <div class="flex h-screen flex-col">
+	<div class="flex flex-wrap gap-2 p-2">
+		{#each displayAssets as asset}
+			<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
+				<!-- <Badge
+				variant="outline"
+				class="flex items-center gap-1"
+				title={`${activity.name} - Started: ${new Date(activity.start).toLocaleTimeString()}`}
+			> -->
+				{#if asset.icon && asset.icon.length > 0}
+					<div class="icon-container mr-1 h-4 w-4">
+						<img src={asset.icon} alt="Activity Icon" />
+					</div>
+				{:else}
+					📌
+				{/if}
+				{asset.name}
+				<Button size="icon" variant="ghost"><X /></Button>
+			</Badge>
+		{/each}
+		{#if displayAssets.length === 0}
+			<Badge variant="outline">No recent activities</Badge>
+		{/if}
+	</div>
+	<Button
+		onclick={() => {
+			loadActivities();
+		}}>Reload Activities</Button
+	>
 	{#if isCheckingApiKey}
 		<div class="flex h-full items-center justify-center">
 			<p class="text-gray-500">Checking API key...</p>
@@ -273,28 +326,6 @@
 			</ScrollArea>
 		{/if}
 
-		<!-- Messages container with auto-scroll -->
-		<!-- <div bind:this={messagesContainer} class="flex flex-1 flex-col overflow-y-auto p-2">
-		{#if statusCode}
-			<div class="mt-4 text-center text-xl">
-				{statusCode}
-			</div>
-		{/if}
-
-		{#each messages as message, i}
-			<div
-				class="message-item mt-4 flex {message.role === 'user' ? 'justify-end' : 'justify-start'}"
-			>
-				<div
-					class="max-w-[80%] rounded-lg p-3 text-xl {message.role === 'user'
-						? 'bg-blue-100 text-blue-900'
-						: 'bg-gray-100 text-gray-900'}"
-				>
-					<Katex math={message.content} finishRendering={() => {}} />
-				</div>
-			</div>
-		{/each}
-	</div> -->
 		<MessageArea {messages} />
 	{/if}
 </div>
@@ -308,5 +339,16 @@
 	:global(main) {
 		height: 100vh;
 		overflow: hidden;
+	}
+
+	.icon-container {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.activity-icon {
+		width: 16px;
+		height: 16px;
 	}
 </style>

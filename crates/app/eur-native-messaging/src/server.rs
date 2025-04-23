@@ -148,12 +148,29 @@ impl TauriIpcServer {
 
 #[tonic::async_trait]
 impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
-    type GatherStateStream = ResponseStream;
+    type GetStateStreamingStream = ResponseStream;
 
-    async fn gather_state(
+    async fn get_state(&self, _req: Request<StateRequest>) -> IpcResult<StateResponse> {
+        eprintln!("Received get_state request");
+
+        // Send GENERATE_REPORT request via native messaging
+        match self.send_native_message("GENERATE_REPORT", json!({})).await {
+            Ok(response) => {
+                // Convert JSON response to StateResponse proto
+                let state_response = JSONToProtoConverter::convert(&response);
+                Ok(Response::new(state_response.unwrap()))
+            }
+            Err(e) => {
+                eprintln!("Error in native messaging: {}", e);
+                Err(Status::internal(format!("Native messaging error: {}", e)))
+            }
+        }
+    }
+
+    async fn get_state_streaming(
         &self,
         req: Request<Streaming<StateRequest>>,
-    ) -> IpcResult<Self::GatherStateStream> {
+    ) -> IpcResult<Self::GetStateStreamingStream> {
         let mut in_stream = req.into_inner();
         let (tx, rx) = mpsc::channel(128); // Increased buffer size to match example
         let server_clone = self.clone();
@@ -234,7 +251,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         });
 
         Ok(Response::new(
-            Box::pin(mapped_stream) as Self::GatherStateStream
+            Box::pin(mapped_stream) as Self::GetStateStreamingStream
         ))
     }
 }

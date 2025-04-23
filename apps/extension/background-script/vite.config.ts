@@ -45,8 +45,8 @@ export default defineConfig({
 			// External packages that should not be bundled into your library.
 			external: [],
 			input: {
-				main: 'src/index.ts',
-				'service-worker/messaging-worker': 'src/lib/service-worker/messaging-worker.ts'
+				main: 'src/index.ts'
+				// 'service-worker/messaging-worker': 'src/lib/service-worker/messaging-worker.ts'
 			},
 			output: {
 				entryFileNames: '[name].js',

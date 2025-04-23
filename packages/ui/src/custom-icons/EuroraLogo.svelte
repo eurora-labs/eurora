@@ -26,14 +26,13 @@
 	width={size}
 	height={size}
 	fill="none"
-	stroke={color}
 	stroke-width={strokeWidth}
 	stroke-linecap="round"
 	stroke-linejoin="round"
 	aria-label={ariaLabel}
 	preserveAspectRatio="xMidYMid"
 	aria-describedby={hasDescription ? ariaDescribedby : undefined}
-	viewBox="0 0 18 18"
+	viewBox="0 0 32 32"
 >
 	{#if title?.id && title.title}
 		<title id={title.id}>{title.title}</title>
@@ -41,15 +40,62 @@
 	{#if desc?.id && desc.desc}
 		<desc id={desc.id}>{desc.desc}</desc>
 	{/if}
-	<defs
-		><clipPath id="a"><path d="M6.9766 5.4375h19.359v19.531H6.9766z" /></clipPath><clipPath id="b"
-			><path d="M6.9766 5.4375h12.023v19.531H6.9766z" /></clipPath
-		><clipPath id="c"><path d="M13 5.4375h13.336v15.562H13z" /></clipPath></defs
-	><g clip-path="url(#a)" transform="matrix(.9315 0 0 .9216 -6.4985 -5.0112)"
-		><path fill="#a020ef" d="m13.328 5.4375 12.973 15.273-19.324 4.3359z" /></g
-	><g clip-path="url(#b)" transform="matrix(.9315 0 0 .9216 -6.4985 -5.0112)"
-		><path fill="#c9b6fa" d="M18.844 19.645 6.977 25.0473l6.3516-19.609z" /></g
-	><g clip-path="url(#c)" transform="matrix(.9315 0 0 .9216 -6.4985 -5.0112)"
-		><path fill="#1d90ff" d="m26.301 20.711-7.457-1.0625-5.5156-14.211z" /></g
+	<defs id="defs11">
+		<linearGradient
+			id="linearGradient12"
+			x1="-7.9197998"
+			x2="13.276"
+			y1="-22.497999"
+			y2="-22.497999"
+			gradientTransform="matrix(1.1331,0,0,1.1352,-1.2995,3.0828)"
+			gradientUnits="userSpaceOnUse"
+		>
+			<stop stop-color="#9369de" offset="0" id="stop2" />
+			<stop stop-color="#5d5de5" offset=".39556" id="stop4" />
+			<stop stop-color="#3679f2" offset=".80444" id="stop6" />
+			<stop stop-color="#0f89ff" offset="1" id="stop8" style="stop-color:#0f89ff;stop-opacity:1;" />
+		</linearGradient>
+	</defs>
+	<g transform="matrix(1.3406,0,0,1.3459,-6.1616,-4.5108)" id="g15">
+		<ellipse
+			transform="matrix(-0.62559,0.78015,-0.78507,-0.6194,0,0)"
+			cx="1.735"
+			cy="-22.457001"
+			rx="12.009"
+			ry="11.814"
+			fill="url(#linearGradient12)"
+			style="fill:url(#linearGradient12);paint-order:stroke fill markers"
+			id="ellipse13"
+		/>
+	</g>
+	<g
+		transform="matrix(1.032,0,0,1.0158,-0.55783,-0.33903)"
+		stroke="#ffffff"
+		stroke-dashoffset="25.624"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		id="g23"
 	>
+		<path
+			d="m 13.856199,1.7584077 6.487083,18.3028393 8.859899,1.216133 z"
+			fill="#1d90ff"
+			stroke-width="1.83546"
+			style="paint-order:stroke markers fill"
+			id="path17"
+		/>
+		<path
+			d="m 13.804953,1.8109616 6.303161,18.5186894 c 0,0 -13.5472744,6.850459 -13.5472744,6.850459 z"
+			fill="#cab7fa"
+			stroke-width="1.81987"
+			style="paint-order:stroke markers fill"
+			id="path19"
+		/>
+		<path
+			d="m 6.793392,27.120689 13.708261,-6.913534 8.710624,1.241796 z"
+			fill="#a01fef"
+			stroke-width="1.83905"
+			style="paint-order:stroke markers fill"
+			id="path21"
+		/>
+	</g>
 </svg>

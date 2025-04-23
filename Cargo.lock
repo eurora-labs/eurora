@@ -1596,6 +1596,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-activity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "eur-native-messaging",
+ "eur-prompt-kit",
+ "eur-proto",
+ "image",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
 name = "eur-client-grpc"
 version = "0.0.0"
 dependencies = [
@@ -1681,14 +1700,23 @@ dependencies = [
  "base64 0.22.1",
  "config",
  "dotenv",
+ "eur-prompt-kit",
  "eur-proto",
  "eur-util",
  "futures",
  "futures-util",
+ "image",
  "openai-api-rs",
  "serde",
  "thiserror 2.0.12",
  "tokio",
+]
+
+[[package]]
+name = "eur-prompt-kit"
+version = "0.1.0"
+dependencies = [
+ "image",
 ]
 
 [[package]]
@@ -1730,11 +1758,13 @@ dependencies = [
  "console-subscriber",
  "defer",
  "dirs",
+ "eur-activity",
  "eur-client-grpc",
  "eur-client-questions",
  "eur-conversation",
  "eur-native-messaging",
  "eur-openai",
+ "eur-prompt-kit",
  "eur-proto",
  "eur-timeline",
  "futures",
@@ -1769,6 +1799,7 @@ dependencies = [
  "tracing-forest",
  "tracing-subscriber",
  "url",
+ "x11rb",
 ]
 
 [[package]]
@@ -1776,8 +1807,11 @@ name = "eur-timeline"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.21.7",
  "chrono",
+ "eur-activity",
  "eur-native-messaging",
+ "eur-prompt-kit",
  "eur-proto",
  "eur-screen-capture",
  "image",
@@ -1789,6 +1823,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-subscriber",
+ "x11rb",
 ]
 
 [[package]]
@@ -2258,6 +2293,16 @@ checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
  "typenum",
  "version_check",
+]
+
+[[package]]
+name = "gethostname"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0176e0459c2e4a1fe232f984bca6890e681076abb9934f6cea7c326f3fc47818"
+dependencies = [
+ "libc",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -6521,7 +6566,7 @@ version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "424f19432397850c2ddd42aa58078630c15287bbce3866eb1d90e7dbee680637"
 dependencies = [
- "gethostname",
+ "gethostname 1.0.1",
  "log",
  "os_info",
  "serde",
@@ -8465,6 +8510,23 @@ dependencies = [
  "once_cell",
  "pkg-config",
 ]
+
+[[package]]
+name = "x11rb"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d91ffca73ee7f68ce055750bf9f6eca0780b8c85eff9bc046a3b0da41755e12"
+dependencies = [
+ "gethostname 0.4.3",
+ "rustix 0.38.44",
+ "x11rb-protocol",
+]
+
+[[package]]
+name = "x11rb-protocol"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec107c4503ea0b4a98ef47356329af139c0a4f7750e621cf2973cd3385ebcb3d"
 
 [[package]]
 name = "xattr"
