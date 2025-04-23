@@ -9,8 +9,7 @@ use x11rb::{
     protocol::{
         Event,
         xproto::{
-            AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask,
-            PropertyNotifyEvent,
+            AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, PropertyNotifyEvent,
         },
     },
     rust_connection::RustConnection,
@@ -150,6 +149,7 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
 
                     match strategy_result {
                         Ok(strategy) => {
+                            // Box<dyn ActivityStrategy> implements ActivityStrategy through deref coercion
                             timeline.start_collection_activity(strategy, &mut s).await;
                             Ok(())
                         }
