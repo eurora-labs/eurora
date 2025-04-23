@@ -6,12 +6,14 @@
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use eur_activity::BrowserStrategy;
 use eur_prompt_kit::Message;
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::runtime::Handle; // Added import
 use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 use tokio::time;
@@ -26,7 +28,7 @@ pub use activity::*;
 pub mod focus_tracker;
 
 pub mod asset_strategy;
-pub use asset_strategy::*;
+pub use asset_strategy::AssetStrategy;
 
 use eur_activity;
 use eur_activity::{ActivityStrategy, DisplayAsset};
@@ -123,7 +125,9 @@ pub struct Timeline {
 impl Timeline {
     /// Create a new timeline with the specified capacity
     pub fn new(capacity: usize, interval_seconds: u64) -> Self {
-        Self {
+        // Browser strategy registration is now handled within eur_activity::REGISTRY initialization.
+        info!("Timeline created.");
+        Timeline {
             activities: Arc::new(RwLock::new(Vec::new())),
             activities_temp: Arc::new(RwLock::new(Vec::new())),
             fragments: Arc::new(RwLock::new(Vec::with_capacity(capacity))),
