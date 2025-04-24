@@ -22,11 +22,11 @@ use tauri::{AppHandle, Emitter, Wry};
 use tauri::{Manager, generate_context};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_log::{Target, TargetKind};
+use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
 
 use rdev::{Event, EventType, Key, listen};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
 
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
@@ -136,45 +136,14 @@ fn main() {
     ));
 
     fn callback(event: Event) {
-        // Get the app handle from a static reference if needed
-        // Only process key events when launcher is visible
-        if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
-            match event.event_type {
-                EventType::KeyPress(key) => {
-                    // Convert the key event to a format suitable for the frontend
-                    let key_data = match event.name {
-                        Some(name) => name,
-                        None => format!("{:?}", key),
-                    };
-
-                    // Log the key event for debugging
-                    eprintln!("Sending key event to launcher: {}", key_data);
-
-                    // We'll emit this event to all windows, the launcher will pick it up
-                    if let Some(app_handle) = APP_HANDLE.lock().ok().and_then(|h| h.clone()) {
-                        if let Some(launcher) = app_handle.get_window("launcher") {
-                            let _ = launcher.emit("key_event", key_data);
-                        }
-                    }
-                }
-                _ => (), // Ignore other event types
-            }
-        }
+        // This function is now defined inside the setup closure where it captures the sender
     }
-
-    // Create a static reference to the app handle for use in the callback
-    lazy_static::lazy_static! {
-        static ref APP_HANDLE: Mutex<Option<AppHandle>> = Mutex::new(None);
-    }
-
-    thread::spawn(move || {
-        if let Err(error) = listen(callback) {
-            eprintln!("Error: {:?}", error)
-        }
-    });
 
     // Regular application startup
     let tauri_context = generate_context!();
+
+    // Create a channel for sending key events from rdev thread to Tauri runtime
+    let (key_event_tx, mut key_event_rx) = mpsc::unbounded_channel::<String>();
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -214,41 +183,33 @@ fn main() {
 
                     let app_handle = tauri_app.handle();
 
-                    // Store the app handle in the static reference for use in the rdev callback
-                    if let Ok(mut handle) = APP_HANDLE.lock() {
-                        *handle = Some(app_handle.clone());
-                    }
-
+                    // --- State Initialization ---
                     let transcript_state = Arc::new(Mutex::new(None::<String>));
                     app_handle.manage(transcript_state);
-
-                    // Initialize the gRPC client state
                     let questions_client = create_shared_client();
                     app_handle.manage(questions_client.clone());
-
-                    // Initialize the timeline and start collection
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
-
-                    // focus_tracker::spawn(&timeline.clone());
-
-                    // Create the keyring service
                     let keyring_service = create_shared_keyring_service();
                     app_handle.manage(keyring_service.clone());
-
-                    // Create the OpenAI client (initially None, will be initialized after API key check)
                     let openai_client = create_shared_openai_client();
                     app_handle.manage(openai_client.clone());
+                    let conversation_storage = create_shared_conversation_storage();
+                    app_handle.manage(conversation_storage.clone());
+                    let current_conversation = create_shared_current_conversation();
+                    app_handle.manage(current_conversation);
 
-                    // Check if API key exists and initialize OpenAI client if it does
+                    // --- Background Tasks ---
+
+                    // Initialize OpenAI client if API key exists
                     let keyring_clone = keyring_service.clone();
-                    let app_handle_clone = app_handle.clone();
+                    let app_handle_openai = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         if keyring_clone.has_api_key() {
                             if let Ok(api_key) = keyring_clone.get_api_key() {
                                 let client = eur_openai::OpenAI::with_api_key(&api_key);
                                 let state: tauri::State<SharedOpenAIClient> =
-                                    app_handle_clone.state();
+                                    app_handle_openai.state();
                                 let mut guard = state.lock().await;
                                 *guard = Some(client);
                                 info!("OpenAI client initialized with API key from keyring");
@@ -257,26 +218,21 @@ fn main() {
                             info!("No API key found in keyring, OpenAI client not initialized");
                         }
                     });
-                    app_handle.manage(openai_client.clone());
 
                     // Initialize conversation storage
-                    let conversation_storage = create_shared_conversation_storage();
-                    let current_conversation = create_shared_current_conversation();
-
-                    // Initialize storage with a database in the app's data directory
                     let db_path = get_db_path(&app_handle);
-
-                    app_handle.manage(conversation_storage.clone());
-
+                    let storage_init_handle = conversation_storage.clone();
                     tauri::async_runtime::spawn(async move {
-                        if let Ok(storage) = ConversationStorage::new(db_path) {
-                            conversation_storage.lock().await.replace(storage);
+                        match ConversationStorage::new(db_path) {
+                            Ok(storage) => {
+                                storage_init_handle.lock().await.replace(storage);
+                                info!("Conversation storage initialized successfully");
+                            }
+                            Err(e) => error!("Failed to initialize conversation storage: {}", e),
                         }
                     });
 
-                    app_handle.manage(current_conversation);
-
-                    // Start the timeline collection process in the background
+                    // Start timeline collection
                     let timeline_clone = timeline.clone();
                     tauri::async_runtime::spawn(async move {
                         if let Err(e) = timeline_clone.start_collection().await {
@@ -286,19 +242,61 @@ fn main() {
                         }
                     });
 
-                    // Initialize the IPC client asynchronously
+                    // Initialize IPC client
                     let ipc_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let ipc_client = create_grpc_ipc_client().await.unwrap();
-                        ipc_handle.manage(ipc_client.clone());
+                        match create_grpc_ipc_client().await {
+                            Ok(ipc_client) => {
+                                ipc_handle.manage(ipc_client.clone());
+                                info!("gRPC IPC client initialized");
+                            }
+                            Err(e) => error!("Failed to initialize gRPC IPC client: {}", e),
+                        }
                     });
 
-                    // Connect to the gRPC server
+                    // Connect to gRPC server
                     let client_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         init_grpc_client(client_handle).await;
                     });
 
+                    // --- rdev Key Listener Setup ---
+                    let rdev_tx = key_event_tx.clone(); // Clone sender for the rdev thread
+                    std::thread::spawn(move || {
+                        let callback = move |event: Event| {
+                            // Only process key events when launcher is visible
+                            if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
+                                if let EventType::KeyPress(key) = event.event_type {
+                                    let key_data = match event.name {
+                                        Some(name) => name,
+                                        None => format!("{:?}", key),
+                                    };
+                                    // Send key data through the channel, ignore errors
+                                    let _ = rdev_tx.send(key_data);
+                                }
+                            }
+                        };
+
+                        if let Err(error) = listen(callback) {
+                            error!("rdev listen error: {:?}", error);
+                        }
+                    });
+
+                    // --- Key Event Receiver Task ---
+                    let receiver_handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        while let Some(key_data) = key_event_rx.recv().await {
+                            if let Some(launcher) = receiver_handle.get_window("launcher") {
+                                // Log the key event for debugging
+                                // eprintln!("Sending key event to launcher via channel: {}", key_data);
+                                if let Err(e) = launcher.emit("key_event", key_data) {
+                                    error!("Failed to emit key_event to launcher: {}", e);
+                                }
+                            }
+                        }
+                    });
+
+                    // --- Global Shortcut Setup ---
                     #[cfg(desktop)]
                     {
                         // println!("Setting up global shortcut");
@@ -307,7 +305,10 @@ fn main() {
 
                         let launcher_label = launcher_window.label().to_string();
 
-                        app_handle.plugin(shortcut_plugin(super_space_shortcut, launcher_label))?;
+                        app_handle.plugin(shortcut_plugin(
+                            super_space_shortcut.clone(),
+                            launcher_label,
+                        ))?;
 
                         app_handle
                             .global_shortcut()
@@ -316,23 +317,29 @@ fn main() {
 
                     // Listen for window focus events
                     let launcher_label = launcher_window.label().to_string();
-                    let app_handle_clone = app_handle.clone();
+                    let app_handle_focus = app_handle.clone();
 
-                    // We'll use a different approach for Windows
+                    // We'll use a different approach for Windows focus handling via on_window_event
 
-                    // Keep the window-specific handler for Linux
+                    // Keep the window-specific handler for Linux focus loss
                     #[cfg(target_os = "linux")]
-                    launcher_window.on_window_event(move |event| {
-                        if let tauri::WindowEvent::Focused(false) = event {
-                            if let Some(launcher) = app_handle_clone.get_window(&launcher_label) {
-                                launcher.hide().expect("Failed to hide launcher window");
-                                // Emit an event to clear the conversation when launcher is hidden
-                                launcher
-                                    .emit("launcher_closed", ())
-                                    .expect("Failed to emit launcher_closed event");
+                    {
+                        let launcher_label_linux = launcher_label.clone();
+                        launcher_window.on_window_event(move |event| {
+                            if let tauri::WindowEvent::Focused(false) = event {
+                                if let Some(launcher) =
+                                    app_handle_focus.get_window(&launcher_label_linux)
+                                {
+                                    launcher.hide().expect("Failed to hide launcher window");
+                                    // Emit an event to clear the conversation when launcher is hidden
+                                    launcher
+                                        .emit("launcher_closed", ())
+                                        .expect("Failed to emit launcher_closed event");
+                                    LAUNCHER_VISIBLE.store(false, Ordering::SeqCst); // Ensure state is updated
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
 
                     Ok(())
                 })
@@ -362,7 +369,7 @@ fn main() {
                             .remove(window.label());
                     }
                     tauri::WindowEvent::Focused(false) => {
-                        // Handle launcher window focus loss for Windows
+                        // Handle launcher window focus loss for non-Linux OS
                         #[cfg(not(target_os = "linux"))]
                         {
                             // Check if this is the launcher window
@@ -372,6 +379,7 @@ fn main() {
                                 window
                                     .emit("launcher_closed", ())
                                     .expect("Failed to emit launcher_closed event");
+                                LAUNCHER_VISIBLE.store(false, Ordering::SeqCst); // Ensure state is updated
                             }
                         }
                     }
@@ -395,7 +403,7 @@ fn main() {
                     check_api_key_exists,
                     save_api_key,
                     initialize_openai_client,
-                    send_key_to_launcher,
+                    send_key_to_launcher, // Keep for potential testing/manual trigger
                 ])
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
