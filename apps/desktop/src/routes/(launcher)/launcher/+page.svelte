@@ -52,6 +52,39 @@
 		messages.push({ role: 'system', content: event.payload });
 	});
 
+	// Listen for key events from the Rust backend
+	listen<string>('key_event', (event) => {
+		console.log('Received key event:', event.payload);
+
+		// If there's text in the input field, handle the key event
+		if (inputRef) {
+			// Handle special keys
+			if (event.payload === 'Escape') {
+				// Clear input field and reset conversation
+				inputRef.value = '';
+				currentConversationId = 'NEW';
+				messages.splice(0, messages.length);
+			} else if (event.payload === 'Backspace') {
+				// Handle backspace key
+				if (inputRef.value.length > 0) {
+					inputRef.value = inputRef.value.slice(0, -1);
+				}
+			} else if (event.payload === 'Enter') {
+				// Submit the current input
+				const question = inputRef.value;
+				if (question.trim().length > 0) {
+					inputRef.value = '';
+					messages.push({ role: 'user', content: question });
+					askQuestion(question);
+				}
+			} else if (event.payload.length === 1 || event.payload === 'Space') {
+				// Handle regular character keys and space
+				const char = event.payload === 'Space' ? ' ' : event.payload;
+				inputRef.value += char;
+			}
+		}
+	});
+
 	// Listen for launcher closed event to clear messages and reset conversation
 	listen('launcher_closed', () => {
 		// Clear messages array
@@ -142,6 +175,8 @@
 	});
 
 	async function handleKeydown(event: KeyboardEvent) {
+		// We still keep the original keyboard handler for direct keyboard input
+		// when typing in the input field
 		if (event.key === 'Enter' && !event.shiftKey) {
 			event.preventDefault();
 			await invoke('resize_launcher_window', { height: 500 });
