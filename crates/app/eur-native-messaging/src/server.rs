@@ -4,14 +4,14 @@ use serde_json::{Value, json};
 use std::io::{self, Read, Write};
 use std::sync::Arc;
 
-use eur_proto::ipc::{StateRequest, StateResponse};
+use eur_proto::ipc::{SnapshotResponse, StateRequest, StateResponse};
 use h2;
 use std::{error::Error, io::ErrorKind, pin::Pin};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, Streaming};
 
-use crate::converter::JSONToProtoConverter;
+use crate::asset_converter::{JSONToProtoAssetConverter, JSONToProtoSnapshotConverter};
 
 type IpcResult<T> = Result<Response<T>, Status>;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<StateResponse, Status>> + Send>>;
@@ -157,8 +157,28 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         match self.send_native_message("GENERATE_REPORT", json!({})).await {
             Ok(response) => {
                 // Convert JSON response to StateResponse proto
-                let state_response = JSONToProtoConverter::convert(&response);
+                let state_response = JSONToProtoAssetConverter::convert(&response);
                 Ok(Response::new(state_response.unwrap()))
+            }
+            Err(e) => {
+                eprintln!("Error in native messaging: {}", e);
+                Err(Status::internal(format!("Native messaging error: {}", e)))
+            }
+        }
+    }
+
+    async fn get_snapshot(&self, _req: Request<StateRequest>) -> IpcResult<SnapshotResponse> {
+        eprintln!("Received get_snapshot request");
+
+        // Send GENERATE_REPORT request via native messaging
+        match self
+            .send_native_message("GENERATE_SNAPSHOT", json!({}))
+            .await
+        {
+            Ok(response) => {
+                // Convert JSON response to SnapshotResponse proto
+                let snapshot_response = JSONToProtoSnapshotConverter::convert(&response);
+                Ok(Response::new(snapshot_response.unwrap()))
             }
             Err(e) => {
                 eprintln!("Error in native messaging: {}", e);
@@ -191,7 +211,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                             Ok(response) => {
                                 // eprintln!("Received GENERATE_REPORT response {:?}", response);
 
-                                let state_response = JSONToProtoConverter::convert(&response);
+                                let state_response = JSONToProtoAssetConverter::convert(&response);
 
                                 match tx.send(Ok(state_response)).await {
                                     Ok(_) => {
