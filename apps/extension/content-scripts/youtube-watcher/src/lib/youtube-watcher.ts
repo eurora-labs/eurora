@@ -107,26 +107,29 @@ interface EurImage extends Partial<ProtoImage> {
 				const currentTime = getCurrentVideoTime();
 
 				const videoFrame = getCurrentVideoFrame();
+				const reportData: ProtoNativeYoutubeState = {
+					type: 'YOUTUBE_STATE',
+					url: window.location.href,
+					title: document.title,
+					transcript: JSON.stringify(videoTranscript),
+					currentTime: Math.round(currentTime),
+					videoFrameBase64: videoFrame.dataBase64,
+					videoFrameWidth: videoFrame.width,
+					videoFrameHeight: videoFrame.height,
+					videoFrameFormat: videoFrame.format
+				};
 
 				if (!videoTranscript) {
 					getYouTubeTranscript(videoId).then((transcript) => {
 						videoTranscript = transcript;
 						// Prepare report data
-						const reportData: ProtoNativeYoutubeState = {
-							type: 'YOUTUBE_STATE',
-							url: window.location.href,
-							title: document.title,
-							transcript: JSON.stringify(videoTranscript),
-							currentTime: Math.round(currentTime),
-							videoFrameBase64: videoFrame.dataBase64,
-							videoFrameWidth: videoFrame.width,
-							videoFrameHeight: videoFrame.height,
-							videoFrameFormat: videoFrame.format
-						};
+						reportData.transcript = JSON.stringify(videoTranscript);
 
 						// Send response back to background script
 						response(reportData);
 					});
+				} else {
+					response(reportData);
 				}
 			} catch (error) {
 				console.error('Error generating YouTube report:', error);
