@@ -42,6 +42,8 @@
 		"publint": "^0.3.12",
 		"rehype-katex": "^7.0.1",
 		"rehype-stringify": "^10.0.1",
+		"rehype-raw": "^7.0.0",
+		"remark-gfm": "^4.0.1",
 		"remark-math": "^6.0.0",
 		"remark-parse": "^11.0.0",
 		"remark-rehype": "^11.1.2",
