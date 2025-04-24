@@ -24,6 +24,13 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use tauri_plugin_log::{Target, TargetKind};
 use tokio::time::{Duration, sleep};
 
+use rdev::{Event, EventType, Key, listen};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+
+// Shared state to track if launcher is visible
+static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
+
 // mod focus_tracker;
 
 use eur_timeline::focus_tracker;
@@ -127,6 +134,45 @@ fn main() {
             ..Default::default()
         },
     ));
+
+    fn callback(event: Event) {
+        // Get the app handle from a static reference if needed
+        // Only process key events when launcher is visible
+        if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
+            match event.event_type {
+                EventType::KeyPress(key) => {
+                    // Convert the key event to a format suitable for the frontend
+                    let key_data = match event.name {
+                        Some(name) => name,
+                        None => format!("{:?}", key),
+                    };
+
+                    // Log the key event for debugging
+                    eprintln!("Sending key event to launcher: {}", key_data);
+
+                    // We'll emit this event to all windows, the launcher will pick it up
+                    if let Some(app_handle) = APP_HANDLE.lock().ok().and_then(|h| h.clone()) {
+                        if let Some(launcher) = app_handle.get_window("launcher") {
+                            let _ = launcher.emit("key_event", key_data);
+                        }
+                    }
+                }
+                _ => (), // Ignore other event types
+            }
+        }
+    }
+
+    // Create a static reference to the app handle for use in the callback
+    lazy_static::lazy_static! {
+        static ref APP_HANDLE: Mutex<Option<AppHandle>> = Mutex::new(None);
+    }
+
+    thread::spawn(move || {
+        if let Err(error) = listen(callback) {
+            eprintln!("Error: {:?}", error)
+        }
+    });
+
     // Regular application startup
     let tauri_context = generate_context!();
 
@@ -167,6 +213,12 @@ fn main() {
                     }
 
                     let app_handle = tauri_app.handle();
+
+                    // Store the app handle in the static reference for use in the rdev callback
+                    if let Ok(mut handle) = APP_HANDLE.lock() {
+                        *handle = Some(app_handle.clone());
+                    }
+
                     let transcript_state = Arc::new(Mutex::new(None::<String>));
                     app_handle.manage(transcript_state);
 
@@ -343,6 +395,7 @@ fn main() {
                     check_api_key_exists,
                     save_api_key,
                     initialize_openai_client,
+                    send_key_to_launcher,
                 ])
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
@@ -367,13 +420,24 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
             let Ok(is_visible) = launcher.is_visible() else {
                 return;
             };
+
+            // // Store app handle for use in the rdev callback
+            // if let Ok(mut handle) = app_handle.lock() {
+            //     *handle = Some(app.clone());
+            // }
+
             if is_visible {
                 // Hide the launcher window and emit the closed event
                 launcher.hide().expect("Failed to hide launcher window");
                 launcher
                     .emit("launcher_closed", ())
                     .expect("Failed to emit launcher_closed event");
+
+                // Update the shared state to indicate launcher is hidden
+                LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
             } else {
+                // Update the shared state to indicate launcher is visible
+                LAUNCHER_VISIBLE.store(true, Ordering::SeqCst);
                 // Get cursor position and center launcher on that screen
                 if let Ok(cursor_position) = launcher.cursor_position() {
                     if let Ok(monitors) = launcher.available_monitors() {
@@ -1111,6 +1175,17 @@ async fn list_conversations(app_handle: tauri::AppHandle) -> Result<Vec<Conversa
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
     storage.list_conversations().map_err(|e| e.to_string())
+}
+
+// Command to manually send a key event to the launcher
+#[tauri::command]
+async fn send_key_to_launcher(app_handle: tauri::AppHandle, key: String) -> Result<(), String> {
+    if let Some(launcher) = app_handle.get_window("launcher") {
+        launcher
+            .emit("key_event", key)
+            .map_err(|e| format!("Failed to send key event: {}", e))?;
+    }
+    Ok(())
 }
 
 // Add this new command to check server status
