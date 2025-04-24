@@ -181,8 +181,8 @@
 	async function handleKeydown(event: KeyboardEvent) {
 		// We still keep the original keyboard handler for direct keyboard input
 		// when typing in the input field
+		event.preventDefault();
 		if (event.key === 'Enter' && !event.shiftKey) {
-			event.preventDefault();
 			await invoke('resize_launcher_window', { height: 500 });
 
 			try {
