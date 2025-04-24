@@ -22,13 +22,10 @@ use tracing::{debug, error, info};
 pub mod browser_state;
 pub use browser_state::*;
 
-pub mod activity;
-pub use activity::*;
-
 pub mod focus_tracker;
 
-pub mod asset_strategy;
-pub use asset_strategy::AssetStrategy;
+// pub mod asset_strategy;
+// pub use asset_strategy::AssetStrategy;
 
 use eur_activity;
 use eur_activity::{ActivityStrategy, DisplayAsset};
@@ -101,9 +98,6 @@ pub type TimelineRef = Arc<Timeline>;
 /// Timeline store that holds fragments of system state over time
 pub struct Timeline {
     /// The activities stored in the timeline
-    activities: Arc<RwLock<Vec<Activity>>>,
-
-    /// The activities stored in the timeline (temporary)
     activities_temp: Arc<RwLock<Vec<eur_activity::Activity>>>,
 
     /// The activities new stored in the timeline
@@ -128,7 +122,6 @@ impl Timeline {
         // Browser strategy registration is now handled within eur_activity::REGISTRY initialization.
         info!("Timeline created.");
         Timeline {
-            activities: Arc::new(RwLock::new(Vec::new())),
             activities_temp: Arc::new(RwLock::new(Vec::new())),
             fragments: Arc::new(RwLock::new(Vec::with_capacity(capacity))),
             capacity,
@@ -140,7 +133,6 @@ impl Timeline {
     /// Create a shareable reference to this Timeline
     pub fn clone_ref(&self) -> TimelineRef {
         Arc::new(Timeline {
-            activities: Arc::clone(&self.activities),
             activities_temp: Arc::clone(&self.activities_temp),
             fragments: Arc::clone(&self.fragments),
             capacity: self.capacity,
@@ -178,21 +170,10 @@ impl Timeline {
         fragments.last().cloned()
     }
 
-    pub fn add_activity(&self, activity: Activity) {
-        let mut activities = self.activities.write();
-        // eprintln!("Adding activity: {:?}", activity);
-        activities.push(activity);
-    }
-
     pub fn add_activity_temp(&self, activity: eur_activity::Activity) {
         let mut activities = self.activities_temp.write();
         // eprintln!("Adding activity: {:?}", activity);
         activities.push(activity.into());
-    }
-
-    pub fn get_activities(&self) -> Vec<Activity> {
-        let activities = self.activities.read();
-        activities.clone()
     }
 
     pub fn get_activities_temp(&self) -> Vec<DisplayAsset> {
