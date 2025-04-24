@@ -108,21 +108,26 @@ interface EurImage extends Partial<ProtoImage> {
 
 				const videoFrame = getCurrentVideoFrame();
 
-				// Prepare report data
-				const reportData: ProtoNativeYoutubeState = {
-					type: 'YOUTUBE_STATE',
-					url: window.location.href,
-					title: document.title,
-					transcript: JSON.stringify(videoTranscript),
-					currentTime: Math.round(currentTime),
-					videoFrameBase64: videoFrame.dataBase64,
-					videoFrameWidth: videoFrame.width,
-					videoFrameHeight: videoFrame.height,
-					videoFrameFormat: videoFrame.format
-				};
+				if (!videoTranscript) {
+					getYouTubeTranscript(videoId).then((transcript) => {
+						videoTranscript = transcript;
+						// Prepare report data
+						const reportData: ProtoNativeYoutubeState = {
+							type: 'YOUTUBE_STATE',
+							url: window.location.href,
+							title: document.title,
+							transcript: JSON.stringify(videoTranscript),
+							currentTime: Math.round(currentTime),
+							videoFrameBase64: videoFrame.dataBase64,
+							videoFrameWidth: videoFrame.width,
+							videoFrameHeight: videoFrame.height,
+							videoFrameFormat: videoFrame.format
+						};
 
-				// Send response back to background script
-				response(reportData);
+						// Send response back to background script
+						response(reportData);
+					});
+				}
 			} catch (error) {
 				console.error('Error generating YouTube report:', error);
 				response({ success: false, error: error.message || 'Unknown error' });
@@ -132,7 +137,7 @@ interface EurImage extends Partial<ProtoImage> {
 		}
 
 		// For non-async handlers
-		if (type !== 'GENERATE_YOUTUBE_REPORT') {
+		if (type !== 'GENERATE_ASSETS') {
 			response();
 		}
 	});
