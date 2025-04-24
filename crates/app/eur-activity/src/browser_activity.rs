@@ -35,6 +35,8 @@ struct ArticleAsset {
 
 impl From<ProtoYoutubeState> for YoutubeAsset {
     fn from(state: ProtoYoutubeState) -> Self {
+        eprintln!("Converting ProtoYoutubeState to YoutubeAsset");
+        eprintln!("ProtoYoutubeState: {:?}", state);
         YoutubeAsset {
             url: state.url,
             title: "transcript asset".to_string(),

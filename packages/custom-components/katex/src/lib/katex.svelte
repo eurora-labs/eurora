@@ -4,6 +4,8 @@
 	import remarkMath from 'remark-math';
 	import remarkParse from 'remark-parse';
 	import remarkRehype from 'remark-rehype';
+	import rehypeRaw from 'rehype-raw';
+	import remarkGfm from 'remark-gfm';
 	import { unified } from 'unified';
 
 	async function renderKatex(elem: HTMLElement, math: string) {
@@ -11,17 +13,17 @@
 
 		math = math.replace(/\\\[/g, '$$$').replace(/\\\]/g, '$$$');
 
-		math = math.replace(/\\\(/g, '$$').replace(/\\\)/g, '$$');
-
-		// math = math.replace('```', '$$');
+		math = math.replace(/\\\(/g, '$$$').replace(/\\\)/g, '$$$');
 
 		console.log('changed math', math);
 
 		const file = await unified()
 			.use(remarkParse)
-			.use(remarkMath)
-			.use(remarkRehype)
-			.use(rehypeKatex)
+			.use(remarkMath, { singleDollarTextMath: false })
+			.use(remarkRehype, { allowDangerousHtml: true })
+			.use(rehypeRaw)
+			.use(remarkGfm)
+			.use(rehypeKatex, { output: 'htmlAndMathml' })
 			.use(rehypeStringify)
 			.process(math);
 
@@ -41,4 +43,8 @@
 	});
 </script>
 
-<span bind:this={htmlElement}>{math}</span>
+<span class="language-math" bind:this={htmlElement}>
+	{math}
+</span>
+
+<!-- <span class="katex" bind:this={htmlElement}>{math}</span> -->
