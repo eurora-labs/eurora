@@ -11,7 +11,8 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, Streaming};
 
-use crate::asset_converter::{JSONToProtoAssetConverter, JSONToProtoSnapshotConverter};
+use crate::asset_converter::JSONToProtoAssetConverter;
+use crate::snapshot_converter::JSONToProtoSnapshotConverter;
 
 type IpcResult<T> = Result<Response<T>, Status>;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<StateResponse, Status>> + Send>>;

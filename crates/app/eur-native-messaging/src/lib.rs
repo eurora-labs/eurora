@@ -5,6 +5,7 @@ pub use tonic::transport::Channel;
 pub mod asset_context;
 pub mod asset_converter;
 pub mod server;
+pub mod snapshot_context;
 pub mod snapshot_converter;
 
 pub use asset_context::{ArticleState, PdfState, YoutubeState};
