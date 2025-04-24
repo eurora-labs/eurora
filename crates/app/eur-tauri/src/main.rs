@@ -1227,7 +1227,7 @@ async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<DisplayAsse
 
     // Get all activities from the timeline
     // let mut activities = timeline.get_activities();
-    let mut activities = timeline.get_activities_temp();
+    let mut activities = timeline.get_activities();
 
     // Sort activities by start time (most recent first)
     // activities.sort_by(|a, b| b.start.cmp(&a.start));

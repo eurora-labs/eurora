@@ -93,7 +93,7 @@ pub type TimelineRef = Arc<Timeline>;
 /// Timeline store that holds fragments of system state over time
 pub struct Timeline {
     /// The activities stored in the timeline
-    activities_temp: Arc<RwLock<Vec<eur_activity::Activity>>>,
+    activities: Arc<RwLock<Vec<eur_activity::Activity>>>,
 
     /// The activities new stored in the timeline
     // activities_new: Arc<RwLock<Vec<ActivityStrategy>>>,
@@ -114,7 +114,7 @@ impl Timeline {
         // Browser strategy registration is now handled within eur_activity::REGISTRY initialization.
         info!("Timeline created.");
         Timeline {
-            activities_temp: Arc::new(RwLock::new(Vec::new())),
+            activities: Arc::new(RwLock::new(Vec::new())),
             fragments: Arc::new(RwLock::new(Vec::with_capacity(capacity))),
             capacity,
             interval_seconds,
@@ -124,7 +124,7 @@ impl Timeline {
     /// Create a shareable reference to this Timeline
     pub fn clone_ref(&self) -> TimelineRef {
         Arc::new(Timeline {
-            activities_temp: Arc::clone(&self.activities_temp),
+            activities: Arc::clone(&self.activities),
             fragments: Arc::clone(&self.fragments),
             capacity: self.capacity,
             interval_seconds: self.interval_seconds,
@@ -160,14 +160,14 @@ impl Timeline {
         fragments.last().cloned()
     }
 
-    pub fn add_activity_temp(&self, activity: eur_activity::Activity) {
-        let mut activities = self.activities_temp.write();
+    pub fn add_activity(&self, activity: eur_activity::Activity) {
+        let mut activities = self.activities.write();
         // eprintln!("Adding activity: {:?}", activity);
         activities.push(activity.into());
     }
 
-    pub fn get_activities_temp(&self) -> Vec<DisplayAsset> {
-        let activities = self.activities_temp.read();
+    pub fn get_activities(&self) -> Vec<DisplayAsset> {
+        let activities = self.activities.read();
 
         if activities.is_empty() {
             return Vec::new();
@@ -177,7 +177,7 @@ impl Timeline {
     }
 
     pub fn construct_asset_messages(&self) -> Vec<Message> {
-        let activities = self.activities_temp.read();
+        let activities = self.activities.read();
         let last_activity = activities.last().unwrap();
 
         last_activity
@@ -207,7 +207,7 @@ impl Timeline {
         );
 
         // Add the activity to the timeline
-        self.add_activity_temp(activity);
+        self.add_activity(activity);
 
         eprintln!("Activity added: ");
     }
