@@ -15,6 +15,11 @@
 
 		math = math.replace(/\\\(/g, '$$$').replace(/\\\)/g, '$$$');
 
+		math = math.replace(/```math/g, '$$$');
+		math = math.replace(/```latex/g, '$$$');
+
+		math = math.replace(/```/g, '$$$');
+
 		console.log('changed math', math);
 
 		const file = await unified()
@@ -23,7 +28,7 @@
 			.use(remarkRehype, { allowDangerousHtml: true })
 			.use(rehypeRaw)
 			.use(remarkGfm)
-			.use(rehypeKatex, { output: 'htmlAndMathml' })
+			.use(rehypeKatex, { output: 'htmlAndMathml', displayMode: true } as any)
 			.use(rehypeStringify)
 			.process(math);
 
@@ -43,7 +48,7 @@
 	});
 </script>
 
-<span class="language-math" bind:this={htmlElement}>
+<span bind:this={htmlElement}>
 	{math}
 </span>
 
