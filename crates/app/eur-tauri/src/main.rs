@@ -11,7 +11,7 @@ use eur_native_messaging::create_grpc_ipc_client;
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
 use eur_tauri::{WindowState, create_launcher};
-use eur_timeline::{BrowserState, Timeline};
+use eur_timeline::Timeline;
 use futures::StreamExt;
 use keyring_service::{ApiKeyStatus, KeyringService};
 use serde::Serialize;
