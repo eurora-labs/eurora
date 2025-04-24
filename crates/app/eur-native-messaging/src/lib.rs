@@ -9,6 +9,7 @@ pub mod snapshot_context;
 pub mod snapshot_converter;
 
 pub use asset_context::{ArticleState, PdfState, YoutubeState};
+pub use snapshot_context::YoutubeSnapshot;
 
 // Define the port as a constant to ensure consistency
 pub const PORT: &str = "1421";

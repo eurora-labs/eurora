@@ -1,8 +1,6 @@
-use crate::asset_context::NativeYoutubeState; // Only need NativeYoutubeState
+use crate::snapshot_context::{NativeYoutubeSnapshot, YoutubeSnapshot}; // Use snapshot context types
 use anyhow::{Error, anyhow}; // Import anyhow macro and Error
-use base64::prelude::*; // Import base64
-use eur_proto::ipc::{ProtoYoutubeSnapshot, SnapshotResponse}; // Import necessary proto types
-use eur_proto::shared::ProtoImage; // Import ProtoImage
+use eur_proto::ipc::SnapshotResponse; // Import necessary proto types
 
 pub struct JSONToProtoSnapshotConverter;
 
@@ -32,26 +30,15 @@ impl JSONToProtoSnapshotConverter {
 
         match snapshot_type {
             "YOUTUBE_SNAPSHOT" => {
-                let native_state = NativeYoutubeState::from(&json);
+                // Convert JSON to NativeYoutubeSnapshot
+                let native_snapshot = NativeYoutubeSnapshot::from(&json);
 
-                // Decode the base64 video frame
-                let video_frame_data = BASE64_STANDARD
-                    .decode(native_state.0.video_frame_base64.as_str())
-                    .map_err(|e| anyhow!("Failed to decode base64 video frame: {}", e))?;
+                // Convert NativeYoutubeSnapshot to YoutubeSnapshot
+                let youtube_snapshot = YoutubeSnapshot::from(&native_snapshot);
 
-                // Construct ProtoYoutubeSnapshot directly
-                let proto_snapshot = ProtoYoutubeSnapshot {
-                    current_time: native_state.0.current_time,
-                    video_frame: Some(ProtoImage {
-                        data: video_frame_data,
-                        width: native_state.0.video_frame_width,
-                        height: native_state.0.video_frame_height,
-                        format: native_state.0.video_frame_format,
-                    }),
-                };
-
+                // Create the snapshot field for the response
                 let snapshot_field =
-                    eur_proto::ipc::snapshot_response::Snapshot::Youtube(proto_snapshot);
+                    eur_proto::ipc::snapshot_response::Snapshot::Youtube(youtube_snapshot.0);
                 Ok(SnapshotResponse {
                     snapshot: Some(snapshot_field),
                 })
