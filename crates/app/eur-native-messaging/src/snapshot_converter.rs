@@ -1,6 +1,8 @@
-pub use crate::asset_context::{ArticleState, NativeYoutubeState, PdfState, YoutubeState};
-use anyhow::Error;
-use eur_proto::ipc::{SnapshotResponse, StateResponse};
+use crate::asset_context::NativeYoutubeState; // Only need NativeYoutubeState
+use anyhow::{Error, anyhow}; // Import anyhow macro and Error
+use base64::prelude::*; // Import base64
+use eur_proto::ipc::{ProtoYoutubeSnapshot, SnapshotResponse}; // Import necessary proto types
+use eur_proto::shared::ProtoImage; // Import ProtoImage
 
 pub struct JSONToProtoSnapshotConverter;
 
@@ -9,29 +11,54 @@ impl JSONToProtoSnapshotConverter {
         let json =
             serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(object.clone())?;
 
-        eprintln!("JSONToProtoConverter::convert json: {:?}", json);
+        eprintln!("JSONToProtoSnapshotConverter::convert json: {:?}", json); // Corrected eprintln message
 
-        // If success is false, return an error
-        if !json.get("success").unwrap().as_bool().unwrap() {
-            eprintln!("Failed to convert JSON to Proto, response: {:?}", json);
-            return Err(anyhow::anyhow!("Failed to convert JSON to Proto"));
+        // Check for success field, common in native messaging responses
+        if let Some(success) = json.get("success") {
+            if !success.as_bool().unwrap_or(false) {
+                eprintln!("Snapshot generation failed in extension: {:?}", json);
+                return Err(anyhow!("Snapshot generation failed in extension"));
+            }
+        } else {
+            eprintln!("Missing 'success' field in snapshot response: {:?}", json);
+            return Err(anyhow!("Missing 'success' field in snapshot response"));
         }
 
-        match json
+        // Determine the type of snapshot
+        let snapshot_type = json
             .get("type")
-            .unwrap_or(&serde_json::Value::String("ARTICLE_STATE".to_string()))
-            .as_str()
-            .unwrap()
-        {
+            .and_then(|t| t.as_str())
+            .ok_or_else(|| anyhow!("Missing or invalid 'type' field in snapshot response"))?;
+
+        match snapshot_type {
             "YOUTUBE_SNAPSHOT" => {
                 let native_state = NativeYoutubeState::from(&json);
-                let proto_state = YoutubeState::from(&native_state);
-                let state = eur_proto::ipc::snapshot_response::Snapshot::Youtube(proto_state.0);
+
+                // Decode the base64 video frame
+                let video_frame_data = BASE64_STANDARD
+                    .decode(native_state.0.video_frame_base64.as_str())
+                    .map_err(|e| anyhow!("Failed to decode base64 video frame: {}", e))?;
+
+                // Construct ProtoYoutubeSnapshot directly
+                let proto_snapshot = ProtoYoutubeSnapshot {
+                    current_time: native_state.0.current_time,
+                    video_frame: Some(ProtoImage {
+                        data: video_frame_data,
+                        width: native_state.0.video_frame_width,
+                        height: native_state.0.video_frame_height,
+                        format: native_state.0.video_frame_format,
+                    }),
+                };
+
+                let snapshot_field =
+                    eur_proto::ipc::snapshot_response::Snapshot::Youtube(proto_snapshot);
                 Ok(SnapshotResponse {
-                    snapshot: Some(state),
+                    snapshot: Some(snapshot_field),
                 })
             }
-            _ => Err(anyhow::anyhow!("Unsupported type")),
+            // Add cases for other snapshot types here if needed in the future
+            // e.g., "ARTICLE_SNAPSHOT", "PDF_SNAPSHOT"
+            _ => Err(anyhow!("Unsupported snapshot type: {}", snapshot_type)),
         }
     }
 }
