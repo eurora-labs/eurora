@@ -1,10 +1,10 @@
-pub use crate::context::{ArticleState, NativeYoutubeState, PdfState, YoutubeState};
+pub use crate::asset_context::{ArticleState, NativeYoutubeState, PdfState, YoutubeState};
 use anyhow::Error;
-use eur_proto::ipc::StateResponse;
+use eur_proto::ipc::{SnapshotResponse, StateResponse};
 
-pub struct JSONToProtoConverter;
+pub struct JSONToProtoAssetConverter;
 
-impl JSONToProtoConverter {
+impl JSONToProtoAssetConverter {
     pub fn convert(object: &serde_json::Value) -> Result<StateResponse, Error> {
         let json =
             serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(object.clone())?;

@@ -306,6 +306,13 @@ impl ActivityStrategy for BrowserStrategy {
     }
 
     async fn retrieve_snapshots(&mut self) -> Result<Vec<Box<dyn crate::ActivitySnapshot>>> {
+        let mut client = self.client.lock().await.clone();
+
+        // Make a direct gRPC call to get the state
+        let request = StateRequest {};
+        let response = client.get_state(request).await?;
+        let state_response = response.into_inner();
+
         // Return empty vector if no matching state was found
         Ok(vec![])
     }
