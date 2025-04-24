@@ -19,3 +19,12 @@ message ProtoNativeYoutubeState {
     int32 video_frame_height = 8;
     shared.ProtoImageFormat video_frame_format = 9;
 }
+
+message ProtoNativeYoutubeSnapshot {
+    string type = 1;
+    float current_time = 2;
+    string video_frame_base64 = 3;
+    int32 video_frame_width = 4;
+    int32 video_frame_height = 5;
+    shared.ProtoImageFormat video_frame_format = 6;
+}
