@@ -160,7 +160,7 @@ interface EurImage extends Partial<ProtoImage> {
 		}
 
 		// For non-async handlers
-		if (type !== 'GENERATE_ASSETS') {
+		if (type !== 'GENERATE_ASSETS' && type !== 'GENERATE_SNAPSHOT') {
 			response();
 		}
 	});
