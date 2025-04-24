@@ -64,7 +64,11 @@
 				inputRef.value = '';
 				currentConversationId = 'NEW';
 				messages.splice(0, messages.length);
-			} else if (event.payload === 'Backspace') {
+			} else if (
+				event.payload === 'Backspace' ||
+				event.payload === 'Delete' ||
+				event.payload === '\b'
+			) {
 				// Handle backspace key
 				if (inputRef.value.length > 0) {
 					inputRef.value = inputRef.value.slice(0, -1);
