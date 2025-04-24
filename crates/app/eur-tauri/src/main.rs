@@ -1137,7 +1137,6 @@ async fn check_grpc_server_connection(server_address: Option<String>) -> Result<
 }
 
 use eur_activity::DisplayAsset;
-use eur_timeline::activity::Activity;
 #[tauri::command]
 async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<DisplayAsset>, String> {
     let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
