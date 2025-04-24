@@ -173,6 +173,13 @@ impl Timeline {
             return Vec::new();
         }
 
+        let last_activity = activities.last().unwrap();
+
+        eprintln!(
+            "Number of snapshots: {:?}",
+            last_activity.snapshots.len() as u32
+        );
+
         activities.last().unwrap().get_display_assets()
     }
 
@@ -185,6 +192,13 @@ impl Timeline {
             .iter()
             .map(|asset| asset.construct_message())
             .collect()
+    }
+
+    pub async fn start_snapshot_collection(
+        &self,
+        mut activity_strategy: Box<dyn ActivityStrategy>,
+        s: &mut String,
+    ) {
     }
 
     pub async fn start_collection_activity(
@@ -209,7 +223,85 @@ impl Timeline {
         // Add the activity to the timeline
         self.add_activity(activity);
 
-        eprintln!("Activity added: ");
+        // Clone the activities Arc for the background task
+        let activities = Arc::clone(&self.activities);
+
+        // Move the strategy into the background task
+        let mut strategy = activity_strategy;
+
+        eprintln!("Done with the assets");
+        eprintln!("Starting the background task for snapshots");
+        let interval = Duration::from_secs(3);
+        let mut interval_timer = time::interval(interval);
+
+        loop {
+            eprintln!("Snapshot interval ticked 1");
+            interval_timer.tick().await;
+            eprintln!("Snapshot interval ticked 2");
+
+            match strategy.retrieve_snapshots().await {
+                Ok(snapshots) => {
+                    eprintln!("Got a snapshot response");
+                    if !snapshots.is_empty() {
+                        // Get write access to the activities
+                        let mut activities_lock = activities.write();
+
+                        // Find the last activity (the one we just added)
+                        if let Some(last_activity) = activities_lock.last_mut() {
+                            // Add the snapshots to the activity
+                            for snapshot in snapshots {
+                                eprintln!("Adding snapshot:");
+                                last_activity.snapshots.push(snapshot);
+                            }
+
+                            debug!("Added new snapshots to activity");
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to retrieve snapshots: {:?}", e);
+                }
+            }
+        }
+
+        // Spawn a background task to periodically collect snapshots
+        // tokio::spawn(async move {
+        //     // Create an interval timer that ticks every 3 seconds
+        //     let mut interval = time::interval(Duration::from_secs(3));
+
+        //     loop {
+        //         eprintln!("Snapshot interval ticked 1");
+        //         // Wait for the next interval tick
+        //         interval.tick().await;
+        //         eprintln!("Snapshot interval ticked 2");
+        //         // Retrieve snapshots from the strategy
+        //         match strategy.retrieve_snapshots().await {
+        //             Ok(snapshots) => {
+        //                 if !snapshots.is_empty() {
+        //                     // Get write access to the activities
+        //                     let mut activities_lock = activities.write();
+
+        //                     // Find the last activity (the one we just added)
+        //                     if let Some(last_activity) = activities_lock.last_mut() {
+        //                         // Add the snapshots to the activity
+        //                         for snapshot in snapshots {
+        //                             eprintln!("Adding snapshot:");
+        //                             last_activity.snapshots.push(snapshot);
+        //                         }
+
+        //                         debug!("Added new snapshots to activity");
+        //                     }
+        //                 }
+        //             }
+        //             Err(e) => {
+        //                 error!("Failed to retrieve snapshots: {:?}", e);
+        //             }
+        //         }
+        //     }
+        // });
+
+        eprintln!("Activity added and snapshot collection started");
+        // s.push_str("Activity collection started");
     }
 
     /// Start the timeline collection process

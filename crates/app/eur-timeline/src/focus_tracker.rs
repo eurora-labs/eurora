@@ -151,6 +151,7 @@ fn track_focus(timeline: super::TimelineRef) -> Result<()> {
                         Ok(strategy) => {
                             // Box<dyn ActivityStrategy> implements ActivityStrategy through deref coercion
                             timeline.start_collection_activity(strategy, &mut s).await;
+                            // timeline.start_snapshot_collection(strategy, &mut s).await;
                             Ok(())
                         }
                         Err(err) => Err(err),
