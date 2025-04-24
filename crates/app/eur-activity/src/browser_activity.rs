@@ -3,7 +3,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{
-    self, ProtoArticleState, ProtoPdfState, ProtoYoutubeState, StateRequest, StateResponse,
+    self, ProtoArticleState, ProtoPdfState, ProtoYoutubeSnapshot, ProtoYoutubeState, StateRequest,
+    StateResponse,
 };
 use eur_proto::shared::ProtoImageFormat;
 
@@ -35,8 +36,8 @@ struct ArticleAsset {
 
 impl From<ProtoYoutubeState> for YoutubeAsset {
     fn from(state: ProtoYoutubeState) -> Self {
-        eprintln!("Converting ProtoYoutubeState to YoutubeAsset");
-        eprintln!("ProtoYoutubeState: {:?}", state);
+        // eprintln!("Converting ProtoYoutubeState to YoutubeAsset");
+        // eprintln!("ProtoYoutubeState: {:?}", state);
         YoutubeAsset {
             url: state.url,
             title: "transcript asset".to_string(),
@@ -167,6 +168,36 @@ impl ActivitySnapshot for ArticleSnapshot {
 
 struct YoutubeSnapshot {
     pub video_frame: DynamicImage,
+}
+
+impl From<ProtoYoutubeSnapshot> for YoutubeSnapshot {
+    fn from(snapshot: ProtoYoutubeSnapshot) -> Self {
+        YoutubeSnapshot {
+            video_frame: {
+                let proto_image = snapshot.video_frame.unwrap();
+                // Directly load the image using the logic from eur-proto's From impl
+                match ProtoImageFormat::try_from(proto_image.format).unwrap_or_default() {
+                    ProtoImageFormat::Png => image::load_from_memory_with_format(
+                        &proto_image.data,
+                        image::ImageFormat::Png,
+                    )
+                    .expect("Failed to load PNG image from proto"),
+                    ProtoImageFormat::Jpeg => image::load_from_memory_with_format(
+                        &proto_image.data,
+                        image::ImageFormat::Jpeg,
+                    )
+                    .expect("Failed to load JPEG image from proto"),
+                    ProtoImageFormat::Webp => image::load_from_memory_with_format(
+                        &proto_image.data,
+                        image::ImageFormat::WebP,
+                    )
+                    .expect("Failed to load WebP image from proto"),
+                    _ => image::load_from_memory(&proto_image.data)
+                        .expect("Failed to load image from proto"),
+                }
+            },
+        }
+    }
 }
 
 impl ActivitySnapshot for YoutubeSnapshot {
@@ -306,12 +337,22 @@ impl ActivityStrategy for BrowserStrategy {
     }
 
     async fn retrieve_snapshots(&mut self) -> Result<Vec<Box<dyn crate::ActivitySnapshot>>> {
+        eprintln!("Retrieving snapshots from browser");
         let mut client = self.client.lock().await.clone();
 
         // Make a direct gRPC call to get the state
         let request = StateRequest {};
-        let response = client.get_state(request).await?;
+        let response = client.get_snapshot(request).await?;
         let state_response = response.into_inner();
+
+        match &state_response.snapshot {
+            Some(ipc::snapshot_response::Snapshot::Youtube(youtube)) => {
+                return Ok(vec![Box::new(YoutubeSnapshot::from(youtube.clone()))]);
+            }
+            None => {
+                eprintln!("No snapshot received from browser");
+            }
+        }
 
         // Return empty vector if no matching state was found
         Ok(vec![])
