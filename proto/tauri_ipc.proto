@@ -7,6 +7,8 @@ service TauriIPC {
     rpc GetState(StateRequest) returns (StateResponse) {}
     rpc GetStateStreaming(stream StateRequest) returns (stream StateResponse) {}
 
+    rpc GetSnapshot(StateRequest) returns (SnapshotResponse) {}
+
 }
 
 message StateRequest {}
@@ -17,6 +19,18 @@ message StateResponse {
         ProtoArticleState article = 3;
         ProtoPdfState pdf = 4;
     }
+}
+
+message SnapshotResponse {
+    oneof snapshot {
+        ProtoYoutubeSnapshot youtube = 2;
+    }
+}
+
+message ProtoYoutubeSnapshot {
+    float current_time = 1;
+    shared.ProtoImage video_frame = 2;
+
 }
 
 message ProtoTranscriptLine {

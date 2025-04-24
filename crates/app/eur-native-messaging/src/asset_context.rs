@@ -76,31 +76,6 @@ impl From<&NativeYoutubeState> for YoutubeState {
     }
 }
 
-// impl From<&serde_json::Map<String, serde_json::Value>> for YoutubeState {
-//     fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
-//         // Convert the video frame from base64 to a Vec<u8>
-//         let video_frame = BASE64_STANDARD
-//             .decode(obj.get("videoFrameBase64").unwrap().as_str().unwrap())
-//             .unwrap();
-//         YoutubeState(ProtoYoutubeState {
-//             url: obj.get("url").unwrap().as_str().unwrap().to_string(),
-//             title: obj.get("title").unwrap().as_str().unwrap().to_string(),
-//             transcript: serde_json::from_str::<Vec<TranscriptLine>>(
-//                 obj.get("transcript").unwrap().as_str().unwrap(),
-//             )
-//             .map(|lines| lines.into_iter().map(Into::into).collect())
-//             .unwrap_or_else(|_| Vec::new()),
-//             current_time: obj.get("currentTime").unwrap().as_f64().unwrap() as f32,
-//             video_frame: Some(ProtoImage {
-//                 data: video_frame,
-//                 width: 0,
-//                 height: 0,
-//                 format: ProtoImageFormat::Jpeg as i32,
-//             }),
-//         })
-//     }
-// }
-
 // New wrapper type for ProtoArticleState
 pub struct ArticleState(pub ProtoArticleState);
 
