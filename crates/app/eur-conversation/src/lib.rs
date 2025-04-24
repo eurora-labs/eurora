@@ -2,7 +2,6 @@ pub mod conversation;
 pub mod storage;
 
 use anyhow::Result;
-use eur_timeline::browser_state::BrowserCollector;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use serde_json::Value;
@@ -48,19 +47,6 @@ pub async fn create_video_question_conversation() -> Result<ConversationId> {
 
     // Save the conversation
     storage.save_conversation(&conversation)?;
-
-    // Collect browser state
-    let mut collector = BrowserCollector::new().await?;
-    if let Ok(Some(browser_state)) = collector.collect_state().await {
-        // Create and save asset from browser state
-        let asset = Asset::new(
-            conversation_id.clone(),
-            browser_state.content_type(),
-            serde_json::to_value(&browser_state)
-                .map_err(|e| anyhow::anyhow!("Failed to serialize browser state: {}", e))?,
-        );
-        storage.save_asset(&asset)?;
-    }
 
     Ok(conversation_id)
 }
@@ -139,49 +125,5 @@ mod tests {
 
         // Cleanup
         std::fs::remove_file(temp_path).ok();
-    }
-}
-
-#[cfg(test)]
-mod video_question_tests {
-    use super::*;
-    use eur_timeline::browser_state::BrowserState;
-    use uuid::Uuid;
-    #[tokio::test]
-    async fn test_create_video_question_conversation() -> Result<()> {
-        // Initialize storage with temporary database
-        let temp_path = std::env::temp_dir().join(format!("test_{}.db", Uuid::new_v4()));
-        init_storage(temp_path.clone())?;
-
-        // Create video question conversation
-        let conversation_id = create_video_question_conversation().await?;
-
-        // Get storage
-        let storage_lock = get_storage()?;
-        let storage = storage_lock.read();
-        let storage = storage.as_ref().unwrap();
-
-        // Verify conversation was created
-        let conversation = storage.get_conversation(&conversation_id)?;
-        assert!(conversation.id == conversation_id);
-
-        // Get assets
-        let assets = storage.get_conversation_assets(&conversation_id)?;
-
-        // There might not be assets if browser state collection failed
-        // but if there are, verify they're correct
-        if !assets.is_empty() {
-            let asset = &assets[0];
-            assert_eq!(asset.conversation_id, conversation_id);
-
-            // Verify we can deserialize the content back to a BrowserState
-            let _browser_state: BrowserState = serde_json::from_value(asset.content.clone())
-                .expect("Should be able to deserialize browser state");
-        }
-
-        // Cleanup
-        std::fs::remove_file(temp_path).ok();
-
-        Ok(())
     }
 }
