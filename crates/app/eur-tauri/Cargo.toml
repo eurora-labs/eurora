@@ -66,7 +66,9 @@ tonic = { workspace = true }
 async-mutex = "1.4.1"
 sentry = { version = "0.37.0" }
 eur-activity = { path = "../eur-activity" }
+lazy_static = "1.4.0"
 
+rdev = "0.5.3"
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-trafficlights-positioner = { git = "https://github.com/gitbutlerapp/tauri-plugin-trafficlights-positioner", branch = "v2" }
 
