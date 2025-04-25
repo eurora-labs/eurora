@@ -22,6 +22,11 @@ It is optional, but recommended to be updated as the project evolves.
   * Conversation management
   * Timeline/focus tracking
   * AI integration
+* Browser extension architecture:
+  * Background script for lifecycle management and coordination
+  * Content scripts for page-specific functionality (YouTube, PDF, articles)
+  * Native messaging for communication with desktop application
+  * Strategy pattern for handling different content types
 
 ## Testing Patterns
 

@@ -16,6 +16,7 @@ This file tracks the project's progress using a task list format.
   * Cleaned up commented-out code
   * Fixed duplicate function call in API key form
   * Added proper class for message scrolling
+* Created mermaid class diagram documentation for the browser extension architecture
 
 ## Current Tasks
 
