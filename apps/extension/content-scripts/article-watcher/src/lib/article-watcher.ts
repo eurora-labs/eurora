@@ -1,5 +1,5 @@
 import { ProtoArticleState } from '@eurora/proto/tauri_ipc';
-// import { Readability } from '@mozilla/readability';
+import { Readability } from '@mozilla/readability';
 interface ArticleState extends Partial<ProtoArticleState> {
 	type: 'ARTICLE_STATE';
 }
@@ -13,11 +13,14 @@ interface ArticleState extends Partial<ProtoArticleState> {
 
 		switch (type) {
 			case 'NEW':
-				// article = new Readability(document).parse();
+				// const article = new Readability(document).parse();
 				// console.log('New article:', article);
 				break;
 			case 'GENERATE_ASSETS':
 				console.log('Generating article report for URL:', window.location.href);
+
+				const clone = document.cloneNode(true) as Document;
+				const article = new Readability(clone).parse();
 
 				// Prepare report data
 				const reportData: ArticleState = {
@@ -27,6 +30,7 @@ interface ArticleState extends Partial<ProtoArticleState> {
 					// content: article?.textContent ?? document.body.textContent,
 					content: document.body.textContent,
 					selectedText: window.getSelection().toString()
+					// ...article
 				};
 
 				// Send response back to background script
