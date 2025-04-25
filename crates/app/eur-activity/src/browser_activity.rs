@@ -81,7 +81,7 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
 impl From<ProtoArticleState> for ArticleAsset {
     fn from(article: ProtoArticleState) -> Self {
         ArticleAsset {
-            url: article.url,
+            url: "".to_string(),
             // title: article.title,
             title: "article asset".to_string(),
             content: article.content,
