@@ -98,6 +98,13 @@
 		console.log('Launcher closed: cleared messages and reset conversation');
 	});
 
+	// Listen for launcher opened event to refresh activities
+	listen('launcher_opened', () => {
+		// Reload activities when launcher is opened
+		loadActivities();
+		console.log('Launcher opened: refreshed activities');
+	});
+
 	// Set up global keydown event listener for Escape key
 	function handleEscapeKey(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
