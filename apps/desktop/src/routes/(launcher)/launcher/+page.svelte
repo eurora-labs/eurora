@@ -173,9 +173,14 @@
 
 	// Auto-scroll to bottom when new messages arrive
 	$effect(() => {
-		// if (messagesContainer && messages.length > 0) {
-		// 	messagesContainer.scrollTop = messagesContainer.scrollHeight;
-		// }
+		// We need to use a different approach for auto-scrolling
+		// since we can't directly bind to the ScrollArea component
+		const scrollArea = document.querySelector('.message-scroll-area');
+		if (scrollArea && messages.length > 0) {
+			setTimeout(() => {
+				scrollArea.scrollTop = scrollArea.scrollHeight;
+			}, 100);
+		}
 	});
 
 	async function handleKeydown(event: KeyboardEvent) {
@@ -302,13 +307,8 @@
 
 <div class="flex h-screen flex-col">
 	<div class="flex flex-wrap gap-2 p-2">
-		{#each displayAssets as asset}
+		{#each displayAssets as asset, index}
 			<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
-				<!-- <Badge
-				variant="outline"
-				class="flex items-center gap-1"
-				title={`${activity.name} - Started: ${new Date(activity.start).toLocaleTimeString()}`}
-			> -->
 				{#if asset.icon && asset.icon.length > 0}
 					<div class="icon-container mr-1 h-4 w-4">
 						<img src={asset.icon} alt="Activity Icon" />
@@ -317,7 +317,15 @@
 					📌
 				{/if}
 				{asset.name}
-				<Button size="icon" variant="ghost"><X /></Button>
+				<Button
+					size="icon"
+					variant="ghost"
+					onclick={() => {
+						displayAssets.splice(index, 1);
+					}}
+				>
+					<X />
+				</Button>
 			</Badge>
 		{/each}
 		{#if displayAssets.length === 0}
@@ -365,7 +373,9 @@
 			</ScrollArea>
 		{/if}
 
-		<MessageArea {messages} />
+		<div class="message-scroll-area flex-grow overflow-auto">
+			<MessageArea {messages} />
+		</div>
 	{/if}
 </div>
 
