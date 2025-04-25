@@ -2,6 +2,7 @@ use base64::prelude::*;
 pub use eur_proto::ipc::{
     ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState,
 };
+pub use eur_proto::native_messaging::ProtoNativeArticleAsset;
 pub use eur_proto::native_messaging::ProtoNativeYoutubeState;
 pub use eur_proto::shared::ProtoImage;
 use serde::Deserialize;
@@ -72,6 +73,34 @@ impl From<&NativeYoutubeState> for YoutubeState {
                 height: obj.0.video_frame_height,
                 format: obj.0.video_frame_format,
             }),
+        })
+    }
+}
+
+pub struct NativeArticleAsset(pub ProtoNativeArticleAsset);
+
+impl From<&serde_json::Map<String, serde_json::Value>> for NativeArticleAsset {
+    fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
+        NativeArticleAsset(ProtoNativeArticleAsset {
+            r#type: obj.get("type").unwrap().as_str().unwrap().to_string(),
+            content: obj.get("content").unwrap().as_str().unwrap().to_string(),
+            text_content: obj
+                .get("textContent")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string(),
+            selected_text: obj
+                .get("selectedText")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+
+            title: obj.get("title").unwrap().as_str().unwrap().to_string(),
+            site_name: obj.get("siteName").unwrap().as_str().unwrap().to_string(),
+
+            language: obj.get("language").unwrap().as_str().unwrap().to_string(),
+            excerpt: obj.get("excerpt").unwrap().as_str().unwrap().to_string(),
+            length: obj.get("length").unwrap().as_i64().unwrap() as i32,
         })
     }
 }
