@@ -21,6 +21,7 @@ This file tracks the project's current status, including recent changes, current
   * Cleaned up commented-out code
   * Fixed duplicate function call in API key form
   * Added proper class for message scrolling
+* Created comprehensive mermaid class diagram documentation for the browser extension architecture
 
 ## Open Questions/Issues
 
