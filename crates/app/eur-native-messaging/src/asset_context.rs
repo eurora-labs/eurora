@@ -108,21 +108,36 @@ impl From<&serde_json::Map<String, serde_json::Value>> for NativeArticleAsset {
 // New wrapper type for ProtoArticleState
 pub struct ArticleState(pub ProtoArticleState);
 
-impl From<&serde_json::Map<String, serde_json::Value>> for ArticleState {
-    fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
+impl From<&NativeArticleAsset> for ArticleState {
+    fn from(obj: &NativeArticleAsset) -> Self {
         ArticleState(ProtoArticleState {
-            url: obj.get("url").unwrap().as_str().unwrap().to_string(),
-            title: obj.get("title").unwrap().as_str().unwrap().to_string(),
-            content: obj.get("content").unwrap().as_str().unwrap().to_string(),
-            selected_text: obj
-                .get("selectedText")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string(),
+            content: obj.0.content.clone(),
+            text_content: obj.0.text_content.clone(),
+            selected_text: obj.0.selected_text.clone(),
+            title: obj.0.title.clone(),
+            site_name: obj.0.site_name.clone(),
+            language: obj.0.language.clone(),
+            excerpt: obj.0.excerpt.clone(),
+            length: obj.0.length,
         })
     }
 }
+
+// impl From<&serde_json::Map<String, serde_json::Value>> for ArticleState {
+//     fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
+//         ArticleState(ProtoArticleState {
+//             url: obj.get("url").unwrap().as_str().unwrap().to_string(),
+//             title: obj.get("title").unwrap().as_str().unwrap().to_string(),
+//             content: obj.get("content").unwrap().as_str().unwrap().to_string(),
+//             selected_text: obj
+//                 .get("selectedText")
+//                 .unwrap()
+//                 .as_str()
+//                 .unwrap()
+//                 .to_string(),
+//         })
+//     }
+// }
 
 // New wrapper type for ProtoPDFState
 pub struct PdfState(pub ProtoPdfState);

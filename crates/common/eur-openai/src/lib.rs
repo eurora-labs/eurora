@@ -278,13 +278,15 @@ impl OpenAI {
             tool_call_id: None,
         }];
 
+        let selected_text = state.selected_text.unwrap_or_default();
+
         // Add highlighted text if it exists
-        if !state.selected_text.is_empty() {
+        if !selected_text.is_empty() {
             chat_messages.push(chat_completion::ChatCompletionMessage {
                 role: chat_completion::MessageRole::user,
                 content: chat_completion::Content::Text(format!(
                     "I highlighted the following part of the article: \n{}",
-                    state.selected_text
+                    selected_text
                 )),
                 name: None,
                 tool_calls: None,

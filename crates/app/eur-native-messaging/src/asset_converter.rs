@@ -32,7 +32,8 @@ impl JSONToProtoAssetConverter {
                 Ok(StateResponse { state: Some(state) })
             }
             "ARTICLE_ASSET" => {
-                let proto_state = Native::from(&json);
+                let native_state = NativeArticleAsset::from(&json);
+                let proto_state = ArticleState::from(&native_state);
                 let state = eur_proto::ipc::state_response::State::Article(proto_state.0);
                 Ok(StateResponse { state: Some(state) })
             }
