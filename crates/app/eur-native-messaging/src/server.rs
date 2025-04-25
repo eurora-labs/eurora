@@ -155,7 +155,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         eprintln!("Received get_state request");
 
         // Send GENERATE_REPORT request via native messaging
-        match self.send_native_message("GENERATE_REPORT", json!({})).await {
+        match self.send_native_message("GENERATE_ASSETS", json!({})).await {
             Ok(response) => {
                 // Convert JSON response to StateResponse proto
                 let state_response = JSONToProtoAssetConverter::convert(&response);

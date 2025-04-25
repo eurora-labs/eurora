@@ -28,3 +28,17 @@ message ProtoNativeYoutubeSnapshot {
     int32 video_frame_height = 5;
     shared.ProtoImageFormat video_frame_format = 6;
 }
+
+message ProtoNativeArticleAsset {
+    string type = 1;
+    string content = 2;
+    string text_content = 3;
+    optional string selected_text = 4;
+
+    string title = 5;
+    string site_name = 6;
+    string language = 7;
+    string excerpt = 8;
+
+    int32 length = 9;
+}

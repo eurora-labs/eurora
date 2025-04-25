@@ -1,4 +1,6 @@
-pub use crate::asset_context::{ArticleState, NativeYoutubeState, PdfState, YoutubeState};
+pub use crate::asset_context::{
+    ArticleState, NativeArticleAsset, NativeYoutubeState, PdfState, YoutubeState,
+};
 use anyhow::Error;
 use eur_proto::ipc::{SnapshotResponse, StateResponse};
 
@@ -29,8 +31,8 @@ impl JSONToProtoAssetConverter {
                 let state = eur_proto::ipc::state_response::State::Youtube(proto_state.0);
                 Ok(StateResponse { state: Some(state) })
             }
-            "ARTICLE_STATE" => {
-                let proto_state = ArticleState::from(&json);
+            "ARTICLE_ASSET" => {
+                let proto_state = Native::from(&json);
                 let state = eur_proto::ipc::state_response::State::Article(proto_state.0);
                 Ok(StateResponse { state: Some(state) })
             }
