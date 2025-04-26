@@ -8,6 +8,8 @@
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
 
+	import { Search } from '@eurora/search';
+
 	import { X } from '@lucide/svelte';
 
 	// Define a type for Conversation based on what we know from main.rs
@@ -353,6 +355,9 @@
 			<ApiKeyForm saved={() => onApiKeySaved()} />
 		</div>
 	{:else}
+		<div class="search-container mb-2 px-2">
+			<Search autofocus={true} placeholder="Search for apps, files, and more..." />
+		</div>
 		<!-- Fixed header with textarea -->
 		<div class="flex-none p-2">
 			<Textarea

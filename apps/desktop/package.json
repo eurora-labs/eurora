@@ -20,7 +20,8 @@
 		"@eurora/ai-chat": "workspace:*",
 		"@eurora/katex": "workspace:*",
 		"@eurora/proto": "workspace:*",
-		"@eurora/ui": "workspace:*"
+		"@eurora/ui": "workspace:*",
+		"@eurora/search": "workspace:*"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.8",

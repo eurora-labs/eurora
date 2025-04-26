@@ -20,6 +20,7 @@ tauri-build = { version = "2.0.3", features = [] }
 [dependencies]
 anyhow = "1.0.97"
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
+eur-search = { path = "../eur-search" }
 backtrace = { version = "0.3.74", optional = true }
 console-subscriber = "0.4.1"
 keyring = "2.3.2"
@@ -39,6 +40,11 @@ tauri-plugin-store = "2.2.0"
 tauri-plugin-updater = "2.7.0"
 tauri-plugin-window-state = "2.2.2"
 x11rb = "0.13.1"
+regex = "1.10.4"
+shell-words = "1.1.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = { version = "0.18.0", features = ["v3_24"] }
 
 parking_lot.workspace = true
 log = "^0.4"

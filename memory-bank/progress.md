@@ -22,6 +22,11 @@ This file tracks the project's progress using a task list format.
   * Implemented proper TypeScript types and event handling
   * Added support for min/max rows configuration
   * Used resize observer for proper resizing on width changes
+* Improved Linux app search implementation:
+  * Rewrote to use GTK's AppInfo API instead of manually parsing .desktop files
+  * Eliminated manual directory traversal for better performance
+  * Aligned with modern Linux app discovery patterns
+  * Improved efficiency and completeness of app discovery
 
 ## Current Tasks
 

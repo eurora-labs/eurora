@@ -4,13 +4,20 @@
 )]
 mod keyring_service;
 
+pub mod search;
+pub use search::{launch_application, search_macos_apps, search_windows_apps};
+
+pub mod window;
+pub use window::create_launcher;
+pub use window::state::WindowState;
+
 use eur_client_grpc::client_builder;
 use eur_client_questions::QuestionsClient;
 use eur_conversation::{Asset, ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
-use eur_tauri::{WindowState, create_launcher};
+use eur_search;
 use eur_timeline::Timeline;
 use futures::StreamExt;
 use keyring_service::{ApiKeyStatus, KeyringService};
@@ -404,6 +411,11 @@ fn main() {
                     save_api_key,
                     initialize_openai_client,
                     send_key_to_launcher, // Keep for potential testing/manual trigger
+                    // Search commands
+                    search_windows_apps,
+                    search_macos_apps,
+                    search_linux_apps,
+                    launch_application,
                 ])
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
@@ -1199,6 +1211,16 @@ async fn send_key_to_launcher(app_handle: tauri::AppHandle, key: String) -> Resu
             .map_err(|e| format!("Failed to send key event: {}", e))?;
     }
     Ok(())
+}
+
+#[tauri::command]
+async fn search_linux_apps(
+    app_handle: tauri::AppHandle,
+    query: String,
+) -> Result<Vec<eur_search::document::Document>, String> {
+    eprintln!("Searching for Linux apps with query: {}", query);
+    eur_search::linux::search_apps(&query).await
+    // This is a placeholder function to prevent errors
 }
 
 // Add this new command to check server status

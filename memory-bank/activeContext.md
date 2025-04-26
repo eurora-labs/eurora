@@ -27,6 +27,11 @@ This file tracks the project's current status, including recent changes, current
   * Added support for configuration parameters like minRows and maxRows
   * Implemented proper TypeScript types and accessibility features
   * Used resize observer for responsive behavior
+* Improved Linux app search implementation:
+  * Replaced manual .desktop file parsing with GTK's AppInfo API
+  * Eliminated inefficient directory traversal for better performance
+  * Aligned with modern Linux app discovery patterns (similar to dlauncher)
+  * Better handling of app icons, terminal requirements, and other metadata
 
 ## Open Questions/Issues
 
