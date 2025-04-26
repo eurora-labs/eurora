@@ -1,3 +1,5 @@
+import { AutoResizeTextarea } from '#custom-components/ui/auto-resize-textarea/index';
+
 export { Button, buttonVariants } from './components/ui/button/index.js';
 export * as Card from './components/ui/card/index.js';
 export { Label } from './components/ui/label/index.js';
@@ -17,3 +19,4 @@ export * as Sheet from './components/ui/sheet/index.js';
 export { Skeleton } from './components/ui/skeleton/index.js';
 export * as Dialog from './components/ui/dialog/index.js';
 export * as Command from './components/ui/command/index.js';
+export * as AutoResizeTextarea from './custom-components/ui/auto-resize-textarea/index.js';

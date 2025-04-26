@@ -142,6 +142,12 @@
 							><a href="/components/input-command">Input Command</a></Sidebar.MenuButton
 						>
 					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton
+							><a href="/components/auto-resize-textarea">Auto Resize Textarea</a
+							></Sidebar.MenuButton
+						>
+					</Sidebar.MenuItem>
 				</Sidebar.Menu>
 			</Sidebar.GroupContent>
 		</Sidebar.Group>

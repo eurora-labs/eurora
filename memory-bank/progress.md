@@ -17,6 +17,11 @@ This file tracks the project's progress using a task list format.
   * Fixed duplicate function call in API key form
   * Added proper class for message scrolling
 * Created mermaid class diagram documentation for the browser extension architecture
+* Implemented an auto-resize textarea component using Svelte 5:
+  * Created component that dynamically adjusts height based on content
+  * Implemented proper TypeScript types and event handling
+  * Added support for min/max rows configuration
+  * Used resize observer for proper resizing on width changes
 
 ## Current Tasks
 
