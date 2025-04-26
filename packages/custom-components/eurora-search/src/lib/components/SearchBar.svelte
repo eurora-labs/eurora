@@ -52,10 +52,6 @@
 </script>
 
 <div class="relative w-full">
-	<div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-		<Search size={18} />
-	</div>
-
 	<input
 		bind:this={input}
 		bind:value

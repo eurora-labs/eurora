@@ -34,12 +34,10 @@ export async function searchMacOsApps(query: string): Promise<AppInfo[]> {
  */
 export async function searchLinuxApps(query: string): Promise<AppInfo[]> {
 	try {
-		console.log('==== Searching Linux apps with query:', query);
 		const documents = await invoke<Document[]>('search_linux_apps', { query });
-		console.log('==== Received documents:', documents.length);
 
 		// Convert Document[] to AppInfo[]
-		const apps: AppInfo[] = documents.map((doc) => ({
+		const apps: AppInfo[] = documents.map((doc: Document) => ({
 			name: doc.title,
 			icon: doc.icon,
 			path: ''

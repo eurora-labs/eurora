@@ -21,7 +21,7 @@ export class LinuxAppProvider implements SearchProvider {
 		console.log('Initializing LinuxAppProvider...');
 		try {
 			// Test the connection by searching for a common term
-			const testResults = await searchLinuxApps('test');
+			const testResults = await searchLinuxApps('');
 			console.log(
 				`LinuxAppProvider initialization successful, found ${testResults.length} test results`
 			);
