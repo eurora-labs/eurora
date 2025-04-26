@@ -1,0 +1,3 @@
+{
+	"extends": ["@eurora/typescript-config/svelte", "./.svelte-kit/tsconfig.json"]
+}
