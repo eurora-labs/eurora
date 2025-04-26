@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import type { AppInfo } from '../types/app-info';
 import type { Document } from '../types/document';
 /**
