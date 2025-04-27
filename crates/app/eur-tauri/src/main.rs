@@ -12,6 +12,7 @@ use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
 use eur_tauri::{WindowState, create_launcher};
 use eur_timeline::Timeline;
+use eur_vision::{capture_region, image_to_base64};
 use futures::StreamExt;
 use keyring_service::{ApiKeyStatus, KeyringService};
 use serde::Serialize;
@@ -446,6 +447,13 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
             } else {
                 // Update the shared state to indicate launcher is visible
                 LAUNCHER_VISIBLE.store(true, Ordering::SeqCst);
+
+                // Variables to store launcher position and size
+                let mut launcher_x = 0;
+                let mut launcher_y = 0;
+                let mut launcher_width = 800; // Default width
+                let mut launcher_height = 500; // Default height
+
                 // Get cursor position and center launcher on that screen
                 if let Ok(cursor_position) = launcher.cursor_position() {
                     if let Ok(monitors) = launcher.available_monitors() {
@@ -461,15 +469,22 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                             {
                                 // Center the launcher on this monitor
                                 let window_size = launcher.inner_size().unwrap();
-                                let x =
+                                launcher_width = window_size.width as u32;
+                                launcher_height = window_size.height as u32;
+
+                                eprintln!("Window size: {:?}", window_size);
+
+                                launcher_x =
                                     position.x + (size.width as i32 - window_size.width as i32) / 2;
-                                let y = position.y
+                                launcher_y = position.y
                                     + (size.height as i32 - window_size.height as i32) / 4;
-                                // let y = (size.height as i32 - window_size.height as i32);
 
                                 launcher
                                     .set_position(tauri::Position::Physical(
-                                        tauri::PhysicalPosition { x, y },
+                                        tauri::PhysicalPosition {
+                                            x: launcher_x,
+                                            y: launcher_y,
+                                        },
                                     ))
                                     .expect("Failed to set launcher position");
                                 break;
@@ -477,6 +492,24 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                         }
                     }
                 }
+                let start_record = std::time::Instant::now();
+                // Capture the screen region behind the launcher
+                match capture_region(0, 0, launcher_width, launcher_height) {
+                    Ok(image) => {
+                        // Convert the image to base64
+                        if let Ok(base64_image) = image_to_base64(image) {
+                            // Send the base64 image to the frontend
+                            launcher
+                                .emit("background_image", base64_image)
+                                .expect("Failed to emit background_image event");
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to capture screen region: {}", e);
+                    }
+                }
+                let duration = start_record.elapsed();
+                println!("Capture of background area completed in: {:?}", duration);
 
                 // Only show the launcher if it was previously hidden
                 launcher.show().expect("Failed to show launcher window");
