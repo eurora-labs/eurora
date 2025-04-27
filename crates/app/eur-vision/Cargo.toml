@@ -1,0 +1,13 @@
+[package]
+name = "eur-vision"
+version = "0.1.0"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+description = "Vision util for capturing screen, window and ocr'ing"
+
+[dependencies]
+tokio = { workspace = true }
+image = { workspace = true }
+rusty-tesseract = "1.1.10"
+anyhow = "1.0.97"
+xcap = { git = "https://github.com/AndreRoelofs/xcap.git", branch = "master" }
