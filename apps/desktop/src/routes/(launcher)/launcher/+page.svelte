@@ -46,6 +46,7 @@
 	let isCheckingApiKey = $state(true);
 	let currentConversationId = $state<string | null>(null);
 	const displayAssets = $state<DisplayAsset[]>([]);
+	let backgroundImage = $state<string | null>(null);
 
 	// Set up event listener for chat responses
 	listen<string>('chat_response', (event) => {
@@ -103,6 +104,13 @@
 		// Reload activities when launcher is opened
 		loadActivities();
 		console.log('Launcher opened: refreshed activities');
+	});
+
+	// Listen for background image event
+	listen<string>('background_image', (event) => {
+		backgroundImage = event.payload;
+		console.log('Received background image');
+		console.log(backgroundImage);
 	});
 
 	// Set up global keydown event listener for Escape key
@@ -182,12 +190,13 @@
 	$effect(() => {
 		// We need to use a different approach for auto-scrolling
 		// since we can't directly bind to the ScrollArea component
-		const scrollArea = document.querySelector('.message-scroll-area');
-		if (scrollArea && messages.length > 0) {
-			setTimeout(() => {
-				scrollArea.scrollTop = scrollArea.scrollHeight;
-			}, 100);
-		}
+		// const scrollArea = document.querySelector('.message-scroll-area');
+		// if (scrollArea && messages.length > 0) {
+		// 	setTimeout(() => {
+		// 		scrollArea.scrollTop = scrollArea.scrollHeight;
+		// 	}, 100);
+		// }
+		// On background image change body background:
 	});
 
 	async function handleKeydown(event: KeyboardEvent) {
@@ -312,78 +321,91 @@
 	}
 </script>
 
-<div class="flex h-screen flex-col">
-	<div class="flex flex-wrap gap-2 p-2">
-		{#each displayAssets as asset, index}
-			<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
-				{#if asset.icon && asset.icon.length > 0}
-					<div class="icon-container mr-1 h-4 w-4">
-						<img src={asset.icon} alt="Activity Icon" />
+<div
+	class="relative flex h-screen flex-col"
+	style={backgroundImage
+		? `background-image: url('${backgroundImage}'); background-size: cover; background-position: center;`
+		: ''}
+>
+	<!-- Semi-transparent overlay to ensure content is visible -->
+	<div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+
+	<!-- Content container -->
+	<div class="relative z-10 flex h-full flex-col">
+		<div class="flex flex-wrap gap-2 p-2">
+			{#each displayAssets as asset, index}
+				<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
+					{#if asset.icon && asset.icon.length > 0}
+						<div class="icon-container mr-1 h-4 w-4">
+							<img src={asset.icon} alt="Activity Icon" />
+						</div>
+					{:else}
+						📌
+					{/if}
+					{asset.name}
+					<Button
+						size="icon"
+						variant="ghost"
+						onclick={() => {
+							displayAssets.splice(index, 1);
+						}}
+					>
+						<X />
+					</Button>
+				</Badge>
+			{/each}
+			{#if displayAssets.length === 0}
+				<Badge variant="outline">No recent activities</Badge>
+			{/if}
+		</div>
+
+		<Button
+			onclick={() => {
+				loadActivities();
+			}}>Reload Activities</Button
+		>
+
+		{#if isCheckingApiKey}
+			<div class="flex h-full items-center justify-center">
+				<p class="text-gray-500">Checking API key...</p>
+			</div>
+		{:else if !hasApiKey}
+			<div class="flex h-full items-center justify-center">
+				<ApiKeyForm saved={() => onApiKeySaved()} />
+			</div>
+		{:else}
+			<!-- Fixed header with textarea -->
+			<div class="flex-none p-2">
+				<Textarea
+					bind:ref={inputRef}
+					class="h-10 w-full text-[34px] leading-[34px]"
+					style="font-size: 34px;"
+					onkeydown={handleKeydown}
+				/>
+			</div>
+			<!-- Recent conversations list -->
+			{#if conversations.length > 0 && messages.length === 0}
+				<ScrollArea class="h-72 w-full overflow-y-hidden rounded-md">
+					<div class="p-4">
+						{#each conversations.slice(0, 5) as conversation}
+							<Button
+								variant="link"
+								class="mx-auto w-full justify-start overflow-hidden"
+								onclick={async () => await switchConversation(conversation.id)}
+							>
+								{conversation.title}
+							</Button>
+							<Separator class="my-2" />
+						{/each}
 					</div>
-				{:else}
-					📌
-				{/if}
-				{asset.name}
-				<Button
-					size="icon"
-					variant="ghost"
-					onclick={() => {
-						displayAssets.splice(index, 1);
-					}}
-				>
-					<X />
-				</Button>
-			</Badge>
-		{/each}
-		{#if displayAssets.length === 0}
-			<Badge variant="outline">No recent activities</Badge>
+				</ScrollArea>
+			{/if}
+
+			<div class="message-scroll-area flex-grow overflow-auto">
+				<MessageArea {messages} />
+			</div>
 		{/if}
 	</div>
-	<Button
-		onclick={() => {
-			loadActivities();
-		}}>Reload Activities</Button
-	>
-	{#if isCheckingApiKey}
-		<div class="flex h-full items-center justify-center">
-			<p class="text-gray-500">Checking API key...</p>
-		</div>
-	{:else if !hasApiKey}
-		<div class="flex h-full items-center justify-center">
-			<ApiKeyForm saved={() => onApiKeySaved()} />
-		</div>
-	{:else}
-		<!-- Fixed header with textarea -->
-		<div class="flex-none p-2">
-			<Textarea
-				bind:ref={inputRef}
-				class="h-10 w-full text-[34px] leading-[34px]"
-				style="font-size: 34px;"
-				onkeydown={handleKeydown}
-			/>
-		</div>
-		<!-- Recent conversations list -->
-		{#if conversations.length > 0 && messages.length === 0}
-			<ScrollArea class="h-72 w-full overflow-y-hidden rounded-md">
-				<div class="p-4">
-					{#each conversations.slice(0, 5) as conversation}
-						<Button
-							variant="link"
-							class="mx-auto w-full justify-start overflow-hidden"
-							onclick={async () => await switchConversation(conversation.id)}
-						>
-							{conversation.title}
-						</Button>
-						<Separator class="my-2" />
-					{/each}
-				</div>
-			</ScrollArea>
-		{/if}
-
-		<div class="message-scroll-area flex-grow overflow-auto">
-			<MessageArea {messages} />
-		</div>
-	{/if}
 </div>
 
 <style>
@@ -406,5 +428,22 @@
 	.activity-icon {
 		width: 16px;
 		height: 16px;
+	}
+
+	/* Styles for the transparent effect */
+	:global(.message-scroll-area) {
+		background-color: rgba(0, 0, 0, 0.4);
+		border-radius: 8px;
+		margin: 0 8px 8px 8px;
+	}
+
+	:global(.textarea) {
+		background-color: rgba(255, 255, 255, 0.8) !important;
+		backdrop-filter: blur(4px);
+	}
+
+	:global(.badge) {
+		background-color: rgba(255, 255, 255, 0.7) !important;
+		backdrop-filter: blur(4px);
 	}
 </style>
