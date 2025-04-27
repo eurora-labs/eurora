@@ -12,7 +12,7 @@ use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
 use eur_tauri::{WindowState, create_launcher};
 use eur_timeline::Timeline;
-use eur_vision::{capture_region, image_to_base64};
+use eur_vision::{capture_region, capture_region_rgb, image_to_base64};
 use futures::StreamExt;
 use keyring_service::{ApiKeyStatus, KeyringService};
 use serde::Serialize;
@@ -494,7 +494,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 }
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
-                match capture_region(0, 0, launcher_width, launcher_height) {
+                match capture_region_rgb(0, 0, launcher_width, launcher_height) {
                     Ok(image) => {
                         // Convert the image to base64
                         if let Ok(base64_image) = image_to_base64(image) {
