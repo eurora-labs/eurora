@@ -20,7 +20,8 @@
 		"rusqlite",
 		"Tauri",
 		"thiserror",
-		"Waitlist"
+		"Waitlist",
+		"xcap"
 	],
 	"protoc": {
 		"options": ["--proto_path=proto"]
