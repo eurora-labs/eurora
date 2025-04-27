@@ -79,6 +79,26 @@ pub fn capture_monitor_region(
     Ok(image_region)
 }
 
+pub fn capture_monitor_region_rgb(
+    monitor: Monitor,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>> {
+    let monitor_width = monitor.width().unwrap();
+    let monitor_height = monitor.height().unwrap();
+
+    let region_width = width.min(monitor_width - x) as u32;
+    let region_height = height.min(monitor_height - y) as u32;
+
+    let image_region = monitor
+        .capture_region_rgb(x as i32, y as i32, region_width, region_height)
+        .map_err(|e| anyhow!("Failed to capture region: {}", e))?;
+
+    Ok(image_region)
+}
+
 /// Captures a region at the specified position with the given dimensions
 ///
 /// # Arguments
@@ -110,6 +130,27 @@ pub fn capture_region(
     capture_monitor_region(monitor, x, y, width, height)
 }
 
+pub fn capture_region_rgb(
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>> {
+    // Get the primary monitor
+    let monitor = Monitor::all()?
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("No monitors found"))?;
+
+    // Ensure x and y are positive
+    let x = if x < 0 { 0 } else { x as u32 };
+    let y = if y < 0 { 0 } else { y as u32 };
+
+    let image = capture_monitor_region_rgb(monitor, x, y, width, height)?;
+
+    Ok(image)
+}
+
 /// Converts an ImageBuffer to a base64 encoded PNG string
 ///
 /// # Arguments
@@ -119,25 +160,37 @@ pub fn capture_region(
 /// # Returns
 ///
 /// A base64 encoded PNG string  
-pub fn image_to_base64(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<String> {
+pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
     let mut buffer = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut buffer);
 
-    let rgb = rgba_to_rgb(image);
+    // let start = std::time::Instant::now();
+    // let rgb = image::DynamicImage::ImageRgba8(image).to_rgb8();
+    // // let rgb = rgba_to_rgb(image);
+    // let duration = start.elapsed();
+    // eprintln!("Conversion to RGB completed in: {:?}", duration);
 
-    rgb.write_to(&mut cursor, image::ImageFormat::Jpeg)
+    image
+        .write_to(&mut cursor, image::ImageFormat::Jpeg)
         .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
 
     let base64 = base64::encode(&buffer);
     Ok(format!("data:image/jpeg;base64,{}", base64))
 }
-fn rgba_to_rgb(rgba_img: ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    let (width, height) = rgba_img.dimensions();
-    let mut rgb_data = Vec::with_capacity((width * height * 3) as usize);
 
-    for pixel in rgba_img.pixels() {
-        rgb_data.extend_from_slice(&pixel.0[..3]); // Take only R, G, B
-    }
+// pub fn image_to_base64(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<String> {
+//     let mut buffer = Vec::new();
+//     let mut cursor = std::io::Cursor::new(&mut buffer);
 
-    ImageBuffer::from_raw(width, height, rgb_data).expect("Failed to create RGB image")
-}
+//     let start = std::time::Instant::now();
+//     let rgb = image::DynamicImage::ImageRgba8(image).to_rgb8();
+//     // let rgb = rgba_to_rgb(image);
+//     let duration = start.elapsed();
+//     eprintln!("Conversion to RGB completed in: {:?}", duration);
+
+//     rgb.write_to(&mut cursor, image::ImageFormat::Jpeg)
+//         .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
+
+//     let base64 = base64::encode(&buffer);
+//     Ok(format!("data:image/jpeg;base64,{}", base64))
+// }
