@@ -2,6 +2,26 @@
 
 This file records architectural and implementation decisions using a list format.
 2025-04-25 21:14:22 - Initial creation of Memory Bank.
+## Database Implementation Decisions
+
+[2025-04-28 17:17:30] - Implemented SQLite as the database engine for personal data
+
+**Decision:** Used SQLite for storing personal data including activities, video frames, and text extracted from OCR.
+
+**Rationale:**
+- SQLite is well-suited for embedded applications and desktop software
+- Lightweight with zero configuration and server-less operation
+- Robust transaction support with ACID compliance
+- Good performance for the expected data volume
+- Cross-platform compatibility aligns with Tauri's multi-platform approach
+
+**Implementation Details:**
+- Created explicit relationships in the database schema (activity → activity_asset, etc.)
+- Used UUID strings as primary keys for all tables to ensure uniqueness
+- Added indexes on foreign keys to improve query performance
+- Implemented a Rust interface with SQLX for type-safe database access
+- Added comprehensive API for common database operations
+- Used ISO8601 format for datetime fields to ensure compatibility
 2025-04-25 21:18:12 - Improvements to launcher components.
 2025-04-28 13:53:00 - Fixed async/await issue in OCR service.
 
@@ -37,3 +57,7 @@ This file records architectural and implementation decisions using a list format
   * Adding futures crate as a dependency
   * Properly collecting futures into a vector
   * Using futures::future::join_all to await all futures concurrently
+# Decision Log
+
+This file tracks key architectural and design decisions made during the project's development.
+2025-04-25 21:14:27 - Initial creation of Memory Bank.
