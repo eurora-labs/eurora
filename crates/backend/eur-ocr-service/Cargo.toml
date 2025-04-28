@@ -1,0 +1,21 @@
+[package]
+name = "eur-ocr-service"
+version = "0.0.1"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+publish = false
+
+[dependencies]
+eur-proto = { path = "../../proto/eur-proto" }
+anyhow = { workspace = true }
+tonic = { workspace = true }
+prost = { workspace = true }
+dotenv = "0.15"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+image = { workspace = true }
+eur-ocr = { path = "../../common/eur-ocr" }
+futures = "0.3"
+[build-dependencies]
+tonic-build = { workspace = true }

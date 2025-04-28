@@ -1889,6 +1889,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-ocr-service"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "dotenv",
+ "eur-ocr",
+ "eur-proto",
+ "futures",
+ "image 0.25.6",
+ "prost",
+ "tokio",
+ "tonic",
+ "tonic-build",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "eur-openai"
 version = "0.1.0"
 dependencies = [
