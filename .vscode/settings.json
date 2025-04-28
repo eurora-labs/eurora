@@ -20,6 +20,7 @@
 		"pybase",
 		"rusqlite",
 		"Tauri",
+		"Tesseract",
 		"Texel",
 		"thiserror",
 		"Waitlist",
