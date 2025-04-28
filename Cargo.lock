@@ -1881,6 +1881,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-ocr"
+version = "0.1.0"
+dependencies = [
+ "image 0.25.6",
+ "rusty-tesseract",
+]
+
+[[package]]
 name = "eur-openai"
 version = "0.1.0"
 dependencies = [
@@ -2030,6 +2038,7 @@ dependencies = [
  "anyhow",
  "base64 0.13.1",
  "bytemuck",
+ "eur-ocr",
  "futures-intrusive",
  "image 0.25.6",
  "pollster",
