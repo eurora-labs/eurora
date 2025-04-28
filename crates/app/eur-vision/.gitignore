@@ -1,0 +1,2 @@
+examples/screenshots/*
+!examples/screenshots/.gitkeep

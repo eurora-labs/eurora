@@ -2,16 +2,12 @@
 	import { Button, Input } from '@eurora/ui';
 	import { invoke } from '@tauri-apps/api/core';
 	import { onMount } from 'svelte';
-	// import { createEventDispatcher } from 'svelte';
 
 	// State variables
 	let apiKey = $state('');
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let hasApiKey = $state(false);
-
-	// Event emitter for when the API key is saved
-	// const dispatch = createEventDispatcher();
 
 	let { saved } = $props();
 
@@ -45,10 +41,7 @@
 
 			// Update state and notify parent
 			hasApiKey = true;
-			saved(true);
 			saved();
-			// dispatch('saved', true);
-			// dispatch('saved');
 		} catch (err) {
 			console.error('Failed to save API key:', err);
 			error = 'Failed to save API key';
@@ -85,12 +78,5 @@
 		<Button disabled={isLoading} onclick={() => saveApiKey()}>
 			{isLoading ? 'Saving...' : 'Save API Key'}
 		</Button>
-		<!-- <button
-			class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded disabled:opacity-50"
-			disabled={isLoading}
-			on:click={() => saveApiKey()}
-		>
-			{isLoading ? 'Saving...' : 'Save API Key'}
-		</button> -->
 	</div>
 </div>

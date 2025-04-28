@@ -1,6 +1,10 @@
 import { YouTubeTranscriptApi } from '@eurora/youtube-transcripts';
 import { ProtoImage, ProtoImageFormat } from '@eurora/proto/shared';
-import { ProtoNativeYoutubeState, ProtoNativeStateType } from '@eurora/proto/native_messaging';
+import {
+	ProtoNativeYoutubeState,
+	ProtoNativeStateType,
+	ProtoNativeYoutubeSnapshot
+} from '@eurora/proto/native_messaging';
 
 interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
@@ -137,10 +141,26 @@ interface EurImage extends Partial<ProtoImage> {
 			}
 
 			return true; // Important: indicates we'll send response asynchronously
+		} else if (type === 'GENERATE_SNAPSHOT') {
+			console.log('Generating snapshots for YouTube video');
+			const currentTime = getCurrentVideoTime();
+			const videoFrame = getCurrentVideoFrame();
+
+			const reportData: ProtoNativeYoutubeSnapshot = {
+				type: 'YOUTUBE_SNAPSHOT',
+				currentTime: Math.round(currentTime),
+				videoFrameBase64: videoFrame.dataBase64,
+				videoFrameWidth: videoFrame.width,
+				videoFrameHeight: videoFrame.height,
+				videoFrameFormat: videoFrame.format
+			};
+
+			response(reportData);
+			return true;
 		}
 
 		// For non-async handlers
-		if (type !== 'GENERATE_ASSETS') {
+		if (type !== 'GENERATE_ASSETS' && type !== 'GENERATE_SNAPSHOT') {
 			response();
 		}
 	});

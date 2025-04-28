@@ -9,9 +9,11 @@ use tonic::transport::Server;
 // Import the PORT constant from lib.rs
 use eur_native_messaging::PORT;
 
-mod context;
-mod converter;
+mod asset_context;
+mod asset_converter;
 mod server;
+mod snapshot_context;
+mod snapshot_converter;
 
 /// Get the path to the lock file
 fn get_lock_file_path() -> Result<PathBuf> {
