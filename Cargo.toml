@@ -2,7 +2,7 @@
 members = [
     "crates/app/eur-*",
     "crates/proto/eur-*",
-    # "crates/backend/eur-*",
+    "crates/backend/eur-*",
     "crates/common/eur-*",
 ]
 resolver = "2"
