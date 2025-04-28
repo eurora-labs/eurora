@@ -3,6 +3,8 @@ use anyhow::{Result, anyhow};
 use image::{ColorType, ImageBuffer, Rgb, Rgba, codecs::jpeg::JpegEncoder};
 use xcap::Monitor;
 
+use eur_ocr::{self, OcrStrategy};
+
 /// Captures the entire primary monitor and returns an ImageBuffer
 pub fn capture_monitor() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
     // Get the primary monitor (first one)
@@ -147,6 +149,11 @@ pub fn capture_region_rgb(
     let y = if y < 0 { 0 } else { y as u32 };
 
     let image = capture_monitor_region_rgb(monitor, x, y, width, height)?;
+
+    // // TODO: remove this code
+    // let tess = eur_ocr::TesseractOcr {};
+    // let result_text = tess.recognize(&image::DynamicImage::ImageRgb8(image.clone()));
+    // eprintln!("Recognized text: {}", result_text);
 
     Ok(image)
 }
