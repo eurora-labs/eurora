@@ -2,6 +2,7 @@ use base64::prelude::*;
 pub use eur_proto::ipc::{
     ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState,
 };
+pub use eur_proto::native_messaging::ProtoNativeArticleAsset;
 pub use eur_proto::native_messaging::ProtoNativeYoutubeState;
 pub use eur_proto::shared::ProtoImage;
 use serde::Deserialize;
@@ -76,49 +77,67 @@ impl From<&NativeYoutubeState> for YoutubeState {
     }
 }
 
-// impl From<&serde_json::Map<String, serde_json::Value>> for YoutubeState {
-//     fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
-//         // Convert the video frame from base64 to a Vec<u8>
-//         let video_frame = BASE64_STANDARD
-//             .decode(obj.get("videoFrameBase64").unwrap().as_str().unwrap())
-//             .unwrap();
-//         YoutubeState(ProtoYoutubeState {
-//             url: obj.get("url").unwrap().as_str().unwrap().to_string(),
-//             title: obj.get("title").unwrap().as_str().unwrap().to_string(),
-//             transcript: serde_json::from_str::<Vec<TranscriptLine>>(
-//                 obj.get("transcript").unwrap().as_str().unwrap(),
-//             )
-//             .map(|lines| lines.into_iter().map(Into::into).collect())
-//             .unwrap_or_else(|_| Vec::new()),
-//             current_time: obj.get("currentTime").unwrap().as_f64().unwrap() as f32,
-//             video_frame: Some(ProtoImage {
-//                 data: video_frame,
-//                 width: 0,
-//                 height: 0,
-//                 format: ProtoImageFormat::Jpeg as i32,
-//             }),
-//         })
-//     }
-// }
+pub struct NativeArticleAsset(pub ProtoNativeArticleAsset);
 
-// New wrapper type for ProtoArticleState
-pub struct ArticleState(pub ProtoArticleState);
-
-impl From<&serde_json::Map<String, serde_json::Value>> for ArticleState {
+impl From<&serde_json::Map<String, serde_json::Value>> for NativeArticleAsset {
     fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
-        ArticleState(ProtoArticleState {
-            url: obj.get("url").unwrap().as_str().unwrap().to_string(),
-            title: obj.get("title").unwrap().as_str().unwrap().to_string(),
+        NativeArticleAsset(ProtoNativeArticleAsset {
+            r#type: obj.get("type").unwrap().as_str().unwrap().to_string(),
             content: obj.get("content").unwrap().as_str().unwrap().to_string(),
-            selected_text: obj
-                .get("selectedText")
+            text_content: obj
+                .get("textContent")
                 .unwrap()
                 .as_str()
                 .unwrap()
                 .to_string(),
+            selected_text: obj
+                .get("selectedText")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+
+            title: obj.get("title").unwrap().as_str().unwrap().to_string(),
+            site_name: obj.get("siteName").unwrap().as_str().unwrap().to_string(),
+
+            language: obj.get("language").unwrap().as_str().unwrap().to_string(),
+            excerpt: obj.get("excerpt").unwrap().as_str().unwrap().to_string(),
+            length: obj.get("length").unwrap().as_i64().unwrap() as i32,
         })
     }
 }
+
+// New wrapper type for ProtoArticleState
+pub struct ArticleState(pub ProtoArticleState);
+
+impl From<&NativeArticleAsset> for ArticleState {
+    fn from(obj: &NativeArticleAsset) -> Self {
+        ArticleState(ProtoArticleState {
+            content: obj.0.content.clone(),
+            text_content: obj.0.text_content.clone(),
+            selected_text: obj.0.selected_text.clone(),
+            title: obj.0.title.clone(),
+            site_name: obj.0.site_name.clone(),
+            language: obj.0.language.clone(),
+            excerpt: obj.0.excerpt.clone(),
+            length: obj.0.length,
+        })
+    }
+}
+
+// impl From<&serde_json::Map<String, serde_json::Value>> for ArticleState {
+//     fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
+//         ArticleState(ProtoArticleState {
+//             url: obj.get("url").unwrap().as_str().unwrap().to_string(),
+//             title: obj.get("title").unwrap().as_str().unwrap().to_string(),
+//             content: obj.get("content").unwrap().as_str().unwrap().to_string(),
+//             selected_text: obj
+//                 .get("selectedText")
+//                 .unwrap()
+//                 .as_str()
+//                 .unwrap()
+//                 .to_string(),
+//         })
+//     }
+// }
 
 // New wrapper type for ProtoPDFState
 pub struct PdfState(pub ProtoPdfState);
