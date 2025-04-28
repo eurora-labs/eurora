@@ -15,6 +15,7 @@
 		"numpy",
 		"oneshot",
 		"opencv",
+		"prost",
 		"protoc",
 		"protol",
 		"pybase",
