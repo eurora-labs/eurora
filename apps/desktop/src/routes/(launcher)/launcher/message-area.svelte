@@ -11,7 +11,7 @@
 	const { messages }: Props = $props();
 </script>
 
-<ScrollArea class="h-full w-full rounded-md">
+<ScrollArea class="message-scroll-area h-full w-full rounded-md">
 	{#each messages as message}
 		{#if message.role === 'user'}
 			<UserChatMessage>

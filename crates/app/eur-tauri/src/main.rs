@@ -481,6 +481,11 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 // Only show the launcher if it was previously hidden
                 launcher.show().expect("Failed to show launcher window");
 
+                // Emit an event to notify that the launcher has been opened
+                launcher
+                    .emit("launcher_opened", ())
+                    .expect("Failed to emit launcher_opened event");
+
                 // Add a small delay before setting focus
                 let launcher_clone = launcher.clone();
                 tauri::async_runtime::spawn(async move {
