@@ -2,6 +2,7 @@ use crate::OcrStrategy;
 use rusty_tesseract::Args;
 use std::collections::HashMap;
 
+#[derive(Default)]
 pub struct TesseractOcr {}
 
 impl OcrStrategy for TesseractOcr {
