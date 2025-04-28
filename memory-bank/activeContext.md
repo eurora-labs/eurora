@@ -23,6 +23,7 @@ This file tracks the project's current status, including recent changes, current
   * Added proper class for message scrolling
 * Created comprehensive mermaid class diagram documentation for the browser extension architecture
 * Fixed async/await issue in OCR service where futures were being collected without awaiting them
+* Enhanced the SQLite database ER diagram by adding explicit relationship definitions based on foreign keys
 
 ## Open Questions/Issues
 
