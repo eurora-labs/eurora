@@ -1,0 +1,8 @@
+[package]
+name = "eur-personal-db"
+version = "0.1.0"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+description = "Eurora Personal DB"
+
+[dependencies]
