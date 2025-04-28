@@ -17,6 +17,7 @@ This file tracks the project's progress using a task list format.
   * Fixed duplicate function call in API key form
   * Added proper class for message scrolling
 * Created mermaid class diagram documentation for the browser extension architecture
+* Fixed async/await issue in OCR service where futures were being collected without awaiting them
 
 ## Current Tasks
 
