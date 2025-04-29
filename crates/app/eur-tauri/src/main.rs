@@ -260,26 +260,26 @@ fn main() {
                     });
 
                     // --- rdev Key Listener Setup ---
-                    let rdev_tx = key_event_tx.clone(); // Clone sender for the rdev thread
-                    std::thread::spawn(move || {
-                        let callback = move |event: Event| {
-                            // Only process key events when launcher is visible
-                            if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
-                                if let EventType::KeyPress(key) = event.event_type {
-                                    let key_data = match event.name {
-                                        Some(name) => name,
-                                        None => format!("{:?}", key),
-                                    };
-                                    // Send key data through the channel, ignore errors
-                                    let _ = rdev_tx.send(key_data);
-                                }
-                            }
-                        };
+                    // let rdev_tx = key_event_tx.clone(); // Clone sender for the rdev thread
+                    // std::thread::spawn(move || {
+                    //     let callback = move |event: Event| {
+                    //         // Only process key events when launcher is visible
+                    //         if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
+                    //             if let EventType::KeyPress(key) = event.event_type {
+                    //                 let key_data = match event.name {
+                    //                     Some(name) => name,
+                    //                     None => format!("{:?}", key),
+                    //                 };
+                    //                 // Send key data through the channel, ignore errors
+                    //                 let _ = rdev_tx.send(key_data);
+                    //             }
+                    //         }
+                    //     };
 
-                        if let Err(error) = listen(callback) {
-                            error!("rdev listen error: {:?}", error);
-                        }
-                    });
+                    //     if let Err(error) = listen(callback) {
+                    //         error!("rdev listen error: {:?}", error);
+                    //     }
+                    // });
 
                     // --- Key Event Receiver Task ---
                     let receiver_handle = app_handle.clone();
@@ -299,27 +299,42 @@ fn main() {
                     #[cfg(desktop)]
                     {
                         // println!("Setting up global shortcut");
-                        let super_space_shortcut =
-                            Shortcut::new(Some(Modifiers::SUPER), Code::Space);
 
-                        let launcher_label = launcher_window.label().to_string();
+                        // If macos, use Control + Space
+                        #[cfg(target_os = "macos")]
+                        {
+                            let control_space_shortcut =
+                                Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+                            let launcher_label = launcher_window.label().to_string();
 
-                        app_handle.plugin(shortcut_plugin(
-                            super_space_shortcut.clone(),
-                            launcher_label,
-                        ))?;
+                            app_handle.plugin(shortcut_plugin(
+                                control_space_shortcut.clone(),
+                                launcher_label,
+                            ))?;
 
-                        app_handle
-                            .global_shortcut()
-                            .register(super_space_shortcut)?;
+                            app_handle
+                                .global_shortcut()
+                                .register(control_space_shortcut)?;
+                        }
+
+                        #[cfg(not(target_os = "macos"))]
+                        {
+                            let super_space_shortcut =
+                                Shortcut::new(Some(Modifiers::SUPER), Code::Space);
+                            let launcher_label = launcher_window.label().to_string();
+
+                            app_handle.plugin(shortcut_plugin(
+                                super_space_shortcut.clone(),
+                                launcher_label,
+                            ))?;
+
+                            app_handle
+                                .global_shortcut()
+                                .register(super_space_shortcut)?;
+                        }
                     }
 
-                    // Listen for window focus events
-                    let launcher_label = launcher_window.label().to_string();
-                    let app_handle_focus = app_handle.clone();
-
                     // We'll use a different approach for Windows focus handling via on_window_event
-
                     // Keep the window-specific handler for Linux focus loss
                     #[cfg(target_os = "linux")]
                     {
@@ -520,7 +535,6 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 // Add a small delay before setting focus
                 let launcher_clone = launcher.clone();
                 tauri::async_runtime::spawn(async move {
-                    sleep(Duration::from_millis(1000)).await;
                     launcher_clone
                         .set_focus()
                         .expect("Failed to focus launcher window");

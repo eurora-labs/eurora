@@ -9612,7 +9612,7 @@ dependencies = [
 [[package]]
 name = "xcap"
 version = "0.5.0"
-source = "git+https://github.com/AndreRoelofs/xcap.git?branch=ar-branch-1#a629faa9d5647cc35c1f34d3271326a528ed4b1b"
+source = "git+https://github.com/AndreRoelofs/xcap.git?branch=ar-branch-3#90ae3ade39f6b2de3d5fc6e786efe81926923298"
 dependencies = [
  "dispatch2",
  "image 0.25.6",
