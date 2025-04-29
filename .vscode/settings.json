@@ -6,6 +6,7 @@
 	],
 	"cSpell.words": [
 		"AUTOINCREMENT",
+		"bytemuck",
 		"chrono",
 		"dotenv",
 		"eurora",
@@ -14,14 +15,21 @@
 		"numpy",
 		"oneshot",
 		"opencv",
+		"prost",
 		"protoc",
 		"protol",
 		"pybase",
 		"rusqlite",
+		"sqlx",
 		"Tauri",
+		"Tesseract",
+		"Texel",
 		"thiserror",
 		"Waitlist",
-		"xcap"
+		"wgpu",
+		"xcap",
+		"xorg",
+		"Zeroable"
 	],
 	"protoc": {
 		"options": ["--proto_path=proto"]

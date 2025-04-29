@@ -123,7 +123,7 @@ connectToNativeHost().then((connected) => {
 	);
 	nativePort.onMessage.addListener(async (message, sender) => {
 		switch (message.type) {
-			case 'GENERATE_REPORT':
+			case 'GENERATE_ASSETS':
 				handleGenerateReport()
 					.then((response) => {
 						console.log('Sending GENERATE_REPORT_RESPONSE message', response);

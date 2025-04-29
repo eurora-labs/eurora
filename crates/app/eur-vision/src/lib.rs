@@ -1,7 +1,9 @@
 use anyhow::{Result, anyhow};
-use image::{ImageBuffer, Rgba};
-use std::time::Instant;
+// use image::{ImageBuffer, Rgb, Rgba};
+use image::{ColorType, ImageBuffer, Rgb, Rgba, codecs::jpeg::JpegEncoder};
 use xcap::Monitor;
+
+use eur_ocr::{self, OcrStrategy};
 
 /// Captures the entire primary monitor and returns an ImageBuffer
 pub fn capture_monitor() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
@@ -26,15 +28,6 @@ pub fn capture_monitor() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
     Ok(img_buffer)
 }
 
-/// Captures the entire primary monitor and measures the time it took
-pub fn capture_monitor_timed() -> Result<(ImageBuffer<Rgba<u8>, Vec<u8>>, std::time::Duration)> {
-    let start = Instant::now();
-    let image = capture_monitor()?;
-    let duration = start.elapsed();
-
-    Ok((image, duration))
-}
-
 /// Captures all available monitors and returns a vector of ImageBuffer for each monitor
 pub fn capture_all_monitors() -> Result<Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>> {
     let monitors = Monitor::all()?;
@@ -55,49 +48,156 @@ pub fn capture_all_monitors() -> Result<Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>> {
     Ok(images)
 }
 
-/// Captures a specific region of the primary monitor
-/// Captures a 600x500 region starting from 1/4th of the monitor width
-pub fn capture_region() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
-    // Get the primary monitor (first one)
+/// Captures a specific region of the screen
+///
+/// # Arguments
+///
+/// * `monitor` - The monitor to capture from
+/// * `x` - The x coordinate of the top-left corner of the region
+/// * `y` - The y coordinate of the top-left corner of the region
+/// * `width` - The width of the region
+/// * `height` - The height of the region
+///
+/// # Returns
+///
+/// An ImageBuffer containing the captured region
+pub fn capture_monitor_region(
+    monitor: Monitor,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+    let monitor_width = monitor.width().unwrap();
+    let monitor_height = monitor.height().unwrap();
+
+    let region_width = width.min(monitor_width - x) as u32;
+    let region_height = height.min(monitor_height - y) as u32;
+
+    let image_region = monitor
+        .capture_region(x as i32, y as i32, region_width, region_height)
+        .map_err(|e| anyhow!("Failed to capture region: {}", e))?;
+
+    Ok(image_region)
+}
+
+pub fn capture_monitor_region_rgb(
+    monitor: Monitor,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>> {
+    let monitor_width = monitor.width().unwrap();
+    let monitor_height = monitor.height().unwrap();
+
+    let region_width = width.min(monitor_width - x) as u32;
+    let region_height = height.min(monitor_height - y) as u32;
+
+    let image_region = monitor
+        .capture_region_rgb(x as i32, y as i32, region_width, region_height)
+        .map_err(|e| anyhow!("Failed to capture region: {}", e))?;
+
+    Ok(image_region)
+}
+
+/// Captures a region at the specified position with the given dimensions
+///
+/// # Arguments
+///
+/// * `x` - The x coordinate of the top-left corner of the region
+/// * `y` - The y coordinate of the top-left corner of the region
+/// * `width` - The width of the region
+/// * `height` - The height of the region
+///
+/// # Returns
+///
+/// An ImageBuffer containing the captured region
+pub fn capture_region(
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+    // Get the primary monitor
     let monitor = Monitor::all()?
         .into_iter()
         .next()
         .ok_or_else(|| anyhow!("No monitors found"))?;
 
-    // Capture the entire monitor first
-    // let full_image = monitor.capture_image()?;
+    // Ensure x and y are positive
+    let x = if x < 0 { 0 } else { x as u32 };
+    let y = if y < 0 { 0 } else { y as u32 };
 
-    let width = monitor.width().unwrap() as i32;
-    let height = monitor.height().unwrap() as i32;
-    let start_x = width / 4; // Start from 1/4th of monitor width
-    let image_region = monitor
-        .capture_region(
-            start_x,
-            0,
-            1100.min((width - start_x) as u32),
-            150.min(height as u32),
-        )
-        .unwrap();
-
-    Ok(image_region)
-
-    // // Convert to an image::ImageBuffer
-    // let width = full_image.width() as u32;
-    // let height = full_image.height() as u32;
-    // let raw_data = full_image.into_raw();
-
-    // // Create an ImageBuffer from the raw data
-    // let full_img_buffer = ImageBuffer::from_raw(width, height, raw_data)
-    //     .ok_or_else(|| anyhow!("Failed to create image buffer"))?;
-
-    // // Calculate the region to capture
-    // let start_x = width / 4; // Start from 1/4th of monitor width
-    // let crop_width = 600.min(width - start_x); // Ensure we don't go beyond the image boundary
-    // let crop_height = 500.min(height); // Ensure we don't go beyond the image boundary
-
-    // // Crop the image to the desired region
-    // let cropped_img =
-    //     image::imageops::crop_imm(&full_img_buffer, start_x, 0, crop_width, crop_height).to_image();
-
-    // Ok(cropped_img)
+    capture_monitor_region(monitor, x, y, width, height)
 }
+
+pub fn capture_region_rgb(
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>> {
+    // Get the primary monitor
+    let monitor = Monitor::all()?
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("No monitors found"))?;
+
+    // Ensure x and y are positive
+    let x = if x < 0 { 0 } else { x as u32 };
+    let y = if y < 0 { 0 } else { y as u32 };
+
+    let image = capture_monitor_region_rgb(monitor, x, y, width, height)?;
+
+    // // TODO: remove this code
+    // let tess = eur_ocr::TesseractOcr {};
+    // let result_text = tess.recognize(&image::DynamicImage::ImageRgb8(image.clone()));
+    // eprintln!("Recognized text: {}", result_text);
+
+    Ok(image)
+}
+
+/// Converts an ImageBuffer to a base64 encoded PNG string
+///
+/// # Arguments
+///
+/// * `image` - The ImageBuffer to convert
+///
+/// # Returns
+///
+/// A base64 encoded PNG string  
+pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
+    let mut buffer = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut buffer);
+
+    // let start = std::time::Instant::now();
+    // let rgb = image::DynamicImage::ImageRgba8(image).to_rgb8();
+    // // let rgb = rgba_to_rgb(image);
+    // let duration = start.elapsed();
+    // eprintln!("Conversion to RGB completed in: {:?}", duration);
+
+    image
+        .write_to(&mut cursor, image::ImageFormat::Jpeg)
+        .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
+
+    let base64 = base64::encode(&buffer);
+    Ok(format!("data:image/jpeg;base64,{}", base64))
+}
+
+// pub fn image_to_base64(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<String> {
+//     let mut buffer = Vec::new();
+//     let mut cursor = std::io::Cursor::new(&mut buffer);
+
+//     let start = std::time::Instant::now();
+//     let rgb = image::DynamicImage::ImageRgba8(image).to_rgb8();
+//     // let rgb = rgba_to_rgb(image);
+//     let duration = start.elapsed();
+//     eprintln!("Conversion to RGB completed in: {:?}", duration);
+
+//     rgb.write_to(&mut cursor, image::ImageFormat::Jpeg)
+//         .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
+
+//     let base64 = base64::encode(&buffer);
+//     Ok(format!("data:image/jpeg;base64,{}", base64))
+// }
