@@ -23,6 +23,10 @@ pub use focus_tracker::FocusEvent;
 #[path = "linux/mod.rs"]
 mod platform;
 
+#[cfg(target_os = "macos")]
+#[path = "macos/mod.rs"]
+mod platform;
+
 use eur_activity;
 use eur_activity::{ActivityStrategy, DisplayAsset};
 
