@@ -34,8 +34,6 @@ static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 
 // mod focus_tracker;
 
-use eur_timeline::focus_tracker;
-
 use tracing::{error, info};
 type SharedTimeline = Arc<Timeline>;
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
@@ -494,20 +492,20 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 }
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
-                match capture_region_rgb(0, 0, launcher_width, launcher_height) {
-                    Ok(image) => {
-                        // Convert the image to base64
-                        if let Ok(base64_image) = image_to_base64(image) {
-                            // Send the base64 image to the frontend
-                            launcher
-                                .emit("background_image", base64_image)
-                                .expect("Failed to emit background_image event");
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to capture screen region: {}", e);
-                    }
-                }
+                // match capture_region_rgb(0, 0, launcher_width, launcher_height) {
+                //     Ok(image) => {
+                //         // Convert the image to base64
+                //         if let Ok(base64_image) = image_to_base64(image) {
+                //             // Send the base64 image to the frontend
+                //             launcher
+                //                 .emit("background_image", base64_image)
+                //                 .expect("Failed to emit background_image event");
+                //         }
+                //     }
+                //     Err(e) => {
+                //         error!("Failed to capture screen region: {}", e);
+                //     }
+                // }
                 let duration = start_record.elapsed();
                 println!("Capture of background area completed in: {:?}", duration);
 

@@ -28,6 +28,7 @@
 		"Waitlist",
 		"wgpu",
 		"xcap",
+		"xorg",
 		"Zeroable"
 	],
 	"protoc": {
