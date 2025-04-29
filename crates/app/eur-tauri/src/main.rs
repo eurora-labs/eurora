@@ -295,64 +295,61 @@ fn main() {
                         }
                     });
 
-                    // --- Global Shortcut Setup ---
-                    #[cfg(desktop)]
+                    // println!("Setting up global shortcut");
+
+                    // If macos, use Control + Space
+                    #[cfg(target_os = "macos")]
                     {
-                        // println!("Setting up global shortcut");
+                        let control_space_shortcut =
+                            Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+                        let launcher_label = launcher_window.label().to_string();
 
-                        // If macos, use Control + Space
-                        #[cfg(target_os = "macos")]
-                        {
-                            let control_space_shortcut =
-                                Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
-                            let launcher_label = launcher_window.label().to_string();
+                        app_handle.plugin(shortcut_plugin(
+                            control_space_shortcut.clone(),
+                            launcher_label,
+                        ))?;
 
-                            app_handle.plugin(shortcut_plugin(
-                                control_space_shortcut.clone(),
-                                launcher_label,
-                            ))?;
-
-                            app_handle
-                                .global_shortcut()
-                                .register(control_space_shortcut)?;
-                        }
-
-                        #[cfg(not(target_os = "macos"))]
-                        {
-                            let super_space_shortcut =
-                                Shortcut::new(Some(Modifiers::SUPER), Code::Space);
-                            let launcher_label = launcher_window.label().to_string();
-
-                            app_handle.plugin(shortcut_plugin(
-                                super_space_shortcut.clone(),
-                                launcher_label,
-                            ))?;
-
-                            app_handle
-                                .global_shortcut()
-                                .register(super_space_shortcut)?;
-                        }
+                        app_handle
+                            .global_shortcut()
+                            .register(control_space_shortcut)?;
                     }
 
-                    // We'll use a different approach for Windows focus handling via on_window_event
-                    // Keep the window-specific handler for Linux focus loss
-                    #[cfg(target_os = "linux")]
+                    #[cfg(any(target_os = "linux", target_os = "windows"))]
                     {
-                        let launcher_label_linux = launcher_label.clone();
-                        launcher_window.on_window_event(move |event| {
-                            if let tauri::WindowEvent::Focused(false) = event {
-                                if let Some(launcher) =
-                                    app_handle_focus.get_window(&launcher_label_linux)
-                                {
-                                    launcher.hide().expect("Failed to hide launcher window");
-                                    // Emit an event to clear the conversation when launcher is hidden
-                                    launcher
-                                        .emit("launcher_closed", ())
-                                        .expect("Failed to emit launcher_closed event");
-                                    LAUNCHER_VISIBLE.store(false, Ordering::SeqCst); // Ensure state is updated
+                        let super_space_shortcut =
+                            Shortcut::new(Some(Modifiers::SUPER), Code::Space);
+                        let launcher_label = launcher_window.label().to_string();
+
+                        app_handle.plugin(shortcut_plugin(
+                            super_space_shortcut.clone(),
+                            launcher_label.clone(),
+                        ))?;
+
+                        app_handle
+                            .global_shortcut()
+                            .register(super_space_shortcut)?;
+
+                        // We'll use a different approach for Windows focus handling via on_window_event
+                        // Keep the window-specific handler for Linux focus loss
+                        #[cfg(target_os = "linux")]
+                        {
+                            let app_handle_focus = app_handle.clone();
+                            let launcher_label_linux = launcher_label.clone();
+                            launcher_window.on_window_event(move |event| {
+                                if let tauri::WindowEvent::Focused(false) = event {
+                                    if let Some(launcher) =
+                                        app_handle_focus.get_window(&launcher_label_linux)
+                                    {
+                                        launcher.hide().expect("Failed to hide launcher window");
+                                        // Emit an event to clear the conversation when launcher is hidden
+                                        launcher
+                                            .emit("launcher_closed", ())
+                                            .expect("Failed to emit launcher_closed event");
+                                        LAUNCHER_VISIBLE.store(false, Ordering::SeqCst); // Ensure state is updated
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
 
                     Ok(())
@@ -532,13 +529,9 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                     .emit("launcher_opened", ())
                     .expect("Failed to emit launcher_opened event");
 
-                // Add a small delay before setting focus
-                let launcher_clone = launcher.clone();
-                tauri::async_runtime::spawn(async move {
-                    launcher_clone
-                        .set_focus()
-                        .expect("Failed to focus launcher window");
-                });
+                launcher
+                    .set_focus()
+                    .expect("Failed to focus launcher window");
             }
         })
         .build()
