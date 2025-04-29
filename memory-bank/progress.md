@@ -17,6 +17,13 @@ This file tracks the project's progress using a task list format.
   * Fixed duplicate function call in API key form
   * Added proper class for message scrolling
 * Created mermaid class diagram documentation for the browser extension architecture
+* Added explicit relationship definitions to the SQLite database ER diagram based on foreign keys
+* Implemented SQLite database schema and Rust interface for the Eurora personal database:
+  * Created SQL migration file with table definitions
+  * Implemented Rust schema with struct definitions
+  * Built a full PersonalDb API for database operations
+  * Added tests for database functionality
+* Fixed async/await issue in OCR service where futures were being collected without awaiting them
 
 ## Current Tasks
 

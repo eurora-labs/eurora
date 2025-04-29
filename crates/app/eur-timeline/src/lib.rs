@@ -4,70 +4,35 @@
 //! and store it in memory for later retrieval. It works by sampling data every
 //! 3 seconds and maintaining a rolling history.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
-use eur_activity::BrowserStrategy;
+use eur_activity::select_strategy_for_process;
 use eur_prompt_kit::Message;
-use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
-use tokio::runtime::Handle; // Added import
-use tokio::sync::Mutex;
-use tokio::task::JoinSet;
 use tokio::time;
 use tracing::{debug, error, info};
 
-pub mod focus_tracker;
+mod focus_tracker;
+pub use focus_tracker::FocusEvent;
 
-// pub mod asset_strategy;
-// pub use asset_strategy::AssetStrategy;
+#[cfg(target_os = "linux")]
+#[path = "linux/mod.rs"]
+mod platform;
+
+#[cfg(target_os = "macos")]
+#[path = "macos/mod.rs"]
+mod platform;
+
+#[cfg(target_os = "windows")]
+#[path = "windows/mod.rs"]
+mod platform;
 
 use eur_activity;
 use eur_activity::{ActivityStrategy, DisplayAsset};
-
-// Custom serialization for ImageBuffer
-mod image_serde {
-    use super::*;
-    use image::{ImageBuffer, Rgba};
-    use serde::de::{self};
-    use serde::ser::SerializeStruct;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(
-        img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let (width, height) = img.dimensions();
-        let raw_data = img.as_raw();
-
-        let mut state = serializer.serialize_struct("ImageBuffer", 3)?;
-        state.serialize_field("width", &width)?;
-        state.serialize_field("height", &height)?;
-        state.serialize_field("data", raw_data)?;
-        state.end()
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct ImageData {
-            width: u32,
-            height: u32,
-            data: Vec<u8>,
-        }
-
-        let data = ImageData::deserialize(deserializer)?;
-        ImageBuffer::from_raw(data.width, data.height, data.data)
-            .ok_or_else(|| de::Error::custom("Failed to create ImageBuffer from data"))
-    }
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SystemState {}
@@ -306,13 +271,40 @@ impl Timeline {
 
     /// Start the timeline collection process
     pub async fn start_collection(&self) -> Result<()> {
-        // info!(
-        //     "Starting timeline collection every {} seconds",
-        //     self.interval_seconds
-        // );
+        let timeline_ref = self.clone_ref();
+        thread::spawn(move || {
+            let tracker = focus_tracker::FocusTracker::new(
+                platform::impl_focus_tracker::ImplFocusTracker::new(),
+            );
+            tracker
+                .track_focus(|event| {
+                    eprintln!("▶ {}: {}", event.process, event.title);
+                    if event.process == "eur-tauri" {
+                        return Ok(());
+                    }
+
+                    let rt = tokio::runtime::Runtime::new()?;
+                    rt.block_on(async {
+                        let strategy = select_strategy_for_process(
+                            &event.process,
+                            format!("{}: {}", event.process, event.title),
+                            event.icon_base64,
+                        )
+                        .await?;
+                        let _ = timeline_ref
+                            .start_collection_activity(strategy, &mut String::new())
+                            .await;
+                        anyhow::Ok(())
+                    })
+                })
+                .unwrap();
+            // if let Err(e) = tracker.track_focus(timeline) {
+            //     eprintln!("Focus‑tracker exited: {e}");
+            // }
+        });
 
         // // Start the focus tracker
-        focus_tracker::spawn(self);
+        // old_focus_tracker::spawn(self);
 
         return Ok(());
     }

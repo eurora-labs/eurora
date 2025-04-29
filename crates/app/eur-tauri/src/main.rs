@@ -12,6 +12,7 @@ use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
 use eur_tauri::{WindowState, create_launcher};
 use eur_timeline::Timeline;
+use eur_vision::{capture_region, capture_region_rgb, image_to_base64};
 use futures::StreamExt;
 use keyring_service::{ApiKeyStatus, KeyringService};
 use serde::Serialize;
@@ -32,8 +33,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 
 // mod focus_tracker;
-
-use eur_timeline::focus_tracker;
 
 use tracing::{error, info};
 type SharedTimeline = Arc<Timeline>;
@@ -261,26 +260,26 @@ fn main() {
                     });
 
                     // --- rdev Key Listener Setup ---
-                    let rdev_tx = key_event_tx.clone(); // Clone sender for the rdev thread
-                    std::thread::spawn(move || {
-                        let callback = move |event: Event| {
-                            // Only process key events when launcher is visible
-                            if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
-                                if let EventType::KeyPress(key) = event.event_type {
-                                    let key_data = match event.name {
-                                        Some(name) => name,
-                                        None => format!("{:?}", key),
-                                    };
-                                    // Send key data through the channel, ignore errors
-                                    let _ = rdev_tx.send(key_data);
-                                }
-                            }
-                        };
+                    // let rdev_tx = key_event_tx.clone(); // Clone sender for the rdev thread
+                    // std::thread::spawn(move || {
+                    //     let callback = move |event: Event| {
+                    //         // Only process key events when launcher is visible
+                    //         if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
+                    //             if let EventType::KeyPress(key) = event.event_type {
+                    //                 let key_data = match event.name {
+                    //                     Some(name) => name,
+                    //                     None => format!("{:?}", key),
+                    //                 };
+                    //                 // Send key data through the channel, ignore errors
+                    //                 let _ = rdev_tx.send(key_data);
+                    //             }
+                    //         }
+                    //     };
 
-                        if let Err(error) = listen(callback) {
-                            error!("rdev listen error: {:?}", error);
-                        }
-                    });
+                    //     if let Err(error) = listen(callback) {
+                    //         error!("rdev listen error: {:?}", error);
+                    //     }
+                    // });
 
                     // --- Key Event Receiver Task ---
                     let receiver_handle = app_handle.clone();
@@ -300,27 +299,42 @@ fn main() {
                     #[cfg(desktop)]
                     {
                         // println!("Setting up global shortcut");
-                        let super_space_shortcut =
-                            Shortcut::new(Some(Modifiers::SUPER), Code::Space);
 
-                        let launcher_label = launcher_window.label().to_string();
+                        // If macos, use Control + Space
+                        #[cfg(target_os = "macos")]
+                        {
+                            let control_space_shortcut =
+                                Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+                            let launcher_label = launcher_window.label().to_string();
 
-                        app_handle.plugin(shortcut_plugin(
-                            super_space_shortcut.clone(),
-                            launcher_label,
-                        ))?;
+                            app_handle.plugin(shortcut_plugin(
+                                control_space_shortcut.clone(),
+                                launcher_label,
+                            ))?;
 
-                        app_handle
-                            .global_shortcut()
-                            .register(super_space_shortcut)?;
+                            app_handle
+                                .global_shortcut()
+                                .register(control_space_shortcut)?;
+                        }
+
+                        #[cfg(not(target_os = "macos"))]
+                        {
+                            let super_space_shortcut =
+                                Shortcut::new(Some(Modifiers::SUPER), Code::Space);
+                            let launcher_label = launcher_window.label().to_string();
+
+                            app_handle.plugin(shortcut_plugin(
+                                super_space_shortcut.clone(),
+                                launcher_label,
+                            ))?;
+
+                            app_handle
+                                .global_shortcut()
+                                .register(super_space_shortcut)?;
+                        }
                     }
 
-                    // Listen for window focus events
-                    let launcher_label = launcher_window.label().to_string();
-                    let app_handle_focus = app_handle.clone();
-
                     // We'll use a different approach for Windows focus handling via on_window_event
-
                     // Keep the window-specific handler for Linux focus loss
                     #[cfg(target_os = "linux")]
                     {
@@ -446,6 +460,13 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
             } else {
                 // Update the shared state to indicate launcher is visible
                 LAUNCHER_VISIBLE.store(true, Ordering::SeqCst);
+
+                // Variables to store launcher position and size
+                let mut launcher_x = 0;
+                let mut launcher_y = 0;
+                let mut launcher_width = 800; // Default width
+                let mut launcher_height = 500; // Default height
+
                 // Get cursor position and center launcher on that screen
                 if let Ok(cursor_position) = launcher.cursor_position() {
                     if let Ok(monitors) = launcher.available_monitors() {
@@ -461,15 +482,22 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                             {
                                 // Center the launcher on this monitor
                                 let window_size = launcher.inner_size().unwrap();
-                                let x =
+                                launcher_width = window_size.width as u32;
+                                launcher_height = window_size.height as u32;
+
+                                eprintln!("Window size: {:?}", window_size);
+
+                                launcher_x =
                                     position.x + (size.width as i32 - window_size.width as i32) / 2;
-                                let y = position.y
+                                launcher_y = position.y
                                     + (size.height as i32 - window_size.height as i32) / 4;
-                                // let y = (size.height as i32 - window_size.height as i32);
 
                                 launcher
                                     .set_position(tauri::Position::Physical(
-                                        tauri::PhysicalPosition { x, y },
+                                        tauri::PhysicalPosition {
+                                            x: launcher_x,
+                                            y: launcher_y,
+                                        },
                                     ))
                                     .expect("Failed to set launcher position");
                                 break;
@@ -477,6 +505,24 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                         }
                     }
                 }
+                let start_record = std::time::Instant::now();
+                // Capture the screen region behind the launcher
+                // match capture_region_rgb(0, 0, launcher_width, launcher_height) {
+                //     Ok(image) => {
+                //         // Convert the image to base64
+                //         if let Ok(base64_image) = image_to_base64(image) {
+                //             // Send the base64 image to the frontend
+                //             launcher
+                //                 .emit("background_image", base64_image)
+                //                 .expect("Failed to emit background_image event");
+                //         }
+                //     }
+                //     Err(e) => {
+                //         error!("Failed to capture screen region: {}", e);
+                //     }
+                // }
+                let duration = start_record.elapsed();
+                println!("Capture of background area completed in: {:?}", duration);
 
                 // Only show the launcher if it was previously hidden
                 launcher.show().expect("Failed to show launcher window");
@@ -489,7 +535,6 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 // Add a small delay before setting focus
                 let launcher_clone = launcher.clone();
                 tauri::async_runtime::spawn(async move {
-                    sleep(Duration::from_millis(1000)).await;
                     launcher_clone
                         .set_focus()
                         .expect("Failed to focus launcher window");

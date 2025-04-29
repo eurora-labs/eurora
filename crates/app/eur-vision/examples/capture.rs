@@ -1,5 +1,5 @@
 use anyhow::Result;
-use eur_vision::{capture_all_monitors, capture_monitor, capture_monitor_timed};
+use eur_vision::{capture_all_monitors, capture_monitor};
 use std::{fs, path::Path, time::Instant};
 
 // Different capture methods to demonstrate and benchmark

@@ -35,10 +35,15 @@ pub mod generated {
             pub use super::*;
         }
     }
+
+    pub mod proto_ocr_service {
+        include!("gen/ocr_service.rs");
+
+        pub mod proto_ocr_service {
+            pub use super::*;
+        }
+    }
 }
 
 // Convenience re-exports of the most commonly used types
-pub use generated::ipc;
-pub use generated::native_messaging;
-pub use generated::questions_service;
-pub use generated::shared;
+pub use generated::*;
