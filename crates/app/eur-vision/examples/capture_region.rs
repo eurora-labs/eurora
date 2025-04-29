@@ -1,7 +1,8 @@
-use anyhow::Result;
-use eur_vision::capture_region;
+use anyhow::{Result, anyhow};
+use eur_vision::capture_monitor_region;
 use std::time::Instant;
 use std::{fs, path::Path};
+use xcap::Monitor;
 
 fn main() -> Result<()> {
     // Create screenshots directory if it doesn't exist
@@ -11,9 +12,18 @@ fn main() -> Result<()> {
     }
 
     println!("Running region capture...");
-
     let start = Instant::now();
-    let image = capture_region()?;
+
+    let monitor = Monitor::all()?
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("No monitors found"))?;
+
+    let width = monitor.width().unwrap() as i32;
+    let height = monitor.height().unwrap() as i32;
+    let start_x = width / 4; // Start from 1/4th of monitor width
+
+    let image = capture_monitor_region(monitor, start_x as u32, 0, width as u32, height as u32)?;
     let duration = start.elapsed();
 
     println!("Region capture completed in: {:?}", duration);
