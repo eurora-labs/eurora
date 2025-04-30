@@ -38,7 +38,6 @@ tauri-plugin-single-instance = "2.2.3"
 tauri-plugin-store = "2.2.0"
 tauri-plugin-updater = "2.7.0"
 tauri-plugin-window-state = "2.2.2"
-x11rb = "0.13.1"
 eur-vision = { path = "../eur-vision" }
 
 parking_lot.workspace = true

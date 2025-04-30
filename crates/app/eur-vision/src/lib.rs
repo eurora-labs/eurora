@@ -138,6 +138,10 @@ pub fn capture_region_rgba(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+    eprintln!(
+        "capture_region_rgba: x: {}, y: {}, width: {}, height: {}",
+        x, y, width, height
+    );
     // Get the primary monitor
     let monitor = Monitor::all()?
         .into_iter()
