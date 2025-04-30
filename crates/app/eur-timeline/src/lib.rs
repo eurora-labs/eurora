@@ -14,8 +14,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tokio::time;
+use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info};
-
 mod focus_tracker;
 pub use focus_tracker::FocusEvent;
 
@@ -194,19 +194,14 @@ impl Timeline {
         // Move the strategy into the background task
         let mut strategy = activity_strategy;
 
-        eprintln!("Done with the assets");
-        eprintln!("Starting the background task for snapshots");
         let interval = Duration::from_secs(3);
         let mut interval_timer = time::interval(interval);
 
         loop {
-            eprintln!("Snapshot interval ticked 1");
             interval_timer.tick().await;
-            eprintln!("Snapshot interval ticked 2");
 
             match strategy.retrieve_snapshots().await {
                 Ok(snapshots) => {
-                    eprintln!("Got a snapshot response");
                     if !snapshots.is_empty() {
                         // Get write access to the activities
                         let mut activities_lock = activities.write();
@@ -215,11 +210,8 @@ impl Timeline {
                         if let Some(last_activity) = activities_lock.last_mut() {
                             // Add the snapshots to the activity
                             for snapshot in snapshots {
-                                eprintln!("Adding snapshot:");
                                 last_activity.snapshots.push(snapshot);
                             }
-
-                            debug!("Added new snapshots to activity");
                         }
                     }
                 }
@@ -228,85 +220,67 @@ impl Timeline {
                 }
             }
         }
-
-        // Spawn a background task to periodically collect snapshots
-        // tokio::spawn(async move {
-        //     // Create an interval timer that ticks every 3 seconds
-        //     let mut interval = time::interval(Duration::from_secs(3));
-
-        //     loop {
-        //         eprintln!("Snapshot interval ticked 1");
-        //         // Wait for the next interval tick
-        //         interval.tick().await;
-        //         eprintln!("Snapshot interval ticked 2");
-        //         // Retrieve snapshots from the strategy
-        //         match strategy.retrieve_snapshots().await {
-        //             Ok(snapshots) => {
-        //                 if !snapshots.is_empty() {
-        //                     // Get write access to the activities
-        //                     let mut activities_lock = activities.write();
-
-        //                     // Find the last activity (the one we just added)
-        //                     if let Some(last_activity) = activities_lock.last_mut() {
-        //                         // Add the snapshots to the activity
-        //                         for snapshot in snapshots {
-        //                             eprintln!("Adding snapshot:");
-        //                             last_activity.snapshots.push(snapshot);
-        //                         }
-
-        //                         debug!("Added new snapshots to activity");
-        //                     }
-        //                 }
-        //             }
-        //             Err(e) => {
-        //                 error!("Failed to retrieve snapshots: {:?}", e);
-        //             }
-        //         }
-        //     }
-        // });
-
-        eprintln!("Activity added and snapshot collection started");
-        // s.push_str("Activity collection started");
     }
 
     /// Start the timeline collection process
     pub async fn start_collection(&self) -> Result<()> {
-        let timeline_ref = self.clone_ref();
-        thread::spawn(move || {
-            let tracker = focus_tracker::FocusTracker::new(
-                platform::impl_focus_tracker::ImplFocusTracker::new(),
-            );
-            tracker
-                .track_focus(|event| {
-                    eprintln!("▶ {}: {}", event.process, event.title);
-                    if event.process == "eur-tauri" {
-                        return Ok(());
-                    }
+        let (tx, mut rx) = mpsc::unbounded_channel::<FocusEvent>();
 
-                    let rt = tokio::runtime::Runtime::new()?;
-                    rt.block_on(async {
-                        let strategy = select_strategy_for_process(
-                            &event.process,
-                            format!("{}: {}", event.process, event.title),
-                            event.icon_base64,
-                        )
-                        .await?;
-                        let _ = timeline_ref
-                            .start_collection_activity(strategy, &mut String::new())
-                            .await;
-                        anyhow::Ok(())
+        // ----------------------------------  X11 thread
+        {
+            let tx = tx.clone(); // move into the thread
+            std::thread::spawn(move || {
+                let tracker = focus_tracker::FocusTracker::new(
+                    platform::impl_focus_tracker::ImplFocusTracker::new(),
+                );
+
+                // this never blocks: it just ships events into the channel
+                tracker
+                    .track_focus(move |event| {
+                        eprintln!("▶ {}: {}", event.process, event.title);
+
+                        // ignore the tracker’s own window, if desired
+                        if event.process != "eur-tauri" {
+                            // it’s OK if the receiver has gone away
+                            let _ = tx.send(event);
+                        }
+                        Ok(())
                     })
-                })
-                .unwrap();
-            // if let Err(e) = tracker.track_focus(timeline) {
-            //     eprintln!("Focus‑tracker exited: {e}");
-            // }
-        });
+                    .expect("focus tracker crashed");
+            });
+        }
 
-        // // Start the focus tracker
-        // old_focus_tracker::spawn(self);
+        // ----------------------------------  async event loop
+        let mut current_job: Option<JoinHandle<()>> = None;
+        let timeline = self.clone_ref(); // Arc / Rc to use inside tasks
 
-        return Ok(());
+        while let Some(event) = rx.recv().await {
+            // shut down the previous collection (if it still runs)
+            if let Some(job) = current_job.take() {
+                job.abort(); // instant, non-blocking
+            }
+
+            // launch a new collection for this focus event
+            let timeline = timeline.clone_ref();
+            current_job = Some(tokio::spawn(async move {
+                // build a strategy for the newly-focused window
+                if let Ok(strategy) = select_strategy_for_process(
+                    &event.process,
+                    format!("{}: {}", event.process, event.title),
+                    event.icon_base64,
+                )
+                .await
+                {
+                    // run the actual collection; ignore its own result
+                    let _ = timeline
+                        .start_collection_activity(strategy, &mut String::new())
+                        .await;
+                }
+                eprintln!("block is done"); // printed when the task ends
+            }));
+        }
+
+        Ok(())
     }
 }
 
