@@ -19,7 +19,9 @@ use default_activity::DefaultStrategy;
 
 #[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {
+    // 
     pub name: String,
+    // image base64
     pub icon: String,
 }
 
