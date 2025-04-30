@@ -44,7 +44,8 @@ fn rgba_to_rgb(rgba_image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u
 
 // Helper function to align a value to the specified alignment
 fn align_to(value: u32, alignment: u32) -> u32 {
-    value.div_ceil(alignment) * alignment
+    (value + alignment) & !alignment
+    // value.div_ceil(alignment) * alignment
 }
 
 pub async fn blur_image(
@@ -367,8 +368,8 @@ pub async fn blur_image(
         }
         ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, corrected_data).unwrap()
     };
-    image.save("../../output.png").unwrap();
-    println!("Saved output.png");
+    // image.save("../../output.png").unwrap();
+    // println!("Saved output.png");
 
     rgba_to_rgb(&image)
 }

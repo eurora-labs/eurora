@@ -93,14 +93,13 @@ pub fn create_launcher(
         handle,
         label,
         // tauri::WebviewUrl::App(window_relative_url.into()),
-
         #[cfg(debug_assertions)]
         tauri::WebviewUrl::External(Url::parse("http://localhost:1420/launcher").unwrap()),
         #[cfg(not(debug_assertions))]
         tauri::WebviewUrl::External(Url::parse("http://tauri.localhost/launcher").unwrap()),
     )
     .resizable(false)
-    .inner_size(575.0, 50.0)
+    .inner_size(512.0, 50.0)
     .disable_drag_drop_handler()
     .decorations(false)
     .always_on_top(true)
