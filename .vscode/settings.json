@@ -15,6 +15,7 @@
 		"protol",
 		"pybase",
 		"rusqlite",
+		"serde",
 		"sqlx",
 		"Tauri",
 		"Tesseract",
