@@ -55,9 +55,8 @@ pub async fn blur_image(
     let width = img.width();
     let height = img.height();
 
-    // WGPU requires bytes_per_row to be aligned to 256 bytes
-    let bytes_per_row_alignment = 256;
-    let bytes_per_row = align_to(4 * width, bytes_per_row_alignment);
+    // WGPU requires bytes_per_row to be aligned
+    let bytes_per_row = align_to(4 * width, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
 
     let instance = wgpu::Instance::default();
     let adapter = instance
