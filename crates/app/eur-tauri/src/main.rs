@@ -252,12 +252,6 @@ fn main() {
                         }
                     });
 
-                    // Connect to gRPC server
-                    let client_handle = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        init_grpc_client(client_handle).await;
-                    });
-
                     // --- rdev Key Listener Setup ---
                     // let rdev_tx = key_event_tx.clone(); // Clone sender for the rdev thread
                     // std::thread::spawn(move || {
@@ -491,6 +485,8 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                                         tauri::PhysicalPosition {
                                             x: launcher_x,
                                             y: launcher_y,
+                                            // x: 0,
+                                            // y: 0,
                                         },
                                     ))
                                     .expect("Failed to set launcher position");
@@ -537,31 +533,6 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
             }
         })
         .build()
-}
-
-// Initialize the gRPC client connection
-async fn init_grpc_client(app_handle: tauri::AppHandle) {
-    let server_url = "http://[::1]:50051".to_string(); // Using IPv6 localhost format
-
-    let builder = client_builder().with_base_url(server_url.clone());
-
-    match builder.create_channel().await {
-        Ok(channel) => match QuestionsClient::new(channel) {
-            Ok(client) => {
-                let state: tauri::State<SharedQuestionsClient> = app_handle.state();
-                if let Ok(mut guard) = state.lock() {
-                    *guard = Some(client);
-                    eprintln!("Connected to gRPC server at {}", server_url);
-                }
-            }
-            Err(e) => {
-                eprintln!("Failed to create questions client: {}", e);
-            }
-        },
-        Err(e) => {
-            eprintln!("Failed to connect to gRPC server: {}", e);
-        }
-    }
 }
 
 #[derive(Clone, Serialize)]
