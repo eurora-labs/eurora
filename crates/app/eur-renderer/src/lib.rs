@@ -42,6 +42,11 @@ fn rgba_to_rgb(rgba_image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgb<u
     ImageBuffer::from_vec(width, height, rgb_data).expect("Failed to create RGB image")
 }
 
+// Helper function to align a value to the specified alignment
+fn align_to(value: u32, alignment: u32) -> u32 {
+    value.div_ceil(alignment) * alignment
+}
+
 pub async fn blur_image(
     img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
     opacity: f32,
@@ -49,6 +54,10 @@ pub async fn blur_image(
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let width = img.width();
     let height = img.height();
+
+    // WGPU requires bytes_per_row to be aligned to 256 bytes
+    let bytes_per_row_alignment = 256;
+    let bytes_per_row = align_to(4 * width, bytes_per_row_alignment);
 
     let instance = wgpu::Instance::default();
     let adapter = instance
@@ -306,7 +315,8 @@ pub async fn blur_image(
     }
 
     // Copy texture to buffer for readback
-    let buffer_size = (4 * width * height) as u64;
+    // Using aligned bytes_per_row for buffer size calculation
+    let buffer_size = (bytes_per_row * height) as u64;
     let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Output Buffer"),
         size: buffer_size,
@@ -325,7 +335,7 @@ pub async fn blur_image(
             buffer: &output_buffer,
             layout: wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * width),
+                bytes_per_row: Some(bytes_per_row),
                 rows_per_image: Some(height),
             },
         },
@@ -341,9 +351,23 @@ pub async fn blur_image(
         .poll(wgpu::PollType::wait())
         .unwrap()
         .is_queue_empty();
-    let bytes = dst_buffer_slice.get_mapped_range().to_vec();
+    let mapped_range = dst_buffer_slice.get_mapped_range();
+    let bytes = mapped_range.to_vec();
 
-    let image = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, bytes).unwrap();
+    // We need to handle the padded bytes when creating the image
+    let image = if bytes_per_row == 4 * width {
+        // No padding case - simple conversion
+        ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, bytes).unwrap()
+    } else {
+        // We have padding - need to remove it
+        let mut corrected_data = Vec::with_capacity((4 * width * height) as usize);
+        for y in 0..height {
+            let row_start = (y * bytes_per_row) as usize;
+            let row_end = row_start + (4 * width) as usize;
+            corrected_data.extend_from_slice(&bytes[row_start..row_end]);
+        }
+        ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, corrected_data).unwrap()
+    };
     image.save("../../output.png").unwrap();
     println!("Saved output.png");
 
