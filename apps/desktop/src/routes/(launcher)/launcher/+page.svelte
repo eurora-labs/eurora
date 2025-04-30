@@ -358,12 +358,12 @@
 				<Badge variant="outline">No recent activities</Badge>
 			{/if}
 		</div>
-
+		<!-- 
 		<Button
 			onclick={() => {
 				loadActivities();
 			}}>Reload Activities</Button
-		>
+		> -->
 
 		{#if isCheckingApiKey}
 			<div class="flex h-full items-center justify-center">
