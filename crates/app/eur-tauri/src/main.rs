@@ -2,7 +2,6 @@
     all(windows, not(test), not(debug_assertions)),
     windows_subsystem = "windows"
 )]
-mod keyring_service;
 
 use eur_client_grpc::client_builder;
 use eur_client_questions::QuestionsClient;
@@ -14,7 +13,9 @@ use eur_tauri::{WindowState, create_launcher};
 use eur_timeline::Timeline;
 use eur_vision::{capture_region, capture_region_rgb, image_to_base64};
 use futures::StreamExt;
-use keyring_service::{ApiKeyStatus, KeyringService};
+// use secret_service::{ApiKeyStatus, SecretService};
+use eur_secret::Sensitive;
+use eur_secret::secret;
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
@@ -40,7 +41,7 @@ type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedOpenAIClient = Arc<async_mutex::Mutex<Option<eur_openai::OpenAI>>>;
 type SharedConversationStorage = Arc<async_mutex::Mutex<Option<ConversationStorage>>>;
 type SharedCurrentConversation = Arc<Mutex<Option<Conversation>>>;
-type SharedKeyringService = Arc<KeyringService>;
+// type SharedSecretService = Arc<SecretService>;
 
 fn create_shared_conversation_storage() -> SharedConversationStorage {
     Arc::new(async_mutex::Mutex::new(None))
@@ -64,9 +65,9 @@ fn create_shared_openai_client() -> SharedOpenAIClient {
     Arc::new(async_mutex::Mutex::new(None))
 }
 
-fn create_shared_keyring_service() -> SharedKeyringService {
-    Arc::new(KeyringService::new())
-}
+// fn create_shared_secret_service() -> SharedSecretService {
+//     Arc::new(SecretService::new())
+// }
 
 fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     let base_path = app_handle.path().app_data_dir().unwrap();
@@ -87,35 +88,36 @@ async fn resize_launcher_window(window: tauri::Window, height: u32) -> Result<()
 }
 
 #[tauri::command]
-async fn check_api_key_exists(
-    keyring_service: tauri::State<'_, SharedKeyringService>,
-) -> Result<ApiKeyStatus, String> {
-    let has_key = keyring_service.has_api_key();
-    Ok(ApiKeyStatus { has_key })
+async fn check_api_key_exists() -> Result<String, String> {
+    let key = secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::BuildKind)
+        .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
+
+    let key = key.map(|s| s.0).unwrap_or_default();
+    if key.is_empty() {
+        return Err("API key not found".to_string());
+    }
+
+    Ok(key)
 }
 
 #[tauri::command]
-async fn save_api_key(
-    keyring_service: tauri::State<'_, SharedKeyringService>,
-    api_key: String,
-) -> Result<(), String> {
-    keyring_service
-        .set_api_key(&api_key)
-        .map_err(|e| format!("Failed to save API key: {}", e))
+async fn save_api_key(api_key: String) -> Result<(), String> {
+    secret::persist(
+        "OPEN_AI_API_KEY",
+        &Sensitive(api_key),
+        secret::Namespace::BuildKind,
+    )
+    .map_err(|e| format!("Failed to save API key: {}", e))?;
+    Ok(())
 }
 
 #[tauri::command]
-async fn initialize_openai_client(
-    app_handle: tauri::AppHandle,
-    keyring_service: tauri::State<'_, SharedKeyringService>,
-) -> Result<bool, String> {
-    // Get the API key from keyring
-    let api_key = keyring_service
-        .get_api_key()
-        .map_err(|e| format!("Failed to get API key: {}", e))?;
+async fn initialize_openai_client(app_handle: tauri::AppHandle) -> Result<bool, String> {
+    let api_key = secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::BuildKind)
+        .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
 
     // Initialize the OpenAI client with the API key
-    let openai_client = eur_openai::OpenAI::with_api_key(&api_key);
+    let openai_client = eur_openai::OpenAI::with_api_key(&api_key.unwrap().0);
 
     // Store the client in the app state
     let state: tauri::State<SharedOpenAIClient> = app_handle.state();
@@ -189,8 +191,6 @@ fn main() {
                     app_handle.manage(questions_client.clone());
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
-                    let keyring_service = create_shared_keyring_service();
-                    app_handle.manage(keyring_service.clone());
                     let openai_client = create_shared_openai_client();
                     app_handle.manage(openai_client.clone());
                     let conversation_storage = create_shared_conversation_storage();
@@ -201,25 +201,24 @@ fn main() {
                     // --- Background Tasks ---
 
                     // Initialize OpenAI client if API key exists
-                    let keyring_clone = keyring_service.clone();
                     let app_handle_openai = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        if keyring_clone.has_api_key() {
-                            if let Ok(api_key) = keyring_clone.get_api_key() {
-                                let client = eur_openai::OpenAI::with_api_key(&api_key);
-                                let state: tauri::State<SharedOpenAIClient> =
-                                    app_handle_openai.state();
-                                let mut guard = state.lock().await;
-                                *guard = Some(client);
-                                info!("OpenAI client initialized with API key from keyring");
-                            }
+                        let api_key =
+                            secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::BuildKind)
+                                .unwrap();
+                        if api_key.is_some() {
+                            let client = eur_openai::OpenAI::with_api_key(&api_key.unwrap().0);
+                            let state: tauri::State<SharedOpenAIClient> = app_handle_openai.state();
+                            let mut guard = state.lock().await;
+                            *guard = Some(client);
+                            info!("OpenAI client initialized with API key from keyring");
                         } else {
                             info!("No API key found in keyring, OpenAI client not initialized");
                         }
                     });
 
                     // Initialize conversation storage
-                    let db_path = get_db_path(&app_handle);
+                    let db_path = get_db_path(app_handle);
                     let storage_init_handle = conversation_storage.clone();
                     tauri::async_runtime::spawn(async move {
                         match ConversationStorage::new(db_path) {
@@ -295,64 +294,59 @@ fn main() {
                         }
                     });
 
-                    // --- Global Shortcut Setup ---
-                    #[cfg(desktop)]
+                    // println!("Setting up global shortcut");
+
+                    // If macos, use Control + Space
+                    #[cfg(target_os = "macos")]
                     {
-                        // println!("Setting up global shortcut");
+                        let control_space_shortcut =
+                            Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+                        let launcher_label = launcher_window.label().to_string();
 
-                        // If macos, use Control + Space
-                        #[cfg(target_os = "macos")]
-                        {
-                            let control_space_shortcut =
-                                Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
-                            let launcher_label = launcher_window.label().to_string();
+                        app_handle
+                            .plugin(shortcut_plugin(control_space_shortcut, launcher_label))?;
 
-                            app_handle.plugin(shortcut_plugin(
-                                control_space_shortcut.clone(),
-                                launcher_label,
-                            ))?;
-
-                            app_handle
-                                .global_shortcut()
-                                .register(control_space_shortcut)?;
-                        }
-
-                        #[cfg(not(target_os = "macos"))]
-                        {
-                            let super_space_shortcut =
-                                Shortcut::new(Some(Modifiers::SUPER), Code::Space);
-                            let launcher_label = launcher_window.label().to_string();
-
-                            app_handle.plugin(shortcut_plugin(
-                                super_space_shortcut.clone(),
-                                launcher_label,
-                            ))?;
-
-                            app_handle
-                                .global_shortcut()
-                                .register(super_space_shortcut)?;
-                        }
+                        app_handle
+                            .global_shortcut()
+                            .register(control_space_shortcut)?;
                     }
 
-                    // We'll use a different approach for Windows focus handling via on_window_event
-                    // Keep the window-specific handler for Linux focus loss
-                    #[cfg(target_os = "linux")]
+                    #[cfg(any(target_os = "linux", target_os = "windows"))]
                     {
-                        let launcher_label_linux = launcher_label.clone();
-                        launcher_window.on_window_event(move |event| {
-                            if let tauri::WindowEvent::Focused(false) = event {
-                                if let Some(launcher) =
-                                    app_handle_focus.get_window(&launcher_label_linux)
-                                {
-                                    launcher.hide().expect("Failed to hide launcher window");
-                                    // Emit an event to clear the conversation when launcher is hidden
-                                    launcher
-                                        .emit("launcher_closed", ())
-                                        .expect("Failed to emit launcher_closed event");
-                                    LAUNCHER_VISIBLE.store(false, Ordering::SeqCst); // Ensure state is updated
+                        let super_space_shortcut =
+                            Shortcut::new(Some(Modifiers::SUPER), Code::Space);
+                        let launcher_label = launcher_window.label().to_string();
+
+                        app_handle.plugin(shortcut_plugin(
+                            super_space_shortcut,
+                            launcher_label.clone(),
+                        ))?;
+
+                        app_handle
+                            .global_shortcut()
+                            .register(super_space_shortcut)?;
+
+                        // We'll use a different approach for Windows focus handling via on_window_event
+                        // Keep the window-specific handler for Linux focus loss
+                        #[cfg(target_os = "linux")]
+                        {
+                            let app_handle_focus = app_handle.clone();
+                            let launcher_label_linux = launcher_label.clone();
+                            launcher_window.on_window_event(move |event| {
+                                if let tauri::WindowEvent::Focused(false) = event {
+                                    if let Some(launcher) =
+                                        app_handle_focus.get_window(&launcher_label_linux)
+                                    {
+                                        launcher.hide().expect("Failed to hide launcher window");
+                                        // Emit an event to clear the conversation when launcher is hidden
+                                        launcher
+                                            .emit("launcher_closed", ())
+                                            .expect("Failed to emit launcher_closed event");
+                                        LAUNCHER_VISIBLE.store(false, Ordering::SeqCst); // Ensure state is updated
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
 
                     Ok(())
@@ -482,8 +476,8 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                             {
                                 // Center the launcher on this monitor
                                 let window_size = launcher.inner_size().unwrap();
-                                launcher_width = window_size.width as u32;
-                                launcher_height = window_size.height as u32;
+                                launcher_width = window_size.width;
+                                launcher_height = window_size.height;
 
                                 eprintln!("Window size: {:?}", window_size);
 
@@ -532,13 +526,9 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                     .emit("launcher_opened", ())
                     .expect("Failed to emit launcher_opened event");
 
-                // Add a small delay before setting focus
-                let launcher_clone = launcher.clone();
-                tauri::async_runtime::spawn(async move {
-                    launcher_clone
-                        .set_focus()
-                        .expect("Failed to focus launcher window");
-                });
+                launcher
+                    .set_focus()
+                    .expect("Failed to focus launcher window");
             }
         })
         .build()
