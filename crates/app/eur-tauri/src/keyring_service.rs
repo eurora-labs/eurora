@@ -36,7 +36,7 @@ impl KeyringService {
     /// Deletes the OpenAI API key from the keyring
     pub fn delete_api_key(&self) -> Result<()> {
         let entry = Entry::new(SERVICE_NAME, API_KEY_USERNAME)?;
-        entry.delete_password()?;
+        entry.delete_credential()?;
         Ok(())
     }
 }
