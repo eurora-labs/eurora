@@ -1,0 +1,14 @@
+[package]
+name = "eur-renderer"
+version = "0.1.0"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+description = ""
+
+[dependencies]
+image = { workspace = true }
+wgpu = "25.0.0"
+bytemuck = "1.22.0"
+pollster = "0.4.0"
+
+

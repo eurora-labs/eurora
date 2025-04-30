@@ -81,13 +81,13 @@ pub fn capture_monitor_region(
     Ok(image_region)
 }
 
-pub fn capture_monitor_region_rgb(
+pub fn capture_monitor_region_rgba(
     monitor: Monitor,
     x: u32,
     y: u32,
     width: u32,
     height: u32,
-) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>> {
+) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
     let monitor_width = monitor.width().unwrap();
     let monitor_height = monitor.height().unwrap();
 
@@ -95,7 +95,7 @@ pub fn capture_monitor_region_rgb(
     let region_height = height.min(monitor_height - y) as u32;
 
     let image_region = monitor
-        .capture_region_rgb(x as i32, y as i32, region_width, region_height)
+        .capture_region(x as i32, y as i32, region_width, region_height)
         .map_err(|e| anyhow!("Failed to capture region: {}", e))?;
 
     Ok(image_region)
@@ -132,12 +132,12 @@ pub fn capture_region(
     capture_monitor_region(monitor, x, y, width, height)
 }
 
-pub fn capture_region_rgb(
+pub fn capture_region_rgba(
     x: i32,
     y: i32,
     width: u32,
     height: u32,
-) -> Result<ImageBuffer<Rgb<u8>, Vec<u8>>> {
+) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
     // Get the primary monitor
     let monitor = Monitor::all()?
         .into_iter()
@@ -148,7 +148,7 @@ pub fn capture_region_rgb(
     let x = if x < 0 { 0 } else { x as u32 };
     let y = if y < 0 { 0 } else { y as u32 };
 
-    let image = capture_monitor_region_rgb(monitor, x, y, width, height)?;
+    let image = capture_monitor_region_rgba(monitor, x, y, width, height)?;
 
     // // TODO: remove this code
     // let tess = eur_ocr::TesseractOcr {};

@@ -11,7 +11,7 @@ use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
 use eur_tauri::{WindowState, create_launcher};
 use eur_timeline::Timeline;
-use eur_vision::{capture_region, capture_region_rgb, image_to_base64};
+use eur_vision::{capture_region, capture_region_rgba, image_to_base64};
 use futures::StreamExt;
 // use secret_service::{ApiKeyStatus, SecretService};
 use eur_secret::Sensitive;
@@ -300,7 +300,7 @@ fn main() {
                     #[cfg(target_os = "macos")]
                     {
                         let control_space_shortcut =
-                            Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+                            Shortcut::new(Some(Modifiers::ALT), Code::Space);
                         let launcher_label = launcher_window.label().to_string();
 
                         app_handle
@@ -354,14 +354,14 @@ fn main() {
                 .plugin(tauri_plugin_http::init())
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
-                .plugin(
-                    tauri_plugin_log::Builder::default()
-                        .targets([
-                            Target::new(TargetKind::Stdout),
-                            Target::new(TargetKind::LogDir { file_name: None }),
-                        ])
-                        .build(),
-                )
+                // .plugin(
+                //     tauri_plugin_log::Builder::default()
+                //         .targets([
+                //             Target::new(TargetKind::Stdout),
+                //             Target::new(TargetKind::LogDir { file_name: None }),
+                //         ])
+                //         .build(),
+                // )
                 .on_window_event(|window, event| match event {
                     #[cfg(target_os = "macos")]
                     tauri::WindowEvent::CloseRequested { .. } => {
@@ -501,20 +501,25 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 }
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
-                // match capture_region_rgb(0, 0, launcher_width, launcher_height) {
-                //     Ok(image) => {
-                //         // Convert the image to base64
-                //         if let Ok(base64_image) = image_to_base64(image) {
-                //             // Send the base64 image to the frontend
-                //             launcher
-                //                 .emit("background_image", base64_image)
-                //                 .expect("Failed to emit background_image event");
-                //         }
-                //     }
-                //     Err(e) => {
-                //         error!("Failed to capture screen region: {}", e);
-                //     }
-                // }
+                match capture_region_rgba(0, 0, launcher_width, launcher_height) {
+                    Ok(image) => {
+                        let t0 = std::time::Instant::now();
+                        let img = pollster::block_on(eur_renderer::blur_image(&image, 0.3, 1.0));
+                        let duration = t0.elapsed();
+                        println!("Capture of background area completed in: {:?}", duration);
+
+                        // // Convert the image to base64
+                        if let Ok(base64_image) = image_to_base64(img) {
+                            // Send the base64 image to the frontend
+                            launcher
+                                .emit("background_image", base64_image)
+                                .expect("Failed to emit background_image event");
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to capture screen region: {}", e);
+                    }
+                }
                 let duration = start_record.elapsed();
                 println!("Capture of background area completed in: {:?}", duration);
 
