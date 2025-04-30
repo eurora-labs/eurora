@@ -1,9 +1,4 @@
 {
-	"eslint.workingDirectories": [
-		{
-			"mode": "auto"
-		}
-	],
 	"cSpell.words": [
 		"AUTOINCREMENT",
 		"bytemuck",
@@ -34,8 +29,43 @@
 	"protoc": {
 		"options": ["--proto_path=proto"]
 	},
+	"eslint.useFlatConfig": true,
+	"eslint.validate": ["svelte"],
+	"eslint.workingDirectories": ["."],
+	"svelte.enable-ts-plugin": true,
+	"prettier.configPath": ".prettierrc",
+	"prettier.useEditorConfig": false,
+	"editor.defaultFormatter": null,
 	"python-envs.pythonProjects": [],
+	"rust-analyzer.check.command": "clippy",
+	"rust-analyzer.check.allTargets": true,
+	"rust-analyzer.check.features": "all",
+	"rust-analyzer.check.extraArgs": ["--target-dir", ".rust-analyzer/target"],
+	"[rust]": {
+		"editor.defaultFormatter": "rust-lang.rust-analyzer"
+	},
 	"[svelte]": {
-		"editor.defaultFormatter": "svelte.svelte-vscode"
-	}
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[typescript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[javascript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[css]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[html]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[json]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[mdx]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"svelte.plugin.css.globals": "packages/ui/src/**/*.css",
+	"typescript.preferences.importModuleSpecifier": "non-relative",
+	"javascript.preferences.importModuleSpecifier": "non-relative"
 }
