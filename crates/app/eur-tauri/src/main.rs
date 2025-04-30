@@ -219,7 +219,7 @@ fn main() {
                     });
 
                     // Initialize conversation storage
-                    let db_path = get_db_path(&app_handle);
+                    let db_path = get_db_path(app_handle);
                     let storage_init_handle = conversation_storage.clone();
                     tauri::async_runtime::spawn(async move {
                         match ConversationStorage::new(db_path) {
@@ -304,10 +304,8 @@ fn main() {
                             Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
                         let launcher_label = launcher_window.label().to_string();
 
-                        app_handle.plugin(shortcut_plugin(
-                            control_space_shortcut.clone(),
-                            launcher_label,
-                        ))?;
+                        app_handle
+                            .plugin(shortcut_plugin(control_space_shortcut, launcher_label))?;
 
                         app_handle
                             .global_shortcut()
@@ -321,7 +319,7 @@ fn main() {
                         let launcher_label = launcher_window.label().to_string();
 
                         app_handle.plugin(shortcut_plugin(
-                            super_space_shortcut.clone(),
+                            super_space_shortcut,
                             launcher_label.clone(),
                         ))?;
 
@@ -479,8 +477,8 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                             {
                                 // Center the launcher on this monitor
                                 let window_size = launcher.inner_size().unwrap();
-                                launcher_width = window_size.width as u32;
-                                launcher_height = window_size.height as u32;
+                                launcher_width = window_size.width;
+                                launcher_height = window_size.height;
 
                                 eprintln!("Window size: {:?}", window_size);
 
