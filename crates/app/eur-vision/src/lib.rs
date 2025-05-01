@@ -1,9 +1,9 @@
 use anyhow::{Result, anyhow};
 // use image::{ImageBuffer, Rgb, Rgba};
-use image::{ColorType, ImageBuffer, Rgb, Rgba, codecs::jpeg::JpegEncoder};
+use image::{ImageBuffer, Rgb, Rgba};
 use xcap::Monitor;
 
-use eur_ocr::{self, OcrStrategy};
+use eur_ocr::{self};
 
 /// Captures the entire primary monitor and returns an ImageBuffer
 pub fn capture_monitor() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
