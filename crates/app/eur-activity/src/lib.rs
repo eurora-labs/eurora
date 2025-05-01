@@ -9,7 +9,6 @@ use tracing::info;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use eur_prompt_kit::Message;
-use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 pub mod browser_activity;
 pub mod default_activity;
