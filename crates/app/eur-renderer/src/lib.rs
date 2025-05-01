@@ -1,5 +1,4 @@
 use image::{ImageBuffer, Rgb, Rgba};
-use std::num::NonZeroU32;
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
