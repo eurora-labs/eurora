@@ -180,8 +180,8 @@ pub async fn blur_image(
 
     let texture_view = texture.create_view(&Default::default());
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-        mag_filter: wgpu::FilterMode::Nearest,
-        min_filter: wgpu::FilterMode::Nearest,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
 

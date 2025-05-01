@@ -476,7 +476,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                         // let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
 
                         eprintln!("Captured image size: {:?}", img.dimensions());
-                        let img = pollster::block_on(eur_renderer::blur_image(&img, 0.3, 1.0));
+                        let img = pollster::block_on(eur_renderer::blur_image(&img, 0.2, 36.0));
                         let duration = t0.elapsed();
                         println!("Capture of background area completed in: {:?}", duration);
 
