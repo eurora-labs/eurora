@@ -112,4 +112,5 @@ incremental        = true
 codegen-units      = 256
 debug              = 1
 overflow-checks    = false
+lto                = false
 
