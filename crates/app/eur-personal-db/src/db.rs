@@ -32,11 +32,7 @@ impl DatabaseManager {
         let connection_string = format!("sqlite:{}", database_path);
 
         unsafe {
-            sqlite3_auto_extension(Some(
-                std::mem::transmute::<*const (), unsafe extern "C" fn()>(
-                    sqlite3_vec_init as *const (),
-                ),
-            ));
+            sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
         }
 
         // Create the database if it doesn't exist
