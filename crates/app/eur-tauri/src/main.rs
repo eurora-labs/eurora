@@ -3,15 +3,14 @@
     windows_subsystem = "windows"
 )]
 
-use eur_client_grpc::client_builder;
 use eur_client_questions::QuestionsClient;
-use eur_conversation::{Asset, ChatMessage, Conversation, ConversationStorage};
+use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
 use eur_tauri::{WindowState, create_launcher};
 use eur_timeline::Timeline;
-use eur_vision::{capture_region, capture_region_rgba, image_to_base64};
+use eur_vision::{capture_region_rgba, image_to_base64};
 use futures::StreamExt;
 // use secret_service::{ApiKeyStatus, SecretService};
 use eur_secret::Sensitive;
@@ -23,9 +22,6 @@ use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Emitter, Wry};
 use tauri::{Manager, generate_context};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-use tauri_plugin_log::{Target, TargetKind};
-use tokio::sync::mpsc;
-use tokio::time::{Duration, sleep};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -80,7 +76,7 @@ async fn resize_launcher_window(window: tauri::Window, height: u32) -> Result<()
     if let Some(launcher) = window.get_window("launcher") {
         let _ = launcher.set_size(tauri::Size::Logical(tauri::LogicalSize {
             width: 1024.0,
-            height: 500.0,
+            height: height as f64,
         }));
     }
     Ok(())
@@ -773,7 +769,7 @@ async fn ask_video_question(
     let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
     let timeline = timeline_state.inner();
 
-    let mut title: Option<String> = Some("Test".to_string());
+    let title: Option<String> = Some("Test".to_string());
 
     let mut messages = timeline.construct_asset_messages();
 
@@ -1219,7 +1215,7 @@ async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<DisplayAsse
 
     // Get all activities from the timeline
     // let mut activities = timeline.get_activities();
-    let mut activities = timeline.get_activities();
+    let activities = timeline.get_activities();
 
     // Sort activities by start time (most recent first)
     // activities.sort_by(|a, b| b.start.cmp(&a.start));
