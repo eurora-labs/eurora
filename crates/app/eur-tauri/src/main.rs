@@ -27,7 +27,6 @@ use tauri_plugin_log::{Target, TargetKind};
 use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
 
-use rdev::{Event, EventType, Key, listen};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 // Shared state to track if launcher is visible
@@ -136,17 +135,10 @@ fn main() {
         },
     ));
 
-    fn callback(event: Event) {
-        // This function is now defined inside the setup closure where it captures the sender
-    }
-
-    eprintln!("Starting Tauri application...");
-
     // Regular application startup
     let tauri_context = generate_context!();
 
-    // Create a channel for sending key events from rdev thread to Tauri runtime
-    let (key_event_tx, mut key_event_rx) = mpsc::unbounded_channel::<String>();
+    // eprintln!("Starting Tauri application...");
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -251,42 +243,6 @@ fn main() {
                                 info!("gRPC IPC client initialized");
                             }
                             Err(e) => error!("Failed to initialize gRPC IPC client: {}", e),
-                        }
-                    });
-
-                    // --- rdev Key Listener Setup ---
-                    // let rdev_tx = key_event_tx.clone(); // Clone sender for the rdev thread
-                    // std::thread::spawn(move || {
-                    //     let callback = move |event: Event| {
-                    //         // Only process key events when launcher is visible
-                    //         if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
-                    //             if let EventType::KeyPress(key) = event.event_type {
-                    //                 let key_data = match event.name {
-                    //                     Some(name) => name,
-                    //                     None => format!("{:?}", key),
-                    //                 };
-                    //                 // Send key data through the channel, ignore errors
-                    //                 let _ = rdev_tx.send(key_data);
-                    //             }
-                    //         }
-                    //     };
-
-                    //     if let Err(error) = listen(callback) {
-                    //         error!("rdev listen error: {:?}", error);
-                    //     }
-                    // });
-
-                    // --- Key Event Receiver Task ---
-                    let receiver_handle = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        while let Some(key_data) = key_event_rx.recv().await {
-                            if let Some(launcher) = receiver_handle.get_window("launcher") {
-                                // Log the key event for debugging
-                                // eprintln!("Sending key event to launcher via channel: {}", key_data);
-                                if let Err(e) = launcher.emit("key_event", key_data) {
-                                    error!("Failed to emit key_event to launcher: {}", e);
-                                }
-                            }
                         }
                     });
 
@@ -433,11 +389,6 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
             let Ok(is_visible) = launcher.is_visible() else {
                 return;
             };
-
-            // // Store app handle for use in the rdev callback
-            // if let Ok(mut handle) = app_handle.lock() {
-            //     *handle = Some(app.clone());
-            // }
 
             if is_visible {
                 // Hide the launcher window and emit the closed event
