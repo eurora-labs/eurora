@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{
     self, ProtoArticleState, ProtoPdfState, ProtoYoutubeSnapshot, ProtoYoutubeState, StateRequest,
-    StateResponse,
 };
 use eur_proto::shared::ProtoImageFormat;
 

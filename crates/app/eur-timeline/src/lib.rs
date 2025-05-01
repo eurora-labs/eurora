@@ -11,11 +11,10 @@ use eur_prompt_kit::Message;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 use tokio::time;
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 mod focus_tracker;
 pub use focus_tracker::FocusEvent;
 
@@ -161,7 +160,7 @@ impl Timeline {
 
     pub async fn start_snapshot_collection(
         &self,
-        mut activity_strategy: Box<dyn ActivityStrategy>,
+        activity_strategy: Box<dyn ActivityStrategy>,
         s: &mut String,
     ) {
     }

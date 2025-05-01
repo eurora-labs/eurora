@@ -2,7 +2,7 @@ pub use crate::asset_context::{
     ArticleState, NativeArticleAsset, NativeYoutubeState, PdfState, YoutubeState,
 };
 use anyhow::Error;
-use eur_proto::ipc::{SnapshotResponse, StateResponse};
+use eur_proto::ipc::StateResponse;
 
 pub struct JSONToProtoAssetConverter;
 

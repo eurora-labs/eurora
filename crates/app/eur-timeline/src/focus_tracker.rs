@@ -17,7 +17,7 @@ impl FocusTracker {
 }
 
 impl FocusTracker {
-    pub fn track_focus<F>(&self, mut on_focus: F) -> anyhow::Result<()>
+    pub fn track_focus<F>(&self, on_focus: F) -> anyhow::Result<()>
     where
         F: FnMut(crate::FocusEvent) -> anyhow::Result<()>,
     {
