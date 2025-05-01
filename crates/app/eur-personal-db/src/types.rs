@@ -1,58 +1,59 @@
-// use sqlx::sqlite::SqlitePool;
+use sqlx::FromRow;
+use sqlx::sqlite::SqlitePool;
 
-// /// Activity table structure
-// #[derive(Debug, Clone)]
-// pub struct Activity {
-//     pub id: String,
-//     pub name: String,
-//     pub app_name: String,
-//     pub window_name: String,
-//     pub started_at: String,
-//     pub ended_at: Option<String>,
-// }
+/// Activity table structure
+#[derive(FromRow, Debug)]
+pub struct Activity {
+    pub id: String,
+    pub name: String,
+    pub app_name: String,
+    pub window_name: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+}
 
-// /// Activity asset table structure
-// #[derive(Debug, Clone)]
-// pub struct ActivityAsset {
-//     pub id: String,
-//     pub activity_id: String,
-//     pub data: String, // JSON blob stored as text
-//     pub created_at: String,
-//     pub updated_at: String,
-// }
+/// Activity asset table structure
+#[derive(FromRow, Debug)]
+pub struct ActivityAsset {
+    pub id: String,
+    pub activity_id: String,
+    pub data: String, // JSON blob stored as text
+    pub created_at: String,
+    pub updated_at: String,
+}
 
-// /// Video chunk table structure
-// #[derive(Debug, Clone)]
-// pub struct VideoChunk {
-//     pub id: String,
-//     pub file_path: String,
-// }
+/// Video chunk table structure
+#[derive(FromRow, Debug)]
+pub struct VideoChunk {
+    pub id: String,
+    pub file_path: String,
+}
 
-// /// Frame table structure
-// #[derive(Debug, Clone)]
-// pub struct Frame {
-//     pub id: String,
-//     pub video_chunk_id: String,
-//     pub relative_index: i32,
-// }
+/// Frame table structure
+#[derive(FromRow, Debug)]
+pub struct Frame {
+    pub id: String,
+    pub video_chunk_id: String,
+    pub relative_index: i32,
+}
 
-// /// Activity snapshot table structure
-// #[derive(Debug, Clone)]
-// pub struct ActivitySnapshot {
-//     pub id: String,
-//     pub frame_id: String,
-//     pub activity_id: String,
-// }
+/// Activity snapshot table structure
+#[derive(FromRow, Debug)]
+pub struct ActivitySnapshot {
+    pub id: String,
+    pub frame_id: String,
+    pub activity_id: String,
+}
 
-// /// Frame text table structure
-// #[derive(Debug, Clone)]
-// pub struct FrameText {
-//     pub id: String,
-//     pub frame_id: String,
-//     pub text: String,
-//     pub text_json: Option<String>,
-//     pub ocr_engine: String,
-// }
+/// Frame text table structure
+#[derive(FromRow, Debug)]
+pub struct FrameText {
+    pub id: String,
+    pub frame_id: String,
+    pub text: String,
+    pub text_json: Option<String>,
+    pub ocr_engine: String,
+}
 
 // /// Database schema initialization
 // pub async fn initialize_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
