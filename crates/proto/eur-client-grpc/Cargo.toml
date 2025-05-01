@@ -8,5 +8,5 @@ publish = false
 [dependencies]
 anyhow = { workspace = true }
 tonic = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, default-features = false }
 tracing = { workspace = true }
