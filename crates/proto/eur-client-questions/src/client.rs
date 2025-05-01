@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use eur_client_grpc::ClientBuilder;
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::{
     ArticleQuestionRequest, PdfQuestionRequest, ProtoChatMessage, VideoQuestionRequest,
@@ -94,18 +93,5 @@ impl QuestionsClient {
             .context("Failed to get answer from questions service")?;
 
         Ok(response.into_inner().response)
-    }
-}
-
-/// Extension trait for ClientBuilder to create Questions clients
-pub trait QuestionsClientBuilderExt {
-    /// Create a questions service client
-    async fn questions_client(&self) -> Result<QuestionsClient>;
-}
-
-impl QuestionsClientBuilderExt for ClientBuilder {
-    async fn questions_client(&self) -> Result<QuestionsClient> {
-        let channel = Channel::from_static("http://[::1]:50051").connect().await?;
-        QuestionsClient::new(channel)
     }
 }
