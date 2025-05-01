@@ -1920,14 +1920,12 @@ dependencies = [
  "futures",
  "image 0.25.6",
  "libsqlite3-sys",
- "rand 0.8.5",
  "serde",
  "serde_json",
  "sqlite-vec",
  "sqlx",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "zerocopy",
 ]
 
