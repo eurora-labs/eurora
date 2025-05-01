@@ -24,7 +24,7 @@ eur-secret = { path = "../eur-secret" }
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 backtrace = { version = "0.3.74", optional = true }
 console-subscriber = "0.4.1"
-reqwest = { version = "0.12.15", features = ["json", ] }
+reqwest = { version = "0.12.15", features = ["json", "native-tls"] }
 serde.workspace = true
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
 tauri = { version = "^2.4.1", features = ["unstable"] }
