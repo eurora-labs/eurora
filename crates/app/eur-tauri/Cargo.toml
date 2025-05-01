@@ -57,7 +57,7 @@ eur-proto = { path = "../../proto/eur-proto" }
 eur-timeline = { path = "../eur-timeline" }
 eur-client-questions = { path = "../../proto/eur-client-questions" }
 eur-client-grpc = { path = "../../proto/eur-client-grpc" }
-eur-conversation = { path = "../eur-conversation" }
+# eur-conversation = { path = "../eur-conversation" }
 eur-native-messaging = { path = "../eur-native-messaging" }
 eur-openai = { path = "../../common/eur-openai" }
 chrono = { workspace = true }
