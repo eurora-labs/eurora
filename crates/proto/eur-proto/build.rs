@@ -9,8 +9,6 @@ fn main() -> Result<()> {
         .map(|entry| entry.path())
         .collect::<Vec<_>>();
 
-    println!("cargo:rerun-if-changed=../../../proto/");
-
     tonic_build::configure()
         .build_server(true)
         .build_client(true)
