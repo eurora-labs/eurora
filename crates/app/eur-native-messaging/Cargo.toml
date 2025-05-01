@@ -26,3 +26,8 @@ winreg = "0.55"
 
 [build-dependencies]
 tonic-build = { workspace = true }
+
+[lints.clippy]
+all = "deny"
+perf = "deny"
+correctness = "deny"
