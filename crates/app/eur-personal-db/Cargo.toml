@@ -14,7 +14,7 @@ description = "Eurora Personal DB"
 # ] }
 # uuid = { version = "1.8.0", features = ["v4", "serde"] }
 # chrono = { version = "0.4.37", features = ["serde"] }
-# tokio = { version = "1.36.0", features = ["full"] }
+# tokio = { workspace = true, default-features = false  }
 
 # [dev-dependencies]
 # tempfile = "3.10.1"
