@@ -1,9 +1,10 @@
 use anyhow::{Result, anyhow};
 // use image::{ImageBuffer, Rgb, Rgba};
+use base64::{Engine as _, engine::general_purpose};
 use image::{ImageBuffer, Rgb, Rgba};
 use xcap::Monitor;
 
-use eur_ocr::{self};
+// use eur_ocr::{self};
 
 /// Captures the entire primary monitor and returns an ImageBuffer
 pub fn capture_monitor() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
@@ -17,8 +18,8 @@ pub fn capture_monitor() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
     let image = monitor.capture_image()?;
 
     // Convert to an image::ImageBuffer
-    let width = image.width() as u32;
-    let height = image.height() as u32;
+    let width = image.width();
+    let height = image.height();
     let raw_data = image.into_raw();
 
     // Create an ImageBuffer from the raw data
@@ -35,8 +36,8 @@ pub fn capture_all_monitors() -> Result<Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>> {
 
     for monitor in monitors {
         let image = monitor.capture_image()?;
-        let width = image.width() as u32;
-        let height = image.height() as u32;
+        let width = image.width();
+        let height = image.height();
         let raw_data = image.into_raw();
 
         let img_buffer = ImageBuffer::from_raw(width, height, raw_data)
@@ -68,8 +69,8 @@ pub fn capture_monitor_region(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
-    let monitor_width = monitor.width().unwrap();
-    let monitor_height = monitor.height().unwrap();
+    // let monitor_width = monitor.width().unwrap();
+    // let monitor_height = monitor.height().unwrap();
 
     // let region_width = width.min(monitor_width - x) as u32;
     // let region_height = height.min(monitor_height - y) as u32;
@@ -88,8 +89,8 @@ pub fn capture_monitor_region_rgba(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
-    let monitor_width = monitor.width().unwrap();
-    let monitor_height = monitor.height().unwrap();
+    // let monitor_width = monitor.width().unwrap();
+    // let monitor_height = monitor.height().unwrap();
 
     // let region_width = width.min(monitor_width - x) as u32;
     // let region_height = height.min(monitor_height - y) as u32;
@@ -185,7 +186,8 @@ pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
         .write_to(&mut cursor, image::ImageFormat::Jpeg)
         .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
 
-    let base64 = base64::encode(&buffer);
+    let base64 = general_purpose::STANDARD.encode(&buffer);
+    // let base64 = base64::encode(&buffer);
     Ok(format!("data:image/jpeg;base64,{}", base64))
 }
 
