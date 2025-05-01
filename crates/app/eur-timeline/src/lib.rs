@@ -160,15 +160,16 @@ impl Timeline {
 
     pub async fn start_snapshot_collection(
         &self,
-        activity_strategy: Box<dyn ActivityStrategy>,
-        s: &mut String,
+        _activity_strategy: Box<dyn ActivityStrategy>,
+        _s: &mut str,
     ) {
+        todo!();
     }
 
     pub async fn start_collection_activity(
         &self,
         mut activity_strategy: Box<dyn ActivityStrategy>,
-        s: &mut String,
+        _s: &mut str,
     ) {
         // Retrieve initial assets from the activity
         let assets = activity_strategy

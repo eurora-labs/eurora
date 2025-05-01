@@ -35,8 +35,7 @@ pub(crate) mod state {
     /// Note that this type is managed in Tauri and thus needs to be `Send` and `Sync`.
     #[derive(Clone)]
     pub struct WindowState {
-        /// NOTE: This handle is required for this type to be self-contained
-        app_handle: AppHandle,
+        _app_handle: AppHandle,
         /// The state for every open application window.
         state: Arc<parking_lot::Mutex<BTreeMap<WindowLabel, State>>>,
     }
@@ -48,7 +47,7 @@ pub(crate) mod state {
     impl WindowState {
         pub fn new(app_handle: AppHandle) -> Self {
             Self {
-                app_handle,
+                _app_handle: app_handle,
                 state: Default::default(),
             }
         }
