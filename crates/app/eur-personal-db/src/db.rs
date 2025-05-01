@@ -19,6 +19,8 @@ use zerocopy::FromBytes;
 
 use futures::future::try_join_all;
 
+use crate::types::{Activity, ActivityAsset};
+
 pub struct DatabaseManager {
     pub pool: SqlitePool,
 }
@@ -77,5 +79,45 @@ impl DatabaseManager {
             Ok(_) => Ok(()),
             Err(e) => Err(e.into()),
         }
+    }
+
+    pub async fn insert_activity(&self, activity: &Activity) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO activity (id, name, app_name, window_name, started_at, ended_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(activity.id.clone())
+        .bind(activity.name.clone())
+        .bind(activity.app_name.clone())
+        .bind(activity.window_name.clone())
+        .bind(activity.started_at.clone())
+        .bind(activity.ended_at.clone())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn insert_activity_asset(
+        &self,
+        activity_id: &str,
+        asset: &ActivityAsset,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO activity_asset (activity_id, data, created_at, updated_At)
+            VALUES (?, ?, ?)
+            "#,
+        )
+        .bind(activity_id)
+        .bind(asset.data.clone())
+        .bind(asset.created_at.clone())
+        .bind(asset.updated_at.clone())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 }
