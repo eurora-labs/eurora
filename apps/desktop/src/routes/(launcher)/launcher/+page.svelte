@@ -109,8 +109,10 @@
 	// Listen for background image event
 	listen<string>('background_image', (event) => {
 		backgroundImage = event.payload;
-		console.log('Received background image');
-		console.log(backgroundImage);
+		document.body.style.backgroundImage = `url('${event.payload}')`;
+		document.body.style.backgroundSize = '100%';
+		document.body.style.backgroundPosition = 'center';
+		document.body.style.backgroundRepeat = 'no-repeat';
 	});
 
 	// Set up global keydown event listener for Escape key
@@ -321,18 +323,19 @@
 	}
 </script>
 
-<div
+<div class="relative flex h-screen flex-col">
+	<!-- <div
 	class="relative flex h-screen flex-col"
 	style={backgroundImage
 		? `background-image: url('${backgroundImage}'); background-size: cover; background-position: center;`
 		: ''}
->
+> -->
 	<!-- Semi-transparent overlay to ensure content is visible -->
 	<div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
 
 	<!-- Content container -->
 	<div class="relative z-10 flex h-full flex-col">
-		<div class="flex flex-wrap gap-2 p-2">
+		<!-- <div class="flex flex-wrap gap-2 p-2">
 			{#each displayAssets as asset, index}
 				<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
 					{#if asset.icon && asset.icon.length > 0}
@@ -357,7 +360,7 @@
 			{#if displayAssets.length === 0}
 				<Badge variant="outline">No recent activities</Badge>
 			{/if}
-		</div>
+		</div> -->
 		<!-- 
 		<Button
 			onclick={() => {
