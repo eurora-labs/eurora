@@ -5,7 +5,6 @@ use std::io::{self, Read, Write};
 use std::sync::Arc;
 
 use eur_proto::ipc::{SnapshotResponse, StateRequest, StateResponse};
-use h2;
 use std::{error::Error, io::ErrorKind, pin::Pin};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};

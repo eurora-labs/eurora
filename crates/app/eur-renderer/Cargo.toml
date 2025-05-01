@@ -10,5 +10,3 @@ image = { workspace = true }
 wgpu = "25.0.0"
 bytemuck = "1.22.0"
 pollster = "0.4.0"
-
-
