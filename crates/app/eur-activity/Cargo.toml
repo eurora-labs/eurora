@@ -9,9 +9,9 @@ description = "Timeline storage for capturing system state over time"
 eur-proto = { path = "../../proto/eur-proto" }
 eur-native-messaging = { path = "../eur-native-messaging" }
 
-image = "0.25.6"
+image.workspace = true
 chrono = { version = "0.4.40", features = ["serde"] }
-tokio = { version = "1.44.2", features = ["full"] }
+tokio = { workspace = true, default-features = false }
 serde = { workspace = true }
 serde_json = "1.0.114"
 tracing = "0.1.40"

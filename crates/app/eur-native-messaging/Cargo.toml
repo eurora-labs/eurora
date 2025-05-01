@@ -16,13 +16,18 @@ tonic = { workspace = true }
 prost = { workspace = true }
 futures = { workspace = true }
 tokio-stream = { workspace = true }
-base64 = "0.22.1"
+base64.workspace = true
 ctrlc = "3.4.6"
 h2 = "0.4.8"
-sentry = { version = "0.37.0" }
+sentry = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
 
 [build-dependencies]
 tonic-build = { workspace = true }
+
+[lints.clippy]
+all = "deny"
+perf = "deny"
+correctness = "deny"
