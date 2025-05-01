@@ -1,0 +1,20 @@
+[package]
+name = "eur-personal-db"
+version = "0.1.0"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+description = "Eurora Personal DB"
+
+[dependencies]
+# sqlx = { version = "0.8.5", features = [
+#     "runtime-tokio",
+#     "sqlite",
+#     "uuid",
+#     "chrono",
+# ] }
+# uuid = { version = "1.8.0", features = ["v4", "serde"] }
+# chrono = { version = "0.4.37", features = ["serde"] }
+# tokio = { workspace = true, default-features = false  }
+
+# [dev-dependencies]
+# tempfile = "3.10.1"
