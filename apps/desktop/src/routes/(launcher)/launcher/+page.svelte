@@ -331,7 +331,7 @@
 		: ''}
 > -->
 	<!-- Semi-transparent overlay to ensure content is visible -->
-	<div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+	<!-- <div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div> -->
 
 	<!-- Content container -->
 	<div class="relative z-10 flex h-full flex-col">
