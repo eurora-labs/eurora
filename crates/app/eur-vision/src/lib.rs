@@ -71,11 +71,11 @@ pub fn capture_monitor_region(
     let monitor_width = monitor.width().unwrap();
     let monitor_height = monitor.height().unwrap();
 
-    let region_width = width.min(monitor_width - x) as u32;
-    let region_height = height.min(monitor_height - y) as u32;
+    // let region_width = width.min(monitor_width - x) as u32;
+    // let region_height = height.min(monitor_height - y) as u32;
 
     let image_region = monitor
-        .capture_region(x as i32, y as i32, region_width, region_height)
+        .capture_region(x as i32, y as i32, width, height)
         .map_err(|e| anyhow!("Failed to capture region: {}", e))?;
 
     Ok(image_region)
@@ -91,11 +91,11 @@ pub fn capture_monitor_region_rgba(
     let monitor_width = monitor.width().unwrap();
     let monitor_height = monitor.height().unwrap();
 
-    let region_width = width.min(monitor_width - x) as u32;
-    let region_height = height.min(monitor_height - y) as u32;
+    // let region_width = width.min(monitor_width - x) as u32;
+    // let region_height = height.min(monitor_height - y) as u32;
 
     let image_region = monitor
-        .capture_region(x as i32, y as i32, region_width, region_height)
+        .capture_region(x as i32, y as i32, width, height)
         .map_err(|e| anyhow!("Failed to capture region: {}", e))?;
 
     Ok(image_region)

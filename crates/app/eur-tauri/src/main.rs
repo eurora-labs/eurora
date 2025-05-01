@@ -79,8 +79,8 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
 async fn resize_launcher_window(window: tauri::Window, height: u32) -> Result<(), String> {
     if let Some(launcher) = window.get_window("launcher") {
         let _ = launcher.set_size(tauri::Size::Logical(tauri::LogicalSize {
-            width: 800.0,
-            height: height as f64,
+            width: 1024.0,
+            height: 500.0,
         }));
     }
     Ok(())
@@ -406,15 +406,21 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 // Variables to store launcher position and size
                 let mut launcher_x = 0;
                 let mut launcher_y = 0;
-                let mut launcher_width = 800; // Default width
+                let mut launcher_width = 1024; // Default width
                 let mut launcher_height = 500; // Default height
 
                 // Get cursor position and center launcher on that screen
                 if let Ok(cursor_position) = launcher.cursor_position() {
                     if let Ok(monitors) = launcher.available_monitors() {
                         for monitor in monitors {
+                            monitor.name();
                             let size = monitor.size();
                             let position = monitor.position();
+                            let scale_factor = monitor.scale_factor();
+
+                            eprintln!("Monitor size: {:?}", size);
+                            eprintln!("Monitor position: {:?}", position);
+                            eprintln!("Monitor scale factor: {:?}", scale_factor);
 
                             // Check if cursor is on this monitor
                             if cursor_position.x >= position.x as f64
@@ -424,8 +430,6 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                             {
                                 // Center the launcher on this monitor
                                 let window_size = launcher.inner_size().unwrap();
-                                launcher_width = window_size.width;
-                                launcher_height = window_size.height;
 
                                 eprintln!("Window size: {:?}", window_size);
 
@@ -433,6 +437,8 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                                     position.x + (size.width as i32 - window_size.width as i32) / 2;
                                 launcher_y = position.y
                                     + (size.height as i32 - window_size.height as i32) / 4;
+
+                                eprintln!("Launcher position: ({}, {})", launcher_x, launcher_y);
 
                                 launcher
                                     .set_position(tauri::Position::Physical(
@@ -444,6 +450,14 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                                         },
                                     ))
                                     .expect("Failed to set launcher position");
+
+                                launcher_x = ((size.width as i32 as f64) / 2.0) as i32
+                                    - (window_size.width as f64 / 2.0) as i32;
+                                launcher_y = ((size.height as i32 as f64) / 4.0) as i32
+                                    - (window_size.height as f64 / 4.0) as i32;
+                                // - (window_size.height as f64 / 4.0) as i32;
+                                launcher_width = window_size.width;
+                                launcher_height = window_size.height;
                                 break;
                             }
                         }
@@ -451,11 +465,18 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 }
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
-                match capture_region_rgba(launcher_x, launcher_y, launcher_width, launcher_height) {
+                match capture_region_rgba(
+                    launcher_x,
+                    launcher_y,
+                    launcher_width,
+                    launcher_height + 200,
+                ) {
                     Ok(img) => {
                         let t0 = std::time::Instant::now();
-                        let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
-                        // let img = pollster::block_on(eur_renderer::blur_image(&image, 0.3, 1.0));
+                        // let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
+
+                        eprintln!("Captured image size: {:?}", img.dimensions());
+                        let img = pollster::block_on(eur_renderer::blur_image(&img, 0.3, 1.0));
                         let duration = t0.elapsed();
                         println!("Capture of background area completed in: {:?}", duration);
 
