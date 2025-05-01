@@ -15,5 +15,5 @@ pub use snapshot_context::YoutubeSnapshot;
 pub const PORT: &str = "1421";
 
 pub async fn create_grpc_ipc_client() -> Result<TauriIpcClient<Channel>> {
-    return Ok(TauriIpcClient::connect(format!("http://[::1]:{}", PORT)).await?);
+    Ok(TauriIpcClient::connect(format!("http://[::1]:{}", PORT)).await?)
 }
