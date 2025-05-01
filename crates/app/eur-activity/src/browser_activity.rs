@@ -16,19 +16,19 @@ use eur_prompt_kit::{ImageContent, Message, MessageContent, Role, TextContent};
 struct TranscriptLine {
     text: String,
     start: f32,
-    duration: f32,
+    _duration: f32,
 }
 
 struct YoutubeAsset {
-    pub url: String,
+    pub _url: String,
     pub title: String,
     pub transcript: Vec<TranscriptLine>,
-    pub current_time: f32,
+    pub _current_time: f32,
     pub video_frame: DynamicImage,
 }
 
 struct ArticleAsset {
-    pub url: String,
+    pub _url: String,
     pub title: String,
     pub content: String,
 }
@@ -38,7 +38,7 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
         // eprintln!("Converting ProtoYoutubeState to YoutubeAsset");
         // eprintln!("ProtoYoutubeState: {:?}", state);
         YoutubeAsset {
-            url: state.url,
+            _url: state.url,
             title: "transcript asset".to_string(),
             transcript: state
                 .transcript
@@ -46,10 +46,10 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
                 .map(|line| TranscriptLine {
                     text: line.text,
                     start: line.start,
-                    duration: line.duration,
+                    _duration: line.duration,
                 })
                 .collect(),
-            current_time: state.current_time,
+            _current_time: state.current_time,
             video_frame: {
                 let proto_image = state.video_frame.unwrap();
                 // Directly load the image using the logic from eur-proto's From impl
@@ -80,7 +80,7 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
 impl From<ProtoArticleState> for ArticleAsset {
     fn from(article: ProtoArticleState) -> Self {
         ArticleAsset {
-            url: "".to_string(),
+            _url: "".to_string(),
             // title: article.title,
             title: "article asset".to_string(),
             content: article.content,
@@ -139,7 +139,7 @@ impl ActivityAsset for ArticleAsset {
     }
 }
 
-struct ArticleSnapshot {
+pub struct ArticleSnapshot {
     pub highlight: Option<String>,
 }
 

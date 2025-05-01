@@ -1,5 +1,5 @@
+use base64::engine::general_purpose;
 use base64::prelude::*;
-use base64::{Engine as _, engine::general_purpose};
 use config::{Config, Environment, File};
 use dotenv::dotenv;
 use eur_prompt_kit::{Message, MessageContent, Role};
