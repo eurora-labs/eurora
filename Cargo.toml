@@ -101,6 +101,7 @@ codegen-units = 1 # Compile crates one after another so the compiler can optimiz
 lto = true        # Enables link to optimizations
 opt-level = "s"   # Optimize for binary size
 debug = true      # Enable debug symbols, for profiling
+strip = true
 
 [profile.bench]
 codegen-units = 256
@@ -113,4 +114,5 @@ codegen-units      = 256
 debug              = 1
 overflow-checks    = false
 lto                = false
+strip = false
 
