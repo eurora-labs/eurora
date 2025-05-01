@@ -140,6 +140,8 @@ fn main() {
         // This function is now defined inside the setup closure where it captures the sender
     }
 
+    eprintln!("Starting Tauri application...");
+
     // Regular application startup
     let tauri_context = generate_context!();
 
@@ -336,7 +338,8 @@ fn main() {
                                         launcher
                                             .emit("launcher_closed", ())
                                             .expect("Failed to emit launcher_closed event");
-                                        LAUNCHER_VISIBLE.store(false, Ordering::SeqCst); // Ensure state is updated
+                                        LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
+                                        // Ensure state is updated
                                     }
                                 }
                             });
@@ -381,7 +384,8 @@ fn main() {
                                 window
                                     .emit("launcher_closed", ())
                                     .expect("Failed to emit launcher_closed event");
-                                LAUNCHER_VISIBLE.store(false, Ordering::SeqCst); // Ensure state is updated
+                                LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
+                                // Ensure state is updated
                             }
                         }
                     }
@@ -414,7 +418,6 @@ fn main() {
                 });
         });
 }
-
 fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> TauriPlugin<Wry> {
     tauri_plugin_global_shortcut::Builder::new()
         .with_handler(move |app: &AppHandle, shortcut, event| {
@@ -497,10 +500,11 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 }
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
-                match capture_region_rgba(0, 0, launcher_width, launcher_height) {
-                    Ok(image) => {
+                match capture_region_rgba(launcher_x, launcher_y, launcher_width, launcher_height) {
+                    Ok(img) => {
                         let t0 = std::time::Instant::now();
-                        let img = pollster::block_on(eur_renderer::blur_image(&image, 0.3, 1.0));
+                        let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
+                        // let img = pollster::block_on(eur_renderer::blur_image(&image, 0.3, 1.0));
                         let duration = t0.elapsed();
                         println!("Capture of background area completed in: {:?}", duration);
 
