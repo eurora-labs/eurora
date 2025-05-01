@@ -18,12 +18,13 @@ test = false
 tauri-build = { version = "2.0.3", features = [] }
 
 [dependencies]
+tauri-utils = "2.4.0"                                                       # single entry removes second 8.6 s build  
 anyhow = "1.0.97"
 eur-secret = { path = "../eur-secret" }
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 backtrace = { version = "0.3.74", optional = true }
 console-subscriber = "0.4.1"
-reqwest = { version = "0.12.15", features = ["json"] }
+reqwest = { version = "0.12.15", features = ["json", ] }
 serde.workspace = true
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
 tauri = { version = "^2.4.1", features = ["unstable"] }
@@ -39,7 +40,7 @@ tauri-plugin-store = "2.2.0"
 tauri-plugin-updater = "2.7.0"
 tauri-plugin-window-state = "2.2.2"
 eur-vision = { path = "../eur-vision" }
-
+image.workspace = true
 parking_lot.workspace = true
 log = "^0.4"
 # The features here optimize for performance.
@@ -64,7 +65,7 @@ defer = "0.2.1"
 futures = { workspace = true }
 tonic = { workspace = true }
 async-mutex = "1.4.1"
-sentry = { version = "0.37.0" }
+sentry = { workspace = true }
 eur-activity = { path = "../eur-activity" }
 lazy_static = "1.4.0"
 eur-renderer = { path = "../eur-renderer" }
