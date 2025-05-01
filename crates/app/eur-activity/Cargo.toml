@@ -1,0 +1,22 @@
+[package]
+name = "eur-activity"
+version = "0.1.0"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+description = "Timeline storage for capturing system state over time"
+
+[dependencies]
+eur-proto = { path = "../../proto/eur-proto" }
+eur-native-messaging = { path = "../eur-native-messaging" }
+
+image.workspace = true
+chrono = { version = "0.4.40", features = ["serde"] }
+tokio = { workspace = true, default-features = false }
+serde = { workspace = true }
+serde_json = "1.0.114"
+tracing = "0.1.40"
+anyhow = "1.0.80"
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
+async-trait = "0.1.77"
+eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
