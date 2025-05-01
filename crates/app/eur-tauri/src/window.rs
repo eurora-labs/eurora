@@ -99,7 +99,7 @@ pub fn create_launcher(
         tauri::WebviewUrl::External(Url::parse("http://tauri.localhost/launcher").unwrap()),
     )
     .resizable(false)
-    .inner_size(512.0, 50.0)
+    .inner_size(512.0, 250.0)
     .disable_drag_drop_handler()
     .decorations(false)
     .always_on_top(true)
