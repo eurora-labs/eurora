@@ -428,6 +428,15 @@
 		backdrop-filter: blur(18px);
 		-webkit-backdrop-filter: blur(18px);
 		background-color: rgba(255, 255, 255, 0.2);
-		z-index: 9999;
+		z-index: 2;
+	}
+
+	.backdrop-custom-2 {
+		filter: blur(18px);
+		-webkit-filter: blur(18px);
+
+		z-index: 1;
+
+		background-color: rgba(255, 255, 255, 0.5);
 	}
 </style>
