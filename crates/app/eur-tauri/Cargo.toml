@@ -69,7 +69,7 @@ sentry = { workspace = true }
 eur-activity = { path = "../eur-activity" }
 lazy_static = "1.4.0"
 eur-renderer = { path = "../eur-renderer" }
-pollster = "0.3"
+pollster = "0.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-trafficlights-positioner = { git = "https://github.com/gitbutlerapp/tauri-plugin-trafficlights-positioner", branch = "v2" }
