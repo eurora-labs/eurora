@@ -17,3 +17,5 @@ export * as Sheet from './components/ui/sheet/index.js';
 export { Skeleton } from './components/ui/skeleton/index.js';
 export * as Dialog from './components/ui/dialog/index.js';
 export * as Command from './components/ui/command/index.js';
+export { SystemChatMessage } from './custom-components/ui/system-chat-message/index.js';
+export { UserChatMessage } from './custom-components/ui/user-chat-message/index.js';

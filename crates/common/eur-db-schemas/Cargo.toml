@@ -1,9 +1,0 @@
-[package]
-name = "eur-db-schemas"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-rusqlite = { version = "0.34.0", features = ["bundled"] }
-eur-proto = { path = "../../proto/eur-proto" }
-tokio = { workspace = true, default-features = false }

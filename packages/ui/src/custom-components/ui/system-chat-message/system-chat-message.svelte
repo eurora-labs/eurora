@@ -3,6 +3,8 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '@eurora/ui/utils.js';
 
+	// import { Katex } from '@eurora/katex';
+
 	let {
 		ref = $bindable(null),
 		class: className,
@@ -23,22 +25,15 @@
 		<div
 			class="mx-auto flex flex-1 gap-4 text-base md:max-w-3xl md:gap-5 lg:max-w-[4rem] lg:gap-6 xl:max-w-[48rem]"
 		>
-			<div class="group/conversation-turn relative flex w-full min-w-0 flex-col">
+			<div class="group/conversation-turn agent-turn relative flex w-full min-w-0 flex-col px-4">
 				<div class="flex-col gap-1 md:gap-3">
-					<div class="flex max-w-full flex-grow flex-col">
+					<div class="flex min-w-[500px] max-w-full flex-grow flex-col">
 						<div
-							class="text-message relative flex min-h-8 w-full flex-col items-end gap-2 whitespace-normal break-words text-start"
+							class="text-message relative flex min-h-8 w-full flex-col items-end gap-2 whitespace-normal break-words text-start [.text-message+&]:mt-5"
 						>
-							<div class="w-full">
-								<div class="flex w-full flex-col items-end gap-1 empty:hidden rtl:items-start">
-									<div
-										class="relative max-w-[70%] rounded-3xl bg-token-message-surface px-5 py-2.5"
-									>
-										<div class="whitespace-pre-wrap">
-											{@render children?.()}
-										</div>
-									</div>
-								</div>
+							<div class="flex w-full flex-col gap-1 first:pt-[3px] empty:hidden">
+								{@render children?.()}
+								<!-- <Katex math={text} finishRendering={() => {}} /> -->
 							</div>
 						</div>
 					</div>
