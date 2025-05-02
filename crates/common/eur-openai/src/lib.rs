@@ -2,7 +2,7 @@ use base64::engine::general_purpose;
 use base64::prelude::*;
 use config::{Config, Environment, File};
 use dotenv::dotenv;
-use eur_prompt_kit::{Message, MessageContent, Role};
+use eur_prompt_kit::{LLMMessage, MessageContent, Role};
 use eur_util::flatten_transcript_with_highlight;
 use futures::Stream;
 use image;
@@ -104,7 +104,7 @@ impl OpenAI {
 
     pub async fn video_question(
         &mut self,
-        messages: Vec<Message>,
+        messages: Vec<LLMMessage>,
     ) -> Result<impl Stream<Item = Result<ChatCompletionResponseForStream, APIError>>, String> {
         if messages.is_empty() {
             return Err("Messages cannot be empty".to_string());

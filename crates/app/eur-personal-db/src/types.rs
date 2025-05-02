@@ -1,15 +1,16 @@
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use sqlx::sqlite::SqlitePool;
-
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Serialize, Deserialize)]
 pub struct Conversation {
     pub id: String,
     pub title: String,
-    pub created_at: String,
-    pub updated_at: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub id: String,
     pub conversation_id: String,
@@ -17,8 +18,8 @@ pub struct ChatMessage {
     pub content: String,
     pub visible: bool,
 
-    pub created_at: String,
-    pub updated_at: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Activity table structure
