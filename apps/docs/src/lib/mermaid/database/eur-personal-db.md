@@ -6,11 +6,13 @@ This diagram visualizes the SQLite database schema used by Eurora for storing an
 
 ```mermaid
 erDiagram
-    activity ||--o{ activity_asset : "has many assets"
-    activity ||--o{ activity_snapshot : "has many snapshots"
-    frame ||--o{ activity_snapshot : "appears in many snapshots"
-    video_chunk ||--o{ frame : "contains many frames"
-    frame ||--o{ frame_text : "has many text extractions"
+    Activity ||--o{ ActivityAsset : "has many assets"
+    Activity ||--o{ ActivitySnapshot : "has many snapshots"
+    Frame ||--o{ ActivitySnapshot : "appears in many snapshots"
+    VideoChunk ||--o{ Frame : "contains many frames"
+    Frame ||--o{ FrameText : "has many text extractions"
+    Conversation ||--o{ ChatMessage : "has many messages"
+    ChatMessage ||--o{ ActivityAsset : "has many assets"
 
     Conversation {
         uuid id PK
@@ -22,6 +24,7 @@ erDiagram
 
     ChatMessage {
         uuid id PK
+        uuid conversation_id FK
         string role
         string content
         bool visible
@@ -33,11 +36,12 @@ erDiagram
     %% Table for tracking each individual Activity. Can be different apps, different tabs or even more granular domain sub url activities (e.g. Youtube ?watch id's)
     Activity {
         uuid id PK
-
         string name
         string app_name
         string window_name
-        datetime started_at
+        int64 duration
+
+        datetime created_at
         datetime ended_at
     }
 
