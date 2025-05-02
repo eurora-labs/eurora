@@ -59,14 +59,14 @@ pub fn set_application_namespace(identifier: impl Into<String>) {
 fn entry_for(handle: &str, namespace: Namespace) -> Result<keyring::Entry> {
     let ns = match namespace {
         Namespace::BuildKind => NAMESPACE.lock().unwrap().clone(),
-        Namespace::Global => "gitbutler".into(),
+        Namespace::Global => "eurora".into(),
     };
     Ok(keyring::Entry::new(
         &format!(
             "{prefix}-{handle}",
             prefix = if ns.is_empty() { "development" } else { &ns }
         ),
-        "GitButler",
+        "Eurora",
     )?)
 }
 

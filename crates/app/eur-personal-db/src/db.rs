@@ -12,6 +12,7 @@ use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::types::Uuid;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::try_join;
 use tracing::{debug, error, warn};
 
 use std::collections::BTreeMap;
@@ -113,16 +114,16 @@ impl DatabaseManager {
     pub async fn get_conversation(
         &self,
         conversation_id: &str,
-    ) -> Result<Option<Conversation>, sqlx::Error> {
+    ) -> Result<Conversation, sqlx::Error> {
         let conversation = sqlx::query_as(
             r#"
             SELECT id, title, created_at, updated_at
             FROM conversation
             WHERE id = ?
-            "#,
+             "#,
         )
         .bind(conversation_id)
-        .fetch_optional(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
 
         Ok(conversation)
@@ -140,6 +141,26 @@ impl DatabaseManager {
         .await?;
 
         Ok(conversations)
+    }
+
+    pub async fn get_conversation_with_messages(
+        &self,
+        conversation_id: &str,
+    ) -> Result<(Conversation, Vec<ChatMessage>), sqlx::Error> {
+        let conversation = self.get_conversation(conversation_id).await?;
+        let messages = self.get_chat_messages(conversation_id).await?;
+
+        // let conversation = self.get_conversation(conversation_id).await?;
+        // let messages = self.get_chat_messages(conversation_id);
+
+        // Use future to wait in parallel
+        // let (conversation, messages) = try_join!(conversation, messages)?;
+
+        eprintln!("Conversation: {:?}", conversation);
+        eprintln!("Messages: {:?}", messages);
+
+        Ok((conversation, messages))
+        // Ok((conversation, vec![]))
     }
 
     pub async fn insert_chat_message(
