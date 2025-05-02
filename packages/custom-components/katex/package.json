@@ -21,12 +21,6 @@
 	"svelte": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"type": "module",
-	"exports": {
-		".": {
-			"types": "./dist/index.js",
-			"svelte": "./dist/index.d.ts"
-		}
-	},
 	"peerDependencies": {
 		"svelte": "^5.28.2"
 	},
@@ -53,5 +47,11 @@
 		"unified": "^11.0.5",
 		"vite": "^6.3.4",
 		"vitest": "^3.1.2"
+	},
+	"exports": {
+		".": {
+			"types": "./src/lib/index.ts",
+			"svelte": "./src/lib/index.ts"
+		}
 	}
 }
