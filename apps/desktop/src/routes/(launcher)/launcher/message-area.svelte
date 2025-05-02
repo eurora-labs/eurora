@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { ScrollArea, Card } from '@eurora/ui';
-	import SystemChatMessage from '$lib/components/SystemChatMessage.svelte';
-	import UserChatMessage from '$lib/components/UserChatMessage.svelte';
+	import { ScrollArea, Card, SystemChatMessage, UserChatMessage } from '@eurora/ui';
+	// import SystemChatMessage from '$lib/components/SystemChatMessage.svelte';
+	// import UserChatMessage from '$lib/components/UserChatMessage.svelte';
 
 	import { ProtoChatMessage } from '@eurora/proto/questions_service';
+	import { Katex } from '@eurora/katex';
 
 	interface Props {
 		messages: ProtoChatMessage[];
@@ -18,7 +19,9 @@
 				{message.content}
 			</UserChatMessage>
 		{:else}
-			<SystemChatMessage text={message.content} />
+			<SystemChatMessage>
+				<Katex math={message.content} finishRendering={() => {}} />
+			</SystemChatMessage>
 		{/if}
 	{/each}
 </ScrollArea>

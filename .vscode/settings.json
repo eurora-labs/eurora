@@ -7,6 +7,7 @@
 		"eurora",
 		"hmpbdoleeoankjfjcogiohcfojknnkdd",
 		"Katex",
+		"libsqlite",
 		"numpy",
 		"oneshot",
 		"opencv",
@@ -14,6 +15,7 @@
 		"protoc",
 		"protol",
 		"pybase",
+		"reqwest",
 		"rusqlite",
 		"serde",
 		"sqlx",
@@ -25,7 +27,8 @@
 		"wgpu",
 		"xcap",
 		"xorg",
-		"Zeroable"
+		"Zeroable",
+		"zerocopy"
 	],
 	"protoc": {
 		"options": ["--proto_path=proto"]
