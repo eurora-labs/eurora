@@ -6,59 +6,92 @@ This diagram visualizes the SQLite database schema used by Eurora for storing an
 
 ```mermaid
 erDiagram
-    activity ||--o{ activity_asset : "has many assets"
-    activity ||--o{ activity_snapshot : "has many snapshots"
-    frame ||--o{ activity_snapshot : "appears in many snapshots"
-    video_chunk ||--o{ frame : "contains many frames"
-    frame ||--o{ frame_text : "has many text extractions"
+    Activity ||--o{ ActivityAsset : "has many assets"
+    Activity ||--o{ ActivitySnapshot : "has many snapshots"
+    Frame ||--o{ ActivitySnapshot : "appears in many snapshots"
+    VideoChunk ||--o{ Frame : "contains many frames"
+    Frame ||--o{ FrameText : "has many text extractions"
+    Conversation ||--o{ ChatMessage : "has many messages"
+    ChatMessage ||--o{ ActivityAsset : "has many assets"
 
-    %% Table for tracking each individual activity. Can be different apps, different tabs or even more granular domain sub url activities (e.g. Youtube ?watch id's)
-    activity {
+    Conversation {
         uuid id PK
+        string title
 
-        string name
-        string app_name
-        string window_name
-        datetime started_at
-        datetime ended_at
-    }
-
-    %% Table for references to heavier prompt helpers that don't need to be collected regularly
-    activity_asset {
-        uuid id PK
-        uuid activity_id FK
-
-        JSONB data
         datetime created_at
         datetime updated_at
     }
 
-    activity_snapshot {
+    ChatMessage {
+        uuid id PK
+        uuid conversation_id FK
+        string role
+        string content
+        %% Messages compiled from assets and snapshots are hidden
+        bool visible
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% Table for tracking each individual Activity. Can be different apps, different tabs or even more granular domain sub url activities (e.g. Youtube ?watch id's)
+    Activity {
+        uuid id PK
+        string name
+        string app_name
+        string window_name
+        int64 duration
+
+        datetime created_at
+        datetime ended_at
+    }
+
+    %% Table for references to heavier prompt helpers that don't need to be collected regularly
+    ActivityAsset {
+        uuid id PK
+        uuid activity_id FK
+        JSONB data
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    ActivitySnapshot {
         uuid id PK
         uuid frame_id FK
         uuid activity_id FK
+
+        datetime created_at
+        datetime updated_at
     }
 
-    video_chunk {
+    VideoChunk {
         uuid id PK
-
         string file_path
+
+        datetime created_at
+        datetime updated_at
     }
 
-    frame {
+    Frame {
         uuid id PK
         uuid video_chunk_id FK
-
         int relative_index
+
+        datetime created_at
+        datetime updated_at
     }
 
-    frame_text {
+    FrameText {
         uuid id PK
         uuid frame_id FK
 
         string text
         string text_json
         string ocr_engine
+
+        datetime created_at
+        datetime updated_at
     }
 
 ```
