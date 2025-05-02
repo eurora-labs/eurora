@@ -1,5 +1,25 @@
 -- Create tables for Eurora database
 
+-- Table for conversation history
+CREATE TABLE conversation (
+    id TEXT PRIMARY KEY,         -- UUID
+    title TEXT NOT NULL,          -- Conversation name
+    created_at TEXT NOT NULL,    -- ISO8601 datetime when conversation was created
+    updated_at TEXT NOT NULL     -- ISO8601 datetime when conversation was last updated
+);
+
+-- Table for conversation messages
+CREATE TABLE chat_message (
+    id TEXT PRIMARY KEY,         -- UUID
+    conversation_id TEXT NOT NULL, -- Foreign key to conversation
+    role TEXT NOT NULL,          -- Role of the message sender (user or assistant)
+    content TEXT NOT NULL,       -- Content of the message
+    visible BOOLEAN NOT NULL,    -- Visibility of the message (true or false)
+    created_at TEXT NOT NULL,    -- ISO8601 datetime when message was created
+    updated_at TEXT NOT NULL,    -- ISO8601 datetime when message was last updated
+    FOREIGN KEY (conversation_id) REFERENCES conversation(id)
+);
+
 -- Table for tracking each individual activity
 CREATE TABLE activity (
     id TEXT PRIMARY KEY,         -- UUID
@@ -59,3 +79,4 @@ CREATE INDEX idx_activity_snapshot_activity_id ON activity_snapshot(activity_id)
 CREATE INDEX idx_activity_snapshot_frame_id ON activity_snapshot(frame_id);
 CREATE INDEX idx_frame_video_chunk_id ON frame(video_chunk_id);
 CREATE INDEX idx_frame_text_frame_id ON frame_text(frame_id);
+CREATE INDEX idx_chat_message_conversation_id ON chat_message(conversation_id);
