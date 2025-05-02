@@ -156,6 +156,18 @@ impl OpenAI {
                 tool_calls: None,
                 tool_call_id: None,
             });
+        } else if let MessageContent::Text(text_message) = &first_message.content {
+            openai_messages.push(chat_completion::ChatCompletionMessage {
+                role: match first_message.role {
+                    Role::User => chat_completion::MessageRole::user,
+                    Role::System => chat_completion::MessageRole::system,
+                    Role::Assistant => chat_completion::MessageRole::assistant, // Should not happen for first message usually
+                },
+                content: chat_completion::Content::Text(text_message.text.clone()),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
+            });
         } else {
             return Err("First message must be of type MessageContent::Image".to_string());
         }

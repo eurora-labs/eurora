@@ -89,19 +89,19 @@ impl DatabaseManager {
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
     ) -> Result<Conversation, sqlx::Error> {
-        let id = sqlx::query(
+        let id = Uuid::new_v4().to_string();
+        sqlx::query(
             r#"
             INSERT INTO conversation (id, title, created_at, updated_at)
             VALUES (?, ?, ?, ?)
             "#,
         )
-        .bind(Uuid::new_v4().to_string())
+        .bind(id.clone())
         .bind(title)
         .bind(created_at)
         .bind(updated_at)
         .execute(&self.pool)
-        .await?
-        .last_insert_rowid();
+        .await?;
 
         Ok(Conversation {
             id: id.to_string(),
@@ -148,7 +148,7 @@ impl DatabaseManager {
         conversation_id: &str,
     ) -> Result<(Conversation, Vec<ChatMessage>), sqlx::Error> {
         let conversation = self.get_conversation(conversation_id).await?;
-        let messages = self.get_chat_messages(conversation_id).await?;
+        // let messages = self.get_chat_messages(conversation_id).await?;
 
         // let conversation = self.get_conversation(conversation_id).await?;
         // let messages = self.get_chat_messages(conversation_id);
@@ -157,10 +157,10 @@ impl DatabaseManager {
         // let (conversation, messages) = try_join!(conversation, messages)?;
 
         eprintln!("Conversation: {:?}", conversation);
-        eprintln!("Messages: {:?}", messages);
+        // eprintln!("Messages: {:?}", messages);
 
-        Ok((conversation, messages))
-        // Ok((conversation, vec![]))
+        // Ok((conversation, messages))
+        Ok((conversation, vec![]))
     }
 
     pub async fn insert_chat_message(

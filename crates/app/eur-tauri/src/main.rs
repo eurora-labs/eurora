@@ -227,14 +227,16 @@ fn main() {
                     let db_path = get_db_path(app_handle);
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        match DatabaseManager::new(&db_path).await {
-                            Ok(db_manager) => {
-                                db_app_handle
-                                    .manage(Arc::new(db_manager).clone() as SharedPersonalDb);
-                                info!("Database manager initialized successfully");
-                            }
-                            Err(e) => error!("Failed to initialize database manager: {}", e),
-                        }
+                        let db = create_shared_database_manager(&db_app_handle).await;
+                        db_app_handle.manage(db.clone());
+                        // match DatabaseManager::new(&db_path).await {
+                        //     Ok(db_manager) => {
+                        //         db_app_handle
+                        //             .manage(Arc::new(db_manager).clone() as SharedPersonalDb);
+                        //         eprintln!("Database manager initialized successfully");
+                        //     }
+                        //     Err(e) => error!("Failed to initialize database manager: {}", e),
+                        // }
                     });
                     // let storage_init_handle = conversation_storage.clone();
                     // tauri::async_runtime::spawn(async move {
@@ -563,7 +565,9 @@ async fn continue_conversation(
         true,
         Utc::now(),
         Utc::now(),
-    );
+    )
+    .await
+    .unwrap();
 
     let chat_messages = db
         .get_chat_messages(&conversation_id)
@@ -625,7 +629,9 @@ async fn continue_conversation(
             true,
             Utc::now(),
             Utc::now(),
-        );
+        )
+        .await
+        .unwrap();
         eprintln!(
             "Added assistant response to conversation {}",
             conversation_id
@@ -851,6 +857,21 @@ async fn ask_video_question(
         }),
     });
 
+    // let mut old_messages: Vec<ProtoChatMessage> = messages
+    //     .iter()
+    //     .map(|msg| {
+    //         let role = match msg.role {
+    //             eur_prompt_kit::Role::User => "USER".to_string(),
+    //             eur_prompt_kit::Role::Assistant => "SYSTEM".to_string(),
+    //             _ => "SYSTEM".to_string(),
+    //         };
+    //         return ProtoChatMessage {
+    //             role,
+    //             content: msg.content.into().te,
+    //         };
+    //     })
+    //     .collect();
+
     let state: tauri::State<SharedOpenAIClient> = app_handle.state();
     let mut guard = state.lock().await;
     let client = guard
@@ -867,6 +888,8 @@ async fn ask_video_question(
             .map_err(|e| format!("Failed to insert conversation: {}", e))?;
 
         conversation_id = conversation.id.clone();
+
+        eprintln!("New conversation ID: {}", conversation_id);
 
         db.insert_chat_message(
             &conversation_id,
