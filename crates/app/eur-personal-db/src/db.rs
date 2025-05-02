@@ -9,6 +9,7 @@ use sqlx::TypeInfo;
 use sqlx::ValueRef;
 use sqlx::migrate::MigrateDatabase;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::types::Uuid;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, warn};
@@ -83,46 +84,117 @@ impl DatabaseManager {
 
     pub async fn insert_conversation(
         &self,
-        conversation: &Conversation,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
+        title: &str,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
+    ) -> Result<Conversation, sqlx::Error> {
+        let id = sqlx::query(
             r#"
             INSERT INTO conversation (id, title, created_at, updated_at)
             VALUES (?, ?, ?, ?)
             "#,
         )
-        .bind(conversation.id.clone())
-        .bind(conversation.title.clone())
-        .bind(conversation.created_at.clone())
-        .bind(conversation.updated_at.clone())
+        .bind(Uuid::new_v4().to_string())
+        .bind(title)
+        .bind(created_at)
+        .bind(updated_at)
         .execute(&self.pool)
+        .await?
+        .last_insert_rowid();
+
+        Ok(Conversation {
+            id: id.to_string(),
+            title: title.to_string(),
+            created_at,
+            updated_at,
+        })
+    }
+
+    pub async fn get_conversation(
+        &self,
+        conversation_id: &str,
+    ) -> Result<Option<Conversation>, sqlx::Error> {
+        let conversation = sqlx::query_as(
+            r#"
+            SELECT id, title, created_at, updated_at
+            FROM conversation
+            WHERE id = ?
+            "#,
+        )
+        .bind(conversation_id)
+        .fetch_optional(&self.pool)
         .await?;
 
-        Ok(())
+        Ok(conversation)
+    }
+
+    pub async fn list_conversations(&self) -> Result<Vec<Conversation>, sqlx::Error> {
+        let conversations = sqlx::query_as(
+            r#"
+            SELECT id, title, created_at, updated_at
+            FROM conversation
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(conversations)
     }
 
     pub async fn insert_chat_message(
         &self,
         conversation_id: &str,
-        message: &ChatMessage,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
+        role: &str,
+        content: &str,
+        visible: bool,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
+    ) -> Result<ChatMessage, sqlx::Error> {
+        let id = sqlx::query(
             r#"
             INSERT INTO chat_message (id, conversation_id, role, content, visible, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
         )
-        .bind(message.id.clone())
+        .bind(Uuid::new_v4().to_string())
         .bind(conversation_id)
-        .bind(message.role.clone())
-        .bind(message.content.clone())
-        .bind(message.visible)
-        .bind(message.created_at.clone())
-        .bind(message.updated_at.clone())
+        .bind(role)
+        .bind(content)
+        .bind(visible)
+        .bind(created_at)
+        .bind(updated_at)
         .execute(&self.pool)
+        .await?
+        .last_insert_rowid();
+
+        Ok(ChatMessage {
+            id: id.to_string(),
+            conversation_id: conversation_id.to_string(),
+            role: role.to_string(),
+            content: content.to_string(),
+            visible,
+            created_at,
+            updated_at,
+        })
+    }
+
+    pub async fn get_chat_messages(
+        &self,
+        conversation_id: &str,
+    ) -> Result<Vec<ChatMessage>, sqlx::Error> {
+        let messages = sqlx::query_as(
+            r#"
+            SELECT id, role, content, visible, created_at, updated_at
+            FROM chat_message
+            WHERE conversation_id = ?
+            "#,
+        )
+        .bind(conversation_id)
+        .fetch_all(&self.pool)
         .await?;
 
-        Ok(())
+        Ok(messages)
     }
 
     pub async fn insert_activity(&self, activity: &Activity) -> Result<(), sqlx::Error> {
