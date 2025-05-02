@@ -23,7 +23,6 @@
 	type Conversation = {
 		id: string;
 		title: string;
-		messages: ChatMessage[];
 		created_at: number;
 		updated_at: number;
 	};
@@ -286,33 +285,25 @@
 		try {
 			// Clear current messages and load messages from the selected conversation
 			messages.splice(0, messages.length);
-			const conversation = (await invoke('get_conversation', {
+			const [conversation, chat_messages] = (await invoke('get_conversation_with_messages', {
 				conversationId: id
-			})) as Conversation;
+			})) as [Conversation, ChatMessage[]];
 
 			if (conversation && conversation.id) {
 				console.log('Switched to conversation:', conversation);
-				conversation.messages = [];
 
-				conversation.messages.push({
-					id: 'test',
-					role: 'system',
-					content: 'This is a test message',
-					visible: true,
-					created_at: 5,
-					updated_at: 5
-				});
+				chat_messages.push({
+					role: 'user',
+					content: 'test sfadf asdf sdiong sfdipgn siodnv psodmv pisdnpin'
+				} as any);
 
 				// Load messages from this conversation
-				if (conversation.messages) {
+				if (chat_messages) {
 					// Convert the conversation messages to ProtoChatMessage format
-					const conversationMessages = (conversation as Conversation).messages.map((msg) => ({
-						role: msg.role,
-						content: msg.content
-					}));
 
 					// Update the messages array with the conversation messages
-					messages.splice(0, messages.length, ...conversationMessages);
+					// messages.splice(0, messages.length, ...conversationMessages);
+					messages.splice(0, messages.length, ...chat_messages);
 					console.log('Loaded messages:', messages);
 				}
 			}
@@ -412,7 +403,7 @@
 				</ScrollArea>
 			{/if}
 
-			<div class="message-scroll-area flex-grow overflow-auto">
+			<div class="message-scroll-area w-full flex-grow overflow-auto">
 				<MessageArea {messages} />
 			</div>
 		{/if}
