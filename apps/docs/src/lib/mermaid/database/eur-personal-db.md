@@ -12,8 +12,26 @@ erDiagram
     video_chunk ||--o{ frame : "contains many frames"
     frame ||--o{ frame_text : "has many text extractions"
 
-    %% Table for tracking each individual activity. Can be different apps, different tabs or even more granular domain sub url activities (e.g. Youtube ?watch id's)
-    activity {
+    Conversation {
+        uuid id PK
+        string title
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    ChatMessage {
+        uuid id PK
+        string role
+        string content
+        bool visible
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% Table for tracking each individual Activity. Can be different apps, different tabs or even more granular domain sub url activities (e.g. Youtube ?watch id's)
+    Activity {
         uuid id PK
 
         string name
@@ -24,41 +42,52 @@ erDiagram
     }
 
     %% Table for references to heavier prompt helpers that don't need to be collected regularly
-    activity_asset {
+    ActivityAsset {
         uuid id PK
         uuid activity_id FK
-
+        uuid chat_message_id FK
         JSONB data
+
         datetime created_at
         datetime updated_at
     }
 
-    activity_snapshot {
+    ActivitySnapshot {
         uuid id PK
         uuid frame_id FK
         uuid activity_id FK
+
+        datetime created_at
+        datetime updated_at
     }
 
-    video_chunk {
+    VideoChunk {
         uuid id PK
-
         string file_path
+
+        datetime created_at
+        datetime updated_at
     }
 
-    frame {
+    Frame {
         uuid id PK
         uuid video_chunk_id FK
-
         int relative_index
+
+        datetime created_at
+        datetime updated_at
     }
 
-    frame_text {
+    FrameText {
         uuid id PK
         uuid frame_id FK
 
         string text
         string text_json
         string ocr_engine
+
+        datetime created_at
+        datetime updated_at
     }
 
 ```
