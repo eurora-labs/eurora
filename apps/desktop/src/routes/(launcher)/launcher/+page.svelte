@@ -284,19 +284,27 @@
 	// Function to switch to a selected conversation
 	async function switchConversation(id: string) {
 		try {
-			await invoke('switch_conversation', { conversationId: id });
-			currentConversationId = id;
-
 			// Clear current messages and load messages from the selected conversation
 			messages.splice(0, messages.length);
+			const conversation = (await invoke('get_conversation', {
+				conversationId: id
+			})) as Conversation;
 
-			// Get the conversation details
-			const conversation = await invoke('get_current_conversation');
-			if (conversation && (conversation as Conversation).id) {
+			if (conversation && conversation.id) {
 				console.log('Switched to conversation:', conversation);
+				conversation.messages = [];
+
+				conversation.messages.push({
+					id: 'test',
+					role: 'System',
+					content: 'This is a test message',
+					visible: true,
+					created_at: 5,
+					updated_at: 5
+				});
 
 				// Load messages from this conversation
-				if ((conversation as Conversation).messages) {
+				if (conversation.messages) {
 					// Convert the conversation messages to ProtoChatMessage format
 					const conversationMessages = (conversation as Conversation).messages.map((msg) => ({
 						role: msg.role,
