@@ -1,0 +1,93 @@
+# Eurora SQLite Database Structure
+
+This diagram visualizes the SQLite database schema used by Eurora for storing and managing various data types.
+
+## Entity Relationship Diagram
+
+```mermaid
+erDiagram
+    activity ||--o{ activity_asset : "has many assets"
+    activity ||--o{ activity_snapshot : "has many snapshots"
+    frame ||--o{ activity_snapshot : "appears in many snapshots"
+    video_chunk ||--o{ frame : "contains many frames"
+    frame ||--o{ frame_text : "has many text extractions"
+
+    Conversation {
+        uuid id PK
+        string title
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    ChatMessage {
+        uuid id PK
+        string role
+        string content
+        bool visible
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% Table for tracking each individual Activity. Can be different apps, different tabs or even more granular domain sub url activities (e.g. Youtube ?watch id's)
+    Activity {
+        uuid id PK
+
+        string name
+        string app_name
+        string window_name
+        datetime started_at
+        datetime ended_at
+    }
+
+    %% Table for references to heavier prompt helpers that don't need to be collected regularly
+    ActivityAsset {
+        uuid id PK
+        uuid activity_id FK
+        uuid chat_message_id FK
+        JSONB data
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    ActivitySnapshot {
+        uuid id PK
+        uuid frame_id FK
+        uuid activity_id FK
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    VideoChunk {
+        uuid id PK
+        string file_path
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    Frame {
+        uuid id PK
+        uuid video_chunk_id FK
+        int relative_index
+
+        datetime created_at
+        datetime updated_at
+    }
+
+    FrameText {
+        uuid id PK
+        uuid frame_id FK
+
+        string text
+        string text_json
+        string ocr_engine
+
+        datetime created_at
+        datetime updated_at
+    }
+
+```
