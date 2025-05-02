@@ -2000,6 +2000,7 @@ dependencies = [
  "eur-client-questions",
  "eur-native-messaging",
  "eur-openai",
+ "eur-personal-db",
  "eur-prompt-kit",
  "eur-proto",
  "eur-renderer",
