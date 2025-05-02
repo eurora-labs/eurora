@@ -35,7 +35,7 @@ pub enum MessageContent {
     Image(ImageContent),
 }
 
-pub struct Message {
+pub struct LLMMessage {
     pub role: Role,
     pub content: MessageContent,
 }
@@ -45,6 +45,6 @@ pub struct LLMRequest {
     pub endpoint: String,
     pub model: String,
 
-    pub messages: Vec<Message>,
+    pub messages: Vec<LLMMessage>,
     // Add extra parameters when functionality expands
 }
