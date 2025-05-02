@@ -19,7 +19,7 @@ use zerocopy::FromBytes;
 
 use futures::future::try_join_all;
 
-use crate::types::{Activity, ActivityAsset};
+use crate::types::{Activity, ActivityAsset, ChatMessage, Conversation};
 
 pub struct DatabaseManager {
     pub pool: SqlitePool,
@@ -79,6 +79,50 @@ impl DatabaseManager {
             Ok(_) => Ok(()),
             Err(e) => Err(e.into()),
         }
+    }
+
+    pub async fn insert_conversation(
+        &self,
+        conversation: &Conversation,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO conversation (id, title, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            "#,
+        )
+        .bind(conversation.id.clone())
+        .bind(conversation.title.clone())
+        .bind(conversation.created_at.clone())
+        .bind(conversation.updated_at.clone())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn insert_chat_message(
+        &self,
+        conversation_id: &str,
+        message: &ChatMessage,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO chat_message (id, conversation_id, role, content, visible, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(message.id.clone())
+        .bind(conversation_id)
+        .bind(message.role.clone())
+        .bind(message.content.clone())
+        .bind(message.visible)
+        .bind(message.created_at.clone())
+        .bind(message.updated_at.clone())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 
     pub async fn insert_activity(&self, activity: &Activity) -> Result<(), sqlx::Error> {
