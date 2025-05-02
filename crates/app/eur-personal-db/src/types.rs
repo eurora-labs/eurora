@@ -1,6 +1,26 @@
 use sqlx::FromRow;
 use sqlx::sqlite::SqlitePool;
 
+#[derive(FromRow, Debug)]
+pub struct Conversation {
+    pub id: String,
+    pub title: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(FromRow, Debug)]
+pub struct ChatMessage {
+    pub id: String,
+    pub conversation_id: String,
+    pub role: String,
+    pub content: String,
+    pub visible: bool,
+
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 /// Activity table structure
 #[derive(FromRow, Debug)]
 pub struct Activity {
@@ -18,6 +38,7 @@ pub struct ActivityAsset {
     pub id: String,
     pub activity_id: String,
     pub data: String, // JSON blob stored as text
+
     pub created_at: String,
     pub updated_at: String,
 }
