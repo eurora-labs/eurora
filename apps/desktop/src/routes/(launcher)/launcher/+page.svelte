@@ -23,7 +23,6 @@
 	type Conversation = {
 		id: string;
 		title: string;
-		messages: ChatMessage[];
 		created_at: number;
 		updated_at: number;
 	};
@@ -284,27 +283,27 @@
 	// Function to switch to a selected conversation
 	async function switchConversation(id: string) {
 		try {
-			await invoke('switch_conversation', { conversationId: id });
-			currentConversationId = id;
-
 			// Clear current messages and load messages from the selected conversation
 			messages.splice(0, messages.length);
+			const [conversation, chat_messages] = (await invoke('get_conversation_with_messages', {
+				conversationId: id
+			})) as [Conversation, ChatMessage[]];
 
-			// Get the conversation details
-			const conversation = await invoke('get_current_conversation');
-			if (conversation && (conversation as Conversation).id) {
+			if (conversation && conversation.id) {
 				console.log('Switched to conversation:', conversation);
 
+				chat_messages.push({
+					role: 'user',
+					content: 'test sfadf asdf sdiong sfdipgn siodnv psodmv pisdnpin'
+				} as any);
+
 				// Load messages from this conversation
-				if ((conversation as Conversation).messages) {
+				if (chat_messages) {
 					// Convert the conversation messages to ProtoChatMessage format
-					const conversationMessages = (conversation as Conversation).messages.map((msg) => ({
-						role: msg.role,
-						content: msg.content
-					}));
 
 					// Update the messages array with the conversation messages
-					messages.splice(0, messages.length, ...conversationMessages);
+					// messages.splice(0, messages.length, ...conversationMessages);
+					messages.splice(0, messages.length, ...chat_messages);
 					console.log('Loaded messages:', messages);
 				}
 			}
@@ -404,7 +403,7 @@
 				</ScrollArea>
 			{/if}
 
-			<div class="message-scroll-area flex-grow overflow-auto">
+			<div class="message-scroll-area w-full flex-grow overflow-auto">
 				<MessageArea {messages} />
 			</div>
 		{/if}
