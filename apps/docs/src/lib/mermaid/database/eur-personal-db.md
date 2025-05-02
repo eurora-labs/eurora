@@ -27,6 +27,7 @@ erDiagram
         uuid conversation_id FK
         string role
         string content
+        %% Messages compiled from assets and snapshots are hidden
         bool visible
 
         datetime created_at
@@ -49,7 +50,6 @@ erDiagram
     ActivityAsset {
         uuid id PK
         uuid activity_id FK
-        uuid chat_message_id FK
         JSONB data
 
         datetime created_at
