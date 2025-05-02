@@ -8,7 +8,7 @@ use tracing::info;
 // use eur_timeline::TimelineRef;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use eur_prompt_kit::Message;
+use eur_prompt_kit::LLMMessage;
 use serde::{Deserialize, Serialize};
 pub mod browser_activity;
 pub mod default_activity;
@@ -18,7 +18,7 @@ use default_activity::DefaultStrategy;
 
 #[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {
-    // 
+    //
     pub name: String,
     // image base64
     pub icon: String,
@@ -34,13 +34,13 @@ pub trait ActivityAsset: Send + Sync {
     fn get_name(&self) -> &String;
     fn get_icon(&self) -> Option<&String>;
 
-    fn construct_message(&self) -> Message;
+    fn construct_message(&self) -> LLMMessage;
 
     // fn get_display(&self) -> DisplayAsset;
 }
 
 pub trait ActivitySnapshot: Send + Sync {
-    fn construct_message(&self) -> Message;
+    fn construct_message(&self) -> LLMMessage;
 
     fn get_updated_at(&self) -> u64;
     fn get_created_at(&self) -> u64;

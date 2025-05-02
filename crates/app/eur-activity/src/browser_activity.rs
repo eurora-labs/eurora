@@ -10,7 +10,7 @@ use eur_proto::shared::ProtoImageFormat;
 use image::DynamicImage;
 use tokio::sync::Mutex;
 
-use eur_prompt_kit::{ImageContent, Message, MessageContent, Role, TextContent};
+use eur_prompt_kit::{ImageContent, LLMMessage, MessageContent, Role, TextContent};
 
 #[derive(Debug, Clone)]
 struct TranscriptLine {
@@ -97,8 +97,8 @@ impl ActivityAsset for YoutubeAsset {
         None
     }
 
-    fn construct_message(&self) -> Message {
-        Message {
+    fn construct_message(&self) -> LLMMessage {
+        LLMMessage {
             role: Role::User,
             content: MessageContent::Image(ImageContent {
                 text: Some(format!(
@@ -125,8 +125,8 @@ impl ActivityAsset for ArticleAsset {
         None
     }
 
-    fn construct_message(&self) -> Message {
-        Message {
+    fn construct_message(&self) -> LLMMessage {
+        LLMMessage {
             role: Role::User,
             content: MessageContent::Text(TextContent {
                 text: format!(
@@ -144,8 +144,8 @@ pub struct ArticleSnapshot {
 }
 
 impl ActivitySnapshot for ArticleSnapshot {
-    fn construct_message(&self) -> Message {
-        Message {
+    fn construct_message(&self) -> LLMMessage {
+        LLMMessage {
             role: Role::User,
             content: MessageContent::Text(TextContent {
                 text: format!(
@@ -200,8 +200,8 @@ impl From<ProtoYoutubeSnapshot> for YoutubeSnapshot {
 }
 
 impl ActivitySnapshot for YoutubeSnapshot {
-    fn construct_message(&self) -> Message {
-        Message {
+    fn construct_message(&self) -> LLMMessage {
+        LLMMessage {
             role: Role::User,
             content: MessageContent::Image(ImageContent {
                 text: None,

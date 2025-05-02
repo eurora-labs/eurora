@@ -7,7 +7,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use eur_activity::select_strategy_for_process;
-use eur_prompt_kit::Message;
+use eur_prompt_kit::LLMMessage;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -147,7 +147,7 @@ impl Timeline {
         activities.last().unwrap().get_display_assets()
     }
 
-    pub fn construct_asset_messages(&self) -> Vec<Message> {
+    pub fn construct_asset_messages(&self) -> Vec<LLMMessage> {
         let activities = self.activities.read();
         let last_activity = activities.last().unwrap();
 
