@@ -296,7 +296,7 @@
 
 				conversation.messages.push({
 					id: 'test',
-					role: 'System',
+					role: 'system',
 					content: 'This is a test message',
 					visible: true,
 					created_at: 5,
