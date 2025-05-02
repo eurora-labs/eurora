@@ -211,8 +211,7 @@ fn main() {
                     let app_handle_openai = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         let api_key =
-                            secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::BuildKind)
-                                .unwrap();
+                            secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::Global).unwrap();
                         if api_key.is_some() {
                             let client = eur_openai::OpenAI::with_api_key(&api_key.unwrap().0);
                             let state: tauri::State<SharedOpenAIClient> = app_handle_openai.state();
@@ -385,7 +384,7 @@ fn main() {
                     list_activities,
                     get_current_conversation,
                     switch_conversation,
-                    get_conversation,
+                    get_conversation_with_messages,
                     list_conversations,
                     check_api_key_exists,
                     save_api_key,
@@ -925,9 +924,7 @@ async fn ask_video_question(
 }
 
 #[tauri::command]
-async fn get_current_conversation(
-    app_handle: tauri::AppHandle,
-) -> Result<Option<Conversation>, String> {
+async fn get_current_conversation(app_handle: tauri::AppHandle) -> Result<Conversation, String> {
     let db = app_handle.state::<SharedPersonalDb>().clone();
     let current_conversation_id = app_handle.state::<SharedCurrentConversationId>().clone();
     Ok(db.get_conversation(&current_conversation_id).await.unwrap())
@@ -935,18 +932,17 @@ async fn get_current_conversation(
 
 // remember to call `.manage(MyState::default())`
 #[tauri::command]
-async fn get_conversation(
+async fn get_conversation_with_messages(
     app_handle: tauri::AppHandle,
     conversation_id: String,
-) -> Result<Conversation, String> {
+) -> Result<(Conversation, Vec<ChatMessage>), String> {
     let db = app_handle.state::<SharedPersonalDb>().clone();
     let conversation = db
-        .get_conversation(&conversation_id)
+        .get_conversation_with_messages(&conversation_id)
         .await
-        .map_err(|e| format!("Failed to get conversation: {}", e))
         .unwrap();
 
-    Ok(conversation.unwrap())
+    Ok(conversation)
 }
 
 #[tauri::command]
