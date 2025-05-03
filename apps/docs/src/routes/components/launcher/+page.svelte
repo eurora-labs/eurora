@@ -6,9 +6,7 @@
 </script>
 
 <div>
-	<div
-		class="launcher absolute left-1/2 top-1/4 h-[100px] w-[1100px] -translate-x-1/2 -translate-y-1/4"
-	>
+	<div class="launcher absolute left-1/2 top-1/4 w-[1100px] -translate-x-1/2">
 		<Launcher.Root class="rounded-lg border shadow-md">
 			<Launcher.Input placeholder="Search" />
 			<Launcher.List>
@@ -22,7 +20,7 @@
 						<Smile />
 						<span>Search Emoji</span>
 					</Launcher.Item>
-					<Launcher.Item disabled>
+					<Launcher.Item>
 						<Calculator />
 						<span>Calculator</span>
 					</Launcher.Item>
