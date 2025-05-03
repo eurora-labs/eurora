@@ -1,14 +1,16 @@
 <script lang="ts">
 	// import { Search } from '@lucide/svelte';
 	import { Input } from '@eurora/ui';
+	import { Launcher } from '@eurora/launcher';
 </script>
 
 <div>
 	<div
-		class="launcher absolute left-1/2 top-1/4 h-[150px] w-[1100px] -translate-x-1/2 -translate-y-1/4"
+		class="launcher absolute left-1/2 top-1/4 h-[100px] w-[1100px] -translate-x-1/2 -translate-y-1/4"
 	>
 		<!-- <Search /> -->
-		<Input type="text" placeholder="Eurora Search" class="h-full w-full border-none text-[32px]" />
+		<!-- <Input type="text" placeholder="Eurora Search" class="h-full w-full border-none text-[32px]" /> -->
+		<Launcher />
 	</div>
 	<img class=" w-full" src="/sample_background.jpg" alt="Sample Background" />
 </div>
