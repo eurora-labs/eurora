@@ -804,6 +804,9 @@ importers:
       '@eurora/ui':
         specifier: workspace:*
         version: link:../../ui
+      '@lucide/svelte':
+        specifier: ^0.507.0
+        version: 0.507.0(svelte@5.28.2)
       '@sveltejs/adapter-static':
         specifier: ^3.0.8
         version: 3.0.8(@sveltejs/kit@2.20.7(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.28.2)(vite@6.3.4(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.28.2)(vite@6.3.4(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))
@@ -1580,6 +1583,11 @@ packages:
 
   '@lucide/svelte@0.503.0':
     resolution: {integrity: sha512-Y7Q8pHnX2YG8Ef4a/VnYFN9tTAJS33MiS78vQtPiyp5iiWuBlTMoViMiRUxQb7U9Ro46RdJ0kpCADvvha3Z2rA==}
+    peerDependencies:
+      svelte: ^5
+
+  '@lucide/svelte@0.507.0':
+    resolution: {integrity: sha512-kXIg/2IHEo1bAwZG94fjA9O6+E3Sv5aQrW2yyPf4JvCYIUIF8DGLIQI4vfjoUyNq2dEX4cI33pZarzGOHr0npg==}
     peerDependencies:
       svelte: ^5
 
@@ -5897,6 +5905,10 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.0
 
   '@lucide/svelte@0.503.0(svelte@5.28.2)':
+    dependencies:
+      svelte: 5.28.2
+
+  '@lucide/svelte@0.507.0(svelte@5.28.2)':
     dependencies:
       svelte: 5.28.2
 
