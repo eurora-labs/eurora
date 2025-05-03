@@ -9,9 +9,9 @@
 	<div
 		class="launcher absolute left-1/2 top-1/4 h-[100px] w-[1100px] -translate-x-1/2 -translate-y-1/4"
 	>
-		<Launcher.Root class="h-full rounded-lg border shadow-md">
+		<Launcher.Root class="rounded-lg border shadow-md">
 			<Launcher.Input placeholder="Search" />
-			<!-- <Launcher.List>
+			<Launcher.List>
 				<Launcher.Empty>No results found.</Launcher.Empty>
 				<Launcher.Group heading="Suggestions">
 					<Launcher.Item>
@@ -45,7 +45,7 @@
 						<Launcher.Shortcut>⌘S</Launcher.Shortcut>
 					</Launcher.Item>
 				</Launcher.Group>
-			</Launcher.List> -->
+			</Launcher.List>
 		</Launcher.Root>
 		<!-- <Search /> -->
 		<!-- <Input type="text" placeholder="Eurora Search" class="h-full w-full border-none text-[32px]" /> -->
