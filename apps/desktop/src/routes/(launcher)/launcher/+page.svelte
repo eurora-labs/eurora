@@ -112,7 +112,7 @@
 
 		if (backdropCustom2Ref) {
 			backdropCustom2Ref.style.backgroundImage = `url('${event.payload}')`;
-			backdropCustom2Ref.style.backgroundSize = '100%';
+			backdropCustom2Ref.style.backgroundSize = '150%';
 			backdropCustom2Ref.style.backgroundPosition = 'center';
 			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
 		}
@@ -419,7 +419,7 @@
 	</div>
 </div>
 <div
-	class="backdrop-custom-2 fixed left-0 top-0 h-screen w-screen"
+	class="backdrop-custom-2 fixed left-[-50px] top-[-50px] h-screen w-screen"
 	bind:this={backdropCustom2Ref}
 ></div>
 
@@ -435,8 +435,11 @@
 		filter: blur(18px);
 		-webkit-filter: blur(18px);
 
+		width: 110vw;
+		height: 120vh;
+
 		z-index: 1;
 
-		background-color: rgba(128, 128, 128, 0.5);
+		background-color: rgba(0, 0, 0, 1);
 	}
 </style>
