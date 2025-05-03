@@ -18,15 +18,15 @@
 	"sideEffects": [
 		"**/*.css"
 	],
-	"svelte": "./dist/index.js",
-	"types": "./dist/index.d.ts",
+	"svelte": "./src/index.js",
 	"type": "module",
+	"private": false,
 	"peerDependencies": {
 		"svelte": "^5.28.2"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^4.0.0",
 		"@eurora/typescript-config": "workspace:*",
+		"@eurora/ui": "workspace:*",
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.20.7",
 		"@sveltejs/package": "^2.3.11",
@@ -34,13 +34,7 @@
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
 		"publint": "^0.3.12",
-		"rehype-katex": "^7.0.1",
-		"rehype-stringify": "^10.0.1",
-		"rehype-raw": "^7.0.0",
-		"remark-gfm": "^4.0.1",
-		"remark-math": "^6.0.0",
-		"remark-parse": "^11.0.0",
-		"remark-rehype": "^11.1.2",
+		"bits-ui": "^1.4.2",
 		"svelte": "^5.28.2",
 		"svelte-check": "^4.1.6",
 		"typescript": "^5.8.3",
@@ -49,9 +43,7 @@
 		"vitest": "^3.1.2"
 	},
 	"exports": {
-		".": {
-			"types": "./src/lib/index.ts",
-			"svelte": "./src/lib/index.ts"
-		}
+		".": "./dist/index.js",
+		"./*": "./dist/*"
 	}
 }
