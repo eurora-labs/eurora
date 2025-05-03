@@ -15,18 +15,16 @@
 		"test:integration": "playwright test",
 		"test:unit": "vitest"
 	},
-	"dependencies": {
-		"@eurora/ui": "workspace:*",
-		"@lucide/svelte": "^0.503.0"
-	},
 	"devDependencies": {
 		"@eurora/eslint-config": "workspace:*",
-		"@eurora/typescript-config": "workspace:*",
 		"@eurora/launcher": "workspace:*",
-		"@sveltejs/adapter-auto": "^3.3.1",
+		"@eurora/typescript-config": "workspace:*",
+		"@sveltejs/adapter-auto": "^6.0.0",
+		"@eurora/ui": "workspace:*",
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.20.4",
 		"@sveltejs/vite-plugin-svelte": "^5.0.3",
+		"@lucide/svelte": "^0.507.0",
 		"eslint": "^9.25.1",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
