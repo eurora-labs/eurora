@@ -419,7 +419,7 @@
 	</div>
 </div>
 <div
-	class="backdrop-custom-2 absolute left-0 top-0 h-screen w-screen"
+	class="backdrop-custom-2 fixed left-0 top-0 h-screen w-screen"
 	bind:this={backdropCustom2Ref}
 ></div>
 
@@ -437,6 +437,6 @@
 
 		z-index: 1;
 
-		background-color: rgba(255, 255, 255, 0.5);
+		background-color: rgba(128, 128, 128, 0.5);
 	}
 </style>
