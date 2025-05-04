@@ -1,2 +1,2 @@
-import * as Launcher from './components';
+import * as Launcher from './components/bits-command';
 export { Launcher };
