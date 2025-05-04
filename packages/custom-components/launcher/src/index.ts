@@ -1,2 +1,4 @@
 import * as Launcher from './components/bits-command';
-export { Launcher };
+
+import * as LauncherNative from './components/native-command';
+export { Launcher, LauncherNative };
