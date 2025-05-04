@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 	import { cn } from '@eurora/ui/utils.js';
 
 	let {
@@ -8,10 +7,10 @@
 		disabled = false,
 		value = '',
 		children,
+		select,
+		keydown,
 		...restProps
 	} = $props();
-
-	const dispatch = createEventDispatcher();
 
 	// Track if item is selected/highlighted
 	let selected = false;
@@ -19,7 +18,7 @@
 	// Handle click events
 	function handleClick(event: MouseEvent) {
 		if (!disabled) {
-			dispatch('select', { value });
+			select({ value });
 		}
 	}
 
@@ -29,10 +28,10 @@
 
 		if (event.key === 'Enter' || event.key === ' ') {
 			event.preventDefault();
-			dispatch('select', { value });
+			select({ value });
 		}
 
-		dispatch('keydown', event);
+		keydown(event);
 	}
 </script>
 
