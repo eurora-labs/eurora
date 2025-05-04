@@ -28,9 +28,12 @@
 		'text-popover-foreground flex h-full w-full flex-col overflow-hidden rounded-md border-none',
 		className
 	)}
+	tabindex="0"
 	bind:this={ref}
-	on:keydown={handleKeyDown}
+	onkeydown={handleKeyDown}
 	role="combobox"
+	aria-controls="listbox"
+	aria-expanded="false"
 	aria-haspopup="listbox"
 	data-command-root
 >
