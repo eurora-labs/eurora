@@ -7,7 +7,7 @@
 	let {
 		ref = $bindable<HTMLTextAreaElement | null>(null),
 		value = $bindable(''),
-		minRows = $bindable(1),
+		minRows = $bindable(2),
 		maxRows = $bindable(Infinity),
 		class: className,
 		...restProps
@@ -114,9 +114,15 @@
 	bind:this={ref}
 	bind:value
 	class={cn(
-		'flex w-full resize-none overflow-hidden rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+		'border-input placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-none overflow-hidden rounded-md border bg-transparent px-3 py-2 text-base shadow-sm focus-visible:outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
 		className
 	)}
-	on:input={adjustHeight}
+	oninput={adjustHeight}
 	{...restProps}
 ></textarea>
+
+<style>
+	textarea::placeholder {
+		color: rgba(0, 0, 0, 0.25);
+	}
+</style>
