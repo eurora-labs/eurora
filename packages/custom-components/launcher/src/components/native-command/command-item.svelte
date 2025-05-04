@@ -45,8 +45,8 @@
 	aria-selected={selected}
 	data-disabled={disabled || undefined}
 	tabindex={disabled ? -1 : 0}
-	on:click={handleClick}
-	on:keydown={handleKeyDown}
+	onclick={handleClick}
+	onkeydown={handleKeyDown}
 	data-command-item
 	{...restProps}
 >
