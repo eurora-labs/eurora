@@ -2,8 +2,7 @@
 	"extends": ["@eurora/typescript-config/svelte"],
 	"compilerOptions": {
 		"target": "ES2022",
-		"module": "NodeNext",
-		"moduleResolution": "NodeNext",
+		"module": "Node16",
 		"outDir": "./build",
 		"rootDir": "./src",
 		"strict": true,
