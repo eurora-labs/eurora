@@ -6,7 +6,7 @@
 		ref = $bindable(null),
 		class: className = '',
 		children,
-		keydown
+		keydown = $bindable(() => {})
 	} = $props();
 
 	// Store for active item index and filtered items

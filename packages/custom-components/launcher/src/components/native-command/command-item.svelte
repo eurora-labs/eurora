@@ -7,8 +7,8 @@
 		disabled = false,
 		value = '',
 		children,
-		select,
-		keydown,
+		select = $bindable(() => {}),
+		keydown = $bindable(() => {}),
 		...restProps
 	} = $props();
 
