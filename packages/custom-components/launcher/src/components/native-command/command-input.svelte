@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 	import { Search } from '@lucide/svelte';
 	import { cn } from '@eurora/ui/utils.js';
 
@@ -10,21 +9,21 @@
 		height = $bindable('100px'),
 		placeholder = 'Type a command or search...',
 		disabled = false,
+		input,
+		keydown,
 		...restProps
 	} = $props();
-
-	const dispatch = createEventDispatcher();
 
 	// Handle input event to update value and dispatch event
 	function handleInput(event: Event) {
 		const target = event.target as HTMLInputElement;
 		value = target.value;
-		dispatch('input', { value });
+		input(value);
 	}
 
 	// Handle keydown for special keys like arrow keys, enter, escape
 	function handleKeyDown(event: KeyboardEvent) {
-		dispatch('keydown', event);
+		keydown(event);
 	}
 </script>
 
@@ -49,9 +48,3 @@
 		{...restProps}
 	/>
 </div>
-
-<style>
-	:global(.custom-input::placeholder) {
-		color: rgba(0, 0, 0, 0.25);
-	}
-</style>
