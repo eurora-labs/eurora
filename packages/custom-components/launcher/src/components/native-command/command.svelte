@@ -1,11 +1,13 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 	import { cn } from '@eurora/ui/utils.js';
 
-	let { value = $bindable(''), ref = $bindable(null), class: className = '', children } = $props();
-
-	// Create event dispatcher for any events we need to forward
-	const dispatch = createEventDispatcher();
+	let {
+		value = $bindable(''),
+		ref = $bindable(null),
+		class: className = '',
+		children,
+		keydown
+	} = $props();
 
 	// Store for active item index and filtered items
 	let activeIndex = -1;
@@ -17,7 +19,7 @@
 
 	// Handle keydown for keyboard navigation
 	function handleKeyDown(event: KeyboardEvent) {
-		dispatch('keydown', event);
+		keydown(event);
 	}
 </script>
 
