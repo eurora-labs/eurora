@@ -9,8 +9,8 @@
 		height = $bindable('100px'),
 		placeholder = 'Type a command or search...',
 		disabled = false,
-		input,
-		keydown,
+		input = $bindable(() => {}),
+		keydown = $bindable(() => {}),
 		...restProps
 	} = $props();
 
