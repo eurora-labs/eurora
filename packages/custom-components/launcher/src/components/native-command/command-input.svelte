@@ -40,8 +40,8 @@
 		bind:value
 		{placeholder}
 		{disabled}
-		on:input={handleInput}
-		on:keydown={handleKeyDown}
+		oninput={handleInput}
+		onkeydown={handleKeyDown}
 		role="combobox"
 		aria-autocomplete="list"
 		autocomplete="off"
