@@ -24,6 +24,11 @@ This file tracks the project's progress using a task list format.
   * Built a full PersonalDb API for database operations
   * Added tests for database functionality
 * Fixed async/await issue in OCR service where futures were being collected without awaiting them
+* Migrated command components from bits-ui to native HTML implementation:
+  * Created primitive HTML replacements for all bits-ui components
+  * Maintained the same styling and functionality
+  * Created proper accessibility attributes for native components
+  * Implemented key navigation and selection behavior
 
 ## Current Tasks
 
