@@ -11,15 +11,6 @@
 		height = $bindable('100px'),
 		...restProps
 	}: CommandPrimitive.InputProps = $props();
-
-	ref?.addEventListener('input', () => {
-		if (!ref) return;
-		ref.style.height = `${ref.scrollHeight}px`; // Set to scroll height
-
-		console.log('ref', ref.scrollHeight);
-	});
-
-	function adjustHeight(event: Event) {}
 </script>
 
 <div class="items-top flex h-fit border-none px-3" data-command-input-wrapper="">
