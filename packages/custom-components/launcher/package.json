@@ -1,0 +1,53 @@
+{
+	"name": "@eurora/launcher",
+	"version": "0.0.1",
+	"scripts": {
+		"dev": "vite dev",
+		"prepare": "svelte-kit sync || echo ''",
+		"prepack": "svelte-kit sync && svelte-package && publint",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"format": "prettier --write .",
+		"lint": "prettier --check ."
+	},
+	"files": [
+		"dist",
+		"!dist/**/*.test.*",
+		"!dist/**/*.spec.*"
+	],
+	"sideEffects": [
+		"**/*.css"
+	],
+	"svelte": "./src/index.ts",
+	"types": "./src/index.ts",
+	"type": "module",
+	"private": false,
+	"peerDependencies": {
+		"svelte": "^5.28.2"
+	},
+	"devDependencies": {
+		"@eurora/typescript-config": "workspace:*",
+		"@eurora/ui": "workspace:*",
+		"@sveltejs/adapter-static": "^3.0.8",
+		"@sveltejs/kit": "^2.20.7",
+		"@sveltejs/package": "^2.3.11",
+		"@sveltejs/vite-plugin-svelte": "^5.0.0",
+		"prettier": "^3.5.3",
+		"@lucide/svelte": "^0.507.0",
+		"prettier-plugin-svelte": "^3.3.3",
+		"publint": "^0.3.12",
+		"bits-ui": "^1.4.2",
+		"svelte": "^5.28.2",
+		"svelte-check": "^4.1.6",
+		"typescript": "^5.8.3",
+		"unified": "^11.0.5",
+		"vite": "^6.3.4",
+		"vitest": "^3.1.2"
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"svelte": "./src/index.ts"
+		}
+	}
+}

@@ -76,6 +76,7 @@
 		},
 		"./global.css": "./src/global.css",
 		"./tailwind.config": "./tailwind.config.ts",
-		"./postcss.config": "./postcss.config.js"
+		"./postcss.config": "./postcss.config.js",
+		"./utils.js": "./src/utils.ts"
 	}
 }

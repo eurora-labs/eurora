@@ -36,6 +36,7 @@
 	};
 
 	let inputRef = $state<HTMLTextAreaElement | null>(null);
+	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
 	let transcript = $state<string | null>(null);
 	const messages = $state<ProtoChatMessage[]>([]);
 	let statusCode = $state<string | null>(null);
@@ -108,10 +109,18 @@
 	// Listen for background image event
 	listen<string>('background_image', (event) => {
 		backgroundImage = event.payload;
-		document.body.style.backgroundImage = `url('${event.payload}')`;
-		document.body.style.backgroundSize = '100%';
-		document.body.style.backgroundPosition = 'center';
-		document.body.style.backgroundRepeat = 'no-repeat';
+
+		if (backdropCustom2Ref) {
+			backdropCustom2Ref.style.backgroundImage = `url('${event.payload}')`;
+			backdropCustom2Ref.style.backgroundSize = '150%';
+			backdropCustom2Ref.style.backgroundPosition = 'center';
+			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+		}
+
+		// document.body.style.backgroundImage = `url('${event.payload}')`;
+		// document.body.style.backgroundSize = '100%';
+		// document.body.style.backgroundPosition = 'center';
+		// document.body.style.backgroundRepeat = 'no-repeat';
 	});
 
 	// Set up global keydown event listener for Escape key
@@ -322,7 +331,7 @@
 	}
 </script>
 
-<div class="relative flex h-screen flex-col">
+<div class="backdrop-custom relative flex h-screen flex-col">
 	<!-- <div
 	class="relative flex h-screen flex-col"
 	style={backgroundImage
@@ -409,43 +418,28 @@
 		{/if}
 	</div>
 </div>
+<div
+	class="backdrop-custom-2 fixed left-[-50px] top-[-50px] h-screen w-screen"
+	bind:this={backdropCustom2Ref}
+></div>
 
 <style>
-	:global(html, body) {
-		overflow: hidden;
-		margin-bottom: 100px;
+	.backdrop-custom {
+		backdrop-filter: blur(18px);
+		-webkit-backdrop-filter: blur(18px);
+		background-color: rgba(255, 255, 255, 0.2);
+		z-index: 2;
 	}
 
-	:global(main) {
-		height: 100vh;
-		overflow: hidden;
-	}
+	.backdrop-custom-2 {
+		filter: blur(18px);
+		-webkit-filter: blur(18px);
 
-	.icon-container {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
+		width: 110vw;
+		height: 120vh;
 
-	.activity-icon {
-		width: 16px;
-		height: 16px;
-	}
+		z-index: 1;
 
-	/* Styles for the transparent effect */
-	:global(.message-scroll-area) {
-		background-color: rgba(0, 0, 0, 0.4);
-		border-radius: 8px;
-		margin: 0 8px 8px 8px;
-	}
-
-	:global(.textarea) {
-		background-color: rgba(255, 255, 255, 0.8) !important;
-		backdrop-filter: blur(4px);
-	}
-
-	:global(.badge) {
-		background-color: rgba(255, 255, 255, 0.7) !important;
-		backdrop-filter: blur(4px);
+		background-color: rgba(0, 0, 0, 1);
 	}
 </style>
