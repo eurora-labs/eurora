@@ -134,6 +134,20 @@
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
 		<Sidebar.Group>
+			<Sidebar.GroupLabel>Components</Sidebar.GroupLabel>
+			<Sidebar.GroupContent>
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton>
+							{#snippet child({ props })}
+								<a href="/components/launcher" {...props}> <span>Launcher</span> </a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+			</Sidebar.GroupContent>
+		</Sidebar.Group>
+		<Sidebar.Group>
 			<Sidebar.GroupLabel>Application</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
@@ -153,5 +167,9 @@
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
 	</Sidebar.Content>
-	<Sidebar.Footer>Footer</Sidebar.Footer>
+	<Sidebar.Footer>
+		<div class="flex w-full justify-end">
+			<Sidebar.Trigger />
+		</div>
+	</Sidebar.Footer>
 </Sidebar.Root>
