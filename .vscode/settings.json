@@ -11,6 +11,7 @@
 		"numpy",
 		"oneshot",
 		"opencv",
+		"pcss",
 		"prost",
 		"protoc",
 		"protol",
