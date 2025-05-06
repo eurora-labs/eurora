@@ -18,15 +18,15 @@
 		"ui:add": "pnpm dlx shadcn-svelte@next add"
 	},
 	"peerDependencies": {
-		"@lucide/svelte": "^0.503.0",
+		"@lucide/svelte": "^0.507.0",
 		"svelte": "^5.0.0"
 	},
 	"devDependencies": {
-		"@eslint/compat": "^1.2.8",
+		"@eslint/compat": "^1.2.9",
 		"@eslint/js": "^9.25.1",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
-		"@lucide/svelte": "^0.503.0",
+		"@lucide/svelte": "^0.507.0",
 		"@playwright/test": "^1.52.0",
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.20.7",
