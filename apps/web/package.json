@@ -36,7 +36,7 @@
 		"@sveltejs/kit": "^2.20.7",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"eslint": "^9.25.1",
-		"@lucide/svelte": "^0.503.0",
+		"@lucide/svelte": "^0.507.0",
 		"perfect-arrows": "^0.3.7",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
