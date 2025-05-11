@@ -1,0 +1,49 @@
+{
+	"name": "@eurora/extension-article-watcher",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"module": "index.ts",
+	"main": "index.ts",
+	"exports": {
+		".": {
+			"types": "./index.ts",
+			"svelte": "./index.ts"
+		}
+	},
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"format": "prettier --write .",
+		"lint": "prettier --check . && eslint .",
+		"test:unit": "vitest",
+		"test": "npm run test:unit -- --run && npm run test:e2e",
+		"test:e2e": "playwright test"
+	},
+	"devDependencies": {
+		"@eslint/compat": "^1.2.9",
+		"@eslint/js": "^9.25.1",
+		"@eurora/eslint-config": "workspace:*",
+		"@eurora/proto": "workspace:*",
+		"@eurora/typescript-config": "workspace:*",
+		"@mozilla/readability": "^0.6.0",
+		"@playwright/test": "^1.52.0",
+		"@testing-library/jest-dom": "^6.6.3",
+		"@types/chrome": "^0.0.320",
+		"eslint": "^9.25.1",
+		"eslint-config-prettier": "^10.1.2",
+		"globals": "^15.15.0",
+		"jsdom": "^25.0.1",
+		"prettier": "^3.5.3",
+		"rxjs": "^7.8.2",
+		"typescript": "^5.8.3",
+		"typescript-eslint": "^8.31.1",
+		"vite": "^6.3.4",
+		"vite-plugin-dts": "^4.5.3",
+		"vitest": "^3.1.2"
+	}
+}
