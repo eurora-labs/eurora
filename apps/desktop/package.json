@@ -23,7 +23,7 @@
 		"@eurora/ui": "workspace:*"
 	},
 	"devDependencies": {
-		"@eslint/compat": "^1.2.8",
+		"@eslint/compat": "^1.2.9",
 		"@eslint/js": "^9.25.1",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
@@ -51,7 +51,7 @@
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
 		"katex": "^0.16.22",
-		"@lucide/svelte": "^0.503.0",
+		"@lucide/svelte": "^0.507.0",
 		"postcss-nesting": "^13.0.1",
 		"postcss-pxtorem": "^6.1.0",
 		"prettier": "^3.5.3",
