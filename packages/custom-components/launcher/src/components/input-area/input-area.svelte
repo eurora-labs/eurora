@@ -5,7 +5,7 @@
 	export interface Props {
 		ref?: ProsemirrorEditor;
 		query: Query;
-		value: string;
+		value?: string;
 		class?: ClassValue;
 	}
 </script>
@@ -29,6 +29,7 @@
 
 <ProsemirrorEditor
 	bind:this={ref}
+	bind:value
 	class={cn(className, 'h-[70px] px-0 pb-2 text-[40px] leading-[40px]')}
 	{...restProps}
 />
