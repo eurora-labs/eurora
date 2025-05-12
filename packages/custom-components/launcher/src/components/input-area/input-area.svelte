@@ -1,23 +1,35 @@
-<script lang="ts">
-	import type { WithElementRef, WithoutChildren } from 'bits-ui';
-	import type { HTMLTextareaAttributes } from 'svelte/elements';
-	import { cn } from '@eurora/ui/utils.js';
-
-	let {
-		ref = $bindable<HTMLTextAreaElement | null>(null),
-		value = $bindable(''),
-		class: className,
-		...restProps
-	}: WithoutChildren<WithElementRef<HTMLTextareaAttributes>> = $props();
-
-	// Calculate and set the textarea height
-	function adjustHeight(event: Event) {
-		const target = event.target as HTMLTextAreaElement;
-		if (!target) return;
-		target.style.height = `${target.scrollHeight}px`; // Set to scroll height
+<script lang="ts" module>
+	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core';
+	import type { ClassValue } from 'svelte/elements';
+	export interface Props {
+		ref?: ProsemirrorEditor;
+		query: Query;
+		value: string;
+		class?: ClassValue;
 	}
 </script>
 
+<script lang="ts">
+	import { cn } from '@eurora/ui/utils.js';
+
+	import { onMount } from 'svelte';
+
+	let {
+		ref = $bindable<ProsemirrorEditor | undefined>(undefined),
+		query,
+		value = $bindable(''),
+		class: className,
+		...restProps
+	}: Props = $props();
+
+	onMount(() => {
+		ref?.sendQuery(query);
+	});
+</script>
+
+<ProsemirrorEditor bind:this={ref} />
+
+<!-- 
 <textarea
 	bind:this={ref}
 	bind:value
@@ -27,7 +39,7 @@
 	)}
 	oninput={adjustHeight}
 	{...restProps}
-></textarea>
+></textarea> -->
 
 <style>
 	textarea::placeholder {
