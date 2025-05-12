@@ -19,6 +19,8 @@
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/launcher": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
+		"@eurora/prosemirror-core": "workspace:*",
+		"@eurora/ext-transcript": "workspace:*",
 		"@sveltejs/adapter-auto": "^6.0.0",
 		"@eurora/ui": "workspace:*",
 		"@sveltejs/adapter-static": "^3.0.8",
