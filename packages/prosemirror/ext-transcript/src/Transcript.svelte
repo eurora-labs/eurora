@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	import type { NodeSpec } from 'prosemirror-model';
 	import { Node as PMNode } from 'prosemirror-model';
-	import type { NodeProps } from '../../typings/extension.js';
+	import type { NodeProps } from '@eurora/prosemirror-core';
 	export interface TranscriptAttrs {
 		id?: string;
 		text?: string;
@@ -43,7 +43,8 @@
 </script>
 
 <script lang="ts">
-	import type { SvelteNodeViewProps } from '../../SvelteNodeView.js';
+	import { Badge } from '@eurora/ui';
+	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
 	export interface Props extends SvelteNodeViewProps<TranscriptAttrs> {
 		ref: HTMLElement;
 		attrs: TranscriptAttrs;
@@ -61,6 +62,10 @@
 	function handleKeyDown(event: KeyboardEvent) {
 		event.preventDefault();
 	}
+
+	export function destroy() {
+		ref?.remove();
+	}
 </script>
 
 <span
@@ -72,14 +77,8 @@
 	{...attrs}
 	onkeydown={handleKeyDown}
 >
-	{attrs.text}
+	<Badge>{attrs.text}</Badge>
 </span>
 
 <style lang="postcss">
-	:global(.transcript) {
-		width: fit-content;
-		background-color: red;
-		padding: 5px;
-		display: inline-block;
-	}
 </style>
