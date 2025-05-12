@@ -9,10 +9,12 @@
 	import { paragraphExtension } from './components/paragraph/extension.js';
 	import { type Commands, commands as defaultCommands } from './commands.js';
 	import './Editor.css';
+	import { type ClassValue } from 'svelte/elements';
 
 	export interface Props {
 		query?: Query;
 		placeholder?: string;
+		class?: ClassValue;
 	}
 
 	let editorRef: HTMLDivElement | null = $state(null);
@@ -22,7 +24,7 @@
 
 	export { view };
 
-	let { query, placeholder }: Props = $props();
+	let { query, placeholder, class: className }: Props = $props();
 
 	onMount(() => {
 		init();
@@ -197,16 +199,14 @@
 	});
 </script>
 
-<div contenteditable class:ProseMirror={true} bind:this={editorRef}></div>
+<div contenteditable class:ProseMirror={true} bind:this={editorRef} class={className}></div>
 
 <style lang="postcss">
 	.ProseMirror {
 		border-top: 0;
-		min-height: 300px;
 		overflow-wrap: break-word;
 		outline: none;
 		white-space: pre-wrap;
 		width: 100%;
-		@apply p-4;
 	}
 </style>
