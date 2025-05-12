@@ -5,6 +5,7 @@ packages:
   - 'packages/*'
   - 'packages/website-modules/youtube/*'
   - 'packages/custom-components/*'
+  - 'packages/prosemirror/**/*'
   - 'crates/*'
   - 'backend/*'
 
