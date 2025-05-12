@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core';
 	import type { Query } from '@eurora/prosemirror-core';
-	// import { equationExtension } from '@eurora/ext-equation';
-	// import { paragraphExtension } from '@eurora/ext-paragraph';
-	// import { blockquoteExtension } from '@eurora/ext-blockquote';
 	import { transcriptExtension } from '@eurora/ext-transcript';
 	import { onMount } from 'svelte';
 
@@ -11,7 +8,6 @@
 
 	const exampleInput: Query = {
 		text: 'Where in ',
-		// extensions: [transcriptExtension()]
 		extensions: []
 	};
 
@@ -65,9 +61,23 @@
 		editorRef?.view.dispatch(tr);
 	}
 
-	function addTranscriptExtension() {
-		exampleInput.extensions.push(transcriptExtension());
-		editorRef?.sendQuery(exampleInput);
+	async function addTranscriptExtension() {
+		const position = 9;
+		exampleInput.extensions.push({ ...transcriptExtension(), position });
+		await editorRef?.sendQuery(exampleInput);
+		editorRef?.cmd((state, dispatch) => {
+			const tr = state.tr;
+			const { schema } = state;
+			const nodes = schema.nodes;
+			tr.insert(
+				position,
+				nodes.transcript.createChecked(
+					{ id: 'transcript-1', text: 'Some transcript with attrs' },
+					schema.text('transcript')
+				)
+			);
+			dispatch?.(tr);
+		});
 	}
 </script>
 
@@ -78,8 +88,7 @@
 	<button>Reset</button>
 	<button>Select all</button>
 	<button onclick={focus}>Focus</button>
-	<button onclick={addTranscriptNode}>Add transcript</button>
-	<button onclick={addTranscriptExtension}>Add transcript extension</button>
+	<button onclick={addTranscriptExtension}>Add transcript</button>
 </div>
 
 <!-- <div class="mirror">Current plain text content of the editor: "{textContent}"</div> -->
