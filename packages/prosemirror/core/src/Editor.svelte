@@ -3,11 +3,11 @@
 	import { DOMParser } from 'prosemirror-model';
 	import { EditorView } from 'prosemirror-view';
 	import { onDestroy, onMount } from 'svelte';
-	import type { Query, QueryExtension, Cmd } from './typings/index.js';
+	import type { Query, Cmd } from './typings/index.js';
 	import type { SveltePMExtension } from './typings/extension.js';
 	import { createExtensions } from './createExtensions.js';
 	import { paragraphExtension } from './components/paragraph/extension.js';
-	import { Commands, commands as defaultCommands } from './commands.js';
+	import { type Commands, commands as defaultCommands } from './commands.js';
 	import './Editor.css';
 
 	export interface Props {
@@ -17,7 +17,7 @@
 
 	let editorRef: HTMLDivElement | null = $state(null);
 	let view: EditorView | null = null;
-	let currentExtensions: QueryExtension[] = [];
+	let currentExtensions: SveltePMExtension[] = [];
 	let commands: Commands = $state(defaultCommands);
 
 	export { view };
@@ -42,7 +42,7 @@
 		const extensions = [...(currentQuery?.extensions ?? [])];
 
 		// Add paragraph extension if not already present
-		if (!extensions.some((ext) => ext.extension.name === 'paragraph')) {
+		if (!extensions.some((ext) => ext.name === 'paragraph')) {
 			extensions.unshift(paragraphExtension());
 		}
 
@@ -69,7 +69,7 @@
 		const newExtensions = [...(newQuery.extensions ?? [])];
 
 		// Add paragraph extension if not already present
-		if (!newExtensions.some((ext) => ext.extension.name === 'paragraph')) {
+		if (!newExtensions.some((ext) => ext.name === 'paragraph')) {
 			newExtensions.unshift(paragraphExtension());
 		}
 
@@ -129,12 +129,15 @@
 	}
 
 	// Helper function to check if extensions have changed
-	function hasExtensionsChanged(oldExts: QueryExtension[], newExts: QueryExtension[]): boolean {
+	function hasExtensionsChanged(
+		oldExts: SveltePMExtension[],
+		newExts: SveltePMExtension[]
+	): boolean {
 		if (oldExts.length !== newExts.length) return true;
 
 		// Create maps of extension names for faster lookup
-		const oldExtMap = new Map(oldExts.map((ext) => [ext.extension.name, ext]));
-		const newExtMap = new Map(newExts.map((ext) => [ext.extension.name, ext]));
+		const oldExtMap = new Map(oldExts.map((ext) => [ext.name, ext]));
+		const newExtMap = new Map(newExts.map((ext) => [ext.name, ext]));
 
 		// Check if any extension names differ
 		for (const [name] of oldExtMap) {
@@ -175,11 +178,11 @@
 		view?.dispatch(tr);
 	}
 
-	export function sendQuery(newQuery: Query) {
+	export async function sendQuery(newQuery: Query) {
 		if (!view) {
-			init(newQuery);
+			await init(newQuery);
 		} else {
-			updateExtensions(newQuery);
+			await updateExtensions(newQuery);
 		}
 	}
 

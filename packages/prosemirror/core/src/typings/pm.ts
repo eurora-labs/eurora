@@ -4,7 +4,7 @@ import { EditorView } from 'prosemirror-view';
 export type Cmd = (
 	state: EditorState,
 	dispatch: ((tr: Transaction) => void) | undefined,
-	view: EditorView,
+	view: EditorView
 ) => boolean | undefined | void;
 
 export interface Commands {
