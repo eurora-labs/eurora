@@ -12,6 +12,7 @@
 	import { type ClassValue } from 'svelte/elements';
 
 	export interface Props {
+		value?: string;
 		query?: Query;
 		placeholder?: string;
 		class?: ClassValue;
@@ -24,7 +25,7 @@
 
 	export { view };
 
-	let { query, placeholder, class: className }: Props = $props();
+	let { value = $bindable(''), query, placeholder, class: className }: Props = $props();
 
 	onMount(() => {
 		init();
@@ -199,7 +200,13 @@
 	});
 </script>
 
-<div contenteditable class:ProseMirror={true} bind:this={editorRef} class={className}></div>
+<div
+	bind:textContent={value}
+	contenteditable
+	class:ProseMirror={true}
+	bind:this={editorRef}
+	class={className}
+></div>
 
 <style lang="postcss">
 	.ProseMirror {
