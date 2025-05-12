@@ -42,6 +42,7 @@ export interface SveltePMExtension {
 	svelteNodes?: {
 		[name: string]: SveltePMNode<any>;
 	};
+	position?: number;
 	init?: (editor: Editor) => void;
 	plugins?: (editor: Editor, schema: Schema) => Plugin[];
 	destroy?: () => void;
