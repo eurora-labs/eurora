@@ -15,7 +15,7 @@
 				<Badge class="h-[50px] w-fit"><CreditCard /> Test 2</Badge>
 				<Badge class="h-[50px] w-fit bg-black"><Plus /></Badge>
 			</span> -->
-			<Launcher.List>
+			<Launcher.List hidden>
 				<Launcher.Empty>No results found.</Launcher.Empty>
 				<Launcher.Group heading="Suggestions">
 					<Launcher.Item>
