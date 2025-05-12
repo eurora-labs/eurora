@@ -803,6 +803,12 @@ importers:
 
   packages/custom-components/launcher:
     devDependencies:
+      '@eurora/ext-transcript':
+        specifier: workspace:*
+        version: link:../../prosemirror/ext-transcript
+      '@eurora/prosemirror-core':
+        specifier: workspace:*
+        version: link:../../prosemirror/core
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../../typescript-config
