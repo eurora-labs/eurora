@@ -24,7 +24,7 @@
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.20.4",
 		"@sveltejs/vite-plugin-svelte": "^5.0.3",
-		"@lucide/svelte": "^0.507.0",
+		"@lucide/svelte": "^0.510.0",
 		"eslint": "^9.25.1",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
