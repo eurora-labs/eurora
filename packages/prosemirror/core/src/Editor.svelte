@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { EditorState } from 'prosemirror-state';
+	import { EditorState, Plugin } from 'prosemirror-state';
 	import { DOMParser } from 'prosemirror-model';
 	import { EditorView } from 'prosemirror-view';
 	import { onDestroy, onMount } from 'svelte';
+	import { dropCursor } from 'prosemirror-dropcursor';
+	import { gapCursor } from 'prosemirror-gapcursor';
 	import type { Query, Cmd } from './typings/index.js';
 	import type { SveltePMExtension } from './typings/extension.js';
 	import { createExtensions } from './createExtensions.js';
@@ -10,7 +12,6 @@
 	import { type Commands, commands as defaultCommands } from './commands.js';
 	import './Editor.css';
 	import { type ClassValue } from 'svelte/elements';
-
 	export interface Props {
 		value?: string;
 		query?: Query;
@@ -25,13 +26,15 @@
 
 	export { view };
 
-	let { value = $bindable(''), query, placeholder, class: className }: Props = $props();
-
-	onMount(() => {
-		init();
-	});
+	let {
+		value = $bindable(''),
+		query,
+		placeholder = 'Type something',
+		class: className
+	}: Props = $props();
 
 	export async function init(queryParam?: Query) {
+		if (!editorRef) return;
 		const currentQuery = queryParam || query;
 		// Update the query reference if a new one is provided
 		if (queryParam) {
@@ -55,19 +58,25 @@
 		// @ts-ignore
 		const created = await createExtensions(this as any, extensions);
 
-		view = new EditorView(editorRef, {
-			state: EditorState.create({
-				schema: created.schema,
-				plugins: [...created.plugins],
-				doc: DOMParser.fromSchema(created.schema).parse(doc)
-			}),
-			nodeViews: created.nodeViews,
-			markViews: created.markViews
-		});
+		view = new EditorView(
+			{
+				mount: editorRef
+			},
+			// editorRef,
+			{
+				state: EditorState.create({
+					schema: created.schema,
+					plugins: [...created.plugins, placeholderPlugin(placeholder)],
+					doc: DOMParser.fromSchema(created.schema).parse(doc)
+				}),
+				nodeViews: created.nodeViews,
+				markViews: created.markViews
+			}
+		);
 	}
 
 	export async function updateExtensions(newQuery: Query) {
-		if (!view) return;
+		if (!view || !editorRef) return;
 		// Make a copy of the extensions to avoid modifying the original
 		const newExtensions = [...(newQuery.extensions ?? [])];
 
@@ -111,7 +120,7 @@
 		// Create a new state with the updated schema and plugins
 		const newState = EditorState.create({
 			schema: created.schema,
-			plugins: [...created.plugins],
+			plugins: [...created.plugins, placeholderPlugin(placeholder)],
 			doc: newQuery.text
 				? (() => {
 						const p = document.createElement('p');
@@ -198,22 +207,48 @@
 	onDestroy(() => {
 		view?.destroy();
 	});
+
+	function placeholderPlugin(text: string) {
+		const update = (view: EditorView) => {
+			if (view.state.doc.textContent?.length > 0) {
+				editorRef?.removeAttribute('data-placeholder');
+			} else {
+				editorRef?.setAttribute('data-placeholder', text);
+			}
+		};
+
+		return new Plugin({
+			view(view) {
+				update(view);
+
+				return { update };
+			}
+		});
+	}
 </script>
 
 <div
 	bind:textContent={value}
-	contenteditable
 	class:ProseMirror={true}
+	contenteditable
 	bind:this={editorRef}
 	class={className}
 ></div>
 
 <style lang="postcss">
-	.ProseMirror {
+	:global(.ProseMirror) {
 		border-top: 0;
 		overflow-wrap: break-word;
 		outline: none;
 		white-space: pre-wrap;
 		width: 100%;
+	}
+
+	:global(.ProseMirror[data-placeholder])::before {
+		color: rgba(0, 0, 0, 0.2);
+		position: absolute;
+		content: attr(data-placeholder);
+		pointer-events: none;
+		line-height: 70px;
 	}
 </style>
