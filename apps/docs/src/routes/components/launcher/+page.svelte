@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { Calendar, Smile, Calculator, User, CreditCard, Settings, Plus } from '@lucide/svelte';
+	import { Calendar, Smile, Calculator, User, CreditCard, Settings } from '@lucide/svelte';
 
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
 	import { Launcher } from '@eurora/launcher';
-	import { Badge } from '@eurora/ui';
 </script>
 
 <div>
