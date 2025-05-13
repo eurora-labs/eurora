@@ -33,7 +33,7 @@
 		"@sveltejs/package": "^2.3.11",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"prettier": "^3.5.3",
-		"@lucide/svelte": "^0.507.0",
+		"@lucide/svelte": "^0.510.0",
 		"prettier-plugin-svelte": "^3.3.3",
 		"publint": "^0.3.12",
 		"bits-ui": "^1.4.2",

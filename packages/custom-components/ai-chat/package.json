@@ -36,7 +36,7 @@
 	},
 	"dependencies": {
 		"@eurora/katex": "workspace:*",
-		"@lucide/svelte": "^0.507.0"
+		"@lucide/svelte": "^0.510.0"
 	},
 	"devDependencies": {
 		"@eurora/typescript-config": "workspace:*",
@@ -55,7 +55,7 @@
 		"eslint-plugin-svelte": "^2.46.1",
 		"globals": "^15.14.0",
 		"jsdom": "^25.0.1",
-		"@lucide/svelte": "^0.507.0",
+		"@lucide/svelte": "^0.510.0",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
 		"prettier-plugin-tailwindcss": "^0.6.11",
