@@ -32,7 +32,7 @@
 		"@eurora/typescript-config": "workspace:*",
 		"@playwright/test": "^1.52.0",
 		"@testing-library/jest-dom": "^6.6.3",
-		"@types/chrome": "^0.0.320",
+		"@types/chrome": "^0.0.322",
 		"eslint": "^9.25.1",
 		"eslint-config-prettier": "^10.1.2",
 		"globals": "^15.15.0",
