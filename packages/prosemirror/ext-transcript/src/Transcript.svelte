@@ -22,6 +22,7 @@
 		inline: true,
 		defining: false,
 		atom: false,
+		selectable: false,
 
 		parseDOM: [
 			{
