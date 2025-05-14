@@ -20,6 +20,8 @@
 		content: 'inline+',
 		group: 'inline',
 		inline: true,
+		defining: true,
+		atom: true,
 
 		parseDOM: [
 			{
@@ -37,7 +39,7 @@
 		],
 		toDOM(node: PMNode) {
 			const { id, text } = node.attrs;
-			return ['span', { id, class: 'transcript', pre: text }, text];
+			return ['span', { id, class: 'transcript' }];
 		}
 	};
 </script>
@@ -77,8 +79,16 @@
 	{...attrs}
 	onkeydown={handleKeyDown}
 >
-	<Badge>{attrs.text}</Badge>
+	{attrs.text}
 </span>
 
 <style lang="postcss">
+	.transcript {
+		@apply w-fit items-center gap-2 text-[40px] leading-[40px] text-white;
+		@apply mx-2 p-2;
+		background: rgba(128, 128, 128, 0.4);
+		color: rgba(0, 0, 0, 0.8);
+		border-radius: 16px;
+		display: inline;
+	}
 </style>
