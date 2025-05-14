@@ -20,8 +20,8 @@
 		content: 'inline+',
 		group: 'inline',
 		inline: true,
-		defining: true,
-		atom: true,
+		defining: false,
+		atom: false,
 
 		parseDOM: [
 			{
@@ -86,9 +86,10 @@
 	.transcript {
 		@apply w-fit items-center gap-2 text-[40px] leading-[40px] text-white;
 		@apply mx-2 p-2;
-		background: rgba(128, 128, 128, 0.4);
-		color: rgba(0, 0, 0, 0.8);
+		color: rgba(0, 0, 0, 0.7);
 		border-radius: 16px;
-		display: inline;
+		display: inline-block;
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
 	}
 </style>

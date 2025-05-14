@@ -66,7 +66,7 @@
 			{
 				state: EditorState.create({
 					schema: created.schema,
-					plugins: [...created.plugins, placeholderPlugin(placeholder), dropCursor(), gapCursor()],
+					plugins: [...created.plugins, placeholderPlugin(placeholder)],
 					doc: mainNode
 				}),
 				nodeViews: created.nodeViews,
@@ -83,12 +83,12 @@
 			const { schema } = state;
 			const nodes = schema.nodes;
 			tr.insert(
-				0,
-				nodes.transcript.createChecked({ id: 'transcript-1', text: 'frames' }, schema.text(' '))
+				1,
+				nodes.transcript.createChecked({ id: 'transcript-1', text: 'PDF File' }, schema.text(' '))
 			);
 			tr.insert(
 				1,
-				nodes.transcript.createChecked({ id: 'transcript-2', text: 'transcript' }, schema.text(' '))
+				nodes.transcript.createChecked({ id: 'transcript-2', text: 'video' }, schema.text(' '))
 			);
 
 			tr.setSelection(TextSelection.create(tr.doc, 0));
