@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { EditorState, Plugin } from 'prosemirror-state';
+	import { EditorState, Plugin, TextSelection } from 'prosemirror-state';
 	import { DOMParser } from 'prosemirror-model';
 	import { EditorView } from 'prosemirror-view';
 	import { onDestroy, onMount } from 'svelte';
@@ -23,7 +23,7 @@
 	let view: EditorView | null = null;
 	let currentExtensions: SveltePMExtension[] = [];
 	let commands: Commands = $state(defaultCommands);
-
+	let mainNode: PMNode | null = null;
 	export { view };
 
 	let {
@@ -57,6 +57,7 @@
 
 		// @ts-ignore
 		const created = await createExtensions(this as any, extensions);
+		mainNode = DOMParser.fromSchema(created.schema).parse(doc);
 
 		view = new EditorView(
 			{
@@ -65,13 +66,34 @@
 			{
 				state: EditorState.create({
 					schema: created.schema,
-					plugins: [...created.plugins, placeholderPlugin(placeholder)],
-					doc: DOMParser.fromSchema(created.schema).parse(doc)
+					plugins: [...created.plugins, placeholderPlugin(placeholder), dropCursor(), gapCursor()],
+					doc: mainNode
 				}),
 				nodeViews: created.nodeViews,
 				markViews: created.markViews
 			}
 		);
+
+		experimentalAddTranscript();
+	}
+
+	function experimentalAddTranscript() {
+		cmd((state, dispatch) => {
+			const tr = state.tr;
+			const { schema } = state;
+			const nodes = schema.nodes;
+			tr.insert(
+				0,
+				nodes.transcript.createChecked({ id: 'transcript-1', text: 'frames' }, schema.text(' '))
+			);
+			tr.insert(
+				1,
+				nodes.transcript.createChecked({ id: 'transcript-2', text: 'transcript' }, schema.text(' '))
+			);
+
+			tr.setSelection(TextSelection.create(tr.doc, 0));
+			dispatch?.(tr);
+		});
 	}
 
 	export async function updateExtensions(newQuery: Query) {
