@@ -10,7 +10,7 @@
 	import { createExtensions } from './createExtensions.js';
 	import { paragraphExtension } from './components/paragraph/extension.js';
 	import { type Commands, commands as defaultCommands } from './commands.js';
-	import './Editor.css';
+	// import './Editor.css';
 	import { type ClassValue } from 'svelte/elements';
 	export interface Props {
 		value?: string;
@@ -62,7 +62,6 @@
 			{
 				mount: editorRef
 			},
-			// editorRef,
 			{
 				state: EditorState.create({
 					schema: created.schema,
@@ -194,7 +193,7 @@
 		if (!view) {
 			await init(newQuery);
 		} else {
-			await updateExtensions(newQuery);
+			// await updateExtensions(newQuery);
 		}
 	}
 
