@@ -24,7 +24,7 @@
 				<div class="transcript-badge">video</div>
 			</span> -->
 			<Launcher.List>
-				<Launcher.Empty>No results found.</Launcher.Empty>
+				<!-- <Launcher.Empty>No results found.</Launcher.Empty> -->
 				<Launcher.Group heading="Suggestions">
 					<Launcher.Item>
 						<Calendar />
