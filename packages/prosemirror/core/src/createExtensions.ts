@@ -1,4 +1,4 @@
-import { NodeSpec, Schema } from 'prosemirror-model';
+import { type NodeSpec, Schema } from 'prosemirror-model';
 import { default as Editor } from './Editor.svelte';
 import { SveltePMExtension, PMExtension, ExtensionData, Initialized } from './typings/index.js';
 import { createNodeSpec } from './extensions/createNodeSpec.js';
