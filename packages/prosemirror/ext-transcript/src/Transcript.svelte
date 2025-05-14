@@ -45,7 +45,7 @@
 </script>
 
 <script lang="ts">
-	import { Badge } from '@eurora/ui';
+	import { Badge, ContextChip } from '@eurora/ui';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
 	export interface Props extends SvelteNodeViewProps<TranscriptAttrs> {
 		ref: HTMLElement;
@@ -70,26 +70,6 @@
 	}
 </script>
 
-<span
-	role="button"
-	class="transcript"
-	onclick={handleClick}
-	bind:this={ref}
-	data-hole
-	{...attrs}
-	onkeydown={handleKeyDown}
->
+<ContextChip onclick={handleClick} bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>
 	{attrs.text}
-</span>
-
-<style lang="postcss">
-	.transcript {
-		@apply w-fit items-center gap-2 text-[40px] leading-[40px] text-white;
-		@apply mx-2 p-2;
-		color: rgba(0, 0, 0, 0.7);
-		border-radius: 16px;
-		display: inline-block;
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
-	}
-</style>
+</ContextChip>
