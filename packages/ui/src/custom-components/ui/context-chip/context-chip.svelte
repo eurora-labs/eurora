@@ -26,7 +26,7 @@
 	:global(.context-chip) {
 		@apply w-fit items-center gap-2 text-[40px] leading-[40px] text-white;
 		@apply mx-2 p-2;
-		color: rgba(0, 0, 0, 0.7);
+		color: rgba(0, 0, 0, 1);
 		background: transparent;
 		border-radius: 16px;
 		display: inline-block;

@@ -250,6 +250,7 @@
 
 <div
 	bind:textContent={value}
+	spellcheck={false}
 	class:ProseMirror={true}
 	contenteditable
 	bind:this={editorRef}
