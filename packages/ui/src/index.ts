@@ -19,3 +19,4 @@ export * as Dialog from './components/ui/dialog/index.js';
 export * as Command from './components/ui/command/index.js';
 export { SystemChatMessage } from './custom-components/ui/system-chat-message/index.js';
 export { UserChatMessage } from './custom-components/ui/user-chat-message/index.js';
+export { ContextChip, contextChipVariants } from './custom-components/ui/context-chip/index.js';
