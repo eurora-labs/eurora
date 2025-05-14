@@ -1,4 +1,4 @@
-import { NodeSpec, Node as PMNode, Schema } from 'prosemirror-model';
+import { type NodeSpec, Node as PMNode, Schema } from 'prosemirror-model';
 import type { Component } from 'svelte';
 import { MarkViewConstructor, NodeViewConstructor } from 'prosemirror-view';
 import { Plugin } from 'prosemirror-state';
