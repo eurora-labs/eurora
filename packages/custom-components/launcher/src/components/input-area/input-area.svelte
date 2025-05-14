@@ -1,6 +1,7 @@
 <script lang="ts" module>
 	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core';
 	import type { ClassValue } from 'svelte/elements';
+	import { transcriptExtension } from '@eurora/ext-transcript';
 
 	export interface Props {
 		ref?: ProsemirrorEditor;
@@ -23,14 +24,14 @@
 	}: Props = $props();
 
 	onMount(() => {
-		ref?.sendQuery(query);
+		ref?.sendQuery({ ...query, extensions: [...(query?.extensions ?? []), transcriptExtension()] });
 	});
 </script>
 
 <ProsemirrorEditor
 	bind:this={ref}
 	bind:value
-	class={cn(className, 'h-[70px] text-[40px] leading-[40px]')}
+	class={cn(className, 'h-[70px] text-[40px] leading-[40px] text-black')}
 	{...restProps}
 />
 
