@@ -20,7 +20,7 @@
 			'custom-input my-[15px] flex w-full rounded-md border-none bg-transparent py-0 shadow-none outline-none focus:border-transparent focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50',
 			className
 		)}
-		style="font-size: 40px; line-height: 70px; box-shadow: none;  color: rgba(0, 0, 0, 0.5); padding-left: 0px; font-weight: 400; height: 70px;"
+		style="font-size: 40px; line-height: 70px; box-shadow: none;  color: rgba(0, 0, 0, 0.5); padding: 0px; font-weight: 400; height: 70px;"
 		bind:ref
 		bind:value
 		{...restProps}
