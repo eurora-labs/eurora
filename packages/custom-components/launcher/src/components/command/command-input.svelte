@@ -14,7 +14,7 @@
 </script>
 
 <div class="items-top flex h-fit border-none px-3" data-command-input-wrapper="">
-	<Search class="mr-2 mt-7 shrink-0 opacity-50" size="40" style="color: rgba(0, 0, 0, 0.8); " />
+	<!-- <Search class="mr-2 mt-7 shrink-0 opacity-50" size="40" style="color: rgba(0, 0, 0, 0.8); " /> -->
 	<CommandPrimitive.Input
 		class={cn(
 			'custom-input my-[15px] flex w-full rounded-md border-none bg-transparent py-0 shadow-none outline-none focus:border-transparent focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50',
