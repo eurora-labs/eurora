@@ -100,16 +100,17 @@ async fn resize_launcher_window(window: tauri::Window, height: u32) -> Result<()
 }
 
 #[tauri::command]
-async fn check_api_key_exists() -> Result<String, String> {
-    let key = secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::BuildKind)
+async fn check_api_key_exists() -> Result<bool, String> {
+    let key = secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::Global)
         .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
 
-    let key = key.map(|s| s.0).unwrap_or_default();
-    if key.is_empty() {
-        return Err("API key not found".to_string());
+    let key = key.map(|s| s.0);
+
+    if key.is_none() {
+        return Ok(false);
     }
 
-    Ok(key)
+    Ok(true)
 }
 
 #[tauri::command]
@@ -117,7 +118,7 @@ async fn save_api_key(api_key: String) -> Result<(), String> {
     secret::persist(
         "OPEN_AI_API_KEY",
         &Sensitive(api_key),
-        secret::Namespace::BuildKind,
+        secret::Namespace::Global,
     )
     .map_err(|e| format!("Failed to save API key: {}", e))?;
     Ok(())
@@ -125,7 +126,7 @@ async fn save_api_key(api_key: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn initialize_openai_client(app_handle: tauri::AppHandle) -> Result<bool, String> {
-    let api_key = secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::BuildKind)
+    let api_key = secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::Global)
         .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
 
     // Initialize the OpenAI client with the API key
