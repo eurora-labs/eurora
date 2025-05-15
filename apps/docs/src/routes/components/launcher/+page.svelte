@@ -50,15 +50,15 @@
 				<Launcher.Group heading="Google Drive">
 					<Launcher.Item>
 						<SiGoogledrive />
-						<span>Report card</span>
-					</Launcher.Item>
-					<Launcher.Item>
-						<SiGoogledrive />
 						<span>Presentation 1</span>
 					</Launcher.Item>
 					<Launcher.Item>
 						<SiGoogledrive />
-						<span>Exercise sheet 1</span>
+						<span>Report card</span>
+					</Launcher.Item>
+					<Launcher.Item>
+						<SiGoogledrive />
+						<span>Exercise sheet 3</span>
 					</Launcher.Item>
 				</Launcher.Group>
 			</Launcher.List>
