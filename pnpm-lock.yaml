@@ -215,7 +215,7 @@ importers:
         version: link:../../packages/ui
       '@icons-pack/svelte-simple-icons':
         specifier: ^5.0.0
-        version: 5.0.0(@sveltejs/kit@2.20.8(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.28.2)(vite@6.3.5(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.28.2)(vite@6.3.5(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.28.2)
+        version: 5.0.0(@sveltejs/kit@2.21.0(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.28.3)(vite@6.3.5(@types/node@22.15.17)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.28.3)(vite@6.3.5(@types/node@22.15.17)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.28.3)
       '@lucide/svelte':
         specifier: ^0.510.0
         version: 0.510.0(svelte@5.28.3)
@@ -895,7 +895,7 @@ importers:
         version: link:../../typescript-config
       '@sveltejs/vite-plugin-svelte':
         specifier: ^5.0.0
-        version: 5.0.3(svelte@5.28.2)(vite@6.3.5(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0))
+        version: 5.0.3(svelte@5.28.3)(vite@6.3.5(@types/node@22.15.17)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0))
       prosemirror-commands:
         specifier: ^1.5.2
         version: 1.7.1
@@ -931,7 +931,7 @@ importers:
         version: 1.39.2
       svelte:
         specifier: ^5.28.2
-        version: 5.28.2
+        version: 5.28.3
 
   packages/prosemirror/ext-transcript:
     devDependencies:
@@ -946,7 +946,7 @@ importers:
         version: link:../../ui
       '@sveltejs/vite-plugin-svelte':
         specifier: ^5.0.0
-        version: 5.0.3(svelte@5.28.2)(vite@6.3.5(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0))
+        version: 5.0.3(svelte@5.28.3)(vite@6.3.5(@types/node@22.15.17)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0))
       prosemirror-model:
         specifier: ^1.20.0
         version: 1.25.1
@@ -955,16 +955,16 @@ importers:
         version: 1.39.2
       svelte:
         specifier: ^5.28.2
-        version: 5.28.2
+        version: 5.28.3
       svelte-check:
         specifier: ^4.1.7
-        version: 4.1.7(picomatch@4.0.2)(svelte@5.28.2)(typescript@5.8.3)
+        version: 4.1.7(picomatch@4.0.2)(svelte@5.28.3)(typescript@5.8.3)
       svelte-preprocess:
         specifier: ^6.0.3
-        version: 6.0.3(@babel/core@7.27.1)(postcss-load-config@4.0.2(postcss@8.5.3))(postcss@8.5.3)(svelte@5.28.2)(typescript@5.8.3)
+        version: 6.0.3(@babel/core@7.27.1)(postcss-load-config@4.0.2(postcss@8.5.3))(postcss@8.5.3)(svelte@5.28.3)(typescript@5.8.3)
       svelte2tsx:
         specifier: ^0.7.7
-        version: 0.7.36(svelte@5.28.2)(typescript@5.8.3)
+        version: 0.7.36(svelte@5.28.3)(typescript@5.8.3)
 
   packages/proto:
     devDependencies:
@@ -1006,9 +1006,6 @@ importers:
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
-      '@icons-pack/svelte-simple-icons':
-        specifier: ^5.0.0
-        version: 5.0.0(@sveltejs/kit@2.20.8(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.28.2)(vite@6.3.5(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.28.2)(vite@6.3.5(@types/node@22.13.14)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.28.2)
       '@lucide/svelte':
         specifier: ^0.510.0
         version: 0.510.0(svelte@5.28.3)
@@ -4788,10 +4785,6 @@ packages:
   property-information@7.0.0:
     resolution: {integrity: sha512-7D/qOz/+Y4X/rzSB6jKxKUsQnphO046ei8qxG59mtM3RG3DHgTK81HrxrmoDVINJb8NKT5ZsRbwHvQ6B68Iyhg==}
 
-<<<<<<< HEAD
-  protolint@0.55.2:
-    resolution: {integrity: sha512-ljydeSKWGnJOd1TUedAhzSsbVdTovae5knD1lsQJgU341gxErwCgJLmk6YHlqyr9wcIgv/guxQxzymmQIKfbYQ==}
-=======
   prosemirror-commands@1.7.1:
     resolution: {integrity: sha512-rT7qZnQtx5c0/y/KlYaGvtG411S97UaL6gdp6RIZ23DLHanMYLyfGBV5DtSnZdthQql7W+lEVbpSfwtO8T+L2w==}
 
@@ -4834,9 +4827,8 @@ packages:
   prosemirror-view@1.39.2:
     resolution: {integrity: sha512-BmOkml0QWNob165gyUxXi5K5CVUgVPpqMEAAml/qzgKn9boLUWVPzQ6LtzXw8Cn1GtRQX4ELumPxqtLTDaAKtg==}
 
-  protolint@0.54.0:
-    resolution: {integrity: sha512-iTbw7HTscB4afpqzSRFJXdKQy1ANRi2R6dwVdYKIhWSjAsNV8vP7szy/1XfiW4HDjqTiE0/4FCyFcd3u/6AkOg==}
->>>>>>> 401e2b3e84db4342b290ee7287355fdc8e288237
+  protolint@0.55.2:
+    resolution: {integrity: sha512-ljydeSKWGnJOd1TUedAhzSsbVdTovae5knD1lsQJgU341gxErwCgJLmk6YHlqyr9wcIgv/guxQxzymmQIKfbYQ==}
     hasBin: true
 
   proxy-addr@2.0.7:
@@ -9681,9 +9673,6 @@ snapshots:
 
   property-information@7.0.0: {}
 
-<<<<<<< HEAD
-  protolint@0.55.2:
-=======
   prosemirror-commands@1.7.1:
     dependencies:
       prosemirror-model: 1.25.1
@@ -9769,8 +9758,7 @@ snapshots:
       prosemirror-state: 1.4.3
       prosemirror-transform: 1.10.4
 
-  protolint@0.54.0:
->>>>>>> 401e2b3e84db4342b290ee7287355fdc8e288237
+  protolint@0.55.2:
     dependencies:
       got: 12.6.1
       got-fetch: 5.1.10(got@12.6.1)
@@ -10228,20 +10216,16 @@ snapshots:
     optionalDependencies:
       svelte: 5.28.3
 
-<<<<<<< HEAD
-  svelte-radix@2.0.1(svelte@5.28.3):
-=======
-  svelte-preprocess@6.0.3(@babel/core@7.27.1)(postcss-load-config@4.0.2(postcss@8.5.3))(postcss@8.5.3)(svelte@5.28.2)(typescript@5.8.3):
+  svelte-preprocess@6.0.3(@babel/core@7.27.1)(postcss-load-config@4.0.2(postcss@8.5.3))(postcss@8.5.3)(svelte@5.28.3)(typescript@5.8.3):
     dependencies:
-      svelte: 5.28.2
+      svelte: 5.28.3
     optionalDependencies:
       '@babel/core': 7.27.1
       postcss: 8.5.3
       postcss-load-config: 4.0.2(postcss@8.5.3)
       typescript: 5.8.3
 
-  svelte-radix@2.0.1(svelte@5.28.2):
->>>>>>> 401e2b3e84db4342b290ee7287355fdc8e288237
+  svelte-radix@2.0.1(svelte@5.28.3):
     dependencies:
       svelte: 5.28.3
 
