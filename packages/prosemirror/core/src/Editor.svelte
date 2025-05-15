@@ -85,7 +85,10 @@
 			const nodes = schema.nodes;
 			tr.insert(
 				1,
-				nodes.transcript.createChecked({ id: 'transcript-1', text: 'PDF File' }, schema.text(' '))
+				nodes.transcript.createChecked(
+					{ id: 'transcript-1', text: 'Exercise Sheet 2' },
+					schema.text(' ')
+				)
 			);
 			tr.insert(
 				1,
