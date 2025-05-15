@@ -83,13 +83,13 @@
 			const tr = state.tr;
 			const { schema } = state;
 			const nodes = schema.nodes;
-			tr.insert(
-				1,
-				nodes.transcript.createChecked(
-					{ id: 'transcript-1', text: 'Exercise Sheet 2' },
-					schema.text(' ')
-				)
-			);
+			// tr.insert(
+			// 	1,
+			// 	nodes.transcript.createChecked(
+			// 		{ id: 'transcript-1', text: 'Exercise Sheet 2' },
+			// 		schema.text(' ')
+			// 	)
+			// );
 			tr.insert(
 				1,
 				nodes.transcript.createChecked({ id: 'transcript-2', text: 'video' }, schema.text(' '))
