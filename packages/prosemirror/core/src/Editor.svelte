@@ -259,6 +259,9 @@
 ></div>
 
 <style lang="postcss">
+	:global(.ProseMirror-separator) {
+		display: none;
+	}
 	:global(.ProseMirror) {
 		border-top: 0;
 		overflow-wrap: break-word;
