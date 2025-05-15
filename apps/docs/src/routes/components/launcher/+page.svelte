@@ -7,8 +7,13 @@
 		CreditCard,
 		Settings,
 		Captions,
-		Film
+		Film,
+		YoutubeIcon,
+		HardDrive,
+		FileTextIcon
 	} from '@lucide/svelte';
+
+	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
 
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
 	import { Launcher } from '@eurora/launcher';
@@ -31,36 +36,29 @@
 			</span> -->
 			<Launcher.List>
 				<!-- <Launcher.Empty>No results found.</Launcher.Empty> -->
-				<Launcher.Group heading="Suggestions">
+				<Launcher.Group heading="Local Files">
 					<Launcher.Item>
-						<Calendar />
-						<span>Calendar</span>
+						<HardDrive />
+						<span>Exercise Sheet 2</span>
 					</Launcher.Item>
 					<Launcher.Item>
-						<Smile />
-						<span>Search Emoji</span>
-					</Launcher.Item>
-					<Launcher.Item>
-						<Calculator />
-						<span>Calculator</span>
+						<FileTextIcon />
+						<span>Notes</span>
 					</Launcher.Item>
 				</Launcher.Group>
 				<Launcher.Separator />
-				<Launcher.Group heading="Settings">
+				<Launcher.Group heading="Google Drive">
 					<Launcher.Item>
-						<User />
-						<span>Profile</span>
-						<Launcher.Shortcut>⌘P</Launcher.Shortcut>
+						<SiGoogledrive />
+						<span>Report card</span>
 					</Launcher.Item>
 					<Launcher.Item>
-						<CreditCard />
-						<span>Billing</span>
-						<Launcher.Shortcut>⌘B</Launcher.Shortcut>
+						<SiGoogledrive />
+						<span>Notes</span>
 					</Launcher.Item>
 					<Launcher.Item>
-						<Settings />
-						<span>Settings</span>
-						<Launcher.Shortcut>⌘S</Launcher.Shortcut>
+						<SiGoogledrive />
+						<span>Exercise sheet 1</span>
 					</Launcher.Item>
 				</Launcher.Group>
 			</Launcher.List>
