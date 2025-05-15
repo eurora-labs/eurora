@@ -3,9 +3,11 @@
 	import { cn } from '@eurora/ui/utils.js';
 	import { InputArea } from '../input-area/index.js';
 	import type { Query } from '@eurora/prosemirror-core';
+	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core';
 
 	interface Props extends CommandPrimitive.InputProps {
 		query?: Query;
+		editorRef?: ProsemirrorEditor;
 	}
 
 	let {
@@ -14,6 +16,7 @@
 		value = $bindable(''),
 		height = $bindable('100px'),
 		query = $bindable(undefined),
+		editorRef = $bindable(undefined),
 		...restProps
 	}: Props = $props();
 </script>
@@ -32,7 +35,7 @@
 		{...restProps}
 	>
 		{#snippet child({ props })}
-			<InputArea bind:ref={ref as any} bind:value bind:query {...props} />
+			<InputArea bind:ref={editorRef} bind:value bind:query {...props} />
 		{/snippet}
 	</CommandPrimitive.Input>
 </div>
