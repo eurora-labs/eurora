@@ -32,6 +32,6 @@
 
 <style lang="postcss">
 	:global(p) {
-		margin: 1rem 0;
+		/* margin: 1rem 0; */
 	}
 </style>
