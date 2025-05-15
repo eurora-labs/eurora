@@ -265,6 +265,9 @@
 	:global(.ProseMirror-separator) {
 		display: none;
 	}
+	:global(.ProseMirror-trailingBreak) {
+		display: none;
+	}
 	:global(.ProseMirror) {
 		border-top: 0;
 		overflow-wrap: break-word;
@@ -272,6 +275,7 @@
 		white-space: pre-wrap;
 		width: 100%;
 		align-items: anchor-center;
+		line-height: 100px;
 	}
 
 	:global(.ProseMirror[data-placeholder])::before {
@@ -279,6 +283,6 @@
 		position: absolute;
 		content: attr(data-placeholder);
 		pointer-events: none;
-		line-height: 70px;
+		line-height: 100px;
 	}
 </style>
