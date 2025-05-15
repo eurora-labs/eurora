@@ -212,7 +212,7 @@
 		view?.dispatch(tr);
 	}
 
-	export async function sendQuery(newQuery: Query) {
+	export async function sendQuery(newQuery?: Query) {
 		if (!view) {
 			await init(newQuery);
 		} else {
