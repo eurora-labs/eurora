@@ -63,6 +63,10 @@ export default defineConfig({
 			'@eurora/katex': path.resolve(
 				__dirname,
 				'../../packages/custom-components/katex/src/lib/index.ts'
+			),
+			'@eurora/launcher': path.resolve(
+				__dirname,
+				'../../packages/custom-components/launcher/src/index.ts'
 			)
 		}
 	}
