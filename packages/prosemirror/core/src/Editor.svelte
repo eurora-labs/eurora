@@ -268,6 +268,7 @@
 		outline: none;
 		white-space: pre-wrap;
 		width: 100%;
+		align-items: anchor-center;
 	}
 
 	:global(.ProseMirror[data-placeholder])::before {
