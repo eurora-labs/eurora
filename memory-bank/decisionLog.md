@@ -61,3 +61,21 @@ This file records architectural and implementation decisions using a list format
 
 This file tracks key architectural and design decisions made during the project's development.
 2025-04-25 21:14:27 - Initial creation of Memory Bank.
+
+[2025-05-14 18:53:02] - Implemented Context Chip component
+
+**Decision:** Created a reusable Context Chip component based on the styling from Transcript.svelte.
+
+**Rationale:**
+- Extracted styling from Transcript.svelte to create a reusable component
+- Implemented as a UI component following the same pattern as the Badge component
+- Added variants to support different use cases (default, primary, secondary, destructive, outline)
+- Included support for click handlers and links
+- Used backdrop blur effect for a modern, translucent appearance
+
+**Implementation Details:**
+- Created component in packages/ui/src/custom-components/ui/context-chip
+- Used tailwind-variants (tv) for variant styling
+- Added proper TypeScript typing for variants
+- Exported component in the main UI package index.ts
+- Created documentation page in the docs app
