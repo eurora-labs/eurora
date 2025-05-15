@@ -15,7 +15,7 @@
 	import { onMount } from 'svelte';
 
 	let {
-		ref = $bindable<ProsemirrorEditor | undefined>(undefined),
+		ref = $bindable(),
 		query = $bindable(undefined),
 		value = $bindable(''),
 		class: className,
@@ -36,7 +36,10 @@
 <ProsemirrorEditor
 	bind:this={ref}
 	bind:value
-	class={cn(className, 'h-fit min-h-[70px] text-[40px] leading-[40px] text-black')}
+	class={cn(
+		className,
+		'h-fit min-h-[100px] border-none pt-[15px] text-[40px] leading-[100px] text-black shadow-none'
+	)}
 	{...restProps}
 />
 
