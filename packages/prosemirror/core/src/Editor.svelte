@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { EditorState, Plugin, TextSelection } from 'prosemirror-state';
+	import { Node as PMNode } from 'prosemirror-model';
 	import { DOMParser } from 'prosemirror-model';
 	import { EditorView } from 'prosemirror-view';
 	import { onDestroy, onMount } from 'svelte';
@@ -11,7 +12,7 @@
 	import { paragraphExtension } from './components/paragraph/extension.js';
 	import { type Commands, commands as defaultCommands } from './commands.js';
 	// import './Editor.css';
-	import { type ClassValue } from 'svelte/elements';
+	import type { ClassValue } from 'svelte/elements';
 	export interface Props {
 		value?: string;
 		query?: Query;
