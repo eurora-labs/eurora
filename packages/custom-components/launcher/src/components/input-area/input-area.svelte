@@ -1,24 +1,55 @@
-<script lang="ts">
-	import type { WithElementRef, WithoutChildren } from 'bits-ui';
-	import type { HTMLTextareaAttributes } from 'svelte/elements';
-	import { cn } from '@eurora/ui/utils.js';
+<script lang="ts" module>
+	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core';
+	import type { ClassValue } from 'svelte/elements';
 
-	let {
-		ref = $bindable<HTMLTextAreaElement | null>(null),
-		value = $bindable(''),
-		class: className,
-		...restProps
-	}: WithoutChildren<WithElementRef<HTMLTextareaAttributes>> = $props();
-
-	// Calculate and set the textarea height
-	function adjustHeight(event: Event) {
-		const target = event.target as HTMLTextAreaElement;
-		if (!target) return;
-		target.style.height = `${target.scrollHeight}px`; // Set to scroll height
+	export interface Props {
+		ref?: ProsemirrorEditor;
+		query?: Query;
+		value?: string;
+		class?: ClassValue;
 	}
 </script>
 
-<textarea
+<script lang="ts">
+	import { cn } from '@eurora/ui/utils.js';
+	import { onMount } from 'svelte';
+
+	let {
+		ref = $bindable<ProsemirrorEditor | undefined>(undefined),
+		query = $bindable(undefined),
+		value = $bindable(''),
+		class: className,
+		...restProps
+	}: Props = $props();
+
+	onMount(() => {
+		if (!query) {
+			query = {
+				text: '',
+				extensions: []
+			};
+		}
+		ref?.sendQuery(query);
+	});
+</script>
+
+<ProsemirrorEditor
+	bind:this={ref}
+	bind:value
+	class={cn(className, 'h-fit min-h-[70px] text-[40px] leading-[40px] text-black')}
+	{...restProps}
+/>
+
+<!-- <textarea
+	bind:value
+	class={cn(
+		'border-input focus-visible:ring-ring flex w-full resize-none overflow-hidden rounded-md border bg-transparent px-3 py-2 shadow-sm focus-visible:outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50',
+		className
+	)}
+	{...restProps}
+></textarea> -->
+
+<!-- <textarea
 	bind:this={ref}
 	bind:value
 	class={cn(
@@ -27,8 +58,7 @@
 	)}
 	oninput={adjustHeight}
 	{...restProps}
-></textarea>
-
+></textarea> -->
 <style>
 	textarea::placeholder {
 		color: rgba(0, 0, 0, 0.25);
