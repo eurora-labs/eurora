@@ -13,12 +13,18 @@
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
 	import { Launcher } from '@eurora/launcher';
 	import { Badge } from '@eurora/ui';
+	import { transcriptExtension } from '@eurora/ext-transcript';
+
+	let exampleInput = $state({
+		text: '',
+		extensions: [transcriptExtension()]
+	});
 </script>
 
 <div>
 	<div class="launcher absolute left-1/2 top-1/4 w-[1100px] -translate-x-1/2">
 		<Launcher.Root class="rounded-lg border shadow-md">
-			<Launcher.Input placeholder="Search" />
+			<Launcher.Input placeholder="Search" bind:query={exampleInput} />
 			<!-- <span class="absolute left-[175px] top-4 ml-2 mt-2 flex items-center gap-2">
 				<div class="transcript-badge">transcript</div>
 				<div class="transcript-badge">video</div>

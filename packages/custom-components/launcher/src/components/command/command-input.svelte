@@ -2,14 +2,20 @@
 	import { Command as CommandPrimitive } from 'bits-ui';
 	import { cn } from '@eurora/ui/utils.js';
 	import { InputArea } from '../input-area/index.js';
+	import type { Query } from '@eurora/prosemirror-core';
+
+	interface Props extends CommandPrimitive.InputProps {
+		query?: Query;
+	}
 
 	let {
 		ref = $bindable(null),
 		class: className,
 		value = $bindable(''),
 		height = $bindable('100px'),
+		query = $bindable(undefined),
 		...restProps
-	}: CommandPrimitive.InputProps = $props();
+	}: Props = $props();
 </script>
 
 <div class="items-top flex h-fit border-none px-3" data-command-input-wrapper="">
@@ -26,7 +32,7 @@
 		{...restProps}
 	>
 		{#snippet child({ props })}
-			<InputArea bind:ref bind:value {...props} />
+			<InputArea bind:ref={ref as any} bind:value bind:query {...props} />
 		{/snippet}
 	</CommandPrimitive.Input>
 </div>
