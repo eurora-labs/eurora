@@ -27,6 +27,8 @@
 	},
 	"devDependencies": {
 		"@eurora/typescript-config": "workspace:*",
+		"@eurora/prosemirror-core": "workspace:*",
+		"@eurora/ext-transcript": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.20.7",
