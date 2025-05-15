@@ -19,7 +19,8 @@
 	},
 	"peerDependencies": {
 		"@lucide/svelte": "^0.510.0",
-		"svelte": "^5.0.0"
+		"svelte": "^5.0.0",
+		"@icons-pack/svelte-simple-icons": "^5.0.0"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.9",
