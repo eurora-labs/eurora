@@ -19,17 +19,37 @@
 	import { Launcher } from '@eurora/launcher';
 	import { Badge } from '@eurora/ui';
 	import { transcriptExtension } from '@eurora/ext-transcript';
+	import { Editor as ProsemirrorEditor, TextSelection } from '@eurora/prosemirror-core';
+	let editorRef: ProsemirrorEditor | undefined = $state(undefined);
 
 	let exampleInput = $state({
 		text: '',
 		extensions: [transcriptExtension()]
 	});
+
+	function addExerciseSheet() {
+		editorRef?.cmd((state, dispatch) => {
+			const tr = state.tr;
+			const { schema } = state;
+			const nodes = schema.nodes;
+			const { $from: from } = state.selection;
+			tr.insert(
+				from.pos,
+				nodes.transcript.createChecked(
+					{ id: 'transcript-1', text: 'Exercise Sheet 2' },
+					schema.text(' ')
+				)
+			);
+
+			dispatch?.(tr);
+		});
+	}
 </script>
 
 <div>
 	<div class="launcher absolute left-1/2 top-1/4 w-[1100px] -translate-x-1/2">
 		<Launcher.Root class="rounded-lg border shadow-md">
-			<Launcher.Input placeholder="Search" bind:query={exampleInput} />
+			<Launcher.Input placeholder="Search" bind:query={exampleInput} bind:editorRef />
 			<!-- <span class="absolute left-[175px] top-4 ml-2 mt-2 flex items-center gap-2">
 				<div class="transcript-badge">transcript</div>
 				<div class="transcript-badge">video</div>
@@ -37,7 +57,7 @@
 			<Launcher.List>
 				<!-- <Launcher.Empty>No results found.</Launcher.Empty> -->
 				<Launcher.Group heading="Local Files">
-					<Launcher.Item>
+					<Launcher.Item onclick={addExerciseSheet}>
 						<HardDrive />
 						<span>Exercise Sheet 2</span>
 					</Launcher.Item>
