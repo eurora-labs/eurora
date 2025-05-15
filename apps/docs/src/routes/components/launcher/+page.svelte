@@ -54,7 +54,7 @@
 					</Launcher.Item>
 					<Launcher.Item>
 						<SiGoogledrive />
-						<span>Notes</span>
+						<span>Presentation 1</span>
 					</Launcher.Item>
 					<Launcher.Item>
 						<SiGoogledrive />
