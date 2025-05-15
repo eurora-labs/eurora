@@ -168,8 +168,8 @@
 	// Function to check if API key exists
 	async function checkApiKey() {
 		try {
-			const result: { has_key: boolean } = await invoke('check_api_key_exists');
-			hasApiKey = result.has_key;
+			const result: boolean = await invoke('check_api_key_exists');
+			hasApiKey = result;
 
 			// If API key exists, initialize the OpenAI client
 			if (hasApiKey) {
