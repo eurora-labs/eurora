@@ -38,7 +38,7 @@
 	bind:value
 	class={cn(
 		className,
-		'h-fit min-h-[100px] border-none pt-[15px] text-[40px] leading-[100px] text-black shadow-none'
+		'ProsemirrorEditor h-fit min-h-[100px] border-none pt-[15px] text-[40px] leading-[100px] text-black shadow-none'
 	)}
 	{...restProps}
 />
@@ -66,5 +66,8 @@
 	textarea::placeholder {
 		color: rgba(0, 0, 0, 0.25);
 		text-align: start;
+	}
+	.ProsemirrorEditor {
+		color: rgba(0, 0, 0, 0.8);
 	}
 </style>
