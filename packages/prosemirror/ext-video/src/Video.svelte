@@ -54,9 +54,9 @@
 <script lang="ts">
 	import { Badge, ContextChip, Dialog, Label, Input, Button, buttonVariants } from '@eurora/ui';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
-	export interface Props extends SvelteNodeViewProps<TranscriptAttrs> {
+	export interface Props extends SvelteNodeViewProps<VideoAttrs> {
 		ref: HTMLElement;
-		attrs: TranscriptAttrs;
+		attrs: VideoAttrs;
 	}
 
 	let { ref, attrs }: Props = $props();
