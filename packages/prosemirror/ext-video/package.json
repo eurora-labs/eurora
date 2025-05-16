@@ -1,0 +1,29 @@
+{
+	"name": "@eurora/ext-video",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./src/index.ts",
+	"module": "./src/index.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"svelte": "./src/index.ts"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {},
+	"devDependencies": {
+		"@eurora/prosemirror-core": "workspace:*",
+		"@eurora/typescript-config": "workspace:*",
+		"@eurora/ui": "workspace:*",
+		"prosemirror-model": "^1.20.0",
+		"prosemirror-view": "^1.33.5",
+		"svelte": "^5.28.2",
+		"svelte-check": "^4.1.7",
+		"svelte-preprocess": "^6.0.3",
+		"svelte2tsx": "^0.7.7",
+		"@sveltejs/vite-plugin-svelte": "^5.0.0"
+	}
+}
