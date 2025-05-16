@@ -2,8 +2,8 @@
 	"name": "@eurora/ext-transcript",
 	"version": "0.0.1",
 	"type": "module",
-	"main": "./src/index.ts",
-	"module": "./src/index.ts",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
 	"exports": {
 		".": {
 			"types": "./src/index.ts",
