@@ -52,7 +52,7 @@
 </script>
 
 <script lang="ts">
-	import { Badge, ContextChip, Dialog, Label, Input } from '@eurora/ui';
+	import { Badge, ContextChip, Dialog, Label, Input, Button, buttonVariants } from '@eurora/ui';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
 	export interface Props extends SvelteNodeViewProps<TranscriptAttrs> {
 		ref: HTMLElement;
