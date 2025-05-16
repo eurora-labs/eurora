@@ -376,7 +376,7 @@
 				<Badge variant="outline">No recent activities</Badge>
 			{/if}
 		</div> -->
-		<!-- 
+		<!--
 		<Button
 			onclick={() => {
 				loadActivities();
@@ -464,8 +464,8 @@
 	}
 
 	.backdrop-custom-2 {
-		filter: blur(18px);
-		-webkit-filter: blur(18px);
+		/* filter: blur(18px); */
+		/* -webkit-filter: blur(18px); */
 
 		width: 110vw;
 		height: 200px;
