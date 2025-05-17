@@ -11,7 +11,7 @@ classDiagram
         +initialize()
         +handleInstallation()
     }
-    
+
     class NativeMessagingWorker {
         -nativePort: chrome.runtime.Port
         -messageQueue: any[]
@@ -21,14 +21,14 @@ classDiagram
         +handleGenerateReport()
         +handleGenerateSnapshot()
     }
-    
+
     %% Content Scripts
     class ContentScript {
         <<interface>>
         +initialize()
         +handleMessages()
     }
-    
+
     class YouTubeWatcher {
         -videoId: string
         -videoTranscript: any
@@ -40,17 +40,17 @@ classDiagram
         +getCurrentVideoId()
         +getYouTubeTranscript(videoId): Promise
     }
-    
+
     class PDFWatcher {
         -pdfViewerApplication: any
         +getPdfState(): Promise~PdfState~
         +getPageContent(application): Promise~string~
     }
-    
+
     class ArticleWatcher {
         +extractArticleContent(): string
     }
-    
+
     %% Data Models
     class EurImage {
         +dataBase64: string
@@ -58,7 +58,7 @@ classDiagram
         +height: number
         +format: ProtoImageFormat
     }
-    
+
     class PdfState {
         +type: 'PDF_STATE'
         +url: string
@@ -66,7 +66,7 @@ classDiagram
         +content: string
         +selectedText: string
     }
-    
+
     class ProtoNativeYoutubeState {
         +type: 'YOUTUBE_STATE'
         +url: string
@@ -78,7 +78,7 @@ classDiagram
         +videoFrameHeight: number
         +videoFrameFormat: ProtoImageFormat
     }
-    
+
     class ProtoNativeYoutubeSnapshot {
         +type: 'YOUTUBE_SNAPSHOT'
         +currentTime: number
@@ -87,7 +87,7 @@ classDiagram
         +videoFrameHeight: number
         +videoFrameFormat: ProtoImageFormat
     }
-    
+
     class ProtoNativeArticleAsset {
         +type: 'ARTICLE_ASSET'
         +content: string
@@ -99,31 +99,31 @@ classDiagram
         +length: number
         +selectedText: string
     }
-    
+
     %% UI Components
     class PopupUI {
         +render()
     }
-    
+
     %% Relationships
     BackgroundScript --> NativeMessagingWorker: uses
     ContentScript <|-- YouTubeWatcher: implements
     ContentScript <|-- PDFWatcher: implements
     ContentScript <|-- ArticleWatcher: implements
-    
+
     YouTubeWatcher --> EurImage: creates
     YouTubeWatcher --> ProtoNativeYoutubeState: creates
     YouTubeWatcher --> ProtoNativeYoutubeSnapshot: creates
-    
+
     PDFWatcher --> PdfState: creates
-    
+
     ArticleWatcher --> ProtoNativeArticleAsset: creates
-    
+
     NativeMessagingWorker --> BackgroundScript: communicates with
     NativeMessagingWorker --> YouTubeWatcher: sends messages to
     NativeMessagingWorker --> PDFWatcher: sends messages to
     NativeMessagingWorker --> ArticleWatcher: sends messages to
-    
+
     BackgroundScript --> PopupUI: initializes
 ```
 
@@ -134,6 +134,7 @@ The extension is organized into three main components:
 1. **Background Script**: Manages the extension lifecycle and coordinates communication between content scripts and the native application.
 
 2. **Content Scripts**: Specialized scripts that run in the context of web pages to extract content:
+
    - **YouTube Watcher**: Extracts video information, transcripts, and captures frames from YouTube videos
    - **PDF Watcher**: Extracts content from PDF documents viewed in the browser
    - **Article Watcher**: Uses Mozilla's Readability library to extract clean content from article pages
@@ -149,18 +150,18 @@ sequenceDiagram
     participant BackgroundScript
     participant NativeMessagingWorker
     participant EuroraApp
-    
+
     WebPage->>ContentScript: User visits page
     ContentScript->>ContentScript: Initialize and monitor page
     BackgroundScript->>NativeMessagingWorker: Connect to native host
     NativeMessagingWorker->>EuroraApp: Establish connection
-    
+
     BackgroundScript->>ContentScript: Request content (GENERATE_ASSETS)
     ContentScript->>ContentScript: Extract content
     ContentScript->>BackgroundScript: Return content data
     BackgroundScript->>NativeMessagingWorker: Send to native host
     NativeMessagingWorker->>EuroraApp: Forward content data
-    
+
     EuroraApp->>NativeMessagingWorker: Send response/command
     NativeMessagingWorker->>BackgroundScript: Forward response
     BackgroundScript->>ContentScript: Execute command if needed
