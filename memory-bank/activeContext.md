@@ -40,6 +40,7 @@ This file tracks the project's current status, including recent changes, current
   - Added backdrop blur effect and styling from Transcript component
   - Created demo file to showcase usage
     [2025-05-14 18:50:50] - Implemented Context Chip component
+    [2025-05-17 14:19:45] - Modified Context Chip component to use transparent background with backdrop blur for non-Linux platforms and solid background for Linux desktop app
 
 ## Open Questions/Issues
 
