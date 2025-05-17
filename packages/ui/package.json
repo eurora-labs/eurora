@@ -18,9 +18,9 @@
 		"ui:add": "pnpm dlx shadcn-svelte@next add"
 	},
 	"peerDependencies": {
+		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"@lucide/svelte": "^0.510.0",
-		"svelte": "^5.0.0",
-		"@icons-pack/svelte-simple-icons": "^5.0.0"
+		"svelte": "^5.0.0"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.9",
@@ -41,7 +41,7 @@
 		"@testing-library/jest-dom": "^6.6.3",
 		"@testing-library/svelte": "^5.2.4",
 		"autoprefixer": "^10.4.21",
-		"bits-ui": "^1.4.2",
+		"bits-ui": "^1.4.8",
 		"clsx": "^2.1.1",
 		"eslint": "^9.25.1",
 		"eslint-config-prettier": "^10.1.2",
