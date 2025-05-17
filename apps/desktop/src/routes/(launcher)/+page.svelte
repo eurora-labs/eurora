@@ -67,6 +67,8 @@
 		messages.push({ role: 'system', content: event.payload });
 	});
 
+	listen<string>('add_video_context_chip', (event) => {});
+
 	// Listen for key events from the Rust backend
 	listen<string>('key_event', (event) => {
 		console.log('Received key event:', event.payload);
@@ -114,6 +116,19 @@
 	listen('launcher_opened', () => {
 		// Reload activities when launcher is opened
 		loadActivities();
+
+		editorRef?.cmd((state, dispatch) => {
+			const tr = state.tr;
+			const { schema } = state;
+			const nodes = schema.nodes;
+			const { $from: from } = state.selection;
+			tr.insert(
+				from.pos,
+				nodes.transcript.createChecked({ id: 'transcript-1', text: 'video' }, schema.text(' '))
+			);
+
+			dispatch?.(tr);
+		});
 		console.log('Launcher opened: refreshed activities');
 	});
 
