@@ -2,10 +2,12 @@
 	import type { NodeSpec } from 'prosemirror-model';
 	import { Node as PMNode } from 'prosemirror-model';
 	import type { NodeProps } from '@eurora/prosemirror-core';
+
 	export interface Frame {
 		id: string;
 		ocrText?: string;
 	}
+
 	export interface VideoAttrs {
 		id?: string;
 		transcript?: string;

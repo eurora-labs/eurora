@@ -5,24 +5,24 @@ This file provides a high-level overview of the project and the expected product
 
 ## Project Goal
 
-* Eurora appears to be an experimental AI-powered desktop application currently in early alpha testing.
-* The project is structured as a monorepo containing multiple apps and packages.
+- Eurora appears to be an experimental AI-powered desktop application currently in early alpha testing.
+- The project is structured as a monorepo containing multiple apps and packages.
 
 ## Key Features
 
-* AI chat integration (packages/custom-components/ai-chat)
-* Screen capture functionality (crates/app/eur-screen-capture)
-* Conversation management (crates/app/eur-conversation)
-* Timeline/focus tracking (crates/app/eur-timeline)
-* OpenAI integration (crates/common/eur-openai)
+- AI chat integration (packages/custom-components/ai-chat)
+- Screen capture functionality (crates/app/eur-screen-capture)
+- Conversation management (crates/app/eur-conversation)
+- Timeline/focus tracking (crates/app/eur-timeline)
+- OpenAI integration (crates/common/eur-openai)
 
 ## Overall Architecture
 
-* Built using Tauri framework (Rust backend + web frontend)
-* Monorepo structure with:
-  * apps/ - Application frontends
-  * crates/ - Rust backend code
-  * packages/ - Frontend packages and components
-  * proto/ - Protocol definitions
-  * extensions/ - Browser extensions
-  * scripts/ - Utility scripts
+- Built using Tauri framework (Rust backend + web frontend)
+- Monorepo structure with:
+  - apps/ - Application frontends
+  - crates/ - Rust backend code
+  - packages/ - Frontend packages and components
+  - proto/ - Protocol definitions
+  - extensions/ - Browser extensions
+  - scripts/ - Utility scripts
