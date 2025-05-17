@@ -16,7 +16,7 @@
 	import { Launcher } from '@eurora/launcher';
 	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core';
 	import { transcriptExtension } from '@eurora/ext-transcript';
-
+	import { videoExtension } from '@eurora/ext-video';
 	// Define a type for Conversation based on what we know from main.rs
 	type ChatMessage = {
 		id: string;
@@ -48,7 +48,7 @@
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
 		text: '',
-		extensions: [transcriptExtension()]
+		extensions: [transcriptExtension(), videoExtension()]
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
 	let transcript = $state<string | null>(null);
@@ -124,7 +124,7 @@
 			const { $from: from } = state.selection;
 			tr.insert(
 				from.pos,
-				nodes.transcript.createChecked({ id: 'transcript-1', text: 'video' }, schema.text(' '))
+				nodes.video.createChecked({ id: 'video-1', text: 'video' }, schema.text(' '))
 			);
 
 			dispatch?.(tr);

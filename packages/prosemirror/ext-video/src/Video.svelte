@@ -80,7 +80,10 @@
 </script>
 
 <Dialog.Root>
-	<Dialog.Trigger class={buttonVariants({ variant: 'outline' })}>Edit Profile</Dialog.Trigger>
+	<Dialog.Trigger>
+		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>video</ContextChip>
+	</Dialog.Trigger>
+
 	<Dialog.Content class="sm:max-w-[425px]">
 		<Dialog.Header>
 			<Dialog.Title>Edit profile</Dialog.Title>
@@ -103,6 +106,3 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
-<ContextChip onclick={handleClick} bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>
-	video
-</ContextChip>
