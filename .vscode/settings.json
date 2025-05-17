@@ -48,6 +48,15 @@
 	"rust-analyzer.check.allTargets": true,
 	"rust-analyzer.check.features": "all",
 	"rust-analyzer.check.extraArgs": ["--target-dir", ".rust-analyzer/target"],
+	"rust-analyzer.files.excludeDirs": [
+		"dist",
+		"node_modules",
+		"public",
+		"src",
+		".turbo",
+		".svelte-kit",
+		".venv"
+	],
 	"[rust]": {
 		"editor.defaultFormatter": "rust-lang.rust-analyzer"
 	},
