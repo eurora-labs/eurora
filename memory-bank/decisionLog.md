@@ -85,3 +85,18 @@ This file tracks key architectural and design decisions made during the project'
 - Added proper TypeScript typing for variants
 - Exported component in the main UI package index.ts
 - Created documentation page in the docs app
+
+[2025-05-17 14:19:55] - Modified Context Chip component for platform-specific styling
+
+**Decision:** Updated the Context Chip component to use different background styles based on the platform.
+
+**Rationale:**
+- Linux desktop app requires a solid background due to platform-specific rendering differences
+- Non-Linux platforms can benefit from the modern backdrop blur effect
+- Maintaining consistent visual appearance across platforms while addressing platform-specific requirements
+
+**Implementation Details:**
+- Used CSS selectors to detect when the body has the "linux-app" class (Linux desktop app)
+- For Linux: Applied solid background-color: rgba(0, 0, 0, 0.2) without backdrop filter
+- For other platforms: Used transparent background with backdrop-filter: blur(6px)
+- Ensured backward compatibility with existing usage of the component
