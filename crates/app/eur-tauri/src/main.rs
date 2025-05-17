@@ -163,6 +163,7 @@ fn main() {
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let builder = tauri::Builder::default()
+                .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
                     // let main_window =
