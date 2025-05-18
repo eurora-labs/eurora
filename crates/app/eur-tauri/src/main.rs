@@ -496,8 +496,8 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 match capture_region_rgba(
                     launcher_x,
                     launcher_y,
-                    launcher_width + 100,
-                    launcher_height + 100,
+                    launcher_width,
+                    launcher_height,
                 ) {
                     Ok(img) => {
                         let t0 = std::time::Instant::now();
