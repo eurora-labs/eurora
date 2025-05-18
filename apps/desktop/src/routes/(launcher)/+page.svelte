@@ -466,7 +466,7 @@
 	</div>
 </div>
 <div
-	class="backdrop-custom-2 fixed left-[-50px] top-[-50px] h-screen w-screen"
+	class="backdrop-custom-2 fixed left-[0px] top-[0px] h-screen w-screen"
 	bind:this={backdropCustom2Ref}
 ></div>
 
@@ -482,8 +482,8 @@
 		/* filter: blur(18px); */
 		/* -webkit-filter: blur(18px); */
 
-		width: 110vw;
-		height: 200px;
+		width: 100%;
+		height: 100%;
 
 		z-index: 1;
 
