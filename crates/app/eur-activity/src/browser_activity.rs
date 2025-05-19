@@ -1,4 +1,6 @@
-use crate::{ActivityAsset, ActivitySnapshot, ActivityStrategy};
+use std::collections::HashMap;
+
+use crate::{ActivityAsset, ActivitySnapshot, ActivityStrategy, ContextChip};
 use anyhow::Result;
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
@@ -114,6 +116,14 @@ impl ActivityAsset for YoutubeAsset {
             }),
         }
     }
+
+    fn get_context_chip(&self) -> Option<ContextChip> {
+        Some(ContextChip {
+            id: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
+            attrs: HashMap::new(),
+            icon: None,
+        })
+    }
 }
 
 impl ActivityAsset for ArticleAsset {
@@ -136,6 +146,15 @@ impl ActivityAsset for ArticleAsset {
                 ),
             }),
         }
+    }
+
+    fn get_context_chip(&self) -> Option<ContextChip> {
+        Some(ContextChip {
+            // TODO: Add a unique ID for the article
+            id: "None".to_string(),
+            attrs: HashMap::new(),
+            icon: None,
+        })
     }
 }
 
