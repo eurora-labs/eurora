@@ -6,6 +6,7 @@ import { SvelteNodeView } from '@eurora/prosemirror-core';
 
 export function transcriptExtension() {
 	return {
+		id: 'D8215655-A880-4B0F-8EFA-0B6B447F8AF3',
 		name: 'transcript' as const,
 		svelteNodes: {
 			transcript: {
