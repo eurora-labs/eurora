@@ -9,10 +9,14 @@
 			const scaleFactor = result as number;
 
 			const resizeObserver = new ResizeObserver(() => {
+				if (!mainRef) return;
 				try {
+					console.log('scrollHeight', mainRef?.scrollHeight);
+					console.log('offsetHeight', mainRef?.offsetHeight);
+					console.log('clientHeight', mainRef?.clientHeight);
 					invoke('resize_window', {
-						height: mainRef?.scrollHeight,
-						scaleFactor
+						height: mainRef.scrollHeight,
+						scaleFactor: scaleFactor
 					});
 				} catch (error) {
 					console.error('Failed to resize window:', error);
