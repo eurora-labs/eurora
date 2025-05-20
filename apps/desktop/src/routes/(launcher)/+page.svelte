@@ -14,9 +14,11 @@
 
 	// Import the Launcher component
 	import { Launcher } from '@eurora/launcher';
-	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core';
-	import { transcriptExtension } from '@eurora/ext-transcript';
-	import { videoExtension } from '@eurora/ext-video';
+	import { Editor as ProsemirrorEditor, type SveltePMExtension } from '@eurora/prosemirror-core';
+	// Import the extension factory instead of individual extensions
+	import { extensionFactory } from '@eurora/prosemirror-factory';
+	// Import to ensure extensions are registered
+	import '@eurora/prosemirror-factory/register-extensions';
 	// Define a type for Conversation based on what we know from main.rs
 	type ChatMessage = {
 		id: string;
@@ -26,6 +28,11 @@
 		created_at: number;
 		updated_at: number;
 	};
+
+	interface ExtensionData {
+		id: string;
+		attrs: Record<string, any>;
+	}
 
 	type Conversation = {
 		id: string;
@@ -48,7 +55,7 @@
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
 		text: '',
-		extensions: [transcriptExtension(), videoExtension()]
+		extensions: [{ id: 'test', attrs: {} }] as ExtensionData[]
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
 	let transcript = $state<string | null>(null);
@@ -117,17 +124,25 @@
 		// Reload activities when launcher is opened
 		loadActivities();
 
+		// Get video extension ID from the factory
+		const VIDEO_EXTENSION_ID = '9370B14D-B61C-4CE2-BDE7-B18684E8731A';
+
 		editorRef?.cmd((state, dispatch) => {
 			const tr = state.tr;
 			const { schema } = state;
 			const nodes = schema.nodes;
 			const { $from: from } = state.selection;
-			tr.insert(
-				from.pos,
-				nodes.video.createChecked({ id: 'video-1', text: 'video' }, schema.text(' '))
-			);
 
-			dispatch?.(tr);
+			// Check if video node is available in schema
+			if (nodes.video) {
+				tr.insert(
+					from.pos,
+					nodes.video.createChecked({ id: 'video-1', text: 'video' }, schema.text(' '))
+				);
+				dispatch?.(tr);
+			} else {
+				console.warn('Video node not found in schema');
+			}
 		});
 		console.log('Launcher opened: refreshed activities');
 	});
@@ -162,6 +177,20 @@
 		}
 	}
 
+	function convertToQuery() {
+		const extensions: SveltePMExtension[] = [];
+		for (const extensionData of searchQuery.extensions) {
+			const extension = extensionFactory.getExtension(extensionData.id);
+			extensions.push({
+				id: extension.id,
+				attrs: extensionData.attrs
+			});
+		}
+		return {
+			text: searchQuery.text,
+			extensions
+		};
+	}
 	// Add global keydown event listener when component is mounted
 	onMount(() => {
 		document.addEventListener('keydown', handleEscapeKey);
