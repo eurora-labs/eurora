@@ -21,6 +21,7 @@
 		"@eurora/katex": "workspace:*",
 		"@eurora/launcher": "workspace:*",
 		"@eurora/prosemirror-core": "workspace:*",
+		"@eurora/prosemirror-factory": "workspace:*",
 		"@eurora/proto": "workspace:*",
 		"@eurora/ui": "workspace:*"
 	},
