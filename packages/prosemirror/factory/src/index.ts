@@ -24,9 +24,12 @@ export class ExtensionFactory {
 	/**
 	 * Get an extension instance by ID
 	 */
-	getExtension(id: string): SveltePMExtension | undefined {
+	getExtension(id: string): SveltePMExtension {
 		const creator = this.registry.get(id);
-		return creator ? creator() : undefined;
+		if (!creator) {
+			throw new Error(`Extension with ID ${id} not found`);
+		}
+		return creator();
 	}
 
 	/**
