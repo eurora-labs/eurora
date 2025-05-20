@@ -44,7 +44,6 @@
 
 	let inputRef = $state<HTMLTextAreaElement | null>(null);
 	let editorRef: ProsemirrorEditor | undefined = $state();
-
 	registerCoreExtensions();
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
@@ -379,7 +378,7 @@
 	}
 </script>
 
-<div class="backdrop-custom relative flex h-screen flex-col">
+<div class="backdrop-custom relative flex h-full flex-col">
 	<!-- <div
 	class="relative flex h-screen flex-col"
 	style={backgroundImage
@@ -447,7 +446,7 @@
 
 					<!-- Recent conversations list -->
 					{#if messages.length === 0}
-						<Launcher.List hidden>
+						<Launcher.List>
 							<Launcher.Group heading="Local Files">
 								<Launcher.Item>
 									<HardDrive />
