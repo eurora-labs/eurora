@@ -332,6 +332,11 @@ fn main() {
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
+                .plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Error)
+                        .build(),
+                )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
                 // .plugin(
@@ -1045,6 +1050,7 @@ async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<DisplayAsse
 async fn get_scale_factor(app_handle: tauri::AppHandle, height: f64) -> Result<f64, String> {
     let window = app_handle.get_window("launcher").unwrap();
     let current_size = window.inner_size().unwrap();
+    // let scale_factor = height / current_size.height as f64;
     let scale_factor = (current_size.height as f64) / (height);
     // let scale_factor = 1.0;
     eprintln!("Scale factor: {}", scale_factor);
@@ -1061,14 +1067,15 @@ async fn resize_window(
     scale_factor: f64,
 ) -> Result<(), String> {
     let window = app_handle.get_window("launcher").unwrap();
-    let current_size = window.inner_size().unwrap();
+    let current_size = window.outer_size().unwrap();
     let new_height = height * scale_factor;
     eprintln!("New height: {}", new_height);
     eprintln!("Current height: {}", current_size.height);
     eprintln!("Scale factor: {}", scale_factor);
     let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
         width: current_size.width,
-        height: new_height as u32 + 72,
+        // height: new_height as u32 + 72,
+        height: new_height as u32,
     }));
     Ok(())
 }
