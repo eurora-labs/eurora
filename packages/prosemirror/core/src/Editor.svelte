@@ -49,7 +49,7 @@
 		const extensions = [...(currentQuery?.extensions ?? [])];
 
 		// Add paragraph extension if not already present
-		if (!extensions.some((ext) => ext.name === 'paragraph')) {
+		if (!extensions.some((ext) => ext.id === 'paragraph')) {
 			extensions.unshift(paragraphExtension());
 		}
 
