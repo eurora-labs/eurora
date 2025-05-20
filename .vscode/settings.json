@@ -48,6 +48,8 @@
 	"rust-analyzer.check.allTargets": true,
 	"rust-analyzer.check.features": "all",
 	"rust-analyzer.check.extraArgs": ["--target-dir", ".rust-analyzer/target"],
+	"rust-analyzer.cargo.buildScripts.enable": false,
+	"rust-analyzer.procMacro.enable": false,
 	"rust-analyzer.files.excludeDirs": [
 		"dist",
 		"node_modules",
