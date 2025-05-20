@@ -16,9 +16,7 @@
 	import { Launcher } from '@eurora/launcher';
 	import { Editor as ProsemirrorEditor, type SveltePMExtension } from '@eurora/prosemirror-core';
 	// Import the extension factory instead of individual extensions
-	import { extensionFactory } from '@eurora/prosemirror-factory';
-	// Import to ensure extensions are registered
-	import '@eurora/prosemirror-factory/register-extensions';
+	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory';
 	// Define a type for Conversation based on what we know from main.rs
 	type ChatMessage = {
 		id: string;
@@ -28,11 +26,6 @@
 		created_at: number;
 		updated_at: number;
 	};
-
-	interface ExtensionData {
-		id: string;
-		attrs: Record<string, any>;
-	}
 
 	type Conversation = {
 		id: string;
@@ -55,7 +48,7 @@
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
 		text: '',
-		extensions: [{ id: 'test', attrs: {} }] as ExtensionData[]
+		extensions: [] as SveltePMExtension[]
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
 	let transcript = $state<string | null>(null);
@@ -177,22 +170,9 @@
 		}
 	}
 
-	function convertToQuery() {
-		const extensions: SveltePMExtension[] = [];
-		for (const extensionData of searchQuery.extensions) {
-			const extension = extensionFactory.getExtension(extensionData.id);
-			extensions.push({
-				id: extension.id,
-				attrs: extensionData.attrs
-			});
-		}
-		return {
-			text: searchQuery.text,
-			extensions
-		};
-	}
 	// Add global keydown event listener when component is mounted
 	onMount(() => {
+		registerCoreExtensions();
 		document.addEventListener('keydown', handleEscapeKey);
 
 		// Check if API key exists
@@ -281,6 +261,26 @@
 		}
 	}
 
+	async function addVideoExtension() {
+		const extension = extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A');
+		console.log('extension', extension);
+		searchQuery.text = ' ';
+
+		searchQuery.extensions.push(extension);
+		editorRef?.cmd((state, dispatch) => {
+			const tr = state.tr;
+			const { schema } = state;
+			const nodes = schema.nodes;
+			tr.insert(
+				0,
+				nodes.transcript.createChecked(
+					{ id: 'transcript-1', text: 'Some transcript with attrs' },
+					schema.text('transcript')
+				)
+			);
+			dispatch?.(tr);
+		});
+	}
 	async function askQuestion(question: string): Promise<void> {
 		try {
 			type DownloadEvent =
@@ -394,6 +394,7 @@
 
 	<!-- Content container -->
 	<div class="relative z-10 flex h-full flex-col">
+		<button onclick={addVideoExtension} class="absolute right-2 top-2">Add video</button>
 		<!-- <div class="flex flex-wrap gap-2 p-2">
 			{#each displayAssets as asset, index}
 				<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
