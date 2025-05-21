@@ -22,30 +22,48 @@ impl ImplFocusTracker {
     where
         F: FnMut(crate::FocusEvent) -> anyhow::Result<()>,
     {
+        // Track the previously focused app
+        let mut prev_process: Option<String> = None;
+        let mut prev_title: Option<String> = None;
+
         // Set up the event loop
         loop {
             // Get the current focused window information
             match get_focused_window_info() {
                 Ok((process, title, icon_data)) => {
-                    // Convert icon data to base64 if available
-                    let icon_base64 = icon_data
-                        .map(|data| convert_icon_to_base64(&data))
-                        .unwrap_or_else(|| Ok(String::new()))
-                        .unwrap_or_default();
+                    // Only report focus events when the application or title changes
+                    let focus_changed = match (&prev_process, &prev_title) {
+                        (Some(prev_proc), Some(prev_ttl)) => {
+                            *prev_proc != process || *prev_ttl != title
+                        }
+                        _ => true, // First run, always report
+                    };
 
-                    // Create and send the focus event
-                    on_focus(FocusEvent {
-                        process,
-                        title,
-                        icon_base64,
-                    })?;
+                    if focus_changed {
+                        // Convert icon data to base64 if available
+                        let icon_base64 = icon_data
+                            .map(|data| convert_icon_to_base64(&data))
+                            .unwrap_or_else(|| Ok(String::new()))
+                            .unwrap_or_default();
+
+                        // Create and send the focus event
+                        on_focus(FocusEvent {
+                            process: process.clone(),
+                            title: title.clone(),
+                            icon_base64,
+                        })?;
+
+                        // Update previous values
+                        prev_process = Some(process);
+                        prev_title = Some(title);
+                    }
                 }
                 Err(e) => {
                     eprintln!("Error getting window info: {}", e);
                 }
             }
 
-            // Sleep to avoid high CPU usage
+            // Sleep to avoid high CPU usage (we can keep checking frequently)
             std::thread::sleep(Duration::from_millis(500));
         }
     }
