@@ -49,7 +49,7 @@
 		const extensions = [...(currentQuery?.extensions ?? [])];
 
 		// Add paragraph extension if not already present
-		if (!extensions.some((ext) => ext.name === 'paragraph')) {
+		if (!extensions.some((ext) => ext.id === 'paragraph')) {
 			extensions.unshift(paragraphExtension());
 		}
 
@@ -74,30 +74,6 @@
 				markViews: created.markViews
 			}
 		);
-
-		experimentalAddTranscript();
-	}
-
-	function experimentalAddTranscript() {
-		cmd((state, dispatch) => {
-			const tr = state.tr;
-			const { schema } = state;
-			const nodes = schema.nodes;
-			// tr.insert(
-			// 	1,
-			// 	nodes.transcript.createChecked(
-			// 		{ id: 'transcript-1', text: 'Exercise Sheet 2' },
-			// 		schema.text(' ')
-			// 	)
-			// );
-			tr.insert(
-				1,
-				nodes.transcript.createChecked({ id: 'transcript-2', text: 'video' }, schema.text(' '))
-			);
-
-			tr.setSelection(TextSelection.create(tr.doc, 0));
-			dispatch?.(tr);
-		});
 	}
 
 	export async function updateExtensions(newQuery: Query) {
@@ -265,6 +241,9 @@
 	:global(.ProseMirror-separator) {
 		display: none;
 	}
+	:global(.ProseMirror-trailingBreak) {
+		display: none;
+	}
 	:global(.ProseMirror) {
 		border-top: 0;
 		overflow-wrap: break-word;
@@ -272,6 +251,7 @@
 		white-space: pre-wrap;
 		width: 100%;
 		align-items: anchor-center;
+		line-height: 100px;
 	}
 
 	:global(.ProseMirror[data-placeholder])::before {
@@ -279,6 +259,6 @@
 		position: absolute;
 		content: attr(data-placeholder);
 		pointer-events: none;
-		line-height: 70px;
+		line-height: 100px;
 	}
 </style>
