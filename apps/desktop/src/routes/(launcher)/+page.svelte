@@ -8,8 +8,15 @@
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
 
-	import { X } from '@lucide/svelte';
+	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
 
+	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
+
+	// Import the Launcher component
+	import { Launcher } from '@eurora/launcher';
+	import { Editor as ProsemirrorEditor, type SveltePMExtension } from '@eurora/prosemirror-core';
+	// Import the extension factory instead of individual extensions
+	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory';
 	// Define a type for Conversation based on what we know from main.rs
 	type ChatMessage = {
 		id: string;
@@ -36,6 +43,15 @@
 	};
 
 	let inputRef = $state<HTMLTextAreaElement | null>(null);
+	let editorRef: ProsemirrorEditor | undefined = $state();
+	registerCoreExtensions();
+	// Query object for the Launcher.Input component
+	let searchQuery = $state({
+		text: '',
+		extensions: [
+			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A')
+		] as SveltePMExtension[]
+	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
 	let transcript = $state<string | null>(null);
 	const messages = $state<ProtoChatMessage[]>([]);
@@ -53,40 +69,39 @@
 		messages.push({ role: 'system', content: event.payload });
 	});
 
+	listen<string>('add_video_context_chip', (event) => {});
+
 	// Listen for key events from the Rust backend
 	listen<string>('key_event', (event) => {
 		console.log('Received key event:', event.payload);
 
-		// If there's text in the input field, handle the key event
-		if (inputRef) {
-			// Handle special keys
-			if (event.payload === 'Escape') {
-				// Clear input field and reset conversation
-				inputRef.value = '';
-				currentConversationId = 'NEW';
-				messages.splice(0, messages.length);
-			} else if (
-				event.payload === 'Backspace' ||
-				event.payload === 'Delete' ||
-				event.payload === '\b'
-			) {
-				// Handle backspace key
-				if (inputRef.value.length > 0) {
-					inputRef.value = inputRef.value.slice(0, -1);
-				}
-			} else if (event.payload === 'Enter') {
-				// Submit the current input
-				const question = inputRef.value;
-				if (question.trim().length > 0) {
-					inputRef.value = '';
-					messages.push({ role: 'user', content: question });
-					askQuestion(question);
-				}
-			} else if (event.payload.length === 1 || event.payload === 'Space') {
-				// Handle regular character keys and space
-				const char = event.payload === 'Space' ? ' ' : event.payload;
-				inputRef.value += char;
+		// Handle special keys
+		if (event.payload === 'Escape') {
+			// Clear input field and reset conversation
+			searchQuery.text = '';
+			currentConversationId = 'NEW';
+			messages.splice(0, messages.length);
+		} else if (
+			event.payload === 'Backspace' ||
+			event.payload === 'Delete' ||
+			event.payload === '\b'
+		) {
+			// Handle backspace key
+			if (searchQuery.text.length > 0) {
+				searchQuery.text = searchQuery.text.slice(0, -1);
 			}
+		} else if (event.payload === 'Enter') {
+			// Submit the current input
+			const question = searchQuery.text;
+			if (question.trim().length > 0) {
+				searchQuery.text = '';
+				messages.push({ role: 'user', content: question });
+				askQuestion(question);
+			}
+		} else if (event.payload.length === 1 || event.payload === 'Space') {
+			// Handle regular character keys and space
+			const char = event.payload === 'Space' ? ' ' : event.payload;
+			searchQuery.text += char;
 		}
 	});
 
@@ -99,10 +114,48 @@
 		console.log('Launcher closed: cleared messages and reset conversation');
 	});
 
+	interface PMCommand {
+		name: string;
+		position?: number;
+		attrs?: Record<string, any>;
+	}
+	function executeCommand(command: PMCommand) {
+		if (!editorRef) return;
+		editorRef.cmd((state, dispatch) => {
+			const tr = state.tr;
+			const { schema } = state;
+			const nodes = schema.nodes;
+			tr.insert(
+				command.position ?? 0,
+				nodes[command.name].createChecked({ id: 'video-1', ...command.attrs }, schema.text('video'))
+			);
+			dispatch?.(tr);
+		});
+	}
 	// Listen for launcher opened event to refresh activities
-	listen('launcher_opened', () => {
+	listen('launcher_opened', (event) => {
 		// Reload activities when launcher is opened
 		loadActivities();
+		console.log(event);
+		executeCommand(event.payload as PMCommand);
+
+		// editorRef?.cmd((state, dispatch) => {
+		// 	const tr = state.tr;
+		// 	const { schema } = state;
+		// 	const nodes = schema.nodes;
+		// 	const { $from: from } = state.selection;
+
+		// 	// Check if video node is available in schema
+		// 	if (nodes.video) {
+		// 		tr.insert(
+		// 			from.pos,
+		// 			nodes.video.createChecked({ id: 'video-1', text: 'video' }, schema.text(' '))
+		// 		);
+		// 		dispatch?.(tr);
+		// 	} else {
+		// 		console.warn('Video node not found in schema');
+		// 	}
+		// });
 		console.log('Launcher opened: refreshed activities');
 	});
 
@@ -132,9 +185,7 @@
 			console.log('Escape pressed: cleared messages and set conversation to NEW');
 
 			// Clear input field if there's any text
-			if (inputRef) {
-				inputRef.value = '';
-			}
+			searchQuery.text = '';
 		}
 	}
 
@@ -192,8 +243,8 @@
 			console.error('Failed to load conversations:', error);
 		});
 
-	invoke('resize_launcher_window', { height: 500 }).then(() => {
-		console.log('Window resized to 500px');
+	invoke('resize_launcher_window', { height: 100 }).then(() => {
+		console.log('Window resized to 100px');
 	});
 
 	// Auto-scroll to bottom when new messages arrive
@@ -214,22 +265,35 @@
 		// when typing in the input field
 		// event.preventDefault();
 		if (event.key === 'Enter' && !event.shiftKey) {
-			await invoke('resize_launcher_window', { height: 500 });
+			await invoke('resize_launcher_window', { height: 100 });
 
 			try {
-				if (inputRef) {
-					const question = inputRef.value;
-					inputRef.value = '';
-					messages.push({ role: 'user', content: question });
-					await askQuestion(question);
-					// Responses will come through the event listener
-				}
+				const question = searchQuery.text;
+				searchQuery.text = '';
+				messages.push({ role: 'user', content: question });
+				await askQuestion(question);
+				// Responses will come through the event listener
 			} catch (error) {
 				console.error('Error:', error);
 			}
 		}
 	}
 
+	async function addVideoExtension() {
+		editorRef?.cmd((state, dispatch) => {
+			const tr = state.tr;
+			const { schema } = state;
+			const nodes = schema.nodes;
+			tr.insert(
+				0,
+				nodes['9370B14D-B61C-4CE2-BDE7-B18684E8731A'].createChecked(
+					{ id: 'video-1', text: 'Some video with attrs' },
+					schema.text('video')
+				)
+			);
+			dispatch?.(tr);
+		});
+	}
 	async function askQuestion(question: string): Promise<void> {
 		try {
 			type DownloadEvent =
@@ -325,13 +389,13 @@
 	function onApiKeySaved() {
 		hasApiKey = true;
 		// Resize the window after API key is saved
-		invoke('resize_launcher_window', { height: 500 }).catch((error) => {
+		invoke('resize_launcher_window', { height: 100 }).catch((error) => {
 			console.error('Failed to resize window:', error);
 		});
 	}
 </script>
 
-<div class="backdrop-custom relative flex h-screen flex-col">
+<div class="backdrop-custom relative flex h-full flex-col">
 	<!-- <div
 	class="relative flex h-screen flex-col"
 	style={backgroundImage
@@ -343,6 +407,7 @@
 
 	<!-- Content container -->
 	<div class="relative z-10 flex h-full flex-col">
+		<!-- <button onclick={addVideoExtension} class="absolute right-2 top-2">Add video</button> -->
 		<!-- <div class="flex flex-wrap gap-2 p-2">
 			{#each displayAssets as asset, index}
 				<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
@@ -369,7 +434,7 @@
 				<Badge variant="outline">No recent activities</Badge>
 			{/if}
 		</div> -->
-		<!-- 
+		<!--
 		<Button
 			onclick={() => {
 				loadActivities();
@@ -385,32 +450,58 @@
 				<ApiKeyForm saved={() => onApiKeySaved()} />
 			</div>
 		{:else}
-			<!-- Fixed header with textarea -->
-			<div class="flex-none p-2">
-				<Textarea
-					bind:ref={inputRef}
-					class="h-10 w-full text-[34px] leading-[34px]"
-					style="font-size: 34px;"
-					onkeydown={handleKeydown}
-				/>
+			<!-- Launcher component -->
+			<div class="flex-none p-0">
+				<Launcher.Root class="rounded-lg border-none shadow-none">
+					<Launcher.Input
+						placeholder="Search"
+						bind:query={searchQuery}
+						bind:editorRef
+						onkeydown={handleKeydown}
+						class="h-[100px]"
+					/>
+
+					<!-- Recent conversations list -->
+					{#if messages.length === 0}
+						<Launcher.List>
+							<!-- <Launcher.List hidden> -->
+							<Launcher.Group heading="Local Files">
+								<Launcher.Item onclick={addVideoExtension}>
+									<HardDrive />
+									<span>Video</span>
+								</Launcher.Item>
+								<Launcher.Item>
+									<FileTextIcon />
+									<span>Notes</span>
+								</Launcher.Item>
+							</Launcher.Group>
+							<Launcher.Separator />
+							<Launcher.Group heading="Google Drive">
+								<Launcher.Item>
+									<SiGoogledrive />
+									<span>Presentation 1</span>
+								</Launcher.Item>
+								<Launcher.Item>
+									<SiGoogledrive />
+									<span>Report card</span>
+								</Launcher.Item>
+								<Launcher.Item>
+									<SiGoogledrive />
+									<span>Exercise sheet 3</span>
+								</Launcher.Item>
+							</Launcher.Group>
+							<!-- <Launcher.Group heading="Recent Conversations">
+								{#each conversations.slice(0, 3) as conversation}
+									<Launcher.Item onclick={async () => await switchConversation(conversation.id)}>
+										<FileTextIcon />
+										<span>{conversation.title}</span>
+									</Launcher.Item>
+								{/each}
+							</Launcher.Group> -->
+						</Launcher.List>
+					{/if}
+				</Launcher.Root>
 			</div>
-			<!-- Recent conversations list -->
-			{#if conversations.length > 0 && messages.length === 0}
-				<ScrollArea class="h-72 w-full overflow-y-hidden rounded-md">
-					<div class="p-4">
-						{#each conversations.slice(0, 5) as conversation}
-							<Button
-								variant="link"
-								class="mx-auto w-full justify-start overflow-hidden"
-								onclick={async () => await switchConversation(conversation.id)}
-							>
-								{conversation.title}
-							</Button>
-							<Separator class="my-2" />
-						{/each}
-					</div>
-				</ScrollArea>
-			{/if}
 
 			<div class="message-scroll-area w-full flex-grow overflow-auto">
 				<MessageArea {messages} />
@@ -419,7 +510,7 @@
 	</div>
 </div>
 <div
-	class="backdrop-custom-2 fixed left-[-50px] top-[-50px] h-screen w-screen"
+	class="backdrop-custom-2 fixed left-[0px] top-[0px] h-screen w-screen"
 	bind:this={backdropCustom2Ref}
 ></div>
 
@@ -432,11 +523,11 @@
 	}
 
 	.backdrop-custom-2 {
-		filter: blur(18px);
-		-webkit-filter: blur(18px);
+		/* filter: blur(18px); */
+		/* -webkit-filter: blur(18px); */
 
-		width: 110vw;
-		height: 120vh;
+		width: 100%;
+		height: 100%;
 
 		z-index: 1;
 
