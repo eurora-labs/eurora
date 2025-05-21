@@ -27,7 +27,7 @@ export function getAttrsWithOutputSpec(
 	spec: readonly any[],
 	dom: HTMLElement,
 	output: any,
-	customHandler?: (el: HTMLElement, attr: string) => any,
+	customHandler?: (el: HTMLElement, attr: string) => any
 ) {
 	let attrs = {} as { [attr: string]: any };
 	if (!output.tag) {
@@ -54,7 +54,7 @@ export function getAttrsWithOutputSpec(
 			// if (customHandler()) attr = customHandler()
 			const s = output.selector.join(' > ') as string;
 			const el = dom.querySelector(s);
-			Array.from(el?.attributes || []).forEach(attr => {
+			Array.from(el?.attributes || []).forEach((attr) => {
 				const { name, value } = attr;
 				if (name in val) {
 					if (value === 'true') {
@@ -69,10 +69,7 @@ export function getAttrsWithOutputSpec(
 						attrs[name] = value;
 					}
 				} else {
-					console.warn(
-						`Found attribute (${name}) which wasnt defined in attribute object:`,
-						val,
-					);
+					console.warn(`Found attribute (${name}) which wasnt defined in attribute object:`, val);
 				}
 			});
 			idx += 1;

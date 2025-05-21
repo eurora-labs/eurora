@@ -1,0 +1,114 @@
+<script lang="ts" module>
+	import type { NodeSpec } from 'prosemirror-model';
+	import { Node as PMNode } from 'prosemirror-model';
+	import type { NodeProps } from '@eurora/prosemirror-core';
+
+	export interface Frame {
+		id: string;
+		ocrText?: string;
+	}
+
+	export interface VideoAttrs {
+		id?: string;
+		transcript?: string;
+		text?: string;
+		currentFrame?: Frame;
+	}
+
+	export const videoAttrs: VideoAttrs = {
+		id: undefined,
+		transcript: undefined,
+		text: undefined,
+		currentFrame: undefined
+	};
+
+	export const videoSchema: NodeSpec = {
+		attrs: Object.entries(videoAttrs).reduce(
+			(acc, [key, value]) => ({ ...acc, [key]: { default: value } }),
+			{}
+		),
+		content: 'inline+',
+		group: 'inline',
+		inline: true,
+		defining: false,
+		atom: true,
+		selectable: false,
+
+		parseDOM: [
+			{
+				tag: 'span.video', // Changed from figure
+				getAttrs: (dom: HTMLElement | string) => {
+					if (dom instanceof HTMLElement) {
+						return {
+							id: dom.getAttribute('id'),
+							text: dom.getAttribute('data-text')
+						};
+					}
+					return null;
+				}
+			}
+		],
+		toDOM(node: PMNode) {
+			const { id, text } = node.attrs;
+			return ['span', { id, class: 'video' }];
+		}
+	};
+</script>
+
+<script lang="ts">
+	import { Badge, ContextChip, Label, Input, Button, buttonVariants, Popover } from '@eurora/ui';
+	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
+	export interface Props extends SvelteNodeViewProps<VideoAttrs> {
+		ref: HTMLElement;
+		attrs: VideoAttrs;
+	}
+
+	let { ref, attrs }: Props = $props();
+
+	export { ref, attrs };
+
+	function handleClick(event: MouseEvent) {
+		alert('some longer script');
+		event.preventDefault();
+	}
+
+	function handleKeyDown(event: KeyboardEvent) {
+		event.preventDefault();
+	}
+
+	export function destroy() {
+		ref?.remove();
+	}
+</script>
+
+<Popover.Root>
+	<Popover.Trigger>
+		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.text}</ContextChip>
+	</Popover.Trigger>
+	<Popover.Content class="w-80">
+		<div class="grid gap-4">
+			<div class="space-y-2">
+				<h4 class="font-medium leading-none">Dimensions</h4>
+				<p class="text-muted-foreground text-sm">Set the dimensions for the layer.</p>
+			</div>
+			<div class="grid gap-2">
+				<div class="grid grid-cols-3 items-center gap-4">
+					<Label for="width">Width</Label>
+					<Input id="width" value="100%" class="col-span-2 h-8" />
+				</div>
+				<div class="grid grid-cols-3 items-center gap-4">
+					<Label for="maxWidth">Max. width</Label>
+					<Input id="maxWidth" value="300px" class="col-span-2 h-8" />
+				</div>
+				<div class="grid grid-cols-3 items-center gap-4">
+					<Label for="height">Height</Label>
+					<Input id="height" value="25px" class="col-span-2 h-8" />
+				</div>
+				<div class="grid grid-cols-3 items-center gap-4">
+					<Label for="maxHeight">Max. height</Label>
+					<Input id="maxHeight" value="none" class="col-span-2 h-8" />
+				</div>
+			</div>
+		</div>
+	</Popover.Content>
+</Popover.Root>
