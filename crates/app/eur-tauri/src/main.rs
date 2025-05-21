@@ -535,10 +535,10 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                         "launcher_opened",
                         ExampleChip {
                             name: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
-                            attrs: HashMap::from([
-                                ("id".to_string(), "video-1".to_string()),
-                                ("text".to_string(), "video from rust 2".to_string()),
-                            ]),
+                            attrs: HashMap::from([(
+                                "text".to_string(),
+                                "video from rust 2".to_string(),
+                            )]),
                             position: Some(0),
                         },
                     )

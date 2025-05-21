@@ -33,6 +33,7 @@
 		"@eurora/ext-transcript": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"@eurora/typescript-config": "workspace:*",
+		"uuid": "^11.1.0",
 		"@playwright/test": "^1.52.0",
 		"@sveltejs/adapter-node": "^5.2.12",
 		"@sveltejs/adapter-static": "^3.0.8",

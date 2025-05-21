@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
-
+	import { executeCommand, type PMCommand } from '$lib/commands.js';
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
 
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
@@ -114,30 +114,14 @@
 		console.log('Launcher closed: cleared messages and reset conversation');
 	});
 
-	interface PMCommand {
-		name: string;
-		position?: number;
-		attrs?: Record<string, any>;
-	}
-	function executeCommand(command: PMCommand) {
-		if (!editorRef) return;
-		editorRef.cmd((state, dispatch) => {
-			const tr = state.tr;
-			const { schema } = state;
-			const nodes = schema.nodes;
-			tr.insert(
-				command.position ?? 0,
-				nodes[command.name].createChecked({ id: 'video-1', ...command.attrs }, schema.text('video'))
-			);
-			dispatch?.(tr);
-		});
-	}
 	// Listen for launcher opened event to refresh activities
 	listen('launcher_opened', (event) => {
 		// Reload activities when launcher is opened
 		loadActivities();
 		console.log(event);
-		executeCommand(event.payload as PMCommand);
+		if (editorRef) {
+			executeCommand(editorRef, event.payload as PMCommand);
+		}
 
 		// editorRef?.cmd((state, dispatch) => {
 		// 	const tr = state.tr;
