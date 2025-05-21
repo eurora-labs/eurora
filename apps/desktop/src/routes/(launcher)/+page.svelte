@@ -382,25 +382,31 @@
 	bind:this={backdropCustom2Ref}
 ></div>
 
-<style>
+<style lang="postcss">
 	.backdrop-custom {
 		backdrop-filter: blur(18px);
 		-webkit-backdrop-filter: blur(18px);
-		/* background-color: rgba(255, 255, 255, 0.2); */
-
-		background: transparent;
+		background-color: rgba(255, 255, 255, 0.2);
 		z-index: 2;
 	}
 
 	.backdrop-custom-2 {
-		/* filter: blur(18px); */
-		/* -webkit-filter: blur(18px); */
-
 		width: 100%;
 		height: 100%;
 
 		z-index: 1;
 
-		/* background-color: rgba(0, 0, 0, 1); */
+		background-color: rgba(0, 0, 0, 1);
+	}
+	:global(body.linux-app .backdrop-custom) {
+		background: transparent;
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
+	:global(body.linux-app .backdrop-custom-2) {
+		background: transparent;
+		background-color: transparent;
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
 	}
 </style>
