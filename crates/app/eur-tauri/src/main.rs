@@ -332,6 +332,11 @@ fn main() {
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
+                .plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Error)
+                        .build(),
+                )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
                 // .plugin(
@@ -386,6 +391,8 @@ fn main() {
                     continue_conversation,
                     check_grpc_server_connection,
                     list_activities,
+                    get_scale_factor,
+                    resize_window,
                     get_current_conversation,
                     switch_conversation,
                     get_conversation_with_messages,
@@ -493,12 +500,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 }
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
-                match capture_region_rgba(
-                    launcher_x,
-                    launcher_y,
-                    launcher_width,
-                    launcher_height,
-                ) {
+                match capture_region_rgba(launcher_x, launcher_y, launcher_width, launcher_height) {
                     Ok(img) => {
                         let t0 = std::time::Instant::now();
                         let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
@@ -1042,4 +1044,38 @@ async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<DisplayAsse
     let limited_activities = activities.into_iter().take(5).collect();
 
     Ok(limited_activities)
+}
+
+#[tauri::command]
+async fn get_scale_factor(app_handle: tauri::AppHandle, height: f64) -> Result<f64, String> {
+    let window = app_handle.get_window("launcher").unwrap();
+    let current_size = window.inner_size().unwrap();
+    // let scale_factor = height / current_size.height as f64;
+    let scale_factor = (current_size.height as f64) / (height);
+    // let scale_factor = 1.0;
+    eprintln!("Scale factor: {}", scale_factor);
+    eprintln!("window scale factor: {}", window.scale_factor().unwrap());
+    eprintln!("Current height: {}", current_size.height);
+    eprintln!("Webview height: {}", height);
+    Ok(scale_factor)
+}
+
+#[tauri::command]
+async fn resize_window(
+    app_handle: tauri::AppHandle,
+    height: f64,
+    scale_factor: f64,
+) -> Result<(), String> {
+    let window = app_handle.get_window("launcher").unwrap();
+    let current_size = window.outer_size().unwrap();
+    let new_height = height * scale_factor;
+    eprintln!("New height: {}", new_height);
+    eprintln!("Current height: {}", current_size.height);
+    eprintln!("Scale factor: {}", scale_factor);
+    let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
+        width: current_size.width,
+        // height: new_height as u32 + 72,
+        height: new_height as u32,
+    }));
+    Ok(())
 }
