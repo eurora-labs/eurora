@@ -36,7 +36,7 @@
 
 		parseDOM: [
 			{
-				tag: 'span.9370B14D-B61C-4CE2-BDE7-B18684E8731A', // Changed from figure
+				tag: 'span.video', // Changed from figure
 				getAttrs: (dom: HTMLElement | string) => {
 					if (dom instanceof HTMLElement) {
 						return {
