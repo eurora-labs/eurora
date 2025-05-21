@@ -4,52 +4,32 @@
 	import '../../app.pcss';
 	let { children } = $props();
 	let mainRef = $state<HTMLElement | null>(null);
-	onMount(() => {
-		invoke('get_scale_factor', { height: mainRef?.scrollHeight }).then(async (result) => {
-			const scaleFactor = result as number;
+	let scaleFactor = $state<number>(1.0);
 
-			const resizeObserver = new ResizeObserver(() => {
-				if (!mainRef) return;
-				try {
-					console.log('scrollHeight', mainRef?.scrollHeight);
-					console.log('offsetHeight', mainRef?.offsetHeight);
-					console.log('clientHeight', mainRef?.clientHeight);
-					invoke('resize_window', {
-						height: mainRef.scrollHeight,
-						scaleFactor: scaleFactor
-					});
-				} catch (error) {
-					console.error('Failed to resize window:', error);
-				}
+	function resizeWindow() {
+		if (!mainRef) return;
+		try {
+			invoke('resize_window', {
+				height: mainRef.scrollHeight,
+				scaleFactor: scaleFactor
 			});
+		} catch (error) {
+			console.error('Failed to resize window:', error);
+		}
+	}
 
-onMount(() => {
-  let resizeObserver: ResizeObserver | undefined;
-  
-  invoke('get_scale_factor', { height: mainRef?.scrollHeight }).then(async (result) => {
-    const scaleFactor = result as number;
+	onMount(() => {
+		const resizeObserver = new ResizeObserver(resizeWindow);
 
-    resizeObserver = new ResizeObserver(() => {
-      try {
-        invoke('resize_window', {
-          height: mainRef?.scrollHeight,
-          scaleFactor
-        });
-      } catch (error) {
-        console.error('Failed to resize window:', error);
-      }
-    });
+		invoke('get_scale_factor', { height: mainRef?.scrollHeight }).then(async (result) => {
+			scaleFactor = result as number;
 
-    resizeObserver.observe(mainRef!);
-  });
-  
-  return () => {
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-    }
-  };
-});
+			resizeObserver.observe(mainRef!);
 		});
+
+		return () => {
+			resizeObserver.disconnect();
+		};
 	});
 </script>
 
