@@ -115,12 +115,18 @@
 	});
 
 	// Listen for launcher opened event to refresh activities
-	listen('launcher_opened', () => {
+	listen('launcher_opened', (event) => {
 		// Reload activities when launcher is opened
 		loadActivities();
-
-		// Get video extension ID from the factory
-		const VIDEO_EXTENSION_ID = '9370B14D-B61C-4CE2-BDE7-B18684E8731A';
+		console.log(event);
+		const { name, ...rest } = event.payload as any;
+		editorRef?.cmd((state, dispatch) => {
+			const tr = state.tr;
+			const { schema } = state;
+			const nodes = schema.nodes;
+			tr.insert(0, nodes[name].createChecked({ id: 'video-1', ...rest }, schema.text('video')));
+			dispatch?.(tr);
+		});
 
 		// editorRef?.cmd((state, dispatch) => {
 		// 	const tr = state.tr;
@@ -269,7 +275,7 @@
 			const nodes = schema.nodes;
 			tr.insert(
 				0,
-				nodes['video'].createChecked(
+				nodes['9370B14D-B61C-4CE2-BDE7-B18684E8731A'].createChecked(
 					{ id: 'video-1', text: 'Some video with attrs' },
 					schema.text('video')
 				)
