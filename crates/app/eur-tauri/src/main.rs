@@ -530,7 +530,13 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
 
                 // Emit an event to notify that the launcher has been opened
                 launcher
-                    .emit("launcher_opened", ())
+                    .emit(
+                        "launcher_opened",
+                        ExampleChip {
+                            name: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
+                            text: "video from rust".to_string(),
+                        },
+                    )
                     .expect("Failed to emit launcher_opened event");
 
                 launcher
@@ -541,6 +547,11 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
         .build()
 }
 
+#[derive(Clone, Serialize)]
+struct ExampleChip {
+    name: String,
+    text: String,
+}
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
 enum DownloadEvent<'a> {

@@ -11,12 +11,14 @@
 	export interface VideoAttrs {
 		id?: string;
 		transcript?: string;
+		text?: string;
 		currentFrame?: Frame;
 	}
 
 	export const videoAttrs: VideoAttrs = {
 		id: undefined,
 		transcript: undefined,
+		text: undefined,
 		currentFrame: undefined
 	};
 
@@ -34,7 +36,7 @@
 
 		parseDOM: [
 			{
-				tag: 'span.video', // Changed from figure
+				tag: 'span.9370B14D-B61C-4CE2-BDE7-B18684E8731A', // Changed from figure
 				getAttrs: (dom: HTMLElement | string) => {
 					if (dom instanceof HTMLElement) {
 						return {
@@ -81,7 +83,7 @@
 
 <Popover.Root>
 	<Popover.Trigger>
-		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>video</ContextChip>
+		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.text}</ContextChip>
 	</Popover.Trigger>
 	<Popover.Content class="w-80">
 		<div class="grid gap-4">

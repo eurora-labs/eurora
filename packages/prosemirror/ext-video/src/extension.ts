@@ -9,7 +9,7 @@ export function videoExtension(): SveltePMExtension {
 	return {
 		name: ID,
 		svelteNodes: {
-			video: {
+			[ID]: {
 				attrs: videoAttrs,
 				schema: videoSchema,
 				// component: Video,
