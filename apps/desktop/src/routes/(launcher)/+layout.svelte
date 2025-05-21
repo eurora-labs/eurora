@@ -23,7 +23,32 @@
 				}
 			});
 
-			resizeObserver.observe(mainRef!);
+onMount(() => {
+  let resizeObserver: ResizeObserver | undefined;
+  
+  invoke('get_scale_factor', { height: mainRef?.scrollHeight }).then(async (result) => {
+    const scaleFactor = result as number;
+
+    resizeObserver = new ResizeObserver(() => {
+      try {
+        invoke('resize_window', {
+          height: mainRef?.scrollHeight,
+          scaleFactor
+        });
+      } catch (error) {
+        console.error('Failed to resize window:', error);
+      }
+    });
+
+    resizeObserver.observe(mainRef!);
+  });
+  
+  return () => {
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+    }
+  };
+});
 		});
 	});
 </script>
