@@ -32,7 +32,6 @@ export interface SveltePMMark {
 }
 
 export interface SveltePMExtension {
-	id: string;
 	name: string;
 	commands?: { [name: string]: (...args: any[]) => Cmd };
 	keymaps?: { [key: string]: Cmd | { cmd: Cmd; priority: number }[] };
