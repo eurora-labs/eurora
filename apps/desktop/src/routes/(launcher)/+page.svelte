@@ -44,11 +44,13 @@
 
 	let inputRef = $state<HTMLTextAreaElement | null>(null);
 	let editorRef: ProsemirrorEditor | undefined = $state();
-
+	registerCoreExtensions();
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
 		text: '',
-		extensions: [] as SveltePMExtension[]
+		extensions: [
+			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A')
+		] as SveltePMExtension[]
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
 	let transcript = $state<string | null>(null);
@@ -120,23 +122,23 @@
 		// Get video extension ID from the factory
 		const VIDEO_EXTENSION_ID = '9370B14D-B61C-4CE2-BDE7-B18684E8731A';
 
-		editorRef?.cmd((state, dispatch) => {
-			const tr = state.tr;
-			const { schema } = state;
-			const nodes = schema.nodes;
-			const { $from: from } = state.selection;
+		// editorRef?.cmd((state, dispatch) => {
+		// 	const tr = state.tr;
+		// 	const { schema } = state;
+		// 	const nodes = schema.nodes;
+		// 	const { $from: from } = state.selection;
 
-			// Check if video node is available in schema
-			if (nodes.video) {
-				tr.insert(
-					from.pos,
-					nodes.video.createChecked({ id: 'video-1', text: 'video' }, schema.text(' '))
-				);
-				dispatch?.(tr);
-			} else {
-				console.warn('Video node not found in schema');
-			}
-		});
+		// 	// Check if video node is available in schema
+		// 	if (nodes.video) {
+		// 		tr.insert(
+		// 			from.pos,
+		// 			nodes.video.createChecked({ id: 'video-1', text: 'video' }, schema.text(' '))
+		// 		);
+		// 		dispatch?.(tr);
+		// 	} else {
+		// 		console.warn('Video node not found in schema');
+		// 	}
+		// });
 		console.log('Launcher opened: refreshed activities');
 	});
 
@@ -172,7 +174,6 @@
 
 	// Add global keydown event listener when component is mounted
 	onMount(() => {
-		registerCoreExtensions();
 		document.addEventListener('keydown', handleEscapeKey);
 
 		// Check if API key exists
@@ -262,20 +263,15 @@
 	}
 
 	async function addVideoExtension() {
-		const extension = extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A');
-		console.log('extension', extension);
-		searchQuery.text = ' ';
-
-		searchQuery.extensions.push(extension);
 		editorRef?.cmd((state, dispatch) => {
 			const tr = state.tr;
 			const { schema } = state;
 			const nodes = schema.nodes;
 			tr.insert(
 				0,
-				nodes.transcript.createChecked(
-					{ id: 'transcript-1', text: 'Some transcript with attrs' },
-					schema.text('transcript')
+				nodes.video.createChecked(
+					{ id: 'video-1', text: 'Some video with attrs' },
+					schema.text('video')
 				)
 			);
 			dispatch?.(tr);
@@ -382,7 +378,7 @@
 	}
 </script>
 
-<div class="backdrop-custom relative flex h-screen flex-col">
+<div class="backdrop-custom relative flex h-full flex-col">
 	<!-- <div
 	class="relative flex h-screen flex-col"
 	style={backgroundImage
@@ -394,7 +390,7 @@
 
 	<!-- Content container -->
 	<div class="relative z-10 flex h-full flex-col">
-		<button onclick={addVideoExtension} class="absolute right-2 top-2">Add video</button>
+		<!-- <button onclick={addVideoExtension} class="absolute right-2 top-2">Add video</button> -->
 		<!-- <div class="flex flex-wrap gap-2 p-2">
 			{#each displayAssets as asset, index}
 				<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
@@ -450,11 +446,12 @@
 
 					<!-- Recent conversations list -->
 					{#if messages.length === 0}
-						<Launcher.List hidden>
+						<Launcher.List>
+							<!-- <Launcher.List hidden> -->
 							<Launcher.Group heading="Local Files">
-								<Launcher.Item>
+								<Launcher.Item onclick={addVideoExtension}>
 									<HardDrive />
-									<span>Exercise Sheet 2</span>
+									<span>Video</span>
 								</Launcher.Item>
 								<Launcher.Item>
 									<FileTextIcon />
