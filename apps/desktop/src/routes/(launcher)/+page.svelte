@@ -114,19 +114,30 @@
 		console.log('Launcher closed: cleared messages and reset conversation');
 	});
 
+	interface PMCommand {
+		name: string;
+		position?: number;
+		attrs?: Record<string, any>;
+	}
+	function executeCommand(command: PMCommand) {
+		if (!editorRef) return;
+		editorRef.cmd((state, dispatch) => {
+			const tr = state.tr;
+			const { schema } = state;
+			const nodes = schema.nodes;
+			tr.insert(
+				command.position ?? 0,
+				nodes[command.name].createChecked({ id: 'video-1', ...command.attrs }, schema.text('video'))
+			);
+			dispatch?.(tr);
+		});
+	}
 	// Listen for launcher opened event to refresh activities
 	listen('launcher_opened', (event) => {
 		// Reload activities when launcher is opened
 		loadActivities();
 		console.log(event);
-		const { name, ...rest } = event.payload as any;
-		editorRef?.cmd((state, dispatch) => {
-			const tr = state.tr;
-			const { schema } = state;
-			const nodes = schema.nodes;
-			tr.insert(0, nodes[name].createChecked({ id: 'video-1', ...rest }, schema.text('video')));
-			dispatch?.(tr);
-		});
+		executeCommand(event.payload as PMCommand);
 
 		// editorRef?.cmd((state, dispatch) => {
 		// 	const tr = state.tr;
