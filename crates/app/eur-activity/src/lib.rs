@@ -3,6 +3,8 @@
 //! This module provides functionality for tracking and reporting activities.
 //! It defines the Activity trait and the ActivityReporter struct, which
 //! can be used to collect data from activities and store it in a timeline.
+use std::collections::HashMap;
+
 use tracing::info;
 
 // use eur_timeline::TimelineRef;
@@ -17,8 +19,13 @@ pub use browser_activity::BrowserStrategy;
 use default_activity::DefaultStrategy;
 
 #[derive(Serialize, Deserialize)]
+pub struct ContextChip {
+    pub id: String,
+    pub attrs: HashMap<String, String>,
+    pub icon: Option<String>,
+}
+#[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {
-    //
     pub name: String,
     // image base64
     pub icon: String,
@@ -35,6 +42,7 @@ pub trait ActivityAsset: Send + Sync {
     fn get_icon(&self) -> Option<&String>;
 
     fn construct_message(&self) -> LLMMessage;
+    fn get_context_chip(&self) -> Option<ContextChip>;
 
     // fn get_display(&self) -> DisplayAsset;
 }
