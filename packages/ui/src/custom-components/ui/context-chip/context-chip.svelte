@@ -27,10 +27,17 @@
 		@apply w-fit items-center gap-2 text-[40px] leading-[40px] text-white;
 		@apply mx-2 p-2;
 		color: rgba(0, 0, 0, 1);
-		background: transparent;
 		border-radius: 16px;
 		display: inline-block;
+		background-color: transparent;
 		backdrop-filter: blur(6px);
 		-webkit-backdrop-filter: blur(6px);
+	}
+
+	/* Apply solid background for Linux desktop app */
+	:global(body.linux-app .context-chip) {
+		background-color: rgba(0, 0, 0, 0.2);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
 	}
 </style>

@@ -7,7 +7,7 @@ classDiagram
     %% Activity --> ActivityAsset: creates on init()
 
     class Command {
-    
+
     }
 
     class Activity {

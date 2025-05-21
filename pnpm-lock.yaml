@@ -62,6 +62,15 @@ importers:
       '@eurora/katex':
         specifier: workspace:*
         version: link:../../packages/custom-components/katex
+      '@eurora/launcher':
+        specifier: workspace:*
+        version: link:../../packages/custom-components/launcher
+      '@eurora/prosemirror-core':
+        specifier: workspace:*
+        version: link:../../packages/prosemirror/core
+      '@eurora/prosemirror-factory':
+        specifier: workspace:*
+        version: link:../../packages/prosemirror/factory
       '@eurora/proto':
         specifier: workspace:*
         version: link:../../packages/proto
@@ -78,9 +87,18 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      '@eurora/ext-transcript':
+        specifier: workspace:*
+        version: link:../../packages/prosemirror/ext-transcript
+      '@eurora/ext-video':
+        specifier: workspace:*
+        version: link:../../packages/prosemirror/ext-video
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@icons-pack/svelte-simple-icons':
+        specifier: ^5.0.0
+        version: 5.0.0(@sveltejs/kit@2.21.0(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.30.1)(vite@6.3.5(@types/node@22.15.18)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.30.1)(vite@6.3.5(@types/node@22.15.18)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0)))(svelte@5.30.1)
       '@lucide/svelte':
         specifier: ^0.510.0
         version: 0.510.0(svelte@5.30.1)
@@ -966,6 +984,80 @@ importers:
         specifier: ^0.7.7
         version: 0.7.38(svelte@5.30.1)(typescript@5.8.3)
 
+  packages/prosemirror/ext-video:
+    dependencies:
+      prosemirror-model:
+        specifier: ^1.20.0
+        version: 1.25.1
+      prosemirror-view:
+        specifier: ^1.33.5
+        version: 1.39.3
+      svelte:
+        specifier: ^5.28.2
+        version: 5.30.1
+    devDependencies:
+      '@eurora/prosemirror-core':
+        specifier: workspace:*
+        version: link:../core
+      '@eurora/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@eurora/ui':
+        specifier: workspace:*
+        version: link:../../ui
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5.0.0
+        version: 5.0.3(svelte@5.30.1)(vite@6.3.5(@types/node@22.15.18)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0))
+      svelte-check:
+        specifier: ^4.1.7
+        version: 4.2.0(picomatch@4.0.2)(svelte@5.30.1)(typescript@5.8.3)
+      svelte-preprocess:
+        specifier: ^6.0.3
+        version: 6.0.3(@babel/core@7.27.1)(postcss-load-config@4.0.2(postcss@8.5.3))(postcss@8.5.3)(svelte@5.30.1)(typescript@5.8.3)
+      svelte2tsx:
+        specifier: ^0.7.7
+        version: 0.7.38(svelte@5.30.1)(typescript@5.8.3)
+
+  packages/prosemirror/factory:
+    dependencies:
+      '@eurora/ext-transcript':
+        specifier: workspace:*
+        version: link:../ext-transcript
+      '@eurora/ext-video':
+        specifier: workspace:*
+        version: link:../ext-video
+      prosemirror-model:
+        specifier: ^1.20.0
+        version: 1.25.1
+      prosemirror-view:
+        specifier: ^1.33.5
+        version: 1.39.3
+      svelte:
+        specifier: ^5.28.2
+        version: 5.30.1
+    devDependencies:
+      '@eurora/prosemirror-core':
+        specifier: workspace:*
+        version: link:../core
+      '@eurora/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@eurora/ui':
+        specifier: workspace:*
+        version: link:../../ui
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5.0.0
+        version: 5.0.3(svelte@5.30.1)(vite@6.3.5(@types/node@22.15.18)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0))
+      svelte-check:
+        specifier: ^4.1.7
+        version: 4.2.0(picomatch@4.0.2)(svelte@5.30.1)(typescript@5.8.3)
+      svelte-preprocess:
+        specifier: ^6.0.3
+        version: 6.0.3(@babel/core@7.27.1)(postcss-load-config@4.0.2(postcss@8.5.3))(postcss@8.5.3)(svelte@5.30.1)(typescript@5.8.3)
+      svelte2tsx:
+        specifier: ^0.7.7
+        version: 0.7.38(svelte@5.30.1)(typescript@5.8.3)
+
   packages/proto:
     devDependencies:
       '@bufbuild/buf':
@@ -1053,7 +1145,7 @@ importers:
         specifier: ^10.4.21
         version: 10.4.21(postcss@8.5.3)
       bits-ui:
-        specifier: ^1.4.2
+        specifier: ^1.4.8
         version: 1.4.8(svelte@5.30.1)
       clsx:
         specifier: ^2.1.1
