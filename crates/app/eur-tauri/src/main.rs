@@ -19,6 +19,7 @@ use futures::{StreamExt, TryFutureExt};
 use eur_secret::Sensitive;
 use eur_secret::secret;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
 use tauri::plugin::TauriPlugin;
@@ -534,7 +535,11 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                         "launcher_opened",
                         ExampleChip {
                             name: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
-                            text: "video from rust".to_string(),
+                            attrs: HashMap::from([
+                                ("id".to_string(), "video-1".to_string()),
+                                ("text".to_string(), "video from rust 2".to_string()),
+                            ]),
+                            position: Some(0),
                         },
                     )
                     .expect("Failed to emit launcher_opened event");
@@ -550,7 +555,8 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
 #[derive(Clone, Serialize)]
 struct ExampleChip {
     name: String,
-    text: String,
+    attrs: HashMap<String, String>,
+    position: Option<usize>,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
