@@ -7,8 +7,7 @@ export const ID = '9370B14D-B61C-4CE2-BDE7-B18684E8731A';
 
 export function videoExtension(): SveltePMExtension {
 	return {
-		id: ID,
-		name: 'video' as const,
+		name: ID,
 		svelteNodes: {
 			video: {
 				attrs: videoAttrs,
