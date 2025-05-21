@@ -19,6 +19,7 @@ use futures::{StreamExt, TryFutureExt};
 use eur_secret::Sensitive;
 use eur_secret::secret;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
 use tauri::plugin::TauriPlugin;
@@ -163,6 +164,7 @@ fn main() {
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let builder = tauri::Builder::default()
+                .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
                     // let main_window =
@@ -331,6 +333,11 @@ fn main() {
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
+                .plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Error)
+                        .build(),
+                )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
                 // .plugin(
@@ -385,6 +392,8 @@ fn main() {
                     continue_conversation,
                     check_grpc_server_connection,
                     list_activities,
+                    get_scale_factor,
+                    resize_window,
                     get_current_conversation,
                     switch_conversation,
                     get_conversation_with_messages,
@@ -522,7 +531,17 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
 
                 // Emit an event to notify that the launcher has been opened
                 launcher
-                    .emit("launcher_opened", ())
+                    .emit(
+                        "launcher_opened",
+                        ExampleChip {
+                            name: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
+                            attrs: HashMap::from([
+                                ("id".to_string(), "video-1".to_string()),
+                                ("text".to_string(), "video from rust 2".to_string()),
+                            ]),
+                            position: Some(0),
+                        },
+                    )
                     .expect("Failed to emit launcher_opened event");
 
                 launcher
@@ -533,6 +552,12 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
         .build()
 }
 
+#[derive(Clone, Serialize)]
+struct ExampleChip {
+    name: String,
+    attrs: HashMap<String, String>,
+    position: Option<usize>,
+}
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
 enum DownloadEvent<'a> {
@@ -1036,4 +1061,38 @@ async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<DisplayAsse
     let limited_activities = activities.into_iter().take(5).collect();
 
     Ok(limited_activities)
+}
+
+#[tauri::command]
+async fn get_scale_factor(app_handle: tauri::AppHandle, height: f64) -> Result<f64, String> {
+    let window = app_handle.get_window("launcher").unwrap();
+    let current_size = window.inner_size().unwrap();
+    // let scale_factor = height / current_size.height as f64;
+    let scale_factor = (current_size.height as f64) / (height);
+    // let scale_factor = 1.0;
+    eprintln!("Scale factor: {}", scale_factor);
+    eprintln!("window scale factor: {}", window.scale_factor().unwrap());
+    eprintln!("Current height: {}", current_size.height);
+    eprintln!("Webview height: {}", height);
+    Ok(scale_factor)
+}
+
+#[tauri::command]
+async fn resize_window(
+    app_handle: tauri::AppHandle,
+    height: f64,
+    scale_factor: f64,
+) -> Result<(), String> {
+    let window = app_handle.get_window("launcher").unwrap();
+    let current_size = window.outer_size().unwrap();
+    let new_height = height * scale_factor;
+    eprintln!("New height: {}", new_height);
+    eprintln!("Current height: {}", current_size.height);
+    eprintln!("Scale factor: {}", scale_factor);
+    let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
+        width: current_size.width,
+        // height: new_height as u32 + 72,
+        height: new_height as u32,
+    }));
+    Ok(())
 }
