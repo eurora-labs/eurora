@@ -123,23 +123,6 @@
 			executeCommand(editorRef, event.payload as PMCommand);
 		}
 
-		// editorRef?.cmd((state, dispatch) => {
-		// 	const tr = state.tr;
-		// 	const { schema } = state;
-		// 	const nodes = schema.nodes;
-		// 	const { $from: from } = state.selection;
-
-		// 	// Check if video node is available in schema
-		// 	if (nodes.video) {
-		// 		tr.insert(
-		// 			from.pos,
-		// 			nodes.video.createChecked({ id: 'video-1', text: 'video' }, schema.text(' '))
-		// 		);
-		// 		dispatch?.(tr);
-		// 	} else {
-		// 		console.warn('Video node not found in schema');
-		// 	}
-		// });
 		console.log('Launcher opened: refreshed activities');
 	});
 
@@ -153,11 +136,6 @@
 			backdropCustom2Ref.style.backgroundPosition = 'center';
 			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
 		}
-
-		// document.body.style.backgroundImage = `url('${event.payload}')`;
-		// document.body.style.backgroundSize = '100%';
-		// document.body.style.backgroundPosition = 'center';
-		// document.body.style.backgroundRepeat = 'no-repeat';
 	});
 
 	// Set up global keydown event listener for Escape key
@@ -232,17 +210,7 @@
 	});
 
 	// Auto-scroll to bottom when new messages arrive
-	$effect(() => {
-		// We need to use a different approach for auto-scrolling
-		// since we can't directly bind to the ScrollArea component
-		// const scrollArea = document.querySelector('.message-scroll-area');
-		// if (scrollArea && messages.length > 0) {
-		// 	setTimeout(() => {
-		// 		scrollArea.scrollTop = scrollArea.scrollHeight;
-		// 	}, 100);
-		// }
-		// On background image change body background:
-	});
+	$effect(() => {});
 
 	async function handleKeydown(event: KeyboardEvent) {
 		// We still keep the original keyboard handler for direct keyboard input
@@ -337,38 +305,6 @@
 		}
 	}
 
-	// Function to switch to a selected conversation
-	async function switchConversation(id: string) {
-		try {
-			// Clear current messages and load messages from the selected conversation
-			messages.splice(0, messages.length);
-			const [conversation, chat_messages] = (await invoke('get_conversation_with_messages', {
-				conversationId: id
-			})) as [Conversation, ChatMessage[]];
-
-			if (conversation && conversation.id) {
-				console.log('Switched to conversation:', conversation);
-
-				chat_messages.push({
-					role: 'user',
-					content: 'test sfadf asdf sdiong sfdipgn siodnv psodmv pisdnpin'
-				} as any);
-
-				// Load messages from this conversation
-				if (chat_messages) {
-					// Convert the conversation messages to ProtoChatMessage format
-
-					// Update the messages array with the conversation messages
-					// messages.splice(0, messages.length, ...conversationMessages);
-					messages.splice(0, messages.length, ...chat_messages);
-					console.log('Loaded messages:', messages);
-				}
-			}
-		} catch (error) {
-			console.error('Failed to switch conversation:', error);
-		}
-	}
-
 	// Handle API key saved event
 	function onApiKeySaved() {
 		hasApiKey = true;
@@ -380,51 +316,7 @@
 </script>
 
 <div class="backdrop-custom relative flex h-full flex-col">
-	<!-- <div
-	class="relative flex h-screen flex-col"
-	style={backgroundImage
-		? `background-image: url('${backgroundImage}'); background-size: cover; background-position: center;`
-		: ''}
-> -->
-	<!-- Semi-transparent overlay to ensure content is visible -->
-	<!-- <div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div> -->
-
-	<!-- Content container -->
 	<div class="relative z-10 flex h-full flex-col">
-		<!-- <button onclick={addVideoExtension} class="absolute right-2 top-2">Add video</button> -->
-		<!-- <div class="flex flex-wrap gap-2 p-2">
-			{#each displayAssets as asset, index}
-				<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
-					{#if asset.icon && asset.icon.length > 0}
-						<div class="icon-container mr-1 h-4 w-4">
-							<img src={asset.icon} alt="Activity Icon" />
-						</div>
-					{:else}
-						📌
-					{/if}
-					{asset.name}
-					<Button
-						size="icon"
-						variant="ghost"
-						onclick={() => {
-							displayAssets.splice(index, 1);
-						}}
-					>
-						<X />
-					</Button>
-				</Badge>
-			{/each}
-			{#if displayAssets.length === 0}
-				<Badge variant="outline">No recent activities</Badge>
-			{/if}
-		</div> -->
-		<!--
-		<Button
-			onclick={() => {
-				loadActivities();
-			}}>Reload Activities</Button
-		> -->
-
 		{#if isCheckingApiKey}
 			<div class="flex h-full items-center justify-center">
 				<p class="text-gray-500">Checking API key...</p>
@@ -474,14 +366,6 @@
 									<span>Exercise sheet 3</span>
 								</Launcher.Item>
 							</Launcher.Group>
-							<!-- <Launcher.Group heading="Recent Conversations">
-								{#each conversations.slice(0, 3) as conversation}
-									<Launcher.Item onclick={async () => await switchConversation(conversation.id)}>
-										<FileTextIcon />
-										<span>{conversation.title}</span>
-									</Launcher.Item>
-								{/each}
-							</Launcher.Group> -->
 						</Launcher.List>
 					{/if}
 				</Launcher.Root>
