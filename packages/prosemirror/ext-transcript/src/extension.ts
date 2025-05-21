@@ -7,8 +7,7 @@ export const ID = 'D8215655-A880-4B0F-8EFA-0B6B447F8AF3';
 
 export function transcriptExtension() {
 	return {
-		id: ID,
-		name: 'transcript' as const,
+		name: ID,
 		svelteNodes: {
 			transcript: {
 				attrs: transcriptAttrs,
