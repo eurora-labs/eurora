@@ -269,7 +269,7 @@
 			const nodes = schema.nodes;
 			tr.insert(
 				0,
-				nodes.video.createChecked(
+				nodes['video'].createChecked(
 					{ id: 'video-1', text: 'Some video with attrs' },
 					schema.text('video')
 				)
