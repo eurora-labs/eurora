@@ -390,7 +390,7 @@
 
 	<!-- Content container -->
 	<div class="relative z-10 flex h-full flex-col">
-		<button onclick={addVideoExtension} class="absolute right-2 top-2">Add video</button>
+		<!-- <button onclick={addVideoExtension} class="absolute right-2 top-2">Add video</button> -->
 		<!-- <div class="flex flex-wrap gap-2 p-2">
 			{#each displayAssets as asset, index}
 				<Badge variant="outline" class="flex items-center gap-1" title={`${asset.name}`}>
@@ -446,12 +446,12 @@
 
 					<!-- Recent conversations list -->
 					{#if messages.length === 0}
-						<!-- <Launcher.List> -->
-						<Launcher.List hidden>
+						<Launcher.List>
+							<!-- <Launcher.List hidden> -->
 							<Launcher.Group heading="Local Files">
-								<Launcher.Item>
+								<Launcher.Item onclick={addVideoExtension}>
 									<HardDrive />
-									<span>Exercise Sheet 2</span>
+									<span>Video</span>
 								</Launcher.Item>
 								<Launcher.Item>
 									<FileTextIcon />
