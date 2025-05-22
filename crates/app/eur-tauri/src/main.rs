@@ -533,18 +533,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
 
                 // Emit an event to notify that the launcher has been opened
                 launcher
-                    .emit(
-                        "launcher_opened",
-                        ContextChip {
-                            extension_id: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
-                            attrs: HashMap::from([(
-                                "text".to_string(),
-                                "video from rust 2".to_string(),
-                            )]),
-                            icon: None,
-                            position: Some(0),
-                        },
-                    )
+                    .emit("launcher_opened", ())
                     .expect("Failed to emit launcher_opened event");
 
                 launcher
