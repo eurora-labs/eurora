@@ -18,11 +18,12 @@ use anyhow::{Context, Result};
 pub use browser_activity::BrowserStrategy;
 use default_activity::DefaultStrategy;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ContextChip {
-    pub id: String,
+    pub extension_id: String,
     pub attrs: HashMap<String, String>,
     pub icon: Option<String>,
+    pub position: Option<usize>,
 }
 #[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {
