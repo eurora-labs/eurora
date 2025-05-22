@@ -120,7 +120,8 @@ impl ActivityAsset for YoutubeAsset {
     fn get_context_chip(&self) -> Option<ContextChip> {
         Some(ContextChip {
             name: "video".to_string(),
-            extension_id: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
+            // extension_id: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
+            extension_id: "7c7b59bb-d44d-431a-9f4d-64240172e092".to_string(),
             attrs: HashMap::new(),
             icon: None,
             position: Some(0),
