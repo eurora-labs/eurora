@@ -21,6 +21,7 @@ use default_activity::DefaultStrategy;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ContextChip {
     pub extension_id: String,
+    pub name: String,
     pub attrs: HashMap<String, String>,
     pub icon: Option<String>,
     pub position: Option<usize>,

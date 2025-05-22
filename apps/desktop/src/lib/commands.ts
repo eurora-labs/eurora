@@ -4,6 +4,7 @@ export interface PMCommand {
 	extension_id: string;
 	position?: number;
 	text?: string;
+	name?: string;
 	attrs?: Record<string, any>;
 }
 export function executeCommand(editorRef: Editor, command: PMCommand) {
@@ -17,7 +18,7 @@ export function executeCommand(editorRef: Editor, command: PMCommand) {
 		tr.insert(
 			command.position ?? 0,
 			nodes[command.extension_id].createChecked(
-				{ id, ...command.attrs },
+				{ id, name: command.name, ...command.attrs },
 				schema.text(command.text ?? ' ')
 			)
 		);
