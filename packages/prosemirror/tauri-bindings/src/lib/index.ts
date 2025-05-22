@@ -1,7 +1,11 @@
 import { Editor } from '@eurora/prosemirror-core';
 import { Fragment } from 'prosemirror-model';
 function handleFragment(content: Fragment) {
-    if    
+	content.forEach((node) => {
+		if (node.type === 'video') {
+			console.log(node.attrs);
+		}
+	});
 }
 
 export function processQuery(editorRef: Editor): string {

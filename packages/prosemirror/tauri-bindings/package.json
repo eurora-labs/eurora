@@ -1,0 +1,50 @@
+{
+	"name": "@eurora/prosemirror-tauri-bindings",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"svelte": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./register-extensions": {
+			"types": "./src/register-extensions.ts",
+			"default": "./dist/register-extensions.js"
+		},
+		"./utils": {
+			"types": "./src/utils.ts",
+			"default": "./dist/utils.js"
+		},
+		"./example-usage": {
+			"types": "./src/example-usage.ts",
+			"default": "./dist/example-usage.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsc --watch"
+	},
+	"devDependencies": {
+		"@eurora/prosemirror-core": "workspace:*",
+		"@eurora/typescript-config": "workspace:*",
+		"@eurora/ui": "workspace:*",
+		"svelte-check": "^4.1.7",
+		"svelte-preprocess": "^6.0.3",
+		"svelte2tsx": "^0.7.7",
+		"@sveltejs/vite-plugin-svelte": "^5.0.0",
+		"@eurora/ext-transcript": "workspace:*",
+		"@eurora/ext-video": "workspace:*",
+		"@eurora/ext-youtube-video": "workspace:*"
+	},
+	"dependencies": {
+		"svelte": "^5.28.2",
+		"prosemirror-model": "^1.20.0",
+		"prosemirror-view": "^1.33.5"
+	}
+}
