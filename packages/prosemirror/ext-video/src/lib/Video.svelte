@@ -68,7 +68,7 @@
 
 	let { ref, attrs }: Props = $props();
 
-	export { ref, attrs };
+	export { ref, attrs, videoAttrs, videoSchema };
 
 	function handleClick(event: MouseEvent) {
 		alert('some longer script');
