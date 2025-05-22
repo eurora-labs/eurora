@@ -131,6 +131,7 @@ impl Timeline {
     }
     pub fn get_context_chips(&self) -> Vec<eur_activity::ContextChip> {
         let activities = self.activities.read();
+        eprintln!("Number of activities: {:?}", activities.len());
         activities.last().unwrap().get_context_chips()
     }
 
