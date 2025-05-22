@@ -1043,13 +1043,13 @@ async fn check_grpc_server_connection(server_address: Option<String>) -> Result<
 
 use eur_activity::{ContextChip, DisplayAsset};
 #[tauri::command]
-async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<DisplayAsset>, String> {
+async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<ContextChip>, String> {
     let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
     let timeline = timeline_state.inner();
 
     // Get all activities from the timeline
     // let mut activities = timeline.get_activities();
-    let activities = timeline.get_activities();
+    let activities = timeline.get_context_chips();
 
     // Sort activities by start time (most recent first)
     // activities.sort_by(|a, b| b.start.cmp(&a.start));

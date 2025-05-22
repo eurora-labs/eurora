@@ -129,6 +129,10 @@ impl Timeline {
         // eprintln!("Adding activity: {:?}", activity);
         activities.push(activity.into());
     }
+    pub fn get_context_chips(&self) -> Vec<eur_activity::ContextChip> {
+        let activities = self.activities.read();
+        activities.last().unwrap().get_context_chips()
+    }
 
     pub fn get_activities(&self) -> Vec<DisplayAsset> {
         let activities = self.activities.read();
