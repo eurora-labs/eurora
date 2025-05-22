@@ -20,3 +20,4 @@ tokio-stream = { workspace = true }
 tonic = { workspace = true }
 async-trait = "0.1.77"
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
+uuid = { workspace = true }
