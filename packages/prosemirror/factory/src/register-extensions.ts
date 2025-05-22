@@ -22,15 +22,15 @@ export function registerCoreExtensions(): void {
  * Alternative approach: Lazy loading extensions
  * This provides an async way to load extensions only when needed
  */
-export async function lazyRegisterCoreExtensions(): Promise<void> {
-	try {
-		const videoModule = await import('@eurora/ext-video');
-		extensionFactory.register(videoExtensionID, videoModule.videoExtension);
+// export async function lazyRegisterCoreExtensions(): Promise<void> {
+// 	try {
+// 		const videoModule = await import('@eurora/ext-video');
+// 		extensionFactory.register(videoExtensionID, videoModule.videoExtension);
 
-		const transcriptModule = await import('@eurora/ext-transcript');
-		extensionFactory.register(transcriptExtensionID, transcriptModule.transcriptExtension);
-	} catch (error) {
-		console.error('Failed to register core extensions:', error);
-		throw error;
-	}
-}
+// 		const transcriptModule = await import('@eurora/ext-transcript');
+// 		extensionFactory.register(transcriptExtensionID, transcriptModule.transcriptExtension);
+// 	} catch (error) {
+// 		console.error('Failed to register core extensions:', error);
+// 		throw error;
+// 	}
+// }
