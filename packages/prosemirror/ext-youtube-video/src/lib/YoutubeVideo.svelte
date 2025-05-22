@@ -12,6 +12,7 @@
 		id?: string;
 		transcript?: string;
 		text?: string;
+		name?: string;
 		currentFrame?: Frame;
 	}
 
@@ -19,6 +20,7 @@
 		id: undefined,
 		transcript: undefined,
 		text: undefined,
+		name: undefined,
 		currentFrame: undefined
 	};
 
@@ -41,7 +43,8 @@
 					if (dom instanceof HTMLElement) {
 						return {
 							id: dom.getAttribute('id'),
-							text: dom.getAttribute('data-text')
+							text: dom.getAttribute('data-text'),
+							name: dom.getAttribute('data-name')
 						};
 					}
 					return null;
@@ -49,8 +52,8 @@
 			}
 		],
 		toDOM(node: PMNode) {
-			const { id, text } = node.attrs;
-			return ['span', { id, class: 'video' }];
+			const { id, text, name } = node.attrs;
+			return ['span', { id, 'data-text': text, 'data-name': name, class: 'video' }];
 		}
 	};
 </script>
