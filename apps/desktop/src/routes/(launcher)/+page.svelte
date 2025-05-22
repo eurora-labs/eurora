@@ -169,6 +169,7 @@
 			result.forEach((command) => {
 				executeCommand(editorRef!, command);
 			});
+			console.log('state JSON', editorRef.view?.state.toJSON());
 		} catch (error) {
 			console.error('Failed to load activities:', error);
 		}
