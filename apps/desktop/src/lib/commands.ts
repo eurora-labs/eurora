@@ -1,13 +1,14 @@
 import type { Editor } from '@eurora/prosemirror-core';
 import { v7 as uuidv7 } from 'uuid';
 export interface PMCommand {
-	name: string;
+	extension_id: string;
 	position?: number;
 	text?: string;
 	attrs?: Record<string, any>;
 }
 export function executeCommand(editorRef: Editor, command: PMCommand) {
 	if (!editorRef) return;
+	console.log('command', command);
 	editorRef.cmd((state, dispatch) => {
 		const tr = state.tr;
 		const { schema } = state;
@@ -15,7 +16,10 @@ export function executeCommand(editorRef: Editor, command: PMCommand) {
 		const id = uuidv7();
 		tr.insert(
 			command.position ?? 0,
-			nodes[command.name].createChecked({ id, ...command.attrs }, schema.text(command.text ?? ''))
+			nodes[command.extension_id].createChecked(
+				{ id, ...command.attrs },
+				schema.text(command.text ?? ' ')
+			)
 		);
 		dispatch?.(tr);
 	});
