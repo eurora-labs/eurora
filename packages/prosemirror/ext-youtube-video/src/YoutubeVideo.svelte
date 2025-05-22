@@ -12,7 +12,6 @@
 		id?: string;
 		transcript?: string;
 		text?: string;
-		name?: string;
 		currentFrame?: Frame;
 	}
 
@@ -20,7 +19,6 @@
 		id: undefined,
 		transcript: undefined,
 		text: undefined,
-		name: undefined,
 		currentFrame: undefined
 	};
 
@@ -43,8 +41,7 @@
 					if (dom instanceof HTMLElement) {
 						return {
 							id: dom.getAttribute('id'),
-							text: dom.getAttribute('data-text'),
-							name: dom.getAttribute('data-name')
+							text: dom.getAttribute('data-text')
 						};
 					}
 					return null;
@@ -86,7 +83,7 @@
 
 <Popover.Root>
 	<Popover.Trigger>
-		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.name}</ContextChip>
+		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.text}</ContextChip>
 	</Popover.Trigger>
 	<Popover.Content class="w-80">
 		<div class="grid gap-4">
