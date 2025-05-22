@@ -1,5 +1,4 @@
 import type { Editor } from '@eurora/prosemirror-core';
-import { v7 as uuidv7 } from 'uuid';
 export interface PMCommand {
 	id: string;
 	extension_id: string;
