@@ -49,7 +49,8 @@
 	let searchQuery = $state({
 		text: '',
 		extensions: [
-			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A')
+			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A'),
+			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092')
 		] as SveltePMExtension[]
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);

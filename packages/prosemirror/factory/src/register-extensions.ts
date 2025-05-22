@@ -3,6 +3,7 @@ import { extensionFactory } from './index.js';
 // Import extensions
 import { videoExtension, videoExtensionID } from '@eurora/ext-video';
 import { transcriptExtension, transcriptExtensionID } from '@eurora/ext-transcript';
+import { youtubeVideoExtension, youtubeVideoExtensionID } from '@eurora/ext-youtube-video';
 
 /**
  * Register all known core extensions
@@ -12,6 +13,7 @@ import { transcriptExtension, transcriptExtensionID } from '@eurora/ext-transcri
 export function registerCoreExtensions(): void {
 	extensionFactory.register(videoExtensionID, videoExtension);
 	extensionFactory.register(transcriptExtensionID, transcriptExtension);
+	extensionFactory.register(youtubeVideoExtensionID, youtubeVideoExtension);
 }
 
 // Option 1: Auto-register extensions when this module is imported
