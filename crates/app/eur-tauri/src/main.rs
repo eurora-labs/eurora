@@ -535,12 +535,13 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 launcher
                     .emit(
                         "launcher_opened",
-                        ExampleChip {
-                            name: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
+                        ContextChip {
+                            extension_id: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
                             attrs: HashMap::from([(
                                 "text".to_string(),
                                 "video from rust 2".to_string(),
                             )]),
+                            icon: None,
                             position: Some(0),
                         },
                     )
@@ -554,12 +555,6 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
         .build()
 }
 
-#[derive(Clone, Serialize)]
-struct ExampleChip {
-    name: String,
-    attrs: HashMap<String, String>,
-    position: Option<usize>,
-}
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
 enum DownloadEvent<'a> {
@@ -1046,7 +1041,7 @@ async fn check_grpc_server_connection(server_address: Option<String>) -> Result<
     }
 }
 
-use eur_activity::DisplayAsset;
+use eur_activity::{ContextChip, DisplayAsset};
 #[tauri::command]
 async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<DisplayAsset>, String> {
     let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
