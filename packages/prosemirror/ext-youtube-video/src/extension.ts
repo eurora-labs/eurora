@@ -6,6 +6,8 @@ import { SvelteNodeView } from '@eurora/prosemirror-core';
 export const ID = '7c7b59bb-d44d-431a-9f4d-64240172e092';
 
 export function videoExtension(): SveltePMExtension {
+	console.log('videoAttrs', videoAttrs);
+	console.log('videoSchema', videoSchema);
 	return {
 		name: ID,
 		svelteNodes: {
