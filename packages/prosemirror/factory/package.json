@@ -39,7 +39,8 @@
 		"svelte2tsx": "^0.7.7",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"@eurora/ext-transcript": "workspace:*",
-		"@eurora/ext-video": "workspace:*"
+		"@eurora/ext-video": "workspace:*",
+		"@eurora/ext-youtube-video": "workspace:*"
 	},
 	"dependencies": {
 		"svelte": "^5.28.2",
