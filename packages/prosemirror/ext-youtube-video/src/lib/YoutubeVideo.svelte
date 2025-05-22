@@ -61,6 +61,7 @@
 <script lang="ts">
 	import { Badge, ContextChip, Label, Input, Button, buttonVariants, Popover } from '@eurora/ui';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
+	import { SiYoutube } from '@icons-pack/svelte-simple-icons';
 	export interface Props extends SvelteNodeViewProps<VideoAttrs> {
 		ref: HTMLElement;
 		attrs: VideoAttrs;
@@ -86,7 +87,10 @@
 
 <Popover.Root>
 	<Popover.Trigger>
-		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.text}</ContextChip>
+		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>
+			<SiYoutube size={24} />
+			{attrs.name}
+		</ContextChip>
 	</Popover.Trigger>
 	<Popover.Content class="w-80">
 		<div class="grid gap-4">
