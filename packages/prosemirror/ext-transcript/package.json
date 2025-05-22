@@ -6,24 +6,40 @@
 	"module": "./dist/index.js",
 	"exports": {
 		".": {
-			"types": "./src/index.ts",
-			"svelte": "./src/index.ts"
+			"types": "./dist/index.js",
+			"svelte": "./dist/index.js"
 		}
 	},
 	"files": [
 		"dist"
 	],
-	"scripts": {},
+	"scripts": {
+		"dev": "vite dev",
+		"check": "svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "pnpm check --watch",
+		"package": "pnpm run --sequential \"/^package:.*/\"",
+		"package:svelte": "svelte-kit sync && svelte-package",
+		"prepublishOnly": "pnpm run package",
+		"prepare": "svelte-kit sync",
+		"test": "vitest run --mode development",
+		"test:watch": "vitest --watch --mode development"
+	},
 	"devDependencies": {
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
-		"prosemirror-model": "^1.20.0",
-		"prosemirror-view": "^1.33.5",
-		"svelte": "^5.28.2",
-		"svelte-check": "^4.1.7",
+		"@sveltejs/kit": "catalog:svelte",
+		"@sveltejs/package": "^2.3.2",
+		"svelte": "catalog:svelte",
+		"svelte-check": "catalog:svelte",
 		"svelte-preprocess": "^6.0.3",
 		"svelte2tsx": "^0.7.7",
-		"@sveltejs/vite-plugin-svelte": "^5.0.0"
+		"@sveltejs/vite-plugin-svelte": "catalog:svelte",
+		"vite": "catalog:",
+		"vitest": "catalog:"
+	},
+	"dependencies": {
+		"prosemirror-model": "^1.20.0",
+		"prosemirror-view": "^1.33.5"
 	}
 }
