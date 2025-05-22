@@ -118,10 +118,6 @@
 	listen('launcher_opened', (event) => {
 		// Reload activities when launcher is opened
 		loadActivities();
-		console.log(event);
-		if (editorRef) {
-			executeCommand(editorRef, event.payload as PMCommand);
-		}
 
 		console.log('Launcher opened: refreshed activities');
 	});
@@ -158,9 +154,6 @@
 		// Check if API key exists
 		checkApiKey();
 
-		// Load activities
-		loadActivities();
-
 		// Clean up event listener when component is unmounted
 		return () => {
 			document.removeEventListener('keydown', handleEscapeKey);
@@ -170,9 +163,11 @@
 	// Function to load activities from the backend
 	async function loadActivities() {
 		try {
-			const result = await invoke('list_activities');
-			displayAssets.splice(0, displayAssets.length, ...(result as DisplayAsset[]));
-			console.log('Loaded activities:', displayAssets);
+			const result: PMCommand[] = await invoke('list_activities');
+			if (!editorRef) return;
+			result.forEach((command) => {
+				executeCommand(editorRef!, command);
+			});
 		} catch (error) {
 			console.error('Failed to load activities:', error);
 		}
