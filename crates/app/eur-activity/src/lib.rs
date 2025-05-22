@@ -111,6 +111,12 @@ impl Activity {
             })
             .collect()
     }
+    pub fn get_context_chips(&self) -> Vec<ContextChip> {
+        self.assets
+            .iter()
+            .filter_map(|asset| asset.get_context_chip())
+            .collect()
+    }
 }
 
 /// Select the appropriate strategy based on the process name
