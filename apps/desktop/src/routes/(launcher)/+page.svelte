@@ -115,7 +115,7 @@
 	});
 
 	// Listen for launcher opened event to refresh activities
-	listen('launcher_opened', (event) => {
+	listen('launcher_opened', () => {
 		// Reload activities when launcher is opened
 		loadActivities();
 
