@@ -107,8 +107,9 @@ impl ActivityAsset for YoutubeAsset {
             role: Role::User,
             content: MessageContent::Image(ImageContent {
                 text: Some(format!(
-                    "I am watching a video and have a question about it. \
+                    "I am watching a video with id {} and have a question about it. \
                 Here's the transcript of the video: \n {}",
+                    self.id,
                     self.transcript
                         .iter()
                         .map(|line| format!("{} ({}s)", line.text, line.start))
