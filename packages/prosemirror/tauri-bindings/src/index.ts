@@ -1,7 +1,12 @@
 import { Editor } from '@eurora/prosemirror-core';
 import { Fragment, Node } from 'prosemirror-model';
 
-export function processQuery(editorRef: Editor): string {
+export interface QueryAssets {
+	text: string;
+	assets: string[];
+}
+export function processQuery(editorRef: Editor): QueryAssets {
+	const query: QueryAssets = { text: '', assets: [] };
 	const view = editorRef.view;
 	if (!view) {
 		throw new Error('No view found');
@@ -9,13 +14,12 @@ export function processQuery(editorRef: Editor): string {
 
 	// Get the editor state as JSON to match the expected structure
 	const stateJson = view.state.toJSON();
-	let query = '';
 
 	// Recursive function to process nodes based on the JSON structure
 	const processNodeJson = (node: any) => {
 		// If it's a text node, add its text content to the query
 		if (node.type === 'text' && node.text) {
-			query += node.text;
+			query.text += node.text;
 		}
 		// If it's any other node with a type that looks like a UUID (not doc or paragraph)
 		// add it to the query as an identifier
@@ -23,7 +27,8 @@ export function processQuery(editorRef: Editor): string {
 		else if (node.type && node.type !== 'doc' && node.type !== 'paragraph') {
 			// If the type looks like a UUID (has hyphens and is long), add it to the query
 			if (node.type.includes('-') || node.type.length > 10) {
-				query += node.attrs.id;
+				query.text += node.attrs.id;
+				query.assets.push(node.attrs.id);
 			}
 		}
 
