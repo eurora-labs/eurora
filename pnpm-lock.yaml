@@ -118,6 +118,9 @@ importers:
       '@eurora/ext-video':
         specifier: workspace:*
         version: link:../../packages/prosemirror/ext-video
+      '@eurora/prosemirror-tauri-bindings':
+        specifier: workspace:*
+        version: link:../../packages/prosemirror/tauri-bindings
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config

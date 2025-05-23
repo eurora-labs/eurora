@@ -9,7 +9,7 @@
 	import ApiKeyForm from './api-key-form.svelte';
 	import { executeCommand, type PMCommand } from '$lib/commands.js';
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
-
+	import { processQuery } from '@eurora/prosemirror-tauri-bindings';
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
 
 	// Import the Launcher component
@@ -169,6 +169,8 @@
 			result.forEach((command) => {
 				executeCommand(editorRef!, command);
 			});
+			const query = processQuery(editorRef);
+			console.log('query', query);
 
 			console.log('state JSON', editorRef.view?.state.toJSON());
 		} catch (error) {
@@ -237,7 +239,7 @@
 			tr.insert(
 				0,
 				nodes['9370B14D-B61C-4CE2-BDE7-B18684E8731A'].createChecked(
-					{ id: 'video-1', text: 'Some video with attrs' },
+					{ id: 'video-1', name: 'Some video with attrs' },
 					schema.text('video')
 				)
 			);
