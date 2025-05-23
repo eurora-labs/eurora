@@ -8,7 +8,7 @@
 		".": {
 			"types": "./src/index.js",
 			"svelte": "./src/index.js",
-			"default": "./dist/index.js"
+			"default": "./src/index.js"
 		}
 	},
 	"files": [
