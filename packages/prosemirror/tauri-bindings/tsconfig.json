@@ -4,10 +4,11 @@
 		"target": "ESNext",
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
-		"outDir": "./build",
+		"outDir": "./dist",
 		"rootDir": "./src",
 		"strict": true,
 		"esModuleInterop": true,
+		"sourceMap": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
 		"resolveJsonModule": true
