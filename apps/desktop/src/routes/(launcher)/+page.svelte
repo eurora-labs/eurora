@@ -9,7 +9,7 @@
 	import ApiKeyForm from './api-key-form.svelte';
 	import { executeCommand, type PMCommand } from '$lib/commands.js';
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
-	import { processQuery } from '@eurora/prosemirror-tauri-bindings';
+	import { processQuery, type QueryAssets } from '@eurora/prosemirror-tauri-bindings';
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
 
 	// Import the Launcher component
@@ -93,12 +93,10 @@
 			}
 		} else if (event.payload === 'Enter') {
 			// Submit the current input
-			const question = searchQuery.text;
-			if (question.trim().length > 0) {
-				searchQuery.text = '';
-				messages.push({ role: 'user', content: question });
-				askQuestion(question);
-			}
+			searchQuery.text = '';
+			const query = processQuery(editorRef!);
+			messages.push({ role: 'user', content: query.text });
+			askQuestion(query);
 		} else if (event.payload.length === 1 || event.payload === 'Space') {
 			// Handle regular character keys and space
 			const char = event.payload === 'Space' ? ' ' : event.payload;
@@ -223,7 +221,8 @@
 				const question = searchQuery.text;
 				searchQuery.text = '';
 				messages.push({ role: 'user', content: question });
-				await askQuestion(question);
+				const query = processQuery(editorRef!);
+				await askQuestion(query);
 				// Responses will come through the event listener
 			} catch (error) {
 				console.error('Error:', error);
@@ -246,7 +245,8 @@
 			dispatch?.(tr);
 		});
 	}
-	async function askQuestion(question: string): Promise<void> {
+	async function askQuestion(query: QueryAssets): Promise<void> {
+		console.log('askQuestion', query);
 		try {
 			type DownloadEvent =
 				| {
@@ -277,13 +277,17 @@
 
 			// Use the current conversation ID if one is selected and we have existing messages,
 			// otherwise create a new one
-			const conversationId =
-				messages.length > 0 && currentConversationId ? currentConversationId : 'NEW';
-
+			// const conversationId =
+			// messages.length > 0 && currentConversationId ? currentConversationId : 'NEW';
+			const conversationId = 'NEW';
 			if (conversationId === 'NEW') {
-				await invoke('ask_video_question', { conversationId, question, channel: onEvent });
+				await invoke('ask_video_question', { conversationId, query, channel: onEvent });
 			} else {
-				await invoke('continue_conversation', { conversationId, question, channel: onEvent });
+				await invoke('continue_conversation', {
+					conversationId,
+					question: query.text,
+					channel: onEvent
+				});
 			}
 
 			// If we created a new conversation, refresh the conversation list

@@ -18,7 +18,7 @@ use futures::{StreamExt, TryFutureExt};
 // use secret_service::{ApiKeyStatus, SecretService};
 use eur_secret::Sensitive;
 use eur_secret::secret;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
@@ -835,16 +835,20 @@ async fn continue_conversation(
     //     ))
     // }
 }
-
+#[derive(Serialize, Deserialize)]
+struct QueryAssets {
+    text: String,
+    assets: Vec<String>,
+}
 // Tauri command to ask questions about content (video or article) via gRPC
 #[tauri::command]
 async fn ask_video_question(
     app_handle: tauri::AppHandle,
     mut conversation_id: String,
-    question: String,
+    query: QueryAssets,
     channel: Channel<DownloadEvent<'_>>,
 ) -> Result<String, String> {
-    eprintln!("Asking question: {}", question);
+    eprintln!("Asking question: {}", query.text);
     eprintln!("Conversation ID: {}", conversation_id);
 
     let db = app_handle.state::<SharedPersonalDb>().clone();
@@ -860,7 +864,7 @@ async fn ask_video_question(
     messages.push(eur_prompt_kit::LLMMessage {
         role: eur_prompt_kit::Role::User,
         content: eur_prompt_kit::MessageContent::Text(eur_prompt_kit::TextContent {
-            text: question.clone(),
+            text: query.text.clone(),
         }),
     });
 
@@ -901,7 +905,7 @@ async fn ask_video_question(
         db.insert_chat_message(
             &conversation_id,
             "USER",
-            &question,
+            &query.text,
             true,
             Utc::now(),
             Utc::now(),

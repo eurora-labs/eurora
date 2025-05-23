@@ -1,5 +1,5 @@
 import { default as Paragraph, paragraphAttrs, paragraphSchema } from './Paragraph.svelte';
-import type { SveltePMExtension } from '@prosemirror-svelte/core';
+import type { SveltePMExtension } from '@eurora/prosemirror-core';
 
 export function paragraphExtension() {
 	return {
