@@ -132,6 +132,13 @@ pub fn capture_region(
 
     capture_monitor_region(monitor, x, y, width, height)
 }
+pub fn capture_monitor_by_name(monitor_name: String) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+    let monitor = Monitor::all()?
+        .into_iter()
+        .find(|monitor| monitor.name().unwrap() == monitor_name)
+        .ok_or_else(|| anyhow!("No monitors found"))?;
+    Ok(monitor.capture_image().unwrap())
+}
 
 pub fn capture_focused_region_rgba(
     monitor_name: String,

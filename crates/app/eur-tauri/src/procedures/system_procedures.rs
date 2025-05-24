@@ -1,4 +1,5 @@
 use eur_activity::ContextChip;
+use tauri::Emitter;
 use tauri::{Manager, Runtime};
 
 #[taurpc::procedures(
