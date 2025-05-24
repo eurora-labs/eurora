@@ -416,7 +416,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
                 match capture_focused_region_rgba(
-                    monitor_name,
+                    monitor_name.clone(),
                     launcher_x as u32,
                     launcher_y as u32,
                     launcher_width,
@@ -453,7 +453,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
 
                 // Emit an event to notify that the launcher has been opened
                 launcher
-                    .emit("launcher_opened", ())
+                    .emit("launcher_opened", monitor_name.clone())
                     .expect("Failed to emit launcher_opened event");
 
                 launcher
