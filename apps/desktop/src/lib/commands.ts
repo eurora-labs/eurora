@@ -1,4 +1,5 @@
 import type { Editor } from '@eurora/prosemirror-core';
+import type { ContextChip } from '@eurora/tauri-bindings';
 export interface PMCommand {
 	id: string;
 	extension_id: string;
@@ -7,7 +8,7 @@ export interface PMCommand {
 	name?: string;
 	attrs?: Record<string, any>;
 }
-export function executeCommand(editorRef: Editor, command: PMCommand) {
+export function executeCommand(editorRef: Editor, command: ContextChip) {
 	if (!editorRef) return;
 	console.log('command', command);
 	editorRef.cmd((state, dispatch) => {
@@ -18,7 +19,7 @@ export function executeCommand(editorRef: Editor, command: PMCommand) {
 			command.position ?? 0,
 			nodes[command.extension_id].createChecked(
 				{ id: command.id, name: command.name, ...command.attrs },
-				schema.text(command.text ?? ' ')
+				schema.text(command.name ?? ' ')
 			)
 		);
 		dispatch?.(tr);

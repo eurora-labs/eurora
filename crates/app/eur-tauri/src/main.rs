@@ -12,7 +12,9 @@ use eur_personal_db::{ChatMessage, Conversation, DatabaseManager};
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
 use eur_tauri::{
-    WindowState, create_launcher,
+    WindowState,
+    context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
+    create_launcher,
     query_procedures::{QueryApi, QueryApiImpl},
     shared_types::SharedOpenAIClient,
     shared_types::SharedTimeline,
@@ -392,6 +394,7 @@ fn main() {
             let router = Router::new()
                 // .export_config(typescript_config)
                 .merge(ThirdPartyApiImpl.into_handler())
+                .merge(ContextChipApiImpl.into_handler())
                 .merge(WindowApiImpl.into_handler())
                 .merge(QueryApiImpl.into_handler());
             builder

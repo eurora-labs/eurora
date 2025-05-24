@@ -18,6 +18,7 @@
 
 // pub mod logs;
 // pub mod menu;
+pub mod context_chip_procedures;
 pub mod query_procedures;
 pub mod shared_types;
 pub mod third_party_procedures;
