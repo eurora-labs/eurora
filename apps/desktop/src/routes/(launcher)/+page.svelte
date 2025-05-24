@@ -158,9 +158,11 @@
 					const offsetY = -launcherInfo.launcher_y;
 
 					backdropCustom2Ref.style.backgroundImage = `url('${fullMonitorImage}')`;
+					// backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
 					backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
 					backdropCustom2Ref.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
 					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+					// backdropCustom2Ref.style.backgroundClip = 'content-box';
 
 					// Update the backgroundImage state
 					backgroundImage = fullMonitorImage;
@@ -185,7 +187,7 @@
 
 		if (backdropCustom2Ref) {
 			backdropCustom2Ref.style.backgroundImage = `url('${event.payload}')`;
-			backdropCustom2Ref.style.backgroundSize = '150%';
+			backdropCustom2Ref.style.backgroundSize = '100%';
 			backdropCustom2Ref.style.backgroundPosition = 'center';
 			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
 		}
