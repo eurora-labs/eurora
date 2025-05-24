@@ -73,6 +73,7 @@
 	let currentConversationId = $state<string | null>(null);
 	const displayAssets = $state<DisplayAsset[]>([]);
 	let backgroundImage = $state<string | null>(null);
+	let currentMonitorName = $state<string>('');
 
 	// Set up event listener for chat responses
 	listen<string>('chat_response', (event) => {
@@ -123,11 +124,39 @@
 	});
 
 	// Listen for launcher opened event to refresh activities
-	listen('launcher_opened', () => {
+	listen<string>('launcher_opened', async (event) => {
 		// Reload activities when launcher is opened
 		loadActivities();
 
-		console.log('Launcher opened: refreshed activities');
+		// Store the monitor name from the event payload
+		currentMonitorName = event.payload;
+		console.log('Launcher opened: refreshed activities, monitor:', currentMonitorName);
+
+		// Capture full monitor after launcher is opened to replace the small background
+		try {
+			if (currentMonitorName) {
+				// Capture the full monitor using the monitor name from the event
+				const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorName);
+
+				// Replace the background image with the full monitor capture
+				if (backdropCustom2Ref && fullMonitorImage) {
+					backdropCustom2Ref.style.backgroundImage = `url('${fullMonitorImage}')`;
+					backdropCustom2Ref.style.backgroundSize = 'cover';
+					backdropCustom2Ref.style.backgroundPosition = 'center';
+					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+
+					// Update the backgroundImage state
+					backgroundImage = fullMonitorImage;
+
+					console.log(
+						'Full monitor background captured and applied for monitor:',
+						currentMonitorName
+					);
+				}
+			}
+		} catch (error) {
+			console.error('Failed to capture full monitor background:', error);
+		}
 	});
 
 	// Listen for background image event
