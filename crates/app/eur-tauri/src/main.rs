@@ -4,11 +4,10 @@
 )]
 
 use anyhow::Result;
-use chrono::Utc;
 use eur_client_questions::QuestionsClient;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
-use eur_personal_db::{ChatMessage, Conversation, DatabaseManager};
+use eur_personal_db::{Conversation, DatabaseManager};
 use eur_tauri::{
     WindowState, create_launcher,
     procedures::{
@@ -18,17 +17,14 @@ use eur_tauri::{
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
-    shared_types::{SharedOpenAIClient, SharedTimeline, create_shared_timeline},
+    shared_types::{SharedOpenAIClient, create_shared_timeline},
 };
-use eur_vision::{capture_focused_region_rgba, capture_region_rgba, image_to_base64};
+use eur_vision::{capture_focused_region_rgba, image_to_base64};
 use futures::{StreamExt, TryFutureExt};
 // use secret_service::{ApiKeyStatus, SecretService};
-use eur_secret::Sensitive;
 use eur_secret::secret;
-use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::ipc::Channel;
 use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Emitter, Wry};
 use tauri::{Manager, generate_context};
