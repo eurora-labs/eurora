@@ -52,3 +52,5 @@ This file tracks the project's progress using a task list format.
 - Explore key components in more detail
 - Identify current development priorities
 - Understand how the various components interact
+
+[2025-05-24 12:40:55] - Migrated frontend from regular Tauri commands to TauRPC procedures
