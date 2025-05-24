@@ -18,14 +18,14 @@ use anyhow::{Context, Result};
 pub use browser_activity::BrowserStrategy;
 use default_activity::DefaultStrategy;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[taurpc::ipc_type]
 pub struct ContextChip {
     pub id: String,
     pub extension_id: String,
     pub name: String,
     pub attrs: HashMap<String, String>,
     pub icon: Option<String>,
-    pub position: Option<usize>,
+    pub position: Option<u32>,
 }
 #[derive(Serialize, Deserialize)]
 pub struct DisplayAsset {
