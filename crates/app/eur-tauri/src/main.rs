@@ -22,7 +22,7 @@ use eur_tauri::{
     shared_types::SharedTimeline,
     shared_types::create_shared_timeline,
 };
-use eur_vision::{capture_region_rgba, image_to_base64};
+use eur_vision::{capture_focused_region_rgba, capture_region_rgba, image_to_base64};
 use futures::{StreamExt, TryFutureExt};
 // use secret_service::{ApiKeyStatus, SecretService};
 use eur_secret::Sensitive;
@@ -455,12 +455,13 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 let mut launcher_y = 0;
                 let mut launcher_width = 1024; // Default width
                 let mut launcher_height = 500; // Default height
+                let mut monitor_name = "".to_string();
 
                 // Get cursor position and center launcher on that screen
                 if let Ok(cursor_position) = launcher.cursor_position() {
                     if let Ok(monitors) = launcher.available_monitors() {
                         for monitor in monitors {
-                            monitor.name();
+                            monitor_name = monitor.name().unwrap().to_string();
                             let size = monitor.size();
                             let position = monitor.position();
                             let scale_factor = monitor.scale_factor();
@@ -512,7 +513,13 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 }
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
-                match capture_region_rgba(launcher_x, launcher_y, launcher_width, launcher_height) {
+                match capture_focused_region_rgba(
+                    monitor_name,
+                    launcher_x as u32,
+                    launcher_y as u32,
+                    launcher_width,
+                    launcher_height,
+                ) {
                     Ok(img) => {
                         let t0 = std::time::Instant::now();
                         let img = match cfg!(target_os = "linux") {
