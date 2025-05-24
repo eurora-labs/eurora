@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
-	import { executeCommand, type PMCommand } from '$lib/commands.js';
+	import { executeCommand } from '$lib/commands.js';
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
 	import { processQuery, type QueryAssets } from '@eurora/prosemirror-tauri-bindings';
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
