@@ -11,7 +11,12 @@
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
 	import { processQuery, type QueryAssets } from '@eurora/prosemirror-tauri-bindings';
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
-	import { createTauRPCProxy, type ResponseChunk, type Query } from '@eurora/tauri-bindings';
+	import {
+		createTauRPCProxy,
+		type ResponseChunk,
+		type Query,
+		type ContextChip
+	} from '@eurora/tauri-bindings';
 
 	// Import the Launcher component
 	import { Launcher } from '@eurora/launcher';
@@ -167,7 +172,7 @@
 	async function loadActivities() {
 		try {
 			// Note: list_activities is not yet available in TauRPC, fallback to invoke for now
-			const result: PMCommand[] = await invoke('list_activities');
+			const result: ContextChip[] = await taurpc.context_chip.get();
 			if (!editorRef) return;
 			result.forEach((command) => {
 				executeCommand(editorRef!, command);
