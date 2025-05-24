@@ -13,14 +13,12 @@ use eur_tauri::{
     WindowState, create_launcher,
     procedures::{
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
-        // conversation_procedures::{ConversationApi, ConversationApiImpl},
+        monitor_procedures::{MonitorApi, MonitorApiImpl},
         query_procedures::{QueryApi, QueryApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
-    shared_types::SharedOpenAIClient,
-    shared_types::SharedTimeline,
-    shared_types::create_shared_timeline,
+    shared_types::{SharedOpenAIClient, SharedTimeline, create_shared_timeline},
 };
 use eur_vision::{capture_focused_region_rgba, capture_region_rgba, image_to_base64};
 use futures::{StreamExt, TryFutureExt};
@@ -392,6 +390,7 @@ fn main() {
             let router = Router::new()
                 // .export_config(typescript_config)
                 .merge(ThirdPartyApiImpl.into_handler())
+                .merge(MonitorApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(WindowApiImpl.into_handler())
                 .merge(QueryApiImpl.into_handler());
