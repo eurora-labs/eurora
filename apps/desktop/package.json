@@ -23,6 +23,7 @@
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/prosemirror-factory": "workspace:*",
 		"@eurora/proto": "workspace:*",
+		"@eurora/tauri-bindings": "workspace:*",
 		"@eurora/ui": "workspace:*"
 	},
 	"devDependencies": {

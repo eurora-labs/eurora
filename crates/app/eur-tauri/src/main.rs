@@ -384,16 +384,13 @@ fn main() {
 
             #[cfg(not(target_os = "linux"))]
             let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
-            let typescript_config = specta_typescript::Typescript::default();
-            typescript_config
-                .export_to(
-                    "../../../../packages/tauri-bindings/src/lib/gen/bindings.ts",
-                    &specta::export(),
-                )
-                .unwrap();
+            // let typescript_config = specta_typescript::Typescript::default();
+            // typescript_config
+            //     .export_to("../../../bindings.ts", &specta::export())
+            //     .unwrap();
 
             let router = Router::new()
-                .export_config(typescript_config)
+                // .export_config(typescript_config)
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(WindowApiImpl.into_handler())
                 .merge(QueryApiImpl.into_handler());
