@@ -358,6 +358,8 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 let mut launcher_width = 1024; // Default width
                 let mut launcher_height = 500; // Default height
                 let mut monitor_name = "".to_string();
+                let mut monitor_width = 1920u32; // Default monitor width
+                let mut monitor_height = 1080u32; // Default monitor height
 
                 // Get cursor position and center launcher on that screen
                 if let Ok(cursor_position) = launcher.cursor_position() {
@@ -378,6 +380,10 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                                 && cursor_position.y >= position.y as f64
                                 && cursor_position.y <= (position.y + size.height as i32) as f64
                             {
+                                // Store monitor dimensions
+                                monitor_width = size.width;
+                                monitor_height = size.height;
+
                                 // Center the launcher on this monitor
                                 let window_size = launcher.inner_size().unwrap();
 
@@ -452,8 +458,18 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 launcher.show().expect("Failed to show launcher window");
 
                 // Emit an event to notify that the launcher has been opened
+                // Include positioning information for proper background alignment
+                let launcher_info = serde_json::json!({
+                    "monitor_name": monitor_name.clone(),
+                    "launcher_x": launcher_x,
+                    "launcher_y": launcher_y,
+                    "launcher_width": launcher_width,
+                    "launcher_height": launcher_height,
+                    "monitor_width": monitor_width,
+                    "monitor_height": monitor_height
+                });
                 launcher
-                    .emit("launcher_opened", monitor_name.clone())
+                    .emit("launcher_opened", launcher_info)
                     .expect("Failed to emit launcher_opened event");
 
                 launcher
