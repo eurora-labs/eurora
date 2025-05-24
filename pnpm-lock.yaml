@@ -99,6 +99,9 @@ importers:
       '@eurora/proto':
         specifier: workspace:*
         version: link:../../packages/proto
+      '@eurora/tauri-bindings':
+        specifier: workspace:*
+        version: link:../../packages/tauri-bindings
       '@eurora/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -1281,6 +1284,9 @@ importers:
       svelte2tsx:
         specifier: ^0.7.7
         version: 0.7.39(svelte@5.33.1)(typescript@5.8.3)
+      taurpc:
+        specifier: ^1.8.1
+        version: 1.8.1
 
   packages/typescript-config: {}
 
@@ -5288,6 +5294,9 @@ packages:
   tar@7.4.3:
     resolution: {integrity: sha512-5S7Va8hKfV7W5U6g3aYxXmlPoZVAwUMy9AOKyF2fVuZa2UD3qZjg578OrLRt8PcNN1PleVaL/5/yYATNL0ICUw==}
     engines: {node: '>=18'}
+
+  taurpc@1.8.1:
+    resolution: {integrity: sha512-qfR1ekhXApjbnWAqyE5qpDa/oMmKBwjNNDuqjYn7sO+ChI5qwQ4J/fS+00dVLE3I0lbZDizyY8ObSFBz3MRerQ==}
 
   temp-dir@3.0.0:
     resolution: {integrity: sha512-nHc6S/bwIilKHNRgK/3jlhDoIHcp45YgyiwcAk46Tr0LfEqGBVpmiAyuiuxeVE44m3mXnEeVhaipLOEWmH+Njw==}
@@ -10090,6 +10099,10 @@ snapshots:
       minizlib: 3.0.2
       mkdirp: 3.0.1
       yallist: 5.0.0
+
+  taurpc@1.8.1:
+    dependencies:
+      '@tauri-apps/api': 2.5.0
 
   temp-dir@3.0.0: {}
 
