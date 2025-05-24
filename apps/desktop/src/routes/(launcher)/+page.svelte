@@ -74,6 +74,15 @@
 	const displayAssets = $state<DisplayAsset[]>([]);
 	let backgroundImage = $state<string | null>(null);
 	let currentMonitorName = $state<string>('');
+	let launcherInfo = $state<{
+		monitor_name: string;
+		launcher_x: number;
+		launcher_y: number;
+		launcher_width: number;
+		launcher_height: number;
+		monitor_width: number;
+		monitor_height: number;
+	} | null>(null);
 
 	// Set up event listener for chat responses
 	listen<string>('chat_response', (event) => {
@@ -124,33 +133,44 @@
 	});
 
 	// Listen for launcher opened event to refresh activities
-	listen<string>('launcher_opened', async (event) => {
+	listen<any>('launcher_opened', async (event) => {
 		// Reload activities when launcher is opened
 		loadActivities();
 
-		// Store the monitor name from the event payload
-		currentMonitorName = event.payload;
-		console.log('Launcher opened: refreshed activities, monitor:', currentMonitorName);
+		// Store the launcher information from the event payload
+		launcherInfo = event.payload;
+		currentMonitorName = launcherInfo?.monitor_name || '';
+		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
 
 		// Capture full monitor after launcher is opened to replace the small background
 		try {
-			if (currentMonitorName) {
+			if (currentMonitorName && launcherInfo) {
 				// Capture the full monitor using the monitor name from the event
 				const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorName);
 
 				// Replace the background image with the full monitor capture
+				// Position it so it appears as if looking through transparent glass
 				if (backdropCustom2Ref && fullMonitorImage) {
+					// Calculate the position offset to align the background properly
+					// The background should be positioned so that the launcher area shows
+					// the same content as if it were transparent
+					const offsetX = -launcherInfo.launcher_x;
+					const offsetY = -launcherInfo.launcher_y;
+
 					backdropCustom2Ref.style.backgroundImage = `url('${fullMonitorImage}')`;
-					backdropCustom2Ref.style.backgroundSize = 'cover';
-					backdropCustom2Ref.style.backgroundPosition = 'center';
+					backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
+					backdropCustom2Ref.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
 					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
 
 					// Update the backgroundImage state
 					backgroundImage = fullMonitorImage;
 
 					console.log(
-						'Full monitor background captured and applied for monitor:',
-						currentMonitorName
+						'Full monitor background captured and positioned for monitor:',
+						currentMonitorName,
+						'offset:',
+						offsetX,
+						offsetY
 					);
 				}
 			}
