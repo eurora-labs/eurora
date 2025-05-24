@@ -1,5 +1,8 @@
 use tauri::{Manager, Runtime};
-#[taurpc::procedures(path = "window")]
+#[taurpc::procedures(
+    path = "window",
+    export_to = "../../../packages/tauri-bindings/src/lib/gen/bindings.ts"
+)]
 pub trait WindowApi {
     async fn get_scale_factor<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
