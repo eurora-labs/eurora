@@ -11,12 +11,16 @@
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
 	import { processQuery, type QueryAssets } from '@eurora/prosemirror-tauri-bindings';
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
+	import { createTauRPCProxy, type ResponseChunk, type Query } from '@eurora/tauri-bindings';
 
 	// Import the Launcher component
 	import { Launcher } from '@eurora/launcher';
 	import { Editor as ProsemirrorEditor, type SveltePMExtension } from '@eurora/prosemirror-core';
 	// Import the extension factory instead of individual extensions
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory';
+
+	// Create TauRPC proxy
+	const taurpc = createTauRPCProxy();
 	// Define a type for Conversation based on what we know from main.rs
 	type ChatMessage = {
 		id: string;
@@ -162,6 +166,7 @@
 	// Function to load activities from the backend
 	async function loadActivities() {
 		try {
+			// Note: list_activities is not yet available in TauRPC, fallback to invoke for now
 			const result: PMCommand[] = await invoke('list_activities');
 			if (!editorRef) return;
 			result.forEach((command) => {
@@ -179,12 +184,12 @@
 	// Function to check if API key exists
 	async function checkApiKey() {
 		try {
-			const result: boolean = await invoke('check_api_key_exists');
+			const result: boolean = await taurpc.third_party.check_api_key_exists();
 			hasApiKey = result;
 
 			// If API key exists, initialize the OpenAI client
 			if (hasApiKey) {
-				await invoke('initialize_openai_client');
+				await taurpc.third_party.initialize_openai_client();
 			}
 		} catch (error) {
 			console.error('Failed to check API key:', error);
@@ -194,6 +199,7 @@
 	}
 
 	// Load conversations when component is mounted
+	// Note: list_conversations is not yet available in TauRPC, fallback to invoke for now
 	invoke('list_conversations')
 		.then((result) => {
 			conversations.splice(0, conversations.length, ...(result as Conversation[]));
@@ -203,7 +209,8 @@
 			console.error('Failed to load conversations:', error);
 		});
 
-	invoke('resize_launcher_window', { height: 100 }).then(() => {
+	// Use TauRPC for window resize
+	taurpc.window.resize_launcher_window(100, 1.0).then(() => {
 		console.log('Window resized to 100px');
 	});
 
@@ -215,7 +222,7 @@
 		// when typing in the input field
 		// event.preventDefault();
 		if (event.key === 'Enter' && !event.shiftKey) {
-			await invoke('resize_launcher_window', { height: 100 });
+			await taurpc.window.resize_launcher_window(100, 1.0);
 
 			try {
 				const question = searchQuery.text;
@@ -248,58 +255,33 @@
 	async function askQuestion(query: QueryAssets): Promise<void> {
 		console.log('askQuestion', query);
 		try {
-			type DownloadEvent =
-				| {
-						event: 'message';
-						data: {
-							message: string;
-						};
-				  }
-				| {
-						event: 'append';
-						data: {
-							chunk: string;
-						};
-				  };
-
-			const onEvent = new Channel<DownloadEvent>();
-			onEvent.onmessage = (message) => {
-				if (message.event == 'message') {
-					messages.push({
-						role: 'system',
-						content: message.data.message
-					});
-				} else {
-					messages.at(-1)!.content += message.data.chunk;
-				}
-				console.log(`got download event ${message.event}`);
+			// Convert QueryAssets to Query type expected by TauRPC
+			const tauRpcQuery: Query = {
+				text: query.text,
+				assets: query.assets
 			};
 
-			// Use the current conversation ID if one is selected and we have existing messages,
-			// otherwise create a new one
-			// const conversationId =
-			// messages.length > 0 && currentConversationId ? currentConversationId : 'NEW';
-			const conversationId = 'NEW';
-			if (conversationId === 'NEW') {
-				await invoke('ask_video_question', { conversationId, query, channel: onEvent });
-			} else {
-				await invoke('continue_conversation', {
-					conversationId,
-					question: query.text,
-					channel: onEvent
-				});
-			}
-
-			// If we created a new conversation, refresh the conversation list
-			if (conversationId === 'NEW') {
-				invoke('list_conversations')
-					.then((result) => {
-						conversations.splice(0, conversations.length, ...(result as Conversation[]));
-					})
-					.catch((error) => {
-						console.error('Failed to refresh conversations:', error);
+			const onEvent = (response: ResponseChunk) => {
+				if (response.chunk === '') {
+					// Initial message
+					messages.push({
+						role: 'system',
+						content: ''
 					});
-			}
+				} else {
+					// Append chunk to the last message
+					if (messages.length > 0) {
+						messages.at(-1)!.content += response.chunk;
+					}
+				}
+				console.log(`got response chunk: ${response.chunk}`);
+			};
+
+			// Use TauRPC send_query procedure
+			await taurpc.send_query(onEvent, tauRpcQuery);
+
+			// Note: Conversation management is not yet available in TauRPC,
+			// so we skip the conversation refresh for now
 		} catch (error) {
 			console.error('Failed to get answer:', error);
 			messages.push({
@@ -312,8 +294,8 @@
 	// Handle API key saved event
 	function onApiKeySaved() {
 		hasApiKey = true;
-		// Resize the window after API key is saved
-		invoke('resize_launcher_window', { height: 100 }).catch((error) => {
+		// Resize the window after API key is saved using TauRPC
+		taurpc.window.resize_launcher_window(100, 1.0).catch((error) => {
 			console.error('Failed to resize window:', error);
 		});
 	}
