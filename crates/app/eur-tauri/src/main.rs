@@ -11,7 +11,15 @@ use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{ChatMessage, Conversation, DatabaseManager};
 use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
 use eur_proto::questions_service::ProtoChatMessage;
-use eur_tauri::{WindowState, create_launcher};
+use eur_tauri::{
+    WindowState, create_launcher,
+    query_procedures::{QueryApi, QueryApiImpl},
+    shared_types::SharedOpenAIClient,
+    shared_types::SharedTimeline,
+    shared_types::create_shared_timeline,
+    third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
+    window_procedures::{WindowApi, WindowApiImpl},
+};
 use eur_timeline::Timeline;
 use eur_vision::{capture_region_rgba, image_to_base64};
 use futures::{StreamExt, TryFutureExt};
@@ -20,24 +28,21 @@ use eur_secret::Sensitive;
 use eur_secret::secret;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
 use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Emitter, Wry};
-use tauri::{Manager, generate_context};
+use tauri::{Manager, Runtime, State, Window, generate_context};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-
-use std::sync::atomic::{AtomicBool, Ordering};
-
+use taurpc::Router;
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 
 // mod focus_tracker;
 
 use tracing::{error, info};
-type SharedTimeline = Arc<Timeline>;
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
-type SharedOpenAIClient = Arc<async_mutex::Mutex<Option<eur_openai::OpenAI>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
 type SharedCurrentConversation = Arc<Option<Conversation>>;
 type SharedCurrentConversationId = Arc<String>;
@@ -67,11 +72,6 @@ fn create_shared_current_conversation() -> SharedCurrentConversation {
 // And replace create_shared_client with this function:
 fn create_shared_client() -> SharedQuestionsClient {
     Arc::new(Mutex::new(None))
-}
-
-fn create_shared_timeline() -> SharedTimeline {
-    // Create a timeline that collects state every 3 seconds and keeps 1 hour of history
-    Arc::new(eur_timeline::create_default_timeline())
 }
 
 fn create_shared_openai_client() -> SharedOpenAIClient {
@@ -384,7 +384,19 @@ fn main() {
 
             #[cfg(not(target_os = "linux"))]
             let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+            let typescript_config = specta_typescript::Typescript::default();
+            typescript_config
+                .export_to(
+                    "../../../../packages/tauri-bindings/src/lib/gen/bindings.ts",
+                    &specta::export(),
+                )
+                .unwrap();
 
+            let router = Router::new()
+                .export_config(typescript_config)
+                .merge(ThirdPartyApiImpl.into_handler())
+                .merge(WindowApiImpl.into_handler())
+                .merge(QueryApiImpl.into_handler());
             builder
                 .invoke_handler(tauri::generate_handler![
                     resize_launcher_window,
@@ -403,6 +415,7 @@ fn main() {
                     initialize_openai_client,
                     send_key_to_launcher, // Keep for potential testing/manual trigger
                 ])
+                .invoke_handler(router.into_handler())
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
                 .run(|_app_handle, event| {
@@ -835,11 +848,13 @@ async fn continue_conversation(
     //     ))
     // }
 }
+
 #[derive(Serialize, Deserialize)]
 struct QueryAssets {
     text: String,
     assets: Vec<String>,
 }
+
 // Tauri command to ask questions about content (video or article) via gRPC
 #[tauri::command]
 async fn ask_video_question(
