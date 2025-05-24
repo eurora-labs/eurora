@@ -1,5 +1,4 @@
 use eur_vision::{capture_monitor_by_name, image_to_base64};
-use image::DynamicImage;
 
 #[taurpc::procedures(
     path = "monitor",
