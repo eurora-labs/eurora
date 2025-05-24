@@ -10,15 +10,17 @@ use eur_client_questions::QuestionsClient;
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{ChatMessage, Conversation, DatabaseManager};
 use eur_tauri::{
-    WindowState,
-    context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
-    create_launcher,
-    query_procedures::{QueryApi, QueryApiImpl},
+    WindowState, create_launcher,
+    procedures::{
+        context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
+        // conversation_procedures::{ConversationApi, ConversationApiImpl},
+        query_procedures::{QueryApi, QueryApiImpl},
+        third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
+        window_procedures::{WindowApi, WindowApiImpl},
+    },
     shared_types::SharedOpenAIClient,
     shared_types::SharedTimeline,
     shared_types::create_shared_timeline,
-    third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
-    window_procedures::{WindowApi, WindowApiImpl},
 };
 use eur_vision::{capture_region_rgba, image_to_base64};
 use futures::{StreamExt, TryFutureExt};
