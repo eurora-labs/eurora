@@ -1,5 +1,4 @@
 use tauri::AppHandle;
-use url::Url;
 pub(crate) mod state {
 
     use std::{collections::BTreeMap, sync::Arc};
