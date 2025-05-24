@@ -1,13 +1,6 @@
 import type { Editor } from '@eurora/prosemirror-core';
 import type { ContextChip } from '@eurora/tauri-bindings';
-export interface PMCommand {
-	id: string;
-	extension_id: string;
-	position?: number;
-	text?: string;
-	name?: string;
-	attrs?: Record<string, any>;
-}
+
 export function executeCommand(editorRef: Editor, command: ContextChip) {
 	if (!editorRef) return;
 	console.log('command', command);
