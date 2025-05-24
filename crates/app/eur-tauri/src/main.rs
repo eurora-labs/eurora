@@ -3,14 +3,12 @@
     windows_subsystem = "windows"
 )]
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::Utc;
 use eur_client_questions::QuestionsClient;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{ChatMessage, Conversation, DatabaseManager};
-use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
-use eur_proto::questions_service::ProtoChatMessage;
 use eur_tauri::{
     WindowState,
     context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
@@ -22,20 +20,18 @@ use eur_tauri::{
     third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
     window_procedures::{WindowApi, WindowApiImpl},
 };
-use eur_timeline::Timeline;
 use eur_vision::{capture_region_rgba, image_to_base64};
 use futures::{StreamExt, TryFutureExt};
 // use secret_service::{ApiKeyStatus, SecretService};
 use eur_secret::Sensitive;
 use eur_secret::secret;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
 use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Emitter, Wry};
-use tauri::{Manager, Runtime, State, Window, generate_context};
+use tauri::{Manager, generate_context};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use taurpc::Router;
 // Shared state to track if launcher is visible
@@ -1049,7 +1045,7 @@ async fn check_grpc_server_connection(server_address: Option<String>) -> Result<
     }
 }
 
-use eur_activity::{ContextChip, DisplayAsset};
+use eur_activity::ContextChip;
 #[tauri::command]
 async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<ContextChip>, String> {
     let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
