@@ -1,25 +1,16 @@
 use chrono::{DateTime, Utc};
-use image::DynamicImage;
 use libsqlite3_sys::sqlite3_auto_extension;
 use sqlite_vec::sqlite3_vec_init;
 use sqlx::Column;
-use sqlx::Error as SqlxError;
-use sqlx::Row;
 use sqlx::TypeInfo;
-use sqlx::ValueRef;
 use sqlx::migrate::MigrateDatabase;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::types::Uuid;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::try_join;
-use tracing::{debug, error, warn};
+use tracing::debug;
 
-use std::collections::BTreeMap;
 
-use zerocopy::FromBytes;
 
-use futures::future::try_join_all;
 
 use crate::types::{Activity, ActivityAsset, ChatMessage, Conversation};
 
