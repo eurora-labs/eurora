@@ -22,14 +22,15 @@ struct TranscriptLine {
 }
 
 struct YoutubeAsset {
+    pub id: String,
     pub _url: String,
     pub title: String,
     pub transcript: Vec<TranscriptLine>,
     pub _current_time: f32,
     pub video_frame: DynamicImage,
 }
-
 struct ArticleAsset {
+    pub id: String,
     pub _url: String,
     pub title: String,
     pub content: String,
@@ -40,6 +41,7 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
         // eprintln!("Converting ProtoYoutubeState to YoutubeAsset");
         // eprintln!("ProtoYoutubeState: {:?}", state);
         YoutubeAsset {
+            id: uuid::Uuid::new_v4().to_string(),
             _url: state.url,
             title: "transcript asset".to_string(),
             transcript: state
@@ -82,6 +84,7 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
 impl From<ProtoArticleState> for ArticleAsset {
     fn from(article: ProtoArticleState) -> Self {
         ArticleAsset {
+            id: uuid::Uuid::new_v4().to_string(),
             _url: "".to_string(),
             // title: article.title,
             title: "article asset".to_string(),
@@ -104,8 +107,9 @@ impl ActivityAsset for YoutubeAsset {
             role: Role::User,
             content: MessageContent::Image(ImageContent {
                 text: Some(format!(
-                    "I am watching a video and have a question about it. \
+                    "I am watching a video with id {} and have a question about it. \
                 Here's the transcript of the video: \n {}",
+                    self.id,
                     self.transcript
                         .iter()
                         .map(|line| format!("{} ({}s)", line.text, line.start))
@@ -119,8 +123,11 @@ impl ActivityAsset for YoutubeAsset {
 
     fn get_context_chip(&self) -> Option<ContextChip> {
         Some(ContextChip {
-            extension_id: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
-            attrs: HashMap::from([("text".to_string(), self.title.clone())]),
+            id: self.id.clone(),
+            name: "video".to_string(),
+            // extension_id: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
+            extension_id: "7c7b59bb-d44d-431a-9f4d-64240172e092".to_string(),
+            attrs: HashMap::new(),
             icon: None,
             position: Some(0),
         })
@@ -151,6 +158,8 @@ impl ActivityAsset for ArticleAsset {
 
     fn get_context_chip(&self) -> Option<ContextChip> {
         Some(ContextChip {
+            id: self.id.clone(),
+            name: "article".to_string(),
             extension_id: "None".to_string(),
             attrs: HashMap::new(),
             icon: None,
