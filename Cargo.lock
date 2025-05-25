@@ -1828,6 +1828,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-auth-service"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "dotenv",
+ "eur-proto",
+ "futures",
+ "image 0.25.6",
+ "prost",
+ "tokio",
+ "tonic 0.13.0",
+ "tonic-build",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "eur-client-grpc"
 version = "0.0.0"
 dependencies = [
