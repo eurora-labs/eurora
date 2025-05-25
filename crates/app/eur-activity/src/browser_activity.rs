@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{ActivityAsset, ActivitySnapshot, ActivityStrategy, ContextChip};
+use crate::{ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, ContextChip};
 use anyhow::Result;
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
@@ -13,6 +13,29 @@ use image::DynamicImage;
 use tokio::sync::Mutex;
 
 use eur_prompt_kit::{ImageContent, LLMMessage, MessageContent, Role, TextContent};
+
+/// Helper function to safely load images from protocol buffer data
+fn load_image_from_proto(
+    proto_image: eur_proto::shared::ProtoImage,
+) -> Result<DynamicImage, ActivityError> {
+    let format = ProtoImageFormat::try_from(proto_image.format)
+        .map_err(|_| ActivityError::ProtocolBuffer("Invalid image format".to_string()))?;
+
+    let image = match format {
+        ProtoImageFormat::Png => {
+            image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::Png)?
+        }
+        ProtoImageFormat::Jpeg => {
+            image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::Jpeg)?
+        }
+        ProtoImageFormat::Webp => {
+            image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::WebP)?
+        }
+        _ => image::load_from_memory(&proto_image.data)?,
+    };
+
+    Ok(image)
+}
 
 #[derive(Debug, Clone)]
 struct TranscriptLine {
@@ -36,11 +59,15 @@ struct ArticleAsset {
     pub content: String,
 }
 
-impl From<ProtoYoutubeState> for YoutubeAsset {
-    fn from(state: ProtoYoutubeState) -> Self {
-        // eprintln!("Converting ProtoYoutubeState to YoutubeAsset");
-        // eprintln!("ProtoYoutubeState: {:?}", state);
-        YoutubeAsset {
+impl YoutubeAsset {
+    pub fn try_from(state: ProtoYoutubeState) -> Result<Self, ActivityError> {
+        let proto_image = state
+            .video_frame
+            .ok_or_else(|| ActivityError::ProtocolBuffer("Missing video frame data".to_string()))?;
+
+        let video_frame = load_image_from_proto(proto_image)?;
+
+        Ok(YoutubeAsset {
             id: uuid::Uuid::new_v4().to_string(),
             _url: state.url,
             title: "transcript asset".to_string(),
@@ -54,30 +81,16 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
                 })
                 .collect(),
             _current_time: state.current_time,
-            video_frame: {
-                let proto_image = state.video_frame.unwrap();
-                // Directly load the image using the logic from eur-proto's From impl
-                match ProtoImageFormat::try_from(proto_image.format).unwrap_or_default() {
-                    ProtoImageFormat::Png => image::load_from_memory_with_format(
-                        &proto_image.data,
-                        image::ImageFormat::Png,
-                    )
-                    .expect("Failed to load PNG image from proto"),
-                    ProtoImageFormat::Jpeg => image::load_from_memory_with_format(
-                        &proto_image.data,
-                        image::ImageFormat::Jpeg,
-                    )
-                    .expect("Failed to load JPEG image from proto"),
-                    ProtoImageFormat::Webp => image::load_from_memory_with_format(
-                        &proto_image.data,
-                        image::ImageFormat::WebP,
-                    )
-                    .expect("Failed to load WebP image from proto"),
-                    _ => image::load_from_memory(&proto_image.data)
-                        .expect("Failed to load image from proto"),
-                }
-            },
-        }
+            video_frame,
+        })
+    }
+}
+
+impl From<ProtoYoutubeState> for YoutubeAsset {
+    fn from(state: ProtoYoutubeState) -> Self {
+        // For backward compatibility, use the safe version but panic on error
+        // This should be replaced with proper error handling in calling code
+        Self::try_from(state).expect("Failed to convert ProtoYoutubeState to YoutubeAsset")
     }
 }
 
@@ -170,6 +183,19 @@ impl ActivityAsset for ArticleAsset {
 
 pub struct ArticleSnapshot {
     pub highlight: Option<String>,
+    pub created_at: u64,
+    pub updated_at: u64,
+}
+
+impl ArticleSnapshot {
+    pub fn new(highlight: Option<String>) -> Self {
+        let now = chrono::Utc::now().timestamp() as u64;
+        Self {
+            highlight,
+            created_at: now,
+            updated_at: now,
+        }
+    }
 }
 
 impl ActivitySnapshot for ArticleSnapshot {
@@ -186,45 +212,42 @@ impl ActivitySnapshot for ArticleSnapshot {
     }
 
     fn get_updated_at(&self) -> u64 {
-        todo!()
+        self.updated_at
     }
 
     fn get_created_at(&self) -> u64 {
-        todo!()
+        self.created_at
     }
 }
 
 struct YoutubeSnapshot {
     pub video_frame: DynamicImage,
+    pub created_at: u64,
+    pub updated_at: u64,
+}
+
+impl YoutubeSnapshot {
+    pub fn try_from(snapshot: ProtoYoutubeSnapshot) -> Result<Self, ActivityError> {
+        let proto_image = snapshot
+            .video_frame
+            .ok_or_else(|| ActivityError::ProtocolBuffer("Missing video frame data".to_string()))?;
+
+        let video_frame = load_image_from_proto(proto_image)?;
+        let now = chrono::Utc::now().timestamp() as u64;
+
+        Ok(YoutubeSnapshot {
+            video_frame,
+            created_at: now,
+            updated_at: now,
+        })
+    }
 }
 
 impl From<ProtoYoutubeSnapshot> for YoutubeSnapshot {
     fn from(snapshot: ProtoYoutubeSnapshot) -> Self {
-        YoutubeSnapshot {
-            video_frame: {
-                let proto_image = snapshot.video_frame.unwrap();
-                // Directly load the image using the logic from eur-proto's From impl
-                match ProtoImageFormat::try_from(proto_image.format).unwrap_or_default() {
-                    ProtoImageFormat::Png => image::load_from_memory_with_format(
-                        &proto_image.data,
-                        image::ImageFormat::Png,
-                    )
-                    .expect("Failed to load PNG image from proto"),
-                    ProtoImageFormat::Jpeg => image::load_from_memory_with_format(
-                        &proto_image.data,
-                        image::ImageFormat::Jpeg,
-                    )
-                    .expect("Failed to load JPEG image from proto"),
-                    ProtoImageFormat::Webp => image::load_from_memory_with_format(
-                        &proto_image.data,
-                        image::ImageFormat::WebP,
-                    )
-                    .expect("Failed to load WebP image from proto"),
-                    _ => image::load_from_memory(&proto_image.data)
-                        .expect("Failed to load image from proto"),
-                }
-            },
-        }
+        // For backward compatibility, use the safe version but panic on error
+        // This should be replaced with proper error handling in calling code
+        Self::try_from(snapshot).expect("Failed to convert ProtoYoutubeSnapshot to YoutubeSnapshot")
     }
 }
 
@@ -240,11 +263,11 @@ impl ActivitySnapshot for YoutubeSnapshot {
     }
 
     fn get_updated_at(&self) -> u64 {
-        todo!()
+        self.updated_at
     }
 
     fn get_created_at(&self) -> u64 {
-        todo!()
+        self.created_at
     }
 }
 
@@ -387,7 +410,16 @@ impl ActivityStrategy for BrowserStrategy {
     }
 
     fn gather_state(&self) -> String {
-        todo!()
+        let state = serde_json::json!({
+            "process_name": self.process_name,
+            "name": self.name,
+            "timestamp": chrono::Utc::now().timestamp(),
+            "status": "active",
+            "strategy_type": "browser",
+            "supported_content": ["youtube", "article", "pdf"]
+        });
+
+        state.to_string()
     }
 
     fn get_name(&self) -> &String {
@@ -400,5 +432,136 @@ impl ActivityStrategy for BrowserStrategy {
 
     fn get_process_name(&self) -> &String {
         &self.process_name
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ActivitySnapshot;
+
+    #[test]
+    fn test_browser_strategy_supported_processes() {
+        let supported = BrowserStrategy::get_supported_processes();
+        assert!(supported.contains(&"firefox"));
+        assert!(supported.contains(&"chrome"));
+        assert!(supported.contains(&"safari"));
+        assert!(!supported.is_empty());
+    }
+
+    #[test]
+    fn test_article_snapshot_creation() {
+        let snapshot = ArticleSnapshot::new(Some("Test highlight".to_string()));
+
+        assert_eq!(snapshot.highlight, Some("Test highlight".to_string()));
+        assert!(snapshot.created_at > 0);
+        assert!(snapshot.updated_at > 0);
+        assert_eq!(snapshot.created_at, snapshot.updated_at);
+    }
+
+    #[test]
+    fn test_article_snapshot_timestamps() {
+        let snapshot = ArticleSnapshot::new(None);
+
+        assert_eq!(snapshot.get_created_at(), snapshot.created_at);
+        assert_eq!(snapshot.get_updated_at(), snapshot.updated_at);
+    }
+
+    #[test]
+    fn test_article_snapshot_message_construction() {
+        let snapshot = ArticleSnapshot::new(Some("Important text".to_string()));
+        let message = snapshot.construct_message();
+
+        match message.content {
+            MessageContent::Text(text_content) => {
+                assert!(text_content.text.contains("Important text"));
+                assert!(text_content.text.contains("highlighted"));
+            }
+            _ => panic!("Expected text content"),
+        }
+    }
+
+    #[test]
+    fn test_article_asset_creation() {
+        let article_state = ProtoArticleState {
+            content: "Test article content".to_string(),
+            text_content: "Test text content".to_string(),
+            selected_text: None,
+            title: "Test Title".to_string(),
+            site_name: "Test Site".to_string(),
+            language: "en".to_string(),
+            excerpt: "Test excerpt".to_string(),
+            length: 100,
+        };
+
+        let asset = ArticleAsset::from(article_state);
+        assert_eq!(asset.title, "article asset");
+        assert_eq!(asset.content, "Test article content");
+        assert!(!asset.id.is_empty());
+    }
+
+    #[test]
+    fn test_article_asset_context_chip() {
+        let article_state = ProtoArticleState {
+            content: "Test content".to_string(),
+            text_content: "Test text content".to_string(),
+            selected_text: None,
+            title: "Test Title".to_string(),
+            site_name: "Test Site".to_string(),
+            language: "en".to_string(),
+            excerpt: "Test excerpt".to_string(),
+            length: 50,
+        };
+
+        let asset = ArticleAsset::from(article_state);
+        let chip = asset.get_context_chip().unwrap();
+
+        assert_eq!(chip.name, "article");
+        assert_eq!(chip.extension_id, "None");
+        assert!(!chip.id.is_empty());
+    }
+
+    #[test]
+    fn test_browser_state_content_type() {
+        let youtube_state = BrowserState::Youtube(ProtoYoutubeState {
+            url: "test".to_string(),
+            title: "Test Video".to_string(),
+            transcript: vec![],
+            current_time: 0.0,
+            video_frame: None,
+        });
+
+        assert_eq!(youtube_state.content_type(), "youtube");
+
+        let article_state = BrowserState::Article(ProtoArticleState {
+            content: "test".to_string(),
+            text_content: "Test text content".to_string(),
+            selected_text: None,
+            title: "Test Title".to_string(),
+            site_name: "Test Site".to_string(),
+            language: "en".to_string(),
+            excerpt: "Test excerpt".to_string(),
+            length: 10,
+        });
+
+        assert_eq!(article_state.content_type(), "article");
+    }
+
+    #[test]
+    fn test_load_image_from_proto_invalid_format() {
+        let proto_image = eur_proto::shared::ProtoImage {
+            data: vec![1, 2, 3], // Invalid image data
+            format: 999,         // Invalid format
+            width: 100,
+            height: 100,
+        };
+
+        let result = load_image_from_proto(proto_image);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ActivityError::ProtocolBuffer(_) => {} // Expected
+            _ => panic!("Expected ProtocolBuffer error"),
+        }
     }
 }
