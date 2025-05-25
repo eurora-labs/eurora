@@ -35,6 +35,9 @@ where
     )?;
     conn.flush()?;
 
+    // Track the currently focused window to monitor its title changes
+    let mut current_focused_window: Option<u32> = None;
+
     // ── Event loop ─────────────────────────────────────────────────────────────
     loop {
         let event = match conn.wait_for_event() {
@@ -46,30 +49,67 @@ where
             }
         };
 
-        if let Event::PropertyNotify(PropertyNotifyEvent { atom, .. }) = event {
-            if atom != net_active_window {
-                continue;
+        if let Event::PropertyNotify(PropertyNotifyEvent { atom, window, .. }) = event {
+            let mut should_emit_focus_event = false;
+            let mut new_window: Option<u32> = None;
+
+            // Check if this is an active window change
+            if atom == net_active_window && window == root {
+                // Active window changed
+                new_window = active_window(&conn, root, net_active_window)?;
+                should_emit_focus_event = true;
+
+                // Update monitoring for the new focused window
+                if let Some(old_win) = current_focused_window {
+                    // Stop monitoring the old window
+                    let _ = conn.change_window_attributes(
+                        old_win,
+                        &ChangeWindowAttributesAux::new().event_mask(EventMask::NO_EVENT),
+                    );
+                }
+
+                if let Some(new_win) = new_window {
+                    // Start monitoring the new window for title changes
+                    let _ = conn.change_window_attributes(
+                        new_win,
+                        &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
+                    );
+                    current_focused_window = Some(new_win);
+                } else {
+                    current_focused_window = None;
+                }
+            }
+            // Check if this is a title change on the currently focused window
+            else if atom == net_wm_name && Some(window) == current_focused_window {
+                // Title changed on the focused window
+                new_window = current_focused_window;
+                should_emit_focus_event = true;
             }
 
-            // ── Gather window data ────────────────────────────────────────────
-            let win = match active_window(&conn, root, net_active_window)? {
-                Some(w) => w,
-                None => continue,
-            };
-            let title = window_name(&conn, win, net_wm_name, utf8_string)?;
-            let proc = process_name(&conn, win, net_wm_pid).unwrap_or_else(|_| "<unknown>".into());
-            let icon = get_icon_data(&conn, win, net_wm_icon)
-                .ok()
-                .and_then(|d| convert_icon_to_base64(&d).ok())
-                .unwrap_or_default();
+            if should_emit_focus_event {
+                // ── Gather window data ────────────────────────────────────────────
+                let win = match new_window {
+                    Some(w) => w,
+                    None => continue,
+                };
+                let title = window_name(&conn, win, net_wm_name, utf8_string)?;
+                let proc =
+                    process_name(&conn, win, net_wm_pid).unwrap_or_else(|_| "<unknown>".into());
+                let icon = get_icon_data(&conn, win, net_wm_icon)
+                    .ok()
+                    .and_then(|d| convert_icon_to_base64(&d).ok())
+                    .unwrap_or_default();
 
-            // ── Invoke user-supplied handler ──────────────────────────────────
-            on_focus(FocusEvent {
-                process: proc,
-                title,
-                icon_base64: icon,
-            })?;
+                // ── Invoke user-supplied handler ──────────────────────────────────
+                on_focus(FocusEvent {
+                    process: proc,
+                    title,
+                    icon_base64: icon,
+                })?;
+            }
         }
+
+        conn.flush()?;
     }
 }
 
