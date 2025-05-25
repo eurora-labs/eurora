@@ -17,7 +17,8 @@
 // pub mod commands;
 
 // pub mod logs;
-// pub mod menu;
+pub mod procedures;
+pub mod shared_types;
 pub mod window;
 pub use window::create as create_window;
 pub use window::create_launcher;

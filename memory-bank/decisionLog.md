@@ -102,3 +102,27 @@ This file tracks key architectural and design decisions made during the project'
 - For Linux: Applied solid background-color: rgba(0, 0, 0, 0.2) without backdrop filter
 - For other platforms: Used transparent background with backdrop-filter: blur(6px)
 - Ensured backward compatibility with existing usage of the component
+
+[2025-05-24 12:41:02] - Migrated frontend from regular Tauri commands to TauRPC procedures
+
+**Decision:** Updated the frontend TypeScript code to use TauRPC instead of direct Tauri invoke calls.
+
+**Rationale:**
+- TauRPC provides fully-typed IPC communication between Rust backend and TypeScript frontend
+- Eliminates the need for manual type definitions and provides compile-time type safety
+- Follows the existing pattern already established in the project with some procedures
+- Improves developer experience with better autocomplete and error checking
+
+**Implementation Details:**
+- Updated `apps/desktop/src/routes/(launcher)/+page.svelte` to use TauRPC proxy
+- Updated `apps/desktop/src/routes/(launcher)/api-key-form.svelte` to use TauRPC proxy
+- Migrated the following function calls to TauRPC:
+  - `check_api_key_exists()` → `taurpc.third_party.check_api_key_exists()`
+  - `save_api_key()` → `taurpc.third_party.save_api_key()`
+  - `initialize_openai_client()` → `taurpc.third_party.initialize_openai_client()`
+  - `resize_launcher_window()` → `taurpc.window.resize_launcher_window()`
+  - `send_query()` → `taurpc.send_query()` (for the main query functionality)
+- Left some functions as fallbacks to regular invoke calls where TauRPC procedures don't exist yet:
+  - `list_activities` (not yet implemented in TauRPC)
+  - `list_conversations` (not yet implemented in TauRPC)
+- Used existing TauRPC bindings generated in `packages/tauri-bindings/src/lib/gen/bindings.ts`
