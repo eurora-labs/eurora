@@ -1857,7 +1857,7 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
  "tonic 0.13.1",
