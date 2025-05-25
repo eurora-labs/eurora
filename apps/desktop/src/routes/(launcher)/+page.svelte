@@ -7,16 +7,25 @@
 	import { onMount } from 'svelte';
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
-	import { executeCommand, type PMCommand } from '$lib/commands.js';
+	import { executeCommand } from '$lib/commands.js';
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
-
+	import { processQuery, type QueryAssets } from '@eurora/prosemirror-tauri-bindings';
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
+	import {
+		createTauRPCProxy,
+		type ResponseChunk,
+		type Query,
+		type ContextChip
+	} from '@eurora/tauri-bindings';
 
 	// Import the Launcher component
 	import { Launcher } from '@eurora/launcher';
 	import { Editor as ProsemirrorEditor, type SveltePMExtension } from '@eurora/prosemirror-core';
 	// Import the extension factory instead of individual extensions
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory';
+
+	// Create TauRPC proxy
+	const taurpc = createTauRPCProxy();
 	// Define a type for Conversation based on what we know from main.rs
 	type ChatMessage = {
 		id: string;
@@ -49,7 +58,8 @@
 	let searchQuery = $state({
 		text: '',
 		extensions: [
-			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A')
+			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A'),
+			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092')
 		] as SveltePMExtension[]
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
@@ -63,6 +73,16 @@
 	let currentConversationId = $state<string | null>(null);
 	const displayAssets = $state<DisplayAsset[]>([]);
 	let backgroundImage = $state<string | null>(null);
+	let currentMonitorName = $state<string>('');
+	let launcherInfo = $state<{
+		monitor_name: string;
+		launcher_x: number;
+		launcher_y: number;
+		launcher_width: number;
+		launcher_height: number;
+		monitor_width: number;
+		monitor_height: number;
+	} | null>(null);
 
 	// Set up event listener for chat responses
 	listen<string>('chat_response', (event) => {
@@ -92,12 +112,10 @@
 			}
 		} else if (event.payload === 'Enter') {
 			// Submit the current input
-			const question = searchQuery.text;
-			if (question.trim().length > 0) {
-				searchQuery.text = '';
-				messages.push({ role: 'user', content: question });
-				askQuestion(question);
-			}
+			searchQuery.text = '';
+			const query = processQuery(editorRef!);
+			messages.push({ role: 'user', content: query.text });
+			askQuestion(query);
 		} else if (event.payload.length === 1 || event.payload === 'Space') {
 			// Handle regular character keys and space
 			const char = event.payload === 'Space' ? ' ' : event.payload;
@@ -115,11 +133,52 @@
 	});
 
 	// Listen for launcher opened event to refresh activities
-	listen('launcher_opened', (event) => {
+	listen<any>('launcher_opened', async (event) => {
 		// Reload activities when launcher is opened
 		loadActivities();
 
-		console.log('Launcher opened: refreshed activities');
+		// Store the launcher information from the event payload
+		launcherInfo = event.payload;
+		currentMonitorName = launcherInfo?.monitor_name || '';
+		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
+
+		// Capture full monitor after launcher is opened to replace the small background
+		try {
+			if (currentMonitorName && launcherInfo) {
+				// Capture the full monitor using the monitor name from the event
+				const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorName);
+
+				// Replace the background image with the full monitor capture
+				// Position it so it appears as if looking through transparent glass
+				if (backdropCustom2Ref && fullMonitorImage) {
+					// Calculate the position offset to align the background properly
+					// The background should be positioned so that the launcher area shows
+					// the same content as if it were transparent
+					const offsetX = -launcherInfo.launcher_x;
+					const offsetY = -launcherInfo.launcher_y;
+
+					backdropCustom2Ref.style.backgroundImage = `url('${fullMonitorImage}')`;
+					// backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
+					backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
+					backdropCustom2Ref.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
+					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+					// backdropCustom2Ref.style.backgroundClip = 'content-box';
+
+					// Update the backgroundImage state
+					backgroundImage = fullMonitorImage;
+
+					console.log(
+						'Full monitor background captured and positioned for monitor:',
+						currentMonitorName,
+						'offset:',
+						offsetX,
+						offsetY
+					);
+				}
+			}
+		} catch (error) {
+			console.error('Failed to capture full monitor background:', error);
+		}
 	});
 
 	// Listen for background image event
@@ -128,7 +187,7 @@
 
 		if (backdropCustom2Ref) {
 			backdropCustom2Ref.style.backgroundImage = `url('${event.payload}')`;
-			backdropCustom2Ref.style.backgroundSize = '150%';
+			backdropCustom2Ref.style.backgroundSize = '100%';
 			backdropCustom2Ref.style.backgroundPosition = 'center';
 			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
 		}
@@ -163,11 +222,16 @@
 	// Function to load activities from the backend
 	async function loadActivities() {
 		try {
-			const result: PMCommand[] = await invoke('list_activities');
+			// Note: list_activities is not yet available in TauRPC, fallback to invoke for now
+			const result: ContextChip[] = await taurpc.context_chip.get();
 			if (!editorRef) return;
 			result.forEach((command) => {
 				executeCommand(editorRef!, command);
 			});
+			const query = processQuery(editorRef);
+			console.log('query', query);
+
+			console.log('state JSON', editorRef.view?.state.toJSON());
 		} catch (error) {
 			console.error('Failed to load activities:', error);
 		}
@@ -176,12 +240,12 @@
 	// Function to check if API key exists
 	async function checkApiKey() {
 		try {
-			const result: boolean = await invoke('check_api_key_exists');
+			const result: boolean = await taurpc.third_party.check_api_key_exists();
 			hasApiKey = result;
 
 			// If API key exists, initialize the OpenAI client
 			if (hasApiKey) {
-				await invoke('initialize_openai_client');
+				await taurpc.third_party.initialize_openai_client();
 			}
 		} catch (error) {
 			console.error('Failed to check API key:', error);
@@ -191,6 +255,7 @@
 	}
 
 	// Load conversations when component is mounted
+	// Note: list_conversations is not yet available in TauRPC, fallback to invoke for now
 	invoke('list_conversations')
 		.then((result) => {
 			conversations.splice(0, conversations.length, ...(result as Conversation[]));
@@ -200,7 +265,8 @@
 			console.error('Failed to load conversations:', error);
 		});
 
-	invoke('resize_launcher_window', { height: 100 }).then(() => {
+	// Use TauRPC for window resize
+	taurpc.window.resize_launcher_window(100, 1.0).then(() => {
 		console.log('Window resized to 100px');
 	});
 
@@ -212,13 +278,14 @@
 		// when typing in the input field
 		// event.preventDefault();
 		if (event.key === 'Enter' && !event.shiftKey) {
-			await invoke('resize_launcher_window', { height: 100 });
+			await taurpc.window.resize_launcher_window(100, 1.0);
 
 			try {
 				const question = searchQuery.text;
 				searchQuery.text = '';
 				messages.push({ role: 'user', content: question });
-				await askQuestion(question);
+				const query = processQuery(editorRef!);
+				await askQuestion(query);
 				// Responses will come through the event listener
 			} catch (error) {
 				console.error('Error:', error);
@@ -234,63 +301,43 @@
 			tr.insert(
 				0,
 				nodes['9370B14D-B61C-4CE2-BDE7-B18684E8731A'].createChecked(
-					{ id: 'video-1', text: 'Some video with attrs' },
+					{ id: 'video-1', name: 'Some video with attrs' },
 					schema.text('video')
 				)
 			);
 			dispatch?.(tr);
 		});
 	}
-	async function askQuestion(question: string): Promise<void> {
+	async function askQuestion(query: QueryAssets): Promise<void> {
+		console.log('askQuestion', query);
 		try {
-			type DownloadEvent =
-				| {
-						event: 'message';
-						data: {
-							message: string;
-						};
-				  }
-				| {
-						event: 'append';
-						data: {
-							chunk: string;
-						};
-				  };
-
-			const onEvent = new Channel<DownloadEvent>();
-			onEvent.onmessage = (message) => {
-				if (message.event == 'message') {
-					messages.push({
-						role: 'system',
-						content: message.data.message
-					});
-				} else {
-					messages.at(-1)!.content += message.data.chunk;
-				}
-				console.log(`got download event ${message.event}`);
+			// Convert QueryAssets to Query type expected by TauRPC
+			const tauRpcQuery: Query = {
+				text: query.text,
+				assets: query.assets
 			};
 
-			// Use the current conversation ID if one is selected and we have existing messages,
-			// otherwise create a new one
-			const conversationId =
-				messages.length > 0 && currentConversationId ? currentConversationId : 'NEW';
-
-			if (conversationId === 'NEW') {
-				await invoke('ask_video_question', { conversationId, question, channel: onEvent });
-			} else {
-				await invoke('continue_conversation', { conversationId, question, channel: onEvent });
-			}
-
-			// If we created a new conversation, refresh the conversation list
-			if (conversationId === 'NEW') {
-				invoke('list_conversations')
-					.then((result) => {
-						conversations.splice(0, conversations.length, ...(result as Conversation[]));
-					})
-					.catch((error) => {
-						console.error('Failed to refresh conversations:', error);
+			const onEvent = (response: ResponseChunk) => {
+				if (response.chunk === '') {
+					// Initial message
+					messages.push({
+						role: 'system',
+						content: ''
 					});
-			}
+				} else {
+					// Append chunk to the last message
+					if (messages.length > 0) {
+						messages.at(-1)!.content += response.chunk;
+					}
+				}
+				console.log(`got response chunk: ${response.chunk}`);
+			};
+
+			// Use TauRPC send_query procedure
+			await taurpc.send_query(onEvent, tauRpcQuery);
+
+			// Note: Conversation management is not yet available in TauRPC,
+			// so we skip the conversation refresh for now
 		} catch (error) {
 			console.error('Failed to get answer:', error);
 			messages.push({
@@ -303,8 +350,8 @@
 	// Handle API key saved event
 	function onApiKeySaved() {
 		hasApiKey = true;
-		// Resize the window after API key is saved
-		invoke('resize_launcher_window', { height: 100 }).catch((error) => {
+		// Resize the window after API key is saved using TauRPC
+		taurpc.window.resize_launcher_window(100, 1.0).catch((error) => {
 			console.error('Failed to resize window:', error);
 		});
 	}
