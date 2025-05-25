@@ -3,45 +3,41 @@
     windows_subsystem = "windows"
 )]
 
-use anyhow::{Context, Result};
-use chrono::Utc;
+use anyhow::Result;
 use eur_client_questions::QuestionsClient;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
-use eur_personal_db::{ChatMessage, Conversation, DatabaseManager};
-use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
-use eur_proto::questions_service::ProtoChatMessage;
-use eur_tauri::{WindowState, create_launcher};
-use eur_timeline::Timeline;
-use eur_vision::{capture_region_rgba, image_to_base64};
+use eur_personal_db::{Conversation, DatabaseManager};
+use eur_tauri::{
+    WindowState, create_launcher,
+    procedures::{
+        context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
+        monitor_procedures::{MonitorApi, MonitorApiImpl},
+        query_procedures::{QueryApi, QueryApiImpl},
+        third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
+        window_procedures::{WindowApi, WindowApiImpl},
+    },
+    shared_types::{SharedOpenAIClient, create_shared_timeline},
+};
+use eur_vision::{capture_focused_region_rgba, image_to_base64};
 use futures::{StreamExt, TryFutureExt};
 // use secret_service::{ApiKeyStatus, SecretService};
-use eur_secret::Sensitive;
 use eur_secret::secret;
-use serde::Serialize;
-use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::ipc::Channel;
 use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Emitter, Wry};
 use tauri::{Manager, generate_context};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-
-use std::sync::atomic::{AtomicBool, Ordering};
-
+use taurpc::Router;
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 
 // mod focus_tracker;
 
 use tracing::{error, info};
-type SharedTimeline = Arc<Timeline>;
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
-type SharedOpenAIClient = Arc<async_mutex::Mutex<Option<eur_openai::OpenAI>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
-type SharedCurrentConversation = Arc<Option<Conversation>>;
-type SharedCurrentConversationId = Arc<String>;
-// type SharedSecretService = Arc<SecretService>;
 
 async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> SharedPersonalDb {
     let db_path = get_db_path(app_handle);
@@ -60,18 +56,9 @@ async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> Shared
 //     Arc::new(async_mutex::Mutex::new(None))
 // }
 
-fn create_shared_current_conversation() -> SharedCurrentConversation {
-    Arc::new(None)
-}
-
 // And replace create_shared_client with this function:
 fn create_shared_client() -> SharedQuestionsClient {
     Arc::new(Mutex::new(None))
-}
-
-fn create_shared_timeline() -> SharedTimeline {
-    // Create a timeline that collects state every 3 seconds and keeps 1 hour of history
-    Arc::new(eur_timeline::create_default_timeline())
 }
 
 fn create_shared_openai_client() -> SharedOpenAIClient {
@@ -87,58 +74,6 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     std::fs::create_dir_all(&base_path).unwrap();
     let db_path = base_path.join("personal_database.sqlite");
     db_path.to_string_lossy().to_string()
-}
-
-#[tauri::command]
-async fn resize_launcher_window(window: tauri::Window, height: u32) -> Result<(), String> {
-    if let Some(launcher) = window.get_window("launcher") {
-        let _ = launcher.set_size(tauri::Size::Logical(tauri::LogicalSize {
-            width: 1024.0,
-            height: height as f64,
-        }));
-    }
-    Ok(())
-}
-
-#[tauri::command]
-async fn check_api_key_exists() -> Result<bool, String> {
-    let key = secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::Global)
-        .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
-
-    let key = key.map(|s| s.0);
-
-    if key.is_none() {
-        return Ok(false);
-    }
-
-    Ok(true)
-}
-
-#[tauri::command]
-async fn save_api_key(api_key: String) -> Result<(), String> {
-    secret::persist(
-        "OPEN_AI_API_KEY",
-        &Sensitive(api_key),
-        secret::Namespace::Global,
-    )
-    .map_err(|e| format!("Failed to save API key: {}", e))?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn initialize_openai_client(app_handle: tauri::AppHandle) -> Result<bool, String> {
-    let api_key = secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::Global)
-        .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
-
-    // Initialize the OpenAI client with the API key
-    let openai_client = eur_openai::OpenAI::with_api_key(&api_key.unwrap().0);
-
-    // Store the client in the app state
-    let state: tauri::State<SharedOpenAIClient> = app_handle.state();
-    let mut guard = state.lock().await;
-    *guard = Some(openai_client);
-
-    Ok(true)
 }
 
 fn main() {
@@ -232,25 +167,7 @@ fn main() {
                     tauri::async_runtime::spawn(async move {
                         let db = create_shared_database_manager(&db_app_handle).await;
                         db_app_handle.manage(db.clone());
-                        // match DatabaseManager::new(&db_path).await {
-                        //     Ok(db_manager) => {
-                        //         db_app_handle
-                        //             .manage(Arc::new(db_manager).clone() as SharedPersonalDb);
-                        //         eprintln!("Database manager initialized successfully");
-                        //     }
-                        //     Err(e) => error!("Failed to initialize database manager: {}", e),
-                        // }
                     });
-                    // let storage_init_handle = conversation_storage.clone();
-                    // tauri::async_runtime::spawn(async move {
-                    //     match ConversationStorage::new(db_path) {
-                    //         Ok(storage) => {
-                    //             storage_init_handle.lock().await.replace(storage);
-                    //             info!("Conversation storage initialized successfully");
-                    //         }
-                    //         Err(e) => error!("Failed to initialize conversation storage: {}", e),
-                    //     }
-                    // });
 
                     // Start timeline collection
                     let timeline_clone = timeline.clone();
@@ -384,25 +301,21 @@ fn main() {
 
             #[cfg(not(target_os = "linux"))]
             let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+            // let typescript_config = specta_typescript::Typescript::default();
+            // typescript_config
+            //     .export_to("../../../bindings.ts", &specta::export())
+            //     .unwrap();
 
+            let router = Router::new()
+                // .export_config(typescript_config)
+                .merge(ThirdPartyApiImpl.into_handler())
+                .merge(MonitorApiImpl.into_handler())
+                .merge(ContextChipApiImpl.into_handler())
+                .merge(WindowApiImpl.into_handler())
+                .merge(QueryApiImpl.into_handler());
             builder
-                .invoke_handler(tauri::generate_handler![
-                    resize_launcher_window,
-                    ask_video_question,
-                    continue_conversation,
-                    check_grpc_server_connection,
-                    list_activities,
-                    get_scale_factor,
-                    resize_window,
-                    get_current_conversation,
-                    switch_conversation,
-                    get_conversation_with_messages,
-                    list_conversations,
-                    check_api_key_exists,
-                    save_api_key,
-                    initialize_openai_client,
-                    send_key_to_launcher, // Keep for potential testing/manual trigger
-                ])
+                .invoke_handler(tauri::generate_handler![list_conversations,])
+                .invoke_handler(router.into_handler())
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
                 .run(|_app_handle, event| {
@@ -444,12 +357,15 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 let mut launcher_y = 0;
                 let mut launcher_width = 1024; // Default width
                 let mut launcher_height = 500; // Default height
+                let mut monitor_name = "".to_string();
+                let mut monitor_width = 1920u32; // Default monitor width
+                let mut monitor_height = 1080u32; // Default monitor height
 
                 // Get cursor position and center launcher on that screen
                 if let Ok(cursor_position) = launcher.cursor_position() {
                     if let Ok(monitors) = launcher.available_monitors() {
                         for monitor in monitors {
-                            monitor.name();
+                            monitor_name = monitor.name().unwrap().to_string();
                             let size = monitor.size();
                             let position = monitor.position();
                             let scale_factor = monitor.scale_factor();
@@ -464,6 +380,10 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                                 && cursor_position.y >= position.y as f64
                                 && cursor_position.y <= (position.y + size.height as i32) as f64
                             {
+                                // Store monitor dimensions
+                                monitor_width = size.width;
+                                monitor_height = size.height;
+
                                 // Center the launcher on this monitor
                                 let window_size = launcher.inner_size().unwrap();
 
@@ -501,7 +421,13 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 }
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
-                match capture_region_rgba(launcher_x, launcher_y, launcher_width, launcher_height) {
+                match capture_focused_region_rgba(
+                    monitor_name.clone(),
+                    launcher_x as u32,
+                    launcher_y as u32,
+                    launcher_width,
+                    launcher_height,
+                ) {
                     Ok(img) => {
                         let t0 = std::time::Instant::now();
                         let img = match cfg!(target_os = "linux") {
@@ -532,19 +458,18 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 launcher.show().expect("Failed to show launcher window");
 
                 // Emit an event to notify that the launcher has been opened
+                // Include positioning information for proper background alignment
+                let launcher_info = serde_json::json!({
+                    "monitor_name": monitor_name.clone(),
+                    "launcher_x": launcher_x,
+                    "launcher_y": launcher_y,
+                    "launcher_width": launcher_width,
+                    "launcher_height": launcher_height,
+                    "monitor_width": monitor_width,
+                    "monitor_height": monitor_height
+                });
                 launcher
-                    .emit(
-                        "launcher_opened",
-                        ContextChip {
-                            extension_id: "9370B14D-B61C-4CE2-BDE7-B18684E8731A".to_string(),
-                            attrs: HashMap::from([(
-                                "text".to_string(),
-                                "video from rust 2".to_string(),
-                            )]),
-                            icon: None,
-                            position: Some(0),
-                        },
-                    )
+                    .emit("launcher_opened", launcher_info)
                     .expect("Failed to emit launcher_opened event");
 
                 launcher
@@ -554,542 +479,9 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
         })
         .build()
 }
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase", tag = "event", content = "data")]
-enum DownloadEvent<'a> {
-    #[serde(rename_all = "camelCase")]
-    Message { message: &'a str },
-    #[serde(rename_all = "camelCase")]
-    Append { chunk: &'a str },
-}
-
-#[tauri::command]
-async fn continue_conversation(
-    app_handle: tauri::AppHandle,
-    conversation_id: String,
-    question: String,
-    channel: Channel<DownloadEvent<'_>>,
-) -> Result<(), String> {
-    eprintln!("Continuing conversation: {}", conversation_id);
-    eprintln!("Asking question: {}", question);
-
-    let db = app_handle.state::<SharedPersonalDb>().clone();
-
-    db.insert_chat_message(
-        &conversation_id,
-        "user",
-        &question,
-        true,
-        Utc::now(),
-        Utc::now(),
-    )
-    .await
-    .unwrap();
-
-    let chat_messages = db
-        .get_chat_messages(&conversation_id)
-        .await
-        .map_err(|e| format!("Failed to get previous messages: {}", e))
-        .unwrap();
-
-    // Get the OpenAI client
-    let state: tauri::State<SharedOpenAIClient> = app_handle.state();
-    let mut guard = state.lock().await;
-    let client = guard
-        .as_mut()
-        .ok_or_else(|| "OpenAI client not initialized".to_string())?;
-
-    let messages = chat_messages
-        .iter()
-        .map(|msg| {
-            let mut role = eur_prompt_kit::Role::System;
-            if msg.role == "user" {
-                role = eur_prompt_kit::Role::User;
-            }
-
-            eur_prompt_kit::LLMMessage {
-                role,
-                content: eur_prompt_kit::MessageContent::Text(eur_prompt_kit::TextContent {
-                    text: msg.content.clone(),
-                }),
-            }
-        })
-        .collect();
-
-    let mut stream = client.video_question(messages).await?;
-    channel
-        .send(DownloadEvent::Message { message: "" })
-        .map_err(|e| format!("Failed to send response: {e}"))?;
-    // Collect the complete response
-    let mut complete_response = String::new();
-
-    while let Some(Ok(chunk)) = stream.next().await {
-        for message in chunk.choices {
-            let Some(message) = message.delta.content else {
-                continue;
-            };
-            // Append to the complete response
-            complete_response.push_str(&message);
-
-            channel
-                .send(DownloadEvent::Append { chunk: &message })
-                .map_err(|e| format!("Failed to send response: {e}"))?;
-        }
-    }
-
-    // After the stream ends, add the complete response as a ChatMessage to the conversation
-    if !complete_response.is_empty() {
-        db.insert_chat_message(
-            &conversation_id,
-            "SYSTEM",
-            &complete_response,
-            true,
-            Utc::now(),
-            Utc::now(),
-        )
-        .await
-        .unwrap();
-        eprintln!(
-            "Added assistant response to conversation {}",
-            conversation_id
-        );
-    }
-
-    Ok(())
-
-    // // Process based on asset type
-    // if asset.asset_type == "youtube" {
-    //     // Deserialize the YouTube state from the asset content
-    //     let youtube_state: ProtoYoutubeState =
-    //         serde_json::from_value(asset.content.get("Youtube").unwrap().clone())
-    //             .map_err(|e| format!("Failed to deserialize YouTube state: {}", e))?;
-
-    //     // Get all messages from the conversation
-    //     let messages: Vec<ProtoChatMessage> = conversation
-    //         .messages
-    //         .iter()
-    //         .map(|msg| ProtoChatMessage {
-    //             role: msg.role.clone(),
-    //             content: msg.content.clone(),
-    //         })
-    //         .collect();
-
-    //     // Collect the complete response
-    //     let mut complete_response = String::new();
-
-    //     // Send the question to the OpenAI API
-    //     let mut stream = client.video_question_old(messages, youtube_state).await?;
-
-    //     channel
-    //         .send(DownloadEvent::Message { message: "" })
-    //         .map_err(|e| format!("Failed to send response: {e}"))?;
-
-    //     while let Some(Ok(chunk)) = stream.next().await {
-    //         for message in chunk.choices {
-    //             let Some(message) = message.delta.content else {
-    //                 continue;
-    //             };
-    //             // Append to the complete response
-    //             complete_response.push_str(&message);
-
-    //             channel
-    //                 .send(DownloadEvent::Append { chunk: &message })
-    //                 .map_err(|e| format!("Failed to send response: {e}"))?;
-    //         }
-    //     }
-
-    //     // After the stream ends, add the complete response as a ChatMessage to the conversation
-    //     if !complete_response.is_empty() {
-    //         // Create a new ChatMessage with the assistant's response
-    //         let chat_message =
-    //             ChatMessage::new(None, "assistant".to_string(), complete_response, true);
-
-    //         // Add the message to the conversation and save it
-    //         let mut updated_conversation = conversation.clone();
-    //         updated_conversation
-    //             .add_message(chat_message)
-    //             .map_err(|e| e.to_string())?;
-    //         storage.save_conversation(&updated_conversation).unwrap();
-
-    //         eprintln!(
-    //             "Added assistant response to conversation {}",
-    //             updated_conversation.id
-    //         );
-    //     }
-
-    //     Ok(())
-    // } else if asset.asset_type == "article" {
-    //     // Deserialize the Article state from the asset content
-    //     let article_state: ProtoArticleState =
-    //         serde_json::from_value(asset.content.get("Article").unwrap().clone())
-    //             .map_err(|e| format!("Failed to deserialize Article state: {}", e))?;
-
-    //     // Get all messages from the conversation
-    //     let messages: Vec<ProtoChatMessage> = conversation
-    //         .messages
-    //         .iter()
-    //         .map(|msg| ProtoChatMessage {
-    //             role: msg.role.clone(),
-    //             content: msg.content.clone(),
-    //         })
-    //         .collect();
-
-    //     // Collect the complete response
-    //     let mut complete_response = String::new();
-
-    //     // Send the question to the OpenAI API
-    //     let mut stream = client.article_question(messages, article_state).await?;
-
-    //     channel
-    //         .send(DownloadEvent::Message { message: "" })
-    //         .map_err(|e| format!("Failed to send response: {e}"))?;
-
-    //     while let Some(Ok(chunk)) = stream.next().await {
-    //         for message in chunk.choices {
-    //             let Some(message) = message.delta.content else {
-    //                 continue;
-    //             };
-    //             // Append to the complete response
-    //             complete_response.push_str(&message);
-
-    //             channel
-    //                 .send(DownloadEvent::Append { chunk: &message })
-    //                 .map_err(|e| format!("Failed to send response: {e}"))?;
-    //         }
-    //     }
-
-    //     // After the stream ends, add the complete response as a ChatMessage to the conversation
-    //     if !complete_response.is_empty() {
-    //         // Create a new ChatMessage with the assistant's response
-    //         let chat_message =
-    //             ChatMessage::new(None, "assistant".to_string(), complete_response, true);
-
-    //         // Add the message to the conversation and save it
-    //         let mut updated_conversation = conversation.clone();
-    //         updated_conversation
-    //             .add_message(chat_message)
-    //             .map_err(|e| e.to_string())?;
-    //         storage.save_conversation(&updated_conversation).unwrap();
-
-    //         eprintln!(
-    //             "Added assistant response to conversation {}",
-    //             updated_conversation.id
-    //         );
-    //     }
-
-    //     Ok(())
-    // } else if asset.asset_type == "pdf" {
-    //     // Deserialize the PDF state from the asset content
-    //     let pdf_state: ProtoPdfState =
-    //         serde_json::from_value(asset.content.get("Pdf").unwrap().clone())
-    //             .map_err(|e| format!("Failed to deserialize PDF state: {}", e))?;
-
-    //     // Get all messages from the conversation
-    //     let messages: Vec<ProtoChatMessage> = conversation
-    //         .messages
-    //         .iter()
-    //         .map(|msg| ProtoChatMessage {
-    //             role: msg.role.clone(),
-    //             content: msg.content.clone(),
-    //         })
-    //         .collect();
-
-    //     // Collect the complete response
-    //     let mut complete_response = String::new();
-
-    //     // Send the question to the OpenAI API
-    //     let mut stream = client.pdf_question(messages, pdf_state).await?;
-
-    //     channel
-    //         .send(DownloadEvent::Message { message: "" })
-    //         .map_err(|e| format!("Failed to send response: {e}"))?;
-
-    //     while let Some(Ok(chunk)) = stream.next().await {
-    //         for message in chunk.choices {
-    //             let Some(message) = message.delta.content else {
-    //                 continue;
-    //             };
-    //             // Append to the complete response
-    //             complete_response.push_str(&message);
-
-    //             channel
-    //                 .send(DownloadEvent::Append { chunk: &message })
-    //                 .map_err(|e| format!("Failed to send response: {e}"))?;
-    //         }
-    //     }
-
-    //     // After the stream ends, add the complete response as a ChatMessage to the conversation
-    //     if !complete_response.is_empty() {
-    //         // Create a new ChatMessage with the assistant's response
-    //         let chat_message =
-    //             ChatMessage::new(None, "assistant".to_string(), complete_response, true);
-
-    //         // Add the message to the conversation and save it
-    //         let mut updated_conversation = conversation.clone();
-    //         updated_conversation
-    //             .add_message(chat_message)
-    //             .map_err(|e| e.to_string())?;
-    //         storage.save_conversation(&updated_conversation).unwrap();
-
-    //         eprintln!(
-    //             "Added assistant response to conversation {}",
-    //             updated_conversation.id
-    //         );
-    //     }
-
-    //     Ok(())
-    // } else {
-    //     Err(format!(
-    //         "Asset type {} not yet implemented",
-    //         asset.asset_type
-    //     ))
-    // }
-}
-
-// Tauri command to ask questions about content (video or article) via gRPC
-#[tauri::command]
-async fn ask_video_question(
-    app_handle: tauri::AppHandle,
-    mut conversation_id: String,
-    question: String,
-    channel: Channel<DownloadEvent<'_>>,
-) -> Result<String, String> {
-    eprintln!("Asking question: {}", question);
-    eprintln!("Conversation ID: {}", conversation_id);
-
-    let db = app_handle.state::<SharedPersonalDb>().clone();
-
-    // Get the timeline from app state
-    let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
-    let timeline = timeline_state.inner();
-
-    let title: String = "Placeholder Title".to_string();
-
-    let mut messages = timeline.construct_asset_messages();
-
-    messages.push(eur_prompt_kit::LLMMessage {
-        role: eur_prompt_kit::Role::User,
-        content: eur_prompt_kit::MessageContent::Text(eur_prompt_kit::TextContent {
-            text: question.clone(),
-        }),
-    });
-
-    // let mut old_messages: Vec<ProtoChatMessage> = messages
-    //     .iter()
-    //     .map(|msg| {
-    //         let role = match msg.role {
-    //             eur_prompt_kit::Role::User => "USER".to_string(),
-    //             eur_prompt_kit::Role::Assistant => "SYSTEM".to_string(),
-    //             _ => "SYSTEM".to_string(),
-    //         };
-    //         return ProtoChatMessage {
-    //             role,
-    //             content: msg.content.into().te,
-    //         };
-    //     })
-    //     .collect();
-
-    let state: tauri::State<SharedOpenAIClient> = app_handle.state();
-    let mut guard = state.lock().await;
-    let client = guard
-        .as_mut()
-        .ok_or_else(|| "OpenAI client not initialized".to_string())?;
-
-    if conversation_id == "NEW" {
-        // Create new conversation and store it in SQLite
-        eprintln!("Creating new conversation with title: {}", title);
-
-        let conversation = db
-            .insert_conversation(&title, Utc::now(), Utc::now())
-            .await
-            .map_err(|e| format!("Failed to insert conversation: {}", e))?;
-
-        conversation_id = conversation.id.clone();
-
-        eprintln!("New conversation ID: {}", conversation_id);
-
-        db.insert_chat_message(
-            &conversation_id,
-            "USER",
-            &question,
-            true,
-            Utc::now(),
-            Utc::now(),
-        )
-        .await
-        .map_err(|e| format!("Failed to insert chat message: {}", e))?;
-    }
-
-    let mut complete_response = String::new();
-
-    let mut stream = client.video_question(messages).await?;
-
-    channel
-        .send(DownloadEvent::Message { message: "" })
-        .map_err(|e| format!("Failed to send response: {e}"))?;
-
-    while let Some(Ok(chunk)) = stream.next().await {
-        for message in chunk.choices {
-            let Some(message) = message.delta.content else {
-                continue;
-            };
-            // Append to the complete response
-            complete_response.push_str(&message);
-
-            channel
-                .send(DownloadEvent::Append { chunk: &message })
-                .map_err(|e| format!("Failed to send response: {e}"))?;
-        }
-    }
-
-    // After the stream ends, add the complete response as a ChatMessage to the conversation
-    if !complete_response.is_empty() {
-        db.insert_chat_message(
-            &conversation_id,
-            "SYSTEM",
-            &complete_response,
-            true,
-            Utc::now(),
-            Utc::now(),
-        )
-        .await
-        .map_err(|e| format!("Failed to insert chat message: {}", e))?;
-        eprintln!(
-            "Added assistant response to conversation {}",
-            conversation_id
-        );
-    }
-
-    Ok("test".into())
-}
-
-#[tauri::command]
-async fn get_current_conversation(app_handle: tauri::AppHandle) -> Result<Conversation, String> {
-    let db = app_handle.state::<SharedPersonalDb>().clone();
-    let current_conversation_id = app_handle.state::<SharedCurrentConversationId>().clone();
-    Ok(db.get_conversation(&current_conversation_id).await.unwrap())
-}
-
-// remember to call `.manage(MyState::default())`
-#[tauri::command]
-async fn get_conversation_with_messages(
-    app_handle: tauri::AppHandle,
-    conversation_id: String,
-) -> Result<(Conversation, Vec<ChatMessage>), String> {
-    let db = app_handle.state::<SharedPersonalDb>().clone();
-    let conversation = db
-        .get_conversation_with_messages(&conversation_id)
-        .await
-        .unwrap();
-
-    Ok(conversation)
-}
-
-#[tauri::command]
-async fn switch_conversation(
-    app_handle: tauri::AppHandle,
-    conversation_id: String,
-) -> Result<(), String> {
-    Ok(())
-}
-
 #[tauri::command]
 async fn list_conversations(app_handle: tauri::AppHandle) -> Result<Vec<Conversation>, String> {
     let db = app_handle.state::<SharedPersonalDb>().clone();
     let conversations = db.list_conversations().await.unwrap();
     Ok(conversations)
-    // Ok(vec![])
-    // let storage_state: tauri::State<SharedConversationStorage> = app_handle.state();
-    // let storage_guard = storage_state.lock().await;
-    // let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
-
-    // storage.list_conversations().map_err(|e| e.to_string())
-}
-
-// Command to manually send a key event to the launcher
-#[tauri::command]
-async fn send_key_to_launcher(app_handle: tauri::AppHandle, key: String) -> Result<(), String> {
-    if let Some(launcher) = app_handle.get_window("launcher") {
-        launcher
-            .emit("key_event", key)
-            .map_err(|e| format!("Failed to send key event: {}", e))?;
-    }
-    Ok(())
-}
-
-// Add this new command to check server status
-#[tauri::command]
-async fn check_grpc_server_connection(server_address: Option<String>) -> Result<String, String> {
-    let address = server_address.unwrap_or_else(|| "0.0.0.0:50051".to_string());
-
-    eprintln!("Checking connection to gRPC server: {}", address);
-
-    // Try to establish a basic TCP connection to check if the server is listening
-    match tokio::net::TcpStream::connect(address.replace("http://", "").replace("https://", ""))
-        .await
-    {
-        Ok(_) => {
-            eprintln!("TCP connection successful");
-            Ok("Server is reachable".to_string())
-        }
-        Err(e) => {
-            let error_msg = format!("Failed to connect to server: {}", e);
-            eprintln!("{}", error_msg);
-            Err(error_msg)
-        }
-    }
-}
-
-use eur_activity::{ContextChip, DisplayAsset};
-#[tauri::command]
-async fn list_activities(app_handle: tauri::AppHandle) -> Result<Vec<ContextChip>, String> {
-    let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
-    let timeline = timeline_state.inner();
-
-    // Get all activities from the timeline
-    // let mut activities = timeline.get_activities();
-    let activities = timeline.get_context_chips();
-
-    // Sort activities by start time (most recent first)
-    // activities.sort_by(|a, b| b.start.cmp(&a.start));
-
-    // Limit to the 5 most recent activities to avoid cluttering the UI
-    let limited_activities = activities.into_iter().take(5).collect();
-
-    Ok(limited_activities)
-}
-
-#[tauri::command]
-async fn get_scale_factor(app_handle: tauri::AppHandle, height: f64) -> Result<f64, String> {
-    let window = app_handle.get_window("launcher").unwrap();
-    let current_size = window.inner_size().unwrap();
-    // let scale_factor = height / current_size.height as f64;
-    let scale_factor = (current_size.height as f64) / (height);
-    // let scale_factor = 1.0;
-    eprintln!("Scale factor: {}", scale_factor);
-    eprintln!("window scale factor: {}", window.scale_factor().unwrap());
-    eprintln!("Current height: {}", current_size.height);
-    eprintln!("Webview height: {}", height);
-    Ok(scale_factor)
-}
-
-#[tauri::command]
-async fn resize_window(
-    app_handle: tauri::AppHandle,
-    height: f64,
-    scale_factor: f64,
-) -> Result<(), String> {
-    let window = app_handle.get_window("launcher").unwrap();
-    let current_size = window.outer_size().unwrap();
-    let new_height = height * scale_factor;
-    eprintln!("New height: {}", new_height);
-    eprintln!("Current height: {}", current_size.height);
-    eprintln!("Scale factor: {}", scale_factor);
-    let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
-        width: current_size.width,
-        // height: new_height as u32 + 72,
-        height: new_height as u32,
-    }));
-    Ok(())
 }

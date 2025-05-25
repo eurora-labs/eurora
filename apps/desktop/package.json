@@ -23,6 +23,7 @@
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/prosemirror-factory": "workspace:*",
 		"@eurora/proto": "workspace:*",
+		"@eurora/tauri-bindings": "workspace:*",
 		"@eurora/ui": "workspace:*"
 	},
 	"devDependencies": {
@@ -32,6 +33,7 @@
 		"@eurora/ext-video": "workspace:*",
 		"@eurora/ext-transcript": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
+		"@eurora/prosemirror-tauri-bindings": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"uuid": "^11.1.0",
 		"@playwright/test": "^1.52.0",
