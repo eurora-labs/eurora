@@ -75,7 +75,6 @@ function sendMessageToNativeHost(payload: any, tabId?: number) {
 	try {
 		// Forward the payload directly as it should already be in protocol format
 		// The payload comes from content scripts that construct proper protocol messages
-		console.log('Sending message to native host:', payload);
 		nativePort!.postMessage(payload);
 
 		return { status: 'sent' };
@@ -165,19 +164,13 @@ async function handleGenerateSnapshot() {
 			chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_SNAPSHOT' }, (response) => {
 				if (chrome.runtime.lastError) {
 					reject({ error: chrome.runtime.lastError });
-				} else if (response && response.error) {
+				} else if (response?.error) {
 					reject({ error: response.error });
 				} else {
 					resolve(response);
 				}
 			})
 		);
-
-		if (response && response.error) {
-			throw new Error(response.error || 'Unknown error');
-		}
-		console.log('Active tab', activeTab);
-		console.log('Snapshot response', response);
 
 		return { success: true, ...response };
 	} catch (error) {
@@ -212,19 +205,13 @@ async function handleGenerateReport() {
 			chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' }, (response) => {
 				if (chrome.runtime.lastError) {
 					reject({ error: chrome.runtime.lastError });
-				} else if (response && response.error) {
+				} else if (response?.error) {
 					reject({ error: response.error });
 				} else {
 					resolve(response);
 				}
 			})
 		);
-
-		if (response && response.error) {
-			throw new Error(response.error || 'Unknown error');
-		}
-		console.log('Active tab', activeTab);
-		console.log('Response', response);
 
 		return { success: true, ...response };
 	} catch (error) {
