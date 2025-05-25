@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use base64::prelude::*;
 pub use eur_proto::ipc::ProtoYoutubeSnapshot;
 pub use eur_proto::native_messaging::ProtoNativeYoutubeSnapshot;
@@ -28,13 +29,24 @@ impl From<&serde_json::Map<String, serde_json::Value>> for NativeYoutubeSnapshot
     }
 }
 
-impl From<&NativeYoutubeSnapshot> for YoutubeSnapshot {
-    fn from(obj: &NativeYoutubeSnapshot) -> Self {
+impl TryFrom<&NativeYoutubeSnapshot> for YoutubeSnapshot {
+    type Error = anyhow::Error;
+
+    fn try_from(obj: &NativeYoutubeSnapshot) -> Result<Self> {
         let video_frame_data = BASE64_STANDARD
             .decode(obj.0.video_frame_base64.as_str())
-            .unwrap();
+            .with_context(|| {
+                format!(
+                    "Failed to decode base64 video frame data in snapshot: '{}'",
+                    obj.0
+                        .video_frame_base64
+                        .chars()
+                        .take(50)
+                        .collect::<String>()
+                )
+            })?;
 
-        YoutubeSnapshot(ProtoYoutubeSnapshot {
+        Ok(YoutubeSnapshot(ProtoYoutubeSnapshot {
             current_time: obj.0.current_time,
             video_frame: Some(ProtoImage {
                 data: video_frame_data,
@@ -42,6 +54,6 @@ impl From<&NativeYoutubeSnapshot> for YoutubeSnapshot {
                 height: obj.0.video_frame_height,
                 format: obj.0.video_frame_format,
             }),
-        })
+        }))
     }
 }

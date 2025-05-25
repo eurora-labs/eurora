@@ -73,18 +73,9 @@ function sendMessageToNativeHost(payload: any, tabId?: number) {
 	console.log('Sending message to native host:', payload);
 	console.log('Native port:', nativePort);
 	try {
-		// Format the message according to the native messaging protocol
-		const nativeMessage = {
-			type: 'TRANSCRIPT',
-			videoId: payload.videoId || 'unknown',
-			transcript:
-				typeof payload.transcript === 'string'
-					? payload.transcript
-					: JSON.stringify(payload.transcript)
-		};
-
-		console.log('Sending message to native host:', nativeMessage);
-		nativePort!.postMessage(nativeMessage);
+		// Forward the payload directly as it should already be in protocol format
+		// The payload comes from content scripts that construct proper protocol messages
+		nativePort!.postMessage(payload);
 
 		return { status: 'sent' };
 	} catch (error) {
@@ -155,7 +146,41 @@ console.log('Native messaging service worker registered');
 
 import { getCurrentTab } from '../utils/tabs.js';
 
-async function handleGenerateSnapshot() {}
+async function handleGenerateSnapshot() {
+	try {
+		// Get the current active tab
+		const activeTab = await getCurrentTab();
+
+		if (!activeTab || !activeTab.url) {
+			return { success: false, error: 'No active tab found' };
+		}
+
+		type Response = {
+			error?: string;
+			[key: string]: any;
+		};
+
+		const response: Response = await new Promise((resolve, reject) =>
+			chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_SNAPSHOT' }, (response) => {
+				if (chrome.runtime.lastError) {
+					reject({ error: chrome.runtime.lastError });
+				} else if (response?.error) {
+					reject({ error: response.error });
+				} else {
+					resolve(response);
+				}
+			})
+		);
+
+		return { success: true, ...response };
+	} catch (error) {
+		console.error('Error generating snapshot:', error);
+		return {
+			success: false,
+			error: String(error)
+		};
+	}
+}
 
 /**
  * Handles the GENERATE_REPORT message by getting the current active tab,
@@ -180,19 +205,13 @@ async function handleGenerateReport() {
 			chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' }, (response) => {
 				if (chrome.runtime.lastError) {
 					reject({ error: chrome.runtime.lastError });
-				} else if (response && response.error) {
+				} else if (response?.error) {
 					reject({ error: response.error });
 				} else {
 					resolve(response);
 				}
 			})
 		);
-
-		if (response && response.error) {
-			throw new Error(response.error || 'Unknown error');
-		}
-		console.log('Active tab', activeTab);
-		console.log('Response', response);
 
 		return { success: true, ...response };
 	} catch (error) {
