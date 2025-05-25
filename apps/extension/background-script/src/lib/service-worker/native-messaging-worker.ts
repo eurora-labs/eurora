@@ -73,18 +73,10 @@ function sendMessageToNativeHost(payload: any, tabId?: number) {
 	console.log('Sending message to native host:', payload);
 	console.log('Native port:', nativePort);
 	try {
-		// Format the message according to the native messaging protocol
-		const nativeMessage = {
-			type: 'TRANSCRIPT',
-			videoId: payload.videoId || 'unknown',
-			transcript:
-				typeof payload.transcript === 'string'
-					? payload.transcript
-					: JSON.stringify(payload.transcript)
-		};
-
-		console.log('Sending message to native host:', nativeMessage);
-		nativePort!.postMessage(nativeMessage);
+		// Forward the payload directly as it should already be in protocol format
+		// The payload comes from content scripts that construct proper protocol messages
+		console.log('Sending message to native host:', payload);
+		nativePort!.postMessage(payload);
 
 		return { status: 'sent' };
 	} catch (error) {
