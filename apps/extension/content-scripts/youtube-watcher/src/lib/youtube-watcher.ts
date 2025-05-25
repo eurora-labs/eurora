@@ -136,8 +136,23 @@ interface EurImage extends Partial<ProtoImage> {
 					response(reportData);
 				}
 			} catch (error) {
-				console.error('Error generating YouTube report:', error);
-				response({ success: false, error: error.message || 'Unknown error' });
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				const contextualError = `Failed to generate YouTube assets for ${window.location.href}: ${errorMessage}`;
+				console.error('Error generating YouTube report:', {
+					url: window.location.href,
+					videoId: videoId,
+					error: errorMessage,
+					stack: error instanceof Error ? error.stack : undefined
+				});
+				response({
+					success: false,
+					error: contextualError,
+					context: {
+						url: window.location.href,
+						videoId: videoId,
+						timestamp: new Date().toISOString()
+					}
+				});
 			}
 
 			return true; // Important: indicates we'll send response asynchronously
