@@ -58,3 +58,5 @@ This file tracks the project's progress using a task list format.
 [2025-05-25 12:42:00] - Completed comprehensive analysis of eur-activity crate and created detailed documentation including critical issues analysis, architecture overview, implementation roadmap, and testing strategy
 
 [2025-05-25 12:55:50] - Successfully completed Phase 1 implementation of eur-activity crate fixes
+
+[2025-05-25 14:33:00] - Fixed Linux focus tracker to detect Chrome tab switches like macOS implementation
