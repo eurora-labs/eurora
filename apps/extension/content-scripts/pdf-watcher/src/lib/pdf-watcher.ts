@@ -13,7 +13,7 @@ interface PdfState extends Partial<ProtoPdfState> {
 		const { type } = obj;
 
 		switch (type) {
-			case 'GENERATE_PDF_REPORT':
+			case 'GENERATE_ASSETS':
 				console.log('Generating PDF report for URL:', window.location.href);
 
 				getPdfState().then((pdfState) => {
