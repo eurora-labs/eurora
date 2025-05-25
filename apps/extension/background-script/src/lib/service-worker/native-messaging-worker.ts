@@ -155,7 +155,47 @@ console.log('Native messaging service worker registered');
 
 import { getCurrentTab } from '../utils/tabs.js';
 
-async function handleGenerateSnapshot() {}
+async function handleGenerateSnapshot() {
+	try {
+		// Get the current active tab
+		const activeTab = await getCurrentTab();
+
+		if (!activeTab || !activeTab.url) {
+			return { success: false, error: 'No active tab found' };
+		}
+
+		type Response = {
+			error?: string;
+			[key: string]: any;
+		};
+
+		const response: Response = await new Promise((resolve, reject) =>
+			chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_SNAPSHOT' }, (response) => {
+				if (chrome.runtime.lastError) {
+					reject({ error: chrome.runtime.lastError });
+				} else if (response && response.error) {
+					reject({ error: response.error });
+				} else {
+					resolve(response);
+				}
+			})
+		);
+
+		if (response && response.error) {
+			throw new Error(response.error || 'Unknown error');
+		}
+		console.log('Active tab', activeTab);
+		console.log('Snapshot response', response);
+
+		return { success: true, ...response };
+	} catch (error) {
+		console.error('Error generating snapshot:', error);
+		return {
+			success: false,
+			error: String(error)
+		};
+	}
+}
 
 /**
  * Handles the GENERATE_REPORT message by getting the current active tab,
