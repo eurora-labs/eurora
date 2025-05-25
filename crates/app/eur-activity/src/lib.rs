@@ -14,9 +14,11 @@ use eur_prompt_kit::LLMMessage;
 use serde::{Deserialize, Serialize};
 pub mod browser_activity;
 pub mod default_activity;
+pub mod error;
 use anyhow::{Context, Result};
 pub use browser_activity::BrowserStrategy;
 use default_activity::DefaultStrategy;
+pub use error::ActivityError;
 
 #[taurpc::ipc_type]
 pub struct ContextChip {
@@ -148,7 +150,7 @@ pub async fn select_strategy_for_process(
             "Creating BrowserStrategy for browser process: {}",
             process_name
         );
-        let strategy = BrowserStrategy::new(process_name.to_string(), display_name, icon)
+        let strategy = BrowserStrategy::new(display_name, icon, process_name.to_string())
             .await
             .context(format!(
                 "Failed to create browser strategy for process: {}",
@@ -198,4 +200,104 @@ pub trait ActivityStrategy: Send + Sync {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_activity_creation() {
+        let activity = Activity::new(
+            "Test Activity".to_string(),
+            "test_icon".to_string(),
+            "test_process".to_string(),
+            vec![],
+        );
+
+        assert_eq!(activity.name, "Test Activity");
+        assert_eq!(activity.icon, "test_icon");
+        assert_eq!(activity.process_name, "test_process");
+        assert!(activity.end.is_none());
+        assert!(activity.assets.is_empty());
+        assert!(activity.snapshots.is_empty());
+    }
+
+    #[test]
+    fn test_activity_display_assets() {
+        let activity = Activity::new(
+            "Test Activity".to_string(),
+            "default_icon".to_string(),
+            "test_process".to_string(),
+            vec![],
+        );
+
+        let display_assets = activity.get_display_assets();
+        assert!(display_assets.is_empty());
+    }
+
+    #[test]
+    fn test_activity_context_chips() {
+        let activity = Activity::new(
+            "Test Activity".to_string(),
+            "default_icon".to_string(),
+            "test_process".to_string(),
+            vec![],
+        );
+
+        let context_chips = activity.get_context_chips();
+        assert!(context_chips.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_select_strategy_for_process_browser() {
+        let result = select_strategy_for_process(
+            "firefox",
+            "Firefox Browser".to_string(),
+            "icon_data".to_string(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let strategy = result.unwrap();
+        assert_eq!(strategy.get_name(), "Firefox Browser");
+        assert_eq!(strategy.get_process_name(), "firefox");
+    }
+
+    #[tokio::test]
+    async fn test_select_strategy_for_process_default() {
+        let result = select_strategy_for_process(
+            "unknown_process",
+            "Unknown App".to_string(),
+            "icon_data".to_string(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let strategy = result.unwrap();
+        assert_eq!(strategy.get_name(), "Unknown App");
+        assert_eq!(strategy.get_process_name(), "unknown_process");
+    }
+
+    #[test]
+    fn test_display_asset_creation() {
+        let asset = DisplayAsset::new("Test Asset".to_string(), "base64_icon_data".to_string());
+
+        assert_eq!(asset.name, "Test Asset");
+        assert_eq!(asset.icon, "base64_icon_data");
+    }
+
+    #[test]
+    fn test_context_chip_creation() {
+        let chip = ContextChip {
+            id: "test_id".to_string(),
+            extension_id: "ext_id".to_string(),
+            name: "Test Chip".to_string(),
+            attrs: std::collections::HashMap::new(),
+            icon: Some("icon_data".to_string()),
+            position: Some(1),
+        };
+
+        assert_eq!(chip.id, "test_id");
+        assert_eq!(chip.extension_id, "ext_id");
+        assert_eq!(chip.name, "Test Chip");
+        assert_eq!(chip.position, Some(1));
+    }
+}
