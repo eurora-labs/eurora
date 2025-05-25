@@ -13,10 +13,24 @@ impl JSONToProtoAssetConverter {
 
         eprintln!("JSONToProtoConverter::convert json: {:?}", json);
 
-        // If success is false, return an error
-        if !json.get("success").unwrap().as_bool().unwrap() {
-            eprintln!("Failed to convert JSON to Proto, response: {:?}", json);
-            return Err(anyhow::anyhow!("Failed to convert JSON to Proto"));
+        // Check for success field and provide detailed error context
+        let success = json
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .ok_or_else(|| {
+                anyhow::anyhow!("Missing or invalid 'success' field in JSON response")
+            })?;
+
+        if !success {
+            let error_msg = json
+                .get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown error");
+            eprintln!(
+                "Asset conversion failed - success: false, error: {}, full response: {:?}",
+                error_msg, json
+            );
+            return Err(anyhow::anyhow!("Asset conversion failed: {}", error_msg));
         }
 
         match json
@@ -27,7 +41,8 @@ impl JSONToProtoAssetConverter {
         {
             "YOUTUBE_STATE" => {
                 let native_state = NativeYoutubeState::from(&json);
-                let proto_state = YoutubeState::from(&native_state);
+                let proto_state = YoutubeState::try_from(&native_state)
+                    .map_err(|e| anyhow::anyhow!("Failed to convert YouTube state: {}", e))?;
                 let state = eur_proto::ipc::state_response::State::Youtube(proto_state.0);
                 Ok(StateResponse { state: Some(state) })
             }
@@ -44,7 +59,13 @@ impl JSONToProtoAssetConverter {
                 let state = eur_proto::ipc::state_response::State::Pdf(proto_state.0);
                 Ok(StateResponse { state: Some(state) })
             }
-            _ => Err(anyhow::anyhow!("Unsupported type")),
+            unknown_type => {
+                eprintln!(
+                    "Unsupported asset type '{}' in JSON: {:?}",
+                    unknown_type, json
+                );
+                Err(anyhow::anyhow!("Unsupported asset type: '{}'. Supported types: YOUTUBE_STATE, ARTICLE_ASSET, PDF_STATE", unknown_type))
+            }
         }
     }
 }
