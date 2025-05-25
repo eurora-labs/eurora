@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use base64::prelude::*;
 pub use eur_proto::ipc::{
     ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState,
@@ -51,18 +52,29 @@ impl From<&serde_json::Map<String, serde_json::Value>> for NativeYoutubeState {
     }
 }
 
-impl From<&NativeYoutubeState> for YoutubeState {
-    fn from(obj: &NativeYoutubeState) -> Self {
+impl TryFrom<&NativeYoutubeState> for YoutubeState {
+    type Error = anyhow::Error;
+
+    fn try_from(obj: &NativeYoutubeState) -> Result<Self> {
         let video_frame_data = BASE64_STANDARD
             .decode(obj.0.video_frame_base64.as_str())
-            .unwrap();
+            .with_context(|| {
+                format!(
+                    "Failed to decode base64 video frame data: '{}'",
+                    obj.0
+                        .video_frame_base64
+                        .chars()
+                        .take(50)
+                        .collect::<String>()
+                )
+            })?;
 
         // Parse the transcript string into Vec<TranscriptLine> and convert to Vec<ProtoTranscriptLine>
         let transcript = serde_json::from_str::<Vec<TranscriptLine>>(obj.0.transcript.as_str())
             .map(|lines| lines.into_iter().map(Into::into).collect())
             .unwrap_or_else(|_| Vec::new());
 
-        YoutubeState(ProtoYoutubeState {
+        Ok(YoutubeState(ProtoYoutubeState {
             url: obj.0.url.clone(),
             title: obj.0.title.clone(),
             transcript,
@@ -73,7 +85,7 @@ impl From<&NativeYoutubeState> for YoutubeState {
                 height: obj.0.video_frame_height,
                 format: obj.0.video_frame_format,
             }),
-        })
+        }))
     }
 }
 
