@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { Button, Input } from '@eurora/ui';
 	import { invoke } from '@tauri-apps/api/core';
+	import { createTauRPCProxy } from '@eurora/tauri-bindings';
 	import { onMount } from 'svelte';
+
+	// Create TauRPC proxy
+	const taurpc = createTauRPCProxy();
 
 	// State variables
 	let apiKey = $state('');
@@ -14,8 +18,8 @@
 	// Check if API key exists on mount
 	onMount(async () => {
 		try {
-			const result: { has_key: boolean } = await invoke('check_api_key_exists');
-			hasApiKey = result.has_key;
+			const result = await taurpc.third_party.check_api_key_exists();
+			hasApiKey = result;
 		} catch (err) {
 			console.error('Failed to check API key:', err);
 			error = 'Failed to check if API key exists';
@@ -33,11 +37,11 @@
 		error = null;
 
 		try {
-			// Save the API key to the keyring
-			await invoke('save_api_key', { apiKey });
+			// Save the API key to the keyring using TauRPC
+			await taurpc.third_party.save_api_key(apiKey);
 
-			// Initialize the OpenAI client with the new key
-			await invoke('initialize_openai_client');
+			// Initialize the OpenAI client with the new key using TauRPC
+			await taurpc.third_party.initialize_openai_client();
 
 			// Update state and notify parent
 			hasApiKey = true;
@@ -55,8 +59,8 @@
 	<div class="mb-4">
 		<h2 class="mb-2 text-xl font-bold">Welcome to Eurora</h2>
 		<p class="text-gray-600">
-			Please enter your OpenAI API key to get started. Your key will be stored securely in your
-			system's keyring.
+			Please enter your OpenAI API key to get started. Your key will be stored securely in
+			your system's keyring.
 		</p>
 	</div>
 
@@ -68,7 +72,8 @@
 					<p class="text-sm text-red-500">{error}</p>
 				{/if}
 				<p class="text-xs text-gray-500">
-					Your API key is stored securely and is only used to communicate with OpenAI's services.
+					Your API key is stored securely and is only used to communicate with OpenAI's
+					services.
 				</p>
 			</div>
 		</form>

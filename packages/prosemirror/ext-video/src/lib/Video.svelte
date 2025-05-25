@@ -12,6 +12,7 @@
 		id?: string;
 		transcript?: string;
 		text?: string;
+		name?: string;
 		currentFrame?: Frame;
 	}
 
@@ -19,6 +20,7 @@
 		id: undefined,
 		transcript: undefined,
 		text: undefined,
+		name: undefined,
 		currentFrame: undefined
 	};
 
@@ -41,7 +43,8 @@
 					if (dom instanceof HTMLElement) {
 						return {
 							id: dom.getAttribute('id'),
-							text: dom.getAttribute('data-text')
+							text: dom.getAttribute('data-text'),
+							name: dom.getAttribute('data-name')
 						};
 					}
 					return null;
@@ -65,7 +68,7 @@
 
 	let { ref, attrs }: Props = $props();
 
-	export { ref, attrs };
+	export { ref, attrs, videoAttrs, videoSchema };
 
 	function handleClick(event: MouseEvent) {
 		alert('some longer script');
@@ -83,7 +86,7 @@
 
 <Popover.Root>
 	<Popover.Trigger>
-		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.text}</ContextChip>
+		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.name}</ContextChip>
 	</Popover.Trigger>
 	<Popover.Content class="w-80">
 		<div class="grid gap-4">
