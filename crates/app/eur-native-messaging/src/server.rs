@@ -1,13 +1,13 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::io::{self, Read, Write};
 use std::sync::Arc;
 
 use eur_proto::ipc::{SnapshotResponse, StateRequest, StateResponse};
 use std::{error::Error, io::ErrorKind, pin::Pin};
 use tokio::sync::{mpsc, oneshot};
-use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
+use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};
 
 use crate::asset_converter::JSONToProtoAssetConverter;
@@ -89,23 +89,19 @@ impl TauriIpcServer {
                         }
                     };
 
-                    // Write to stdout and read response from stdin
+                    // Use single mutex to prevent deadlock - acquire both stdin and stdout atomically
                     let stdout_guard = stdout_mutex.lock().await;
                     let stdin_guard = stdin_mutex.lock().await;
 
-                    if let Err(e) = write_message(&*stdout_guard, &message_value) {
-                        let _ = response_sender.send(Err(anyhow!("Write error: {}", e)));
-                        continue;
-                    }
+                    // Perform write and read as atomic operation
+                    let result = async {
+                        write_message(&*stdout_guard, &message_value)
+                            .map_err(|e| anyhow!("Write error: {}", e))?;
+                        read_message(&*stdin_guard)
+                            .map_err(|e| anyhow!("Read error: {}", e))
+                    }.await;
 
-                    match read_message(&*stdin_guard) {
-                        Ok(response) => {
-                            let _ = response_sender.send(Ok(response));
-                        },
-                        Err(e) => {
-                            let _ = response_sender.send(Err(anyhow!("Read error: {}", e)));
-                        }
-                    }
+                    let _ = response_sender.send(result);
                 },
                 Some(native_message) = native_rx.recv() => {
                     // Process incoming native messages (if any)
