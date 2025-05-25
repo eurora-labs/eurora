@@ -191,3 +191,23 @@ This file tracks key architectural and design decisions made during the project'
 - Task 5: Skipped documentation comments per user preference to keep code clean
 - Fixed critical bug in select_strategy_for_process parameter ordering
 - All tests now pass without warnings
+
+[2025-05-25 14:33:00] - Fixed Linux focus tracker to detect Chrome tab switches
+
+**Decision:** Modified the Linux X11 focus tracker to monitor window title changes in addition to active window changes.
+
+**Rationale:**
+
+- The macOS implementation reports focus events for both window switches AND tab switches in Chrome
+- The Linux implementation only reported focus events for window switches, missing Chrome tab switches
+- This inconsistency meant the timeline tracking behaved differently across platforms
+- Chrome tab switches change the window title but not the active window in X11
+
+**Implementation Details:**
+
+- Added tracking of the currently focused window (`current_focused_window`)
+- Modified event handling to listen for both `_NET_ACTIVE_WINDOW` and `_NET_WM_NAME` property changes
+- When active window changes: stop monitoring old window, start monitoring new window for title changes
+- When title changes on focused window: emit focus event with updated title
+- Maintains the same event-driven approach while capturing title changes within the same window
+- Added proper cleanup of event monitoring when windows change focus
