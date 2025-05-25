@@ -20,7 +20,7 @@ base64 = { workspace = true }
 ctrlc = "3.4.6"
 h2 = "0.4.8"
 sentry = { workspace = true }
-thiserror = "1.0"
+thiserror = "2.0.12"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
