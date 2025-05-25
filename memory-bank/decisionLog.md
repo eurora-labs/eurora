@@ -169,3 +169,25 @@ This file tracks key architectural and design decisions made during the project'
 - Clarified that extension IDs will remain hardcoded for architectural reasons
 - Updated roadmap to include asset type registry and processing pipeline documentation
 - Modified README to reflect corrected understanding of design decisions
+
+[2025-05-25 12:55:55] - Completed Phase 1 implementation of eur-activity crate critical fixes
+
+**Decision:** Successfully implemented all Phase 1 critical fixes for the eur-activity crate as planned.
+
+**Rationale:**
+
+- Eliminated all runtime panics by implementing missing TODO methods
+- Added proper error handling with custom ActivityError types
+- Implemented comprehensive timestamp tracking for snapshots
+- Added basic unit test coverage (15 tests passing)
+- Fixed parameter ordering bug in strategy selection
+
+**Implementation Details:**
+
+- Task 1: Added timestamp fields to ArticleSnapshot and YoutubeSnapshot structs with proper constructors
+- Task 2: Implemented gather_state() method returning JSON representation of browser activity state
+- Task 3: Created custom ActivityError enum with proper From implementations and safe image loading helper
+- Task 4: Added 15 unit tests covering core functionality, strategy selection, and error handling
+- Task 5: Skipped documentation comments per user preference to keep code clean
+- Fixed critical bug in select_strategy_for_process parameter ordering
+- All tests now pass without warnings
