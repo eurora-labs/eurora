@@ -16,11 +16,28 @@ interface PdfState extends Partial<ProtoPdfState> {
 			case 'GENERATE_ASSETS':
 				console.log('Generating PDF report for URL:', window.location.href);
 
-				getPdfState().then((pdfState) => {
-					response(pdfState);
-				});
+				getPdfState()
+					.then((pdfState) => {
+						response(pdfState);
+					})
+					.catch((error) => {
+						const errorMessage = error instanceof Error ? error.message : String(error);
+						const contextualError = `Failed to generate PDF assets for ${window.location.href}: ${errorMessage}`;
+						console.error('Error generating PDF report:', {
+							url: window.location.href,
+							error: errorMessage,
+							stack: error instanceof Error ? error.stack : undefined
+						});
+						response({
+							success: false,
+							error: contextualError,
+							context: {
+								url: window.location.href,
+								timestamp: new Date().toISOString()
+							}
+						});
+					});
 
-				// response(getPdfState());
 				return true;
 			default:
 				response();
