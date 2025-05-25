@@ -18,6 +18,7 @@
 		query?: Query;
 		placeholder?: string;
 		class?: ClassValue;
+		onkeydown?: (event: KeyboardEvent) => void;
 	}
 
 	let editorRef: HTMLDivElement | null = $state(null);
@@ -31,6 +32,7 @@
 		value = $bindable(''),
 		query,
 		placeholder = 'Type something',
+		onkeydown,
 		class: className
 	}: Props = $props();
 
@@ -49,7 +51,7 @@
 		const extensions = [...(currentQuery?.extensions ?? [])];
 
 		// Add paragraph extension if not already present
-		if (!extensions.some((ext) => ext.id === 'paragraph')) {
+		if (!extensions.some((ext) => ext.name === 'paragraph')) {
 			extensions.unshift(paragraphExtension());
 		}
 
@@ -233,8 +235,11 @@
 	spellcheck={false}
 	class:ProseMirror={true}
 	contenteditable
+	{onkeydown}
 	bind:this={editorRef}
 	class={className}
+	role="textbox"
+	tabindex={0}
 ></div>
 
 <style lang="postcss">

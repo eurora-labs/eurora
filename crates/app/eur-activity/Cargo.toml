@@ -20,3 +20,7 @@ tokio-stream = { workspace = true }
 tonic = { workspace = true }
 async-trait = "0.1.77"
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
+uuid = { workspace = true }
+taurpc = "0.5.0"
+specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
+specta-typescript = { version = "0.0.9" }
