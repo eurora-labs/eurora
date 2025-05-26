@@ -1828,6 +1828,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-auth"
+version = "0.1.0"
+dependencies = [
+ "eur-secret",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "eur-auth-service"
 version = "0.0.1"
 dependencies = [
@@ -2097,6 +2107,17 @@ dependencies = [
  "tracing-subscriber",
  "windows-sys 0.59.0",
  "x11rb",
+]
+
+[[package]]
+name = "eur-user"
+version = "0.1.0"
+dependencies = [
+ "eur-secret",
+ "image 0.25.6",
+ "serde",
+ "serde_json",
+ "uuid",
 ]
 
 [[package]]
