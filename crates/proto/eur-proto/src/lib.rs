@@ -5,43 +5,36 @@
 
 // Include the generated code
 pub mod generated {
-    include!("gen/questions_service.rs");
 
     // Re-export all generated modules
     pub mod questions_service {
+        include!("gen/questions_service.rs");
         pub use super::*;
     }
 
     pub mod shared {
         include!("gen/shared.rs");
-
-        pub mod shared {
-            pub use super::*;
-        }
+        pub use super::*;
     }
 
     pub mod ipc {
         include!("gen/ipc.rs");
-
-        pub mod ipc {
-            pub use super::*;
-        }
+        pub use super::*;
     }
 
     pub mod native_messaging {
         include!("gen/native_messaging.rs");
-
-        pub mod native_messaging {
-            pub use super::*;
-        }
+        pub use super::*;
     }
 
     pub mod proto_ocr_service {
         include!("gen/ocr_service.rs");
+        pub use super::*;
+    }
 
-        pub mod proto_ocr_service {
-            pub use super::*;
-        }
+    pub mod proto_auth_service {
+        include!("gen/auth.v1.rs");
+        pub use super::*;
     }
 }
 
