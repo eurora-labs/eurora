@@ -154,6 +154,7 @@ pub fn create_launcher(
     .title_bar_style(tauri::TitleBarStyle::Overlay)
     .hidden_title(true)
     .visible(false)
+    .content_protected(true)
     .build()?;
 
     Ok(window)
