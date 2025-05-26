@@ -1,7 +1,7 @@
 syntax = "proto3";
 package auth.v1;
 
-service AuthService {
+service ProtoAuthService {
     rpc Login (LoginRequest) returns (LoginResponse);
 }
 

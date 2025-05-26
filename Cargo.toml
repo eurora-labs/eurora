@@ -51,6 +51,8 @@ image = {version = "0.25.6", features = ["jpeg", "png"], default-features = fals
 base64 = "0.22.1"
 sentry = { version = "0.37.0"}
 
+eur-secret = {path = "crates/app/eur-secret"}
+eur-user = {path = "crates/common/eur-user"}
 
 # eur-tauri = { path = "crates/eur-tauri" }
 
