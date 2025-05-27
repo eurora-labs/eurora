@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
     // Note: This example requires a PostgreSQL database to be running
     // You would typically get this from environment variables
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://user:password@localhost/eurora_auth".to_string());
+        .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/eurora".to_string());
 
     println!("Connecting to database...");
 

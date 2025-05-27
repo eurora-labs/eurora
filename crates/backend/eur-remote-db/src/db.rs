@@ -79,14 +79,13 @@ impl DatabaseManager {
         // Insert password credentials
         sqlx::query(
             r#"
-            INSERT INTO password_credentials (id, user_id, password_hash, password_salt, updated_at)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO password_credentials (id, user_id, password_hash, updated_at)
+            VALUES ($1, $2, $3, $4)
             "#,
         )
         .bind(password_id)
         .bind(user_id)
         .bind(&request.password_hash)
-        .bind(&request.password_salt)
         .bind(None::<DateTime<Utc>>) // updated_at is null initially
         .execute(&mut *tx)
         .await?;
@@ -209,7 +208,7 @@ impl DatabaseManager {
     ) -> Result<PasswordCredentials, sqlx::Error> {
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
             r#"
-            SELECT id, user_id, password_hash, password_salt, updated_at
+            SELECT id, user_id, password_hash, updated_at
             FROM password_credentials
             WHERE user_id = $1
             "#,
@@ -232,15 +231,13 @@ impl DatabaseManager {
             r#"
             UPDATE password_credentials 
             SET password_hash = $2,
-                password_salt = $3,
-                updated_at = $4
+                updated_at = $3
             WHERE user_id = $1
-            RETURNING id, user_id, password_hash, password_salt, updated_at
+            RETURNING id, user_id, password_hash, updated_at
             "#,
         )
         .bind(user_id)
         .bind(&request.password_hash)
-        .bind(&request.password_salt)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;

@@ -19,7 +19,6 @@ pub struct PasswordCredentials {
     pub id: Uuid,
     pub user_id: Uuid,
     pub password_hash: String,
-    pub password_salt: String,
     pub updated_at: Option<DateTime<Utc>>,
 }
 
@@ -29,7 +28,6 @@ pub struct CreateUserRequest {
     pub email: String,
     pub display_name: Option<String>,
     pub password_hash: String,
-    pub password_salt: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,5 +41,4 @@ pub struct UpdateUserRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdatePasswordRequest {
     pub password_hash: String,
-    pub password_salt: String,
 }
