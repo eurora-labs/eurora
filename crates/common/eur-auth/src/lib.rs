@@ -29,7 +29,8 @@ pub struct JwtConfig {
 impl Default for JwtConfig {
     fn default() -> Self {
         Self {
-            secret: std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-secret-key".to_string()),
+            secret: std::env::var("JWT_SECRET")
+                .expect("JWT_SECRET must be set at runtime for secure token validation"),
             access_token_expiry_hours: 1,  // 1 hour
             refresh_token_expiry_days: 30, // 30 days
         }
