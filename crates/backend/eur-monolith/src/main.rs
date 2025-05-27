@@ -1,4 +1,5 @@
 use dotenv::dotenv;
+use eur_auth::JwtConfig;
 use eur_auth_service::AuthService;
 use eur_ocr_service::OcrService;
 use eur_proto::{
@@ -25,9 +26,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db_manager =
         Arc::new(DatabaseManager::new("postgres://postgres:postgres@localhost:5432/eurora").await?);
 
+    // Create shared JWT configuration
+    let jwt_config = JwtConfig::default();
+
     let addr = "[::1]:50051".parse().unwrap();
-    let ocr_service = OcrService::default();
-    let auth_service = AuthService::new(db_manager, None); // Use default JWT config
+    let ocr_service = OcrService::new(Some(jwt_config.clone()));
+    let auth_service = AuthService::new(db_manager, Some(jwt_config));
+
     Server::builder()
         .add_service(ProtoOcrServiceServer::new(ocr_service))
         .add_service(ProtoAuthServiceServer::new(auth_service))
