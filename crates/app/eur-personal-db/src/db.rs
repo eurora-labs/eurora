@@ -9,9 +9,6 @@ use sqlx::types::Uuid;
 use std::time::Duration;
 use tracing::debug;
 
-
-
-
 use crate::types::{Activity, ActivityAsset, ChatMessage, Conversation};
 
 pub struct DatabaseManager {
