@@ -1854,7 +1854,9 @@ dependencies = [
 name = "eur-auth"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "eur-secret",
+ "jsonwebtoken",
  "serde",
  "serde_json",
  "uuid",
@@ -1868,6 +1870,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "dotenv",
+ "eur-auth",
  "eur-proto",
  "eur-remote-db",
  "futures",
@@ -1912,6 +1915,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "dotenv",
+ "eur-auth",
  "eur-auth-service",
  "eur-ocr-service",
  "eur-proto",
@@ -1965,6 +1969,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "dotenv",
+ "eur-auth",
  "eur-ocr",
  "eur-proto",
  "futures",
