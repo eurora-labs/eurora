@@ -21,7 +21,6 @@ CREATE TABLE password_credentials (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    password_salt VARCHAR(255) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE,
     
     -- Foreign key constraint
@@ -70,5 +69,4 @@ COMMENT ON COLUMN users.created_at IS 'Timestamp when user account was created';
 COMMENT ON COLUMN users.updated_at IS 'Timestamp when user account was last updated';
 COMMENT ON COLUMN password_credentials.user_id IS 'Foreign key reference to users table';
 COMMENT ON COLUMN password_credentials.password_hash IS 'Hashed password for authentication';
-COMMENT ON COLUMN password_credentials.password_salt IS 'Salt used for password hashing';
 COMMENT ON COLUMN password_credentials.updated_at IS 'Timestamp when password was last updated';
