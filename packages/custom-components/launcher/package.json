@@ -23,7 +23,7 @@
 	"type": "module",
 	"private": false,
 	"peerDependencies": {
-		"svelte": "^5.28.2"
+		"svelte": "^5.33.3"
 	},
 	"devDependencies": {
 		"@eurora/typescript-config": "workspace:*",
@@ -31,20 +31,20 @@
 		"@eurora/ext-transcript": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@sveltejs/adapter-static": "^3.0.8",
-		"@sveltejs/kit": "^2.20.7",
+		"@sveltejs/kit": "^2.21.1",
 		"@sveltejs/package": "^2.3.11",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"prettier": "^3.5.3",
-		"@lucide/svelte": "^0.510.0",
+		"@lucide/svelte": "^0.511.0",
 		"prettier-plugin-svelte": "^3.3.3",
 		"publint": "^0.3.12",
 		"bits-ui": "^1.4.2",
-		"svelte": "^5.28.2",
-		"svelte-check": "^4.1.6",
+		"svelte": "^5.33.3",
+		"svelte-check": "^4.2.1",
 		"typescript": "^5.8.3",
 		"unified": "^11.0.5",
-		"vite": "^6.3.4",
-		"vitest": "^3.1.2"
+		"vite": "^6.3.5",
+		"vitest": "^3.1.4"
 	},
 	"exports": {
 		".": {
