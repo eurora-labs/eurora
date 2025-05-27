@@ -22,7 +22,7 @@ CREATE TABLE password_credentials (
     user_id UUID NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     
     -- Foreign key constraint
     CONSTRAINT fk_password_credentials_user_id 
