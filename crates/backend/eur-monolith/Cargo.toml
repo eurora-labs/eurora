@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 eur-proto = { path = "../../proto/eur-proto" }
+eur-auth = { path = "../../common/eur-auth" }
 eur-ocr-service = { path = '../eur-ocr-service' }
 eur-auth-service = { path = '../eur-auth-service' }
 eur-remote-db = { path = '../eur-remote-db' }
