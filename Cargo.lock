@@ -2075,6 +2075,7 @@ dependencies = [
  "futures",
  "image 0.25.6",
  "prost",
+ "sentry",
  "tokio",
  "tonic 0.13.0",
  "tonic-build",
