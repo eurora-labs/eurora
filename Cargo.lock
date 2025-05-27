@@ -1878,6 +1878,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-monolith"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "dotenv",
+ "eur-auth-service",
+ "eur-ocr-service",
+ "eur-proto",
+ "futures",
+ "image 0.25.6",
+ "prost",
+ "tokio",
+ "tonic 0.13.0",
+ "tonic-build",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "eur-native-messaging"
 version = "0.1.0"
 dependencies = [
