@@ -13,7 +13,7 @@ CREATE TABLE users (
     display_name VARCHAR(255),
     email_verified BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
 -- Create password_credentials table
@@ -21,7 +21,8 @@ CREATE TABLE password_credentials (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
     
     -- Foreign key constraint
     CONSTRAINT fk_password_credentials_user_id 
