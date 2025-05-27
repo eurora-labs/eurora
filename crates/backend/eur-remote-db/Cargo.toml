@@ -18,24 +18,10 @@ sqlx = { version = "0.8.5", features = [
     "migrate",
 ] }
 futures = { workspace = true, features = ["std"] }
-image = { workspace = true, features = [
-    "jpeg",
-    "png",
-], default-features = false }
 chrono = { workspace = true, features = ["serde"] }
 uuid = { version = "1.8.0", features = ["v4", "serde"] }
 tracing = { workspace = true }
 zerocopy = { version = "0.8.25" }
-
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-
 tokio = { workspace = true, features = ["full", "tracing"] }
-
-# uuid = { version = "1.8.0", features = ["v4", "serde"] }
-# chrono = { version = "0.4.37", features = ["serde"] }
-# tokio = { workspace = true, default-features = false  }
-
-# [dev-dependencies]
-# tempfile = "3.10.1"
