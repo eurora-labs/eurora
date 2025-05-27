@@ -2012,13 +2012,12 @@ dependencies = [
  "chrono",
  "futures",
  "image 0.25.6",
- "libsqlite3-sys",
  "serde",
  "serde_json",
- "sqlite-vec",
  "sqlx",
  "tokio",
  "tracing",
+ "uuid",
  "zerocopy",
 ]
 
