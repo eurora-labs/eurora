@@ -5,8 +5,8 @@ use eur_proto::{
     proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer,
     proto_ocr_service::proto_ocr_service_server::ProtoOcrServiceServer,
 };
-use tonic::{Request, Response, Status, transport::Server};
-use tracing::{Level, info};
+use tonic::transport::Server;
+use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
