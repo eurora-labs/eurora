@@ -1,0 +1,26 @@
+
+[package]
+name = "eur-monolith"
+version = "0.0.1"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+publish = false
+
+[dependencies]
+eur-proto = { path = "../../proto/eur-proto" }
+eur-auth = { path = "../../common/eur-auth" }
+eur-ocr-service = { path = '../eur-ocr-service' }
+eur-auth-service = { path = '../eur-auth-service' }
+eur-remote-db = { path = '../eur-remote-db' }
+anyhow = { workspace = true }
+tonic = { workspace = true }
+prost = { workspace = true }
+dotenv = "0.15"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+image = { workspace = true }
+futures = "0.3"
+sentry = { workspace = true }
+[build-dependencies]
+tonic-build = { workspace = true }

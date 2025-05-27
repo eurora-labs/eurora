@@ -211,3 +211,169 @@ This file tracks key architectural and design decisions made during the project'
 - When title changes on focused window: emit focus event with updated title
 - Maintains the same event-driven approach while capturing title changes within the same window
 - Added proper cleanup of event monitoring when windows change focus
+
+[2025-05-27 09:45:00] - Implemented JWT authentication for OCR service using tonic interceptor
+
+**Decision:** Added JWT token validation to the OCR service to ensure only authenticated users can access image transcription functionality.
+
+**Rationale:**
+
+- Security requirement to protect OCR service from unauthorized access
+- Consistent authentication mechanism across all backend services
+- Leverages existing JWT infrastructure from the auth service
+- Follows best practices for microservice authentication
+
+**Implementation Details:**
+
+- Added jsonwebtoken and serde dependencies to eur-ocr-service/Cargo.toml
+- Created JWT Claims structure matching the auth service implementation
+- Implemented JwtConfig for OCR service with shared secret configuration
+- Added validate_token() function to decode and validate JWT tokens
+- Created authenticate_request() function to extract Bearer tokens from request metadata
+- Modified OcrService struct to include jwt_config field with constructor
+- Updated transcribe_image() method to authenticate requests before processing
+- Modified main.rs to share JWT configuration between auth and OCR services
+- Added proper error handling with Status::unauthenticated for invalid tokens
+- Included logging for authentication success/failure events
+
+**Security Features:**
+
+- Validates JWT signature using shared secret
+- Ensures token type is "access" (not refresh)
+- Checks token expiration automatically via jsonwebtoken library
+- Extracts user information from validated claims for logging
+- Returns proper gRPC status codes for authentication failures
+
+[2025-05-27 09:51:00] - Refactored JWT authentication to use shared structures in eur-auth crate
+
+**Decision:** Moved duplicated JWT structures and validation functions from individual services to a shared eur-auth crate to eliminate code duplication.
+
+**Rationale:**
+
+- Eliminates code duplication between auth-service and ocr-service
+- Provides a single source of truth for JWT-related functionality
+- Improves maintainability and consistency across services
+- Follows DRY (Don't Repeat Yourself) principle
+- Makes it easier to add JWT authentication to additional services
+
+**Implementation Details:**
+
+- Created shared JWT structures in crates/common/eur-auth/src/lib.rs:
+    - Claims struct with all JWT fields
+    - JwtConfig struct with secret and expiry configurations
+    - validate_token() function for general token validation
+    - validate_access_token() function specifically for access tokens
+    - validate_refresh_token() function specifically for refresh tokens
+- Updated eur-auth-service to use shared structures:
+    - Added eur-auth dependency to Cargo.toml
+    - Removed duplicated Claims and JwtConfig structs
+    - Updated validate_token() method to use shared function
+    - Cleaned up unused imports
+- Updated eur-ocr-service to use shared structures:
+    - Replaced local JWT dependencies with eur-auth dependency
+    - Removed duplicated Claims, JwtConfig, and validate_token code
+    - Updated authenticate_request() to use validate_access_token()
+- Updated eur-monolith to use shared JwtConfig:
+    - Added eur-auth dependency to Cargo.toml
+    - Updated imports to use shared JwtConfig
+    - Simplified service initialization with shared configuration
+
+**Benefits:**
+
+- Single point of maintenance for JWT functionality
+- Consistent token validation across all services
+- Easier to add new JWT-authenticated services
+- Reduced codebase size and complexity
+- Better type safety and consistency
+
+[2025-05-27 11:24:00] - Transferred AuthService implementation to ProtoAuthService following OCR service pattern
+
+**Decision:** Restructured the authentication service to move all business logic into the ProtoAuthService trait implementation, similar to how the OCR service is structured.
+
+**Rationale:**
+
+- Provides consistency across all gRPC services in the project
+- Follows the established pattern from the OCR service implementation
+- Centralizes all authentication logic within the gRPC trait implementation
+- Improves maintainability by having a single, consistent service architecture
+
+**Implementation Details:**
+
+- Added missing RPC calls to proto/auth_service.proto:
+    - `rpc Register (RegisterRequest) returns (LoginResponse);`
+    - `rpc RefreshToken (RefreshTokenRequest) returns (LoginResponse);`
+- Added corresponding message definitions:
+    - `RegisterRequest` with username, email, password, and optional display_name
+    - `RefreshTokenRequest` with refresh_token field
+- Updated imports to include new proto message types
+- Added Default implementation for AuthService with proper database connection
+- Implemented missing trait methods in ProtoAuthService:
+    - `register()` method that calls existing `register_user()` logic
+    - `refresh_token()` method that calls existing `refresh_token()` logic
+- Maintained all existing business logic and error handling
+- Preserved JWT token generation and validation functionality
+- Added proper gRPC status code handling for authentication errors
+
+**Benefits:**
+
+- Consistent service architecture across all backend services
+- Complete gRPC API coverage for authentication operations
+- Proper error handling with appropriate gRPC status codes
+- Maintains existing security features and JWT functionality
+
+[2025-05-27 11:27:00] - Fixed naming conflict and async issues in AuthService implementation
+
+**Decision:** Resolved compilation errors in the AuthService by fixing method naming conflicts and removing problematic Default implementation.
+
+**Rationale:**
+
+- The refresh_token method name conflicted between the trait implementation and internal method
+- The Default implementation tried to create a DatabaseManager synchronously, but DatabaseManager::new() is async
+- Removing Default implementation ensures proper service initialization with database connections
+
+**Implementation Details:**
+
+- Renamed internal method from `refresh_token()` to `refresh_access_token()` to avoid naming conflict
+- Updated trait implementation to call the renamed `refresh_access_token()` method
+- Removed Default implementation that caused async/sync mismatch with DatabaseManager::new()
+- Service now requires proper initialization through the `new()` constructor with database connection
+- All compilation errors resolved, cargo check passes successfully
+
+**Benefits:**
+
+- Eliminates recursive method calls that would cause stack overflow
+- Ensures proper async handling of database operations
+- Maintains clean separation between trait methods and internal implementation
+- Follows proper Rust patterns for service initialization
+
+[2025-05-27 12:32:35] - Implemented GitHub Actions deployment workflow for eur-monolith backend service
+
+**Decision:** Created a comprehensive CI/CD pipeline for the eur-monolith Rust backend service following the pattern of the existing deploy-web.yml workflow.
+
+**Rationale:**
+
+- The eur-monolith is a gRPC server combining OCR and Auth services that requires different deployment approach than the static web app
+- Needed automated building, testing, and containerization for the Rust backend service
+- Following established patterns from the project's existing Docker workflow (push-e2e-img.yml)
+- Enables consistent deployment process with proper artifact management and Docker image publishing
+
+**Implementation Details:**
+
+- Created `.github/workflows/deploy-monolith.yml` with three main jobs: build, docker, and deploy
+- Build job: Sets up Rust toolchain, runs formatting/linting checks, executes tests, and builds release binary
+- Docker job: Creates optimized Debian-based container image with security best practices (non-root user, health checks)
+- Deploy job: Provides deployment instructions and placeholder for actual deployment steps
+- Triggers on changes to monolith crate and related dependencies (auth-service, ocr-service, remote-db, proto)
+- Uses GitHub Container Registry (ghcr.io) for Docker image storage following project conventions
+- Includes proper caching for Rust dependencies and Docker layers for faster builds
+- Provides comprehensive environment variable documentation for deployment configuration
+- Follows security best practices with minimal container image and non-root execution
+
+**Key Features:**
+
+- Automated Rust code quality checks (formatting, clippy, tests)
+- Multi-stage workflow with artifact passing between jobs
+- Docker image optimization with health checks and security hardening
+- Flexible deployment target support (placeholder for various deployment methods)
+- Proper environment variable handling for database connections and JWT configuration
+- Concurrent deployment protection and manual workflow dispatch capability

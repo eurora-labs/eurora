@@ -605,6 +605,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89e25b6adfb930f02d1981565a6e5d9c547ac15a96606256d3b59040e5cd4ca3"
 
 [[package]]
+name = "bcrypt"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e65938ed058ef47d92cf8b346cc76ef48984572ade631927e9937b5ffc7662c7"
+dependencies = [
+ "base64 0.22.1",
+ "blowfish",
+ "getrandom 0.2.15",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.69.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -732,6 +745,16 @@ dependencies = [
  "futures-io",
  "futures-lite",
  "piper",
+]
+
+[[package]]
+name = "blowfish"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e412e2cd0f2b2d93e02543ceae7917b3c70331573df19ee046bcbc35e45e87d7"
+dependencies = [
+ "byteorder",
+ "cipher",
 ]
 
 [[package]]
@@ -1980,6 +2003,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-auth"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "eur-secret",
+ "jsonwebtoken",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "eur-auth-service"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bcrypt",
+ "chrono",
+ "dotenv",
+ "eur-auth",
+ "eur-proto",
+ "eur-remote-db",
+ "futures",
+ "image 0.25.6",
+ "jsonwebtoken",
+ "prost",
+ "serde",
+ "tokio",
+ "tonic 0.13.0",
+ "tonic-build",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "eur-client-grpc"
 version = "0.0.0"
 dependencies = [
@@ -2000,6 +2059,28 @@ dependencies = [
  "tonic 0.13.0",
  "tonic-build",
  "tracing",
+]
+
+[[package]]
+name = "eur-monolith"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "dotenv",
+ "eur-auth",
+ "eur-auth-service",
+ "eur-ocr-service",
+ "eur-proto",
+ "eur-remote-db",
+ "futures",
+ "image 0.25.6",
+ "prost",
+ "sentry",
+ "tokio",
+ "tonic 0.13.0",
+ "tonic-build",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2041,6 +2122,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "dotenv",
+ "eur-auth",
  "eur-ocr",
  "eur-proto",
  "futures",
@@ -2108,6 +2190,22 @@ dependencies = [
  "tokio",
  "tonic 0.13.0",
  "tonic-build",
+]
+
+[[package]]
+name = "eur-remote-db"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "futures",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "uuid",
+ "zerocopy",
 ]
 
 [[package]]
@@ -2233,6 +2331,17 @@ dependencies = [
  "tracing-subscriber",
  "windows-sys 0.59.0",
  "x11rb",
+]
+
+[[package]]
+name = "eur-user"
+version = "0.1.0"
+dependencies = [
+ "eur-secret",
+ "image 0.25.6",
+ "serde",
+ "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -3775,6 +3884,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "9.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a87cc7a48537badeae96744432de36f4be2b4a34a05a5ef32e9dd8a1c169dde"
+dependencies = [
+ "base64 0.22.1",
+ "js-sys",
+ "pem",
+ "ring",
+ "serde",
+ "serde_json",
+ "simple_asn1",
+]
+
+[[package]]
 name = "keyboard-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5138,6 +5262,16 @@ name = "pathdiff"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
+
+[[package]]
+name = "pem"
+version = "3.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38af38e8470ac9dee3ce1bae1af9c1671fffc44ddfd8bd1d0a3445bf349a8ef3"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+]
 
 [[package]]
 name = "pem-rfc7468"
@@ -6930,6 +7064,18 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "simple_asn1"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "thiserror 2.0.12",
+ "time",
+]
 
 [[package]]
 name = "siphasher"
