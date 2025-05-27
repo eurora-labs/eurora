@@ -68,3 +68,5 @@ This file tracks the project's progress using a task list format.
 [2025-05-27 09:45:00] - Implemented JWT authentication for OCR service with tonic interceptor functionality
 
 [2025-05-27 09:51:00] - Refactored JWT authentication to eliminate code duplication by creating shared eur-auth crate
+
+[2025-05-27 11:24:00] - Successfully transferred AuthService implementation to ProtoAuthService following OCR service pattern
