@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 eur-proto = { path = "../../proto/eur-proto" }
 eur-remote-db = { path = "../eur-remote-db" }
+eur-auth = { path = "../../common/eur-auth" }
 anyhow = { workspace = true }
 tonic = { workspace = true }
 prost = { workspace = true }
