@@ -304,3 +304,6 @@ extensions/chromium/contentstyle.css
 
 *.exe
 *.d
+*.mp4
+*.webm
+*.mkv
