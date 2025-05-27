@@ -211,3 +211,77 @@ This file tracks key architectural and design decisions made during the project'
 - When title changes on focused window: emit focus event with updated title
 - Maintains the same event-driven approach while capturing title changes within the same window
 - Added proper cleanup of event monitoring when windows change focus
+
+[2025-05-27 09:45:00] - Implemented JWT authentication for OCR service using tonic interceptor
+
+**Decision:** Added JWT token validation to the OCR service to ensure only authenticated users can access image transcription functionality.
+
+**Rationale:**
+
+- Security requirement to protect OCR service from unauthorized access
+- Consistent authentication mechanism across all backend services
+- Leverages existing JWT infrastructure from the auth service
+- Follows best practices for microservice authentication
+
+**Implementation Details:**
+
+- Added jsonwebtoken and serde dependencies to eur-ocr-service/Cargo.toml
+- Created JWT Claims structure matching the auth service implementation
+- Implemented JwtConfig for OCR service with shared secret configuration
+- Added validate_token() function to decode and validate JWT tokens
+- Created authenticate_request() function to extract Bearer tokens from request metadata
+- Modified OcrService struct to include jwt_config field with constructor
+- Updated transcribe_image() method to authenticate requests before processing
+- Modified main.rs to share JWT configuration between auth and OCR services
+- Added proper error handling with Status::unauthenticated for invalid tokens
+- Included logging for authentication success/failure events
+
+**Security Features:**
+
+- Validates JWT signature using shared secret
+- Ensures token type is "access" (not refresh)
+- Checks token expiration automatically via jsonwebtoken library
+- Extracts user information from validated claims for logging
+- Returns proper gRPC status codes for authentication failures
+
+[2025-05-27 09:51:00] - Refactored JWT authentication to use shared structures in eur-auth crate
+
+**Decision:** Moved duplicated JWT structures and validation functions from individual services to a shared eur-auth crate to eliminate code duplication.
+
+**Rationale:**
+
+- Eliminates code duplication between auth-service and ocr-service
+- Provides a single source of truth for JWT-related functionality
+- Improves maintainability and consistency across services
+- Follows DRY (Don't Repeat Yourself) principle
+- Makes it easier to add JWT authentication to additional services
+
+**Implementation Details:**
+
+- Created shared JWT structures in crates/common/eur-auth/src/lib.rs:
+    - Claims struct with all JWT fields
+    - JwtConfig struct with secret and expiry configurations
+    - validate_token() function for general token validation
+    - validate_access_token() function specifically for access tokens
+    - validate_refresh_token() function specifically for refresh tokens
+- Updated eur-auth-service to use shared structures:
+    - Added eur-auth dependency to Cargo.toml
+    - Removed duplicated Claims and JwtConfig structs
+    - Updated validate_token() method to use shared function
+    - Cleaned up unused imports
+- Updated eur-ocr-service to use shared structures:
+    - Replaced local JWT dependencies with eur-auth dependency
+    - Removed duplicated Claims, JwtConfig, and validate_token code
+    - Updated authenticate_request() to use validate_access_token()
+- Updated eur-monolith to use shared JwtConfig:
+    - Added eur-auth dependency to Cargo.toml
+    - Updated imports to use shared JwtConfig
+    - Simplified service initialization with shared configuration
+
+**Benefits:**
+
+- Single point of maintenance for JWT functionality
+- Consistent token validation across all services
+- Easier to add new JWT-authenticated services
+- Reduced codebase size and complexity
+- Better type safety and consistency
