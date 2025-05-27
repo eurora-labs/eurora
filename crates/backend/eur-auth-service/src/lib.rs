@@ -8,41 +8,14 @@ use eur_proto::proto_auth_service::{
     EmailPasswordCredentials, LoginRequest, LoginResponse, login_request::Credential,
 };
 use eur_remote_db::{CreateUserRequest, DatabaseManager};
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
-use serde::{Deserialize, Serialize};
+use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-/// JWT Claims structure
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    sub: String,        // Subject (user ID)
-    username: String,   // Username
-    email: String,      // Email
-    exp: usize,         // Expiration time
-    iat: usize,         // Issued at
-    token_type: String, // "access" or "refresh"
-}
-
-/// Configuration for JWT tokens
-#[derive(Debug, Clone)]
-pub struct JwtConfig {
-    pub secret: String,
-    pub access_token_expiry_hours: i64,
-    pub refresh_token_expiry_days: i64,
-}
-
-impl Default for JwtConfig {
-    fn default() -> Self {
-        Self {
-            secret: std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-secret-key".to_string()),
-            access_token_expiry_hours: 1,  // 1 hour
-            refresh_token_expiry_days: 30, // 30 days
-        }
-    }
-}
+// Re-export shared types for convenience
+pub use eur_auth::{Claims, JwtConfig};
 
 /// The main authentication service
 #[derive(Debug)]
@@ -120,13 +93,7 @@ impl AuthService {
 
     /// Validate and decode a JWT token
     pub fn validate_token(&self, token: &str) -> Result<Claims> {
-        let decoding_key = DecodingKey::from_secret(self.jwt_config.secret.as_ref());
-        let validation = Validation::new(Algorithm::HS256);
-
-        let token_data = decode::<Claims>(token, &decoding_key, &validation)
-            .map_err(|e| anyhow!("Invalid token: {}", e))?;
-
-        Ok(token_data.claims)
+        eur_auth::validate_token(token, &self.jwt_config)
     }
 
     /// Register a new user (not in proto yet, but implementing for completeness)
