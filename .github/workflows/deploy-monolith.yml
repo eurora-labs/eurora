@@ -27,7 +27,7 @@ concurrency:
     cancel-in-progress: true
 
 env:
-    RUST_VERSION: 1.88 # Set this to the Rust version to use
+    RUST_VERSION: stable # Set this to the Rust version to use
     REGISTRY: ghcr.io
     IMAGE_NAME: ${{ github.repository }}/eur-monolith
 
