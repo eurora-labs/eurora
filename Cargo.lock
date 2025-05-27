@@ -2005,6 +2005,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-remote-db"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "futures",
+ "image 0.25.6",
+ "libsqlite3-sys",
+ "serde",
+ "serde_json",
+ "sqlite-vec",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "zerocopy",
+]
+
+[[package]]
 name = "eur-renderer"
 version = "0.1.0"
 dependencies = [
