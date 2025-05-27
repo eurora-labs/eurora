@@ -285,3 +285,63 @@ This file tracks key architectural and design decisions made during the project'
 - Easier to add new JWT-authenticated services
 - Reduced codebase size and complexity
 - Better type safety and consistency
+
+[2025-05-27 11:24:00] - Transferred AuthService implementation to ProtoAuthService following OCR service pattern
+
+**Decision:** Restructured the authentication service to move all business logic into the ProtoAuthService trait implementation, similar to how the OCR service is structured.
+
+**Rationale:**
+
+- Provides consistency across all gRPC services in the project
+- Follows the established pattern from the OCR service implementation
+- Centralizes all authentication logic within the gRPC trait implementation
+- Improves maintainability by having a single, consistent service architecture
+
+**Implementation Details:**
+
+- Added missing RPC calls to proto/auth_service.proto:
+    - `rpc Register (RegisterRequest) returns (LoginResponse);`
+    - `rpc RefreshToken (RefreshTokenRequest) returns (LoginResponse);`
+- Added corresponding message definitions:
+    - `RegisterRequest` with username, email, password, and optional display_name
+    - `RefreshTokenRequest` with refresh_token field
+- Updated imports to include new proto message types
+- Added Default implementation for AuthService with proper database connection
+- Implemented missing trait methods in ProtoAuthService:
+    - `register()` method that calls existing `register_user()` logic
+    - `refresh_token()` method that calls existing `refresh_token()` logic
+- Maintained all existing business logic and error handling
+- Preserved JWT token generation and validation functionality
+- Added proper gRPC status code handling for authentication errors
+
+**Benefits:**
+
+- Consistent service architecture across all backend services
+- Complete gRPC API coverage for authentication operations
+- Proper error handling with appropriate gRPC status codes
+- Maintains existing security features and JWT functionality
+
+[2025-05-27 11:27:00] - Fixed naming conflict and async issues in AuthService implementation
+
+**Decision:** Resolved compilation errors in the AuthService by fixing method naming conflicts and removing problematic Default implementation.
+
+**Rationale:**
+
+- The refresh_token method name conflicted between the trait implementation and internal method
+- The Default implementation tried to create a DatabaseManager synchronously, but DatabaseManager::new() is async
+- Removing Default implementation ensures proper service initialization with database connections
+
+**Implementation Details:**
+
+- Renamed internal method from `refresh_token()` to `refresh_access_token()` to avoid naming conflict
+- Updated trait implementation to call the renamed `refresh_access_token()` method
+- Removed Default implementation that caused async/sync mismatch with DatabaseManager::new()
+- Service now requires proper initialization through the `new()` constructor with database connection
+- All compilation errors resolved, cargo check passes successfully
+
+**Benefits:**
+
+- Eliminates recursive method calls that would cause stack overflow
+- Ensures proper async handling of database operations
+- Maintains clean separation between trait methods and internal implementation
+- Follows proper Rust patterns for service initialization
