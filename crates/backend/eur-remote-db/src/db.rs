@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::types::{
     CreateUserRequest, PasswordCredentials, UpdatePasswordRequest, UpdateUserRequest, User,
 };
-
+#[derive(Debug)]
 pub struct DatabaseManager {
     pub pool: PgPool,
 }
