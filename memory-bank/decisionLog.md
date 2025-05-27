@@ -345,3 +345,35 @@ This file tracks key architectural and design decisions made during the project'
 - Ensures proper async handling of database operations
 - Maintains clean separation between trait methods and internal implementation
 - Follows proper Rust patterns for service initialization
+
+[2025-05-27 12:32:35] - Implemented GitHub Actions deployment workflow for eur-monolith backend service
+
+**Decision:** Created a comprehensive CI/CD pipeline for the eur-monolith Rust backend service following the pattern of the existing deploy-web.yml workflow.
+
+**Rationale:**
+
+- The eur-monolith is a gRPC server combining OCR and Auth services that requires different deployment approach than the static web app
+- Needed automated building, testing, and containerization for the Rust backend service
+- Following established patterns from the project's existing Docker workflow (push-e2e-img.yml)
+- Enables consistent deployment process with proper artifact management and Docker image publishing
+
+**Implementation Details:**
+
+- Created `.github/workflows/deploy-monolith.yml` with three main jobs: build, docker, and deploy
+- Build job: Sets up Rust toolchain, runs formatting/linting checks, executes tests, and builds release binary
+- Docker job: Creates optimized Debian-based container image with security best practices (non-root user, health checks)
+- Deploy job: Provides deployment instructions and placeholder for actual deployment steps
+- Triggers on changes to monolith crate and related dependencies (auth-service, ocr-service, remote-db, proto)
+- Uses GitHub Container Registry (ghcr.io) for Docker image storage following project conventions
+- Includes proper caching for Rust dependencies and Docker layers for faster builds
+- Provides comprehensive environment variable documentation for deployment configuration
+- Follows security best practices with minimal container image and non-root execution
+
+**Key Features:**
+
+- Automated Rust code quality checks (formatting, clippy, tests)
+- Multi-stage workflow with artifact passing between jobs
+- Docker image optimization with health checks and security hardening
+- Flexible deployment target support (placeholder for various deployment methods)
+- Proper environment variable handling for database connections and JWT configuration
+- Concurrent deployment protection and manual workflow dispatch capability
