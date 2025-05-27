@@ -23,8 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
-    let db_manager =
-        Arc::new(DatabaseManager::new("postgres://postgres:postgres@localhost:5432/eurora").await?);
+    let database_url = std::env::var("REMOTE_DATABASE_URL")
+        .expect("REMOTE_DATABASE_URL environment variable must be set");
+    let db_manager = Arc::new(DatabaseManager::new(&database_url).await?);
 
     // Create shared JWT configuration
     let jwt_config = JwtConfig::default();
