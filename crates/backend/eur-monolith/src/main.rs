@@ -29,7 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create shared JWT configuration
     let jwt_config = JwtConfig::default();
 
-    let addr = "[::1]:50051".parse().unwrap();
+    let addr = std::env::var("MONOLITH_PORT")
+        .unwrap_or_else(|_| "[::1]:50051".to_string())
+        .parse()
+        .expect("Invalid MONOLITH_PORT format");
     let ocr_service = OcrService::new(Some(jwt_config.clone()));
     let auth_service = AuthService::new(db_manager, Some(jwt_config));
 
