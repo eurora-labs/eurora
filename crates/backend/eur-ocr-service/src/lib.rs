@@ -1,6 +1,7 @@
-//! The Eurora monolith server that hosts the gRPC service for questions.
+//! The Eurora OCR service that provides gRPC endpoints for image transcription with JWT authentication.
 
 use anyhow::{Result, anyhow};
+use eur_auth::{Claims, JwtConfig, validate_access_token};
 use eur_ocr::{self, OcrStrategy};
 use eur_proto::proto_ocr_service::proto_ocr_service_server::ProtoOcrService;
 use eur_proto::proto_ocr_service::{TranscribeImageRequest, TranscribeImageResponse};
@@ -8,10 +9,52 @@ use eur_proto::shared::ProtoImage;
 use futures;
 use futures::future;
 use tonic::{Request, Response, Status};
-use tracing::info;
+use tracing::{info, warn};
 
-#[derive(Default, Debug)]
-pub struct OcrService {}
+/// Extract and validate JWT token from request metadata
+pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
+    // Get authorization header
+    let auth_header = request
+        .metadata()
+        .get("authorization")
+        .ok_or_else(|| anyhow!("Missing authorization header"))?;
+
+    // Convert to string
+    let auth_str = auth_header
+        .to_str()
+        .map_err(|_| anyhow!("Invalid authorization header format"))?;
+
+    // Extract Bearer token
+    if !auth_str.starts_with("Bearer ") {
+        return Err(anyhow!("Authorization header must start with 'Bearer '"));
+    }
+
+    let token = &auth_str[7..]; // Remove "Bearer " prefix
+
+    // Validate access token using shared function
+    validate_access_token(token, jwt_config)
+}
+
+#[derive(Debug)]
+pub struct OcrService {
+    jwt_config: JwtConfig,
+}
+
+impl Default for OcrService {
+    fn default() -> Self {
+        Self {
+            jwt_config: JwtConfig::default(),
+        }
+    }
+}
+
+impl OcrService {
+    pub fn new(jwt_config: Option<JwtConfig>) -> Self {
+        Self {
+            jwt_config: jwt_config.unwrap_or_default(),
+        }
+    }
+}
 
 #[tonic::async_trait]
 impl ProtoOcrService for OcrService {
@@ -19,7 +62,21 @@ impl ProtoOcrService for OcrService {
         &self,
         request: Request<TranscribeImageRequest>,
     ) -> Result<Response<TranscribeImageResponse>, Status> {
-        info!("Received ocr request");
+        info!("Received OCR request");
+
+        // Authenticate the request
+        let _claims = match authenticate_request(&request, &self.jwt_config) {
+            Ok(claims) => {
+                info!("Authenticated OCR request for user: {}", claims.username);
+                claims
+            }
+            Err(e) => {
+                warn!("Authentication failed for OCR request: {}", e);
+                return Err(Status::unauthenticated(
+                    "Invalid or missing authentication token",
+                ));
+            }
+        };
 
         let request_inner = request.into_inner();
 
