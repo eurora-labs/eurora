@@ -3,6 +3,8 @@ package auth.v1;
 
 service ProtoAuthService {
     rpc Login (LoginRequest) returns (LoginResponse);
+    rpc Register (RegisterRequest) returns (LoginResponse);
+    rpc RefreshToken (RefreshTokenRequest) returns (LoginResponse);
 }
 
 message LoginRequest {
@@ -27,6 +29,17 @@ enum Provider {
     GOOGLE = 1;
     APPLE = 2;
 }
+message RegisterRequest {
+    string username = 1;
+    string email = 2;
+    string password = 3;
+    optional string display_name = 4;
+}
+
+message RefreshTokenRequest {
+    string refresh_token = 1;
+}
+
 message LoginResponse {
     string access_token = 1;
     string refresh_token = 2;
