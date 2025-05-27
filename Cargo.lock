@@ -1886,6 +1886,7 @@ dependencies = [
  "eur-auth-service",
  "eur-ocr-service",
  "eur-proto",
+ "eur-remote-db",
  "futures",
  "image 0.25.6",
  "prost",
