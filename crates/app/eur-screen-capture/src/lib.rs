@@ -1,102 +1,210 @@
-use anyhow::{Context, Result};
-use image::DynamicImage;
-use std::path::{Path, PathBuf};
-use tracing::debug;
-use xcap::Monitor;
+use image::Rgb;
+use image::imageops::FilterType;
+use image::{DynamicImage, ImageBuffer};
+use scap::{Target, get_all_targets};
+use scap::{
+    capturer::{Area, Capturer, Options, Point, Size},
+    frame::Frame,
+};
+use std::{
+    fs,
+    io::Write,
+    process::{self, Command, Stdio},
+};
 
-/// Represents a captured screenshot
-pub struct Screenshot {
-    pub image: DynamicImage,
-    pub width: u32,
-    pub height: u32,
-    pub monitor_name: String,
+struct ScreenRecorder {
+    target: Target,
+    recorder: Capturer,
 }
 
-impl Screenshot {
-    /// Save the screenshot to a file
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        self.image.save(&path)?;
-        Ok(())
+impl ScreenRecorder {
+    pub fn new(target: Target, recorder: Capturer) -> Self {
+        Self { target, recorder }
     }
 }
 
-/// Capture the primary monitor
-pub fn capture_primary_monitor() -> Result<Screenshot> {
-    let monitor = Monitor::all()?
-        .into_iter()
-        .find(|m| m.is_primary())
-        .context("Could not find primary monitor")?;
+#[test]
+fn record() {
+    let width = 1920;
+    let height = 1080;
+    let framerate = 1;
+    // let num_frames = 60;
+    let output_dir = "output";
 
-    capture_monitor(&monitor)
-}
+    let args = [
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        &format!("{}x{}", width, height),
+        "-r",
+        &framerate.to_string(),
+        "-i",
+        "pipe:0", // read from stdin
+        "-c:v",
+        "libx265",
+        "-tag:v",
+        "hvc1",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        &format!("{}/render.mp4", output_dir),
+    ];
 
-/// Capture all available monitors
-pub fn capture_all_monitors() -> Result<Vec<Screenshot>> {
-    let monitors = Monitor::all()?;
+    //[
+    //     "-f",
+    //     "rawvideo",
+    //     "-pix_fmt",
+    //     "rgb24",
+    //     "-s",
+    //     &format!("{}x{}", width, height),
+    //     "-r",
+    //     &framerate.to_string(),
+    //     "-i",
+    //     "pipe:0", // read from stdin
+    //     "-c:v",
+    //     "libx264",
+    //     "-preset",
+    //     "veryslow",
+    //     "-crf",
+    //     "23",
+    //     "-pix_fmt",
+    //     "yuv420p",
+    //     "-f",
+    //     "hls",
+    //     "-hls_time",
+    //     "10",
+    //     "-hls_list_size",
+    //     "0",
+    //     &format!("{}/index.m3u8", output_dir),
+    // ]
+    // Start ffmpeg process
+    let mut ffmpeg = Command::new("ffmpeg")
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .unwrap();
 
-    monitors.iter().map(capture_monitor).collect()
-}
+    let mut ffmpeg_stdin = ffmpeg.stdin.take().expect("Failed to open ffmpeg stdin");
 
-/// Capture a specific monitor by index (0-based)
-pub fn capture_monitor_by_index(index: usize) -> Result<Screenshot> {
-    let monitors = Monitor::all()?;
-
-    if index >= monitors.len() {
-        anyhow::bail!(
-            "Monitor index out of bounds: {}, max index is {}",
-            index,
-            monitors.len() - 1
-        );
+    // Check if the platform is supported
+    if !scap::is_supported() {
+        println!("Platform not supported");
+        return;
     }
 
-    capture_monitor(&monitors[index])
-}
+    // Check if we have permission to capture screen
+    // If we don't, request it.
+    if !scap::has_permission() {
+        println!("Requesting permission...");
+        if !scap::request_permission() {
+            println!("Permission denied for");
+            return;
+        }
+    }
 
-/// Capture a specific monitor
-fn capture_monitor(monitor: &Monitor) -> Result<Screenshot> {
-    debug!("Capturing monitor: {}", monitor.name());
+    // // Get recording targets
+    // let targets = scap::get_all_targets();
 
-    let img = monitor.capture_image()?;
+    let targets = get_all_targets();
 
-    Ok(Screenshot {
-        image: img.into(),
-        width: monitor.width(),
-        height: monitor.height(),
-        monitor_name: monitor.name().to_string(),
-    })
-}
+    for t in targets {
+        match t {
+            Target::Window(window) => {
+                // println!("window :{:?}", window)
+            }
+            Target::Display(display) => {
+                println!("display :{:?}", display)
+            }
+        }
+    }
+    // println!("targets {:?}", targets);
+    // Create Options
+    let options = Options {
+        fps: framerate,
+        show_cursor: true,
+        show_highlight: true,
+        excluded_targets: None,
+        output_type: scap::frame::FrameType::RGB,
+        output_resolution: scap::capturer::Resolution::_1080p,
+        crop_area: None,
+        //  Some(Area {
+        //     origin: Point { x: 0.0, y: 0.0 },
+        //     size: Size {
+        //         width: 500.0,
+        //         height: 500.0,
+        //     },
+        // }),
+        ..Default::default()
+    };
 
-/// List all available monitors
-pub fn list_monitors() -> Result<Vec<MonitorInfo>> {
-    let monitors = Monitor::all()?;
+    // Create Recorder with options
+    let mut recorder = Capturer::build(options).unwrap_or_else(|err| {
+        println!("Problem with building Capturer: {err}");
+        process::exit(1);
+    });
 
-    Ok(monitors
-        .iter()
-        .enumerate()
-        .map(|(idx, m)| MonitorInfo {
-            index: idx,
-            name: m.name().to_string(),
-            width: m.width(),
-            height: m.height(),
-            is_primary: m.is_primary(),
-        })
-        .collect())
-}
+    // Start Capture
+    recorder.start_capture();
 
-/// Information about a monitor
-#[derive(Debug, Clone)]
-pub struct MonitorInfo {
-    pub index: usize,
-    pub name: String,
-    pub width: u32,
-    pub height: u32,
-    pub is_primary: bool,
-}
+    // Capture 100 frames
+    let mut start_time: u64 = 0;
+    for i in 0..10 {
+        let frame = recorder.get_next_frame().expect("Error");
 
-/// Generate a filename for a screenshot
-pub fn generate_filename(prefix: &str, monitor_name: &str) -> PathBuf {
-    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-    let sanitized_name = monitor_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+        match frame {
+            Frame::RGB(frame) => {
+                if start_time == 0 {
+                    start_time = frame.display_time;
+                }
 
-    PathBuf::from(format!("{prefix}_{sanitized_name}_{timestamp}.png"))
+                println!(
+                    "Recieved BGRA frame {} of width {} and height {} and time {}",
+                    i,
+                    frame.width,
+                    frame.height,
+                    frame.display_time - start_time
+                );
+
+                if frame.width == 0 || frame.height == 0 {
+                    continue;
+                }
+
+                let img_buffer: ImageBuffer<Rgb<u8>, Vec<u8>> =
+                    ImageBuffer::from_raw(frame.width as u32, frame.height as u32, frame.data)
+                        .expect("Failed to create ImageBuffer from raw data");
+
+                let dynamic_image = DynamicImage::ImageRgb8(img_buffer);
+
+                // Resize to target resolution
+                let resized: DynamicImage =
+                    dynamic_image.resize_exact(width, height, FilterType::Triangle);
+
+                let buffer = resized.as_bytes();
+
+                ffmpeg_stdin.write_all(buffer).unwrap();
+            }
+            _ => {
+                panic!();
+            }
+        }
+    }
+
+    // Stop Capture
+    recorder.stop_capture();
+
+    drop(ffmpeg_stdin); // Close stdin to let ffmpeg finalize output
+    let status = ffmpeg.wait().unwrap();
+
+    if status.success() {
+        println!("✅ HLS output written to {}/index.m3u8", output_dir);
+    } else {
+        eprintln!("❌ FFmpeg exited with error: {:?}", status);
+    }
 }
