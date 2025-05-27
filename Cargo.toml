@@ -53,7 +53,6 @@ sentry = { version = "0.37.0"}
 
 eur-secret = {path = "crates/app/eur-secret"}
 eur-user = {path = "crates/common/eur-user"}
-
 # eur-tauri = { path = "crates/eur-tauri" }
 
 # gitbutler-id = { path = "crates/gitbutler-id" }
