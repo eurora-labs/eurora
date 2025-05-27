@@ -64,3 +64,7 @@ This file tracks the project's progress using a task list format.
 [2025-05-27 08:56:20] - Created PostgreSQL migration for remote database authentication schema based on auth_diagram.md
 
 [2025-05-27 09:04:23] - Created PostgreSQL database interface with types.rs and db.rs, updated Cargo.toml dependencies
+
+[2025-05-27 09:45:00] - Implemented JWT authentication for OCR service with tonic interceptor functionality
+
+[2025-05-27 09:51:00] - Refactored JWT authentication to eliminate code duplication by creating shared eur-auth crate
