@@ -113,7 +113,7 @@ impl AuthService {
             return Err(anyhow!("Username already exists"));
         }
 
-        if self.db.user_exists_by_email(email).await.unwrap_or(false) {
+        if self.db.user_exists_by_email(email).await? {
             return Err(anyhow!("Email already exists"));
         }
 
