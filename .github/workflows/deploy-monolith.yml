@@ -1,0 +1,213 @@
+name: Deploy Monolith Backend
+
+on:
+    # Runs on pushes targeting the main branch
+    push:
+        branches: ['main']
+        paths:
+            - 'crates/backend/eur-monolith/**'
+            - 'crates/backend/eur-auth-service/**'
+            - 'crates/backend/eur-ocr-service/**'
+            - 'crates/backend/eur-remote-db/**'
+            - 'crates/common/eur-auth/**'
+            - 'proto/**'
+            - '.github/workflows/deploy-monolith.yml'
+
+    # Allows you to run this workflow manually from the Actions tab
+    workflow_dispatch:
+
+# Sets permissions for deployment
+permissions:
+    contents: read
+    packages: write
+
+# Allow only one concurrent deployment
+concurrency:
+    group: 'monolith-deploy'
+    cancel-in-progress: true
+
+env:
+    RUST_VERSION: 1.88 # Set this to the Rust version to use
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}/eur-monolith
+
+jobs:
+    # Build job
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  toolchain: ${{ env.RUST_VERSION }}
+                  components: rustfmt, clippy
+
+            - name: Cache Rust dependencies
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: 'crates/backend/eur-monolith'
+
+            - name: Install protobuf compiler
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y protobuf-compiler
+
+            - name: Check code formatting
+              run: cargo fmt --all -- --check
+
+            - name: Run clippy
+              run: cargo clippy --all-targets --all-features -- -D warnings
+
+            - name: Run tests
+              run: cargo test --workspace
+
+            - name: Build monolith
+              run: cargo build --release --bin eur-monolith
+              working-directory: crates/backend/eur-monolith
+
+            - name: Upload build artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: eur-monolith-binary
+                  path: target/release/eur-monolith
+                  retention-days: 7
+
+    # Docker build and push job
+    docker:
+        runs-on: ubuntu-latest
+        needs: build
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Download build artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: eur-monolith-binary
+                  path: ./target/release/
+
+            - name: Make binary executable
+              run: chmod +x ./target/release/eur-monolith
+
+            - name: Create Dockerfile
+              run: |
+                  cat > Dockerfile << 'EOF'
+                  FROM debian:bookworm-slim
+
+                  # Install runtime dependencies
+                  RUN apt-get update && apt-get install -y \
+                      ca-certificates \
+                      libssl3 \
+                      && rm -rf /var/lib/apt/lists/*
+
+                  # Create app user
+                  RUN useradd -r -s /bin/false eurora
+
+                  # Copy binary
+                  COPY target/release/eur-monolith /usr/local/bin/eur-monolith
+
+                  # Set ownership and permissions
+                  RUN chown eurora:eurora /usr/local/bin/eur-monolith
+
+                  # Switch to non-root user
+                  USER eurora
+
+                  # Expose port
+                  EXPOSE 50051
+
+                  # Set environment variables
+                  ENV RUST_LOG=info
+                  ENV MONOLITH_ADDR=[::]:50051
+
+                  # Health check
+                  HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+                    CMD timeout 3s bash -c "</dev/tcp/localhost/50051" || exit 1
+
+                  # Run the binary
+                  CMD ["/usr/local/bin/eur-monolith"]
+                  EOF
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Log in to Container Registry
+              uses: docker/login-action@v3
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract metadata
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  tags: |
+                      type=ref,event=branch
+                      type=ref,event=pr
+                      type=sha,prefix={{branch}}-
+                      type=raw,value=latest,enable={{is_default_branch}}
+
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+    # Deployment job (placeholder - customize based on your deployment target)
+    deploy:
+        runs-on: ubuntu-latest
+        needs: [build, docker]
+        environment: production
+        steps:
+            - name: Deploy notification
+              run: |
+                  echo "🚀 Monolith deployment ready!"
+                  echo "Docker image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+                  echo ""
+                  echo "To deploy this image, use:"
+                  echo "docker run -d \\"
+                  echo "  --name eur-monolith \\"
+                  echo "  -p 50051:50051 \\"
+                  echo "  -e DATABASE_URL=postgres://user:pass@host:5432/eurora \\"
+                  echo "  -e JWT_SECRET=your-jwt-secret \\"
+                  echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+                  echo ""
+                  echo "Required environment variables:"
+                  echo "- DATABASE_URL: PostgreSQL connection string"
+                  echo "- JWT_SECRET: Secret for JWT token signing (optional, defaults to 'secret')"
+                  echo "- MONOLITH_ADDR: Server bind address (optional, defaults to '[::]:50051')"
+                  echo "- RUST_LOG: Log level (optional, defaults to 'info')"
+
+            # Add your actual deployment steps here
+            # Examples:
+            # - Deploy to Kubernetes
+            # - Deploy to cloud provider (AWS ECS, Google Cloud Run, etc.)
+            # - Deploy to VPS via SSH
+            # - Update docker-compose on server
+            #
+            # Example for SSH deployment:
+            # - name: Deploy to server
+            #   uses: appleboy/ssh-action@v1.0.3
+            #   with:
+            #     host: ${{ secrets.HOST }}
+            #     username: ${{ secrets.USERNAME }}
+            #     key: ${{ secrets.KEY }}
+            #     script: |
+            #       docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            #       docker stop eur-monolith || true
+            #       docker rm eur-monolith || true
+            #       docker run -d \
+            #         --name eur-monolith \
+            #         --restart unless-stopped \
+            #         -p 50051:50051 \
+            #         -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            #         -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            #         ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
