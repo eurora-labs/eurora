@@ -34,18 +34,15 @@ impl AuthService {
     }
 
     /// Hash a password using bcrypt
-    fn hash_password(&self, password: &str) -> Result<(String, String)> {
-        let salt = uuid::Uuid::new_v4().to_string();
-        let salted_password = format!("{}{}", password, salt);
-        let hashed = hash(salted_password, DEFAULT_COST)
-            .map_err(|e| anyhow!("Failed to hash password: {}", e))?;
-        Ok((hashed, salt))
+    fn hash_password(&self, password: &str) -> Result<String> {
+        let hashed =
+            hash(password, DEFAULT_COST).map_err(|e| anyhow!("Failed to hash password: {}", e))?;
+        Ok(hashed)
     }
 
     /// Verify a password against a hash
-    fn verify_password(&self, password: &str, salt: &str, hash: &str) -> Result<bool> {
-        let salted_password = format!("{}{}", password, salt);
-        verify(salted_password, hash).map_err(|e| anyhow!("Failed to verify password: {}", e))
+    fn verify_password(&self, password: &str, hash: &str) -> Result<bool> {
+        verify(password, hash).map_err(|e| anyhow!("Failed to verify password: {}", e))
     }
 
     /// Generate JWT tokens (access and refresh)
@@ -121,7 +118,7 @@ impl AuthService {
         }
 
         // Hash the password
-        let (password_hash, password_salt) = self.hash_password(password)?;
+        let password_hash = self.hash_password(password)?;
 
         // Create user request
         let create_request = CreateUserRequest {
@@ -129,7 +126,6 @@ impl AuthService {
             email: email.to_string(),
             display_name,
             password_hash,
-            password_salt,
         };
 
         // Create user in database
@@ -259,11 +255,7 @@ impl AuthService {
         };
 
         // Verify password
-        let password_valid = match self.verify_password(
-            &password,
-            &password_creds.password_salt,
-            &password_creds.password_hash,
-        ) {
+        let password_valid = match self.verify_password(&password, &password_creds.password_hash) {
             Ok(valid) => valid,
             Err(e) => {
                 error!("Password verification error: {}", e);
