@@ -21,5 +21,6 @@ tracing-subscriber = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
 image = { workspace = true }
 futures = "0.3"
+sentry = { workspace = true }
 [build-dependencies]
 tonic-build = { workspace = true }
