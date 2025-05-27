@@ -8,3 +8,5 @@ eur-secret = { workspace = true }
 serde = { workspace = true, features = ["std"] }
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
 uuid = { workspace = true }
+jsonwebtoken = "9.3"
+anyhow = { workspace = true }
