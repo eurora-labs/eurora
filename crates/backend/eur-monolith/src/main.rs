@@ -16,6 +16,17 @@ use tracing_subscriber::FmtSubscriber;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load environment variables
     dotenv().ok();
+    // Initialize sentry
+    let sentry_dsn = std::env::var("SENTRY_MONOLITH_DSN")
+        .expect("SENTRY_MONOLITH_DSN environment variable must be set");
+    let _guard = sentry::init((
+        sentry_dsn,
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            send_default_pii: true,
+            ..Default::default()
+        },
+    ));
 
     // Initialize tracing
     let subscriber = FmtSubscriber::builder()
@@ -36,11 +47,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Invalid MONOLITH_ADDR format");
     let ocr_service = OcrService::new(Some(jwt_config.clone()));
     let auth_service = AuthService::new(db_manager, Some(jwt_config));
-
+    tracing::info!("Starting gRPC server at {}", addr);
     Server::builder()
         .add_service(ProtoOcrServiceServer::new(ocr_service))
         .add_service(ProtoAuthServiceServer::new(auth_service))
-        .serve(addr)
+        .serve_with_shutdown(addr, async {
+            tokio::signal::ctrl_c()
+                .await
+                .expect("Failed to install CTRL+C signal handler");
+            tracing::info!("Shutting down gracefully...");
+        })
         .await?;
 
     Ok(())
