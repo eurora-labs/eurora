@@ -1,0 +1,47 @@
+syntax = "proto3";
+package auth.v1;
+
+service ProtoAuthService {
+    rpc Login (LoginRequest) returns (LoginResponse);
+    rpc Register (RegisterRequest) returns (LoginResponse);
+    rpc RefreshToken (RefreshTokenRequest) returns (LoginResponse);
+}
+
+message LoginRequest {
+    oneof credential {
+        EmailPasswordCredentials email_password = 1;
+        ThirdPartyCredentials third_party = 2;
+    }
+}
+
+message EmailPasswordCredentials {
+    string login = 1;
+    string password = 2;
+}
+
+message ThirdPartyCredentials {
+    Provider provider = 1;
+    string id_token = 2;
+}
+
+enum Provider {
+    PROVIDER_UNSPECIFIED = 0;
+    GOOGLE = 1;
+    APPLE = 2;
+}
+message RegisterRequest {
+    string username = 1;
+    string email = 2;
+    string password = 3;
+    optional string display_name = 4;
+}
+
+message RefreshTokenRequest {
+    string refresh_token = 1;
+}
+
+message LoginResponse {
+    string access_token = 1;
+    string refresh_token = 2;
+    int64 expires_in = 3;
+}
