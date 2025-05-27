@@ -87,18 +87,38 @@ impl ProtoOcrService for OcrService {
             .images
             .iter()
             .map(|image| async {
-                let dynamic_image = convert_proto_image_to_dynamic_image(image.clone())
-                    .await
-                    .unwrap();
-
-                tess_strategy.recognize(&dynamic_image)
+                match convert_proto_image_to_dynamic_image(image.clone()).await {
+                    Ok(dynamic_image) => {
+                        let text = tess_strategy.recognize(&dynamic_image);
+                        Ok(text)
+                    }
+                    Err(e) => {
+                        warn!("Image conversion failed: {}", e);
+                        Err(format!("Image conversion failed: {}", e))
+                    }
+                }
             })
             .collect::<Vec<_>>();
 
         // Await all futures concurrently
-        let strings = future::join_all(futures).await;
+        let results = future::join_all(futures).await;
 
-        Ok(Response::new(TranscribeImageResponse { texts: strings }))
+        // Check if any operations failed
+        let mut texts = Vec::new();
+        for result in results {
+            match result {
+                Ok(text) => texts.push(text),
+                Err(error_msg) => {
+                    warn!("OCR operation failed: {}", error_msg);
+                    return Err(Status::internal(format!(
+                        "OCR operation failed: {}",
+                        error_msg
+                    )));
+                }
+            }
+        }
+
+        Ok(Response::new(TranscribeImageResponse { texts }))
     }
 }
 
