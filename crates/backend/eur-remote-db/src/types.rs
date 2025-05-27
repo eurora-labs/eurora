@@ -18,6 +18,7 @@ pub struct User {
 pub struct PasswordCredentials {
     pub id: Uuid,
     pub user_id: Uuid,
+    #[serde(skip_serializing)]
     pub password_hash: String,
     pub updated_at: Option<DateTime<Utc>>,
 }
