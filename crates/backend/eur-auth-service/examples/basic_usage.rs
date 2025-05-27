@@ -8,6 +8,7 @@
 //! 5. Validate tokens
 
 use anyhow::Result;
+use chrono;
 use eur_auth_service::{AuthService, JwtConfig};
 use eur_remote_db::DatabaseManager;
 use std::sync::Arc;
@@ -70,15 +71,95 @@ async fn main() -> Result<()> {
         }
     }
 
-    // Example 2: Refresh a token
-    println!("\n=== Token refresh example ===");
-    // In a real application, you would get this from the previous login/register response
-    // For this example, we'll just show how the method would be called
-    println!("Token refresh method is available: auth_service.refresh_token(refresh_token)");
+    // Example 2: Login to get tokens for demonstration
+    println!("\n=== Logging in to get tokens for demonstration ===");
+    let login_result = auth_service
+        .register_user(
+            "demo_user",
+            "demo@example.com",
+            "demo_password123",
+            Some("Demo User".to_string()),
+        )
+        .await;
+
+    let (access_token, refresh_token) = match login_result {
+        Ok(response) => {
+            println!("✅ Demo user created/logged in successfully!");
+            (response.access_token, response.refresh_token)
+        }
+        Err(_) => {
+            // User might already exist, try to create a different one
+            println!("Demo user exists, creating alternative user...");
+            let alt_result = auth_service
+                .register_user(
+                    &format!("demo_user_{}", chrono::Utc::now().timestamp()),
+                    &format!("demo_{}@example.com", chrono::Utc::now().timestamp()),
+                    "demo_password123",
+                    Some("Demo User".to_string()),
+                )
+                .await;
+
+            match alt_result {
+                Ok(response) => {
+                    println!("✅ Alternative demo user created successfully!");
+                    (response.access_token, response.refresh_token)
+                }
+                Err(e) => {
+                    println!("❌ Failed to create demo user: {}", e);
+                    return Ok(());
+                }
+            }
+        }
+    };
 
     // Example 3: Token validation
     println!("\n=== Token validation example ===");
-    println!("Token validation method is available: auth_service.validate_token(token)");
+    match auth_service.validate_token(&access_token) {
+        Ok(claims) => {
+            println!("✅ Access token is valid!");
+            println!("User ID: {}", claims.sub);
+            println!("Username: {}", claims.username);
+            println!("Email: {}", claims.email);
+            println!("Token type: {}", claims.token_type);
+            println!(
+                "Expires at: {}",
+                chrono::DateTime::from_timestamp(claims.exp as i64, 0)
+                    .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                    .unwrap_or_else(|| "Invalid timestamp".to_string())
+            );
+        }
+        Err(e) => {
+            println!("❌ Access token validation failed: {}", e);
+        }
+    }
+
+    // Example 4: Refresh a token
+    println!("\n=== Token refresh example ===");
+    match auth_service.refresh_access_token(&refresh_token).await {
+        Ok(new_response) => {
+            println!("✅ Token refreshed successfully!");
+            println!("New access token: {}...", &new_response.access_token[..20]);
+            println!(
+                "New refresh token: {}...",
+                &new_response.refresh_token[..20]
+            );
+            println!("Expires in: {} seconds", new_response.expires_in);
+
+            // Validate the new access token to show it works
+            match auth_service.validate_token(&new_response.access_token) {
+                Ok(claims) => {
+                    println!("✅ New access token is valid!");
+                    println!("Username: {}", claims.username);
+                }
+                Err(e) => {
+                    println!("❌ New access token validation failed: {}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("❌ Token refresh failed: {}", e);
+        }
+    }
 
     println!("\n🎉 Auth service example completed!");
     println!("\nAvailable methods:");
