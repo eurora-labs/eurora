@@ -5,7 +5,8 @@ use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
 use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthService;
 use eur_proto::proto_auth_service::{
-    EmailPasswordCredentials, LoginRequest, LoginResponse, login_request::Credential,
+    EmailPasswordCredentials, LoginRequest, LoginResponse, RefreshTokenRequest, RegisterRequest,
+    login_request::Credential,
 };
 use eur_remote_db::{CreateUserRequest, DatabaseManager};
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
@@ -149,7 +150,7 @@ impl AuthService {
     }
 
     /// Refresh an access token using a refresh token
-    pub async fn refresh_token(&self, refresh_token: &str) -> Result<LoginResponse> {
+    pub async fn refresh_access_token(&self, refresh_token: &str) -> Result<LoginResponse> {
         info!("Attempting to refresh token");
 
         // Validate the refresh token
@@ -209,6 +210,55 @@ impl ProtoAuthService for AuthService {
                 ))
             }
         }
+    }
+
+    async fn register(
+        &self,
+        request: Request<RegisterRequest>,
+    ) -> Result<Response<LoginResponse>, Status> {
+        let req = request.into_inner();
+
+        info!("Register request received for user: {}", req.username);
+
+        // Call the existing register_user method
+        let response = match self
+            .register_user(&req.username, &req.email, &req.password, req.display_name)
+            .await
+        {
+            Ok(response) => response,
+            Err(e) => {
+                error!("Registration failed: {}", e);
+                return Err(Status::invalid_argument(format!(
+                    "Registration failed: {}",
+                    e
+                )));
+            }
+        };
+
+        Ok(Response::new(response))
+    }
+
+    async fn refresh_token(
+        &self,
+        request: Request<RefreshTokenRequest>,
+    ) -> Result<Response<LoginResponse>, Status> {
+        let req = request.into_inner();
+
+        info!("Refresh token request received");
+
+        // Call the existing refresh_access_token method
+        let response = match self.refresh_access_token(&req.refresh_token).await {
+            Ok(response) => response,
+            Err(e) => {
+                error!("Token refresh failed: {}", e);
+                return Err(Status::unauthenticated(format!(
+                    "Token refresh failed: {}",
+                    e
+                )));
+            }
+        };
+
+        Ok(Response::new(response))
     }
 }
 
