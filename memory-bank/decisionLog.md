@@ -377,3 +377,73 @@ This file tracks key architectural and design decisions made during the project'
 - Flexible deployment target support (placeholder for various deployment methods)
 - Proper environment variable handling for database connections and JWT configuration
 - Concurrent deployment protection and manual workflow dispatch capability
+
+[2025-05-28 09:56:18] - Implemented comprehensive registration page for Eurora web application
+
+**Decision:** Created a modern, accessible registration form with comprehensive validation and user experience features.
+
+**Rationale:**
+
+- The existing registration page was just a placeholder with minimal functionality
+- Users need a proper registration flow to create accounts for the Eurora platform
+- Form should match the project's design system and use existing UI components
+- Registration should align with the auth service proto definition (username, email, password, display_name)
+- Modern UX patterns improve user conversion and reduce registration friction
+
+**Implementation Details:**
+
+- Built using existing UI components from @eurora/ui package (Card, Input, Label, Button, Alert)
+- Implemented client-side validation for all required fields:
+    - Username: minimum 3 characters, required
+    - Email: valid email format validation, required
+    - Password: minimum 8 characters, required
+    - Confirm Password: must match password
+    - Display Name: optional field
+- Added password visibility toggles for better UX
+- Included loading states with spinner during form submission
+- Error handling with user-friendly error messages
+- Success state with confirmation message and redirect to login
+- Responsive design that works on mobile and desktop
+- Proper accessibility with labels, ARIA attributes, and keyboard navigation
+- SEO optimization with proper meta tags and title
+- Form data structure matches RegisterRequest proto definition
+- Added placeholder for actual API integration with auth service
+
+**Benefits:**
+
+- Professional user registration experience
+- Reduces user errors with real-time validation
+- Consistent with project's design system
+- Accessible to users with disabilities
+- Mobile-friendly responsive design
+- Ready for integration with backend auth service
+
+[2025-05-28 10:04:59] - Updated registration page to use improved form validation pattern with Svelte 5 syntax
+
+**Decision:** Enhanced the registration form with better validation patterns and proper Svelte 5 event handling syntax.
+
+**Rationale:**
+
+- User requested to use shadcn-svelte form patterns instead of basic form implementation
+- Project uses Svelte 5 which requires updated event handling syntax (onsubmit instead of on:submit)
+- Better user experience with real-time field validation and visual feedback
+- Follows existing project patterns seen in api-key-form.svelte
+
+**Implementation Details:**
+
+- Updated event handlers to use Svelte 5 syntax: onsubmit, onblur instead of on:submit, on:blur
+- Implemented per-field validation with real-time feedback on blur events
+- Enhanced password validation with stronger requirements (uppercase, lowercase, number)
+- Added username validation with character restrictions (alphanumeric, hyphens, underscores)
+- Visual error states with red borders and error messages
+- Improved accessibility with aria-labels for password visibility toggles
+- Better UX with disabled submit button when validation errors exist
+- Maintained existing UI component usage pattern from the project
+
+**Benefits:**
+
+- Proper Svelte 5 compatibility without syntax errors
+- Better user experience with immediate validation feedback
+- Stronger security with enhanced password requirements
+- Consistent with project's existing form patterns
+- Accessible design with proper ARIA attributes
