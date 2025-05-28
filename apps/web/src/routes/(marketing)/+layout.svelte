@@ -16,14 +16,15 @@
 
 {#if showAlert}
 	<div
-		class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-2 bg-background border-b"
+		class="fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b bg-background px-6 py-2"
 	>
-		<Alert.Root class="flex-1 flex items-center">
+		<Alert.Root class="flex flex-1 items-center">
 			<ShieldAlert class="size-4" />
 			<Alert.Title>Heads up!</Alert.Title>
 			<Alert.Description
-				>All existing text on this website is placeholder and doesn't represent anything about the
-				product, it's features, the team behind it, or any other factual information.</Alert.Description
+				>All existing text on this website is placeholder and doesn't represent anything
+				about the product, it's features, the team behind it, or any other factual
+				information.</Alert.Description
 			>
 		</Alert.Root>
 		<Button variant="destructive" class="ml-2" onclick={dismissAlert}>Dismiss</Button>
@@ -31,13 +32,13 @@
 {/if}
 
 <div
-	class="fixed left-0 right-0 z-40 flex items-center justify-between px-6 py-4 bg-background"
+	class="fixed left-0 right-0 z-40 flex items-center justify-between bg-background px-6 py-4"
 	style="top: {showAlert ? 'var(--alert-height, 40px)' : '0'};"
 >
 	<div class="flex items-center gap-2">
 		<Button variant="link" href="/" class="decoration-transparent">
 			<EurIcons.EuroraLogo style="width: 3rem; height: 3rem;" />
-			<span class="text-lg font-semibolde">Eurora Labs</span>
+			<span class="font-semibolde text-lg">Eurora Labs</span>
 		</Button>
 	</div>
 
@@ -56,13 +57,7 @@
 	</div>
 </div>
 
-<div style="margin-top: {showAlert ? '6rem' : '4rem'};">
-	{@render children?.()}
-</div>
+{@render children?.()}
 
 <style>
-	/* Ensure the content below the header doesn't get hidden */
-	:global(body) {
-		padding-top: 1rem;
-	}
 </style>
