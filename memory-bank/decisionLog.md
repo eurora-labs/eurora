@@ -447,3 +447,44 @@ This file tracks key architectural and design decisions made during the project'
 - Stronger security with enhanced password requirements
 - Consistent with project's existing form patterns
 - Accessible design with proper ARIA attributes
+
+[2025-05-28 10:28:23] - Implemented gRPC-Web auth service integration for frontend registration
+
+**Decision:** Created a complete gRPC-Web client service to connect the frontend registration form to the backend auth service.
+
+**Rationale:**
+
+- User requested integration with the existing backend auth service using grpc-web
+- Need to provide real authentication functionality instead of simulated API calls
+- Frontend should communicate directly with the gRPC backend service
+- Token management needed for maintaining user sessions
+
+**Implementation Details:**
+
+- Created `apps/web/src/lib/services/auth-service.ts` with gRPC-Web client implementation
+- Used official grpc-web package instead of @improbable-eng/grpc-web
+- Generated TypeScript protobuf files using existing proto compilation scripts
+- Updated `packages/proto/src/index.ts` to export auth service types and client
+- Implemented custom GrpcWebRpc transport using fetch API with proper headers
+- Created AuthService class with register(), login(), and refreshToken() methods
+- Added TokenStorage utility class for localStorage token management
+- Integrated auth service into registration page replacing simulated API call
+- Added proper error handling and user-friendly error messages
+- Included logging for debugging and monitoring
+
+**Technical Features:**
+
+- Type-safe gRPC communication using generated TypeScript types
+- Automatic token storage and management in localStorage
+- Error extraction and user-friendly error messages
+- Support for username/email login and registration
+- JWT token refresh functionality
+- Proper gRPC-Web headers and content types
+
+**Benefits:**
+
+- Real backend integration with type safety
+- Secure token-based authentication
+- Consistent error handling across the application
+- Ready for production use with proper token management
+- Extensible for additional auth features (login, logout, etc.)
