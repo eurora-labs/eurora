@@ -637,6 +637,9 @@ importers:
       '@eurora/katex':
         specifier: workspace:*
         version: link:../../packages/custom-components/katex
+      '@eurora/proto':
+        specifier: workspace:*
+        version: link:../../packages/proto
       '@eurora/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -668,6 +671,9 @@ importers:
       eslint:
         specifier: ^9.25.1
         version: 9.27.0(jiti@2.4.2)
+      grpc-web:
+        specifier: ^1.5.0
+        version: 1.5.0
       perfect-arrows:
         specifier: ^0.3.7
         version: 0.3.7
@@ -3712,6 +3718,9 @@ packages:
 
   graphemer@1.4.0:
     resolution: {integrity: sha512-EtKwoO6kxCL9WO5xipiHTZlSzBm7WLT627TqC/uVRd0HKmq8NXyebnNYxDoBi7wt8eTWrUrKXCOVaFq9x1kgag==}
+
+  grpc-web@1.5.0:
+    resolution: {integrity: sha512-y1tS3BBIoiVSzKTDF3Hm7E8hV2n7YY7pO0Uo7depfWJqKzWE+SKr0jvHNIJsJJYILQlpYShpi/DRJJMbosgDMQ==}
 
   has-flag@3.0.0:
     resolution: {integrity: sha512-sKJf1+ceQBr4SMkvQnBDNDtf4TXpVhVGateu0t918bl30FnbE2m4vNLX+VWe/dpjlb+HugGYzW7uQXH98HPEYw==}
@@ -8294,6 +8303,8 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   graphemer@1.4.0: {}
+
+  grpc-web@1.5.0: {}
 
   has-flag@3.0.0: {}
 
