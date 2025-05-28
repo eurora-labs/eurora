@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Button, Card, Input, Label } from '@eurora/ui';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
+	import { authService, TokenStorage, type RegisterData } from '$lib/services/auth-service.js';
 
 	let formData = $state({
 		username: '',
@@ -84,20 +85,29 @@
 		isLoading = true;
 
 		try {
-			// TODO: Implement actual registration API call
-			// This would typically call the auth service register endpoint
-			console.log('Registration data:', {
+			const registerData: RegisterData = {
 				username: formData.username,
 				email: formData.email,
 				password: formData.password,
-				display_name: formData.displayName || undefined
+				displayName: formData.displayName || undefined
+			};
+
+			console.log('Registering user:', {
+				username: registerData.username,
+				email: registerData.email,
+				displayName: registerData.displayName
 			});
 
-			// Simulate API call
-			await new Promise((resolve) => setTimeout(resolve, 1500));
+			// Call the auth service to register the user
+			const tokens = await authService.register(registerData);
 
+			// Save tokens to localStorage
+			TokenStorage.saveTokens(tokens);
+
+			console.log('Registration successful, tokens saved');
 			success = true;
 		} catch (err) {
+			console.error('Registration error:', err);
 			errors = {
 				submit:
 					err instanceof Error ? err.message : 'Registration failed. Please try again.'
