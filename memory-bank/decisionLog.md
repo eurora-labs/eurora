@@ -488,3 +488,41 @@ This file tracks key architectural and design decisions made during the project'
 - Consistent error handling across the application
 - Ready for production use with proper token management
 - Extensible for additional auth features (login, logout, etc.)
+
+[2025-05-29 11:08:51] - Implemented comprehensive login page for Eurora web application
+
+**Decision:** Created a modern, accessible login form following the same patterns and design as the registration page.
+
+**Rationale:**
+
+- Users need a proper login flow to access their existing Eurora accounts
+- Login page should provide consistent user experience with the registration page
+- Form should integrate with the existing gRPC-Web auth service for real authentication
+- Should follow established project patterns for validation, error handling, and UI components
+- Simplified form compared to registration (only login/email and password fields needed)
+
+**Implementation Details:**
+
+- Built using existing UI components from @eurora/ui package (Card, Input, Label, Button)
+- Implemented client-side validation for required fields (login and password)
+- Added password visibility toggle for better user experience
+- Included loading states with spinner during form submission
+- Error handling with user-friendly error messages from auth service
+- Success state with confirmation message and automatic redirect to /app
+- Responsive design that works on mobile and desktop
+- Proper accessibility with labels, ARIA attributes, and keyboard navigation
+- SEO optimization with proper meta tags and title
+- Integration with existing auth service login() method and TokenStorage
+- Uses Svelte 5 syntax (onsubmit, onblur) for event handling
+- Automatic token storage in localStorage upon successful login
+- Link to registration page for new users
+
+**Benefits:**
+
+- Complete authentication flow for existing users
+- Consistent design and user experience with registration
+- Real backend integration with type-safe gRPC communication
+- Accessible design following web standards
+- Mobile-friendly responsive layout
+- Secure token-based authentication with automatic storage
+- Ready for production use with proper error handling
