@@ -377,3 +377,152 @@ This file tracks key architectural and design decisions made during the project'
 - Flexible deployment target support (placeholder for various deployment methods)
 - Proper environment variable handling for database connections and JWT configuration
 - Concurrent deployment protection and manual workflow dispatch capability
+
+[2025-05-28 09:56:18] - Implemented comprehensive registration page for Eurora web application
+
+**Decision:** Created a modern, accessible registration form with comprehensive validation and user experience features.
+
+**Rationale:**
+
+- The existing registration page was just a placeholder with minimal functionality
+- Users need a proper registration flow to create accounts for the Eurora platform
+- Form should match the project's design system and use existing UI components
+- Registration should align with the auth service proto definition (username, email, password, display_name)
+- Modern UX patterns improve user conversion and reduce registration friction
+
+**Implementation Details:**
+
+- Built using existing UI components from @eurora/ui package (Card, Input, Label, Button, Alert)
+- Implemented client-side validation for all required fields:
+    - Username: minimum 3 characters, required
+    - Email: valid email format validation, required
+    - Password: minimum 8 characters, required
+    - Confirm Password: must match password
+    - Display Name: optional field
+- Added password visibility toggles for better UX
+- Included loading states with spinner during form submission
+- Error handling with user-friendly error messages
+- Success state with confirmation message and redirect to login
+- Responsive design that works on mobile and desktop
+- Proper accessibility with labels, ARIA attributes, and keyboard navigation
+- SEO optimization with proper meta tags and title
+- Form data structure matches RegisterRequest proto definition
+- Added placeholder for actual API integration with auth service
+
+**Benefits:**
+
+- Professional user registration experience
+- Reduces user errors with real-time validation
+- Consistent with project's design system
+- Accessible to users with disabilities
+- Mobile-friendly responsive design
+- Ready for integration with backend auth service
+
+[2025-05-28 10:04:59] - Updated registration page to use improved form validation pattern with Svelte 5 syntax
+
+**Decision:** Enhanced the registration form with better validation patterns and proper Svelte 5 event handling syntax.
+
+**Rationale:**
+
+- User requested to use shadcn-svelte form patterns instead of basic form implementation
+- Project uses Svelte 5 which requires updated event handling syntax (onsubmit instead of on:submit)
+- Better user experience with real-time field validation and visual feedback
+- Follows existing project patterns seen in api-key-form.svelte
+
+**Implementation Details:**
+
+- Updated event handlers to use Svelte 5 syntax: onsubmit, onblur instead of on:submit, on:blur
+- Implemented per-field validation with real-time feedback on blur events
+- Enhanced password validation with stronger requirements (uppercase, lowercase, number)
+- Added username validation with character restrictions (alphanumeric, hyphens, underscores)
+- Visual error states with red borders and error messages
+- Improved accessibility with aria-labels for password visibility toggles
+- Better UX with disabled submit button when validation errors exist
+- Maintained existing UI component usage pattern from the project
+
+**Benefits:**
+
+- Proper Svelte 5 compatibility without syntax errors
+- Better user experience with immediate validation feedback
+- Stronger security with enhanced password requirements
+- Consistent with project's existing form patterns
+- Accessible design with proper ARIA attributes
+
+[2025-05-28 10:28:23] - Implemented gRPC-Web auth service integration for frontend registration
+
+**Decision:** Created a complete gRPC-Web client service to connect the frontend registration form to the backend auth service.
+
+**Rationale:**
+
+- User requested integration with the existing backend auth service using grpc-web
+- Need to provide real authentication functionality instead of simulated API calls
+- Frontend should communicate directly with the gRPC backend service
+- Token management needed for maintaining user sessions
+
+**Implementation Details:**
+
+- Created `apps/web/src/lib/services/auth-service.ts` with gRPC-Web client implementation
+- Used official grpc-web package instead of @improbable-eng/grpc-web
+- Generated TypeScript protobuf files using existing proto compilation scripts
+- Updated `packages/proto/src/index.ts` to export auth service types and client
+- Implemented custom GrpcWebRpc transport using fetch API with proper headers
+- Created AuthService class with register(), login(), and refreshToken() methods
+- Added TokenStorage utility class for localStorage token management
+- Integrated auth service into registration page replacing simulated API call
+- Added proper error handling and user-friendly error messages
+- Included logging for debugging and monitoring
+
+**Technical Features:**
+
+- Type-safe gRPC communication using generated TypeScript types
+- Automatic token storage and management in localStorage
+- Error extraction and user-friendly error messages
+- Support for username/email login and registration
+- JWT token refresh functionality
+- Proper gRPC-Web headers and content types
+
+**Benefits:**
+
+- Real backend integration with type safety
+- Secure token-based authentication
+- Consistent error handling across the application
+- Ready for production use with proper token management
+- Extensible for additional auth features (login, logout, etc.)
+
+[2025-05-29 11:08:51] - Implemented comprehensive login page for Eurora web application
+
+**Decision:** Created a modern, accessible login form following the same patterns and design as the registration page.
+
+**Rationale:**
+
+- Users need a proper login flow to access their existing Eurora accounts
+- Login page should provide consistent user experience with the registration page
+- Form should integrate with the existing gRPC-Web auth service for real authentication
+- Should follow established project patterns for validation, error handling, and UI components
+- Simplified form compared to registration (only login/email and password fields needed)
+
+**Implementation Details:**
+
+- Built using existing UI components from @eurora/ui package (Card, Input, Label, Button)
+- Implemented client-side validation for required fields (login and password)
+- Added password visibility toggle for better user experience
+- Included loading states with spinner during form submission
+- Error handling with user-friendly error messages from auth service
+- Success state with confirmation message and automatic redirect to /app
+- Responsive design that works on mobile and desktop
+- Proper accessibility with labels, ARIA attributes, and keyboard navigation
+- SEO optimization with proper meta tags and title
+- Integration with existing auth service login() method and TokenStorage
+- Uses Svelte 5 syntax (onsubmit, onblur) for event handling
+- Automatic token storage in localStorage upon successful login
+- Link to registration page for new users
+
+**Benefits:**
+
+- Complete authentication flow for existing users
+- Consistent design and user experience with registration
+- Real backend integration with type-safe gRPC communication
+- Accessible design following web standards
+- Mobile-friendly responsive layout
+- Secure token-based authentication with automatic storage
+- Ready for production use with proper error handling
