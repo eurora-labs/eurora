@@ -24,19 +24,21 @@
 		"test:unit": "vitest"
 	},
 	"dependencies": {
-		"@eurora/ui": "workspace:*",
-		"@eurora/katex": "workspace:*"
+		"@eurora/katex": "workspace:*",
+		"@eurora/proto": "workspace:*",
+		"@eurora/ui": "workspace:*"
 	},
 	"devDependencies": {
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
-		"@sveltejs/adapter-static": "^3.0.8",
+		"@lucide/svelte": "^0.511.0",
 		"@sveltejs/adapter-auto": "^4.0.0",
+		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.21.1",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"eslint": "^9.25.1",
-		"@lucide/svelte": "^0.511.0",
+		"grpc-web": "^1.5.0",
 		"perfect-arrows": "^0.3.7",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
