@@ -2,9 +2,9 @@ syntax = "proto3";
 package auth.v1;
 
 service ProtoAuthService {
-    rpc Login (LoginRequest) returns (LoginResponse);
-    rpc Register (RegisterRequest) returns (LoginResponse);
-    rpc RefreshToken (RefreshTokenRequest) returns (LoginResponse);
+    rpc Login (LoginRequest) returns (TokenResponse);
+    rpc Register (RegisterRequest) returns (TokenResponse);
+    rpc RefreshToken (RefreshTokenRequest) returns (TokenResponse);
 }
 
 message LoginRequest {
@@ -40,7 +40,7 @@ message RefreshTokenRequest {
     string refresh_token = 1;
 }
 
-message LoginResponse {
+message TokenResponse {
     string access_token = 1;
     string refresh_token = 2;
     int64 expires_in = 3;
