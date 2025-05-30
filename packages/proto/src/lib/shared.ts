@@ -1,1 +1,1 @@
-export { ProtoImage, ProtoImageFormat } from './gen/shared.js';
+export { ProtoImage, ProtoImageFormat } from './gen/shared_pb.js';
