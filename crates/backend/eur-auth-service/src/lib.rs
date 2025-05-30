@@ -191,6 +191,14 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<LoginRequest>,
     ) -> Result<Response<LoginResponse>, Status> {
+        // Return placeholder response for now
+        return Ok(Response::new(LoginResponse {
+            access_token: "placeholder".to_string(),
+            refresh_token: "placeholder".to_string(),
+            expires_in: 3600,
+        }));
+
+        eprintln!("Login request received");
         let req = request.into_inner();
 
         info!("Login request received");

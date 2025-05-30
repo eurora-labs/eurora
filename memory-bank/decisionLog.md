@@ -526,3 +526,44 @@ This file tracks key architectural and design decisions made during the project'
 - Mobile-friendly responsive layout
 - Secure token-based authentication with automatic storage
 - Ready for production use with proper error handling
+
+[2025-05-30 11:39:00] - Configured Envoy proxy for gRPC-Web communication between frontend and backend
+
+**Decision:** Configured Envoy proxy to enable gRPC-Web communication between the web frontend auth service and the backend gRPC monolith service.
+
+**Rationale:**
+
+- Frontend uses gRPC-Web protocol which browsers can handle, but backend uses standard gRPC
+- Envoy proxy provides protocol translation between gRPC-Web and gRPC
+- Enables secure, type-safe communication between frontend and backend
+- Handles CORS requirements for web browser requests
+- Provides proper routing based on service names from proto definitions
+
+**Implementation Details:**
+
+- Updated `config/envoy/envoy.yaml` to listen on port 8080 (matching frontend default)
+- Added gRPC-Web filter for protocol conversion from gRPC-Web to gRPC
+- Added CORS filter with proper headers for browser compatibility
+- Configured routing for auth service: `/auth.v1.ProtoAuthService/` → backend cluster
+- Configured routing for OCR service: `/ocr_service.ProtoOcrService/` → backend cluster
+- Updated backend cluster to point to `127.0.0.1:50051` with HTTP/2 protocol options
+- Modified backend main.rs to use `127.0.0.1:50051` instead of `[::1]:50051` for consistency
+- Added proper timeout configuration (60s) for gRPC requests
+- Included necessary CORS headers: authorization, grpc-status, grpc-message, x-grpc-web
+
+**Technical Features:**
+
+- Protocol conversion: gRPC-Web (HTTP/1.1 + protobuf) ↔ gRPC (HTTP/2 + protobuf)
+- CORS support for cross-origin requests from web browsers
+- Service-based routing using proto package names and service names
+- Proper error handling with gRPC status codes
+- Support for authentication headers (Bearer tokens)
+- Load balancing ready (ROUND_ROBIN policy)
+
+**Benefits:**
+
+- Enables direct frontend-to-backend gRPC communication
+- Type-safe API calls using generated TypeScript clients
+- Consistent error handling across the application
+- Scalable architecture ready for additional services
+- Proper security with JWT authentication support

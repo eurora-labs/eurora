@@ -1,65 +1,62 @@
+admin:
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
+
 static_resources:
   listeners:
-  - name: listener_0
+  - name: grpc_web_listener
     address:
-      socket_address:
-        address: 0.0.0.0
-        port_value: 8080
+      socket_address: { address: 0.0.0.0, port_value: 8080 }
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          stat_prefix: ingress_http
-          http_filters:
-          - name: envoy.filters.http.cors
-          - name: envoy.filters.http.grpc_web
-          - name: envoy.filters.http.router
+          stat_prefix: grpc_web
+          codec_type: AUTO
           route_config:
             name: local_route
             virtual_hosts:
-            - name: local_service
+            - name: backend_services
               domains: ["*"]
               routes:
-              - match:
-                  prefix: "/auth.v1"
+              - match: { prefix: "/auth.v1.ProtoAuthService/" }
                 route:
-                  timeout: 0s
-                  auto_host_rewrite: true
-                  cluster: server|443
-                  max_stream_duration:
-                    grpc_timeout_header_max: 300s
+                  cluster: auth_backend
+                  timeout: 60s
+              - match: { prefix: "/ocr_service.ProtoOcrService/" }
+                route:
+                  cluster: auth_backend
+                  timeout: 60s
               cors:
                 allow_origin_string_match:
-                - safe_regex:
-                    google_re2: {}
-                    regex: ".*"
-                allow_methods: "GET, PUT, DELETE, POST, OPTIONS"
-                allow_headers: "keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,custom-header-1,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web"
-                expose_headers: "custom-header-1,grpc-status,grpc-message"
+                - prefix: "*"
+                allow_methods: GET, PUT, DELETE, POST, OPTIONS
+                allow_headers: keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,custom-header-1,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web,grpc-timeout,authorization
+                max_age: "1728000"
+                expose_headers: custom-header-1,grpc-status,grpc-message
+          http_filters:
+          - name: envoy.filters.http.grpc_web
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
+          - name: envoy.filters.http.cors
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
-  - name: server|443
-    connect_timeout: 30s
+  - name: auth_backend
+    connect_timeout: 0.25s
     type: LOGICAL_DNS
-    # Comment out the following line to test on v6 networks
-    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
     load_assignment:
-      cluster_name: server|443
+      cluster_name: auth_backend
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: server-f2dxgbokta-uc.a.run.app
-                port_value: 443
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        # sni: server-f2dxgbokta-uc.a.run.app
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        upstream_http_protocol_options:
-          auto_sni: true
-        auto_config: {}
+                address: host.docker.internal
+                port_value: 50051

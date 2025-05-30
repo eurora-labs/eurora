@@ -71,6 +71,7 @@
 
 			// Call the auth service to login the user
 			const tokens = await authService.login(loginData);
+			return;
 
 			// Save tokens to localStorage
 			TokenStorage.saveTokens(tokens);

@@ -126,7 +126,7 @@ export class AuthService {
 
 			const response = await this.client.Login(request);
 
-			console.log('Login successful');
+			console.log('Login successful', response);
 
 			return {
 				accessToken: response.accessToken,
