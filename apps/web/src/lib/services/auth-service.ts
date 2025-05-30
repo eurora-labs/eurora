@@ -3,7 +3,7 @@ import { createClient, type Client } from '@connectrpc/connect';
 import {
 	ProtoAuthService,
 	type LoginRequest,
-	type LoginResponse,
+	type TokenResponse,
 	type RefreshTokenRequest,
 	type RegisterRequest
 } from '@eurora/proto/auth_service';
@@ -20,18 +20,18 @@ class AuthService {
 		);
 	}
 
-	public async login(data: LoginRequest): Promise<LoginResponse> {
+	public async login(data: LoginRequest): Promise<TokenResponse> {
 		return await this.client.login(data);
 	}
 
-	public async register(data: RegisterRequest): Promise<LoginResponse> {
+	public async register(data: RegisterRequest): Promise<TokenResponse> {
 		return await this.client.register(data);
 	}
 
-	public async refreshToken(data: RefreshTokenRequest): Promise<LoginResponse> {
+	public async refreshToken(data: RefreshTokenRequest): Promise<TokenResponse> {
 		return await this.client.refreshToken(data);
 	}
 }
 
 export const authService = new AuthService();
-export type { LoginRequest, LoginResponse, RegisterRequest, RefreshTokenRequest };
+export type { LoginRequest, TokenResponse, RegisterRequest, RefreshTokenRequest };
