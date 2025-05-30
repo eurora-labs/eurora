@@ -33,6 +33,15 @@ importers:
 
   .:
     devDependencies:
+      '@bufbuild/buf':
+        specifier: ^1.53.0
+        version: 1.54.0
+      '@bufbuild/protobuf':
+        specifier: ^2.2.5
+        version: 2.5.0
+      '@bufbuild/protoc-gen-es':
+        specifier: ^2.2.5
+        version: 2.5.0(@bufbuild/protobuf@2.5.0)
       '@commitlint/cli':
         specifier: ^19.8.1
         version: 19.8.1(@types/node@22.15.21)(typescript@5.8.3)
@@ -42,6 +51,12 @@ importers:
       '@commitlint/cz-commitlint':
         specifier: ^19.8.0
         version: 19.8.1(@types/node@22.15.21)(commitizen@4.3.1(@types/node@22.15.21)(typescript@5.8.3))(inquirer@9.3.7)(typescript@5.8.3)
+      '@connectrpc/connect':
+        specifier: ^2.0.2
+        version: 2.0.2(@bufbuild/protobuf@2.5.0)
+      '@connectrpc/connect-web':
+        specifier: ^2.0.2
+        version: 2.0.2(@bufbuild/protobuf@2.5.0)(@connectrpc/connect@2.0.2(@bufbuild/protobuf@2.5.0))
       '@tauri-apps/cli':
         specifier: ^2.5.0
         version: 2.5.0
@@ -1656,6 +1671,17 @@ packages:
   '@commitlint/types@19.8.1':
     resolution: {integrity: sha512-/yCrWGCoA1SVKOks25EGadP9Pnj0oAIHGpl2wH2M2Y46dPM2ueb8wyCVOD7O3WCTkaJ0IkKvzhl1JY7+uCT2Dw==}
     engines: {node: '>=v18'}
+
+  '@connectrpc/connect-web@2.0.2':
+    resolution: {integrity: sha512-QANMFPiL2o66BdBEctg4TsQLe5ozsBLqcle3dCBp7BwGlNGTY6NnNnqmt+YRnpeMW88GgomJwWNMGCrRD9pRKA==}
+    peerDependencies:
+      '@bufbuild/protobuf': ^2.2.0
+      '@connectrpc/connect': 2.0.2
+
+  '@connectrpc/connect@2.0.2':
+    resolution: {integrity: sha512-xZuylIUNvNlH52e/4eQsZvY4QZyDJRtEFEDnn/yBrv5Xi5ZZI/p8X+GAHH35ucVaBvv9u7OzHZo8+tEh1EFTxA==}
+    peerDependencies:
+      '@bufbuild/protobuf': ^2.2.0
 
   '@csstools/color-helpers@5.0.2':
     resolution: {integrity: sha512-JqWH1vsgdGcw2RR6VliXXdA0/59LttzlU8UlRT/iUUsEeWfYq8I+K0yhihEUTTHLRm1EXvpsCx3083EU15ecsA==}
@@ -6167,6 +6193,15 @@ snapshots:
     dependencies:
       '@types/conventional-commits-parser': 5.0.1
       chalk: 5.4.1
+
+  '@connectrpc/connect-web@2.0.2(@bufbuild/protobuf@2.5.0)(@connectrpc/connect@2.0.2(@bufbuild/protobuf@2.5.0))':
+    dependencies:
+      '@bufbuild/protobuf': 2.5.0
+      '@connectrpc/connect': 2.0.2(@bufbuild/protobuf@2.5.0)
+
+  '@connectrpc/connect@2.0.2(@bufbuild/protobuf@2.5.0)':
+    dependencies:
+      '@bufbuild/protobuf': 2.5.0
 
   '@csstools/color-helpers@5.0.2': {}
 
