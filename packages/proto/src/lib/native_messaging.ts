@@ -1,1 +1,1 @@
-export * from './gen/native_messaging.js';
+export * from './gen/native_messaging_pb.js';
