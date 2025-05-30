@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { create } from '@bufbuild/protobuf';
 	import { Button, Card, Input, Label } from '@eurora/ui';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
-	import { authService, type LoginRequest } from '$lib/services/auth-service.js';
-	import type { EmailPasswordCredentials } from '@eurora/proto/auth_service';
+	import { authService } from '$lib/services/auth-service.js';
+	import { LoginRequestSchema } from '@eurora/proto/auth_service';
 
 	let formData = $state({
 		login: '',
@@ -61,17 +62,15 @@
 		isLoading = true;
 
 		try {
-			const loginData: LoginRequest = {
-				$typeName: 'auth.v1.LoginRequest',
+			const loginData = create(LoginRequestSchema, {
 				credential: {
 					value: {
-						$typeName: 'auth.v1.EmailPasswordCredentials',
 						login: formData.login,
 						password: formData.password
 					},
 					case: 'emailPassword'
 				}
-			};
+			});
 
 			console.log('Logging in user:', loginData);
 
