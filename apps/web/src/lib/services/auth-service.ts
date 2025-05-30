@@ -6,7 +6,7 @@ import {
 	LoginResponse,
 	EmailPasswordCredentials,
 	type ProtoAuthService
-} from '@eurora/proto';
+} from '@eurora/proto/auth_service';
 
 // Simple gRPC-Web transport implementation using fetch
 class GrpcWebRpc {
