@@ -71,18 +71,18 @@
 
 			// Call the auth service to login the user
 			const tokens = await authService.login(loginData);
-			return;
+			// console.log('Tokens: ', tokens);
 
-			// Save tokens to localStorage
-			TokenStorage.saveTokens(tokens);
+			// // Save tokens to localStorage
+			// TokenStorage.saveTokens(tokens);
 
-			console.log('Login successful, tokens saved');
-			success = true;
+			// console.log('Login successful, tokens saved');
+			// success = true;
 
-			// Redirect to dashboard or home page after a short delay
-			setTimeout(() => {
-				window.location.href = '/app';
-			}, 1500);
+			// // Redirect to dashboard or home page after a short delay
+			// setTimeout(() => {
+			// 	window.location.href = '/app';
+			// }, 1500);
 		} catch (err) {
 			console.error('Login error:', err);
 			errors = {

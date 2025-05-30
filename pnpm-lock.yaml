@@ -1225,13 +1225,20 @@ importers:
         version: 0.7.39(svelte@5.33.3)(typescript@5.8.3)
 
   packages/proto:
+    dependencies:
+      '@bufbuild/protobuf':
+        specifier: ^2.2.5
+        version: 2.5.0
+      grpc-web:
+        specifier: ^1.5.0
+        version: 1.5.0
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
     devDependencies:
       '@bufbuild/buf':
         specifier: ^1.53.0
         version: 1.54.0
-      '@bufbuild/protobuf':
-        specifier: ^2.2.5
-        version: 2.5.0
       '@bufbuild/protoc-gen-es':
         specifier: ^2.2.5
         version: 2.5.0(@bufbuild/protobuf@2.5.0)
@@ -1241,9 +1248,9 @@ importers:
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
-      rxjs:
-        specifier: ^7.8.2
-        version: 7.8.2
+      google-protobuf:
+        specifier: ^3.21.4
+        version: 3.21.4
       typescript:
         specifier: ^5.8.3
         version: 5.8.3
@@ -3698,6 +3705,9 @@ packages:
 
   globrex@0.1.2:
     resolution: {integrity: sha512-uHJgbwAMwNFf5mLst7IWLNg14x1CkeqglJb/K3doi4dw6q2IvAAmM/Y81kevy83wP+Sst+nutFTYOGg3d1lsxg==}
+
+  google-protobuf@3.21.4:
+    resolution: {integrity: sha512-MnG7N936zcKTco4Jd2PX2U96Kf9PxygAPKBug+74LHzmHXmceN16MmRcdgZv+DGef/S9YvQAfRsNCn4cjf9yyQ==}
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -8279,6 +8289,8 @@ snapshots:
   globalyzer@0.1.0: {}
 
   globrex@0.1.2: {}
+
+  google-protobuf@3.21.4: {}
 
   gopd@1.2.0: {}
 

@@ -22,5 +22,6 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
 image = { workspace = true }
 futures = "0.3"
 sentry = { workspace = true }
+tonic-web = "0.13.1"
 [build-dependencies]
 tonic-build = { workspace = true }

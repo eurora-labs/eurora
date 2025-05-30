@@ -2,38 +2,59 @@
 	"name": "@eurora/proto",
 	"version": "0.0.1",
 	"type": "module",
-	"main": "src/index.ts",
-	"typings": "./index.d.ts",
 	"private": true,
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist/**/*"
+	],
+	"scripts": {
+		"build": "tsc",
+		"clean": "rm -rf dist",
+		"dev": "tsc --watch",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@bufbuild/protobuf": "^2.2.5",
+		"grpc-web": "^1.5.0",
+		"rxjs": "^7.8.2"
+	},
 	"devDependencies": {
 		"@bufbuild/buf": "^1.53.0",
-		"@bufbuild/protobuf": "^2.2.5",
 		"@bufbuild/protoc-gen-es": "^2.2.5",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
-		"typescript": "^5.8.3",
-		"rxjs": "^7.8.2"
+		"google-protobuf": "^3.21.4",
+		"typescript": "^5.8.3"
 	},
 	"exports": {
 		".": {
-			"types": "./src/index.ts",
-			"default": "./src/index.ts"
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
 		},
-		"./tauri_ipc": {
-			"types": "./src/lib/tauri_ipc.ts",
-			"default": "./src/lib/tauri_ipc.ts"
+		"./auth": {
+			"types": "./dist/lib/auth_service.d.ts",
+			"default": "./dist/lib/auth_service.js"
 		},
-		"./questions_service": {
-			"types": "./src/lib/questions_service.ts",
-			"default": "./src/lib/questions_service.ts"
+		"./tauri": {
+			"types": "./dist/lib/tauri_ipc.d.ts",
+			"default": "./dist/lib/tauri_ipc.js"
+		},
+		"./questions": {
+			"types": "./dist/lib/questions_service.d.ts",
+			"default": "./dist/lib/questions_service.js"
 		},
 		"./shared": {
-			"types": "./src/lib/shared.ts",
-			"default": "./src/lib/shared.ts"
+			"types": "./dist/lib/shared.d.ts",
+			"default": "./dist/lib/shared.js"
 		},
-		"./native_messaging": {
-			"types": "./src/lib/native_messaging.ts",
-			"default": "./src/lib/native_messaging.ts"
+		"./native": {
+			"types": "./dist/lib/native_messaging.d.ts",
+			"default": "./dist/lib/native_messaging.js"
+		},
+		"./ocr": {
+			"types": "./dist/lib/gen/ocr_service.d.ts",
+			"default": "./dist/lib/gen/ocr_service.js"
 		}
 	}
 }

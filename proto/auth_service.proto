@@ -8,10 +8,12 @@ service ProtoAuthService {
 }
 
 message LoginRequest {
-    oneof credential {
-        EmailPasswordCredentials email_password = 1;
-        ThirdPartyCredentials third_party = 2;
-    }
+    string login = 1;
+    string password = 2;
+    // oneof credential {
+    //     EmailPasswordCredentials email_password = 1;
+    //     ThirdPartyCredentials third_party = 2;
+    // }
 }
 
 message EmailPasswordCredentials {

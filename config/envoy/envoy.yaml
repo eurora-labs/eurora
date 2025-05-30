@@ -12,7 +12,7 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          stat_prefix: grpc_web
+          stat_prefix: ingress_http
           codec_type: AUTO
           route_config:
             name: local_route
@@ -20,14 +20,10 @@ static_resources:
             - name: backend_services
               domains: ["*"]
               routes:
-              - match: { prefix: "/auth.v1.ProtoAuthService/" }
+              - match: { prefix: "/" }
                 route:
-                  cluster: auth_backend
-                  timeout: 60s
-              - match: { prefix: "/ocr_service.ProtoOcrService/" }
-                route:
-                  cluster: auth_backend
-                  timeout: 60s
+                  cluster: eur-monolith
+                  max_grpc_timeout: 0s
               cors:
                 allow_origin_string_match:
                 - prefix: "*"
@@ -46,13 +42,13 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
-  - name: auth_backend
-    connect_timeout: 0.25s
+  - name: eur-monolith
+    connect_timeout: 300s
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
     load_assignment:
-      cluster_name: auth_backend
+      cluster_name: eur-monolith
       endpoints:
       - lb_endpoints:
         - endpoint:

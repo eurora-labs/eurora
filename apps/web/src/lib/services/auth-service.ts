@@ -1,12 +1,12 @@
 import {
-	ProtoAuthServiceClientImpl,
+	ProtoAuthServiceClient,
 	RegisterRequest,
 	LoginRequest,
 	RefreshTokenRequest,
 	LoginResponse,
 	EmailPasswordCredentials,
 	type ProtoAuthService
-} from '@eurora/proto';
+} from '@eurora/proto/auth';
 
 // Simple gRPC-Web transport implementation using fetch
 class GrpcWebRpc {
@@ -65,13 +65,12 @@ export interface AuthTokens {
 }
 
 export class AuthService {
-	private client: ProtoAuthService;
+	private client: ProtoAuthServiceClient;
 	private readonly baseUrl: string;
 
 	constructor(baseUrl: string = 'http://localhost:8080') {
 		this.baseUrl = baseUrl;
-		const rpc = new GrpcWebRpc(baseUrl);
-		this.client = new ProtoAuthServiceClientImpl(rpc);
+		this.client = new ProtoAuthServiceClient(this.baseUrl);
 	}
 
 	/**
@@ -92,14 +91,14 @@ export class AuthService {
 				displayName: request.displayName
 			});
 
-			const response = await this.client.Register(request);
+			const response = await this.client.register(request as any);
 
 			console.log('Registration successful');
 
 			return {
-				accessToken: response.accessToken,
-				refreshToken: response.refreshToken,
-				expiresIn: response.expiresIn
+				accessToken: response.getAccessToken(),
+				refreshToken: response.getRefreshToken(),
+				expiresIn: response.getExpiresIn()
 			};
 		} catch (error) {
 			console.error('Registration failed:', error);
@@ -118,20 +117,20 @@ export class AuthService {
 			};
 
 			const request: LoginRequest = {
-				emailPassword: credentials,
-				thirdParty: undefined
+				login: data.login,
+				password: data.password
 			};
 
 			console.log('Sending login request for:', data.login);
 
-			const response = await this.client.Login(request);
+			const response = await this.client.login(request as any);
 
 			console.log('Login successful', response);
 
 			return {
-				accessToken: response.accessToken,
-				refreshToken: response.refreshToken,
-				expiresIn: response.expiresIn
+				accessToken: response.getAccessToken(),
+				refreshToken: response.getRefreshToken(),
+				expiresIn: response.getExpiresIn()
 			};
 		} catch (error) {
 			console.error('Login failed:', error);
@@ -150,14 +149,14 @@ export class AuthService {
 
 			console.log('Refreshing token');
 
-			const response = await this.client.RefreshToken(request);
+			const response = await this.client.refreshToken(request as any);
 
 			console.log('Token refresh successful');
 
 			return {
-				accessToken: response.accessToken,
-				refreshToken: response.refreshToken,
-				expiresIn: response.expiresIn
+				accessToken: response.getAccessToken(),
+				refreshToken: response.getRefreshToken(),
+				expiresIn: response.getExpiresIn()
 			};
 		} catch (error) {
 			console.error('Token refresh failed:', error);

@@ -24,5 +24,8 @@ chrono = { workspace = true, features = ["serde"] }
 bcrypt = "0.15"
 jsonwebtoken = "9.3"
 serde = { version = "1.0", features = ["derive"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.4", features = ["cors"] }
+tonic-web = "0.13.1"
 [build-dependencies]
 tonic-build = { workspace = true }

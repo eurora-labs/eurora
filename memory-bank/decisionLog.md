@@ -567,3 +567,27 @@ This file tracks key architectural and design decisions made during the project'
 - Consistent error handling across the application
 - Scalable architecture ready for additional services
 - Proper security with JWT authentication support
+
+[2025-05-30 12:21:00] - Fixed login authentication flow returning empty tokens
+
+**Decision:** Removed placeholder response from auth service login method and fixed frontend request structure.
+
+**Rationale:**
+
+- The auth service had a placeholder return statement that prevented actual authentication logic from executing
+- Frontend was using incorrect request structure for LoginRequest based on generated TypeScript types
+- Login flow was returning empty access_token, refresh_token, and expires_in values instead of real JWT tokens
+
+**Implementation Details:**
+
+- Removed early return with placeholder response from crates/backend/eur-auth-service/src/lib.rs login() method
+- Fixed frontend auth service to use correct LoginRequest structure with emailPassword field
+- Removed early return from login page that prevented token saving and redirect logic
+- Now the complete authentication flow executes: credential validation, JWT generation, and token response
+
+**Benefits:**
+
+- Real authentication with proper JWT tokens
+- Complete login flow with token storage and redirect
+- Consistent with existing auth service architecture
+- Enables actual user authentication instead of placeholder responses

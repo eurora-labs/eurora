@@ -3,15 +3,20 @@
 use anyhow::{Result, anyhow};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
-use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthService;
+use eur_proto::proto_auth_service::proto_auth_service_server::{
+    ProtoAuthService, ProtoAuthServiceServer,
+};
 use eur_proto::proto_auth_service::{
     EmailPasswordCredentials, LoginRequest, LoginResponse, RefreshTokenRequest, RegisterRequest,
-    login_request::Credential,
 };
 use eur_remote_db::{CreateUserRequest, DatabaseManager};
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use std::sync::Arc;
+use tonic::service::{LayerExt, Layered};
+use tonic::transport::Server;
 use tonic::{Request, Response, Status};
+use tonic_web::GrpcWebService;
+use tower_http::cors::Cors;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -191,33 +196,35 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<LoginRequest>,
     ) -> Result<Response<LoginResponse>, Status> {
-        // Return placeholder response for now
+        info!("Login request received");
+        eprintln!("Login request received");
+        info!("Login request received");
         return Ok(Response::new(LoginResponse {
-            access_token: "placeholder".to_string(),
-            refresh_token: "placeholder".to_string(),
+            access_token: "test".to_string(),
+            refresh_token: "test".to_string(),
             expires_in: 3600,
         }));
-
-        eprintln!("Login request received");
         let req = request.into_inner();
 
-        info!("Login request received");
+        // eprintln!("Login request received: {:?}", req);
 
-        // Extract credentials from the request
-        let credential = req.credential.ok_or_else(|| {
-            warn!("Login request missing credentials");
-            Status::invalid_argument("Missing credentials")
-        })?;
+        // info!("Login request received");
 
-        match credential {
-            Credential::EmailPassword(creds) => self.handle_email_password_login(creds).await,
-            Credential::ThirdParty(_) => {
-                warn!("Third-party authentication not implemented");
-                Err(Status::unimplemented(
-                    "Third-party authentication not implemented",
-                ))
-            }
-        }
+        // // Extract credentials from the request
+        // let credential = req.credential.ok_or_else(|| {
+        //     warn!("Login request missing credentials");
+        //     Status::invalid_argument("Missing credentials")
+        // })?;
+
+        // match credential {
+        //     Credential::EmailPassword(creds) => self.handle_email_password_login(creds).await,
+        //     Credential::ThirdParty(_) => {
+        //         warn!("Third-party authentication not implemented");
+        //         Err(Status::unimplemented(
+        //             "Third-party authentication not implemented",
+        //         ))
+        //     }
+        // }
     }
 
     async fn register(
@@ -346,4 +353,18 @@ impl AuthService {
 
         Ok(Response::new(response))
     }
+}
+
+pub fn build_service(
+    service: AuthService,
+) -> Layered<
+    Cors<GrpcWebService<ProtoAuthServiceServer<AuthService>>>,
+    eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer<AuthService>,
+> {
+    // let origin = tower_http::cors::AllowOrigin::any();
+    tower::ServiceBuilder::new()
+        .layer(tower_http::cors::CorsLayer::new())
+        .layer(tonic_web::GrpcWebLayer::new())
+        .into_inner()
+        .named_layer(ProtoAuthServiceServer::new(service))
 }
