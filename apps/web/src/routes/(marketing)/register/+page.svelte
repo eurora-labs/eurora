@@ -1,7 +1,9 @@
-<!-- <script lang="ts">
+<script lang="ts">
+	import { create } from '@bufbuild/protobuf';
 	import { Button, Card, Input, Label } from '@eurora/ui';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
-	import { authService, TokenStorage, type RegisterData } from '$lib/services/auth-service.js';
+	import { authService } from '$lib/services/auth-service.js';
+	import { RegisterRequestSchema } from '@eurora/proto/auth_service';
 
 	let formData = $state({
 		username: '',
@@ -85,26 +87,19 @@
 		isLoading = true;
 
 		try {
-			const registerData: RegisterData = {
+			const registerData = create(RegisterRequestSchema, {
 				username: formData.username,
 				email: formData.email,
 				password: formData.password,
 				displayName: formData.displayName || undefined
-			};
-
-			console.log('Registering user:', {
-				username: registerData.username,
-				email: registerData.email,
-				displayName: registerData.displayName
 			});
+
+			console.log('Registering user:', registerData);
 
 			// Call the auth service to register the user
 			const tokens = await authService.register(registerData);
 
-			// Save tokens to localStorage
-			TokenStorage.saveTokens(tokens);
-
-			console.log('Registration successful, tokens saved');
+			console.log('Registration successful, tokens:', tokens);
 			success = true;
 		} catch (err) {
 			console.error('Registration error:', err);
@@ -323,4 +318,4 @@
 			</div>
 		{/if}
 	</div>
-</div> -->
+</div>
