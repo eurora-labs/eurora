@@ -1,1 +1,1 @@
-export * from './gen/questions_service.js';
+export * from './gen/questions_service_pb.js';
