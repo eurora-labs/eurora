@@ -2,9 +2,18 @@
 	"name": "@eurora/proto",
 	"version": "0.0.1",
 	"type": "module",
-	"main": "src/index.ts",
-	"typings": "./index.d.ts",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"private": true,
+	"files": [
+		"dist/**/*"
+	],
+	"scripts": {
+		"build": "tsc",
+		"clean": "rm -rf dist",
+		"dev": "tsc --watch",
+		"typecheck": "tsc --noEmit"
+	},
 	"devDependencies": {
 		"@bufbuild/buf": "^1.53.0",
 		"@bufbuild/protobuf": "^2.2.5",
@@ -15,25 +24,25 @@
 		"rxjs": "^7.8.2"
 	},
 	"exports": {
-		".": {
-			"types": "./src/index.ts",
-			"default": "./src/index.ts"
+		"./auth_service": {
+			"types": "./dist/lib/auth_service.d.ts",
+			"default": "./dist/lib/auth_service.js"
 		},
 		"./tauri_ipc": {
-			"types": "./src/lib/tauri_ipc.ts",
-			"default": "./src/lib/tauri_ipc.ts"
+			"types": "./dist/lib/tauri_ipc.d.ts",
+			"default": "./dist/lib/tauri_ipc.js"
 		},
 		"./questions_service": {
-			"types": "./src/lib/questions_service.ts",
-			"default": "./src/lib/questions_service.ts"
+			"types": "./dist/lib/questions_service.d.ts",
+			"default": "./dist/lib/questions_service.js"
 		},
 		"./shared": {
-			"types": "./src/lib/shared.ts",
-			"default": "./src/lib/shared.ts"
+			"types": "./dist/lib/shared.d.ts",
+			"default": "./dist/lib/shared.js"
 		},
 		"./native_messaging": {
-			"types": "./src/lib/native_messaging.ts",
-			"default": "./src/lib/native_messaging.ts"
+			"types": "./dist/lib/native_messaging.d.ts",
+			"default": "./dist/lib/native_messaging.js"
 		}
 	}
 }
