@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { Button, Card, Input, Label } from '@eurora/ui';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
 	import { authService, TokenStorage, type RegisterData } from '$lib/services/auth-service.js';
@@ -323,4 +323,4 @@
 			</div>
 		{/if}
 	</div>
-</div>
+</div> -->
