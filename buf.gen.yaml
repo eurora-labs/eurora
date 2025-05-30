@@ -3,7 +3,6 @@ version: v2
 clean: true
 inputs:
   - directory: "proto"
-  - module: buf.build/connectrpc/eliza
 plugins:
   - local: protoc-gen-es
     out: packages/proto/src/lib/gen
