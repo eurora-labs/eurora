@@ -194,6 +194,9 @@ impl ProtoAuthService for AuthService {
         let req = request.into_inner();
 
         info!("Login request received");
+        // eprintln!("Request: {:#?}", request);
+
+        // return Err(Status::unimplemented("Login not implemented"));
 
         // Extract credentials from the request
         let credential = req.credential.ok_or_else(|| {

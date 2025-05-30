@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { Button, Card, Input, Label } from '@eurora/ui';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
-	import { authService, TokenStorage, type LoginData } from '$lib/services/auth-service.js';
+	import { authService, type LoginRequest } from '$lib/services/auth-service.js';
+	import type { EmailPasswordCredentials } from '@eurora/proto/auth_service';
 
 	let formData = $state({
 		login: '',
@@ -60,28 +61,30 @@
 		isLoading = true;
 
 		try {
-			const loginData: LoginData = {
-				login: formData.login,
-				password: formData.password
+			const loginData: LoginRequest = {
+				$typeName: 'auth.v1.LoginRequest',
+				credential: {
+					value: {
+						$typeName: 'auth.v1.EmailPasswordCredentials',
+						login: formData.login,
+						password: formData.password
+					},
+					case: 'emailPassword'
+				}
 			};
 
-			console.log('Logging in user:', {
-				login: loginData.login
-			});
+			console.log('Logging in user:', loginData);
 
 			// Call the auth service to login the user
 			const tokens = await authService.login(loginData);
 
-			// Save tokens to localStorage
-			TokenStorage.saveTokens(tokens);
-
-			console.log('Login successful, tokens saved');
+			console.log('Login successful, tokens:', tokens);
 			success = true;
 
-			// Redirect to dashboard or home page after a short delay
-			setTimeout(() => {
-				window.location.href = '/app';
-			}, 1500);
+			// // Redirect to dashboard or home page after a short delay
+			// setTimeout(() => {
+			// 	window.location.href = '/app';
+			// }, 1500);
 		} catch (err) {
 			console.error('Login error:', err);
 			errors = {
