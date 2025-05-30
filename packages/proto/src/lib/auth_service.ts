@@ -1,1 +1,1 @@
-export * from './gen/auth_service.js';
+export * from './gen/auth_service_pb.js';
