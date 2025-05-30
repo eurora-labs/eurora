@@ -9,6 +9,8 @@ use eur_proto::{
 use eur_remote_db::DatabaseManager;
 use std::sync::Arc;
 use tonic::transport::Server;
+use tonic_web::GrpcWebLayer;
+use tower_http::cors::CorsLayer;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -49,7 +51,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth_service = AuthService::new(db_manager, Some(jwt_config));
     tracing::info!("Starting gRPC server at {}", addr);
     Server::builder()
-        .add_service(ProtoOcrServiceServer::new(ocr_service))
+        .accept_http1(true)
+        .layer(CorsLayer::permissive())
+        .layer(GrpcWebLayer::new())
+        // .add_service(ProtoOcrServiceServer::new(ocr_service))
         .add_service(ProtoAuthServiceServer::new(auth_service))
         .serve_with_shutdown(addr, async {
             tokio::signal::ctrl_c()
