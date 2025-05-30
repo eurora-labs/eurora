@@ -50,6 +50,9 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
+            - name: Generate proto types
+              run: pnpm generate
+
             - name: Build web app
               run: pnpm turbo run build --filter @eurora/web...
 
