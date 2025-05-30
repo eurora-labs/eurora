@@ -1,24 +1,30 @@
 {
-	"extends": ["@eurora/typescript-config/svelte"],
 	"compilerOptions": {
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
 		"target": "ESNext",
-		"lib": ["es6", "dom"],
+		"lib": ["ES2022", "DOM"],
 		"strict": false,
-		"noPropertyAccessFromIndexSignature": true,
-		"allowImportingTsExtensions": true,
-		"emitDeclarationOnly": true,
+		"noPropertyAccessFromIndexSignature": false,
+		"allowImportingTsExtensions": false,
+		"emitDeclarationOnly": false,
 		"emitDecoratorMetadata": false,
 		"allowJs": true,
-		"checkJs": true,
+		"checkJs": false,
 		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
 		"composite": false,
 		"declaration": true,
 		"declarationMap": true,
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
 		"paths": {
-			"@eurora/youtube-transcripts": ["./src/index.ts"],
-			"@eurora/youtube-transcripts/*": ["./src/*"]
+			"@eurora/proto": ["./src/index.ts"],
+			"@eurora/proto/*": ["./src/*"]
 		}
-	}
+	},
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist"]
 }
