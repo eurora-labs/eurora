@@ -23,7 +23,7 @@ concurrency:
     cancel-in-progress: true
 
 env:
-    NODE_VERSION: 20.11 # Set this to the node version to use
+    NODE_VERSION: 'lts/jod' # Set this to the node version to use
 
 jobs:
     # Build job
