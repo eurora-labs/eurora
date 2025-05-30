@@ -16,7 +16,7 @@
 
 {#if showAlert}
 	<div
-		class="fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b bg-background px-6 py-2"
+		class="bg-background fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b px-6 py-2"
 	>
 		<Alert.Root class="flex flex-1 items-center">
 			<ShieldAlert class="size-4" />
@@ -32,7 +32,7 @@
 {/if}
 
 <div
-	class="fixed left-0 right-0 z-40 flex items-center justify-between bg-background px-6 py-4"
+	class="bg-background fixed left-0 right-0 z-40 flex items-center justify-between px-6 py-4"
 	style="top: {showAlert ? 'var(--alert-height, 40px)' : '0'};"
 >
 	<div class="flex items-center gap-2">
@@ -46,6 +46,8 @@
 		<!-- <Button variant="ghost" href="/download">Download</Button> -->
 		<!-- <Button variant="ghost" href="/features">Features</Button> -->
 		<!-- <Button variant="ghost" href="/pricing">Pricing</Button> -->
+		<Button variant="ghost" href="/login">Sign In</Button>
+		<Button variant="ghost" href="/register">Sign Up</Button>
 		<Button variant="ghost" href="/about">About Us</Button>
 		<!-- <Button variant="ghost" href="/privacy">Privacy</Button> -->
 		<!-- <Button variant="ghost" href="/contact">Contact</Button> -->
