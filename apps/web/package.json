@@ -25,10 +25,10 @@
 	},
 	"dependencies": {
 		"@eurora/katex": "workspace:*",
-		"@eurora/proto": "workspace:*",
 		"@eurora/ui": "workspace:*"
 	},
 	"devDependencies": {
+		"@eurora/proto": "workspace:*",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
