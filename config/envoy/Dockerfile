@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy:v1.17-latest
+FROM envoyproxy/envoy:v1.34-latest
 
 EXPOSE 8080
 ENV ENVOY_UID=0
