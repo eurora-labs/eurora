@@ -5,7 +5,7 @@ use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
 use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthService;
 use eur_proto::proto_auth_service::{
-    EmailPasswordCredentials, LoginRequest, LoginResponse, RefreshTokenRequest, RegisterRequest,
+    EmailPasswordCredentials, LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse,
     login_request::Credential,
 };
 use eur_remote_db::{CreateUserRequest, DatabaseManager};
@@ -101,7 +101,7 @@ impl AuthService {
         email: &str,
         password: &str,
         display_name: Option<String>,
-    ) -> Result<LoginResponse> {
+    ) -> Result<TokenResponse> {
         info!("Attempting to register user: {}", username);
 
         // Check if user already exists
@@ -142,7 +142,7 @@ impl AuthService {
         let (access_token, refresh_token) =
             self.generate_tokens(&user.id.to_string(), &user.username, &user.email)?;
 
-        Ok(LoginResponse {
+        Ok(TokenResponse {
             access_token,
             refresh_token,
             expires_in: self.jwt_config.access_token_expiry_hours * 3600, // Convert to seconds
@@ -150,7 +150,7 @@ impl AuthService {
     }
 
     /// Refresh an access token using a refresh token
-    pub async fn refresh_access_token(&self, refresh_token: &str) -> Result<LoginResponse> {
+    pub async fn refresh_access_token(&self, refresh_token: &str) -> Result<TokenResponse> {
         info!("Attempting to refresh token");
 
         // Validate the refresh token
@@ -177,7 +177,7 @@ impl AuthService {
 
         info!("Token refreshed successfully for user: {}", user.username);
 
-        Ok(LoginResponse {
+        Ok(TokenResponse {
             access_token,
             refresh_token: new_refresh_token,
             expires_in: self.jwt_config.access_token_expiry_hours * 3600,
@@ -190,10 +190,13 @@ impl ProtoAuthService for AuthService {
     async fn login(
         &self,
         request: Request<LoginRequest>,
-    ) -> Result<Response<LoginResponse>, Status> {
+    ) -> Result<Response<TokenResponse>, Status> {
         let req = request.into_inner();
 
         info!("Login request received");
+        // eprintln!("Request: {:#?}", request);
+
+        // return Err(Status::unimplemented("Login not implemented"));
 
         // Extract credentials from the request
         let credential = req.credential.ok_or_else(|| {
@@ -215,7 +218,7 @@ impl ProtoAuthService for AuthService {
     async fn register(
         &self,
         request: Request<RegisterRequest>,
-    ) -> Result<Response<LoginResponse>, Status> {
+    ) -> Result<Response<TokenResponse>, Status> {
         let req = request.into_inner();
 
         info!("Register request received for user: {}", req.username);
@@ -241,7 +244,7 @@ impl ProtoAuthService for AuthService {
     async fn refresh_token(
         &self,
         request: Request<RefreshTokenRequest>,
-    ) -> Result<Response<LoginResponse>, Status> {
+    ) -> Result<Response<TokenResponse>, Status> {
         let req = request.into_inner();
 
         info!("Refresh token request received");
@@ -267,7 +270,7 @@ impl AuthService {
     async fn handle_email_password_login(
         &self,
         creds: EmailPasswordCredentials,
-    ) -> Result<Response<LoginResponse>, Status> {
+    ) -> Result<Response<TokenResponse>, Status> {
         let login = creds.login.trim();
         let password = creds.password;
 
@@ -330,7 +333,7 @@ impl AuthService {
 
         info!("Login successful for user: {}", user.username);
 
-        let response = LoginResponse {
+        let response = TokenResponse {
             access_token,
             refresh_token,
             expires_in: self.jwt_config.access_token_expiry_hours * 3600,
