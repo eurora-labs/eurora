@@ -32,7 +32,7 @@
 	aria-label={ariaLabel}
 	preserveAspectRatio="xMidYMid"
 	aria-describedby={hasDescription ? ariaDescribedby : undefined}
-	viewBox="0 0 32 32"
+	viewBox="0 0 512 512"
 >
 	{#if title?.id && title.title}
 		<title id={title.id}>{title.title}</title>
@@ -40,62 +40,53 @@
 	{#if desc?.id && desc.desc}
 		<desc id={desc.id}>{desc.desc}</desc>
 	{/if}
-	<defs id="defs11">
-		<linearGradient
-			id="linearGradient12"
-			x1="-7.9197998"
-			x2="13.276"
-			y1="-22.497999"
-			y2="-22.497999"
-			gradientTransform="matrix(1.1331,0,0,1.1352,-1.2995,3.0828)"
+	<defs id="defs1"
+		><linearGradient id="linearGradient12"
+			><stop style="stop-color:#9970e6;stop-opacity:0;" offset="0" id="stop13" /><stop
+				style="stop-color:#e738dd;stop-opacity:0.79911375;"
+				offset="1"
+				id="stop12"
+			/></linearGradient
+		><linearGradient id="linearGradient9"
+			><stop style="stop-color:#36a9f5;stop-opacity:0.80206794;" offset="0" id="stop9" /><stop
+				style="stop-color:#9970e6;stop-opacity:0;"
+				offset="1"
+				id="stop10"
+			/></linearGradient
+		><linearGradient
+			xlink:href="#linearGradient9"
+			id="linearGradient10"
+			x1="337.48911"
+			y1="372.29364"
+			x2="149.59541"
+			y2="282.32697"
 			gradientUnits="userSpaceOnUse"
-		>
-			<stop stop-color="#9369de" offset="0" id="stop2" />
-			<stop stop-color="#5d5de5" offset=".39556" id="stop4" />
-			<stop stop-color="#3679f2" offset=".80444" id="stop6" />
-			<stop stop-color="#0f89ff" offset="1" id="stop8" style="stop-color:#0f89ff;stop-opacity:1;" />
-		</linearGradient>
-	</defs>
-	<g transform="matrix(1.3406,0,0,1.3459,-6.1616,-4.5108)" id="g15">
-		<ellipse
-			transform="matrix(-0.62559,0.78015,-0.78507,-0.6194,0,0)"
-			cx="1.735"
-			cy="-22.457001"
-			rx="12.009"
-			ry="11.814"
-			fill="url(#linearGradient12)"
-			style="fill:url(#linearGradient12);paint-order:stroke fill markers"
-			id="ellipse13"
-		/>
-	</g>
-	<g
-		transform="matrix(1.032,0,0,1.0158,-0.55783,-0.33903)"
-		stroke="#ffffff"
-		stroke-dashoffset="25.624"
-		stroke-linecap="round"
-		stroke-linejoin="round"
-		id="g23"
+			gradientTransform="matrix(1.2785705,0.08486395,-0.06800725,1.0805394,-86.826776,10.489876)"
+		/><linearGradient
+			xlink:href="#linearGradient12"
+			id="linearGradient13"
+			x1="334.49734"
+			y1="356.34833"
+			x2="439.75201"
+			y2="207.37177"
+			gradientUnits="userSpaceOnUse"
+			gradientTransform="matrix(1.207665,0,0,1.0949273,-120.17935,38.128955)"
+		/></defs
+	><g id="layer1"
+		><g id="g14" transform="matrix(1.2083681,0,0,1.176677,-53.516241,-47.718627)"
+			><path
+				style="display:inline;fill:#9970e6;fill-opacity:1;stroke-width:0.469472;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:25.6236;paint-order:fill markers stroke"
+				d="m 426.42625,345.993 -102.38513,93.25058 c -4.43847,4.04248 0.40352,0.66576 -5.51741,-0.75657 L 53.421995,374.8039 c -4.537056,-1.0899 -3.59503,2.25121 -1.146518,-1.31609 L 252.33665,73.605012 c 2.32896,-3.393154 -0.61375,-3.310941 1.85246,0.0037 L 426.76009,344.8249 c 2.89362,3.88911 -0.33384,-4.04207 -0.33384,1.16789 z"
+				id="path1"
+			/><path
+				style="display:inline;fill:url(#linearGradient10);stroke-width:0.471138;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:25.6236;paint-order:fill markers stroke"
+				d="M 321.08595,439.95414 53.391215,375.39497 c -4.699483,-1.22908 -2.773503,3.34388 0,0 L 254.22474,70.548094 c 1.75109,-2.11122 -3.93683,20.576094 1.05694,1.458915 l 67.35433,363.987121 c 0.35089,2.67002 1.49544,4.75651 -1.55006,3.96001 z"
+				id="path5"
+			/><path
+				style="display:inline;fill:url(#linearGradient13);stroke-width:0.459966;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:25.6236;paint-order:fill markers stroke"
+				d="M 427.4126,345.34072 324.36288,442.06847 253.53844,75.183022 c -0.3047,-1.66732 -0.34383,-1.827716 0.68898,-0.420786 L 427.38178,344.14312 c 2.73617,3.72739 0.40146,-4.24229 0.0676,0.65722 z"
+				id="path7"
+			/></g
+		></g
 	>
-		<path
-			d="m 13.856199,1.7584077 6.487083,18.3028393 8.859899,1.216133 z"
-			fill="#1d90ff"
-			stroke-width="1.83546"
-			style="paint-order:stroke markers fill"
-			id="path17"
-		/>
-		<path
-			d="m 13.804953,1.8109616 6.303161,18.5186894 c 0,0 -13.5472744,6.850459 -13.5472744,6.850459 z"
-			fill="#cab7fa"
-			stroke-width="1.81987"
-			style="paint-order:stroke markers fill"
-			id="path19"
-		/>
-		<path
-			d="m 6.793392,27.120689 13.708261,-6.913534 8.710624,1.241796 z"
-			fill="#a01fef"
-			stroke-width="1.83905"
-			style="paint-order:stroke markers fill"
-			id="path21"
-		/>
-	</g>
 </svg>
