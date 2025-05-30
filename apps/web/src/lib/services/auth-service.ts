@@ -4,7 +4,8 @@ import { createClient, type Client } from '@connectrpc/connect';
 import {
 	ProtoAuthService,
 	type LoginRequest,
-	type LoginResponse
+	type LoginResponse,
+	type RegisterRequest
 } from '@eurora/proto/auth_service';
 
 class AuthService {
@@ -21,12 +22,18 @@ class AuthService {
 
 	public async login(data: LoginRequest): Promise<LoginResponse> {
 		try {
-			console.log('Login request:', data);
 			const response = await this.client.login(data);
-			console.log('Login response:', response);
 			return response;
 		} catch (error) {
-			console.error('Login failed:', error);
+			throw error;
+		}
+	}
+
+	public async register(data: RegisterRequest): Promise<LoginResponse> {
+		try {
+			const response = await this.client.register(data);
+			return response;
+		} catch (error) {
 			throw error;
 		}
 	}
