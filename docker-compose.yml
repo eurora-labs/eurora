@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  envoy:
+    image: envoyproxy/envoy:v1.34-latest
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - ENVOY_UID=0
+    working_dir: /etc/envoy
+    volumes:
+      - ./config/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: ["/usr/local/bin/envoy", "-c", "/etc/envoy/envoy.yaml"]
+    stdin_open: true
+    tty: true
