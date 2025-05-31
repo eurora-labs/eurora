@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { AiChat } from '@eurora/ai-chat';
 	import { onMount } from 'svelte';
 	import { chatMessages, askQuestion, loadChatMessages } from '$lib/chat-store';
@@ -52,4 +52,4 @@
 		user-select: text;
 		cursor: text;
 	}
-</style>
+</style> -->
