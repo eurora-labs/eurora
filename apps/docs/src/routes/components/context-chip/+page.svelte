@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ContextChip } from '@eurora/ui';
+	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
 </script>
 
 <div class="flex flex-col gap-4 p-4">
