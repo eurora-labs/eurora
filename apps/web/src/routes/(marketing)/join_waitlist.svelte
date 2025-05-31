@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { Sheet, ScrollArea, Skeleton } from '@eurora/ui';
-	import { buttonVariants } from '@eurora/ui';
+	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
+	import * as Sheet from '@eurora/ui/components/sheet/index';
+	import { Skeleton } from '@eurora/ui/components/skeleton/index';
+	import { buttonVariants } from '@eurora/ui/components/button/index';
 	import WaitlistForm from './waitlist_form.svelte';
 </script>
 
@@ -16,9 +18,9 @@
 		</ScrollArea>
 
 		<Sheet.Footer>
-			<Skeleton class="w-full h-screen" />
-			<Skeleton class="w-full h-screen" />
-			<Skeleton class="w-full h-screen" />
+			<Skeleton class="h-screen w-full" />
+			<Skeleton class="h-screen w-full" />
+			<Skeleton class="h-screen w-full" />
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>
