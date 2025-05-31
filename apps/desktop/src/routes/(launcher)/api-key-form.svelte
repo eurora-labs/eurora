@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Button, Input } from '@eurora/ui';
+	import { Button } from '@eurora/ui/components/button/index';
+	import { Input } from '@eurora/ui/components/input/index';
 	import { invoke } from '@tauri-apps/api/core';
 	import { createTauRPCProxy } from '@eurora/tauri-bindings';
 	import { onMount } from 'svelte';

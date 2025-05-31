@@ -4,7 +4,7 @@
 	import Inbox from '@lucide/svelte/icons/inbox';
 	import Search from '@lucide/svelte/icons/search';
 	import Settings from '@lucide/svelte/icons/settings';
-	import { Sidebar } from '@eurora/ui';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 
 	// Menu items.
 	const items = [
