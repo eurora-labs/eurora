@@ -1,5 +1,6 @@
 <script lang="ts">
-	import '../app.pcss';
+	import '@eurora/ui/main.css';
+	import '../app.css';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
 

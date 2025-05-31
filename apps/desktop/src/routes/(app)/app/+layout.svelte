@@ -1,5 +1,5 @@
 <script lang="ts">
-	import '@eurora/ui/global.css';
+	import '@eurora/ui/main.css';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
 	import * as Breadcrumb from '@eurora/ui/components/breadcrumb/index';
