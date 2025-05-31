@@ -1,22 +1,7 @@
 <script lang="ts">
-	import {
-		Calendar,
-		House,
-		Inbox,
-		Search,
-		Settings,
-		Smile,
-		CreditCard,
-		Calculator,
-		User
-	} from '@lucide/svelte';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import { buttonVariants } from '@eurora/ui/components/button/index';
-	import * as Dialog from '@eurora/ui/components/dialog/index';
-	import * as Command from '@eurora/ui/components/command/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-
-	// Menu items.
+	import { House, Inbox, Calendar, Search, Settings } from '@lucide/svelte';
 	const items = [
 		{
 			title: 'Chat 1',
@@ -48,72 +33,8 @@
 
 <Sidebar.Root>
 	<Sidebar.Header><EuroraLogo />Eurora Labs</Sidebar.Header>
-	<Dialog.Root>
-		<Dialog.Trigger class={buttonVariants({ variant: 'outline' })}
-			><Search /> Search</Dialog.Trigger
-		>
-		<Dialog.Content>
-			<!-- <Dialog.Header>
-				<Dialog.Title>Edit profile</Dialog.Title>
-				<Dialog.Description>
-					Make changes to your profile here. Click save when you're done.
-				</Dialog.Description>
-			</Dialog.Header> -->
-			<!-- <div class="grid gap-4 py-4">
-				<div class="grid grid-cols-4 items-center gap-4">
-					<Label for="name" class="text-right">Name</Label>
-					<Input id="name" value="Pedro Duarte" class="col-span-3" />
-				</div>
-				<div class="grid grid-cols-4 items-center gap-4">
-					<Label for="username" class="text-right">Username</Label>
-					<Input id="username" value="@peduarte" class="col-span-3" />
-				</div>
-			</div> -->
-			<Command.Root>
-				<Command.Input placeholder="Search" />
-				<Command.List>
-					<Command.Empty>No results found.</Command.Empty>
-					<Command.Group heading="Suggestions">
-						<Command.Item>
-							<Calendar />
-							<span>Calendar</span>
-						</Command.Item>
-						<Command.Item>
-							<Smile />
-							<span>Search Emoji</span>
-						</Command.Item>
-						<Command.Item disabled>
-							<Calculator />
-							<span>Calculator</span>
-						</Command.Item>
-					</Command.Group>
-					<Command.Separator />
-					<Command.Group heading="Settings">
-						<Command.Item>
-							<User />
-							<span>Profile</span>
-							<Command.Shortcut>⌘P</Command.Shortcut>
-						</Command.Item>
-						<Command.Item>
-							<CreditCard />
-							<span>Billing</span>
-							<Command.Shortcut>⌘B</Command.Shortcut>
-						</Command.Item>
-						<Command.Item>
-							<Settings />
-							<span>Settings</span>
-							<Command.Shortcut>⌘S</Command.Shortcut>
-						</Command.Item>
-					</Command.Group>
-				</Command.List>
-			</Command.Root>
-			<!-- <Dialog.Footer>
-				<Button type="submit">Save changes</Button>
-			</Dialog.Footer> -->
-		</Dialog.Content>
-	</Dialog.Root>
-	<Sidebar.Content>
-		<Sidebar.Group>
+	<Sidebar.Content
+		><Sidebar.Group>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
 					<Sidebar.MenuItem>
@@ -182,9 +103,5 @@
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
 	</Sidebar.Content>
-	<Sidebar.Footer>
-		<div class="flex w-full justify-end">
-			<Sidebar.Trigger />
-		</div>
-	</Sidebar.Footer>
+	<Sidebar.Footer />
 </Sidebar.Root>
