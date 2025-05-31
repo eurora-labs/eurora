@@ -95,7 +95,6 @@
 			"import": "./dist/*.json",
 			"types": "./dist/*.json"
 		},
-		"./global.css": "./src/global.css",
 		"./postcss.config": "./postcss.config.js",
 		"./tailwind.config": "./tailwind.config.ts"
 	},
