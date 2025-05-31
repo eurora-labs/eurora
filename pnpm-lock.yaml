@@ -1476,6 +1476,9 @@ importers:
       tailwind-variants:
         specifier: ^1.0.0
         version: 1.0.0(tailwindcss@4.1.8)
+      tailwindcss:
+        specifier: ^4.1.7
+        version: 4.1.8
       tw-animate-css:
         specifier: ^1.3.2
         version: 1.3.2
