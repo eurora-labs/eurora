@@ -19,7 +19,7 @@
 	} from '@eurora/tauri-bindings';
 
 	// Import the Launcher component
-	import { Launcher } from '@eurora/launcher';
+	import { Launcher } from '../../../../../packages/custom-components/launcher/src/lib';
 	import { Editor as ProsemirrorEditor, type SveltePMExtension } from '@eurora/prosemirror-core';
 	// Import the extension factory instead of individual extensions
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory';
@@ -420,7 +420,7 @@
 	</div>
 </div>
 <div
-	class="backdrop-custom-2 fixed left-[0px] top-[0px] h-screen w-screen"
+	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
 	bind:this={backdropCustom2Ref}
 ></div>
 
