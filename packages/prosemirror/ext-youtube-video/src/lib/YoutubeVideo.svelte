@@ -59,7 +59,10 @@
 </script>
 
 <script lang="ts">
-	import { Badge, ContextChip, Label, Input, Button, buttonVariants, Popover } from '@eurora/ui';
+	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
+	import { Label } from '@eurora/ui/components/label/index';
+	import { Input } from '@eurora/ui/components/input/index';
+	import * as Popover from '@eurora/ui/components/popover/index';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
 	import { SiYoutube } from '@icons-pack/svelte-simple-icons';
 	export interface Props extends SvelteNodeViewProps<VideoAttrs> {
