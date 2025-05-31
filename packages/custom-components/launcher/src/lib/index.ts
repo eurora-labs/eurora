@@ -1,4 +1,3 @@
 import * as Launcher from './components/command';
-
-import './styles/main.css';
+import './main.css';
 export { Launcher };

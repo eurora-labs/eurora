@@ -19,7 +19,6 @@
 	"dependencies": {
 		"@eurora/ai-chat": "workspace:*",
 		"@eurora/katex": "workspace:*",
-		"@eurora/launcher": "workspace:*",
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/prosemirror-factory": "workspace:*",
 		"@eurora/proto": "workspace:*",
@@ -32,6 +31,7 @@
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/ext-video": "workspace:*",
 		"@eurora/ext-transcript": "workspace:*",
+		"@eurora/launcher": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"@eurora/prosemirror-tauri-bindings": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
