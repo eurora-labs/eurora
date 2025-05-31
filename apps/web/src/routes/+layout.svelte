@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '@eurora/ui/main.css';
 	import '../app.css';
 	// import Terminal from "@lucide/svelte/icons/terminal";
 	let { children } = $props();
