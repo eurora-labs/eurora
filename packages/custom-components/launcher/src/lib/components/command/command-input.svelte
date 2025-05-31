@@ -23,7 +23,11 @@
 </script>
 
 <div class="items-top flex h-[100px] border-none px-3" data-command-input-wrapper="">
-	<Search class="self-center opacity-50" size="40" style="color: rgba(0, 0, 0, 0.8); " />
+	<Search
+		class="self-center opacity-50"
+		size="40"
+		style="color: rgba(0, 0, 0, 0.8); align-self: center; "
+	/>
 	<div class="mr-2 h-[100px] w-2 shrink-0"></div>
 
 	<!-- <Youtube class="mr-2 mt-6 shrink-0 opacity-50" size="70" style="color: rgba(0, 0, 0, 0.8); " /> -->
