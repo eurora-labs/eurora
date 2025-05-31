@@ -7,10 +7,10 @@
 		"baseColor": "slate"
 	},
 	"aliases": {
-		"components": "@eurora/ui/components",
-		"utils": "@eurora/ui/utils",
-		"ui": "@eurora/ui/components/ui",
-		"hooks": "@eurora/ui/hooks"
+		"components": "$lib/components",
+		"utils": "$lib/utils",
+		"ui": "$lib/components",
+		"hooks": "$lib/hooks"
 	},
 	"typescript": true,
 	"registry": "https://next.shadcn-svelte.com/registry"
