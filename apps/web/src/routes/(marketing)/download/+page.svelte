@@ -1,62 +1,71 @@
 <script lang="ts">
-	import { Card, Button } from '@eurora/ui';
+	import * as Card from '@eurora/ui/components/card/index';
+	import { Button } from '@eurora/ui/components/button/index';
 	import { Download, Monitor, Laptop, Globe } from '@lucide/svelte';
 </script>
 
-<div class="container mx-auto px-4 py-16 max-w-5xl">
-	<div class="text-center mb-12">
-		<h1 class="text-4xl font-bold mb-4">Download Eurora</h1>
-		<p class="text-xl text-gray-600 max-w-2xl mx-auto">
+<div class="container mx-auto max-w-5xl px-4 py-16">
+	<div class="mb-12 text-center">
+		<h1 class="mb-4 text-4xl font-bold">Download Eurora</h1>
+		<p class="mx-auto max-w-2xl text-xl text-gray-600">
 			Get Eurora for your preferred platform and start experiencing AI on your own terms.
 		</p>
 	</div>
 
-	<div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-2">
 		<Card.Root class="p-6">
 			<Card.Header>
 				<Card.Title>Desktop Applications</Card.Title>
-				<Card.Description>Download Eurora for your desktop operating system.</Card.Description>
+				<Card.Description
+					>Download Eurora for your desktop operating system.</Card.Description
+				>
 			</Card.Header>
 			<Card.Content>
 				<div class="space-y-4">
-					<div class="flex items-center justify-between p-4 border rounded-md hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
-							<Monitor class="w-8 h-8 text-blue-600" />
+							<Monitor class="h-8 w-8 text-blue-600" />
 							<div>
 								<h3 class="font-medium">Windows</h3>
 								<p class="text-sm text-gray-600">Windows 10 or later</p>
 							</div>
 						</div>
 						<Button>
-							<Download class="w-4 h-4 mr-2" />
+							<Download class="mr-2 h-4 w-4" />
 							Download
 						</Button>
 					</div>
 
-					<div class="flex items-center justify-between p-4 border rounded-md hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
-							<Laptop class="w-8 h-8 text-gray-800" />
+							<Laptop class="h-8 w-8 text-gray-800" />
 							<div>
 								<h3 class="font-medium">macOS</h3>
 								<p class="text-sm text-gray-600">macOS 11 or later</p>
 							</div>
 						</div>
 						<Button>
-							<Download class="w-4 h-4 mr-2" />
+							<Download class="mr-2 h-4 w-4" />
 							Download
 						</Button>
 					</div>
 
-					<div class="flex items-center justify-between p-4 border rounded-md hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
-							<Monitor class="w-8 h-8 text-orange-600" />
+							<Monitor class="h-8 w-8 text-orange-600" />
 							<div>
 								<h3 class="font-medium">Linux</h3>
 								<p class="text-sm text-gray-600">Ubuntu, Debian, Fedora</p>
 							</div>
 						</div>
 						<Button>
-							<Download class="w-4 h-4 mr-2" />
+							<Download class="mr-2 h-4 w-4" />
 							Download
 						</Button>
 					</div>
@@ -71,23 +80,31 @@
 			</Card.Header>
 			<Card.Content>
 				<div class="space-y-4">
-					<div class="flex items-center justify-between p-4 border rounded-md hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
-							<Globe class="w-8 h-8 text-blue-500" />
+							<Globe class="h-8 w-8 text-blue-500" />
 							<div>
 								<h3 class="font-medium">Chrome</h3>
 								<p class="text-sm text-gray-600">Chrome Web Store</p>
 							</div>
 						</div>
 						<Button>
-							<Download class="w-4 h-4 mr-2" />
+							<Download class="mr-2 h-4 w-4" />
 							Add to Chrome
 						</Button>
 					</div>
 
-					<div class="flex items-center justify-between p-4 border rounded-md hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
-							<svg class="w-8 h-8 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+							<svg
+								class="h-8 w-8 text-blue-600"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+							>
 								<path
 									d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm7.369 18.769C17.728 20.187 14.954 21 12 21s-5.728-.813-7.369-2.231a9.954 9.954 0 01-2.385-3.647A9.954 9.954 0 013 12c0-1.087.175-2.134.496-3.113a9.897 9.897 0 012.385-3.647C7.522 3.813 10.296 3 12 3s4.478.813 6.119 2.24a9.897 9.897 0 012.385 3.647A9.954 9.954 0 0121 12a9.954 9.954 0 01-.496 3.122 9.954 9.954 0 01-2.385 3.647zM12 4.8a7.2 7.2 0 100 14.4 7.2 7.2 0 000-14.4zm0 12.6a5.4 5.4 0 110-10.8 5.4 5.4 0 010 10.8z"
 								/>
@@ -98,14 +115,20 @@
 							</div>
 						</div>
 						<Button>
-							<Download class="w-4 h-4 mr-2" />
+							<Download class="mr-2 h-4 w-4" />
 							Add to Firefox
 						</Button>
 					</div>
 
-					<div class="flex items-center justify-between p-4 border rounded-md hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
-							<svg class="w-8 h-8 text-blue-800" viewBox="0 0 24 24" fill="currentColor">
+							<svg
+								class="h-8 w-8 text-blue-800"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+							>
 								<path
 									d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.824a9.176 9.176 0 110 18.352 9.176 9.176 0 010-18.352zm-1.176 2.824v6.353h-2.353l3.529 5.294 3.529-5.294h-2.353V5.647h-2.353z"
 								/>
@@ -116,7 +139,7 @@
 							</div>
 						</div>
 						<Button>
-							<Download class="w-4 h-4 mr-2" />
+							<Download class="mr-2 h-4 w-4" />
 							Add to Edge
 						</Button>
 					</div>
@@ -125,7 +148,7 @@
 		</Card.Root>
 	</div>
 
-	<Card.Root class="p-6 mb-16">
+	<Card.Root class="mb-16 p-6">
 		<Card.Header>
 			<Card.Title>System Requirements</Card.Title>
 			<Card.Description
@@ -133,10 +156,10 @@
 			>
 		</Card.Header>
 		<Card.Content>
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+			<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
 				<div class="space-y-2">
-					<h3 class="font-medium text-lg">Windows</h3>
-					<ul class="list-disc pl-5 space-y-1 text-gray-600">
+					<h3 class="text-lg font-medium">Windows</h3>
+					<ul class="list-disc space-y-1 pl-5 text-gray-600">
 						<li>Windows 10 or later (64-bit)</li>
 						<li>4GB RAM minimum</li>
 						<li>1GB free disk space</li>
@@ -144,8 +167,8 @@
 					</ul>
 				</div>
 				<div class="space-y-2">
-					<h3 class="font-medium text-lg">macOS</h3>
-					<ul class="list-disc pl-5 space-y-1 text-gray-600">
+					<h3 class="text-lg font-medium">macOS</h3>
+					<ul class="list-disc space-y-1 pl-5 text-gray-600">
 						<li>macOS 11 (Big Sur) or later</li>
 						<li>4GB RAM minimum</li>
 						<li>1GB free disk space</li>
@@ -153,8 +176,8 @@
 					</ul>
 				</div>
 				<div class="space-y-2">
-					<h3 class="font-medium text-lg">Linux</h3>
-					<ul class="list-disc pl-5 space-y-1 text-gray-600">
+					<h3 class="text-lg font-medium">Linux</h3>
+					<ul class="list-disc space-y-1 pl-5 text-gray-600">
 						<li>Ubuntu 20.04, Debian 10, or Fedora 34+</li>
 						<li>4GB RAM minimum</li>
 						<li>1GB free disk space</li>
@@ -173,8 +196,8 @@
 		<Card.Content>
 			<div class="space-y-6">
 				<div>
-					<h3 class="font-medium text-lg mb-2">Windows Installation</h3>
-					<ol class="list-decimal pl-5 space-y-1 text-gray-600">
+					<h3 class="mb-2 text-lg font-medium">Windows Installation</h3>
+					<ol class="list-decimal space-y-1 pl-5 text-gray-600">
 						<li>Download the Windows installer (.exe) file</li>
 						<li>Double-click the downloaded file to start the installation</li>
 						<li>Follow the on-screen instructions</li>
@@ -182,19 +205,23 @@
 					</ol>
 				</div>
 				<div>
-					<h3 class="font-medium text-lg mb-2">macOS Installation</h3>
-					<ol class="list-decimal pl-5 space-y-1 text-gray-600">
+					<h3 class="mb-2 text-lg font-medium">macOS Installation</h3>
+					<ol class="list-decimal space-y-1 pl-5 text-gray-600">
 						<li>Download the macOS disk image (.dmg) file</li>
 						<li>Open the disk image and drag Eurora to the Applications folder</li>
 						<li>Open Eurora from the Applications folder</li>
-						<li>If prompted about security settings, follow the instructions to allow the app</li>
+						<li>
+							If prompted about security settings, follow the instructions to allow
+							the app
+						</li>
 					</ol>
 				</div>
 				<div>
-					<h3 class="font-medium text-lg mb-2">Linux Installation</h3>
-					<ol class="list-decimal pl-5 space-y-1 text-gray-600">
+					<h3 class="mb-2 text-lg font-medium">Linux Installation</h3>
+					<ol class="list-decimal space-y-1 pl-5 text-gray-600">
 						<li>
-							Download the appropriate package for your distribution (.deb, .rpm, or .AppImage)
+							Download the appropriate package for your distribution (.deb, .rpm, or
+							.AppImage)
 						</li>
 						<li>For .deb: <code>sudo dpkg -i eurora.deb</code></li>
 						<li>For .rpm: <code>sudo rpm -i eurora.rpm</code></li>
