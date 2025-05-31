@@ -1,91 +1,94 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@config '../tailwind.config.ts';
+
+/*
+ The default border color has changed to `currentcolor` in Tailwind CSS v4,
+ so we've added these compatibility styles to make sure everything still
+ looks the same as it did with Tailwind CSS v3.
+ 
+ If we ever want to remove these styles, we need to add an explicit border
+ color utility to any element that depends on these defaults.
+*/
+@layer base {
+	*,
+	::after,
+	::before,
+	::backdrop,
+	::file-selector-button {
+		border-color: var(--color-gray-200, currentcolor);
+	}
+}
 
 @layer base {
-	:root,
-	:host > * {
-		--background: 285 3% 97%;
-		--foreground: 285 3% 15%;
-		--muted: 285 3% 95%;
-		--muted-foreground: 285 3% 35%;
-		--popover: 285 3% 97%;
-		--popover-foreground: 285 3% 15%;
-		--card: 285 3% 97%;
-		--card-foreground: 285 3% 15%;
-		--border: 285 3% 91%;
-		--input: 285 3% 91%;
-		--primary: 261 71% 64%;
-		--primary-foreground: 0 0% 100%;
-		--secondary: 267 19% 61%;
-		--secondary-foreground: 0 0% 100%;
-		--accent: 348 39% 63%;
-		--accent-foreground: 0 0% 100%;
-		--destructive: 4 100% 64%;
-		--destructive-foreground: 0 0% 100%;
-		--ring: 261 71% 76%;
+	:root {
+		--background: 0 0% 100%;
+		--foreground: 240 10% 3.9%;
+		--muted: 240 4.8% 95.9%;
+		--muted-foreground: 240 3.8% 46.1%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 240 10% 3.9%;
+		--card: 0 0% 100%;
+		--card-foreground: 240 10% 3.9%;
+		--border: 240 5.9% 90%;
+		--input: 240 5.9% 90%;
+		--primary: 240 5.9% 10%;
+		--primary-foreground: 0 0% 98%;
+		--secondary: 240 4.8% 95.9%;
+		--secondary-foreground: 240 5.9% 10%;
+		--accent: 240 4.8% 95.9%;
+		--accent-foreground: 240 5.9% 10%;
+		--destructive: 0 72.2% 50.6%;
+		--destructive-foreground: 0 0% 98%;
+		--ring: 240 10% 3.9%;
 		--radius: 0.5rem;
-		--message-surface: 267 19% 95%;
-
-		/* Sidebar */
-		--sidebar-background: 285 3% 97%;
-		--sidebar-foreground: 285 3% 35%;
-		--sidebar-primary: 261 71% 64%;
-		--sidebar-primary-foreground: 0 0% 100%;
-		--sidebar-accent: 267 19% 61%;
-		--sidebar-accent-foreground: 0 0% 100%;
-		--sidebar-border: 285 3% 91%;
-		--sidebar-ring: 261 71% 64%;
+		--sidebar: 0 0% 98%;
+		--sidebar-foreground: 240 5.3% 26.1%;
+		--sidebar-primary: 240 5.9% 10%;
+		--sidebar-primary-foreground: 0 0% 98%;
+		--sidebar-accent: 240 4.8% 95.9%;
+		--sidebar-accent-foreground: 240 5.9% 10%;
+		--sidebar-border: 220 13% 91%;
+		--sidebar-ring: 217.2 91.2% 59.8%;
 	}
 
 	.dark {
-		--background: 285 3% 15%;
-		--foreground: 285 3% 95%;
-		--muted: 285 3% 20%;
-		--muted-foreground: 285 3% 75%;
-		--popover: 285 3% 15%;
-		--popover-foreground: 285 3% 95%;
-		--card: 285 3% 15%;
-		--card-foreground: 285 3% 95%;
-		--border: 285 3% 23%;
-		--input: 285 3% 23%;
-		--primary: 261 71% 64%;
-		--primary-foreground: 0 0% 100%;
-		--secondary: 267 19% 41%;
-		--secondary-foreground: 0 0% 100%;
-		--accent: 348 39% 43%;
-		--accent-foreground: 0 0% 100%;
-		--destructive: 4 100% 44%;
-		--destructive-foreground: 0 0% 100%;
-		--ring: 261 71% 54%;
-		--message-surface: 267 19% 30%;
-
-		/* Sidebar - adjusted for dark theme */
-		--sidebar-background: 285 3% 20%;
-		--sidebar-foreground: 285 3% 95%;
-		--sidebar-primary: 261 71% 64%;
+		--background: 240 10% 3.9%;
+		--foreground: 0 0% 98%;
+		--muted: 240 3.7% 15.9%;
+		--muted-foreground: 240 5% 64.9%;
+		--popover: 240 10% 3.9%;
+		--popover-foreground: 0 0% 98%;
+		--card: 240 10% 3.9%;
+		--card-foreground: 0 0% 98%;
+		--border: 240 3.7% 15.9%;
+		--input: 240 3.7% 15.9%;
+		--primary: 0 0% 98%;
+		--primary-foreground: 240 5.9% 10%;
+		--secondary: 240 3.7% 15.9%;
+		--secondary-foreground: 0 0% 98%;
+		--accent: 240 3.7% 15.9%;
+		--accent-foreground: 0 0% 98%;
+		--destructive: 0 62.8% 30.6%;
+		--destructive-foreground: 0 0% 98%;
+		--ring: 240 4.9% 83.9%;
+		--sidebar: 240 5.9% 10%;
+		--sidebar-foreground: 240 4.8% 95.9%;
+		--sidebar-primary: 224.3 76.3% 48%;
 		--sidebar-primary-foreground: 0 0% 100%;
-		--sidebar-accent: 267 19% 41%;
-		--sidebar-accent-foreground: 0 0% 100%;
-		--sidebar-border: 285 3% 23%;
-		--sidebar-ring: 261 71% 64%;
+		--sidebar-accent: 240 3.7% 15.9%;
+		--sidebar-accent-foreground: 240 4.8% 95.9%;
+		--sidebar-border: 240 3.7% 15.9%;
+		--sidebar-ring: 217.2 91.2% 59.8%;
 	}
 }
+
 @layer base {
-	*,
-	:host > * {
+	* {
 		@apply border-border;
 	}
 
-	body,
-	:host > *,
-	:host {
+	body {
 		@apply bg-background text-foreground;
-
-		font-size: 16px;
-	}
-
-	.dark .prose {
-		@apply prose-invert;
 	}
 }
