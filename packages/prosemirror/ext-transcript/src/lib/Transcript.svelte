@@ -46,7 +46,7 @@
 </script>
 
 <script lang="ts">
-	import { Badge, ContextChip } from '@eurora/ui';
+	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
 	export interface Props extends SvelteNodeViewProps<TranscriptAttrs> {
 		ref: HTMLElement;

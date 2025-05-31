@@ -6,7 +6,7 @@
 	} from 'bits-ui';
 	import type { Snippet } from 'svelte';
 	import Command from './command.svelte';
-	import * as Dialog from '@eurora/ui/components/ui/dialog/index.js';
+	import * as Dialog from '$lib/components/dialog/index';
 
 	let {
 		open = $bindable(false),
