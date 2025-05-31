@@ -5,7 +5,7 @@ import path from 'path';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-	plugins: [tailwindcss(), debounceReload(), sveltekit()],
+	plugins: [debounceReload(), sveltekit(), tailwindcss()],
 
 	server: {
 		port: 1420,
