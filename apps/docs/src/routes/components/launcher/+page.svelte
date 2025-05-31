@@ -46,7 +46,7 @@
 </script>
 
 <div>
-	<div class="launcher absolute left-1/2 top-1/4 w-[1100px] -translate-x-1/2">
+	<div class="launcher absolute top-1/4 left-1/2 w-[1100px] -translate-x-1/2">
 		<Launcher.Root class="rounded-lg border shadow-md">
 			<Launcher.Input placeholder="Search" bind:query={exampleInput} bind:editorRef />
 			<!-- <span class="absolute left-[175px] top-4 ml-2 mt-2 flex items-center gap-2">
@@ -90,6 +90,7 @@
 </div>
 
 <style lang="postcss">
+	/* @reference "@eurora/ui/main.css"; */
 	.launcher {
 		background: rgba(255, 255, 255, 0.2);
 		box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
@@ -98,8 +99,8 @@
 	}
 
 	.transcript-badge {
-		@apply flex w-fit items-center gap-2 text-[40px] leading-[40px] text-white;
-		@apply p-2;
+		/* @apply flex w-fit items-center gap-2 text-[40px] leading-[40px] text-white; */
+		/* @apply p-2; */
 		background: rgba(128, 128, 128, 0.4);
 		color: rgba(0, 0, 0, 0.8);
 		border-radius: 16px;
