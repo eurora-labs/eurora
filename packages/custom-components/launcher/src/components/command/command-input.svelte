@@ -22,9 +22,9 @@
 	}: Props = $props();
 </script>
 
-<div class="items-top flex h-[100px] border-none px-3" data-command-input-wrapper="">
+<div class={cn('items-top flex h-[100px] border-none px-3')} data-command-input-wrapper="">
 	<Search
-		class="h-[100px] w-[40px] items-center justify-center opacity-50"
+		class="h-[15px] w-[40px] items-center justify-center opacity-50"
 		size="40"
 		style="color: rgba(0, 0, 0, 0.8); "
 	/>
