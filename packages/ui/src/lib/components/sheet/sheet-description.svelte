@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Dialog as SheetPrimitive } from 'bits-ui';
-	import { cn } from '$lib/utils.js';
+	import { Dialog as SheetPrimitive } from "bits-ui";
+	import { cn } from "$lib/utils.js";
 
 	let {
 		ref = $bindable(null),
@@ -11,6 +11,7 @@
 
 <SheetPrimitive.Description
 	bind:ref
-	class={cn('text-sm text-muted-foreground', className)}
+	data-slot="sheet-description"
+	class={cn("text-muted-foreground text-sm", className)}
 	{...restProps}
 />
