@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { create } from '@bufbuild/protobuf';
-	import { Button, Card, Input, Label } from '@eurora/ui';
+	import { Button } from '@eurora/ui/components/button/index';
+	import * as Card from '@eurora/ui/components/card/index';
+	import { Input } from '@eurora/ui/components/input/index';
+	import { Label } from '@eurora/ui/components/label/index';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
 	import { authService } from '$lib/services/auth-service.js';
 	import { LoginRequestSchema } from '@eurora/proto/auth_service';

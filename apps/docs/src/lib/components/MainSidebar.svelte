@@ -10,17 +10,11 @@
 		Calculator,
 		User
 	} from '@lucide/svelte';
-	import {
-		Sidebar,
-		EurIcons,
-		Dialog,
-		Label,
-		Input,
-		buttonVariants,
-		Button,
-		Command
-	} from '@eurora/ui';
-	import { EuroraLogo } from '../../../../../packages/ui/src/custom-icons';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
+	import { buttonVariants } from '@eurora/ui/components/button/index';
+	import * as Dialog from '@eurora/ui/components/dialog/index';
+	import * as Command from '@eurora/ui/components/command/index';
+	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 
 	// Menu items.
 	const items = [
@@ -53,9 +47,10 @@
 </script>
 
 <Sidebar.Root>
-	<Sidebar.Header><EurIcons.EuroraLogo />Eurora Labs</Sidebar.Header>
+	<Sidebar.Header><EuroraLogo />Eurora Labs</Sidebar.Header>
 	<Dialog.Root>
-		<Dialog.Trigger class={buttonVariants({ variant: 'outline' })}><Search /> Search</Dialog.Trigger
+		<Dialog.Trigger class={buttonVariants({ variant: 'outline' })}
+			><Search /> Search</Dialog.Trigger
 		>
 		<Dialog.Content>
 			<!-- <Dialog.Header>
@@ -140,21 +135,27 @@
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton>
 							{#snippet child({ props })}
-								<a href="/components/launcher" {...props}> <span>Launcher</span> </a>
+								<a href="/components/launcher" {...props}>
+									<span>Launcher</span>
+								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton>
 							{#snippet child({ props })}
-								<a href="/components/temp-editor" {...props}> <span>Temp Editor</span> </a>
+								<a href="/components/temp-editor" {...props}>
+									<span>Temp Editor</span>
+								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton>
 							{#snippet child({ props })}
-								<a href="/components/context-chip" {...props}> <span>Context Chip</span> </a>
+								<a href="/components/context-chip" {...props}>
+									<span>Context Chip</span>
+								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
