@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.pcss';
-	import { Sidebar } from '@eurora/ui';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
 
 	let { children } = $props();
