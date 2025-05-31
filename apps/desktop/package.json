@@ -23,12 +23,12 @@
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/prosemirror-factory": "workspace:*",
 		"@eurora/proto": "workspace:*",
-		"@eurora/tauri-bindings": "workspace:*",
-		"@eurora/ui": "workspace:*"
+		"@eurora/tauri-bindings": "workspace:*"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.9",
 		"@eslint/js": "^9.25.1",
+		"@eurora/ui": "workspace:*",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/ext-video": "workspace:*",
 		"@eurora/ext-transcript": "workspace:*",
