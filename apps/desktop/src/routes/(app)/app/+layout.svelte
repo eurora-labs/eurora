@@ -1,11 +1,11 @@
 <script lang="ts">
 	import '@eurora/ui/global.css';
-	import { Sidebar } from '@eurora/ui';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
-	import { Breadcrumb } from '@eurora/ui';
+	import * as Breadcrumb from '@eurora/ui/components/breadcrumb/index';
 	import X from '@lucide/svelte/icons/x';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
-	import { Button } from '@eurora/ui';
+	import { Button } from '@eurora/ui/components/button/index';
 	let { children } = $props();
 </script>
 

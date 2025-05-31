@@ -2,10 +2,8 @@
 	// Removed Input import as we're using a custom div
 	import { onMount } from 'svelte';
 	import { Mic, ScrollText, Youtube, TvMinimalPlay, Globe } from '@lucide/svelte';
-	import { Card, Button, Input } from '@eurora/ui';
-	import { Sheet, ScrollArea, Skeleton } from '@eurora/ui';
-	import { buttonVariants } from '@eurora/ui';
-	// import WaitlistForm from './waitlist_form.svelte';
+	import * as Card from '@eurora/ui/components/card/index';
+	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import JoinWaitlist from './join_waitlist.svelte';
 
 	import { SiYoutube } from '@icons-pack/svelte-simple-icons';
@@ -96,11 +94,11 @@
 	<div class="mx-auto px-4 pt-6" style="min-height: 55vh;">
 		<div class="grid grid-cols-12 gap-6">
 			<!-- Input box centered in the first row -->
-			<div class="col-span-12 flex justify-center mb-4">
+			<div class="col-span-12 mb-4 flex justify-center">
 				<div class="w-full md:w-3/4">
-					<div class="relative animate-grow">
+					<div class="animate-grow relative">
 						<div
-							class="py-4 md:py-6 px-3 md:px-4 shadow-lg rounded-md border border-gray-300 bg-white w-full flex items-center"
+							class="flex w-full items-center rounded-md border border-gray-300 bg-white px-3 py-4 shadow-lg md:px-4 md:py-6"
 							style="font-size: clamp(28px, 5vw, 54px); min-height: 80px; height: auto;"
 						>
 							<div class="flex-grow">
@@ -117,16 +115,19 @@
 			</div>
 
 			<!-- Three cards in a row below the input box -->
-			<div class="col-span-12 grid grid-cols-1 md:grid-cols-12 gap-6">
+			<div class="col-span-12 grid grid-cols-1 gap-6 md:grid-cols-12">
 				{#if visibleCards.includes(1)}
 					<div
-						class="col-span-12 md:col-span-4 card-entrance mb-4 md:mb-0"
+						class="card-entrance col-span-12 mb-4 md:col-span-4 md:mb-0"
 						style="--animation-delay: 0ms;"
 					>
-						<Card.Root class="w-full aspect-video card-content">
-							<Card.Content class="flex flex-col items-center justify-center h-full">
-								<div class="flex justify-center items-center icon-animation">
-									<SiYoutube color="rgb(147 51 234 / var(--tw-text-opacity, 1))" size={64} />
+						<Card.Root class="card-content aspect-video w-full">
+							<Card.Content class="flex h-full flex-col items-center justify-center">
+								<div class="icon-animation flex items-center justify-center">
+									<SiYoutube
+										color="rgb(147 51 234 / var(--tw-text-opacity, 1))"
+										size={64}
+									/>
 								</div>
 								<Card.Title class="title-animation">YouTube Videos</Card.Title>
 							</Card.Content>
@@ -136,12 +137,12 @@
 
 				{#if visibleCards.includes(2)}
 					<div
-						class="col-span-12 md:col-span-4 card-entrance mb-4 md:mb-0"
+						class="card-entrance col-span-12 mb-4 md:col-span-4 md:mb-0"
 						style="--animation-delay: {cards[1].animationDelay};"
 					>
-						<Card.Root class="w-full aspect-video card-content">
-							<Card.Content class="flex flex-col items-center justify-center h-full">
-								<div class="flex justify-center items-center icon-animation">
+						<Card.Root class="card-content aspect-video w-full">
+							<Card.Content class="flex h-full flex-col items-center justify-center">
+								<div class="icon-animation flex items-center justify-center">
 									<ScrollText class="text-purple-600" size={64} />
 								</div>
 								<Card.Title class="title-animation">PDF Documents</Card.Title>
@@ -152,12 +153,12 @@
 
 				{#if visibleCards.includes(3)}
 					<div
-						class="col-span-12 md:col-span-4 card-entrance"
+						class="card-entrance col-span-12 md:col-span-4"
 						style="--animation-delay: {cards[2].animationDelay};"
 					>
-						<Card.Root class="w-full aspect-video card-content">
-							<Card.Content class="flex flex-col items-center justify-center h-full">
-								<div class="flex justify-center items-center icon-animation">
+						<Card.Root class="card-content aspect-video w-full">
+							<Card.Content class="flex h-full flex-col items-center justify-center">
+								<div class="icon-animation flex items-center justify-center">
 									<Globe class="text-purple-600" size={64} />
 								</div>
 								<Card.Title class="title-animation">Any Other Websites</Card.Title>
@@ -171,10 +172,10 @@
 
 	{#if showTagLine}
 		<div
-			class="text-center mt-12 md:mt-24 tagline-entrance px-4 hidden md:block"
+			class="tagline-entrance mt-12 hidden px-4 text-center md:mt-24 md:block"
 			bind:this={taglineComponent}
 		>
-			<h1 class="text-3xl md:text-4xl font-bold mb-4 fade-in-up">AI On Your Own Terms</h1>
+			<h1 class="fade-in-up mb-4 text-3xl font-bold md:text-4xl">AI On Your Own Terms</h1>
 			<div class="fade-in-up" style="--animation-delay: 200ms;">
 				<JoinWaitlist />
 			</div>
@@ -198,7 +199,7 @@
               </Sheet.Root> -->
 			<div class="fade-in-up hidden md:block" style="--animation-delay: 400ms;">
 				<Button
-					class="px-4 py-2 md:px-6 md:py-3 mt-4 w-full sm:w-auto"
+					class="mt-4 w-full px-4 py-2 sm:w-auto md:px-6 md:py-3"
 					variant="outline"
 					onclick={(e) => {
 						const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };

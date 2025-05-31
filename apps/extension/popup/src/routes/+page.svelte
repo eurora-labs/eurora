@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { EurIcons, Button, Separator } from '@eurora/ui';
+	import { Button } from '@eurora/ui/components/button/index';
+	import { Separator } from '@eurora/ui/components/separator/index';
+	import EuroraIcon from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import { SiGithub } from '@icons-pack/svelte-simple-icons';
 	import { Globe } from '@lucide/svelte';
 </script>
@@ -13,7 +15,7 @@
 			<div
 				class="from-primary/20 to-secondary/20 absolute -inset-1 rounded-full bg-gradient-to-r blur-md"
 			></div>
-			<EurIcons.EuroraLogo class="relative mb-2 h-28 w-28" />
+			<EuroraIcon class="relative mb-2 h-28 w-28" />
 		</div>
 		<h1
 			class="from-primary to-secondary mt-3 bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent"
