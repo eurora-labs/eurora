@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Command as CommandPrimitive } from 'bits-ui';
-	import { cn } from '@eurora/ui/utils.js';
+	import { cn } from '../../../../../ui/src/lib/utils.js';
 	import { InputArea } from '../input-area/index.js';
 	import type { Query } from '@eurora/prosemirror-core';
 	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core';
