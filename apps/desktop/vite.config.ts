@@ -2,9 +2,10 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import path from 'path';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-	plugins: [debounceReload(), sveltekit()],
+	plugins: [tailwindcss(), debounceReload(), sveltekit()],
 
 	server: {
 		port: 1420,

@@ -1,7 +1,7 @@
 @import '@eurora/ui/global.css';
 
 body {
-	@apply dark;
+	/* @apply dark; */
 	background-color: rgba(128, 128, 128, 0);
 	/* margin: 0; */
 	/* padding: 0;  */
