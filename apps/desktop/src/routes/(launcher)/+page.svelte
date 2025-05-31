@@ -1,9 +1,9 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
-	import { Textarea, ScrollArea, Separator, Button, Badge } from '@eurora/ui';
 	import { invoke, Channel } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
-	import { ProtoChatMessage } from '@eurora/proto/questions_service';
+
+	import type { ProtoChatMessage } from '@eurora/proto/questions_service';
 	import { onMount } from 'svelte';
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';

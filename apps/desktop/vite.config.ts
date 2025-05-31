@@ -54,7 +54,6 @@ export default defineConfig({
 	// },
 	resolve: {
 		alias: {
-			'@eurora/ui': path.resolve(__dirname, '../../packages/ui/src'),
 			'@eurora/ai-chat': path.resolve(
 				__dirname,
 				'../../packages/custom-components/ai-chat/src/lib/index.ts'
