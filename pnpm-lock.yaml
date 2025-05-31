@@ -102,9 +102,6 @@ importers:
       '@eurora/katex':
         specifier: workspace:*
         version: link:../../packages/custom-components/katex
-      '@eurora/launcher':
-        specifier: workspace:*
-        version: link:../../packages/custom-components/launcher
       '@eurora/prosemirror-core':
         specifier: workspace:*
         version: link:../../packages/prosemirror/core
@@ -133,6 +130,9 @@ importers:
       '@eurora/ext-video':
         specifier: workspace:*
         version: link:../../packages/prosemirror/ext-video
+      '@eurora/launcher':
+        specifier: workspace:*
+        version: link:../../packages/custom-components/launcher
       '@eurora/prosemirror-tauri-bindings':
         specifier: workspace:*
         version: link:../../packages/prosemirror/tauri-bindings
