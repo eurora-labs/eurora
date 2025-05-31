@@ -38,6 +38,9 @@
 		"vite": "catalog:",
 		"vitest": "catalog:"
 	},
+	"peerDependencies": {
+		"@eurora/ui": "workspace:*"
+	},
 	"dependencies": {
 		"prosemirror-model": "^1.20.0",
 		"prosemirror-view": "^1.33.5"
