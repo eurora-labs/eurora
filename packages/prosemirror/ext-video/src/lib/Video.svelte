@@ -59,7 +59,10 @@
 </script>
 
 <script lang="ts">
-	import { Badge, ContextChip, Label, Input, Button, buttonVariants, Popover } from '@eurora/ui';
+	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
+	import { Label } from '@eurora/ui/components/label/index';
+	import { Input } from '@eurora/ui/components/input/index';
+	import * as Popover from '@eurora/ui/components/popover/index';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
 	export interface Props extends SvelteNodeViewProps<VideoAttrs> {
 		ref: HTMLElement;
@@ -86,7 +89,9 @@
 
 <Popover.Root>
 	<Popover.Trigger>
-		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.name}</ContextChip>
+		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}
+			>{attrs.name}</ContextChip
+		>
 	</Popover.Trigger>
 	<Popover.Content class="w-80">
 		<div class="grid gap-4">
