@@ -1,9 +1,13 @@
 <script lang="ts">
-	import { ScrollArea, Card, SystemChatMessage, UserChatMessage } from '@eurora/ui';
+	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
+	import { SystemChatMessage } from '@eurora/ui/custom-components/system-chat-message/index';
+	import { UserChatMessage } from '@eurora/ui/custom-components/user-chat-message/index';
 	// import SystemChatMessage from '$lib/components/SystemChatMessage.svelte';
 	// import UserChatMessage from '$lib/components/UserChatMessage.svelte';
 
-	import { ProtoChatMessage } from '@eurora/proto/questions_service';
+	// import SystemChatMessage from '$lib/components/SystemChatMessage.svelte';
+	// import UserChatMessage from '$lib/components/UserChatMessage.svelte';
+	import type { ProtoChatMessage } from '@eurora/proto/questions_service';
 	import { Katex } from '@eurora/katex';
 
 	interface Props {
