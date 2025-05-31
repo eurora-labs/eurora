@@ -2,7 +2,8 @@
 	import ConversationItem from './conversation-item.svelte';
 	import SendHorizontal from '@lucide/svelte/icons/send-horizontal';
 	import type Message from './message.js';
-	import { Button, Textarea } from '@eurora/ui';
+	import { Button } from '@eurora/ui/components/button/index';
+	import { Textarea } from '@eurora/ui/components/textarea/index';
 
 	let messages: Message[] = $state([]);
 	let inputField;
