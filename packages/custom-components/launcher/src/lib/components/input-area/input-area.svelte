@@ -38,7 +38,7 @@
 	bind:value
 	class={cn(
 		className,
-		'ProsemirrorEditor h-fit min-h-[100px] border-none pt-[15px] text-[40px] leading-[100px] text-black shadow-none'
+		'ProsemirrorEditor h-fit min-h-[100px] text-[40px] text-black shadow-none'
 	)}
 	{...restProps}
 />
@@ -62,12 +62,16 @@
 	oninput={adjustHeight}
 	{...restProps}
 ></textarea> -->
-<style>
+<style lang="postcss">
 	textarea::placeholder {
 		color: rgba(0, 0, 0, 0.25);
 		text-align: start;
 	}
 	.ProsemirrorEditor {
 		color: rgba(0, 0, 0, 0.8);
+		min-height: 100px;
+		height: fit-content;
+		border: none;
+		padding-bottom: 15px;
 	}
 </style>
