@@ -17,7 +17,6 @@
 
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
 	import { Launcher } from '@eurora/launcher';
-	import { Badge } from '@eurora/ui';
 	import { transcriptExtension } from '@eurora/ext-transcript';
 	import { Editor as ProsemirrorEditor, TextSelection } from '@eurora/prosemirror-core';
 	let editorRef: ProsemirrorEditor | undefined = $state(undefined);
