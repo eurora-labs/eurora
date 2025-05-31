@@ -7,7 +7,7 @@
 <script lang="ts" generics="T extends Record<string, unknown>, U extends _FormPathLeaves<T>">
 	import * as FormPrimitive from 'formsnap';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import type { WithElementRef } from 'bits-ui';
+	import type { WithElementRef } from '$lib/utils.js';
 	import { cn } from '$lib/utils.js';
 
 	let {
