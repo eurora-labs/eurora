@@ -1,25 +1,30 @@
 <script lang="ts">
-	import { Card, Button, Input } from '@eurora/ui';
+	import * as Card from '@eurora/ui/components/card/index';
+	import { Button } from '@eurora/ui/components/button/index';
 	import { Mail, Phone, MapPin } from '@lucide/svelte';
+	import { Input } from '@eurora/ui/components/input/index';
 </script>
 
-<div class="container mx-auto px-4 py-16 max-w-5xl">
-	<div class="text-center mb-12">
-		<h1 class="text-4xl font-bold mb-4">Contact Us</h1>
-		<p class="text-xl text-gray-600 max-w-2xl mx-auto">
-			Have questions or want to learn more about Eurora? We're here to help. Reach out to our team.
+<div class="container mx-auto max-w-5xl px-4 py-16">
+	<div class="mb-12 text-center">
+		<h1 class="mb-4 text-4xl font-bold">Contact Us</h1>
+		<p class="mx-auto max-w-2xl text-xl text-gray-600">
+			Have questions or want to learn more about Eurora? We're here to help. Reach out to our
+			team.
 		</p>
 	</div>
 
-	<div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+	<div class="mb-16 grid grid-cols-1 gap-8 md:grid-cols-2">
 		<Card.Root class="p-6">
 			<Card.Header>
 				<Card.Title>Send Us a Message</Card.Title>
-				<Card.Description>Fill out the form below and we'll get back to you soon.</Card.Description>
+				<Card.Description
+					>Fill out the form below and we'll get back to you soon.</Card.Description
+				>
 			</Card.Header>
 			<Card.Content>
 				<form class="space-y-4">
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 						<div class="space-y-2">
 							<label for="name" class="text-sm font-medium">Name</label>
 							<Input id="name" placeholder="Your name" />
@@ -38,7 +43,7 @@
 						<textarea
 							id="message"
 							rows="5"
-							class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+							class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-600"
 							placeholder="Your message here..."
 						></textarea>
 					</div>
@@ -51,26 +56,28 @@
 			<Card.Root class="p-6">
 				<Card.Header>
 					<Card.Title>Contact Information</Card.Title>
-					<Card.Description>Reach out to us directly using the information below.</Card.Description>
+					<Card.Description
+						>Reach out to us directly using the information below.</Card.Description
+					>
 				</Card.Header>
 				<Card.Content>
 					<div class="space-y-4">
 						<div class="flex items-start space-x-3">
-							<Mail class="w-5 h-5 text-purple-600 mt-1" />
+							<Mail class="mt-1 h-5 w-5 text-purple-600" />
 							<div>
 								<h3 class="font-medium">Email</h3>
 								<p class="text-gray-600">contact@eurora-labs.com</p>
 							</div>
 						</div>
 						<div class="flex items-start space-x-3">
-							<Phone class="w-5 h-5 text-purple-600 mt-1" />
+							<Phone class="mt-1 h-5 w-5 text-purple-600" />
 							<div>
 								<h3 class="font-medium">Phone</h3>
 								<p class="text-gray-600">+1 (555) 123-4567</p>
 							</div>
 						</div>
 						<div class="flex items-start space-x-3">
-							<MapPin class="w-5 h-5 text-purple-600 mt-1" />
+							<MapPin class="mt-1 h-5 w-5 text-purple-600" />
 							<div>
 								<h3 class="font-medium">Office</h3>
 								<p class="text-gray-600">
@@ -109,7 +116,7 @@
 		</div>
 	</div>
 
-	<Card.Root class="p-6 mb-16">
+	<Card.Root class="mb-16 p-6">
 		<Card.Header>
 			<Card.Title>Frequently Asked Questions</Card.Title>
 			<Card.Description>Quick answers to common questions</Card.Description>
@@ -117,23 +124,23 @@
 		<Card.Content>
 			<div class="space-y-6">
 				<div>
-					<h3 class="font-medium text-lg mb-2">How do I get started with Eurora?</h3>
+					<h3 class="mb-2 text-lg font-medium">How do I get started with Eurora?</h3>
 					<p class="text-gray-600">
-						Getting started is easy! Simply download the app from our website or app store, create
-						an account, and follow the onboarding process.
+						Getting started is easy! Simply download the app from our website or app
+						store, create an account, and follow the onboarding process.
 					</p>
 				</div>
 				<div>
-					<h3 class="font-medium text-lg mb-2">Is Eurora available on all platforms?</h3>
+					<h3 class="mb-2 text-lg font-medium">Is Eurora available on all platforms?</h3>
 					<p class="text-gray-600">
 						Yes, Eurora is available on Windows, macOS, Linux, iOS, and Android devices.
 					</p>
 				</div>
 				<div>
-					<h3 class="font-medium text-lg mb-2">How secure is my data with Eurora?</h3>
+					<h3 class="mb-2 text-lg font-medium">How secure is my data with Eurora?</h3>
 					<p class="text-gray-600">
-						We take security seriously. All data is encrypted end-to-end, and we never share your
-						information with third parties without your explicit consent.
+						We take security seriously. All data is encrypted end-to-end, and we never
+						share your information with third parties without your explicit consent.
 					</p>
 				</div>
 			</div>
