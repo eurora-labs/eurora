@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { Euro } from '@lucide/svelte';
 	import { SiGithub } from '@icons-pack/svelte-simple-icons';
-	import { Button, EurIcons, Alert } from '@eurora/ui';
+	import { Button } from '@eurora/ui/components/button/index';
+	import * as Alert from '@eurora/ui/components/alert/index';
+	import * as EurIcons from '@eurora/ui/custom-icons/index';
 	import { Terminal, X, ShieldAlert } from '@lucide/svelte';
 	import JoinWaitlist from './join_waitlist.svelte';
 

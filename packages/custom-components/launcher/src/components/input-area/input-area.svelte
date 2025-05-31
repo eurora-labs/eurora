@@ -11,7 +11,7 @@
 </script>
 
 <script lang="ts">
-	import { cn } from '@eurora/ui/utils.js';
+	import { cn } from '../../../../../ui/src/lib/utils.js';
 	import { onMount } from 'svelte';
 
 	let {

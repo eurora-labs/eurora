@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Command as CommandPrimitive } from 'bits-ui';
-	import { cn } from '@eurora/ui/utils.js';
+	import { cn } from '../../../../../ui/src/lib/utils.js';
 
 	let {
 		ref = $bindable(null),
