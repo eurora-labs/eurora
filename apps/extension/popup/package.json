@@ -24,10 +24,10 @@
 		"test:unit": "vitest"
 	},
 	"dependencies": {
-		"@eurora/ui": "workspace:*",
 		"@eurora/katex": "workspace:*"
 	},
 	"devDependencies": {
+		"@eurora/ui": "workspace:*",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",

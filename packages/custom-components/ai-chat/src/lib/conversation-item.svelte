@@ -25,7 +25,9 @@
 								class="text-message flex min-h-8 w-full flex-col items-end gap-2 whitespace-normal break-words text-start [.text-message+&]:mt-5"
 							>
 								<div class="flex w-full flex-col gap-1 first:pt-[3px] empty:hidden">
-									<div class="markdown conversation-text prose w-full break-words">
+									<div
+										class="markdown conversation-text prose w-full break-words"
+									>
 										<p>
 											<Katex bind:math={text} {finishRendering} />
 										</p>
@@ -36,7 +38,9 @@
 							<div
 								class="text-message flex min-h-8 w-full flex-col items-end gap-2 whitespace-normal break-words text-start [.text-message+&]:mt-5"
 							>
-								<div class="flex w-full flex-col items-end gap-1 empty:hidden rtl:items-start">
+								<div
+									class="flex w-full flex-col items-end gap-1 empty:hidden rtl:items-start"
+								>
 									<div
 										class="bg-token-message-surface conversation-text relative max-w-[var(--user-chat-width,70%)] rounded-3xl px-5 py-2.5"
 									>

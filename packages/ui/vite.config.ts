@@ -1,11 +1,12 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
-import path from 'path';
+import { defineConfig } from 'vitest/config';
+
 export default defineConfig({
 	plugins: [sveltekit()],
-	resolve: {
-		alias: {
-			'@eurora/katex': path.resolve(__dirname, '../custom-components/katex/src/lib/index.ts')
-		}
+	test: {
+		include: ['src/**/*.(test|spec).?(m)[jt]s?(x)']
+	},
+	build: {
+		sourcemap: 'inline'
 	}
 });
