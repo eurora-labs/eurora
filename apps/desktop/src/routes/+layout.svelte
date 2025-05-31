@@ -1,4 +1,6 @@
 <script lang="ts">
+	import '@eurora/ui/main.css';
+	import '../app.css';
 	import { platform } from '@tauri-apps/plugin-os';
 	let { children } = $props();
 

@@ -2,9 +2,10 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import path from 'path';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-	plugins: [debounceReload(), sveltekit()],
+	plugins: [debounceReload(), sveltekit(), tailwindcss()],
 
 	server: {
 		port: 1420,
@@ -62,10 +63,6 @@ export default defineConfig({
 			'@eurora/katex': path.resolve(
 				__dirname,
 				'../../packages/custom-components/katex/src/lib/index.ts'
-			),
-			'@eurora/launcher': path.resolve(
-				__dirname,
-				'../../packages/custom-components/launcher/src/index.ts'
 			)
 		}
 	}
