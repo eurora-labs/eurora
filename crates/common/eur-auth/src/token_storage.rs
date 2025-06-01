@@ -61,9 +61,18 @@ impl TokenStorage for SecureTokenStorage {
     }
 
     async fn clear_tokens(&self) -> Result<()> {
-        // Clear both tokens, ignore errors if they don't exist
-        let _ = secret::delete("AUTH_ACCESS_TOKEN", Namespace::Global);
-        let _ = secret::delete("AUTH_REFRESH_TOKEN", Namespace::Global);
+        if let Err(e) = secret::delete("AUTH_ACCESS_TOKEN", Namespace::Global) {
+            match e.downcast_ref::<eur_secret::Error>() {
+                Some(eur_secret::Error::NoEntry) => {}
+                _ => Err(e)?,
+            }
+        }
+        if let Err(e) = secret::delete("AUTH_REFRESH_TOKEN", Namespace::Global) {
+            match e.downcast_ref::<eur_secret::Error>() {
+                Some(eur_secret::Error::NoEntry) => {}
+                _ => Err(e)?,
+            }
+        }
         Ok(())
     }
 }
