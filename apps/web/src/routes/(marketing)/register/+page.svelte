@@ -136,7 +136,7 @@
 	<div class="w-full max-w-md space-y-8">
 		<div class="text-center">
 			<h1 class="text-3xl font-bold tracking-tight">Create your account</h1>
-			<p class="mt-2 text-muted-foreground">
+			<p class="text-muted-foreground mt-2">
 				Join Eurora Labs and unlock AI-powered productivity
 			</p>
 		</div>
@@ -220,7 +220,7 @@
 							bind:value={formData.displayName}
 							disabled={isLoading}
 						/>
-						<p class="text-xs text-muted-foreground">
+						<p class="text-muted-foreground text-xs">
 							This is how your name will appear to other users
 						</p>
 					</div>
@@ -240,7 +240,7 @@
 							/>
 							<button
 								type="button"
-								class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+								class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
 								onclick={togglePasswordVisibility}
 								disabled={isLoading}
 								aria-label={showPassword ? 'Hide password' : 'Show password'}
@@ -255,7 +255,7 @@
 						{#if errors.password}
 							<p class="text-sm text-red-600">{errors.password}</p>
 						{:else}
-							<p class="text-xs text-muted-foreground">
+							<p class="text-muted-foreground text-xs">
 								Must be at least 8 characters with uppercase, lowercase, and number
 							</p>
 						{/if}
@@ -279,7 +279,7 @@
 							/>
 							<button
 								type="button"
-								class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+								class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
 								onclick={toggleConfirmPasswordVisibility}
 								disabled={isLoading}
 								aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
@@ -312,7 +312,7 @@
 			</Card.Root>
 
 			<div class="text-center">
-				<p class="text-sm text-muted-foreground">
+				<p class="text-muted-foreground text-sm">
 					Already have an account?
 					<Button variant="link" href="/login" class="h-auto p-0 font-normal">
 						Sign in here

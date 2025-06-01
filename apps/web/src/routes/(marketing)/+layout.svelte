@@ -3,7 +3,8 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Alert from '@eurora/ui/components/alert/index';
 	import * as EurIcons from '@eurora/ui/custom-icons/index';
-	import { ShieldAlert } from '@lucide/svelte';
+	import { ShieldAlert, LogInIcon } from '@lucide/svelte';
+
 	import JoinWaitlist from './join_waitlist.svelte';
 
 	const { children } = $props();
@@ -17,7 +18,7 @@
 
 {#if showAlert}
 	<div
-		class="fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b bg-background px-6 py-2"
+		class="bg-background fixed top-0 right-0 left-0 z-50 flex items-center justify-between border-b px-6 py-2"
 	>
 		<Alert.Root class="flex flex-1 items-center">
 			<ShieldAlert class="size-4" />
@@ -33,7 +34,7 @@
 {/if}
 
 <div
-	class="fixed left-0 right-0 z-40 flex items-center justify-between bg-background px-6 py-4"
+	class="bg-background fixed right-0 left-0 z-40 flex items-center justify-between px-6 py-4"
 	style="top: {showAlert ? 'var(--alert-height, 40px)' : '0'};"
 >
 	<div class="flex items-center gap-2">
@@ -55,6 +56,10 @@
 			<SiGithub />
 		</Button>
 		<!-- <Button variant="default" href="/download">Get Eurora</Button> -->
+		<Button variant="ghost" href="/login">
+			Login
+			<LogInIcon />
+		</Button>
 	</div>
 </div>
 
