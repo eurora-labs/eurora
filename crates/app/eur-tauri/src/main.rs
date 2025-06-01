@@ -169,16 +169,11 @@ fn main() {
                     // app_handle.manage(current_conversation);
 
                     // Initialize auth manager
-                    let auth_app_handle = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let auth_manager = create_shared_auth_manager().await;
-                        let auth_provider = Arc::new(AuthProvider::new(auth_manager.clone()));
-                        auth_app_handle.manage(auth_manager);
-                        auth_app_handle.manage(auth_provider);
-                        info!("Auth manager initialized");
-                    });
-
-                    // --- Background Tasks ---
+                    let auth_manager = tauri::async_runtime::block_on(create_shared_auth_manager());
+                    let auth_provider = Arc::new(AuthProvider::new(auth_manager.clone()));
+                    app_handle.manage(auth_manager);
+                    app_handle.manage(auth_provider);
+                    info!("Auth manager initialized");
 
                     // Initialize OpenAI client if API key exists
                     let app_handle_openai = app_handle.clone();
