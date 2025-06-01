@@ -61,14 +61,18 @@ async fn create_shared_auth_manager() -> SharedAuthManager {
     let token_storage = Box::new(SecureTokenStorage::new());
     // For now, we'll connect to auth service later when it's available
     let auth_service_url = std::env::var("AUTH_SERVICE_URL").ok();
+    if let Some(ref url) = auth_service_url {
+        info!("Auth service URL: {}", url);
+    } else {
+        info!("No AUTH_SERVICE_URL set, auth service will be unavailable");
+    }
 
     let auth_manager = AuthManager::new(token_storage, auth_service_url)
         .await
-        .map_err(|e| {
-            eprintln!("Failed to create auth manager: {}", e);
-            e
-        })
-        .unwrap();
+        .unwrap_or_else(|e| {
+            error!("Failed to create auth manager: {}", e);
+            panic!("Cannot continue without auth manager {}", e);
+        });
 
     Arc::new(tokio::sync::Mutex::new(auth_manager))
 }
