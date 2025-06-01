@@ -1,6 +1,6 @@
 pub mod secret;
 pub mod sensitive;
-
+pub use keyring::Error;
 /// A type to clearly mark sensitive information using the type-system. As such, it should
 ///
 /// * *not* be logged
