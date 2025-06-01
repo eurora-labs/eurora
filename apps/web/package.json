@@ -28,6 +28,8 @@
 	},
 	"devDependencies": {
 		"@eurora/eslint-config": "workspace:*",
+		"sveltekit-superforms": "^2.25.0",
+		"zod": "^3.25.46",
 		"@eurora/proto": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
