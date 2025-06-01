@@ -4,12 +4,14 @@
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import * as Separator from '@eurora/ui/components/separator/index';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
 	import { authService } from '$lib/services/auth-service.js';
 	import { RegisterRequestSchema } from '@eurora/proto/auth_service';
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
+	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 
 	// Define form schema
 	const registerSchema = z
@@ -90,6 +92,22 @@
 	function toggleConfirmPasswordVisibility() {
 		showConfirmPassword = !showConfirmPassword;
 	}
+
+	// Social registration handlers
+	function handleAppleRegister() {
+		console.log('Apple registration clicked');
+		// TODO: Implement Apple OAuth registration
+	}
+
+	function handleGoogleRegister() {
+		console.log('Google registration clicked');
+		// TODO: Implement Google OAuth registration
+	}
+
+	function handleGitHubRegister() {
+		console.log('GitHub registration clicked');
+		// TODO: Implement GitHub OAuth registration
+	}
 </script>
 
 <svelte:head>
@@ -138,6 +156,27 @@
 			</Card.Root>
 		{:else}
 			<Card.Root class="p-6">
+				<!-- Social Registration Buttons -->
+				<SocialAuthButtons
+					mode="register"
+					onApple={handleAppleRegister}
+					onGoogle={handleGoogleRegister}
+					onGitHub={handleGitHubRegister}
+				/>
+
+				<!-- Divider -->
+				<div class="relative my-6">
+					<div class="absolute inset-0 flex items-center">
+						<Separator.Root class="w-full" />
+					</div>
+					<div class="relative flex justify-center text-xs uppercase">
+						<span class="bg-background text-muted-foreground px-2"
+							>Or register with email</span
+						>
+					</div>
+				</div>
+
+				<!-- Email Registration Form -->
 				<form use:enhance onsubmit={handleSubmit} class="space-y-4">
 					{#if submitError}
 						<div class="rounded-md bg-red-50 p-4">
