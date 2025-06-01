@@ -8,5 +8,5 @@ description = "Secret management for Eurora"
 [dependencies]
 serde = { workspace = true, features = ["std"] }
 keyring = { workspace = true }
-anyhow = "1.0.95"
+anyhow = "1.0.98"
 tracing.workspace = true
