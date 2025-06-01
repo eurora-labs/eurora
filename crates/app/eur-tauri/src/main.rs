@@ -4,13 +4,17 @@
 )]
 
 use anyhow::Result;
+use eur_auth::{AuthManager, SecureTokenStorage};
 use eur_client_questions::QuestionsClient;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
 use eur_tauri::{
-    WindowState, create_launcher,
+    WindowState,
+    auth::AuthProvider,
+    create_launcher,
     procedures::{
+        auth_procedures::{AuthApi, AuthApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         query_procedures::{QueryApi, QueryApiImpl},
@@ -38,6 +42,7 @@ static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 use tracing::{error, info};
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
+type SharedAuthManager = Arc<tokio::sync::Mutex<AuthManager>>;
 
 async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> SharedPersonalDb {
     let db_path = get_db_path(app_handle);
@@ -50,6 +55,22 @@ async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> Shared
             })
             .unwrap(),
     )
+}
+
+async fn create_shared_auth_manager() -> SharedAuthManager {
+    let token_storage = Box::new(SecureTokenStorage::new());
+    // For now, we'll connect to auth service later when it's available
+    let auth_service_url = std::env::var("AUTH_SERVICE_URL").ok();
+
+    let auth_manager = AuthManager::new(token_storage, auth_service_url)
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to create auth manager: {}", e);
+            e
+        })
+        .unwrap();
+
+    Arc::new(tokio::sync::Mutex::new(auth_manager))
 }
 
 // fn create_shared_conversation_storage() -> SharedConversationStorage {
@@ -142,6 +163,16 @@ fn main() {
                     app_handle.manage(current_conversation_id.clone());
                     // let current_conversation = create_shared_current_conversation();
                     // app_handle.manage(current_conversation);
+
+                    // Initialize auth manager
+                    let auth_app_handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let auth_manager = create_shared_auth_manager().await;
+                        let auth_provider = Arc::new(AuthProvider::new(auth_manager.clone()));
+                        auth_app_handle.manage(auth_manager);
+                        auth_app_handle.manage(auth_provider);
+                        info!("Auth manager initialized");
+                    });
 
                     // --- Background Tasks ---
 
@@ -308,6 +339,7 @@ fn main() {
 
             let router = Router::new()
                 // .export_config(typescript_config)
+                .merge(AuthApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
