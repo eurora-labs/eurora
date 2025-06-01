@@ -1,100 +1,72 @@
 <script lang="ts">
 	import { create } from '@bufbuild/protobuf';
+	import * as Form from '@eurora/ui/components/form/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Input } from '@eurora/ui/components/input/index';
-	import { Label } from '@eurora/ui/components/label/index';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
 	import { authService } from '$lib/services/auth-service.js';
 	import { RegisterRequestSchema } from '@eurora/proto/auth_service';
+	import { superForm } from 'sveltekit-superforms';
+	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { z } from 'zod';
 
-	let formData = $state({
-		username: '',
-		email: '',
-		password: '',
-		confirmPassword: '',
-		displayName: ''
-	});
+	// Define form schema
+	const registerSchema = z
+		.object({
+			username: z
+				.string()
+				.min(3, 'Username must be at least 3 characters long')
+				.regex(
+					/^[a-zA-Z0-9_-]+$/,
+					'Username can only contain letters, numbers, hyphens, and underscores'
+				),
+			email: z.string().email('Please enter a valid email address'),
+			displayName: z.string().optional(),
+			password: z
+				.string()
+				.min(8, 'Password must be at least 8 characters long')
+				.regex(
+					/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+					'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+				),
+			confirmPassword: z.string().min(1, 'Please confirm your password')
+		})
+		.refine((data) => data.password === data.confirmPassword, {
+			message: 'Passwords do not match',
+			path: ['confirmPassword']
+		});
+
+	// Initialize form with client-side validation only
+	const form = superForm(
+		{
+			username: '',
+			email: '',
+			displayName: '',
+			password: '',
+			confirmPassword: ''
+		},
+		{
+			validators: zodClient(registerSchema)
+		}
+	);
+
+	const { form: formData, enhance, errors, submitting } = form;
 
 	let showPassword = $state(false);
 	let showConfirmPassword = $state(false);
-	let isLoading = $state(false);
-	let errors = $state<Record<string, string>>({});
 	let success = $state(false);
+	let submitError = $state<string | null>(null);
 
-	function validateField(field: string, value: string): string | null {
-		switch (field) {
-			case 'username':
-				if (!value.trim()) return 'Username is required';
-				if (value.length < 3) return 'Username must be at least 3 characters long';
-				if (!/^[a-zA-Z0-9_-]+$/.test(value))
-					return 'Username can only contain letters, numbers, hyphens, and underscores';
-				return null;
-			case 'email':
-				if (!value.trim()) return 'Email is required';
-				if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
-					return 'Please enter a valid email address';
-				return null;
-			case 'password':
-				if (!value) return 'Password is required';
-				if (value.length < 8) return 'Password must be at least 8 characters long';
-				if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(value))
-					return 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
-				return null;
-			case 'confirmPassword':
-				if (!value) return 'Please confirm your password';
-				if (value !== formData.password) return 'Passwords do not match';
-				return null;
-			default:
-				return null;
-		}
-	}
-
-	function validateForm(): boolean {
-		const newErrors: Record<string, string> = {};
-
-		// Validate all required fields
-		const usernameError = validateField('username', formData.username);
-		if (usernameError) newErrors.username = usernameError;
-
-		const emailError = validateField('email', formData.email);
-		if (emailError) newErrors.email = emailError;
-
-		const passwordError = validateField('password', formData.password);
-		if (passwordError) newErrors.password = passwordError;
-
-		const confirmPasswordError = validateField('confirmPassword', formData.confirmPassword);
-		if (confirmPasswordError) newErrors.confirmPassword = confirmPasswordError;
-
-		errors = newErrors;
-		return Object.keys(newErrors).length === 0;
-	}
-
-	function handleFieldBlur(field: string, value: string) {
-		const error = validateField(field, value);
-		if (error) {
-			errors = { ...errors, [field]: error };
-		} else {
-			const { [field]: _, ...rest } = errors;
-			errors = rest;
-		}
-	}
-
-	async function handleSubmit(event: Event) {
-		event.preventDefault();
-
-		if (!validateForm()) {
-			return;
-		}
-
-		isLoading = true;
+	async function handleSubmit() {
+		submitError = null;
 
 		try {
 			const registerData = create(RegisterRequestSchema, {
-				username: formData.username,
-				email: formData.email,
-				password: formData.password,
-				displayName: formData.displayName || undefined
+				username: $formData.username,
+				email: $formData.email,
+				password: $formData.password,
+				displayName: $formData.displayName || undefined
 			});
 
 			console.log('Registering user:', registerData);
@@ -106,12 +78,8 @@
 			success = true;
 		} catch (err) {
 			console.error('Registration error:', err);
-			errors = {
-				submit:
-					err instanceof Error ? err.message : 'Registration failed. Please try again.'
-			};
-		} finally {
-			isLoading = false;
+			submitError =
+				err instanceof Error ? err.message : 'Registration failed. Please try again.';
 		}
 	}
 
@@ -170,138 +138,135 @@
 			</Card.Root>
 		{:else}
 			<Card.Root class="p-6">
-				<form onsubmit={handleSubmit} class="space-y-4">
-					{#if errors.submit}
+				<form use:enhance onsubmit={handleSubmit} class="space-y-4">
+					{#if submitError}
 						<div class="rounded-md bg-red-50 p-4">
-							<p class="text-sm text-red-800">{errors.submit}</p>
+							<p class="text-sm text-red-800">{submitError}</p>
 						</div>
 					{/if}
 
-					<div class="space-y-2">
-						<Label for="username">Username</Label>
-						<Input
-							id="username"
-							type="text"
-							placeholder="Enter your username"
-							bind:value={formData.username}
-							onblur={() => handleFieldBlur('username', formData.username)}
-							disabled={isLoading}
-							class={errors.username ? 'border-red-500 focus:border-red-500' : ''}
-							required
-						/>
-						{#if errors.username}
-							<p class="text-sm text-red-600">{errors.username}</p>
-						{/if}
-					</div>
+					<Form.Field {form} name="username">
+						<Form.Control>
+							{#snippet children({ props })}
+								<Form.Label>Username</Form.Label>
+								<Input
+									{...props}
+									type="text"
+									placeholder="Enter your username"
+									bind:value={$formData.username}
+									disabled={$submitting}
+								/>
+							{/snippet}
+						</Form.Control>
+						<Form.FieldErrors />
+					</Form.Field>
 
-					<div class="space-y-2">
-						<Label for="email">Email</Label>
-						<Input
-							id="email"
-							type="email"
-							placeholder="Enter your email"
-							bind:value={formData.email}
-							onblur={() => handleFieldBlur('email', formData.email)}
-							disabled={isLoading}
-							class={errors.email ? 'border-red-500 focus:border-red-500' : ''}
-							required
-						/>
-						{#if errors.email}
-							<p class="text-sm text-red-600">{errors.email}</p>
-						{/if}
-					</div>
+					<Form.Field {form} name="email">
+						<Form.Control>
+							{#snippet children({ props })}
+								<Form.Label>Email</Form.Label>
+								<Input
+									{...props}
+									type="email"
+									placeholder="Enter your email"
+									bind:value={$formData.email}
+									disabled={$submitting}
+								/>
+							{/snippet}
+						</Form.Control>
+						<Form.FieldErrors />
+					</Form.Field>
 
-					<div class="space-y-2">
-						<Label for="displayName">Display Name (Optional)</Label>
-						<Input
-							id="displayName"
-							type="text"
-							placeholder="Enter your display name"
-							bind:value={formData.displayName}
-							disabled={isLoading}
-						/>
-						<p class="text-muted-foreground text-xs">
-							This is how your name will appear to other users
-						</p>
-					</div>
+					<Form.Field {form} name="displayName">
+						<Form.Control>
+							{#snippet children({ props })}
+								<Form.Label>Display Name (Optional)</Form.Label>
+								<Input
+									{...props}
+									type="text"
+									placeholder="Enter your display name"
+									bind:value={$formData.displayName}
+									disabled={$submitting}
+								/>
+							{/snippet}
+						</Form.Control>
+						<Form.Description
+							>This is how your name will appear to other users</Form.Description
+						>
+						<Form.FieldErrors />
+					</Form.Field>
 
-					<div class="space-y-2">
-						<Label for="password">Password</Label>
-						<div class="relative">
-							<Input
-								id="password"
-								type={showPassword ? 'text' : 'password'}
-								placeholder="Enter your password"
-								bind:value={formData.password}
-								onblur={() => handleFieldBlur('password', formData.password)}
-								disabled={isLoading}
-								class={errors.password ? 'border-red-500 focus:border-red-500' : ''}
-								required
-							/>
-							<button
-								type="button"
-								class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
-								onclick={togglePasswordVisibility}
-								disabled={isLoading}
-								aria-label={showPassword ? 'Hide password' : 'Show password'}
-							>
-								{#if showPassword}
-									<EyeOff class="h-4 w-4" />
-								{:else}
-									<Eye class="h-4 w-4" />
-								{/if}
-							</button>
-						</div>
-						{#if errors.password}
-							<p class="text-sm text-red-600">{errors.password}</p>
-						{:else}
-							<p class="text-muted-foreground text-xs">
-								Must be at least 8 characters with uppercase, lowercase, and number
-							</p>
-						{/if}
-					</div>
+					<Form.Field {form} name="password">
+						<Form.Control>
+							{#snippet children({ props })}
+								<Form.Label>Password</Form.Label>
+								<div class="relative">
+									<Input
+										{...props}
+										type={showPassword ? 'text' : 'password'}
+										placeholder="Enter your password"
+										bind:value={$formData.password}
+										disabled={$submitting}
+									/>
+									<button
+										type="button"
+										class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
+										onclick={togglePasswordVisibility}
+										disabled={$submitting}
+										aria-label={showPassword
+											? 'Hide password'
+											: 'Show password'}
+									>
+										{#if showPassword}
+											<EyeOff class="h-4 w-4" />
+										{:else}
+											<Eye class="h-4 w-4" />
+										{/if}
+									</button>
+								</div>
+							{/snippet}
+						</Form.Control>
+						<Form.Description>
+							Must be at least 8 characters with uppercase, lowercase, and number
+						</Form.Description>
+						<Form.FieldErrors />
+					</Form.Field>
 
-					<div class="space-y-2">
-						<Label for="confirmPassword">Confirm Password</Label>
-						<div class="relative">
-							<Input
-								id="confirmPassword"
-								type={showConfirmPassword ? 'text' : 'password'}
-								placeholder="Confirm your password"
-								bind:value={formData.confirmPassword}
-								onblur={() =>
-									handleFieldBlur('confirmPassword', formData.confirmPassword)}
-								disabled={isLoading}
-								class={errors.confirmPassword
-									? 'border-red-500 focus:border-red-500'
-									: ''}
-								required
-							/>
-							<button
-								type="button"
-								class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
-								onclick={toggleConfirmPasswordVisibility}
-								disabled={isLoading}
-								aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-							>
-								{#if showConfirmPassword}
-									<EyeOff class="h-4 w-4" />
-								{:else}
-									<Eye class="h-4 w-4" />
-								{/if}
-							</button>
-						</div>
-						{#if errors.confirmPassword}
-							<p class="text-sm text-red-600">{errors.confirmPassword}</p>
-						{/if}
-					</div>
+					<Form.Field {form} name="confirmPassword">
+						<Form.Control>
+							{#snippet children({ props })}
+								<Form.Label>Confirm Password</Form.Label>
+								<div class="relative">
+									<Input
+										{...props}
+										type={showConfirmPassword ? 'text' : 'password'}
+										placeholder="Confirm your password"
+										bind:value={$formData.confirmPassword}
+										disabled={$submitting}
+									/>
+									<button
+										type="button"
+										class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
+										onclick={toggleConfirmPasswordVisibility}
+										disabled={$submitting}
+										aria-label={showConfirmPassword
+											? 'Hide password'
+											: 'Show password'}
+									>
+										{#if showConfirmPassword}
+											<EyeOff class="h-4 w-4" />
+										{:else}
+											<Eye class="h-4 w-4" />
+										{/if}
+									</button>
+								</div>
+							{/snippet}
+						</Form.Control>
+						<Form.FieldErrors />
+					</Form.Field>
 
-					<Button
-						type="submit"
-						class="w-full"
-						disabled={isLoading || Object.keys(errors).length > 0}
-					>
-						{#if isLoading}
+					<Button type="submit" class="w-full" disabled={$submitting}>
+						{#if $submitting}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 							Creating account...
 						{:else}
