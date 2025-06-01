@@ -4,12 +4,14 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import * as Separator from '@eurora/ui/components/separator/index';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
 	import { authService } from '$lib/services/auth-service.js';
 	import { LoginRequestSchema } from '@eurora/proto/auth_service';
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
+	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 
 	// Define form schema
 	const loginSchema = z.object({
@@ -66,6 +68,22 @@
 	function togglePasswordVisibility() {
 		showPassword = !showPassword;
 	}
+
+	// Social login handlers
+	function handleAppleLogin() {
+		console.log('Apple login clicked');
+		// TODO: Implement Apple OAuth
+	}
+
+	function handleGoogleLogin() {
+		console.log('Google login clicked');
+		// TODO: Implement Google OAuth
+	}
+
+	function handleGitHubLogin() {
+		console.log('GitHub login clicked');
+		// TODO: Implement GitHub OAuth
+	}
 </script>
 
 <svelte:head>
@@ -113,6 +131,27 @@
 			</Card.Root>
 		{:else}
 			<Card.Root class="p-6">
+				<!-- Social Login Buttons -->
+				<SocialAuthButtons
+					mode="login"
+					onApple={handleAppleLogin}
+					onGoogle={handleGoogleLogin}
+					onGitHub={handleGitHubLogin}
+				/>
+
+				<!-- Divider -->
+				<div class="relative my-6">
+					<div class="absolute inset-0 flex items-center">
+						<Separator.Root class="w-full" />
+					</div>
+					<div class="relative flex justify-center text-xs uppercase">
+						<span class="bg-background text-muted-foreground px-2"
+							>Or continue with</span
+						>
+					</div>
+				</div>
+
+				<!-- Email/Password Form -->
 				<form use:enhance onsubmit={handleSubmit} class="space-y-4">
 					{#if submitError}
 						<div class="rounded-md bg-red-50 p-4">
