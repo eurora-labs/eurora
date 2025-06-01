@@ -7,6 +7,6 @@ description = ""
 
 [dependencies]
 image = { workspace = true }
-wgpu = "25.0.0"
-bytemuck = "1.22.0"
+wgpu = "25.0.2"
+bytemuck = "1.23.0"
 pollster = "0.4.0"
