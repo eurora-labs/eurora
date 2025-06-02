@@ -2,13 +2,12 @@
 
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Duration, Utc};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use crate::{
-    Claims, JwtConfig, grpc_client::AuthGrpcClient, token_storage::TokenStorage,
+    JwtConfig, grpc_client::AuthGrpcClient, token_storage::TokenStorage,
     validate_access_token, validate_refresh_token,
 };
 
