@@ -26,7 +26,7 @@
 		},
 		args: {
 			value: '',
-			placeholder: 'Type a command or search...'
+			placeholder: 'Search'
 		}
 	});
 </script>
@@ -39,7 +39,7 @@
 <Story name="Default">
 	<div class="w-[450px]">
 		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Type a command or search..." />
+			<Command.Input placeholder="Search" />
 		</Command.Root>
 	</div>
 </Story>
@@ -48,22 +48,7 @@
 <Story name="With Value">
 	<div class="w-[450px]">
 		<Command.Root value="calculator" class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Type a command or search..." />
-		</Command.Root>
-	</div>
-</Story>
-
-<!-- Different Placeholders -->
-<Story name="Different Placeholders">
-	<div class="w-[450px] space-y-4">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Search applications..." />
-		</Command.Root>
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Find files and folders..." />
-		</Command.Root>
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Quick actions and shortcuts..." />
+			<Command.Input placeholder="Search" />
 		</Command.Root>
 	</div>
 </Story>
