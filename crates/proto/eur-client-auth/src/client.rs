@@ -10,14 +10,13 @@ use tracing::{error, info};
 
 /// gRPC client for authentication service
 pub struct AuthClient {
-    client: ProtoAuthServiceClient<Channel>,
+    channel: Channel,
 }
 
 impl AuthClient {
     /// Create a new gRPC client with a channel
     pub fn new(channel: Channel) -> Result<Self> {
-        let client = ProtoAuthServiceClient::new(channel);
-        Ok(Self { client })
+        Ok(Self { channel })
     }
 
     /// Create a new gRPC client connected to the auth service
@@ -27,48 +26,41 @@ impl AuthClient {
             .await
             .map_err(|e| anyhow!("Failed to connect to auth service: {}", e))?;
 
-        let client = ProtoAuthServiceClient::new(channel);
-
         info!("Connected to auth service at {}", service_url);
-        Ok(Self { client })
+        Ok(Self { channel })
+    }
+    pub fn get_client(&self) -> ProtoAuthServiceClient<Channel> {
+        ProtoAuthServiceClient::new(self.channel.clone())
     }
 
     /// Login with email/username and password
-    pub async fn login(&mut self, login: &str, password: &str) -> Result<TokenResponse> {
-        let credentials = EmailPasswordCredentials {
-            login: login.to_string(),
-            password: password.to_string(),
-        };
-
-        let request = LoginRequest {
-            credential: Some(Credential::EmailPassword(credentials)),
-        };
-
-        let response = self.client.login(request).await.map_err(|e| {
+    pub async fn login(&self, data: LoginRequest) -> Result<TokenResponse> {
+        let mut client = self.get_client();
+        let response = client.login(data).await.map_err(|e| {
             error!("Login failed: {}", e);
             anyhow!("Login failed: {}", e)
         })?;
 
-        info!("Login successful for user: {}", login);
+        info!("Login successful for user:");
         Ok(response.into_inner())
     }
 
     /// Register a new user
     pub async fn register(
-        &mut self,
+        &self,
         username: &str,
         email: &str,
         password: &str,
         display_name: Option<String>,
     ) -> Result<TokenResponse> {
+        let mut client = self.get_client();
         let request = RegisterRequest {
             username: username.to_string(),
             email: email.to_string(),
             password: password.to_string(),
             display_name,
         };
-
-        let response = self.client.register(request).await.map_err(|e| {
+        let response = client.register(request).await.map_err(|e| {
             error!("Registration failed: {}", e);
             anyhow!("Registration failed: {}", e)
         })?;
@@ -78,12 +70,13 @@ impl AuthClient {
     }
 
     /// Refresh access token using refresh token
-    pub async fn refresh_token(&mut self, refresh_token: &str) -> Result<TokenResponse> {
+    pub async fn refresh_token(&self, refresh_token: &str) -> Result<TokenResponse> {
+        let mut client = self.get_client();
         let request = RefreshTokenRequest {
             refresh_token: refresh_token.to_string(),
         };
 
-        let response = self.client.refresh_token(request).await.map_err(|e| {
+        let response = client.refresh_token(request).await.map_err(|e| {
             error!("Token refresh failed: {}", e);
             anyhow!("Token refresh failed: {}", e)
         })?;

@@ -2049,6 +2049,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-client-auth"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "eur-client-grpc",
+ "eur-proto",
+ "tokio",
+ "tonic 0.13.0",
+ "tracing",
+]
+
+[[package]]
 name = "eur-client-grpc"
 version = "0.0.0"
 dependencies = [
@@ -2264,12 +2276,14 @@ dependencies = [
  "anyhow",
  "async-mutex",
  "backtrace",
+ "base64 0.22.1",
  "chrono",
  "console-subscriber",
  "defer",
  "dirs",
  "eur-activity",
  "eur-auth",
+ "eur-client-auth",
  "eur-client-grpc",
  "eur-client-questions",
  "eur-native-messaging",
@@ -2351,10 +2365,16 @@ dependencies = [
 name = "eur-user"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "eur-client-auth",
+ "eur-proto",
  "eur-secret",
  "image 0.25.6",
  "serde",
  "serde_json",
+ "tokio",
  "uuid",
 ]
 
