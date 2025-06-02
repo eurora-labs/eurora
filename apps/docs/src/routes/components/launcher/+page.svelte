@@ -16,7 +16,7 @@
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
 
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
-	import { Launcher } from '@eurora/launcher';
+	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
 	import { transcriptExtension } from '@eurora/ext-transcript';
 	import { Editor as ProsemirrorEditor, TextSelection } from '@eurora/prosemirror-core';
 	let editorRef: ProsemirrorEditor | undefined = $state(undefined);
