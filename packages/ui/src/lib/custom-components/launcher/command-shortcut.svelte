@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { WithElementRef } from '@eurora/ui/utils';
+	import type { WithElementRef } from '$lib/utils.js';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import { cn } from '@eurora/ui/utils';
+	import { cn } from '$lib/utils.js';
 
 	let {
 		ref = $bindable(null),
