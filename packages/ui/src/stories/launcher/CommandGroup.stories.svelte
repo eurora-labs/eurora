@@ -51,7 +51,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group heading="Applications">
 						<Command.Item>
@@ -81,7 +81,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group>
 						<Command.Item>
@@ -111,7 +111,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group heading="Applications">
 						<Command.Item>
@@ -163,7 +163,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group heading="Quick Actions">
 						<Command.Item>
@@ -204,7 +204,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group heading="🚀 Quick Actions">
 						<Command.Item>
@@ -240,7 +240,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group heading={args.heading}>
 						<Command.Item>
