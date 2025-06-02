@@ -4,14 +4,13 @@
 )]
 
 use anyhow::Result;
-use eur_auth::{AuthManager, SecureTokenStorage};
 use eur_client_questions::QuestionsClient;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
 use eur_tauri::{
     WindowState,
-    auth::AuthProvider,
+    auth::AuthManager,
     create_launcher,
     procedures::{
         auth_procedures::{AuthApi, AuthApiImpl},
@@ -55,26 +54,6 @@ async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> Shared
             })
             .unwrap(),
     )
-}
-
-async fn create_shared_auth_manager() -> SharedAuthManager {
-    let token_storage = Box::new(SecureTokenStorage::new());
-    // For now, we'll connect to auth service later when it's available
-    let auth_service_url = std::env::var("AUTH_SERVICE_URL").ok();
-    if let Some(ref url) = auth_service_url {
-        info!("Auth service URL: {}", url);
-    } else {
-        info!("No AUTH_SERVICE_URL set, auth service will be unavailable");
-    }
-
-    let auth_manager = AuthManager::new(token_storage, auth_service_url)
-        .await
-        .unwrap_or_else(|e| {
-            error!("Failed to create auth manager: {}", e);
-            panic!("Cannot continue without auth manager {}", e);
-        });
-
-    Arc::new(tokio::sync::Mutex::new(auth_manager))
 }
 
 // fn create_shared_conversation_storage() -> SharedConversationStorage {
@@ -169,10 +148,8 @@ fn main() {
                     // app_handle.manage(current_conversation);
 
                     // Initialize auth manager
-                    let auth_manager = tauri::async_runtime::block_on(create_shared_auth_manager());
-                    let auth_provider = Arc::new(AuthProvider::new(auth_manager.clone()));
+                    let auth_manager = tauri::async_runtime::block_on(AuthManager::new());
                     app_handle.manage(auth_manager);
-                    app_handle.manage(auth_provider);
                     info!("Auth manager initialized");
 
                     // Initialize OpenAI client if API key exists
