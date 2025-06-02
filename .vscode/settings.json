@@ -83,6 +83,9 @@
 	"[mdx]": {
 		"editor.defaultFormatter": "esbenp.prettier-vscode"
 	},
+	"[toml]": {
+		"editor.defaultFormatter": "tamasfe.even-better-toml"
+	},
 	"svelte.plugin.css.globals": "packages/ui/src/**/*.css",
 	"typescript.preferences.importModuleSpecifier": "non-relative",
 	"javascript.preferences.importModuleSpecifier": "non-relative",
@@ -91,5 +94,7 @@
 	},
 	"[markdown]": {
 		"editor.defaultFormatter": "esbenp.prettier-vscode"
-	}
+	},
+	"evenBetterToml.formatter.columnWidth": 150,
+	"evenBetterToml.formatter.arrayAutoCollapse": false
 }
