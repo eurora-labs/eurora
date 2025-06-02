@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use eur_client_auth::AuthClient;
 use eur_proto::proto_auth_service::LoginRequest;
@@ -40,19 +40,8 @@ impl AuthManager {
         let response = self.auth_client.login(data).await?;
 
         // Store tokens securely
-        secret::persist(
-            Self::ACCESS_TOKEN_HANDLE,
-            &Sensitive(response.access_token.clone()),
-            secret::Namespace::BuildKind,
-        )
-        .unwrap();
-
-        secret::persist(
-            Self::REFRESH_TOKEN_HANDLE,
-            &Sensitive(response.refresh_token),
-            secret::Namespace::BuildKind,
-        )
-        .unwrap();
+        store_access_token(response.access_token.clone())?;
+        store_refresh_token(response.refresh_token.clone())?;
 
         Ok(Sensitive(response.access_token))
     }
@@ -93,19 +82,8 @@ impl AuthManager {
         let response = self.auth_client.refresh_token(&refresh_token.0).await?;
 
         // Store tokens securely
-        secret::persist(
-            Self::ACCESS_TOKEN_HANDLE,
-            &Sensitive(response.access_token.clone()),
-            secret::Namespace::BuildKind,
-        )
-        .unwrap();
-
-        secret::persist(
-            Self::REFRESH_TOKEN_HANDLE,
-            &Sensitive(response.refresh_token),
-            secret::Namespace::BuildKind,
-        )
-        .unwrap();
+        store_access_token(response.access_token.clone())?;
+        store_refresh_token(response.refresh_token.clone())?;
 
         Ok(Sensitive(response.access_token))
     }
@@ -119,4 +97,22 @@ fn extract_claims(token: &str) -> Result<Claims> {
     let payload_json: Claims = serde_json::from_slice(&payload).ok().unwrap();
 
     Ok(payload_json)
+}
+
+fn store_access_token(token: String) -> Result<()> {
+    secret::persist(
+        AuthManager::ACCESS_TOKEN_HANDLE,
+        &Sensitive(token),
+        secret::Namespace::BuildKind,
+    )
+    .map_err(|e| anyhow!("Failed to store access token: {}", e))
+}
+
+fn store_refresh_token(token: String) -> Result<()> {
+    secret::persist(
+        AuthManager::REFRESH_TOKEN_HANDLE,
+        &Sensitive(token),
+        secret::Namespace::BuildKind,
+    )
+    .map_err(|e| anyhow!("Failed to store refresh token: {}", e))
 }
