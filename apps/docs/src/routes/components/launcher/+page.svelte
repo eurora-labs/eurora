@@ -10,7 +10,7 @@
 		Film,
 		YoutubeIcon,
 		HardDrive,
-		FileTextIcon
+		FileTextIcon,
 	} from '@lucide/svelte';
 
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
@@ -23,7 +23,7 @@
 
 	let exampleInput = $state({
 		text: '',
-		extensions: [transcriptExtension()]
+		extensions: [transcriptExtension()],
 	});
 
 	function addExerciseSheet() {
@@ -36,8 +36,8 @@
 				from.pos,
 				nodes.transcript.createChecked(
 					{ id: 'transcript-1', text: 'Exercise Sheet 2' },
-					schema.text(' ')
-				)
+					schema.text(' '),
+				),
 			);
 
 			dispatch?.(tr);
@@ -92,17 +92,17 @@
 <style lang="postcss">
 	/* @reference "@eurora/ui/main.css"; */
 	.launcher {
-		background: rgba(255, 255, 255, 0.2);
-		box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 		backdrop-filter: blur(36px);
 		-webkit-backdrop-filter: blur(36px);
+		background: rgba(255, 255, 255, 0.2);
+		box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 	}
 
 	.transcript-badge {
+		border-radius: 16px;
 		/* @apply flex w-fit items-center gap-2 text-[40px] leading-[40px] text-white; */
 		/* @apply p-2; */
 		background: rgba(128, 128, 128, 0.4);
 		color: rgba(0, 0, 0, 0.8);
-		border-radius: 16px;
 	}
 </style>
