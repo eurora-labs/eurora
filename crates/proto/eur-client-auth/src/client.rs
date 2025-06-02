@@ -2,8 +2,7 @@
 
 use anyhow::{Result, anyhow};
 use eur_proto::proto_auth_service::{
-    EmailPasswordCredentials, LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse,
-    login_request::Credential, proto_auth_service_client::ProtoAuthServiceClient,
+    LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse, proto_auth_service_client::ProtoAuthServiceClient,
 };
 use tonic::transport::Channel;
 use tracing::{error, info};
