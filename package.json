@@ -14,6 +14,8 @@
 		"prod:monolith": "cargo run -p eur-monolith -- --mode production",
 		"dev:desktop": "pnpm tauri dev",
 		"dev:ui": "pnpm --filter @eurora/ui storybook",
+		"dev:web": "pnpm --filter @eurora/web dev",
+		"dev:docs": "pnpm --filter @eurora/docs dev",
 		"tauri": "tauri",
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",

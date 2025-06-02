@@ -1434,6 +1434,9 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
+      '@eurora/prosemirror-core':
+        specifier: workspace:*
+        version: link:../prosemirror/core
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config

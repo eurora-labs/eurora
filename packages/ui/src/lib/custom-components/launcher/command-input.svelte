@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Command as CommandPrimitive } from 'bits-ui';
-	import { cn } from '@eurora/ui/utils';
-	import { InputArea } from '../input-area/index.js';
+	import { cn } from '$lib/utils.js';
+	import InputArea from './input-area.svelte';
 	import type { Query } from '@eurora/prosemirror-core';
 	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core';
 	import { Search } from '@lucide/svelte';
