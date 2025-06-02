@@ -1,0 +1,15 @@
+[package]
+name = "eur-client-auth"
+version = "0.1.0"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+description = "Eurora client authentication"
+publish = false
+
+[dependencies]
+eur-proto = { path = "../eur-proto" }
+eur-client-grpc = { path = "../eur-client-grpc" }
+anyhow = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }

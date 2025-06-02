@@ -1,3 +1,4 @@
+pub mod auth_procedures;
 pub mod context_chip_procedures;
 // pub mod conversation_procedures;
 pub mod monitor_procedures;

@@ -526,3 +526,51 @@ This file tracks key architectural and design decisions made during the project'
 - Mobile-friendly responsive layout
 - Secure token-based authentication with automatic storage
 - Ready for production use with proper error handling
+
+[2025-06-01 15:40:00] - Created comprehensive authentication and token management integration plan for eur-tauri
+
+**Decision:** Developed detailed architectural plan for integrating JWT-based authentication into the Eurora Tauri desktop application.
+
+**Rationale:**
+
+- Leverage existing eur-auth-service backend and eur-auth shared utilities
+- Provide secure token storage using OS-level credential management via eur-secret
+- Implement automatic token refresh to maintain seamless user experience
+- Follow established TauRPC patterns for type-safe frontend-backend communication
+- Ensure security best practices with proper token validation and session management
+
+**Implementation Details:**
+
+- 6-phase implementation plan spanning 4 weeks
+- Core infrastructure: Auth procedures module, token manager, gRPC client integration
+- Secure storage: Extend eur-secret for JWT token storage with OS keychain integration
+- State management: Global auth state with reactive updates across the application
+- Frontend integration: Auth context provider and service layer for UI components
+- Background services: Automatic token refresh service with configurable intervals
+- Protected APIs: Authenticated HTTP client for secure API communication
+- Security considerations: Platform-specific secure storage, TLS enforcement, session management
+- Testing strategy: Unit, integration, and performance tests for all auth components
+- Migration strategy: Graceful transition for existing users with backward compatibility
+
+[2025-06-01 15:45:00] - Revised authentication plan to use Rust-centric, stateless frontend approach
+
+**Decision:** Completely revised the authentication integration plan to follow a Rust-centric architecture where eur-auth manages all token operations autonomously and the frontend remains stateless.
+
+**Rationale:**
+
+- Frontend should not store any authentication state or tokens
+- eur-auth crate should be the single source of truth for all authentication operations
+- Other services should request authentication from eur-auth just before making API calls
+- eur-auth should automatically handle token refresh and provide valid tokens transparently
+- Simpler, more secure architecture with clear separation of concerns
+
+**Implementation Details:**
+
+- Enhanced eur-auth crate with AuthManager that handles all token operations
+- AuthProvider service that other procedures use to get valid authentication headers
+- Stateless frontend that only queries auth state from Rust backend
+- Automatic token refresh handled transparently by eur-auth before token expiration
+- All API procedures request authentication just before making external calls
+- Frontend uses reactive queries to get auth state from backend rather than storing it
+- Centralized token storage using eur-secret with no frontend token exposure
+- Clean separation: frontend triggers auth actions, Rust manages all auth state and tokens
