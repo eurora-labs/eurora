@@ -19,7 +19,7 @@
 	} from '@eurora/tauri-bindings';
 
 	// Import the Launcher component
-	import { Launcher } from '../../../../../packages/custom-components/launcher/src/lib';
+	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
 	import { Editor as ProsemirrorEditor, type SveltePMExtension } from '@eurora/prosemirror-core';
 	// Import the extension factory instead of individual extensions
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory';

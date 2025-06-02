@@ -130,9 +130,6 @@ importers:
       '@eurora/ext-video':
         specifier: workspace:*
         version: link:../../packages/prosemirror/ext-video
-      '@eurora/launcher':
-        specifier: workspace:*
-        version: link:../../packages/custom-components/launcher
       '@eurora/prosemirror-tauri-bindings':
         specifier: workspace:*
         version: link:../../packages/prosemirror/tauri-bindings
@@ -280,9 +277,6 @@ importers:
       '@eurora/ext-transcript':
         specifier: workspace:*
         version: link:../../packages/prosemirror/ext-transcript
-      '@eurora/launcher':
-        specifier: workspace:*
-        version: link:../../packages/custom-components/launcher
       '@eurora/prosemirror-core':
         specifier: workspace:*
         version: link:../../packages/prosemirror/core
@@ -961,87 +955,6 @@ importers:
         specifier: ^3.1.4
         version: 3.1.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
-  packages/custom-components/launcher:
-    devDependencies:
-      '@eurora/ext-transcript':
-        specifier: workspace:*
-        version: link:../../prosemirror/ext-transcript
-      '@eurora/prosemirror-core':
-        specifier: workspace:*
-        version: link:../../prosemirror/core
-      '@eurora/typescript-config':
-        specifier: workspace:*
-        version: link:../../typescript-config
-      '@eurora/ui':
-        specifier: workspace:*
-        version: link:../../ui
-      '@lucide/svelte':
-        specifier: ^0.511.0
-        version: 0.511.0(svelte@5.33.3)
-      '@sveltejs/adapter-static':
-        specifier: ^3.0.8
-        version: 3.0.8(@sveltejs/kit@2.21.1(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.33.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
-      '@sveltejs/kit':
-        specifier: ^2.21.1
-        version: 2.21.1(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.33.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
-      '@sveltejs/package':
-        specifier: ^2.3.11
-        version: 2.3.11(svelte@5.33.3)(typescript@5.8.3)
-      '@sveltejs/vite-plugin-svelte':
-        specifier: ^5.0.0
-        version: 5.0.3(svelte@5.33.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
-      '@tailwindcss/postcss':
-        specifier: ^4.1.8
-        version: 4.1.8
-      '@tailwindcss/vite':
-        specifier: ^4.1.7
-        version: 4.1.8(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
-      autoprefixer:
-        specifier: ^10.4.21
-        version: 10.4.21(postcss@8.5.3)
-      bits-ui:
-        specifier: ^2.4.0
-        version: 2.4.0(@internationalized/date@3.8.1)(svelte@5.33.3)
-      postcss:
-        specifier: ^8.5.3
-        version: 8.5.3
-      postcss-cli:
-        specifier: ^11.0.0
-        version: 11.0.1(jiti@2.4.2)(postcss@8.5.3)
-      postcss-import:
-        specifier: ^16.1.0
-        version: 16.1.0(postcss@8.5.3)
-      prettier:
-        specifier: ^3.5.3
-        version: 3.5.3
-      prettier-plugin-svelte:
-        specifier: ^3.3.3
-        version: 3.4.0(prettier@3.5.3)(svelte@5.33.3)
-      publint:
-        specifier: ^0.3.12
-        version: 0.3.12
-      svelte:
-        specifier: ^5.33.3
-        version: 5.33.3
-      svelte-check:
-        specifier: ^4.2.1
-        version: 4.2.1(picomatch@4.0.2)(svelte@5.33.3)(typescript@5.8.3)
-      tailwindcss:
-        specifier: ^4.1.8
-        version: 4.1.8
-      typescript:
-        specifier: ^5.8.3
-        version: 5.8.3
-      unified:
-        specifier: ^11.0.5
-        version: 11.0.5
-      vite:
-        specifier: ^6.3.5
-        version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
-      vitest:
-        specifier: ^3.1.4
-        version: 3.1.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
-
   packages/eslint-config:
     devDependencies:
       '@eslint/eslintrc':
@@ -1434,6 +1347,9 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
+      '@eurora/prosemirror-core':
+        specifier: workspace:*
+        version: link:../prosemirror/core
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
