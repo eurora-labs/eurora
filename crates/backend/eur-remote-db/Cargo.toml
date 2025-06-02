@@ -9,7 +9,7 @@ description = "Eurora Remote DB"
 
 [dependencies]
 anyhow.workspace = true
-sqlx = { version = "0.8.5", features = [
+sqlx = { version = "0.8.6", features = [
     "runtime-tokio",
     "tls-native-tls",
     "postgres",
@@ -19,7 +19,7 @@ sqlx = { version = "0.8.5", features = [
 ] }
 futures = { workspace = true, features = ["std"] }
 chrono = { workspace = true, features = ["serde"] }
-uuid = { version = "1.8.0", features = ["v4", "serde"] }
+uuid = { version = "1.17.0", features = ["v4", "serde"] }
 tracing = { workspace = true }
 zerocopy = { version = "0.8.25" }
 serde = { version = "1.0", features = ["derive"] }
