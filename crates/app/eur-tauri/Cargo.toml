@@ -79,6 +79,8 @@ tauri-specta = { version = "2.0.0-rc.21", features = [
     "typescript",
 ] }
 taurpc = "0.5.0"
+base64 = "0.22.1"
+eur-client-auth = { workspace = true }
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-trafficlights-positioner = { git = "https://github.com/gitbutlerapp/tauri-plugin-trafficlights-positioner", branch = "v2" }
 
