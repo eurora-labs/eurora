@@ -12,3 +12,4 @@ eur-client-grpc = { path = "../eur-client-grpc" }
 anyhow = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
+tokio = { workspace = true }
