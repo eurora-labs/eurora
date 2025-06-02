@@ -11,7 +11,7 @@ image.workspace = true
 eur-native-messaging = { path = "../eur-native-messaging" }
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 eur-activity = { path = "../eur-activity" }
-anyhow = "1.0.98"
+anyhow = { workspace = true }
 base64.workspace = true
 chrono = { version = "0.4.41", features = ["serde"] }
 tokio = { workspace = true, default-features = false }
