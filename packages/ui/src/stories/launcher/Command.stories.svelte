@@ -48,7 +48,7 @@
 <Story name="Default">
 	<div class="w-[450px]">
 		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Type a command or search..." />
+			<Command.Input placeholder="Search" />
 			<Command.List>
 				<Command.Empty>No results found.</Command.Empty>
 				<Command.Group heading="Suggestions">
@@ -82,7 +82,7 @@
 <Story name="With Groups">
 	<div class="w-[450px]">
 		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Type a command or search..." />
+			<Command.Input placeholder="Search" />
 			<Command.List>
 				<Command.Empty>No results found.</Command.Empty>
 				<Command.Group heading="Applications">
@@ -142,7 +142,7 @@
 <Story name="With Icons">
 	<div class="w-[450px]">
 		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Search with beautiful icons..." />
+			<Command.Input placeholder="Search" />
 			<Command.List>
 				<Command.Empty>No results found.</Command.Empty>
 				<Command.Group heading="Quick Actions">
@@ -197,7 +197,7 @@
 <Story name="Empty">
 	<div class="w-[450px]">
 		<Command.Root value="xyz123nonexistent" class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Try searching for something that doesn't exist..." />
+			<Command.Input placeholder="Search" />
 			<Command.List>
 				<Command.Empty>
 					<div class="py-6 text-center text-sm">
@@ -228,7 +228,7 @@
 <Story name="Loading">
 	<div class="w-[450px]">
 		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Search is loading..." />
+			<Command.Input placeholder="Loading..." />
 			<Command.List>
 				<Command.Loading>
 					<div class="flex items-center justify-center py-6">
