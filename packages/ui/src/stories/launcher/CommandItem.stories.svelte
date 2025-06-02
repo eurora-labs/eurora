@@ -43,159 +43,195 @@
 
 <!-- Basic Items -->
 <Story name="Basic Items">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.List>
-				<Command.Group>
-					<Command.Item>
-						<span>Simple Item</span>
-					</Command.Item>
-					<Command.Item>
-						<span>Another Item</span>
-					</Command.Item>
-					<Command.Item>
-						<span>Third Item</span>
-					</Command.Item>
-				</Command.Group>
-			</Command.List>
-		</Command.Root>
+	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
+		<div
+			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+			style="background-image: url('sample_background.jpg')"
+		></div>
+		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
+			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+				<Command.List>
+					<Command.Group>
+						<Command.Item>
+							<span>Simple Item</span>
+						</Command.Item>
+						<Command.Item>
+							<span>Another Item</span>
+						</Command.Item>
+						<Command.Item>
+							<span>Third Item</span>
+						</Command.Item>
+					</Command.Group>
+				</Command.List>
+			</Command.Root>
+		</div>
 	</div>
 </Story>
 
 <!-- Items with Icons -->
 <Story name="With Icons">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.List>
-				<Command.Group>
-					<Command.Item>
-						<Calendar class="mr-2 h-4 w-4" />
-						<span>Calendar</span>
-					</Command.Item>
-					<Command.Item>
-						<Calculator class="mr-2 h-4 w-4" />
-						<span>Calculator</span>
-					</Command.Item>
-					<Command.Item>
-						<Settings class="mr-2 h-4 w-4" />
-						<span>Settings</span>
-					</Command.Item>
-					<Command.Item>
-						<Search class="mr-2 h-4 w-4" />
-						<span>Search</span>
-					</Command.Item>
-				</Command.Group>
-			</Command.List>
-		</Command.Root>
+	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
+		<div
+			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+			style="background-image: url('sample_background.jpg')"
+		></div>
+		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
+			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+				<Command.List>
+					<Command.Group>
+						<Command.Item>
+							<Calendar class="mr-2 h-4 w-4" />
+							<span>Calendar</span>
+						</Command.Item>
+						<Command.Item>
+							<Calculator class="mr-2 h-4 w-4" />
+							<span>Calculator</span>
+						</Command.Item>
+						<Command.Item>
+							<Settings class="mr-2 h-4 w-4" />
+							<span>Settings</span>
+						</Command.Item>
+						<Command.Item>
+							<Search class="mr-2 h-4 w-4" />
+							<span>Search</span>
+						</Command.Item>
+					</Command.Group>
+				</Command.List>
+			</Command.Root>
+		</div>
 	</div>
 </Story>
 
 <!-- Items with Shortcuts -->
 <Story name="With Shortcuts">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.List>
-				<Command.Group>
-					<Command.Item>
-						<Calendar class="mr-2 h-4 w-4" />
-						<span>Calendar</span>
-						<Command.Shortcut>⌘C</Command.Shortcut>
-					</Command.Item>
-					<Command.Item>
-						<Calculator class="mr-2 h-4 w-4" />
-						<span>Calculator</span>
-						<Command.Shortcut>⌘K</Command.Shortcut>
-					</Command.Item>
-					<Command.Item>
-						<Settings class="mr-2 h-4 w-4" />
-						<span>Settings</span>
-						<Command.Shortcut>⌘,</Command.Shortcut>
-					</Command.Item>
-					<Command.Item>
-						<Search class="mr-2 h-4 w-4" />
-						<span>Global Search</span>
-						<Command.Shortcut>⌘/</Command.Shortcut>
-					</Command.Item>
-				</Command.Group>
-			</Command.List>
-		</Command.Root>
+	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
+		<div
+			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+			style="background-image: url('sample_background.jpg')"
+		></div>
+		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
+			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+				<Command.List>
+					<Command.Group>
+						<Command.Item>
+							<Calendar class="mr-2 h-4 w-4" />
+							<span>Calendar</span>
+							<Command.Shortcut>⌘C</Command.Shortcut>
+						</Command.Item>
+						<Command.Item>
+							<Calculator class="mr-2 h-4 w-4" />
+							<span>Calculator</span>
+							<Command.Shortcut>⌘K</Command.Shortcut>
+						</Command.Item>
+						<Command.Item>
+							<Settings class="mr-2 h-4 w-4" />
+							<span>Settings</span>
+							<Command.Shortcut>⌘,</Command.Shortcut>
+						</Command.Item>
+						<Command.Item>
+							<Search class="mr-2 h-4 w-4" />
+							<span>Global Search</span>
+							<Command.Shortcut>⌘/</Command.Shortcut>
+						</Command.Item>
+					</Command.Group>
+				</Command.List>
+			</Command.Root>
+		</div>
 	</div>
 </Story>
 
 <!-- Colored Icons -->
 <Story name="Colored Icons">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.List>
-				<Command.Group>
-					<Command.Item>
-						<Home class="mr-2 h-4 w-4 text-blue-500" />
-						<span>Home</span>
-					</Command.Item>
-					<Command.Item>
-						<FileText class="mr-2 h-4 w-4 text-green-500" />
-						<span>Documents</span>
-					</Command.Item>
-					<Command.Item>
-						<Mail class="mr-2 h-4 w-4 text-red-500" />
-						<span>Mail</span>
-					</Command.Item>
-					<Command.Item>
-						<User class="mr-2 h-4 w-4 text-purple-500" />
-						<span>Profile</span>
-					</Command.Item>
-					<Command.Item>
-						<Folder class="mr-2 h-4 w-4 text-yellow-500" />
-						<span>Folder</span>
-					</Command.Item>
-				</Command.Group>
-			</Command.List>
-		</Command.Root>
+	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
+		<div
+			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+			style="background-image: url('sample_background.jpg')"
+		></div>
+		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
+			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+				<Command.List>
+					<Command.Group>
+						<Command.Item>
+							<Home class="mr-2 h-4 w-4 text-blue-500" />
+							<span>Home</span>
+						</Command.Item>
+						<Command.Item>
+							<FileText class="mr-2 h-4 w-4 text-green-500" />
+							<span>Documents</span>
+						</Command.Item>
+						<Command.Item>
+							<Mail class="mr-2 h-4 w-4 text-red-500" />
+							<span>Mail</span>
+						</Command.Item>
+						<Command.Item>
+							<User class="mr-2 h-4 w-4 text-purple-500" />
+							<span>Profile</span>
+						</Command.Item>
+						<Command.Item>
+							<Folder class="mr-2 h-4 w-4 text-yellow-500" />
+							<span>Folder</span>
+						</Command.Item>
+					</Command.Group>
+				</Command.List>
+			</Command.Root>
+		</div>
 	</div>
 </Story>
 
 <!-- Disabled Items -->
 <Story name="Disabled Items">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.List>
-				<Command.Group>
-					<Command.Item>
-						<Calendar class="mr-2 h-4 w-4" />
-						<span>Available Item</span>
-					</Command.Item>
-					<Command.Item disabled>
-						<Calculator class="mr-2 h-4 w-4" />
-						<span>Disabled Item</span>
-					</Command.Item>
-					<Command.Item>
-						<Settings class="mr-2 h-4 w-4" />
-						<span>Another Available Item</span>
-					</Command.Item>
-					<Command.Item disabled>
-						<Search class="mr-2 h-4 w-4" />
-						<span>Another Disabled Item</span>
-						<Command.Shortcut>⌘/</Command.Shortcut>
-					</Command.Item>
-				</Command.Group>
-			</Command.List>
-		</Command.Root>
+	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
+		<div
+			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+			style="background-image: url('sample_background.jpg')"
+		></div>
+		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
+			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+				<Command.List>
+					<Command.Group>
+						<Command.Item>
+							<Calendar class="mr-2 h-4 w-4" />
+							<span>Available Item</span>
+						</Command.Item>
+						<Command.Item disabled>
+							<Calculator class="mr-2 h-4 w-4" />
+							<span>Disabled Item</span>
+						</Command.Item>
+						<Command.Item>
+							<Settings class="mr-2 h-4 w-4" />
+							<span>Another Available Item</span>
+						</Command.Item>
+						<Command.Item disabled>
+							<Search class="mr-2 h-4 w-4" />
+							<span>Another Disabled Item</span>
+							<Command.Shortcut>⌘/</Command.Shortcut>
+						</Command.Item>
+					</Command.Group>
+				</Command.List>
+			</Command.Root>
+		</div>
 	</div>
 </Story>
 
 <!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.List>
-				<Command.Group>
-					<Command.Item disabled={args.disabled}>
-						<Calendar class="mr-2 h-4 w-4" />
-						<span>{args.disabled ? 'Disabled Item' : 'Interactive Item'}</span>
-						<Command.Shortcut>⌘I</Command.Shortcut>
-					</Command.Item>
-				</Command.Group>
-			</Command.List>
-		</Command.Root>
+	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
+		<div
+			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+			style="background-image: url('sample_background.jpg')"
+		></div>
+		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
+			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+				<Command.List>
+					<Command.Group>
+						<Command.Item disabled={args.disabled}>
+							<Calendar class="mr-2 h-4 w-4" />
+							<span>{args.disabled ? 'Disabled Item' : 'Interactive Item'}</span>
+							<Command.Shortcut>⌘I</Command.Shortcut>
+						</Command.Item>
+					</Command.Group>
+				</Command.List>
+			</Command.Root>
+		</div>
 	</div>
 {/snippet}
