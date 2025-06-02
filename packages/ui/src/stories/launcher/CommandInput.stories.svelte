@@ -37,35 +37,59 @@
 
 <!-- Default Input -->
 <Story name="Default">
-	<div class="w-[450px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Search" />
-		</Command.Root>
+	<div class="relative min-h-[200px] w-[900px] overflow-hidden rounded-lg">
+		<div
+			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+			style="background-image: url('sample_background.jpg')"
+		></div>
+		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
+			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+				<Command.Input placeholder="Search" />
+			</Command.Root>
+		</div>
 	</div>
 </Story>
 
 <!-- With Value -->
 <Story name="With Value">
-	<div class="w-[450px]">
-		<Command.Root value="calculator" class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Search" />
-		</Command.Root>
+	<div class="relative min-h-[200px] w-[900px] overflow-hidden rounded-lg">
+		<div
+			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+			style="background-image: url('sample_background.jpg')"
+		></div>
+		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
+			<Command.Root
+				value="calculator"
+				class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm"
+			>
+				<Command.Input placeholder="Search" />
+			</Command.Root>
+		</div>
 	</div>
 </Story>
 
 <!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<div class="w-[450px]">
-		<Command.Root bind:value={args.value} class="rounded-lg border shadow-md">
-			<Command.Input placeholder={args.placeholder} />
-			<Command.List>
-				<Command.Empty>No results found for "{args.value}"</Command.Empty>
-				<Command.Group heading="Results">
-					<Command.Item>
-						<span>Sample result for: {args.value || 'empty search'}</span>
-					</Command.Item>
-				</Command.Group>
-			</Command.List>
-		</Command.Root>
+	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
+		<div
+			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+			style="background-image: url('sample_background.jpg')"
+		></div>
+		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
+			<Command.Root
+				bind:value={args.value}
+				class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm"
+			>
+				<Command.Input placeholder={args.placeholder} />
+				<Command.List>
+					<Command.Empty>No results found for "{args.value}"</Command.Empty>
+					<Command.Group heading="Results">
+						<Command.Item>
+							<span>Sample result for: {args.value || 'empty search'}</span>
+						</Command.Item>
+					</Command.Group>
+				</Command.List>
+			</Command.Root>
+		</div>
 	</div>
 {/snippet}

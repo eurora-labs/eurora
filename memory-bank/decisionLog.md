@@ -642,3 +642,34 @@ This file tracks key architectural and design decisions made during the project'
 - Analysis based on existing stories: Button, Command, ContextChip, and VideoCard
 - Guidelines follow Storybook best practices and Svelte 5 patterns
 - Prioritized recommendations for immediate, medium-term, and future improvements
+
+[2025-06-02 18:38:00] - Enhanced launcher Storybook stories with background image integration
+
+**Decision:** Added sample_background.jpg as a background image to all launcher component stories in Storybook.
+
+**Rationale:**
+
+- Improves visual presentation of launcher components in Storybook documentation
+- Provides realistic context showing how components appear against actual backgrounds
+- Enhances the developer experience when reviewing component designs
+- Follows established Storybook guidelines for meaningful content and visual consistency
+- Uses backdrop blur and semi-transparent overlays for modern, professional appearance
+
+**Implementation Details:**
+
+- Applied background image to all launcher story files: Command.stories.svelte, CommandGroup.stories.svelte, CommandInput.stories.svelte, CommandItem.stories.svelte
+- Used CSS background-image with url('sample_background.jpg') referencing the static asset
+- Implemented layered approach with absolute positioning for background and relative positioning for content
+- Added semi-transparent white background (bg-white/90) with backdrop blur (backdrop-blur-sm) to command components
+- Maintained appropriate minimum heights for different story types (200px-400px based on content)
+- Preserved all existing functionality and component behavior
+- Followed RULES.md guidelines for consistent container widths and spacing
+- Used responsive design patterns with proper overflow handling
+
+**Benefits:**
+
+- Enhanced visual appeal of Storybook documentation
+- Better representation of real-world usage scenarios
+- Improved component contrast and readability testing
+- Professional presentation for design reviews and stakeholder demonstrations
+- Consistent visual treatment across all launcher component stories
