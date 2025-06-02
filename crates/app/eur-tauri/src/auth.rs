@@ -1,0 +1,122 @@
+use anyhow::Result;
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use eur_client_auth::AuthClient;
+use eur_proto::proto_auth_service::LoginRequest;
+use eur_secret::{Sensitive, secret};
+use serde::{Deserialize, Serialize};
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    sub: String,
+    name: String,
+    exp: i64,
+}
+
+pub struct JwtConfig {
+    refresh_offset: i64,
+}
+
+pub struct AuthManager {
+    auth_client: AuthClient,
+    jwt_config: JwtConfig,
+}
+
+impl AuthManager {
+    pub(super) const ACCESS_TOKEN_HANDLE: &'static str = "AUTH_ACCESS_TOKEN";
+    pub(super) const REFRESH_TOKEN_HANDLE: &'static str = "AUTH_REFRESH_TOKEN";
+
+    pub async fn new() -> Self {
+        let auth_url = std::env::var("AUTH_SERVICE_URL").expect("AUTH_SERVICE_URL not set");
+        let refresh_offset =
+            std::env::var("JWT_REFRESH_OFFSET").expect("JWT_REFRESH_OFFSET not set");
+        Self {
+            auth_client: AuthClient::connect(&auth_url).await.unwrap(),
+            jwt_config: JwtConfig {
+                refresh_offset: refresh_offset.parse().unwrap(),
+            },
+        }
+    }
+
+    pub async fn login(&self, data: LoginRequest) -> Result<Sensitive<String>> {
+        let response = self.auth_client.login(data).await?;
+
+        // Store tokens securely
+        secret::persist(
+            Self::ACCESS_TOKEN_HANDLE,
+            &Sensitive(response.access_token.clone()),
+            secret::Namespace::BuildKind,
+        )
+        .unwrap();
+
+        secret::persist(
+            Self::REFRESH_TOKEN_HANDLE,
+            &Sensitive(response.refresh_token),
+            secret::Namespace::BuildKind,
+        )
+        .unwrap();
+
+        Ok(Sensitive(response.access_token))
+    }
+
+    pub fn get_access_token_payload(&self) -> Result<Claims> {
+        let token = secret::retrieve(Self::ACCESS_TOKEN_HANDLE, secret::Namespace::BuildKind)
+            .expect("Failed to retrieve access token")
+            .expect("No access token found");
+        extract_claims(&token.0)
+    }
+
+    pub fn get_refresh_token_payload(&self) -> Result<Claims> {
+        let token = secret::retrieve(Self::REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)
+            .expect("Failed to retrieve refresh token")
+            .expect("No refresh token found");
+        extract_claims(&token.0)
+    }
+
+    pub async fn get_or_refresh_access_token(&self) -> Result<Sensitive<String>> {
+        // Check if refresh_threshold has passed
+        if self.get_access_token_payload().unwrap().exp < chrono::Utc::now().timestamp() {
+            return self.refresh_tokens().await;
+        }
+        // Validate access token against refresh threshold
+        let token = secret::retrieve(Self::ACCESS_TOKEN_HANDLE, secret::Namespace::BuildKind)
+            .expect("Failed to retrieve access token")
+            .expect("No access token found");
+
+        Ok(token)
+    }
+
+    pub async fn refresh_tokens(&self) -> Result<Sensitive<String>> {
+        let refresh_token =
+            secret::retrieve(Self::REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)
+                .expect("Failed to retrieve refresh token")
+                .expect("No refresh token found");
+
+        let response = self.auth_client.refresh_token(&refresh_token.0).await?;
+
+        // Store tokens securely
+        secret::persist(
+            Self::ACCESS_TOKEN_HANDLE,
+            &Sensitive(response.access_token.clone()),
+            secret::Namespace::BuildKind,
+        )
+        .unwrap();
+
+        secret::persist(
+            Self::REFRESH_TOKEN_HANDLE,
+            &Sensitive(response.refresh_token),
+            secret::Namespace::BuildKind,
+        )
+        .unwrap();
+
+        Ok(Sensitive(response.access_token))
+    }
+}
+
+fn extract_claims(token: &str) -> Result<Claims> {
+    let mut parts = token.splitn(3, '.');
+    let _header_b64 = parts.next().unwrap();
+    let payload_b64 = parts.next().unwrap();
+    let payload = URL_SAFE_NO_PAD.decode(payload_b64).ok().unwrap();
+    let payload_json: Claims = serde_json::from_slice(&payload).ok().unwrap();
+
+    Ok(payload_json)
+}
