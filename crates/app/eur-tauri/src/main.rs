@@ -148,7 +148,7 @@ fn main() {
                     // app_handle.manage(current_conversation);
 
                     // Initialize auth manager
-                    let auth_manager = tauri::async_runtime::block_on(AuthManager::new());
+                    let auth_manager = AuthManager::new();
                     app_handle.manage(auth_manager);
                     info!("Auth manager initialized");
 
