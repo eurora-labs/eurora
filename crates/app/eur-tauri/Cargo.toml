@@ -19,7 +19,7 @@ tauri-build = { version = "2.0.3", features = [] }
 
 [dependencies]
 tauri-utils = "2.4.0"                                                       # single entry removes second 8.6 s build
-anyhow = "1.0.98"
+anyhow = { workspace = true }
 eur-secret = { path = "../eur-secret" }
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 eur-auth = { path = "../../common/eur-auth" }
