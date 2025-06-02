@@ -24,16 +24,18 @@ impl AuthManager {
     pub(super) const ACCESS_TOKEN_HANDLE: &'static str = "AUTH_ACCESS_TOKEN";
     pub(super) const REFRESH_TOKEN_HANDLE: &'static str = "AUTH_REFRESH_TOKEN";
 
-    pub async fn new() -> Self {
-        let auth_url = std::env::var("AUTH_SERVICE_URL").expect("AUTH_SERVICE_URL not set");
-        let refresh_offset =
-            std::env::var("JWT_REFRESH_OFFSET").expect("JWT_REFRESH_OFFSET not set");
-        Self {
-            auth_client: AuthClient::connect(&auth_url).await.unwrap(),
+    pub async fn new() -> Result<Self> {
+        let auth_url = std::env::var("AUTH_SERVICE_URL")
+            .map_err(|_| anyhow!("AUTH_SERVICE_URL environment variable not set"))?;
+        let refresh_offset = std::env::var("JWT_REFRESH_OFFSET").unwrap_or("15".to_string());
+        Ok(Self {
+            auth_client: AuthClient::connect(&auth_url).await?,
             jwt_config: JwtConfig {
-                refresh_offset: refresh_offset.parse().unwrap(),
+                refresh_offset: refresh_offset
+                    .parse()
+                    .map_err(|_| anyhow!("Invalid JWT_REFRESH_OFFSET format"))?,
             },
-        }
+        })
     }
 
     pub async fn login(&self, data: LoginRequest) -> Result<Sensitive<String>> {
