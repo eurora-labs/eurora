@@ -4,6 +4,7 @@
 )]
 
 use anyhow::Result;
+use dotenv::dotenv;
 use eur_client_questions::QuestionsClient;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
@@ -81,6 +82,7 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
 }
 
 fn main() {
+    dotenv().ok();
     let _guard = sentry::init((
         "https://5181d08d2bfcb209a768ab99e1e48f1b@o4508907847352320.ingest.de.sentry.io/4508907850694736",
         sentry::ClientOptions {
@@ -147,10 +149,14 @@ fn main() {
                     // let current_conversation = create_shared_current_conversation();
                     // app_handle.manage(current_conversation);
 
-                    // Initialize auth manager
-                    let auth_manager = tauri::async_runtime::block_on(AuthManager::new());
-                    app_handle.manage(auth_manager);
-                    info!("Auth manager initialized");
+                    let app_handle_auth = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let auth_manager = AuthManager::new()
+                            .await
+                            .expect("AuthManager initialization failed");
+                        app_handle_auth.manage(auth_manager);
+                        info!("Auth manager initialized");
+                    });
 
                     // Initialize OpenAI client if API key exists
                     let app_handle_openai = app_handle.clone();
