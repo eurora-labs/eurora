@@ -9,7 +9,7 @@ description = "Vision util for capturing screen, window and ocr'ing"
 tokio = { workspace = true }
 image = { workspace = true }
 rusty-tesseract = "1.1.10"
-anyhow = "1.0.98"
+anyhow = { workspace = true }
 xcap = { git = "https://github.com/AndreRoelofs/xcap.git", branch = "ar-branch-3" }
 wgpu = "25.0.2"
 bytemuck = "1.23.0"
