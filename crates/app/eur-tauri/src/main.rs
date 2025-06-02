@@ -9,8 +9,11 @@ use eur_client_questions::QuestionsClient;
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
 use eur_tauri::{
-    WindowState, create_launcher,
+    WindowState,
+    auth::AuthManager,
+    create_launcher,
     procedures::{
+        auth_procedures::{AuthApi, AuthApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         query_procedures::{QueryApi, QueryApiImpl},
@@ -38,6 +41,7 @@ static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 use tracing::{error, info};
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
+type SharedAuthManager = Arc<tokio::sync::Mutex<AuthManager>>;
 
 async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> SharedPersonalDb {
     let db_path = get_db_path(app_handle);
@@ -143,7 +147,10 @@ fn main() {
                     // let current_conversation = create_shared_current_conversation();
                     // app_handle.manage(current_conversation);
 
-                    // --- Background Tasks ---
+                    // Initialize auth manager
+                    let auth_manager = tauri::async_runtime::block_on(AuthManager::new());
+                    app_handle.manage(auth_manager);
+                    info!("Auth manager initialized");
 
                     // Initialize OpenAI client if API key exists
                     let app_handle_openai = app_handle.clone();
@@ -308,6 +315,7 @@ fn main() {
 
             let router = Router::new()
                 // .export_config(typescript_config)
+                .merge(AuthApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
