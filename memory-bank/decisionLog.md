@@ -660,7 +660,7 @@ This file tracks key architectural and design decisions made during the project'
 - Applied background image to all launcher story files: Command.stories.svelte, CommandGroup.stories.svelte, CommandInput.stories.svelte, CommandItem.stories.svelte
 - Used CSS background-image with url('sample_background.jpg') referencing the static asset
 - Implemented layered approach with absolute positioning for background and relative positioning for content
-- Added semi-transparent white background (bg-white/90) with backdrop blur (backdrop-blur-sm) to command components
+- Added semi-transparent white background (bg-white/20) with backdrop blur (backdrop-blur-[36px]) to command components
 - Maintained appropriate minimum heights for different story types (200px-400px based on content)
 - Preserved all existing functionality and component behavior
 - Followed RULES.md guidelines for consistent container widths and spacing
