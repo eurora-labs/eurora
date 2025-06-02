@@ -574,3 +574,43 @@ This file tracks key architectural and design decisions made during the project'
 - Frontend uses reactive queries to get auth state from backend rather than storing it
 - Centralized token storage using eur-secret with no frontend token exposure
 - Clean separation: frontend triggers auth actions, Rust manages all auth state and tokens
+
+[2025-06-02 14:52:40] - Implemented comprehensive Storybook setup for UI components
+
+**Decision:** Created comprehensive Storybook stories for Button and VideoCard components in the packages/ui library.
+
+**Rationale:**
+
+- Storybook provides an isolated development environment for UI components
+- Enables visual testing and documentation of component variants and states
+- Improves component development workflow and collaboration
+- Provides interactive playground for testing component behavior
+- Supports design system documentation and component library maintenance
+
+**Implementation Details:**
+
+- Created [`packages/ui/src/stories/button/Button.stories.svelte`](packages/ui/src/stories/button/Button.stories.svelte:1) with comprehensive button component stories:
+    - All variants (default, destructive, outline, secondary, ghost, link)
+    - All sizes (sm, default, lg, icon)
+    - Icon combinations and loading states
+    - Disabled states and link behavior
+    - Interactive controls for testing
+- Created [`packages/ui/src/stories/video-card/VideoCard.stories.svelte`](packages/ui/src/stories/video-card/VideoCard.stories.svelte:1) with video card component stories:
+    - Left and right alignment options
+    - Multiple video format support (MP4, WebM)
+    - Responsive layout demonstrations
+    - Custom styling examples
+    - Component composition breakdown
+    - Fallback behavior for missing video sources
+- Used existing Storybook configuration in [`packages/ui/.storybook/main.ts`](packages/ui/.storybook/main.ts:5) which already included proper story path patterns
+- Leveraged `@storybook/addon-svelte-csf` for Svelte 5 compatibility
+- Included proper TypeScript typing and component documentation
+- Used sample video URLs from Google's test video bucket for demonstrations
+
+**Benefits:**
+
+- Visual component library for design system consistency
+- Interactive testing environment for component development
+- Documentation for component usage and API
+- Quality assurance through visual regression testing capabilities
+- Improved developer experience with component playground
