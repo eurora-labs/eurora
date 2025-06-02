@@ -614,3 +614,31 @@ This file tracks key architectural and design decisions made during the project'
 - Documentation for component usage and API
 - Quality assurance through visual regression testing capabilities
 - Improved developer experience with component playground
+
+[2025-06-02 15:49:40] - Created comprehensive Storybook documentation and guidelines
+
+**Decision:** Analyzed existing Storybook implementation and created detailed guidelines and issue documentation for UI component stories.
+
+**Rationale:**
+
+- Existing Storybook stories showed inconsistent patterns and incomplete implementations
+- Need standardized guidelines to ensure consistent, high-quality component documentation
+- Critical issues identified that prevent effective component usage and development
+- Documentation serves both current development and future team members
+
+**Implementation Details:**
+
+- Created `packages/ui/src/stories/RULES.md` with comprehensive guidelines covering:
+    - File structure and organization standards
+    - Story file structure requirements
+    - Category hierarchy and naming conventions
+    - Required stories for all components
+    - Documentation standards and accessibility requirements
+    - Technical requirements and performance considerations
+- Created `packages/ui/src/stories/ISSUES.md` documenting 10 identified issues:
+    - Critical: Incomplete ContextChip story, inconsistent categorization, import path issues
+    - Moderate: Redundant launcher files, missing argTypes, inconsistent layouts
+    - Minor: Container width inconsistencies, missing error states, accessibility gaps
+- Analysis based on existing stories: Button, Command, ContextChip, and VideoCard
+- Guidelines follow Storybook best practices and Svelte 5 patterns
+- Prioritized recommendations for immediate, medium-term, and future improvements
