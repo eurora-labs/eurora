@@ -46,17 +46,23 @@ impl AuthManager {
         Ok(Sensitive(response.access_token))
     }
 
+    fn get_access_token(&self) -> Result<Sensitive<String>> {
+        secret::retrieve(Self::ACCESS_TOKEN_HANDLE, secret::Namespace::BuildKind)?
+            .ok_or_else(|| anyhow!("No access token found"))
+    }
+
+    fn get_refresh_token(&self) -> Result<Sensitive<String>> {
+        secret::retrieve(Self::REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)?
+            .ok_or_else(|| anyhow!("No refresh token found"))
+    }
+
     pub fn get_access_token_payload(&self) -> Result<Claims> {
-        let token = secret::retrieve(Self::ACCESS_TOKEN_HANDLE, secret::Namespace::BuildKind)
-            .expect("Failed to retrieve access token")
-            .expect("No access token found");
+        let token = self.get_access_token()?;
         extract_claims(&token.0)
     }
 
     pub fn get_refresh_token_payload(&self) -> Result<Claims> {
-        let token = secret::retrieve(Self::REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)
-            .expect("Failed to retrieve refresh token")
-            .expect("No refresh token found");
+        let token = self.get_refresh_token()?;
         extract_claims(&token.0)
     }
 
@@ -65,19 +71,12 @@ impl AuthManager {
         if self.get_access_token_payload().unwrap().exp < chrono::Utc::now().timestamp() {
             return self.refresh_tokens().await;
         }
-        // Validate access token against refresh threshold
-        let token = secret::retrieve(Self::ACCESS_TOKEN_HANDLE, secret::Namespace::BuildKind)
-            .expect("Failed to retrieve access token")
-            .expect("No access token found");
 
-        Ok(token)
+        self.refresh_tokens().await
     }
 
     pub async fn refresh_tokens(&self) -> Result<Sensitive<String>> {
-        let refresh_token =
-            secret::retrieve(Self::REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)
-                .expect("Failed to retrieve refresh token")
-                .expect("No refresh token found");
+        let refresh_token = self.get_refresh_token()?;
 
         let response = self.auth_client.refresh_token(&refresh_token.0).await?;
 
