@@ -52,7 +52,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.Input placeholder="Search" />
 				<Command.List>
 					<Command.Empty>No results found.</Command.Empty>
@@ -92,7 +92,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.Input placeholder="Search" />
 				<Command.List>
 					<Command.Empty>No results found.</Command.Empty>
@@ -158,7 +158,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.Input placeholder="Search" />
 				<Command.List>
 					<Command.Empty>No results found.</Command.Empty>
@@ -221,7 +221,7 @@
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
 			<Command.Root
 				value="xyz123nonexistent"
-				class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm"
+				class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
 			>
 				<Command.Input placeholder="Search" />
 				<Command.List>
@@ -259,7 +259,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.Input placeholder="Loading..." />
 				<Command.List>
 					<Command.Loading>
@@ -296,7 +296,7 @@
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
 			<Command.Root
 				bind:value={args.value}
-				class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm"
+				class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
 			>
 				<Command.Input placeholder="Type to search..." />
 				<Command.List>

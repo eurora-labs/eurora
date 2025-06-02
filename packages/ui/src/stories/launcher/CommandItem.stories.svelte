@@ -41,7 +41,6 @@
 	} from '@lucide/svelte';
 </script>
 
-<!-- Basic Items -->
 <Story name="Basic Items">
 	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
 		<div
@@ -49,7 +48,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group>
 						<Command.Item>
@@ -68,7 +67,6 @@
 	</div>
 </Story>
 
-<!-- Items with Icons -->
 <Story name="With Icons">
 	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
 		<div
@@ -76,7 +74,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group>
 						<Command.Item>
@@ -102,7 +100,6 @@
 	</div>
 </Story>
 
-<!-- Items with Shortcuts -->
 <Story name="With Shortcuts">
 	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
 		<div
@@ -110,7 +107,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group>
 						<Command.Item>
@@ -140,7 +137,6 @@
 	</div>
 </Story>
 
-<!-- Colored Icons -->
 <Story name="Colored Icons">
 	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
 		<div
@@ -148,7 +144,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group>
 						<Command.Item>
@@ -178,7 +174,6 @@
 	</div>
 </Story>
 
-<!-- Disabled Items -->
 <Story name="Disabled Items">
 	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
 		<div
@@ -186,7 +181,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group>
 						<Command.Item>
@@ -213,7 +208,6 @@
 	</div>
 </Story>
 
-<!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
 	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
 		<div
@@ -221,7 +215,7 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.List>
 					<Command.Group>
 						<Command.Item disabled={args.disabled}>

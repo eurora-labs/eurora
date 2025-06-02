@@ -35,7 +35,6 @@
 	import * as Command from '$lib/custom-components/launcher/index.js';
 </script>
 
-<!-- Default Input -->
 <Story name="Default">
 	<div class="relative min-h-[200px] w-[900px] overflow-hidden rounded-lg">
 		<div
@@ -43,14 +42,13 @@
 			style="background-image: url('sample_background.jpg')"
 		></div>
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm">
+			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 				<Command.Input placeholder="Search" />
 			</Command.Root>
 		</div>
 	</div>
 </Story>
 
-<!-- With Value -->
 <Story name="With Value">
 	<div class="relative min-h-[200px] w-[900px] overflow-hidden rounded-lg">
 		<div
@@ -60,7 +58,7 @@
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
 			<Command.Root
 				value="calculator"
-				class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm"
+				class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
 			>
 				<Command.Input placeholder="Search" />
 			</Command.Root>
@@ -68,7 +66,6 @@
 	</div>
 </Story>
 
-<!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
 	<div class="relative min-h-[300px] w-[900px] overflow-hidden rounded-lg">
 		<div
@@ -78,7 +75,7 @@
 		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
 			<Command.Root
 				bind:value={args.value}
-				class="rounded-lg border bg-white/90 shadow-md backdrop-blur-sm"
+				class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
 			>
 				<Command.Input placeholder={args.placeholder} />
 				<Command.List>
