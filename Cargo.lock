@@ -2281,6 +2281,7 @@ dependencies = [
  "console-subscriber",
  "defer",
  "dirs",
+ "dotenv",
  "eur-activity",
  "eur-auth",
  "eur-client-auth",
