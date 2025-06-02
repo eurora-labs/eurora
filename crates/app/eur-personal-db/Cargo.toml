@@ -7,7 +7,7 @@ description = "Eurora Personal DB"
 
 [dependencies]
 anyhow.workspace = true
-sqlx = { version = "0.8.5", features = [
+sqlx = { version = "0.8.6", features = [
     "runtime-tokio",
     "tls-native-tls",
     "sqlite",
