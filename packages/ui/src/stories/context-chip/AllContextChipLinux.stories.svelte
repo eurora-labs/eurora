@@ -3,13 +3,13 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 
 	const { Story } = defineMeta({
-		title: 'Components / ContextChip',
+		title: 'Components / ContextChip / Linux',
 		component: ContextChip,
 		parameters: {
 			docs: {
 				description: {
 					component:
-						'A comprehensive showcase of all context chip variants and states. Context chips are used to display contextual information with backdrop blur effects and various visual styles.',
+						'A comprehensive showcase of all context chip variants and states with Linux-specific styling. This story demonstrates how context chips appear on Linux desktop applications with solid backgrounds instead of backdrop blur effects.',
 				},
 			},
 			controls: { disable: true },
@@ -20,9 +20,20 @@
 <script lang="ts">
 	import StoryContainer from '../StoryContainer.svelte';
 	import { ExternalLink, Hash, Tag, User, Calendar, MapPin, Clock } from '@lucide/svelte';
+	import { onMount } from 'svelte';
+
+	onMount(() => {
+		// Add linux-app class to body to simulate Linux desktop environment
+		document.body.classList.add('linux-app');
+
+		// Cleanup function to remove the class when component is destroyed
+		return () => {
+			document.body.classList.remove('linux-app');
+		};
+	});
 </script>
 
-<Story name="All Context Chips">
+<Story name="All Context Chips (Linux)">
 	<StoryContainer>
 		{#snippet children()}
 			<div class="space-y-8 p-6">
@@ -137,6 +148,16 @@
 							<ContextChip variant="primary">Premium</ContextChip>
 						</div>
 					</div>
+				</div>
+
+				<div class="mt-8 p-4 bg-blue-900/20 rounded-lg border border-blue-500/30">
+					<h3 class="text-md font-semibold mb-2 text-blue-300">Linux Desktop Styling</h3>
+					<p class="text-sm text-blue-200">
+						This story demonstrates how Context Chips appear on Linux desktop applications. The <code
+							class="bg-blue-800/50 px-1 rounded">linux-app</code
+						> class has been added to the body, which triggers solid background styling instead of backdrop
+						blur effects for better compatibility with Linux desktop environments.
+					</p>
 				</div>
 			</div>
 		{/snippet}
