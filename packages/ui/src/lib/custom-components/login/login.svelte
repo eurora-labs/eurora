@@ -1,3 +1,15 @@
+<script lang="ts" module>
+	export interface LoginProps {
+		class?: string;
+		submitError?: string;
+		onsubmit: (event: SubmitEvent) => void;
+
+		onApple: () => void;
+		onGoogle: () => void;
+		onGitHub: () => void;
+	}
+</script>
+
 <script lang="ts">
 	import * as Card from '$lib/components/card/index.js';
 	import { SocialAuthButtons } from '$lib/custom-components/social-auth-buttons/index.js';
@@ -9,17 +21,15 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
-
-	export interface Props {
-		submitError?: string;
-		onsubmit: (event: SubmitEvent) => void;
-
-		onApple: () => void;
-		onGoogle: () => void;
-		onGitHub: () => void;
-	}
-
-	let { onsubmit, submitError, onApple, onGoogle, onGitHub }: Props = $props();
+	import { cn } from '$lib/utils.js';
+	let {
+		class: className,
+		onsubmit,
+		submitError,
+		onApple,
+		onGoogle,
+		onGitHub,
+	}: LoginProps = $props();
 
 	// Define form schema
 	const loginSchema = z.object({
@@ -44,7 +54,7 @@
 	}
 </script>
 
-<Card.Root class="p-6">
+<Card.Root class={cn('p-6', className)}>
 	<SocialAuthButtons mode="login" disabled={$submitting} {onApple} {onGoogle} {onGitHub} />
 
 	<div class="relative my-6">
