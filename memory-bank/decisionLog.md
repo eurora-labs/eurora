@@ -51,15 +51,15 @@ This file records architectural and implementation decisions using a list format
 - Populated initial files with basic project information derived from repository structure
 - Set up structure for ongoing updates as the project evolves
 - Made the following improvements to launcher components:
-    - Fixed auto-scroll functionality by adding a proper class and setTimeout approach
-    - Implemented delete functionality for activity badges using array splicing
-    - Cleaned up commented-out code to improve maintainability
-    - Fixed duplicate function call in API key form
-    - Used consistent event handling approaches across components
+  - Fixed auto-scroll functionality by adding a proper class and setTimeout approach
+  - Implemented delete functionality for activity badges using array splicing
+  - Cleaned up commented-out code to improve maintainability
+  - Fixed duplicate function call in API key form
+  - Used consistent event handling approaches across components
 - Fixed OCR service by:
-    - Adding futures crate as a dependency
-    - Properly collecting futures into a vector
-    - Using futures::future::join_all to await all futures concurrently
+  - Adding futures crate as a dependency
+  - Properly collecting futures into a vector
+  - Using futures::future::join_all to await all futures concurrently
 
 # Decision Log
 
@@ -119,14 +119,14 @@ This file tracks key architectural and design decisions made during the project'
 - Updated `apps/desktop/src/routes/(launcher)/+page.svelte` to use TauRPC proxy
 - Updated `apps/desktop/src/routes/(launcher)/api-key-form.svelte` to use TauRPC proxy
 - Migrated the following function calls to TauRPC:
-    - `check_api_key_exists()` → `taurpc.third_party.check_api_key_exists()`
-    - `save_api_key()` → `taurpc.third_party.save_api_key()`
-    - `initialize_openai_client()` → `taurpc.third_party.initialize_openai_client()`
-    - `resize_launcher_window()` → `taurpc.window.resize_launcher_window()`
-    - `send_query()` → `taurpc.send_query()` (for the main query functionality)
+  - `check_api_key_exists()` → `taurpc.third_party.check_api_key_exists()`
+  - `save_api_key()` → `taurpc.third_party.save_api_key()`
+  - `initialize_openai_client()` → `taurpc.third_party.initialize_openai_client()`
+  - `resize_launcher_window()` → `taurpc.window.resize_launcher_window()`
+  - `send_query()` → `taurpc.send_query()` (for the main query functionality)
 - Left some functions as fallbacks to regular invoke calls where TauRPC procedures don't exist yet:
-    - `list_activities` (not yet implemented in TauRPC)
-    - `list_conversations` (not yet implemented in TauRPC)
+  - `list_activities` (not yet implemented in TauRPC)
+  - `list_conversations` (not yet implemented in TauRPC)
 - Used existing TauRPC bindings generated in `packages/tauri-bindings/src/lib/gen/bindings.ts`
 
 [2025-05-25 12:42:00] - Conducted comprehensive critical analysis of eur-activity crate
@@ -259,24 +259,24 @@ This file tracks key architectural and design decisions made during the project'
 **Implementation Details:**
 
 - Created shared JWT structures in crates/common/eur-auth/src/lib.rs:
-    - Claims struct with all JWT fields
-    - JwtConfig struct with secret and expiry configurations
-    - validate_token() function for general token validation
-    - validate_access_token() function specifically for access tokens
-    - validate_refresh_token() function specifically for refresh tokens
+  - Claims struct with all JWT fields
+  - JwtConfig struct with secret and expiry configurations
+  - validate_token() function for general token validation
+  - validate_access_token() function specifically for access tokens
+  - validate_refresh_token() function specifically for refresh tokens
 - Updated eur-auth-service to use shared structures:
-    - Added eur-auth dependency to Cargo.toml
-    - Removed duplicated Claims and JwtConfig structs
-    - Updated validate_token() method to use shared function
-    - Cleaned up unused imports
+  - Added eur-auth dependency to Cargo.toml
+  - Removed duplicated Claims and JwtConfig structs
+  - Updated validate_token() method to use shared function
+  - Cleaned up unused imports
 - Updated eur-ocr-service to use shared structures:
-    - Replaced local JWT dependencies with eur-auth dependency
-    - Removed duplicated Claims, JwtConfig, and validate_token code
-    - Updated authenticate_request() to use validate_access_token()
+  - Replaced local JWT dependencies with eur-auth dependency
+  - Removed duplicated Claims, JwtConfig, and validate_token code
+  - Updated authenticate_request() to use validate_access_token()
 - Updated eur-monolith to use shared JwtConfig:
-    - Added eur-auth dependency to Cargo.toml
-    - Updated imports to use shared JwtConfig
-    - Simplified service initialization with shared configuration
+  - Added eur-auth dependency to Cargo.toml
+  - Updated imports to use shared JwtConfig
+  - Simplified service initialization with shared configuration
 
 **Benefits:**
 
@@ -300,16 +300,16 @@ This file tracks key architectural and design decisions made during the project'
 **Implementation Details:**
 
 - Added missing RPC calls to proto/auth_service.proto:
-    - `rpc Register (RegisterRequest) returns (LoginResponse);`
-    - `rpc RefreshToken (RefreshTokenRequest) returns (LoginResponse);`
+  - `rpc Register (RegisterRequest) returns (LoginResponse);`
+  - `rpc RefreshToken (RefreshTokenRequest) returns (LoginResponse);`
 - Added corresponding message definitions:
-    - `RegisterRequest` with username, email, password, and optional display_name
-    - `RefreshTokenRequest` with refresh_token field
+  - `RegisterRequest` with username, email, password, and optional display_name
+  - `RefreshTokenRequest` with refresh_token field
 - Updated imports to include new proto message types
 - Added Default implementation for AuthService with proper database connection
 - Implemented missing trait methods in ProtoAuthService:
-    - `register()` method that calls existing `register_user()` logic
-    - `refresh_token()` method that calls existing `refresh_token()` logic
+  - `register()` method that calls existing `register_user()` logic
+  - `refresh_token()` method that calls existing `refresh_token()` logic
 - Maintained all existing business logic and error handling
 - Preserved JWT token generation and validation functionality
 - Added proper gRPC status code handling for authentication errors
@@ -394,11 +394,11 @@ This file tracks key architectural and design decisions made during the project'
 
 - Built using existing UI components from @eurora/ui package (Card, Input, Label, Button, Alert)
 - Implemented client-side validation for all required fields:
-    - Username: minimum 3 characters, required
-    - Email: valid email format validation, required
-    - Password: minimum 8 characters, required
-    - Confirm Password: must match password
-    - Display Name: optional field
+  - Username: minimum 3 characters, required
+  - Email: valid email format validation, required
+  - Password: minimum 8 characters, required
+  - Confirm Password: must match password
+  - Display Name: optional field
 - Added password visibility toggles for better UX
 - Included loading states with spinner during form submission
 - Error handling with user-friendly error messages
@@ -590,18 +590,18 @@ This file tracks key architectural and design decisions made during the project'
 **Implementation Details:**
 
 - Created [`packages/ui/src/stories/button/Button.stories.svelte`](packages/ui/src/stories/button/Button.stories.svelte:1) with comprehensive button component stories:
-    - All variants (default, destructive, outline, secondary, ghost, link)
-    - All sizes (sm, default, lg, icon)
-    - Icon combinations and loading states
-    - Disabled states and link behavior
-    - Interactive controls for testing
+  - All variants (default, destructive, outline, secondary, ghost, link)
+  - All sizes (sm, default, lg, icon)
+  - Icon combinations and loading states
+  - Disabled states and link behavior
+  - Interactive controls for testing
 - Created [`packages/ui/src/stories/video-card/VideoCard.stories.svelte`](packages/ui/src/stories/video-card/VideoCard.stories.svelte:1) with video card component stories:
-    - Left and right alignment options
-    - Multiple video format support (MP4, WebM)
-    - Responsive layout demonstrations
-    - Custom styling examples
-    - Component composition breakdown
-    - Fallback behavior for missing video sources
+  - Left and right alignment options
+  - Multiple video format support (MP4, WebM)
+  - Responsive layout demonstrations
+  - Custom styling examples
+  - Component composition breakdown
+  - Fallback behavior for missing video sources
 - Used existing Storybook configuration in [`packages/ui/.storybook/main.ts`](packages/ui/.storybook/main.ts:5) which already included proper story path patterns
 - Leveraged `@storybook/addon-svelte-csf` for Svelte 5 compatibility
 - Included proper TypeScript typing and component documentation
@@ -629,16 +629,16 @@ This file tracks key architectural and design decisions made during the project'
 **Implementation Details:**
 
 - Created `packages/ui/src/stories/RULES.md` with comprehensive guidelines covering:
-    - File structure and organization standards
-    - Story file structure requirements
-    - Category hierarchy and naming conventions
-    - Required stories for all components
-    - Documentation standards and accessibility requirements
-    - Technical requirements and performance considerations
+  - File structure and organization standards
+  - Story file structure requirements
+  - Category hierarchy and naming conventions
+  - Required stories for all components
+  - Documentation standards and accessibility requirements
+  - Technical requirements and performance considerations
 - Created `packages/ui/src/stories/ISSUES.md` documenting 10 identified issues:
-    - Critical: Incomplete ContextChip story, inconsistent categorization, import path issues
-    - Moderate: Redundant launcher files, missing argTypes, inconsistent layouts
-    - Minor: Container width inconsistencies, missing error states, accessibility gaps
+  - Critical: Incomplete ContextChip story, inconsistent categorization, import path issues
+  - Moderate: Redundant launcher files, missing argTypes, inconsistent layouts
+  - Minor: Container width inconsistencies, missing error states, accessibility gaps
 - Analysis based on existing stories: Button, Command, ContextChip, and VideoCard
 - Guidelines follow Storybook best practices and Svelte 5 patterns
 - Prioritized recommendations for immediate, medium-term, and future improvements
@@ -673,3 +673,36 @@ This file tracks key architectural and design decisions made during the project'
 - Improved component contrast and readability testing
 - Professional presentation for design reviews and stakeholder demonstrations
 - Consistent visual treatment across all launcher component stories
+
+[2025-06-03 08:17:50] - Created reusable StoryContainer component for Storybook stories
+
+**Decision:** Extracted repeated container markup from launcher story files into a reusable [`StoryContainer.svelte`](packages/ui/src/stories/StoryContainer.svelte) component.
+
+**Rationale:**
+
+- Eliminates code duplication across multiple story files
+- Provides consistent background styling and layout for all stories
+- Improves maintainability by centralizing container logic
+- Adds accessibility improvements with proper ARIA attributes
+- Includes fallback background options for better reliability
+
+**Implementation Details:**
+
+- Created [`StoryContainer.svelte`](packages/ui/src/stories/StoryContainer.svelte:1) with slot-based children rendering
+- Added CSS fallback background color (#f5f5f5) and secondary fallback image (grid pattern)
+- Marked background div with `role="presentation"` and `aria-hidden="true"` for accessibility
+- Updated all launcher story files to use the new component:
+  - [`CommandItem.stories.svelte`](packages/ui/src/stories/launcher/CommandItem.stories.svelte:1)
+  - [`CommandGroup.stories.svelte`](packages/ui/src/stories/launcher/CommandGroup.stories.svelte:1)
+  - [`CommandInput.stories.svelte`](packages/ui/src/stories/launcher/CommandInput.stories.svelte:1)
+  - [`Command.stories.svelte`](packages/ui/src/stories/launcher/Command.stories.svelte:1)
+- Replaced 18+ instances of duplicated container markup with single component usage
+- Maintained existing styling and functionality while reducing code duplication
+
+**Benefits:**
+
+- Reduced code duplication by ~500 lines across story files
+- Centralized background styling and accessibility features
+- Easier maintenance and updates to story container styling
+- Consistent user experience across all Storybook stories
+- Better accessibility compliance with proper ARIA attributes
