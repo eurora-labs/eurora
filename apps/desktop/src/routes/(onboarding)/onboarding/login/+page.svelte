@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Login } from '@eurora/ui/custom-components/login/index';
+	import { Button } from '@eurora/ui/components/button/index';
 
 	function onSubmit(event: SubmitEvent) {
 		event.preventDefault();
@@ -20,3 +21,4 @@
 </script>
 
 <Login onsubmit={onSubmit} {onApple} {onGoogle} {onGitHub} />
+<Button class="mt-6" href="/onboarding">Back</Button>
