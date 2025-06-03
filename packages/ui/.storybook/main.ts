@@ -15,7 +15,8 @@ const config: StorybookConfig = {
 	},
 	typescript: {
 		check: false
-	}
+	},
+	staticDirs: ['../static']
 };
 
 export default config;
