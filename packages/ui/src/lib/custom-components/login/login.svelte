@@ -56,7 +56,7 @@
 		</div>
 	</div>
 
-	<form use:enhance {onsubmit} class="space-y-4">
+	<form use:enhance method="POST" {onsubmit} class="space-y-4">
 		{#if submitError}
 			<div class="rounded-md bg-red-50 p-4">
 				<p class="text-sm text-red-800">{submitError}</p>
