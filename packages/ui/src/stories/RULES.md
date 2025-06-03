@@ -15,9 +15,33 @@ This document outlines the standards and best practices for creating Storybook s
 ```
 packages/ui/src/stories/
 ├── component-name/
-│   ├── ComponentName.stories.svelte
+│   ├── ComponentName.stories.svelte          # Interactive story with controls
+│   ├── AllComponentName.stories.svelte       # Showcase of all variants (optional)
 │   └── [additional story files if needed]
 ```
+
+### Dual Story Pattern (Recommended for Complex Components)
+
+For components with many variants, states, or configurations, consider implementing a dual story pattern:
+
+1. **Interactive Story** (`ComponentName.stories.svelte`):
+
+   - Single story with full Storybook controls
+   - Allows developers to test all component properties
+   - Primary entry point for component testing
+
+2. **Showcase Story** (`AllComponentName.stories.svelte`):
+   - Comprehensive display of all variants and states
+   - No interactive controls (set `controls: { disable: true }`)
+   - Organized with clear section headings
+   - Serves as visual documentation and design reference
+
+**When to use dual pattern:**
+
+- Components with 4+ variants or sizes
+- Components with multiple distinct states (loading, disabled, error)
+- Components that benefit from side-by-side comparison
+- Complex components where seeing all options together aids understanding
 
 ## Story File Structure
 
@@ -36,18 +60,17 @@ packages/ui/src/stories/
 		parameters: {
 			docs: {
 				description: {
-					component:
-						'Clear, concise description of the component purpose and functionality.'
-				}
+					component: 'Clear, concise description of the component purpose and functionality.',
+				},
 			},
-			layout: 'centered' // or 'padded' for larger components
+			layout: 'centered', // or 'padded' for larger components
 		},
 		argTypes: {
 			// Define controls for component props
 		},
 		args: {
 			// Default values for props
-		}
+		},
 	});
 </script>
 ```
@@ -99,15 +122,38 @@ packages/ui/src/stories/
 
 ## Required Stories
 
-### Essential Stories (All Components)
+### Single Story Pattern (Simple Components)
 
-1. **Default**: Basic component usage with minimal props
-2. **Variants**: All available visual variants
-3. **Sizes**: All available size options (if applicable)
-4. **Disabled**: Disabled state demonstration
-5. **Interactive**: Template with controls for testing
+For components with few variants or simple configurations:
 
-### Component-Specific Stories
+1. **Interactive**: Single story with controls for all component properties
+2. **Additional Stories**: Specific use cases or complex examples as needed
+
+### Dual Story Pattern (Complex Components)
+
+For components with many variants, states, or configurations:
+
+#### Interactive Story (`ComponentName.stories.svelte`)
+
+- **Single Interactive Story**: Template with full Storybook controls
+- **Purpose**: Allow developers to test all component properties dynamically
+- **Title**: `Components / ComponentName` (main entry point)
+
+#### Showcase Story (`AllComponentName.stories.svelte`)
+
+- **Comprehensive Display**: All variants, sizes, states organized in sections
+- **No Controls**: Set `controls: { disable: true }` in parameters
+- **Clear Organization**: Use section headings and proper spacing
+- **Title**: `Components / ComponentName / All [ComponentName]s`
+- **Sections to Include**:
+  1. **Default**: Basic component usage
+  2. **Variants**: All available visual variants
+  3. **Sizes**: All available size options (if applicable)
+  4. **States**: Disabled, loading, error, active states
+  5. **With Features**: Icons, links, special functionality
+  6. **Use Cases**: Specific scenarios or configurations
+
+### Component-Specific Considerations
 
 - **Complex Components**: Empty states, loading states, error states
 - **Layout Components**: Responsive behavior, alignment options
@@ -257,8 +303,73 @@ import { defineMeta, type StoryContext, type Args } from '@storybook/addon-svelt
 
 Refer to existing stories for implementation examples:
 
-- [`Button.stories.svelte`](./button/Button.stories.svelte) - Comprehensive component coverage
+### Dual Story Pattern Examples
+
+- [`Button.stories.svelte`](./button/Button.stories.svelte) - Interactive story with full controls
+- [`AllButton.stories.svelte`](./button/AllButton.stories.svelte) - Comprehensive showcase of all button variants and states
+
+### Single Story Pattern Examples
+
 - [`Command.stories.svelte`](./launcher/Command.stories.svelte) - Complex component with multiple sub-components
 - [`VideoCard.stories.svelte`](./video-card/VideoCard.stories.svelte) - Responsive component with media content
+
+### Implementation Templates
+
+#### Interactive Story Template
+
+```svelte
+<script module lang="ts">
+	import { Component } from '$lib/components/path/to/component';
+	import { defineMeta, type StoryContext, type Args } from '@storybook/addon-svelte-csf';
+
+	const { Story } = defineMeta({
+		title: 'Components / ComponentName',
+		component: Component,
+		argTypes: {
+			// Define all component props with controls
+		},
+		args: {
+			// Default values
+		}
+	});
+</script>
+
+{#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
+	<Component {...args}>
+		{/* Dynamic content based on args */}
+	</Component>
+{/snippet}
+
+<Story name="Interactive" children={template} />
+```
+
+#### Showcase Story Template
+
+```svelte
+<script module lang="ts">
+	import { Component } from '$lib/components/path/to/component';
+	import { defineMeta } from '@storybook/addon-svelte-csf';
+
+	const { Story } = defineMeta({
+		title: 'Components / ComponentName / All ComponentNames',
+		component: Component,
+		parameters: {
+			controls: { disable: true },
+		},
+	});
+</script>
+
+<Story name="All ComponentName Examples">
+	<div class="space-y-8 p-6">
+		<div>
+			<h2 class="text-lg font-semibold mb-4">Section Title</h2>
+			<div class="flex flex-wrap gap-4">
+				<!-- Component examples -->
+			</div>
+		</div>
+		<!-- More sections -->
+	</div>
+</Story>
+```
 
 These guidelines ensure consistent, high-quality Storybook documentation that serves both developers and designers effectively.
