@@ -23,7 +23,7 @@
 				control: { type: 'text' },
 				description: 'If provided, renders as an anchor element instead of span',
 			},
-			onClick: {
+			onclick: {
 				control: { type: 'boolean' },
 				description: 'Whether the chip has click functionality (renders as button role)',
 			},
@@ -35,7 +35,7 @@
 		args: {
 			variant: 'default',
 			href: undefined,
-			onClick: undefined,
+			onclick: undefined,
 			class: undefined,
 		},
 	});
@@ -49,25 +49,23 @@
 <!-- Interactive Context Chip -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
 	<StoryContainer>
-		{#snippet children()}
-			<ContextChip
-				variant={args.variant}
-				href={args.href}
-				onClick={args.onClick ? () => alert('Context chip clicked!') : undefined}
-				class={args.class}
-			>
-				{#if args.href}
-					<Hash class="mr-2 h-4 w-4" />
-					Link Chip
-				{:else if args.onClick}
-					<Hash class="mr-2 h-4 w-4" />
-					Clickable Chip
-				{:else}
-					<Hash class="mr-2 h-4 w-4" />
-					Context Chip
-				{/if}
-			</ContextChip>
-		{/snippet}
+		<ContextChip
+			variant={args.variant}
+			href={args.href}
+			onclick={args.onclick ? () => alert('Context chip clicked!') : undefined}
+			class={args.class}
+		>
+			{#if args.href}
+				<Hash class="mr-2 h-4 w-4" />
+				Link Chip
+			{:else if args.onclick}
+				<Hash class="mr-2 h-4 w-4" />
+				Clickable Chip
+			{:else}
+				<Hash class="mr-2 h-4 w-4" />
+				Context Chip
+			{/if}
+		</ContextChip>
 	</StoryContainer>
 {/snippet}
 
