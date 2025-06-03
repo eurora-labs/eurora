@@ -60,21 +60,20 @@
 	<div class="mb-4">
 		<h2 class="mb-2 text-xl font-bold">Welcome to Eurora</h2>
 		<p class="text-gray-600">
-			Please enter your OpenAI API key to get started. Your key will be stored securely in
-			your system's keyring.
+			Please enter your OpenAI API key to get started. Your key will be stored securely in your
+			system's keyring.
 		</p>
 	</div>
 
 	<div class="mb-6">
-		<form on:submit|preventDefault={saveApiKey} class="space-y-4">
+		<form onsubmit={saveApiKey} class="space-y-4">
 			<div class="space-y-2">
 				<Input type="password" placeholder="sk-..." bind:value={apiKey} class="w-full" />
 				{#if error}
 					<p class="text-sm text-red-500">{error}</p>
 				{/if}
 				<p class="text-xs text-gray-500">
-					Your API key is stored securely and is only used to communicate with OpenAI's
-					services.
+					Your API key is stored securely and is only used to communicate with OpenAI's services.
 				</p>
 			</div>
 		</form>
