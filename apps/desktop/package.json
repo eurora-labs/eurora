@@ -68,7 +68,7 @@
 		"postcss-pxtorem": "^6.1.0",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
-		"prettier-plugin-tailwindcss": "^0.6.11",
+		"prettier-plugin-tailwindcss": "^0.6.12",
 		"svelte": "^5.33.14",
 		"svelte-check": "^4.2.1",
 		"tinykeys": "^2.1.0",
