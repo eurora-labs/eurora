@@ -28,7 +28,8 @@
 	});
 
 	// Save API key to keyring
-	async function saveApiKey() {
+	async function saveApiKey(event: Event) {
+		event.preventDefault();
 		if (!apiKey.trim()) {
 			error = 'Please enter a valid API key';
 			return;
@@ -80,7 +81,7 @@
 	</div>
 
 	<div class="flex justify-end">
-		<Button disabled={isLoading} onclick={() => saveApiKey()}>
+		<Button disabled={isLoading} onclick={(event) => saveApiKey(event)}>
 			{isLoading ? 'Saving...' : 'Save API Key'}
 		</Button>
 	</div>
