@@ -1,6 +1,10 @@
 <script lang="ts">
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
+	import { open } from '@tauri-apps/plugin-shell';
+	function openLogin() {
+		open('https://www.google.com');
+	}
 </script>
 
 <div class="relative flex h-screen w-full flex-col">
@@ -25,7 +29,7 @@
 					</Card.Header>
 					<Card.Content class="flex justify-center">
 						<Button
-							href="/onboarding/login"
+							onclick={openLogin}
 							variant="default"
 							class="w-full rounded-lg px-6 py-3 font-medium transition-colors duration-200"
 							size="lg"
