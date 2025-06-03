@@ -1,10 +1,9 @@
 <script lang="ts" module>
-	import { cn, type WithElementRef } from '$lib/utils.js';
-	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from 'svelte/elements';
+	import { cn } from '$lib/utils.js';
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	export const contextChipVariants = tv({
-		base: 'inline-block w-fit items-center gap-2 mx-2 p-2 text-[40px] leading-[40px] rounded-2xl backdrop-blur-md text-black/70',
+		base: 'inline-flex w-fit items-center gap-2 mx-2 p-2 text-[40px] leading-[40px] rounded-2xl backdrop-blur-md text-black/70 [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
 		variants: {
 			variant: {
 				default: 'bg-white/30',
@@ -21,42 +20,67 @@
 
 	export type ContextChipVariant = VariantProps<typeof contextChipVariants>['variant'];
 
-	export type ContextChipProps = WithElementRef<HTMLButtonAttributes> &
-		WithElementRef<HTMLAnchorAttributes> & {
-			variant?: ContextChipVariant;
-		};
+	export type ContextChipProps = {
+		variant?: ContextChipVariant;
+		class?: string;
+		href?: string;
+		onclick?: ((event: MouseEvent) => void) | undefined;
+		ref?: HTMLElement | null;
+	};
 </script>
 
 <script lang="ts">
-	let ref: HTMLElement | undefined = undefined;
-	let className: string | undefined | null = undefined;
-	export let href: string | undefined = undefined;
-	export let variant: ContextChipVariant = 'default';
-	export let onClick: ((event: MouseEvent) => void) | undefined = undefined;
-	export { className as class };
+	let {
+		class: className,
+		variant = 'default',
+		ref = $bindable(null),
+		href = undefined,
+		onclick = undefined,
+		children,
+		...restProps
+	}: ContextChipProps & {
+		children?: any;
+		[key: string]: any;
+	} = $props();
 </script>
 
-<svelte:element
-	this={href ? 'a' : 'span'}
-	{href}
-	role={onClick ? 'button' : undefined}
-	on:click={onClick}
-	bind:this={ref}
-	class={cn(contextChipVariants({ variant, className }), 'context-chip')}
-	{...$$restProps}
->
-	<slot />
-</svelte:element>
+{#if href}
+	<a
+		bind:this={ref}
+		class={cn(contextChipVariants({ variant }), className, 'context-chip')}
+		{href}
+		{onclick}
+		{...restProps}
+	>
+		{@render children?.()}
+	</a>
+{:else if onclick}
+	<button
+		bind:this={ref}
+		class={cn(contextChipVariants({ variant }), className, 'context-chip')}
+		{onclick}
+		type="button"
+		{...restProps}
+	>
+		{@render children?.()}
+	</button>
+{:else}
+	<span
+		bind:this={ref}
+		class={cn(contextChipVariants({ variant }), className, 'context-chip')}
+		{...restProps}
+	>
+		{@render children?.()}
+	</span>
+{/if}
 
 <style lang="postcss">
 	:global(.context-chip) {
-		display: inline-block;
+		display: inline-flex;
 		border-radius: 16px;
 		backdrop-filter: blur(6px);
 		-webkit-backdrop-filter: blur(6px);
 		background-color: transparent;
-		/* @apply w-fit items-center gap-2 text-[40px] leading-[40px] text-white; */
-		/* @apply mx-2 p-2; */
 		color: rgba(0, 0, 0, 1);
 	}
 
