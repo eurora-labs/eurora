@@ -9,25 +9,25 @@
 			layout: 'centered',
 			docs: {
 				description: {
-					component:
-						'Individual command items that can be selected within a command palette.'
-				}
-			}
+					component: 'Individual command items that can be selected within a command palette.',
+				},
+			},
 		},
 		argTypes: {
 			disabled: {
 				control: 'boolean',
-				description: 'Whether the item is disabled'
-			}
+				description: 'Whether the item is disabled',
+			},
 		},
 		args: {
-			disabled: false
-		}
+			disabled: false,
+		},
 	});
 </script>
 
 <script lang="ts">
 	import * as Command from '$lib/custom-components/launcher/index.js';
+	import StoryContainer from '../StoryContainer.svelte';
 	import {
 		Calendar,
 		Calculator,
@@ -37,14 +37,13 @@
 		Mail,
 		User,
 		Home,
-		Folder
+		Folder,
 	} from '@lucide/svelte';
 </script>
 
-<!-- Basic Items -->
 <Story name="Basic Items">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
 					<Command.Item>
@@ -59,13 +58,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
-<!-- Items with Icons -->
 <Story name="With Icons">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
 					<Command.Item>
@@ -87,13 +85,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
-<!-- Items with Shortcuts -->
 <Story name="With Shortcuts">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
 					<Command.Item>
@@ -119,13 +116,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
-<!-- Colored Icons -->
 <Story name="Colored Icons">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
 					<Command.Item>
@@ -151,13 +147,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
-<!-- Disabled Items -->
 <Story name="Disabled Items">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
 					<Command.Item>
@@ -180,13 +175,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
-<!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
 					<Command.Item disabled={args.disabled}>
@@ -197,5 +191,5 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 {/snippet}
