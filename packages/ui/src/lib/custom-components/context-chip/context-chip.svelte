@@ -25,7 +25,7 @@
 		class?: string;
 		href?: string;
 		onclick?: ((event: MouseEvent) => void) | undefined;
-		ref?: HTMLElement | null;
+		ref?: HTMLElement;
 	};
 </script>
 
@@ -33,7 +33,7 @@
 	let {
 		class: className,
 		variant = 'default',
-		ref = $bindable(null),
+		ref = $bindable(),
 		href = undefined,
 		onclick = undefined,
 		children,
@@ -71,10 +71,9 @@
 {/if}
 
 <style lang="postcss">
+	@reference "tailwindcss";
 	/* Apply solid background for Linux desktop app */
 	:global(body.linux-app .context-chip) {
-		backdrop-filter: none;
-		-webkit-backdrop-filter: none;
-		background-color: rgba(0, 0, 0, 0.2);
+		@apply bg-gray-200/20 backdrop-blur-none blur-none;
 	}
 </style>
