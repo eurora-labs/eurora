@@ -109,7 +109,8 @@ fn main() {
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
                     let main_window =
-                        create_window(tauri_app.handle(), "main", "index.html".into())
+                        create_window(tauri_app.handle(), "main", "onboarding".into())
+                            // create_window(tauri_app.handle(), "main", "index.html".into())
                             .expect("Failed to create main window");
 
                     // Start the focus tracker
