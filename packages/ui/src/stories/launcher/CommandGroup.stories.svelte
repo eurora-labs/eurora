@@ -9,24 +9,25 @@
 			layout: 'centered',
 			docs: {
 				description: {
-					component: 'Groups related command items together with an optional heading.'
-				}
-			}
+					component: 'Groups related command items together with an optional heading.',
+				},
+			},
 		},
 		argTypes: {
 			heading: {
 				control: 'text',
-				description: 'The heading text for the group'
-			}
+				description: 'The heading text for the group',
+			},
 		},
 		args: {
-			heading: 'Applications'
-		}
+			heading: 'Applications',
+		},
 	});
 </script>
 
 <script lang="ts">
 	import * as Command from '$lib/custom-components/launcher/index.js';
+	import StoryContainer from '../StoryContainer.svelte';
 	import {
 		Calendar,
 		Calculator,
@@ -39,14 +40,14 @@
 		Folder,
 		Music,
 		Video,
-		Image
+		Image,
 	} from '@lucide/svelte';
 </script>
 
 <!-- Basic Group -->
 <Story name="Basic Group">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading="Applications">
 					<Command.Item>
@@ -64,13 +65,13 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- Group without Heading -->
 <Story name="Without Heading">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
 					<Command.Item>
@@ -88,13 +89,13 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- Multiple Groups -->
 <Story name="Multiple Groups">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading="Applications">
 					<Command.Item>
@@ -134,13 +135,13 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- Groups with Shortcuts -->
 <Story name="With Shortcuts">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading="Quick Actions">
 					<Command.Item>
@@ -169,13 +170,13 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- Different Group Styles -->
 <Story name="Different Headings">
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading="🚀 Quick Actions">
 					<Command.Item>
@@ -199,13 +200,13 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<div class="w-[350px]">
-		<Command.Root class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading={args.heading}>
 					<Command.Item>
@@ -223,5 +224,5 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 {/snippet}
