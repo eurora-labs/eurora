@@ -1,0 +1,45 @@
+<script module lang="ts">
+	import { Login } from '$lib/custom-components/login/index.js';
+	import { defineMeta, type StoryContext, type Args } from '@storybook/addon-svelte-csf';
+
+	const { Story } = defineMeta({
+		title: 'Components / Login',
+		component: Login,
+		parameters: {
+			docs: {
+				description: {
+					component:
+						'A comprehensive login form component with social authentication options, form validation, and error handling. Features password visibility toggle, loading states, and integration with social auth providers.',
+				},
+			},
+			layout: 'centered',
+		},
+		argTypes: {
+			submitError: {
+				control: { type: 'text' },
+				description: 'Error message to display when form submission fails',
+			},
+		},
+		args: {
+			submitError: undefined,
+		},
+	});
+</script>
+
+<!-- Interactive Login Form -->
+{#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
+	<div class="w-full max-w-md">
+		<Login
+			submitError={args.submitError}
+			onsubmit={(event) => {
+				event.preventDefault();
+				alert('Form submitted!');
+			}}
+			onApple={() => alert('Apple login clicked!')}
+			onGoogle={() => alert('Google login clicked!')}
+			onGitHub={() => alert('GitHub login clicked!')}
+		/>
+	</div>
+{/snippet}
+
+<Story name="Interactive" children={template} />
