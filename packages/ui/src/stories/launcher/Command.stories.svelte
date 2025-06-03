@@ -10,23 +10,24 @@
 			docs: {
 				description: {
 					component:
-						'A command palette component for launching actions and navigating through the application.'
-				}
-			}
+						'A command palette component for launching actions and navigating through the application.',
+				},
+			},
 		},
 		argTypes: {
 			value: {
 				control: 'text',
-				description: 'The current search value'
-			}
+				description: 'The current search value',
+			},
 		},
 		args: {
-			value: ''
-		}
+			value: '',
+		},
 	});
 </script>
 
 <script lang="ts">
+	import StoryContainer from '../StoryContainer.svelte';
 	import {
 		Search,
 		Calculator,
@@ -40,283 +41,244 @@
 		Folder,
 		Image,
 		Music,
-		Video
+		Video,
 	} from '@lucide/svelte';
 </script>
 
 <!-- Default Command -->
 <Story name="Default">
-	<div class="relative min-h-[400px] w-[900px] overflow-hidden rounded-lg">
-		<div
-			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
-			style="background-image: url('sample_background.jpg')"
-		></div>
-		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
-				<Command.Input placeholder="Search" />
-				<Command.List>
-					<Command.Empty>No results found.</Command.Empty>
-					<Command.Group heading="Suggestions">
-						<Command.Item>
-							<Calendar class="mr-2 h-4 w-4" />
-							<span>Calendar</span>
-						</Command.Item>
-						<Command.Item>
-							<Search class="mr-2 h-4 w-4" />
-							<span>Search Emoji</span>
-						</Command.Item>
-						<Command.Item>
-							<Calculator class="mr-2 h-4 w-4" />
-							<span>Calculator</span>
-						</Command.Item>
-					</Command.Group>
-					<Command.Separator />
-					<Command.Group heading="Settings">
-						<Command.Item>
-							<Settings class="mr-2 h-4 w-4" />
-							<span>Settings</span>
-							<Command.Shortcut>⌘S</Command.Shortcut>
-						</Command.Item>
-					</Command.Group>
-				</Command.List>
-			</Command.Root>
-		</div>
-	</div>
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
+			<Command.Input placeholder="Search" />
+			<Command.List>
+				<Command.Empty>No results found.</Command.Empty>
+				<Command.Group heading="Suggestions">
+					<Command.Item>
+						<Calendar class="mr-2 h-4 w-4" />
+						<span>Calendar</span>
+					</Command.Item>
+					<Command.Item>
+						<Search class="mr-2 h-4 w-4" />
+						<span>Search Emoji</span>
+					</Command.Item>
+					<Command.Item>
+						<Calculator class="mr-2 h-4 w-4" />
+						<span>Calculator</span>
+					</Command.Item>
+				</Command.Group>
+				<Command.Separator />
+				<Command.Group heading="Settings">
+					<Command.Item>
+						<Settings class="mr-2 h-4 w-4" />
+						<span>Settings</span>
+						<Command.Shortcut>⌘S</Command.Shortcut>
+					</Command.Item>
+				</Command.Group>
+			</Command.List>
+		</Command.Root>
+	</StoryContainer>
 </Story>
 
 <!-- With Multiple Groups -->
 <Story name="With Groups">
-	<div class="relative min-h-[400px] w-[900px] overflow-hidden rounded-lg">
-		<div
-			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
-			style="background-image: url('sample_background.jpg')"
-		></div>
-		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
-				<Command.Input placeholder="Search" />
-				<Command.List>
-					<Command.Empty>No results found.</Command.Empty>
-					<Command.Group heading="Applications">
-						<Command.Item>
-							<Calendar class="mr-2 h-4 w-4" />
-							<span>Calendar</span>
-							<Command.Shortcut>⌘C</Command.Shortcut>
-						</Command.Item>
-						<Command.Item>
-							<Calculator class="mr-2 h-4 w-4" />
-							<span>Calculator</span>
-							<Command.Shortcut>⌘K</Command.Shortcut>
-						</Command.Item>
-						<Command.Item>
-							<Mail class="mr-2 h-4 w-4" />
-							<span>Mail</span>
-							<Command.Shortcut>⌘M</Command.Shortcut>
-						</Command.Item>
-					</Command.Group>
-					<Command.Separator />
-					<Command.Group heading="Files">
-						<Command.Item>
-							<FileText class="mr-2 h-4 w-4" />
-							<span>Documents</span>
-						</Command.Item>
-						<Command.Item>
-							<Search class="mr-2 h-4 w-4" />
-							<span>Search Files</span>
-							<Command.Shortcut>⌘F</Command.Shortcut>
-						</Command.Item>
-					</Command.Group>
-					<Command.Separator />
-					<Command.Group heading="Contacts">
-						<Command.Item>
-							<User class="mr-2 h-4 w-4" />
-							<span>John Doe</span>
-						</Command.Item>
-						<Command.Item>
-							<Phone class="mr-2 h-4 w-4" />
-							<span>Call Contact</span>
-						</Command.Item>
-					</Command.Group>
-					<Command.Separator />
-					<Command.Group heading="Settings">
-						<Command.Item>
-							<Settings class="mr-2 h-4 w-4" />
-							<span>Preferences</span>
-							<Command.Shortcut>⌘,</Command.Shortcut>
-						</Command.Item>
-					</Command.Group>
-				</Command.List>
-			</Command.Root>
-		</div>
-	</div>
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
+			<Command.Input placeholder="Search" />
+			<Command.List>
+				<Command.Empty>No results found.</Command.Empty>
+				<Command.Group heading="Applications">
+					<Command.Item>
+						<Calendar class="mr-2 h-4 w-4" />
+						<span>Calendar</span>
+						<Command.Shortcut>⌘C</Command.Shortcut>
+					</Command.Item>
+					<Command.Item>
+						<Calculator class="mr-2 h-4 w-4" />
+						<span>Calculator</span>
+						<Command.Shortcut>⌘K</Command.Shortcut>
+					</Command.Item>
+					<Command.Item>
+						<Mail class="mr-2 h-4 w-4" />
+						<span>Mail</span>
+						<Command.Shortcut>⌘M</Command.Shortcut>
+					</Command.Item>
+				</Command.Group>
+				<Command.Separator />
+				<Command.Group heading="Files">
+					<Command.Item>
+						<FileText class="mr-2 h-4 w-4" />
+						<span>Documents</span>
+					</Command.Item>
+					<Command.Item>
+						<Search class="mr-2 h-4 w-4" />
+						<span>Search Files</span>
+						<Command.Shortcut>⌘F</Command.Shortcut>
+					</Command.Item>
+				</Command.Group>
+				<Command.Separator />
+				<Command.Group heading="Contacts">
+					<Command.Item>
+						<User class="mr-2 h-4 w-4" />
+						<span>John Doe</span>
+					</Command.Item>
+					<Command.Item>
+						<Phone class="mr-2 h-4 w-4" />
+						<span>Call Contact</span>
+					</Command.Item>
+				</Command.Group>
+				<Command.Separator />
+				<Command.Group heading="Settings">
+					<Command.Item>
+						<Settings class="mr-2 h-4 w-4" />
+						<span>Preferences</span>
+						<Command.Shortcut>⌘,</Command.Shortcut>
+					</Command.Item>
+				</Command.Group>
+			</Command.List>
+		</Command.Root>
+	</StoryContainer>
 </Story>
 
 <!-- With Colored Icons -->
 <Story name="With Icons">
-	<div class="relative min-h-[400px] w-[900px] overflow-hidden rounded-lg">
-		<div
-			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
-			style="background-image: url('sample_background.jpg')"
-		></div>
-		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
-				<Command.Input placeholder="Search" />
-				<Command.List>
-					<Command.Empty>No results found.</Command.Empty>
-					<Command.Group heading="Quick Actions">
-						<Command.Item>
-							<Home class="mr-2 h-4 w-4 text-blue-500" />
-							<span>Go Home</span>
-							<Command.Shortcut>⌘H</Command.Shortcut>
-						</Command.Item>
-						<Command.Item>
-							<Search class="mr-2 h-4 w-4 text-green-500" />
-							<span>Global Search</span>
-							<Command.Shortcut>⌘/</Command.Shortcut>
-						</Command.Item>
-						<Command.Item>
-							<Calculator class="mr-2 h-4 w-4 text-purple-500" />
-							<span>Calculator</span>
-							<Command.Shortcut>⌘K</Command.Shortcut>
-						</Command.Item>
-					</Command.Group>
-					<Command.Separator />
-					<Command.Group heading="Media">
-						<Command.Item>
-							<Image class="mr-2 h-4 w-4 text-pink-500" />
-							<span>Photos</span>
-						</Command.Item>
-						<Command.Item>
-							<Music class="mr-2 h-4 w-4 text-orange-500" />
-							<span>Music Library</span>
-						</Command.Item>
-						<Command.Item>
-							<Video class="mr-2 h-4 w-4 text-red-500" />
-							<span>Videos</span>
-						</Command.Item>
-					</Command.Group>
-					<Command.Separator />
-					<Command.Group heading="Files & Folders">
-						<Command.Item>
-							<Folder class="mr-2 h-4 w-4 text-yellow-500" />
-							<span>Documents</span>
-						</Command.Item>
-						<Command.Item>
-							<FileText class="mr-2 h-4 w-4 text-gray-500" />
-							<span>Recent Files</span>
-						</Command.Item>
-					</Command.Group>
-				</Command.List>
-			</Command.Root>
-		</div>
-	</div>
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
+			<Command.Input placeholder="Search" />
+			<Command.List>
+				<Command.Empty>No results found.</Command.Empty>
+				<Command.Group heading="Quick Actions">
+					<Command.Item>
+						<Home class="mr-2 h-4 w-4 text-blue-500" />
+						<span>Go Home</span>
+						<Command.Shortcut>⌘H</Command.Shortcut>
+					</Command.Item>
+					<Command.Item>
+						<Search class="mr-2 h-4 w-4 text-green-500" />
+						<span>Global Search</span>
+						<Command.Shortcut>⌘/</Command.Shortcut>
+					</Command.Item>
+					<Command.Item>
+						<Calculator class="mr-2 h-4 w-4 text-purple-500" />
+						<span>Calculator</span>
+						<Command.Shortcut>⌘K</Command.Shortcut>
+					</Command.Item>
+				</Command.Group>
+				<Command.Separator />
+				<Command.Group heading="Media">
+					<Command.Item>
+						<Image class="mr-2 h-4 w-4 text-pink-500" />
+						<span>Photos</span>
+					</Command.Item>
+					<Command.Item>
+						<Music class="mr-2 h-4 w-4 text-orange-500" />
+						<span>Music Library</span>
+					</Command.Item>
+					<Command.Item>
+						<Video class="mr-2 h-4 w-4 text-red-500" />
+						<span>Videos</span>
+					</Command.Item>
+				</Command.Group>
+				<Command.Separator />
+				<Command.Group heading="Files & Folders">
+					<Command.Item>
+						<Folder class="mr-2 h-4 w-4 text-yellow-500" />
+						<span>Documents</span>
+					</Command.Item>
+					<Command.Item>
+						<FileText class="mr-2 h-4 w-4 text-gray-500" />
+						<span>Recent Files</span>
+					</Command.Item>
+				</Command.Group>
+			</Command.List>
+		</Command.Root>
+	</StoryContainer>
 </Story>
 
 <!-- Empty State -->
 <Story name="Empty">
-	<div class="relative min-h-[400px] w-[900px] overflow-hidden rounded-lg">
-		<div
-			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
-			style="background-image: url('sample_background.jpg')"
-		></div>
-		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root
-				value="xyz123nonexistent"
-				class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
-			>
-				<Command.Input placeholder="Search" />
-				<Command.List>
-					<Command.Empty>
-						<div class="py-6 text-center text-sm">
-							<div class="mb-2">🔍</div>
-							<div>No results found</div>
-							<div class="text-muted-foreground mt-1 text-xs">
-								Try a different search term
-							</div>
-						</div>
-					</Command.Empty>
-					<Command.Group heading="Suggestions">
-						<Command.Item>
-							<span>Calculator</span>
-						</Command.Item>
-						<Command.Item>
-							<span>Calendar</span>
-						</Command.Item>
-						<Command.Item>
-							<span>Settings</span>
-						</Command.Item>
-					</Command.Group>
-				</Command.List>
-			</Command.Root>
-		</div>
-	</div>
+	<StoryContainer>
+		<Command.Root
+			value="xyz123nonexistent"
+			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
+		>
+			<Command.Input placeholder="Search" />
+			<Command.List>
+				<Command.Empty>
+					<div class="py-6 text-center text-sm">
+						<div class="mb-2">🔍</div>
+						<div>No results found</div>
+						<div class="text-muted-foreground mt-1 text-xs">Try a different search term</div>
+					</div>
+				</Command.Empty>
+				<Command.Group heading="Suggestions">
+					<Command.Item>
+						<span>Calculator</span>
+					</Command.Item>
+					<Command.Item>
+						<span>Calendar</span>
+					</Command.Item>
+					<Command.Item>
+						<span>Settings</span>
+					</Command.Item>
+				</Command.Group>
+			</Command.List>
+		</Command.Root>
+	</StoryContainer>
 </Story>
 
 <!-- Loading State -->
 <Story name="Loading">
-	<div class="relative min-h-[400px] w-[900px] overflow-hidden rounded-lg">
-		<div
-			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
-			style="background-image: url('sample_background.jpg')"
-		></div>
-		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
-				<Command.Input placeholder="Loading..." />
-				<Command.List>
-					<Command.Loading>
-						<div class="flex items-center justify-center py-6">
-							<div class="flex items-center space-x-2">
-								<div
-									class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"
-								></div>
-								<span class="text-muted-foreground text-sm">Loading results...</span
-								>
-							</div>
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
+			<Command.Input placeholder="Loading..." />
+			<Command.List>
+				<Command.Loading>
+					<div class="flex items-center justify-center py-6">
+						<div class="flex items-center space-x-2">
+							<div
+								class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"
+							></div>
+							<span class="text-muted-foreground text-sm">Loading results...</span>
 						</div>
-					</Command.Loading>
-					<Command.Empty>No results found.</Command.Empty>
-					<Command.Group heading="Recent">
-						<Command.Item>
-							<Search class="mr-2 h-4 w-4" />
-							<span>Previous search</span>
-						</Command.Item>
-					</Command.Group>
-				</Command.List>
-			</Command.Root>
-		</div>
-	</div>
+					</div>
+				</Command.Loading>
+				<Command.Empty>No results found.</Command.Empty>
+				<Command.Group heading="Recent">
+					<Command.Item>
+						<Search class="mr-2 h-4 w-4" />
+						<span>Previous search</span>
+					</Command.Item>
+				</Command.Group>
+			</Command.List>
+		</Command.Root>
+	</StoryContainer>
 </Story>
 
 <!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<div class="relative min-h-[400px] w-[900px] overflow-hidden rounded-lg">
-		<div
-			class="absolute inset-0 bg-cover bg-center bg-no-repeat"
-			style="background-image: url('sample_background.jpg')"
-		></div>
-		<div class="relative z-10 flex min-h-full items-center justify-center p-6">
-			<Command.Root
-				bind:value={args.value}
-				class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
-			>
-				<Command.Input placeholder="Type to search..." />
-				<Command.List>
-					<Command.Empty>No results found for "{args.value}"</Command.Empty>
-					<Command.Group heading="Applications">
-						<Command.Item>
-							<Calendar class="mr-2 h-4 w-4" />
-							<span>Calendar</span>
-						</Command.Item>
-						<Command.Item>
-							<Calculator class="mr-2 h-4 w-4" />
-							<span>Calculator</span>
-						</Command.Item>
-						<Command.Item>
-							<Settings class="mr-2 h-4 w-4" />
-							<span>Settings</span>
-						</Command.Item>
-					</Command.Group>
-				</Command.List>
-			</Command.Root>
-		</div>
-	</div>
+	<StoryContainer>
+		<Command.Root
+			bind:value={args.value}
+			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
+		>
+			<Command.Input placeholder="Type to search..." />
+			<Command.List>
+				<Command.Empty>No results found for "{args.value}"</Command.Empty>
+				<Command.Group heading="Applications">
+					<Command.Item>
+						<Calendar class="mr-2 h-4 w-4" />
+						<span>Calendar</span>
+					</Command.Item>
+					<Command.Item>
+						<Calculator class="mr-2 h-4 w-4" />
+						<span>Calculator</span>
+					</Command.Item>
+					<Command.Item>
+						<Settings class="mr-2 h-4 w-4" />
+						<span>Settings</span>
+					</Command.Item>
+				</Command.Group>
+			</Command.List>
+		</Command.Root>
+	</StoryContainer>
 {/snippet}
