@@ -16,15 +16,15 @@
 	// Define form schema
 	const loginSchema = z.object({
 		login: z.string().min(1, 'Username or email is required'),
-		password: z.string().min(1, 'Password is required')
+		password: z.string().min(1, 'Password is required'),
 	});
 
 	// Initialize form with client-side validation only
 	const form = superForm(
 		{ login: '', password: '' },
 		{
-			validators: zodClient(loginSchema)
-		}
+			validators: zodClient(loginSchema),
+		},
 	);
 
 	const { form: formData, enhance, errors, submitting } = form;
@@ -41,10 +41,10 @@
 				credential: {
 					value: {
 						login: $formData.login,
-						password: $formData.password
+						password: $formData.password,
 					},
-					case: 'emailPassword'
-				}
+					case: 'emailPassword',
+				},
 			});
 
 			console.log('Logging in user:', loginData);
@@ -98,17 +98,13 @@
 	<div class="w-full max-w-md space-y-8">
 		<div class="text-center">
 			<h1 class="text-3xl font-bold tracking-tight">Welcome back</h1>
-			<p class="text-muted-foreground mt-2">
-				Sign in to your account to continue with Eurora Labs
-			</p>
+			<p class="text-muted-foreground mt-2">Sign in to your account to continue with Eurora Labs</p>
 		</div>
 
 		{#if success}
 			<Card.Root class="p-6">
 				<div class="space-y-4 text-center">
-					<div
-						class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100"
-					>
+					<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
 						<svg
 							class="h-6 w-6 text-green-600"
 							fill="none"
@@ -131,7 +127,6 @@
 			</Card.Root>
 		{:else}
 			<Card.Root class="p-6">
-				<!-- Social Login Buttons -->
 				<SocialAuthButtons
 					mode="login"
 					onApple={handleAppleLogin}
@@ -139,19 +134,15 @@
 					onGitHub={handleGitHubLogin}
 				/>
 
-				<!-- Divider -->
 				<div class="relative my-6">
 					<div class="absolute inset-0 flex items-center">
 						<Separator.Root class="w-full" />
 					</div>
 					<div class="relative flex justify-center text-xs uppercase">
-						<span class="bg-background text-muted-foreground px-2"
-							>Or continue with</span
-						>
+						<span class="bg-background text-muted-foreground px-2">Or continue with</span>
 					</div>
 				</div>
 
-				<!-- Email/Password Form -->
 				<form use:enhance onsubmit={handleSubmit} class="space-y-4">
 					{#if submitError}
 						<div class="rounded-md bg-red-50 p-4">
@@ -192,9 +183,7 @@
 										class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
 										onclick={togglePasswordVisibility}
 										disabled={$submitting}
-										aria-label={showPassword
-											? 'Hide password'
-											: 'Show password'}
+										aria-label={showPassword ? 'Hide password' : 'Show password'}
 									>
 										{#if showPassword}
 											<EyeOff class="h-4 w-4" />
