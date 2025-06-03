@@ -10,23 +10,24 @@
 			docs: {
 				description: {
 					component:
-						'A command palette component for launching actions and navigating through the application.'
-				}
-			}
+						'A command palette component for launching actions and navigating through the application.',
+				},
+			},
 		},
 		argTypes: {
 			value: {
 				control: 'text',
-				description: 'The current search value'
-			}
+				description: 'The current search value',
+			},
 		},
 		args: {
-			value: ''
-		}
+			value: '',
+		},
 	});
 </script>
 
 <script lang="ts">
+	import StoryContainer from '../StoryContainer.svelte';
 	import {
 		Search,
 		Calculator,
@@ -40,15 +41,15 @@
 		Folder,
 		Image,
 		Music,
-		Video
+		Video,
 	} from '@lucide/svelte';
 </script>
 
 <!-- Default Command -->
 <Story name="Default">
-	<div class="w-[450px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Type a command or search..." />
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
+			<Command.Input placeholder="Search" />
 			<Command.List>
 				<Command.Empty>No results found.</Command.Empty>
 				<Command.Group heading="Suggestions">
@@ -75,14 +76,14 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- With Multiple Groups -->
 <Story name="With Groups">
-	<div class="w-[450px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Type a command or search..." />
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
+			<Command.Input placeholder="Search" />
 			<Command.List>
 				<Command.Empty>No results found.</Command.Empty>
 				<Command.Group heading="Applications">
@@ -135,14 +136,14 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- With Colored Icons -->
 <Story name="With Icons">
-	<div class="w-[450px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Search with beautiful icons..." />
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
+			<Command.Input placeholder="Search" />
 			<Command.List>
 				<Command.Empty>No results found.</Command.Empty>
 				<Command.Group heading="Quick Actions">
@@ -190,22 +191,23 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- Empty State -->
 <Story name="Empty">
-	<div class="w-[450px]">
-		<Command.Root value="xyz123nonexistent" class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Try searching for something that doesn't exist..." />
+	<StoryContainer>
+		<Command.Root
+			value="xyz123nonexistent"
+			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
+		>
+			<Command.Input placeholder="Search" />
 			<Command.List>
 				<Command.Empty>
 					<div class="py-6 text-center text-sm">
 						<div class="mb-2">🔍</div>
 						<div>No results found</div>
-						<div class="text-muted-foreground mt-1 text-xs">
-							Try a different search term
-						</div>
+						<div class="text-muted-foreground mt-1 text-xs">Try a different search term</div>
 					</div>
 				</Command.Empty>
 				<Command.Group heading="Suggestions">
@@ -221,14 +223,14 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- Loading State -->
 <Story name="Loading">
-	<div class="w-[450px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Search is loading..." />
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
+			<Command.Input placeholder="Loading..." />
 			<Command.List>
 				<Command.Loading>
 					<div class="flex items-center justify-center py-6">
@@ -249,13 +251,16 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
 <!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<div class="w-[450px]">
-		<Command.Root bind:value={args.value} class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root
+			bind:value={args.value}
+			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
+		>
 			<Command.Input placeholder="Type to search..." />
 			<Command.List>
 				<Command.Empty>No results found for "{args.value}"</Command.Empty>
@@ -275,5 +280,5 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 {/snippet}
