@@ -11,8 +11,8 @@
 	import { z } from 'zod';
 
 	export interface Props {
+		submitError?: string;
 		onsubmit: (event: SubmitEvent) => void;
-		submitError: string | null;
 
 		onApple: () => void;
 		onGoogle: () => void;
