@@ -3,7 +3,7 @@
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	export const contextChipVariants = tv({
-		base: 'inline-flex w-fit items-center gap-2 mx-2 p-2 text-[40px] leading-[40px] rounded-2xl backdrop-blur-md text-black/70 [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+		base: 'context-chip inline-flex w-fit items-center gap-2 mx-2 p-2 text-[40px] leading-[40px] bg-transparent rounded-2xl backdrop-blur-sm text-black/70 [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
 		variants: {
 			variant: {
 				default: 'bg-white/30',
@@ -47,7 +47,7 @@
 {#if href}
 	<a
 		bind:this={ref}
-		class={cn(contextChipVariants({ variant }), className, 'context-chip')}
+		class={cn(contextChipVariants({ variant }), className)}
 		{href}
 		{onclick}
 		{...restProps}
@@ -57,7 +57,7 @@
 {:else if onclick}
 	<button
 		bind:this={ref}
-		class={cn(contextChipVariants({ variant }), className, 'context-chip')}
+		class={cn(contextChipVariants({ variant }), className)}
 		{onclick}
 		type="button"
 		{...restProps}
@@ -65,25 +65,12 @@
 		{@render children?.()}
 	</button>
 {:else}
-	<span
-		bind:this={ref}
-		class={cn(contextChipVariants({ variant }), className, 'context-chip')}
-		{...restProps}
-	>
+	<span bind:this={ref} class={cn(contextChipVariants({ variant }), className)} {...restProps}>
 		{@render children?.()}
 	</span>
 {/if}
 
 <style lang="postcss">
-	:global(.context-chip) {
-		display: inline-flex;
-		border-radius: 16px;
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
-		background-color: transparent;
-		color: rgba(0, 0, 0, 1);
-	}
-
 	/* Apply solid background for Linux desktop app */
 	:global(body.linux-app .context-chip) {
 		backdrop-filter: none;
