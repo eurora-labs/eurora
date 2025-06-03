@@ -65,3 +65,5 @@ This file tracks the project's current status, including recent changes, current
 [2025-06-02 18:38:00] - Enhanced launcher Storybook stories with background image integration
 
 [2025-06-03 08:26:00] - Refactored Button Storybook stories to separate showcase and interactive examples
+
+[2025-06-03 08:34:00] - Updated Storybook RULES.md to document dual story pattern for complex components

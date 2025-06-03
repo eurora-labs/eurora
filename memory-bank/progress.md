@@ -110,3 +110,5 @@ This file tracks the project's progress using a task list format.
 [2025-06-03 08:17:45] - Created reusable StoryContainer component and refactored all launcher story files to use it instead of duplicated container markup
 
 [2025-06-03 08:26:00] - Refactored Button Storybook stories to separate showcase and interactive examples
+
+[2025-06-03 08:34:00] - Updated Storybook RULES.md to document dual story pattern for complex components
