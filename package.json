@@ -38,7 +38,7 @@
 		"prettier-plugin-css-order": "^2.1.2",
 		"prettier-plugin-svelte": "^3.4.0",
 		"svelte-eslint-parser": "^1.2.0",
-		"prettier-plugin-tailwindcss": "^0.6.11",
+		"prettier-plugin-tailwindcss": "^0.6.12",
 		"protolint": "^0.55.2",
 		"@bufbuild/buf": "^1.53.0",
 		"eslint-plugin-svelte": "3.9.0",
