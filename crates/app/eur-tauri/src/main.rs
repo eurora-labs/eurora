@@ -83,13 +83,13 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
 
 fn main() {
     dotenv().ok();
-    let _guard = sentry::init((
-        "https://5181d08d2bfcb209a768ab99e1e48f1b@o4508907847352320.ingest.de.sentry.io/4508907850694736",
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            ..Default::default()
-        },
-    ));
+    // let _guard = sentry::init((
+    //     "https://5181d08d2bfcb209a768ab99e1e48f1b@o4508907847352320.ingest.de.sentry.io/4508907850694736",
+    //     sentry::ClientOptions {
+    //         release: sentry::release_name!(),
+    //         ..Default::default()
+    //     },
+    // ));
 
     // Regular application startup
     let tauri_context = generate_context!();

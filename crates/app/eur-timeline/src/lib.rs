@@ -224,7 +224,8 @@ impl Timeline {
                     }
                 }
                 Err(e) => {
-                    error!("Failed to retrieve snapshots: {:?}", e);
+                    info!("Failed to retrieve snapshots: {:?}", e);
+                    // error!("Failed to retrieve snapshots: {:?}", e);
                 }
             }
         }
