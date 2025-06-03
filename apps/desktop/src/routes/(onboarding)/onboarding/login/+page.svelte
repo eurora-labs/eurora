@@ -20,5 +20,11 @@
 	}
 </script>
 
-<Login onsubmit={onSubmit} {onApple} {onGoogle} {onGitHub} />
-<Button class="mt-6" href="/onboarding">Back</Button>
+<div class="flex flex-col items-center gap-8">
+	<div class="flex justify-center pt-0 pb-0">
+		<h1 class="text-4xl font-bold drop-shadow-lg">Log in or Sign up</h1>
+	</div>
+	<Login class="max-w-sm" onsubmit={onSubmit} {onApple} {onGoogle} {onGitHub} />
+	<!-- Align button to the left end -->
+	<Button class="self-start" href="/onboarding">Back</Button>
+</div>
