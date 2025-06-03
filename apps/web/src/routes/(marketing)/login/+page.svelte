@@ -9,7 +9,7 @@
 	import { authService } from '$lib/services/auth-service.js';
 	import { LoginRequestSchema } from '@eurora/proto/auth_service';
 	import { superForm } from 'sveltekit-superforms';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 
@@ -23,7 +23,7 @@
 	const form = superForm(
 		{ login: '', password: '' },
 		{
-			validators: zodClient(loginSchema),
+			validators: zodClient(loginSchema as unknown as ZodObjectType),
 		},
 	);
 
@@ -70,11 +70,6 @@
 	}
 
 	// Social login handlers
-	function handleAppleLogin() {
-		console.log('Apple login clicked');
-		// TODO: Implement Apple OAuth
-	}
-
 	function handleGoogleLogin() {
 		console.log('Google login clicked');
 		// TODO: Implement Google OAuth
@@ -129,7 +124,7 @@
 			<Card.Root class="p-6">
 				<SocialAuthButtons
 					mode="login"
-					onApple={handleAppleLogin}
+					disabled={$submitting}
 					onGoogle={handleGoogleLogin}
 					onGitHub={handleGitHubLogin}
 				/>
