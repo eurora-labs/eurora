@@ -10,68 +10,57 @@
 			docs: {
 				description: {
 					component:
-						'A specialized input component for command palettes with search icon and ProseMirror editor integration.'
-				}
-			}
+						'A specialized input component for command palettes with search icon and ProseMirror editor integration.',
+				},
+			},
 		},
 		argTypes: {
 			value: {
 				control: 'text',
-				description: 'The input value'
+				description: 'The input value',
 			},
 			placeholder: {
 				control: 'text',
-				description: 'Placeholder text'
-			}
+				description: 'Placeholder text',
+			},
 		},
 		args: {
 			value: '',
-			placeholder: 'Type a command or search...'
-		}
+			placeholder: 'Search',
+		},
 	});
 </script>
 
 <script lang="ts">
 	import * as Command from '$lib/custom-components/launcher/index.js';
+	import StoryContainer from '../StoryContainer.svelte';
 </script>
 
-<!-- Default Input -->
 <Story name="Default">
-	<div class="w-[450px]">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Type a command or search..." />
+	<StoryContainer>
+		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
+			<Command.Input placeholder="Search" />
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
-<!-- With Value -->
 <Story name="With Value">
-	<div class="w-[450px]">
-		<Command.Root value="calculator" class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Type a command or search..." />
+	<StoryContainer>
+		<Command.Root
+			value="calculator"
+			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
+		>
+			<Command.Input placeholder="Search" />
 		</Command.Root>
-	</div>
+	</StoryContainer>
 </Story>
 
-<!-- Different Placeholders -->
-<Story name="Different Placeholders">
-	<div class="w-[450px] space-y-4">
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Search applications..." />
-		</Command.Root>
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Find files and folders..." />
-		</Command.Root>
-		<Command.Root class="rounded-lg border shadow-md">
-			<Command.Input placeholder="Quick actions and shortcuts..." />
-		</Command.Root>
-	</div>
-</Story>
-
-<!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<div class="w-[450px]">
-		<Command.Root bind:value={args.value} class="rounded-lg border shadow-md">
+	<StoryContainer>
+		<Command.Root
+			bind:value={args.value}
+			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
+		>
 			<Command.Input placeholder={args.placeholder} />
 			<Command.List>
 				<Command.Empty>No results found for "{args.value}"</Command.Empty>
@@ -82,5 +71,5 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</div>
+	</StoryContainer>
 {/snippet}
