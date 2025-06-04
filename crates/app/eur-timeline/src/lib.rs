@@ -127,11 +127,14 @@ impl Timeline {
     pub fn add_activity(&self, activity: eur_activity::Activity) {
         let mut activities = self.activities.write();
         // eprintln!("Adding activity: {:?}", activity);
-        activities.push(activity.into());
+        activities.push(activity);
     }
     pub fn get_context_chips(&self) -> Vec<eur_activity::ContextChip> {
         let activities = self.activities.read();
         eprintln!("Number of activities: {:?}", activities.len());
+        if activities.is_empty() {
+            return Vec::new();
+        }
         activities.last().unwrap().get_context_chips()
     }
 
@@ -221,7 +224,8 @@ impl Timeline {
                     }
                 }
                 Err(e) => {
-                    error!("Failed to retrieve snapshots: {:?}", e);
+                    info!("Failed to retrieve snapshots: {:?}", e);
+                    // error!("Failed to retrieve snapshots: {:?}", e);
                 }
             }
         }
