@@ -18,6 +18,7 @@ on:
 
 # Sets permissions for deployment
 permissions:
+    id-token: write
     contents: read
     packages: write
 
