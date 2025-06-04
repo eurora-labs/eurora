@@ -9,14 +9,6 @@
 	let { children } = $props();
 </script>
 
-<!-- <Sidebar.Provider class="min-h-min" open={false}>
-	<MainSidebar />
-	<main>
-		<Sidebar.Trigger />
-		{@render children?.()}
-	</main>
-</Sidebar.Provider> -->
-
 <Sidebar.Provider class="min-h-min" open={false}>
 	<MainSidebar />
 	<Sidebar.Inset class="min-h-min">
