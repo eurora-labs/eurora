@@ -172,11 +172,30 @@ jobs:
                   labels: ${{ steps.meta.outputs.labels }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
-            - name: Deploy to AWS ECR
+
+            - name: Configure AWS credentials
               uses: aws-actions/configure-aws-credentials@v4
               with:
                   role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecr-full-access
                   aws-region: ${{ secrets.AWS_REGION }}
+            - name: Login in to Amazon ECR
+              id: ecr-login
+              uses: aws-actions/amazon-ecr-login@v2
+
+            # - name: Tag and push
+            #   run: |
+            #       IMAGE_TAG=${{ github.sha }}
+            #       docker tag ghcr.io/${{ github.repository }}/eur-monolith:$IMAGE_TAG ${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+            #       docker push ${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+
+            - name: Push Docker image to AWS ECR
+              uses: aws-actions/build-and-push-ecr-image@v5
+              with:
+                  repository: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
 
     # Deployment job (placeholder - customize based on your deployment target)
     # deploy:
