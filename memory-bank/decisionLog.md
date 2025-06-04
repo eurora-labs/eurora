@@ -706,3 +706,37 @@ This file tracks key architectural and design decisions made during the project'
 - Easier maintenance and updates to story container styling
 - Consistent user experience across all Storybook stories
 - Better accessibility compliance with proper ARIA attributes
+
+[2025-06-03 13:21:00] - Implemented modern onboarding UI with card-based layout
+
+**Decision:** Created a visually pleasing onboarding page with centered title and side-by-side clickable cards for authentication and local connection options.
+
+**Rationale:**
+
+- User requested specific layout: title in middle top, left card for "Log in or Sign up", right card for "Connect to local"
+- Needed to follow existing project design patterns using backdrop blur effects and Tailwind CSS
+- Cards should be clickable and visually appealing to improve user experience
+- Design should be consistent with the project's existing launcher component styling
+
+**Implementation Details:**
+
+- Used full-screen layout with backdrop blur effect matching the launcher component pattern
+- Implemented responsive grid layout (1 column on mobile, 2 columns on desktop)
+- Added gradient background with blue-to-purple theme for visual appeal
+- Created two distinct cards with different color schemes:
+  - Left card: Blue theme for authentication (login/signup)
+  - Right card: Green theme for local connection
+- Added hover effects and transitions for better interactivity
+- Used existing UI components from @eurora/ui package (Card, Button)
+- Maintained Linux compatibility with fallback styling (no backdrop filter)
+- Added proper spacing and typography hierarchy with centered title
+- Implemented proper semantic structure with Card.Header, Card.Content sections
+
+**Benefits:**
+
+- Professional and modern user interface
+- Clear visual distinction between the two main onboarding paths
+- Responsive design that works on different screen sizes
+- Consistent with project's existing design system
+- Accessible and user-friendly layout
+- Smooth animations and hover effects for better UX

@@ -12,7 +12,7 @@ use eur_personal_db::{Conversation, DatabaseManager};
 use eur_tauri::{
     WindowState,
     auth::AuthManager,
-    create_launcher,
+    create_launcher, create_window,
     procedures::{
         auth_procedures::{AuthApi, AuthApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
@@ -83,13 +83,13 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
 
 fn main() {
     dotenv().ok();
-    let _guard = sentry::init((
-        "https://5181d08d2bfcb209a768ab99e1e48f1b@o4508907847352320.ingest.de.sentry.io/4508907850694736",
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            ..Default::default()
-        },
-    ));
+    // let _guard = sentry::init((
+    //     "https://5181d08d2bfcb209a768ab99e1e48f1b@o4508907847352320.ingest.de.sentry.io/4508907850694736",
+    //     sentry::ClientOptions {
+    //         release: sentry::release_name!(),
+    //         ..Default::default()
+    //     },
+    // ));
 
     // Regular application startup
     let tauri_context = generate_context!();
@@ -108,15 +108,16 @@ fn main() {
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
-                    // let main_window =
-                    //     create_window(tauri_app.handle(), "main", "index.html".into())
-                    //         .expect("Failed to create main window");
+                    let main_window =
+                        create_window(tauri_app.handle(), "main", "onboarding".into())
+                            // create_window(tauri_app.handle(), "main", "index.html".into())
+                            .expect("Failed to create main window");
 
                     // Start the focus tracker
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
-                        create_launcher(tauri_app.handle(), "launcher", "index.html".into())
+                        create_launcher(tauri_app.handle(), "launcher", "launcher".into())
                             .expect("Failed to create launcher window");
 
                     #[cfg(debug_assertions)]
