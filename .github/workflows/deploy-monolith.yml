@@ -158,7 +158,7 @@ jobs:
               with:
                   images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
                   tags: |
-                      type=ref,event=branch
+                      type=ref,event=branch 
                       type=ref,event=pr
                       type=sha,prefix={{branch}}-
                       type=raw,value=latest,enable={{is_default_branch}}
@@ -172,6 +172,11 @@ jobs:
                   labels: ${{ steps.meta.outputs.labels }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
+            - name: Deploy to AWS ECR
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecr-full-access
+                  aws-region: ${{ secrets.AWS_REGION }}
 
     # Deployment job (placeholder - customize based on your deployment target)
     # deploy:
