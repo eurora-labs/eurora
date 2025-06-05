@@ -1,11 +1,11 @@
 use anyhow::{Result, anyhow};
 use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, RevocationUrl,
-    Scope, TokenResponse as OAuth2TokenResponse, TokenUrl, basic::BasicClient,
+    AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, RevocationUrl, Scope, TokenUrl,
+    basic::BasicClient,
 };
 use serde::{Deserialize, Serialize};
 use std::env;
-use tracing::{error, info};
+use tracing::info;
 
 /// Google OAuth configuration
 #[derive(Debug, Clone)]
@@ -35,37 +35,13 @@ impl GoogleOAuthConfig {
 
 /// Google OAuth client wrapper for URL generation
 pub struct GoogleOAuthClient {
-    client: BasicClient,
     config: GoogleOAuthConfig,
 }
 
 impl GoogleOAuthClient {
     /// Create a new Google OAuth client
     pub fn new(config: GoogleOAuthConfig) -> Result<Self> {
-        let google_client_id = ClientId::new(config.client_id.clone());
-        let google_client_secret = ClientSecret::new(config.client_secret.clone());
-
-        let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-            .map_err(|e| anyhow!("Invalid authorization endpoint URL: {}", e))?;
-
-        let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
-            .map_err(|e| anyhow!("Invalid token endpoint URL: {}", e))?;
-
-        let redirect_url = RedirectUrl::new(config.redirect_uri.clone())
-            .map_err(|e| anyhow!("Invalid redirect URL: {}", e))?;
-
-        // Set up the config for the Google OAuth2 process
-        let client = BasicClient::new(google_client_id)
-            .set_client_secret(google_client_secret)
-            .set_auth_uri(auth_url)
-            .set_token_uri(token_url)
-            .set_redirect_uri(redirect_url)
-            .set_revocation_url(
-                RevocationUrl::new("https://accounts.google.com/o/oauth2/revoke".to_string())
-                    .map_err(|e| anyhow!("Invalid revocation endpoint URL: {}", e))?,
-            );
-
-        Ok(Self { client, config })
+        Ok(Self { config })
     }
 
     /// Generate the authorization URL for Google OAuth
@@ -73,9 +49,31 @@ impl GoogleOAuthClient {
     pub fn get_authorization_url(&self) -> Result<(String, String)> {
         info!("Generating Google OAuth authorization URL");
 
+        let google_client_id = ClientId::new(self.config.client_id.clone());
+        let google_client_secret = ClientSecret::new(self.config.client_secret.clone());
+
+        let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
+            .map_err(|e| anyhow!("Invalid authorization endpoint URL: {}", e))?;
+
+        let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
+            .map_err(|e| anyhow!("Invalid token endpoint URL: {}", e))?;
+
+        let redirect_url = RedirectUrl::new(self.config.redirect_uri.clone())
+            .map_err(|e| anyhow!("Invalid redirect URL: {}", e))?;
+
+        // Set up the config for the Google OAuth2 process
+        let client = BasicClient::new(google_client_id)
+            .set_client_secret(google_client_secret)
+            .set_auth_uri(auth_url)
+            .set_token_uri(token_url)
+            .set_revocation_url(
+                RevocationUrl::new("https://accounts.google.com/o/oauth2/revoke".to_string())
+                    .map_err(|e| anyhow!("Invalid revocation endpoint URL: {}", e))?,
+            )
+            .set_redirect_uri(redirect_url);
+
         // Generate the authorization URL to which we'll redirect the user
-        let (authorize_url, csrf_state) = self
-            .client
+        let (authorize_url, csrf_state) = client
             .authorize_url(CsrfToken::new_random)
             // Request access to OpenID Connect scopes for user authentication
             .add_scope(Scope::new("openid".to_string()))
