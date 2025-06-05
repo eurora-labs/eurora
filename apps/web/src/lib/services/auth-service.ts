@@ -5,7 +5,7 @@ import {
 	type LoginRequest,
 	type TokenResponse,
 	type RefreshTokenRequest,
-	type RegisterRequest
+	type RegisterRequest,
 } from '@eurora/proto/auth_service';
 
 class AuthService {
@@ -14,9 +14,10 @@ class AuthService {
 		this.client = createClient(
 			ProtoAuthService,
 			createGrpcWebTransport({
-				baseUrl: 'http://localhost:50051',
-				useBinaryFormat: true
-			})
+				baseUrl: 'https://api.eurora-labs.com',
+				// baseUrl: 'http://localhost:50051',
+				useBinaryFormat: true,
+			}),
 		);
 	}
 
