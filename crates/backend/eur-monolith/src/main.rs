@@ -7,10 +7,11 @@ use eur_proto::{
     proto_ocr_service::proto_ocr_service_server::ProtoOcrServiceServer,
 };
 use eur_remote_db::DatabaseManager;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tonic::transport::Server;
+use tonic_health::{pb::health_server, server::HealthReporter};
 use tonic_web::GrpcWebLayer;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer, ExposeHeaders};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -30,6 +31,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     ));
 
+    let (health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_serving::<ProtoAuthServiceServer<AuthService>>()
+        .await;
+
     // Initialize tracing
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
@@ -44,16 +50,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let jwt_config = JwtConfig::default();
 
     let addr = std::env::var("MONOLITH_ADDR")
-        .unwrap_or_else(|_| "[::1]:50051".to_string())
+        .unwrap_or_else(|_| "0.0.0.0:50051".to_string())
         .parse()
         .expect("Invalid MONOLITH_ADDR format");
     let ocr_service = OcrService::new(Some(jwt_config.clone()));
     let auth_service = AuthService::new(db_manager, Some(jwt_config));
     tracing::info!("Starting gRPC server at {}", addr);
+
+    let cors = CorsLayer::permissive();
+
     Server::builder()
         .accept_http1(true)
-        .layer(CorsLayer::permissive())
+        .layer(cors)
         .layer(GrpcWebLayer::new())
+        .add_service(health_service)
         // .add_service(ProtoOcrServiceServer::new(ocr_service))
         .add_service(ProtoAuthServiceServer::new(auth_service))
         .serve_with_shutdown(addr, async {
