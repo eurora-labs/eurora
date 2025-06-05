@@ -1,20 +1,31 @@
 <script lang="ts">
+	import { LoginRequestSchema, Provider } from '@eurora/proto/auth_service';
+	import { create } from '@bufbuild/protobuf';
 	import { onMount } from 'svelte';
 	import { authService } from '$lib/services/auth-service';
 	onMount(async () => {
 		const query = new URLSearchParams(window.location.search);
 		const code = query.get('code');
 		const state = query.get('state');
+		if (!code || !state) {
+			console.error('No code or state found in query parameters');
+			return;
+		}
 
-		// Call auth service to exchange code for tokens
-		const tokens = await authService.exchangeCodeForTokens(code, state);
+		const loginData = create(LoginRequestSchema, {
+			credential: {
+				value: {
+					provider: Provider.GOOGLE,
+					code,
+					state,
+				},
+				case: 'thirdParty',
+			},
+		});
 
-		// Store tokens in localStorage
-		localStorage.setItem('access_token', tokens.access_token);
-		localStorage.setItem('refresh_token', tokens.refresh_token);
+		const tokens = await authService.login(loginData);
 
-		// Redirect to dashboard
-		window.location.href = '/app';
+		console.log('Tokens:', tokens);
 	});
 </script>
 
