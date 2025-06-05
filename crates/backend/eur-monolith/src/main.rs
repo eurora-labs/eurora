@@ -57,14 +57,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth_service = AuthService::new(db_manager, Some(jwt_config));
     tracing::info!("Starting gRPC server at {}", addr);
 
-    let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::mirror_request())
-        // .allow_credentials(true)
-        .allow_methods(AllowMethods::any())
-        .max_age(Duration::from_secs(60 * 60 * 24))
-        .allow_headers(AllowHeaders::mirror_request())
-        .expose_headers(ExposeHeaders::any());
-
     let cors = CorsLayer::permissive();
 
     Server::builder()
