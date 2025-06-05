@@ -13,24 +13,22 @@ class AuthService {
 	private readonly headers: Headers;
 	constructor() {
 		this.headers = new Headers();
-		this.headers.set('Access-Control-Allow-Origin', '*');
+		// this.headers.set('Access-Control-Allow-Origin', '*');
 		// this.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 		// this.headers.set('Access-Control-Allow-Headers', 'Content-Type');
 		// this.headers.set('Access-Control-Allow-Credentials', 'true');
 		this.client = createClient(
 			ProtoAuthService,
 			createGrpcWebTransport({
-				// baseUrl: 'https://api.eurora-labs.com',
-				baseUrl: 'http://localhost:50051',
+				baseUrl: 'https://api.eurora-labs.com',
+				// baseUrl: 'http://localhost:50051',
 				useBinaryFormat: true,
 			}),
 		);
 	}
 
 	public async login(data: LoginRequest): Promise<TokenResponse> {
-		return await this.client.login(data, {
-			headers: this.headers,
-		});
+		return await this.client.login(data);
 	}
 
 	public async register(data: RegisterRequest): Promise<TokenResponse> {
