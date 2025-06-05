@@ -3,6 +3,7 @@
 use anyhow::{Result, anyhow};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
+use eur_proto::proto_auth_service::ThirdPartyCredentials;
 use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthService;
 use eur_proto::proto_auth_service::{
     EmailPasswordCredentials, LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse,
@@ -13,6 +14,10 @@ use eur_proto::proto_auth_service::{
 };
 use eur_remote_db::{CreateUserRequest, DatabaseManager};
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, RedirectUrl,
+    TokenResponse as OAuth2TokenResponse, TokenUrl, basic::BasicClient,
+};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
@@ -189,6 +194,193 @@ impl AuthService {
             expires_in: self.jwt_config.access_token_expiry_hours * 3600,
         })
     }
+
+    async fn handle_google_login(
+        &self,
+        creds: ThirdPartyCredentials,
+    ) -> Result<Response<TokenResponse>, Status> {
+        info!("Handling Google login");
+
+        // Extract code and state from credentials
+        let code = &creds.code;
+        let state = &creds.state;
+
+        if code.is_empty() {
+            warn!("Google login attempt with empty authorization code");
+            return Err(Status::invalid_argument("Authorization code is required"));
+        }
+
+        info!("Exchanging authorization code for access token");
+
+        // Create OAuth client for token exchange
+        let google_config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
+            error!("Failed to load Google OAuth config: {}", e);
+            Status::internal("OAuth configuration error")
+        })?;
+
+        let google_client_id = oauth2::ClientId::new(google_config.client_id.clone());
+        let google_client_secret = oauth2::ClientSecret::new(google_config.client_secret.clone());
+
+        let auth_url =
+            oauth2::AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
+                .map_err(|e| {
+                    error!("Invalid authorization endpoint URL: {}", e);
+                    Status::internal("OAuth configuration error")
+                })?;
+
+        let token_url =
+            oauth2::TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
+                .map_err(|e| {
+                    error!("Invalid token endpoint URL: {}", e);
+                    Status::internal("OAuth configuration error")
+                })?;
+
+        let redirect_url =
+            oauth2::RedirectUrl::new(google_config.redirect_uri.clone()).map_err(|e| {
+                error!("Invalid redirect URL: {}", e);
+                Status::internal("OAuth configuration error")
+            })?;
+
+        let client = oauth2::basic::BasicClient::new(google_client_id)
+            .set_client_secret(google_client_secret)
+            .set_auth_uri(auth_url)
+            .set_token_uri(token_url)
+            .set_redirect_uri(redirect_url);
+
+        // Exchange authorization code for access token
+        let http_client = reqwest::ClientBuilder::new()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| {
+                error!("Failed to build HTTP client: {}", e);
+                Status::internal("HTTP client error")
+            })?;
+
+        let token_result = client
+            .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
+            .request_async(&http_client)
+            .await
+            .map_err(|e| {
+                error!("Failed to exchange authorization code: {}", e);
+                Status::unauthenticated("Invalid authorization code")
+            })?;
+
+        let access_token = token_result.access_token().secret();
+        info!("Successfully obtained access token from Google");
+
+        // Get user info from Google
+        let user_info = self.get_google_user_info(access_token).await.map_err(|e| {
+            error!("Failed to get user info from Google: {}", e);
+            Status::internal("Failed to retrieve user information")
+        })?;
+
+        info!("Retrieved user info for: {}", user_info.email);
+
+        // Check if user exists in database
+        let existing_user = self.db.get_user_by_email(&user_info.email).await;
+
+        let user = match existing_user {
+            Ok(user) => {
+                info!("Found existing user: {}", user.username);
+                user
+            }
+            Err(_) => {
+                // Create new user from Google info
+                info!("Creating new user from Google OAuth: {}", user_info.email);
+
+                // Generate username from email (before @ symbol) or use name
+                let username = user_info
+                    .email
+                    .split('@')
+                    .next()
+                    .unwrap_or(&user_info.name)
+                    .to_string();
+
+                // Ensure username is unique by appending numbers if needed
+                let mut final_username = username.clone();
+                let mut counter = 1;
+                while self
+                    .db
+                    .user_exists_by_username(&final_username)
+                    .await
+                    .unwrap_or(false)
+                {
+                    final_username = format!("{}_{}", username, counter);
+                    counter += 1;
+                }
+
+                let create_request = eur_remote_db::CreateUserRequest {
+                    username: final_username,
+                    email: user_info.email.clone(),
+                    display_name: Some(user_info.name.clone()),
+                    password_hash: String::new(), // No password for OAuth users
+                };
+
+                self.db.create_user(create_request).await.map_err(|e| {
+                    error!("Failed to create user from Google OAuth: {}", e);
+                    Status::internal("Failed to create user account")
+                })?
+            }
+        };
+
+        // Generate JWT tokens
+        let (access_token, refresh_token) = self
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .map_err(|e| {
+                error!("Failed to generate tokens: {}", e);
+                Status::internal("Token generation error")
+            })?;
+
+        info!("Google OAuth login successful for user: {}", user.username);
+
+        let response = TokenResponse {
+            access_token,
+            refresh_token,
+            expires_in: self.jwt_config.access_token_expiry_hours * 3600,
+        };
+
+        Ok(Response::new(response))
+    }
+
+    /// Get user info from Google using access token
+    async fn get_google_user_info(
+        &self,
+        access_token: &str,
+    ) -> Result<oauth::google::GoogleUserInfo> {
+        info!("Fetching user info from Google");
+
+        let client = reqwest::Client::new();
+        let response = client
+            .get("https://www.googleapis.com/oauth2/v2/userinfo")
+            .bearer_auth(access_token)
+            .send()
+            .await
+            .map_err(|e| anyhow!("Failed to fetch user info: {}", e))?;
+
+        if !response.status().is_success() {
+            error!("Google API returned error: {}", response.status());
+            return Err(anyhow!("Failed to fetch user info from Google"));
+        }
+
+        let user_info: oauth::google::GoogleUserInfo = response
+            .json()
+            .await
+            .map_err(|e| anyhow!("Failed to parse user info response: {}", e))?;
+
+        info!("Successfully fetched user info for: {}", user_info.email);
+
+        Ok(user_info)
+    }
+
+    async fn handle_github_login(
+        &self,
+        creds: ThirdPartyCredentials,
+    ) -> Result<Response<TokenResponse>, Status> {
+        info!("Handling GitHub login");
+
+        // TODO: Implement GitHub login
+        Err(Status::unimplemented("GitHub login not implemented"))
+    }
 }
 
 #[tonic::async_trait]
@@ -212,11 +404,18 @@ impl ProtoAuthService for AuthService {
 
         match credential {
             Credential::EmailPassword(creds) => self.handle_email_password_login(creds).await,
-            Credential::ThirdParty(_) => {
-                warn!("Third-party authentication not implemented");
-                Err(Status::unimplemented(
-                    "Third-party authentication not implemented",
-                ))
+            Credential::ThirdParty(creds) => {
+                let provider = Provider::try_from(creds.provider)
+                    .map_err(|_| Status::invalid_argument("Invalid provider"))?;
+
+                match provider {
+                    Provider::Google => self.handle_google_login(creds).await,
+                    Provider::Github => self.handle_github_login(creds).await,
+                    Provider::Unspecified => {
+                        warn!("Unspecified provider in OAuth request");
+                        Err(Status::invalid_argument("Provider must be specified"))
+                    }
+                }
             }
         }
     }

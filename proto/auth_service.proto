@@ -22,7 +22,8 @@ message EmailPasswordCredentials {
 
 message ThirdPartyCredentials {
     Provider provider = 1;
-    string id_token = 2;
+    string code = 2;
+    string state = 3;
 }
 
 enum Provider {
