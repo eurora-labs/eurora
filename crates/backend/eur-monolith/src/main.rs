@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::mirror_request())
-        .allow_credentials(true)
+        // .allow_credentials(true)
         .allow_methods(AllowMethods::any())
         .max_age(Duration::from_secs(60 * 60 * 24))
         .allow_headers(AllowHeaders::mirror_request())
