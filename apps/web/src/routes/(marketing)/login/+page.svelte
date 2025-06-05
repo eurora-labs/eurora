@@ -12,7 +12,6 @@
 	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
-	import { goto } from '$app/navigation';
 
 	// Define form schema
 	const loginSchema = z.object({
@@ -73,14 +72,14 @@
 	// Social login handlers
 	async function handleGoogleLogin() {
 		const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
-		goto(url);
+		window.location.href = url;
 		console.log('Google login clicked');
 		// TODO: Implement Google OAuth
 	}
 
 	async function handleGitHubLogin() {
 		const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
-		goto(url);
+		window.location.href = url;
 		console.log('GitHub login clicked');
 		// TODO: Implement GitHub OAuth
 	}
