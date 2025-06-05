@@ -14,14 +14,14 @@ class AuthService {
 	constructor() {
 		this.headers = new Headers();
 		this.headers.set('Access-Control-Allow-Origin', '*');
-		this.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-		this.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-		this.headers.set('Access-Control-Allow-Credentials', 'true');
+		// this.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+		// this.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+		// this.headers.set('Access-Control-Allow-Credentials', 'true');
 		this.client = createClient(
 			ProtoAuthService,
 			createGrpcWebTransport({
-				baseUrl: 'https://api.eurora-labs.com',
-				// baseUrl: 'http://localhost:50051',
+				// baseUrl: 'https://api.eurora-labs.com',
+				baseUrl: 'http://localhost:50051',
 				useBinaryFormat: true,
 			}),
 		);
