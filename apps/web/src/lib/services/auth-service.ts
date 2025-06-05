@@ -5,23 +5,32 @@ import {
 	type LoginRequest,
 	type TokenResponse,
 	type RefreshTokenRequest,
-	type RegisterRequest
+	type RegisterRequest,
 } from '@eurora/proto/auth_service';
 
 class AuthService {
 	private readonly client: Client<typeof ProtoAuthService>;
+	private readonly headers: Headers;
 	constructor() {
+		this.headers = new Headers();
+		this.headers.set('Access-Control-Allow-Origin', '*');
+		this.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+		this.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+		this.headers.set('Access-Control-Allow-Credentials', 'true');
 		this.client = createClient(
 			ProtoAuthService,
 			createGrpcWebTransport({
-				baseUrl: 'http://localhost:50051',
-				useBinaryFormat: true
-			})
+				baseUrl: 'https://api.eurora-labs.com',
+				// baseUrl: 'http://localhost:50051',
+				useBinaryFormat: true,
+			}),
 		);
 	}
 
 	public async login(data: LoginRequest): Promise<TokenResponse> {
-		return await this.client.login(data);
+		return await this.client.login(data, {
+			headers: this.headers,
+		});
 	}
 
 	public async register(data: RegisterRequest): Promise<TokenResponse> {
