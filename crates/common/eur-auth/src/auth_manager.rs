@@ -7,8 +7,8 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 use crate::{
-    JwtConfig, grpc_client::AuthGrpcClient, token_storage::TokenStorage,
-    validate_access_token, validate_refresh_token,
+    JwtConfig, grpc_client::AuthGrpcClient, token_storage::TokenStorage, validate_access_token,
+    validate_refresh_token,
 };
 
 /// User information returned after successful authentication
