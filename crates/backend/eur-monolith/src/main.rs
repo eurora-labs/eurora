@@ -9,6 +9,7 @@ use eur_proto::{
 use eur_remote_db::DatabaseManager;
 use std::sync::Arc;
 use tonic::transport::Server;
+use tonic_health::{pb::health_server, server::HealthReporter};
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
 use tracing::Level;
@@ -29,6 +30,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         },
     ));
+
+    let (health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_serving::<ProtoAuthServiceServer<AuthService>>()
+        .await;
 
     // Initialize tracing
     let subscriber = FmtSubscriber::builder()
@@ -54,6 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .accept_http1(true)
         .layer(CorsLayer::permissive())
         .layer(GrpcWebLayer::new())
+        .add_service(health_service)
         // .add_service(ProtoOcrServiceServer::new(ocr_service))
         .add_service(ProtoAuthServiceServer::new(auth_service))
         .serve_with_shutdown(addr, async {
