@@ -10,13 +10,7 @@ import {
 
 class AuthService {
 	private readonly client: Client<typeof ProtoAuthService>;
-	private readonly headers: Headers;
 	constructor() {
-		this.headers = new Headers();
-		this.headers.set('Access-Control-Allow-Origin', '*');
-		// this.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-		// this.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-		// this.headers.set('Access-Control-Allow-Credentials', 'true');
 		this.client = createClient(
 			ProtoAuthService,
 			createGrpcWebTransport({
