@@ -5,6 +5,7 @@ service ProtoAuthService {
     rpc Login (LoginRequest) returns (TokenResponse);
     rpc Register (RegisterRequest) returns (TokenResponse);
     rpc RefreshToken (RefreshTokenRequest) returns (TokenResponse);
+    rpc GetThirdPartyAuthUrl (ThirdPartyAuthUrlRequest) returns (ThirdPartyAuthUrlResponse);
 }
 
 message LoginRequest {
@@ -27,7 +28,7 @@ message ThirdPartyCredentials {
 enum Provider {
     PROVIDER_UNSPECIFIED = 0;
     GOOGLE = 1;
-    APPLE = 2;
+    GITHUB = 2;
 }
 message RegisterRequest {
     string username = 1;
@@ -38,6 +39,14 @@ message RegisterRequest {
 
 message RefreshTokenRequest {
     string refresh_token = 1;
+}
+
+message ThirdPartyAuthUrlRequest {
+    Provider provider = 1;
+}
+
+message ThirdPartyAuthUrlResponse {
+    string url = 1;
 }
 
 message TokenResponse {
