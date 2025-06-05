@@ -75,63 +75,18 @@ impl GoogleCallbackHandler {
 }
 
 /// Handle Google OAuth callback
-async fn handle_google_callback(
-    Query(params): Query<CallbackQuery>,
-    State(state): State<CallbackState>,
-) -> impl IntoResponse {
-    info!("Received Google OAuth callback");
-
-    // Check for OAuth errors
-    if let Some(error) = params.error {
-        error!("OAuth error: {}", error);
-        return (
-            StatusCode::BAD_REQUEST,
-            Html(format!("<h1>OAuth Error</h1><p>{}</p>", error)),
-        );
-    }
-
-    // Extract authorization code
-    let code = match params.code {
-        Some(code) => code,
-        None => {
-            error!("Missing authorization code in callback");
-            return (
-                StatusCode::BAD_REQUEST,
-                Html("<h1>Error</h1><p>Missing authorization code</p>".to_string()),
-            );
-        }
-    };
-
-    // TODO: Validate CSRF state token here
-    // For now, we'll log it but not validate
-    if let Some(state_token) = params.state {
-        info!("Received state token: {}", state_token);
-        // In production, you should validate this against stored state
-    }
-
-    // Exchange code for tokens and get user info
-    match exchange_code_and_login(&state, &code).await {
-        Ok(response_html) => (StatusCode::OK, Html(response_html)),
-        Err(e) => {
-            error!("Failed to process OAuth callback: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Html(format!(
-                    "<h1>Error</h1><p>Failed to process login: {}</p>",
-                    e
-                )),
-            )
-        }
-    }
-}
 
 /// Exchange authorization code for tokens and perform login
-async fn exchange_code_and_login(state: &CallbackState, code: &str) -> Result<String> {
+async fn exchange_code_and_login(
+    callback_state: &CallbackState,
+    code: &str,
+    state: &str,
+) -> Result<String> {
     info!("Exchanging authorization code for tokens");
 
     // Create OAuth client for token exchange
-    let google_client_id = ClientId::new(state.oauth_config.client_id.clone());
-    let google_client_secret = ClientSecret::new(state.oauth_config.client_secret.clone());
+    let google_client_id = ClientId::new(callback_state.oauth_config.client_id.clone());
+    let google_client_secret = ClientSecret::new(callback_state.oauth_config.client_secret.clone());
 
     let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
         .map_err(|e| anyhow!("Invalid authorization endpoint URL: {}", e))?;
@@ -139,7 +94,7 @@ async fn exchange_code_and_login(state: &CallbackState, code: &str) -> Result<St
     let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
         .map_err(|e| anyhow!("Invalid token endpoint URL: {}", e))?;
 
-    let redirect_url = RedirectUrl::new(state.oauth_config.redirect_uri.clone())
+    let redirect_url = RedirectUrl::new(callback_state.oauth_config.redirect_uri.clone())
         .map_err(|e| anyhow!("Invalid redirect URL: {}", e))?;
 
     let client = BasicClient::new(google_client_id)
@@ -175,7 +130,8 @@ async fn exchange_code_and_login(state: &CallbackState, code: &str) -> Result<St
     // Create third-party credentials
     let third_party_creds = ThirdPartyCredentials {
         provider: Provider::Google as i32,
-        id_token,
+        code: code.to_string(),
+        state: state.to_string(),
     };
 
     // Create login request
@@ -184,7 +140,11 @@ async fn exchange_code_and_login(state: &CallbackState, code: &str) -> Result<St
     };
 
     // Call auth service login
-    match state.auth_service.login(Request::new(login_request)).await {
+    match callback_state
+        .auth_service
+        .login(Request::new(login_request))
+        .await
+    {
         Ok(response) => {
             let token_response = response.into_inner();
             info!("Successfully logged in user via Google OAuth");
