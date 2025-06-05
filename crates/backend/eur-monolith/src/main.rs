@@ -65,6 +65,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_headers(AllowHeaders::mirror_request())
         .expose_headers(ExposeHeaders::any());
 
+    let cors = CorsLayer::very_permissive();
+
     Server::builder()
         .accept_http1(true)
         .layer(cors)
