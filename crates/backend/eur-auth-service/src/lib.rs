@@ -5,9 +5,11 @@ use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
 use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthService;
 use eur_proto::proto_auth_service::{
-    EmailPasswordCredentials, LoginRequest, Provider, RefreshTokenRequest, RegisterRequest,
-    ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse,
+    EmailPasswordCredentials, LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse,
     login_request::Credential,
+};
+use eur_proto::proto_auth_service::{
+    Provider, ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse,
 };
 use eur_remote_db::{CreateUserRequest, DatabaseManager};
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
@@ -19,7 +21,9 @@ use uuid::Uuid;
 // Re-export shared types for convenience
 pub use eur_auth::{Claims, JwtConfig};
 pub mod oauth;
+
 use oauth::google::create_google_oauth_client;
+
 /// The main authentication service
 #[derive(Debug)]
 pub struct AuthService {
@@ -208,55 +212,13 @@ impl ProtoAuthService for AuthService {
 
         match credential {
             Credential::EmailPassword(creds) => self.handle_email_password_login(creds).await,
-            Credential::ThirdParty(creds) => self.handle_third_party_login(creds).await,
+            Credential::ThirdParty(_) => {
+                warn!("Third-party authentication not implemented");
+                Err(Status::unimplemented(
+                    "Third-party authentication not implemented",
+                ))
+            }
         }
-    }
-
-    async fn get_third_party_auth_url(
-        &self,
-        request: Request<ThirdPartyAuthUrlRequest>,
-    ) -> Result<Response<ThirdPartyAuthUrlResponse>, Status> {
-        let req = request.into_inner();
-
-        info!(
-            "Third-party auth URL request received for provider: {:?}",
-            req.provider
-        );
-
-        let provider = Provider::try_from(req.provider)
-            .map_err(|_| Status::invalid_argument("Invalid provider"))?;
-
-        let auth_url = match provider {
-            Provider::Google => {
-                info!("Generating Google OAuth URL");
-
-                let google_client = create_google_oauth_client().map_err(|e| {
-                    error!("Failed to create Google OAuth client: {}", e);
-                    Status::internal("Failed to initialize OAuth client")
-                })?;
-
-                let (url, _csrf_token) = google_client.get_authorization_url().map_err(|e| {
-                    error!("Failed to generate Google OAuth URL: {}", e);
-                    Status::internal("Failed to generate OAuth URL")
-                })?;
-
-                // TODO: Store CSRF token for validation during callback
-                // This should be stored in a cache/database with expiration
-                info!("Generated Google OAuth URL successfully");
-                url
-            }
-            Provider::Github => {
-                warn!("GitHub OAuth not implemented yet");
-                return Err(Status::unimplemented("GitHub OAuth not implemented"));
-            }
-            Provider::Unspecified => {
-                warn!("Unspecified provider in OAuth request");
-                return Err(Status::invalid_argument("Provider must be specified"));
-            }
-        };
-
-        let response = ThirdPartyAuthUrlResponse { url: auth_url };
-        Ok(Response::new(response))
     }
 
     async fn register(
@@ -305,6 +267,52 @@ impl ProtoAuthService for AuthService {
             }
         };
 
+        Ok(Response::new(response))
+    }
+    async fn get_third_party_auth_url(
+        &self,
+        request: Request<ThirdPartyAuthUrlRequest>,
+    ) -> Result<Response<ThirdPartyAuthUrlResponse>, Status> {
+        let req = request.into_inner();
+
+        info!(
+            "Third-party auth URL request received for provider: {:?}",
+            req.provider
+        );
+
+        let provider = Provider::try_from(req.provider)
+            .map_err(|_| Status::invalid_argument("Invalid provider"))?;
+
+        let auth_url = match provider {
+            Provider::Google => {
+                info!("Generating Google OAuth URL");
+
+                let google_client = create_google_oauth_client().map_err(|e| {
+                    error!("Failed to create Google OAuth client: {}", e);
+                    Status::internal("Failed to initialize OAuth client")
+                })?;
+
+                let (url, _csrf_token) = google_client.get_authorization_url().map_err(|e| {
+                    error!("Failed to generate Google OAuth URL: {}", e);
+                    Status::internal("Failed to generate OAuth URL")
+                })?;
+
+                // TODO: Store CSRF token for validation during callback
+                // This should be stored in a cache/database with expiration
+                info!("Generated Google OAuth URL successfully");
+                url
+            }
+            Provider::Github => {
+                warn!("GitHub OAuth not implemented yet");
+                return Err(Status::unimplemented("GitHub OAuth not implemented"));
+            }
+            Provider::Unspecified => {
+                warn!("Unspecified provider in OAuth request");
+                return Err(Status::invalid_argument("Provider must be specified"));
+            }
+        };
+
+        let response = ThirdPartyAuthUrlResponse { url: auth_url };
         Ok(Response::new(response))
     }
 }
@@ -370,151 +378,6 @@ impl AuthService {
             match self.generate_tokens(&user.id.to_string(), &user.username, &user.email) {
                 Ok(tokens) => tokens,
                 Err(e) => {
-                    /// Handle third-party login (Google OAuth)
-                    async fn handle_third_party_login(
-                        &self,
-                        creds: ThirdPartyCredentials,
-                    ) -> Result<Response<TokenResponse>, Status> {
-                        info!(
-                            "Third-party login request received for provider: {:?}",
-                            creds.provider
-                        );
-
-                        let provider = Provider::try_from(creds.provider)
-                            .map_err(|_| Status::invalid_argument("Invalid provider"))?;
-
-                        match provider {
-                            Provider::Google => {
-                                info!("Processing Google OAuth login");
-
-                                // Validate the ID token and get user info
-                                let user_info =
-                                    match self.validate_google_id_token(&creds.id_token).await {
-                                        Ok(info) => info,
-                                        Err(e) => {
-                                            error!("Failed to validate Google ID token: {}", e);
-                                            return Err(Status::unauthenticated(
-                                                "Invalid Google credentials",
-                                            ));
-                                        }
-                                    };
-
-                                info!("Google user info validated for: {}", user_info.email);
-
-                                // Check if user exists in our database
-                                let user = match self.db.get_user_by_email(&user_info.email).await {
-                                    Ok(user) => {
-                                        info!("Existing user found: {}", user.username);
-                                        user
-                                    }
-                                    Err(_) => {
-                                        // User doesn't exist, create a new one
-                                        info!(
-                                            "Creating new user from Google OAuth: {}",
-                                            user_info.email
-                                        );
-
-                                        // Generate a username from email (before @)
-                                        let username = user_info
-                                            .email
-                                            .split('@')
-                                            .next()
-                                            .unwrap_or("user")
-                                            .to_string();
-
-                                        // Create user request (no password for OAuth users)
-                                        let create_request = CreateUserRequest {
-                                            username: username.clone(),
-                                            email: user_info.email.clone(),
-                                            display_name: Some(user_info.name.clone()),
-                                            password_hash: String::new(), // Empty password hash for OAuth users
-                                        };
-
-                                        match self.db.create_user(create_request).await {
-                                            Ok(user) => {
-                                                info!(
-                                                    "Successfully created new user: {}",
-                                                    user.username
-                                                );
-                                                user
-                                            }
-                                            Err(e) => {
-                                                error!("Failed to create user: {}", e);
-                                                return Err(Status::internal(
-                                                    "Failed to create user account",
-                                                ));
-                                            }
-                                        }
-                                    }
-                                };
-
-                                // Generate tokens for the user
-                                let (access_token, refresh_token) = match self.generate_tokens(
-                                    &user.id.to_string(),
-                                    &user.username,
-                                    &user.email,
-                                ) {
-                                    Ok(tokens) => tokens,
-                                    Err(e) => {
-                                        error!("Token generation error: {}", e);
-                                        return Err(Status::internal("Authentication error"));
-                                    }
-                                };
-
-                                info!("Third-party login successful for user: {}", user.username);
-
-                                let response = TokenResponse {
-                                    access_token,
-                                    refresh_token,
-                                    expires_in: self.jwt_config.access_token_expiry_hours * 3600,
-                                };
-
-                                Ok(Response::new(response))
-                            }
-                            Provider::Github => {
-                                warn!("GitHub OAuth not implemented yet");
-                                Err(Status::unimplemented("GitHub OAuth not implemented"))
-                            }
-                            Provider::ProviderUnspecified => {
-                                warn!("Unspecified provider in OAuth request");
-                                Err(Status::invalid_argument("Provider must be specified"))
-                            }
-                        }
-                    }
-
-                    /// Validate Google ID token and extract user info
-                    async fn validate_google_id_token(
-                        &self,
-                        id_token: &str,
-                    ) -> Result<oauth::google::GoogleUserInfo> {
-                        // In this implementation, we're treating the access token as the ID token
-                        // In a real implementation, you would validate a proper JWT ID token
-
-                        // For now, we'll use the token to fetch user info from Google
-                        let client = reqwest::Client::new();
-                        let response = client
-                            .get("https://www.googleapis.com/oauth2/v2/userinfo")
-                            .bearer_auth(id_token)
-                            .send()
-                            .await
-                            .map_err(|e| anyhow!("Failed to fetch user info: {}", e))?;
-
-                        if !response.status().is_success() {
-                            error!("Google API returned error: {}", response.status());
-                            return Err(anyhow!("Failed to validate Google credentials"));
-                        }
-
-                        let user_info: oauth::google::GoogleUserInfo = response
-                            .json()
-                            .await
-                            .map_err(|e| anyhow!("Failed to parse user info response: {}", e))?;
-
-                        if !user_info.verified_email {
-                            return Err(anyhow!("Google email not verified"));
-                        }
-
-                        Ok(user_info)
-                    }
                     error!("Token generation error: {}", e);
                     return Err(Status::internal("Authentication error"));
                 }
