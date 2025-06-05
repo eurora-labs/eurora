@@ -7,11 +7,11 @@ use eur_proto::{
     proto_ocr_service::proto_ocr_service_server::ProtoOcrServiceServer,
 };
 use eur_remote_db::DatabaseManager;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tonic::transport::Server;
 use tonic_health::{pb::health_server, server::HealthReporter};
 use tonic_web::GrpcWebLayer;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowHeaders, AllowOrigin, CorsLayer, ExposeHeaders};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -56,9 +56,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ocr_service = OcrService::new(Some(jwt_config.clone()));
     let auth_service = AuthService::new(db_manager, Some(jwt_config));
     tracing::info!("Starting gRPC server at {}", addr);
+
+    let cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::mirror_request())
+        .allow_credentials(true)
+        .max_age(Duration::from_secs(60 * 60 * 24))
+        .allow_headers(AllowHeaders::mirror_request())
+        .expose_headers(ExposeHeaders::any());
+
     Server::builder()
         .accept_http1(true)
-        .layer(CorsLayer::permissive())
+        .layer(cors)
         .layer(GrpcWebLayer::new())
         .add_service(health_service)
         // .add_service(ProtoOcrServiceServer::new(ocr_service))
