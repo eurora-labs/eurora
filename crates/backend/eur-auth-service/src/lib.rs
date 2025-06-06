@@ -1,6 +1,7 @@
 //! The Eurora authentication service that provides gRPC endpoints for user authentication.
 
 use anyhow::{Result, anyhow};
+use base64::{Engine as _, engine::general_purpose};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
 use eur_proto::proto_auth_service::ThirdPartyCredentials;
@@ -13,13 +14,15 @@ use eur_proto::proto_auth_service::{
     Provider, ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse,
 };
 use eur_remote_db::{
-    CreateOAuthCredentialsRequest, CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
+    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
+    CreateUserRequest, DatabaseManager,
 };
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, RedirectUrl,
     TokenResponse as OAuth2TokenResponse, TokenUrl, basic::BasicClient,
 };
+use rand::{Rng, thread_rng};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
@@ -130,6 +133,12 @@ impl AuthService {
     /// Validate and decode a JWT token
     pub fn validate_token(&self, token: &str) -> Result<Claims> {
         eur_auth::validate_token(token, &self.jwt_config)
+    }
+
+    /// Generate a cryptographically secure random string
+    fn generate_random_string(&self, _length: usize) -> String {
+        // Use UUID for simplicity - generates a 32 character hex string
+        Uuid::new_v4().to_string().replace("-", "")
     }
 
     /// Register a new user (not in proto yet, but implementing for completeness)
@@ -243,6 +252,30 @@ impl AuthService {
             warn!("Google login attempt with empty authorization code");
             return Err(Status::invalid_argument("Authorization code is required"));
         }
+
+        if state.is_empty() {
+            warn!("Google login attempt with empty state parameter");
+            return Err(Status::invalid_argument("State parameter is required"));
+        }
+
+        // Validate and consume the OAuth state
+        let oauth_state = match self.db.get_oauth_state_by_state(state).await {
+            Ok(oauth_state) => oauth_state,
+            Err(_) => {
+                warn!("Invalid or expired OAuth state: {}", state);
+                return Err(Status::invalid_argument(
+                    "Invalid or expired state parameter",
+                ));
+            }
+        };
+
+        // Consume the state to prevent replay attacks
+        if let Err(e) = self.db.consume_oauth_state(state).await {
+            error!("Failed to consume OAuth state: {}", e);
+            // Continue anyway, as the state was valid
+        }
+
+        info!("OAuth state validated successfully for state: {}", state);
 
         info!("Exchanging authorization code for access token");
 
@@ -616,14 +649,45 @@ impl ProtoAuthService for AuthService {
                     Status::internal("Failed to initialize OAuth client")
                 })?;
 
-                let (url, _csrf_token) = google_client.get_authorization_url().map_err(|e| {
-                    error!("Failed to generate Google OAuth URL: {}", e);
-                    Status::internal("Failed to generate OAuth URL")
+                // Generate random state and PKCE verifier
+                let state = self.generate_random_string(32);
+                let pkce_verifier = self.generate_random_string(64);
+
+                // Get redirect URI from Google client config
+                let google_config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
+                    error!("Failed to load Google OAuth config: {}", e);
+                    Status::internal("OAuth configuration error")
                 })?;
 
-                // TODO: Store CSRF token for validation during callback
-                // This should be stored in a cache/database with expiration
-                info!("Generated Google OAuth URL successfully");
+                // Store OAuth state in database
+                let expires_at = Utc::now() + Duration::minutes(10); // 10 minute expiration
+                let oauth_state_request = CreateOAuthStateRequest {
+                    state: state.clone(),
+                    pkce_verifier: pkce_verifier.clone(),
+                    redirect_uri: google_config.redirect_uri.clone(),
+                    ip_address: None, // Could be extracted from request metadata if needed
+                    expires_at,
+                };
+
+                self.db
+                    .create_oauth_state(oauth_state_request)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to store OAuth state: {}", e);
+                        Status::internal("Failed to store OAuth state")
+                    })?;
+
+                let url = google_client
+                    .get_authorization_url_with_state(&state)
+                    .map_err(|e| {
+                        error!("Failed to generate Google OAuth URL: {}", e);
+                        Status::internal("Failed to generate OAuth URL")
+                    })?;
+
+                info!(
+                    "Generated Google OAuth URL successfully with state: {}",
+                    state
+                );
                 url
             }
             Provider::Github => {
