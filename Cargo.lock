@@ -2155,6 +2155,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
+ "base64 0.22.1",
  "bcrypt",
  "chrono",
  "dotenv",
@@ -2167,6 +2168,7 @@ dependencies = [
  "oauth2",
  "openidconnect",
  "prost",
+ "rand 0.8.5",
  "reqwest",
  "serde",
  "serde_urlencoded",
@@ -2357,6 +2359,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "futures",
+ "ipnet",
  "serde",
  "serde_json",
  "sqlx",
@@ -3917,6 +3920,9 @@ name = "ipnet"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "iri-string"
@@ -7668,6 +7674,7 @@ dependencies = [
  "hashbrown 0.15.2",
  "hashlink",
  "indexmap 2.9.0",
+ "ipnet",
  "log",
  "memchr",
  "native-tls",
@@ -7788,6 +7795,7 @@ dependencies = [
  "hkdf",
  "hmac",
  "home",
+ "ipnet",
  "itoa 1.0.15",
  "log",
  "md-5",
