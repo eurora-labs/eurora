@@ -79,7 +79,6 @@
 			console.error('Google login error:', err);
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
 		}
-		// TODO: Implement Google OAuth
 	}
 
 	async function handleGitHubLogin() {
@@ -91,7 +90,6 @@
 			console.error('GitHub login error:', err);
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
 		}
-		// TODO: Implement GitHub OAuth
 	}
 </script>
 
