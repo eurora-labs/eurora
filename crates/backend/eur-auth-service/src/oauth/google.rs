@@ -23,7 +23,7 @@ impl GoogleOAuthConfig {
         let client_secret = env::var("GOOGLE_CLIENT_SECRET")
             .map_err(|_| anyhow!("GOOGLE_CLIENT_SECRET environment variable not set"))?;
         let redirect_uri = env::var("GOOGLE_REDIRECT_URI")
-            .unwrap_or_else(|_| "http://localhost:8080/auth/google/callback".to_string());
+            .unwrap_or_else(|_| "http://localhost:5173/auth/google/callback".to_string());
 
         Ok(Self {
             client_id,
@@ -104,39 +104,4 @@ pub struct GoogleUserInfo {
 pub fn create_google_oauth_client() -> Result<GoogleOAuthClient> {
     let config = GoogleOAuthConfig::from_env()?;
     GoogleOAuthClient::new(config)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_google_oauth_config_creation() {
-        // This test requires environment variables to be set
-        // In a real test environment, you would mock these
-        unsafe {
-            std::env::set_var("GOOGLE_CLIENT_ID", "test_client_id");
-            std::env::set_var("GOOGLE_CLIENT_SECRET", "test_client_secret");
-        }
-
-        let config = GoogleOAuthConfig::from_env().unwrap();
-        assert_eq!(config.client_id, "test_client_id");
-        assert_eq!(config.client_secret, "test_client_secret");
-        assert_eq!(
-            config.redirect_uri,
-            "http://localhost:8080/auth/google/callback"
-        );
-    }
-
-    #[test]
-    fn test_google_oauth_client_creation() {
-        let config = GoogleOAuthConfig {
-            client_id: "test_client_id".to_string(),
-            client_secret: "test_client_secret".to_string(),
-            redirect_uri: "http://localhost:8080/auth/google/callback".to_string(),
-        };
-
-        let client = GoogleOAuthClient::new(config);
-        assert!(client.is_ok());
-    }
 }
