@@ -97,3 +97,24 @@ pub struct UpdateOAuthCredentialsRequest {
     pub access_token_expiry: Option<DateTime<Utc>>,
     pub scope: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct OAuthState {
+    pub id: Uuid,
+    pub state: String,
+    pub pkce_verifier: String,
+    pub redirect_uri: String,
+    pub ip_address: Option<ipnet::IpNet>,
+    pub consumed: bool,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateOAuthStateRequest {
+    pub state: String,
+    pub pkce_verifier: String,
+    pub redirect_uri: String,
+    pub ip_address: Option<ipnet::IpNet>,
+    pub expires_at: DateTime<Utc>,
+}
