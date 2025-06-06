@@ -788,3 +788,12 @@ This file tracks key architectural and design decisions made during the project'
 - Secure token validation and user authentication
 - Extensible architecture for additional OAuth providers (GitHub, etc.)
 - Integration with existing JWT token system
+
+[2025-06-06 11:37:00] - Implemented OAuth state management for secure third-party authentication
+
+- Added oauth_state table support in eur-remote-db with PKCE verifier storage
+- Modified get_third_party_auth_url to generate and store temporary state/verifier pairs
+- Enhanced handle_google_login to validate state parameters against stored values
+- Updated Google OAuth client to support custom state parameters
+- Implemented state consumption to prevent replay attacks
+- Added proper CSRF protection for OAuth callback flow
