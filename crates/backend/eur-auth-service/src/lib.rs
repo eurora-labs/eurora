@@ -12,12 +12,15 @@ use eur_proto::proto_auth_service::{
 use eur_proto::proto_auth_service::{
     Provider, ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse,
 };
-use eur_remote_db::{CreateUserRequest, DatabaseManager};
+use eur_remote_db::{
+    CreateOAuthCredentialsRequest, CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
+};
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, RedirectUrl,
     TokenResponse as OAuth2TokenResponse, TokenUrl, basic::BasicClient,
 };
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
@@ -57,8 +60,16 @@ impl AuthService {
         verify(password, hash).map_err(|e| anyhow!("Failed to verify password: {}", e))
     }
 
+    /// Hash a refresh token for secure storage
+    fn hash_refresh_token(&self, token: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(token.as_bytes());
+        hasher.update(self.jwt_config.secret.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
     /// Generate JWT tokens (access and refresh)
-    fn generate_tokens(
+    async fn generate_tokens(
         &self,
         user_id: &str,
         username: &str,
@@ -96,6 +107,22 @@ impl AuthService {
 
         let refresh_token = encode(&header, &refresh_claims, &encoding_key)
             .map_err(|e| anyhow!("Failed to generate refresh token: {}", e))?;
+
+        // Store refresh token in database
+        let user_uuid =
+            Uuid::parse_str(user_id).map_err(|e| anyhow!("Invalid user ID format: {}", e))?;
+
+        let token_hash = self.hash_refresh_token(&refresh_token);
+        let refresh_request = CreateRefreshTokenRequest {
+            user_id: user_uuid,
+            token_hash,
+            expires_at: refresh_exp,
+        };
+
+        self.db
+            .create_refresh_token(refresh_request)
+            .await
+            .map_err(|e| anyhow!("Failed to store refresh token: {}", e))?;
 
         Ok((access_token, refresh_token))
     }
@@ -150,8 +177,9 @@ impl AuthService {
         info!("User registered successfully: {}", user.username);
 
         // Generate tokens
-        let (access_token, refresh_token) =
-            self.generate_tokens(&user.id.to_string(), &user.username, &user.email)?;
+        let (access_token, refresh_token) = self
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .await?;
 
         Ok(TokenResponse {
             access_token,
@@ -164,27 +192,33 @@ impl AuthService {
     pub async fn refresh_access_token(&self, refresh_token: &str) -> Result<TokenResponse> {
         info!("Attempting to refresh token");
 
-        // Validate the refresh token
-        let claims = self.validate_token(refresh_token)?;
+        // Hash the provided refresh token to look it up in the database
+        let token_hash = self.hash_refresh_token(refresh_token);
 
-        // Ensure it's a refresh token
-        if claims.token_type != "refresh" {
-            return Err(anyhow!("Invalid token type"));
-        }
+        // Get the refresh token from database (this also validates it's not expired/revoked)
+        let stored_token = self
+            .db
+            .get_refresh_token_by_hash(&token_hash)
+            .await
+            .map_err(|e| anyhow!("Invalid or expired refresh token: {}", e))?;
 
         // Get user from database to ensure they still exist
-        let user_id =
-            Uuid::parse_str(&claims.sub).map_err(|e| anyhow!("Invalid user ID in token: {}", e))?;
-
         let user = self
             .db
-            .get_user_by_id(user_id)
+            .get_user_by_id(stored_token.user_id)
             .await
             .map_err(|e| anyhow!("User not found: {}", e))?;
 
+        // Revoke the old refresh token
+        self.db
+            .revoke_refresh_token(&token_hash)
+            .await
+            .map_err(|e| anyhow!("Failed to revoke old refresh token: {}", e))?;
+
         // Generate new tokens
-        let (access_token, new_refresh_token) =
-            self.generate_tokens(&user.id.to_string(), &user.username, &user.email)?;
+        let (access_token, new_refresh_token) = self
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .await?;
 
         info!("Token refreshed successfully for user: {}", user.username);
 
@@ -276,56 +310,147 @@ impl AuthService {
 
         info!("Retrieved user info for: {}", user_info.email);
 
-        // Check if user exists in database
-        let existing_user = self.db.get_user_by_email(&user_info.email).await;
+        // Check if user exists by OAuth provider first
+        let existing_user_by_oauth = self
+            .db
+            .get_user_by_oauth_provider("google", &user_info.id)
+            .await;
 
-        let user = match existing_user {
+        let user = match existing_user_by_oauth {
             Ok(user) => {
-                info!("Found existing user: {}", user.username);
+                info!("Found existing user by OAuth: {}", user.username);
+
+                // Update OAuth credentials with new tokens
+                if let Ok(oauth_creds) = self
+                    .db
+                    .get_oauth_credentials_by_provider_and_user("google", user.id)
+                    .await
+                {
+                    let update_request = eur_remote_db::UpdateOAuthCredentialsRequest {
+                        access_token: Some(access_token.as_bytes().to_vec()),
+                        refresh_token: token_result
+                            .refresh_token()
+                            .map(|t| t.secret().as_bytes().to_vec()),
+                        access_token_expiry: token_result.expires_in().map(|duration| {
+                            chrono::Utc::now()
+                                + chrono::Duration::seconds(duration.as_secs() as i64)
+                        }),
+                        scope: Some("openid email profile".to_string()),
+                    };
+
+                    if let Err(e) = self
+                        .db
+                        .update_oauth_credentials(oauth_creds.id, update_request)
+                        .await
+                    {
+                        warn!("Failed to update OAuth credentials: {}", e);
+                    }
+                }
+
                 user
             }
             Err(_) => {
-                // Create new user from Google info
-                info!("Creating new user from Google OAuth: {}", user_info.email);
+                // Check if user exists by email
+                let existing_user_by_email = self.db.get_user_by_email(&user_info.email).await;
 
-                // Generate username from email (before @ symbol) or use name
-                let username = user_info
-                    .email
-                    .split('@')
-                    .next()
-                    .unwrap_or(&user_info.name)
-                    .to_string();
+                match existing_user_by_email {
+                    Ok(user) => {
+                        info!(
+                            "Found existing user by email, linking OAuth: {}",
+                            user.username
+                        );
 
-                // Ensure username is unique by appending numbers if needed
-                let mut final_username = username.clone();
-                let mut counter = 1;
-                while self
-                    .db
-                    .user_exists_by_username(&final_username)
-                    .await
-                    .unwrap_or(false)
-                {
-                    final_username = format!("{}_{}", username, counter);
-                    counter += 1;
+                        // Link OAuth account to existing user
+                        let oauth_request = CreateOAuthCredentialsRequest {
+                            user_id: user.id,
+                            provider: "google".to_string(),
+                            provider_user_id: user_info.id.clone(),
+                            access_token: Some(access_token.as_bytes().to_vec()),
+                            refresh_token: token_result
+                                .refresh_token()
+                                .map(|t| t.secret().as_bytes().to_vec()),
+                            access_token_expiry: token_result.expires_in().map(|duration| {
+                                chrono::Utc::now()
+                                    + chrono::Duration::seconds(duration.as_secs() as i64)
+                            }),
+                            scope: Some("openid email profile".to_string()),
+                        };
+
+                        if let Err(e) = self.db.create_oauth_credentials(oauth_request).await {
+                            error!("Failed to create OAuth credentials: {}", e);
+                            return Err(Status::internal("Failed to link OAuth account"));
+                        }
+
+                        user
+                    }
+                    Err(_) => {
+                        // Create new user from Google info
+                        info!("Creating new user from Google OAuth: {}", user_info.email);
+
+                        // Generate username from email (before @ symbol) or use name
+                        let username = user_info
+                            .email
+                            .split('@')
+                            .next()
+                            .unwrap_or(&user_info.name)
+                            .to_string();
+
+                        // Ensure username is unique by appending numbers if needed
+                        let mut final_username = username.clone();
+                        let mut counter = 1;
+                        while self
+                            .db
+                            .user_exists_by_username(&final_username)
+                            .await
+                            .unwrap_or(false)
+                        {
+                            final_username = format!("{}_{}", username, counter);
+                            counter += 1;
+                        }
+
+                        let create_request = eur_remote_db::CreateUserRequest {
+                            username: final_username,
+                            email: user_info.email.clone(),
+                            display_name: Some(user_info.name.clone()),
+                            password_hash: String::new(), // No password for OAuth users
+                        };
+
+                        let new_user = self.db.create_user(create_request).await.map_err(|e| {
+                            error!("Failed to create user from Google OAuth: {}", e);
+                            Status::internal("Failed to create user account")
+                        })?;
+
+                        // Create OAuth credentials for the new user
+                        let oauth_request = CreateOAuthCredentialsRequest {
+                            user_id: new_user.id,
+                            provider: "google".to_string(),
+                            provider_user_id: user_info.id.clone(),
+                            access_token: Some(access_token.as_bytes().to_vec()),
+                            refresh_token: token_result
+                                .refresh_token()
+                                .map(|t| t.secret().as_bytes().to_vec()),
+                            access_token_expiry: token_result.expires_in().map(|duration| {
+                                chrono::Utc::now()
+                                    + chrono::Duration::seconds(duration.as_secs() as i64)
+                            }),
+                            scope: Some("openid email profile".to_string()),
+                        };
+
+                        if let Err(e) = self.db.create_oauth_credentials(oauth_request).await {
+                            error!("Failed to create OAuth credentials: {}", e);
+                            return Err(Status::internal("Failed to create OAuth credentials"));
+                        }
+
+                        new_user
+                    }
                 }
-
-                let create_request = eur_remote_db::CreateUserRequest {
-                    username: final_username,
-                    email: user_info.email.clone(),
-                    display_name: Some(user_info.name.clone()),
-                    password_hash: String::new(), // No password for OAuth users
-                };
-
-                self.db.create_user(create_request).await.map_err(|e| {
-                    error!("Failed to create user from Google OAuth: {}", e);
-                    Status::internal("Failed to create user account")
-                })?
             }
         };
 
         // Generate JWT tokens
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .await
             .map_err(|e| {
                 error!("Failed to generate tokens: {}", e);
                 Status::internal("Token generation error")
@@ -573,14 +698,16 @@ impl AuthService {
         }
 
         // Generate tokens
-        let (access_token, refresh_token) =
-            match self.generate_tokens(&user.id.to_string(), &user.username, &user.email) {
-                Ok(tokens) => tokens,
-                Err(e) => {
-                    error!("Token generation error: {}", e);
-                    return Err(Status::internal("Authentication error"));
-                }
-            };
+        let (access_token, refresh_token) = match self
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .await
+        {
+            Ok(tokens) => tokens,
+            Err(e) => {
+                error!("Token generation error: {}", e);
+                return Err(Status::internal("Authentication error"));
+            }
+        };
 
         info!("Login successful for user: {}", user.username);
 
