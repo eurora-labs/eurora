@@ -43,3 +43,78 @@ pub struct UpdateUserRequest {
 pub struct UpdatePasswordRequest {
     pub password_hash: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct OAuthCredentials {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub provider: String,
+    pub provider_user_id: String,
+    pub access_token: Option<Vec<u8>>,
+    pub refresh_token: Option<Vec<u8>>,
+    pub access_token_expiry: Option<DateTime<Utc>>,
+    pub scope: Option<String>,
+    pub issued_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct RefreshToken {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    #[serde(skip_serializing)]
+    pub token_hash: String,
+    pub issued_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub revoked: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateOAuthCredentialsRequest {
+    pub user_id: Uuid,
+    pub provider: String,
+    pub provider_user_id: String,
+    pub access_token: Option<Vec<u8>>,
+    pub refresh_token: Option<Vec<u8>>,
+    pub access_token_expiry: Option<DateTime<Utc>>,
+    pub scope: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRefreshTokenRequest {
+    pub user_id: Uuid,
+    pub token_hash: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateOAuthCredentialsRequest {
+    pub access_token: Option<Vec<u8>>,
+    pub refresh_token: Option<Vec<u8>>,
+    pub access_token_expiry: Option<DateTime<Utc>>,
+    pub scope: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct OAuthState {
+    pub id: Uuid,
+    pub state: String,
+    pub pkce_verifier: String,
+    pub redirect_uri: String,
+    pub ip_address: Option<ipnet::IpNet>,
+    pub consumed: bool,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateOAuthStateRequest {
+    pub state: String,
+    pub pkce_verifier: String,
+    pub redirect_uri: String,
+    pub ip_address: Option<ipnet::IpNet>,
+    pub expires_at: DateTime<Utc>,
+}
