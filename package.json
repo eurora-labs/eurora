@@ -16,14 +16,14 @@
 		"dev:ui": "pnpm --filter @eurora/ui storybook",
 		"build:ui": "turbo run build --filter @eurora/ui...",
 		"dev:web": "pnpm --filter @eurora/web dev",
+		"build:web": "turbo run build --filter @eurora/web...",
 		"dev:docs": "pnpm --filter @eurora/docs dev",
 		"tauri": "tauri",
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",
 		"proto:compile": ". ./.venv/bin/activate && pnpm proto:python && pnpm proto:typescript",
 		"proto:python": "python scripts/proto/compile_python.py",
-		"proto:typescript": "python scripts/proto/compile_typescript.py",
-		"generate": "buf generate",
+		"proto:typescript": "buf generate && turbo run build --filter @eurora/proto --force",
 		"test:e2e": "cd apps/desktop && pnpm test:e2e"
 	},
 	"devDependencies": {

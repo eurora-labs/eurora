@@ -6,7 +6,9 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::types::{
-    CreateUserRequest, PasswordCredentials, UpdatePasswordRequest, UpdateUserRequest, User,
+    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
+    CreateUserRequest, OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken,
+    UpdateOAuthCredentialsRequest, UpdatePasswordRequest, UpdateUserRequest, User,
 };
 #[derive(Debug)]
 pub struct DatabaseManager {
@@ -312,5 +314,304 @@ impl DatabaseManager {
         .await?;
 
         Ok(count.0 > 0)
+    }
+
+    // OAuth credentials management methods
+    pub async fn create_oauth_credentials(
+        &self,
+        request: CreateOAuthCredentialsRequest,
+    ) -> Result<OAuthCredentials, sqlx::Error> {
+        let id = Uuid::new_v4();
+        let now = Utc::now();
+
+        let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
+            r#"
+            INSERT INTO oauth_credentials (
+                id, user_id, provider, provider_user_id, access_token,
+                refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING id, user_id, provider, provider_user_id, access_token,
+                      refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(request.user_id)
+        .bind(&request.provider)
+        .bind(&request.provider_user_id)
+        .bind(&request.access_token)
+        .bind(&request.refresh_token)
+        .bind(&request.access_token_expiry)
+        .bind(&request.scope)
+        .bind(now)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(oauth_creds)
+    }
+
+    pub async fn get_oauth_credentials_by_provider_and_user(
+        &self,
+        provider: &str,
+        user_id: Uuid,
+    ) -> Result<OAuthCredentials, sqlx::Error> {
+        let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
+            r#"
+            SELECT id, user_id, provider, provider_user_id, access_token,
+                   refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
+            FROM oauth_credentials
+            WHERE provider = $1 AND user_id = $2
+            "#,
+        )
+        .bind(provider)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(oauth_creds)
+    }
+
+    pub async fn get_oauth_credentials_by_provider_user_id(
+        &self,
+        provider: &str,
+        provider_user_id: &str,
+    ) -> Result<OAuthCredentials, sqlx::Error> {
+        let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
+            r#"
+            SELECT id, user_id, provider, provider_user_id, access_token,
+                   refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
+            FROM oauth_credentials
+            WHERE provider = $1 AND provider_user_id = $2
+            "#,
+        )
+        .bind(provider)
+        .bind(provider_user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(oauth_creds)
+    }
+
+    pub async fn update_oauth_credentials(
+        &self,
+        id: Uuid,
+        request: UpdateOAuthCredentialsRequest,
+    ) -> Result<OAuthCredentials, sqlx::Error> {
+        let now = Utc::now();
+
+        let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
+            r#"
+            UPDATE oauth_credentials
+            SET access_token = COALESCE($2, access_token),
+                refresh_token = COALESCE($3, refresh_token),
+                access_token_expiry = COALESCE($4, access_token_expiry),
+                scope = COALESCE($5, scope),
+                updated_at = $6
+            WHERE id = $1
+            RETURNING id, user_id, provider, provider_user_id, access_token,
+                      refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(&request.access_token)
+        .bind(&request.refresh_token)
+        .bind(&request.access_token_expiry)
+        .bind(&request.scope)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(oauth_creds)
+    }
+
+    pub async fn get_user_by_oauth_provider(
+        &self,
+        provider: &str,
+        provider_user_id: &str,
+    ) -> Result<User, sqlx::Error> {
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            SELECT u.id, u.username, u.email, u.display_name, u.email_verified, u.created_at, u.updated_at
+            FROM users u
+            INNER JOIN oauth_credentials oc ON u.id = oc.user_id
+            WHERE oc.provider = $1 AND oc.provider_user_id = $2
+            "#,
+        )
+        .bind(provider)
+        .bind(provider_user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(user)
+    }
+
+    // Refresh token management methods
+    pub async fn create_refresh_token(
+        &self,
+        request: CreateRefreshTokenRequest,
+    ) -> Result<RefreshToken, sqlx::Error> {
+        let id = Uuid::new_v4();
+        let now = Utc::now();
+
+        let refresh_token = sqlx::query_as::<_, RefreshToken>(
+            r#"
+            INSERT INTO refresh_tokens (id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(request.user_id)
+        .bind(&request.token_hash)
+        .bind(now)
+        .bind(request.expires_at)
+        .bind(false)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(refresh_token)
+    }
+
+    pub async fn get_refresh_token_by_hash(
+        &self,
+        token_hash: &str,
+    ) -> Result<RefreshToken, sqlx::Error> {
+        let refresh_token = sqlx::query_as::<_, RefreshToken>(
+            r#"
+            SELECT id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at
+            FROM refresh_tokens
+            WHERE token_hash = $1 AND revoked = false AND expires_at > now()
+            "#,
+        )
+        .bind(token_hash)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(refresh_token)
+    }
+
+    pub async fn revoke_refresh_token(&self, token_hash: &str) -> Result<(), sqlx::Error> {
+        let now = Utc::now();
+
+        sqlx::query(
+            r#"
+            UPDATE refresh_tokens
+            SET revoked = true, updated_at = $2
+            WHERE token_hash = $1
+            "#,
+        )
+        .bind(token_hash)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn revoke_all_user_refresh_tokens(&self, user_id: Uuid) -> Result<(), sqlx::Error> {
+        let now = Utc::now();
+
+        sqlx::query(
+            r#"
+            UPDATE refresh_tokens
+            SET revoked = true, updated_at = $2
+            WHERE user_id = $1 AND revoked = false
+            "#,
+        )
+        .bind(user_id)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn cleanup_expired_refresh_tokens(&self) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM refresh_tokens
+            WHERE expires_at < now()
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    // OAuth state management methods
+    pub async fn create_oauth_state(
+        &self,
+        request: CreateOAuthStateRequest,
+    ) -> Result<OAuthState, sqlx::Error> {
+        let id = Uuid::new_v4();
+        let now = Utc::now();
+
+        let oauth_state = sqlx::query_as::<_, OAuthState>(
+            r#"
+            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
+            "#,
+        )
+        .bind(id)
+        .bind(&request.state)
+        .bind(&request.pkce_verifier)
+        .bind(&request.redirect_uri)
+        .bind(request.ip_address)
+        .bind(false) // consumed defaults to false
+        .bind(now)
+        .bind(request.expires_at)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(oauth_state)
+    }
+
+    pub async fn get_oauth_state_by_state(&self, state: &str) -> Result<OAuthState, sqlx::Error> {
+        let oauth_state = sqlx::query_as::<_, OAuthState>(
+            r#"
+            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
+            FROM oauth_state
+            WHERE state = $1 AND consumed = false AND expires_at > now()
+            "#,
+        )
+        .bind(state)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(oauth_state)
+    }
+
+    pub async fn consume_oauth_state(&self, state: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE oauth_state
+            SET consumed = true
+            WHERE state = $1
+            "#,
+        )
+        .bind(state)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn cleanup_expired_oauth_states(&self) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM oauth_state
+            WHERE expires_at < now()
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
     }
 }
