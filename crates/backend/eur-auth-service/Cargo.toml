@@ -24,5 +24,14 @@ chrono = { workspace = true, features = ["serde"] }
 bcrypt = "0.17"
 jsonwebtoken = "9.3"
 serde = { workspace = true, features = ["derive"] }
+axum = { version = "0.8.4", features = ["macros"] }
+oauth2 = "5.0.0"
+openidconnect = "4.0.0"
+reqwest = { version = "0.12", features = ["json"] }
+serde_urlencoded = "0.7"
+url = "2.5"
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.8"
 [build-dependencies]
 tonic-build = { workspace = true }
