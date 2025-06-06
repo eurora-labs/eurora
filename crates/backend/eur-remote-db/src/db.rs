@@ -6,9 +6,9 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::types::{
-    CreateOAuthCredentialsRequest, CreateRefreshTokenRequest, CreateUserRequest, OAuthCredentials,
-    PasswordCredentials, RefreshToken, UpdateOAuthCredentialsRequest, UpdatePasswordRequest,
-    UpdateUserRequest, User,
+    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
+    CreateUserRequest, OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken,
+    UpdateOAuthCredentialsRequest, UpdatePasswordRequest, UpdateUserRequest, User,
 };
 #[derive(Debug)]
 pub struct DatabaseManager {
@@ -534,6 +534,78 @@ impl DatabaseManager {
         let result = sqlx::query(
             r#"
             DELETE FROM refresh_tokens
+            WHERE expires_at < now()
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    // OAuth state management methods
+    pub async fn create_oauth_state(
+        &self,
+        request: CreateOAuthStateRequest,
+    ) -> Result<OAuthState, sqlx::Error> {
+        let id = Uuid::new_v4();
+        let now = Utc::now();
+
+        let oauth_state = sqlx::query_as::<_, OAuthState>(
+            r#"
+            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
+            "#,
+        )
+        .bind(id)
+        .bind(&request.state)
+        .bind(&request.pkce_verifier)
+        .bind(&request.redirect_uri)
+        .bind(request.ip_address)
+        .bind(false) // consumed defaults to false
+        .bind(now)
+        .bind(request.expires_at)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(oauth_state)
+    }
+
+    pub async fn get_oauth_state_by_state(&self, state: &str) -> Result<OAuthState, sqlx::Error> {
+        let oauth_state = sqlx::query_as::<_, OAuthState>(
+            r#"
+            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
+            FROM oauth_state
+            WHERE state = $1 AND consumed = false AND expires_at > now()
+            "#,
+        )
+        .bind(state)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(oauth_state)
+    }
+
+    pub async fn consume_oauth_state(&self, state: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE oauth_state
+            SET consumed = true
+            WHERE state = $1
+            "#,
+        )
+        .bind(state)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn cleanup_expired_oauth_states(&self) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM oauth_state
             WHERE expires_at < now()
             "#,
         )
