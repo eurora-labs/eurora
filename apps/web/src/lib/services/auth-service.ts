@@ -16,8 +16,7 @@ class AuthService {
 		this.client = createClient(
 			ProtoAuthService,
 			createGrpcWebTransport({
-				// baseUrl: 'https://api.eurora-labs.com',
-				baseUrl: 'http://localhost:50051',
+				baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:50051',
 				useBinaryFormat: true,
 			}),
 		);
