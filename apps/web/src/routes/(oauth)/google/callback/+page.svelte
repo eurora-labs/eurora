@@ -22,7 +22,9 @@
 			return;
 		}
 
-		// TODO: Validate state parameter against stored value for CSRF protection
+		// State validation is now handled by the backend auth service
+		// The backend will validate the state parameter against the stored OAuth state
+		// and return an error if the state is invalid or expired
 
 		try {
 			const loginData = create(LoginRequestSchema, {
