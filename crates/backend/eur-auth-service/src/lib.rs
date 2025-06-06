@@ -1,7 +1,6 @@
 //! The Eurora authentication service that provides gRPC endpoints for user authentication.
 
 use anyhow::{Result, anyhow};
-use base64::{Engine as _, engine::general_purpose};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
 use eur_proto::proto_auth_service::ThirdPartyCredentials;
@@ -18,11 +17,7 @@ use eur_remote_db::{
     CreateUserRequest, DatabaseManager,
 };
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
-use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, RedirectUrl,
-    TokenResponse as OAuth2TokenResponse, TokenUrl, basic::BasicClient,
-};
-use rand::{Rng, thread_rng};
+use oauth2::TokenResponse as OAuth2TokenResponse;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
