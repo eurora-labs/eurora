@@ -3,14 +3,10 @@
 use anyhow::{Result, anyhow};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
-use eur_proto::proto_auth_service::ThirdPartyCredentials;
-use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthService;
 use eur_proto::proto_auth_service::{
-    EmailPasswordCredentials, LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse,
-    login_request::Credential,
-};
-use eur_proto::proto_auth_service::{
-    Provider, ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse,
+    EmailPasswordCredentials, GetLoginTokenResponse, LoginRequest, Provider, RefreshTokenRequest,
+    RegisterRequest, ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, ThirdPartyCredentials,
+    TokenResponse, login_request::Credential, proto_auth_service_server::ProtoAuthService,
 };
 use eur_remote_db::{
     CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
@@ -35,14 +31,22 @@ use oauth::google::create_google_oauth_client;
 pub struct AuthService {
     db: Arc<DatabaseManager>,
     jwt_config: JwtConfig,
+    desktop_login_url: String,
 }
 
 impl AuthService {
     /// Create a new AuthService instance
     pub fn new(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Self {
+        let desktop_login_url = std::env::var("DESKTOP_LOGIN_URL")
+            .map_err(|e| {
+                error!("Failed to get desktop login URL: {}", e);
+                anyhow!("Failed to get desktop login URL");
+            })
+            .unwrap_or_default();
         Self {
             db,
             jwt_config: jwt_config.unwrap_or_default(),
+            desktop_login_url,
         }
     }
 
@@ -697,6 +701,20 @@ impl ProtoAuthService for AuthService {
 
         let response = ThirdPartyAuthUrlResponse { url: auth_url };
         Ok(Response::new(response))
+    }
+
+    async fn get_login_token(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<GetLoginTokenResponse>, Status> {
+        let token = self.generate_random_string(64);
+        let expires_in = 60 * 20;
+
+        Ok(Response::new(GetLoginTokenResponse {
+            token: token.clone(),
+            expires_in,
+            url: format!("{}?token={}", self.desktop_login_url, token),
+        }))
     }
 }
 
