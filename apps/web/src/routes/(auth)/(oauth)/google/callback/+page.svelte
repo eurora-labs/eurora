@@ -25,6 +25,8 @@
 		// State validation is now handled by the backend auth service
 		// The backend will validate the state parameter against the stored OAuth state
 		// and return an error if the state is invalid or expired
+		const loginToken = sessionStorage.getItem('loginToken') ?? undefined;
+		if (loginToken) sessionStorage.removeItem('loginToken');
 
 		try {
 			const loginData = create(LoginRequestSchema, {
@@ -33,6 +35,7 @@
 						provider: Provider.GOOGLE,
 						code,
 						state,
+						loginToken,
 					},
 					case: 'thirdParty',
 				},
