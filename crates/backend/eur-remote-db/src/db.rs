@@ -670,7 +670,7 @@ impl DatabaseManager {
             r#"
             UPDATE login_tokens
             SET user_id = $2, updated_at = $3
-            WHERE token = $1
+            WHERE token = $1 AND expires_at > now()
             RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
             "#,
         )
@@ -690,7 +690,7 @@ impl DatabaseManager {
             r#"
             UPDATE login_tokens
             SET consumed = true, updated_at = $2
-            WHERE token = $1
+            WHERE token = $1 AND expires_at > now()
             RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
             "#,
         )
