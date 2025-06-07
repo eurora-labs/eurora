@@ -626,15 +626,16 @@ impl DatabaseManager {
 
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
-            INSERT INTO login_tokens (id, token, expires_at, user_id, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING id, token, expires_at, user_id, created_at, updated_at
+            INSERT INTO login_tokens (id, token, expires_at, user_id, consumed, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
             "#,
         )
         .bind(id)
         .bind(&request.token)
         .bind(request.expires_at)
         .bind(None::<Uuid>) // user_id starts as NULL
+        .bind(false) // consumed starts as false
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -646,7 +647,7 @@ impl DatabaseManager {
     pub async fn get_login_token_by_token(&self, token: &str) -> Result<LoginToken, sqlx::Error> {
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
-            SELECT id, token, expires_at, user_id, created_at, updated_at
+            SELECT id, token, consumed, expires_at, user_id, created_at, updated_at
             FROM login_tokens
             WHERE token = $1 AND expires_at > now()
             "#,
@@ -670,11 +671,30 @@ impl DatabaseManager {
             UPDATE login_tokens
             SET user_id = $2, updated_at = $3
             WHERE token = $1
-            RETURNING id, token, expires_at, user_id, created_at, updated_at
+            RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
             "#,
         )
         .bind(token)
         .bind(request.user_id)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(login_token)
+    }
+
+    pub async fn consume_login_token(&self, token: &str) -> Result<LoginToken, sqlx::Error> {
+        let now = Utc::now();
+
+        let login_token = sqlx::query_as::<_, LoginToken>(
+            r#"
+            UPDATE login_tokens
+            SET consumed = true, updated_at = $2
+            WHERE token = $1
+            RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
+            "#,
+        )
+        .bind(token)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
