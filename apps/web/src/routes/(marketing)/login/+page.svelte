@@ -6,7 +6,7 @@
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Separator from '@eurora/ui/components/separator/index';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
-	import { authService } from '$lib/services/auth-service.js';
+	import { authService } from '@eurora/shared/services/auth-service';
 	import { LoginRequestSchema, Provider } from '@eurora/proto/auth_service';
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
