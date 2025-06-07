@@ -123,6 +123,7 @@ pub struct CreateOAuthStateRequest {
 pub struct LoginToken {
     pub id: Uuid,
     pub token: String,
+    pub consumed: bool,
     pub expires_at: DateTime<Utc>,
     pub user_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,

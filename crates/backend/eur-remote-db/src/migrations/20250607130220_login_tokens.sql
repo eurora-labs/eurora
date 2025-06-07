@@ -11,13 +11,14 @@ CREATE TABLE login_tokens (
     token VARCHAR(128) NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     user_id UUID,
+    consumed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     
     -- Foreign key constraint (optional, can be null initially)
-    CONSTRAINT fk_login_tokens_user_id
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
+    CONSTRAINT fk_login_tokens_user_id 
+        FOREIGN KEY (user_id) 
+        REFERENCES users(id) 
         ON DELETE CASCADE
 );
 
@@ -25,7 +26,7 @@ CREATE TABLE login_tokens (
 CREATE UNIQUE INDEX idx_login_tokens_token ON login_tokens(token);
 CREATE INDEX idx_login_tokens_user_id ON login_tokens(user_id);
 CREATE INDEX idx_login_tokens_expires_at ON login_tokens(expires_at);
-CREATE INDEX idx_login_tokens_unused ON login_tokens(token) WHERE user_id IS NULL;
+CREATE INDEX idx_login_tokens_active ON login_tokens(token) WHERE consumed = false;
 
 -- Add trigger to automatically update updated_at timestamp
 CREATE TRIGGER update_login_tokens_updated_at 
@@ -38,6 +39,7 @@ COMMENT ON TABLE login_tokens IS 'Desktop login tokens for secure authentication
 COMMENT ON COLUMN login_tokens.id IS 'Primary key UUID for login token record';
 COMMENT ON COLUMN login_tokens.token IS 'Unique login token string';
 COMMENT ON COLUMN login_tokens.expires_at IS 'When the token expires';
-COMMENT ON COLUMN login_tokens.user_id IS 'Optional foreign key to users table, filled after user creation (NULL means unused)';
+COMMENT ON COLUMN login_tokens.user_id IS 'Optional foreign key to users table, filled after user creation';
+COMMENT ON COLUMN login_tokens.consumed IS 'Whether the token has been used for login';
 COMMENT ON COLUMN login_tokens.created_at IS 'Timestamp when token was created';
 COMMENT ON COLUMN login_tokens.updated_at IS 'Timestamp when token was last updated';
