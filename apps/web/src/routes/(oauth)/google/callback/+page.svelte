@@ -2,7 +2,7 @@
 	import { LoginRequestSchema, Provider } from '@eurora/proto/auth_service';
 	import { create } from '@bufbuild/protobuf';
 	import { onMount } from 'svelte';
-	import { authService } from '$lib/services/auth-service';
+	import { authService } from '@eurora/shared/services/auth-service';
 	onMount(async () => {
 		const query = new URLSearchParams(window.location.search);
 		const error = query.get('error');

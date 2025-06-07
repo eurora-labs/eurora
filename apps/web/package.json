@@ -31,6 +31,7 @@
 		"@eurora/proto": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
+		"@eurora/shared": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"@lucide/svelte": "^0.511.0",
 		"@sveltejs/adapter-auto": "^4.0.0",
