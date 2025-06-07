@@ -33,7 +33,7 @@ pub mod generated {
     }
 
     pub mod proto_auth_service {
-        include!("gen/auth.v1.rs");
+        include!("gen/auth_service.rs");
         pub use super::*;
     }
 }
