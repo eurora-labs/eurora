@@ -57,4 +57,6 @@ export type {
 	RefreshTokenRequest,
 	Provider,
 	ThirdPartyAuthUrlResponse,
+	GetLoginTokenResponse,
+	LoginByLoginTokenRequest,
 };
