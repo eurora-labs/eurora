@@ -4,9 +4,10 @@ use anyhow::{Result, anyhow};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
 use eur_proto::proto_auth_service::{
-    EmailPasswordCredentials, GetLoginTokenResponse, LoginRequest, Provider, RefreshTokenRequest,
-    RegisterRequest, ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, ThirdPartyCredentials,
-    TokenResponse, login_request::Credential, proto_auth_service_server::ProtoAuthService,
+    EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
+    Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
+    ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
+    proto_auth_service_server::ProtoAuthService,
 };
 use eur_remote_db::{
     CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
@@ -156,7 +157,7 @@ impl AuthService {
 
         match self.db.get_login_token_by_token(token).await {
             Ok(login_token) => {
-                if login_token.user_id.is_none() {
+                if login_token.user_id.is_none() && !login_token.consumed {
                     // Token exists and is unused, associate it with the user
                     let update_request = UpdateLoginTokenRequest { user_id: user.id };
 
@@ -171,6 +172,8 @@ impl AuthService {
                             error!("Failed to update login token with user_id: {}", e);
                         }
                     }
+                } else if login_token.consumed {
+                    info!("Login token '{}' has already been consumed", token);
                 } else {
                     info!("Login token '{}' is already associated with a user", token);
                 }
@@ -679,6 +682,7 @@ impl ProtoAuthService for AuthService {
 
         Ok(Response::new(response))
     }
+
     async fn get_third_party_auth_url(
         &self,
         request: Request<ThirdPartyAuthUrlRequest>,
@@ -788,6 +792,83 @@ impl ProtoAuthService for AuthService {
             expires_in,
             url: format!("{}?token={}", self.desktop_login_url, token),
         }))
+    }
+
+    async fn login_by_login_token(
+        &self,
+        request: Request<LoginByLoginTokenRequest>,
+    ) -> Result<Response<TokenResponse>, Status> {
+        let req = request.into_inner();
+        let token = &req.token;
+
+        info!("Login by login token request received for token: {}", token);
+
+        // Get the login token from database
+        let login_token = match self.db.get_login_token_by_token(token).await {
+            Ok(login_token) => login_token,
+            Err(_) => {
+                warn!("Login token not found or expired: {}", token);
+                return Err(Status::unauthenticated("Invalid or expired login token"));
+            }
+        };
+
+        // Check if user_id is empty (token not associated with user)
+        if login_token.user_id.is_none() {
+            info!(
+                "Login token not yet associated with user, client should keep polling: {}",
+                token
+            );
+            return Err(Status::unavailable(
+                "Login token pending user authentication",
+            ));
+        }
+
+        // Check if token is already consumed
+        if login_token.consumed {
+            warn!("Login token already consumed: {}", token);
+            return Err(Status::unauthenticated("Invalid login token"));
+        }
+
+        // Get the user associated with the token
+        let user_id = login_token.user_id.unwrap();
+        let user = match self.db.get_user_by_id(user_id).await {
+            Ok(user) => user,
+            Err(_) => {
+                error!("User not found for login token: {}", token);
+                return Err(Status::internal("User not found"));
+            }
+        };
+
+        // Mark the token as consumed
+        if let Err(e) = self.db.consume_login_token(token).await {
+            error!("Failed to consume login token: {}", e);
+            return Err(Status::internal("Failed to process login token"));
+        }
+
+        // Generate JWT tokens for the user
+        let (access_token, refresh_token) = match self
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .await
+        {
+            Ok(tokens) => tokens,
+            Err(e) => {
+                error!("Token generation error: {}", e);
+                return Err(Status::internal("Authentication error"));
+            }
+        };
+
+        info!(
+            "Login by login token successful for user: {}",
+            user.username
+        );
+
+        let response = TokenResponse {
+            access_token,
+            refresh_token,
+            expires_in: self.jwt_config.access_token_expiry_hours * 3600,
+        };
+
+        Ok(Response::new(response))
     }
 }
 
