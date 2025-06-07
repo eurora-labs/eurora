@@ -10,7 +10,7 @@ use eur_proto::proto_auth_service::{
 };
 use eur_remote_db::{
     CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
-    CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
+    CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager, UpdateLoginTokenRequest,
 };
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use oauth2::TokenResponse as OAuth2TokenResponse;
@@ -37,12 +37,10 @@ pub struct AuthService {
 impl AuthService {
     /// Create a new AuthService instance
     pub fn new(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Self {
-        let desktop_login_url = std::env::var("DESKTOP_LOGIN_URL")
-            .map_err(|e| {
-                error!("Failed to get desktop login URL: {}", e);
-                anyhow!("Failed to get desktop login URL");
-            })
-            .unwrap_or_default();
+        let desktop_login_url = std::env::var("DESKTOP_LOGIN_URL").unwrap_or_else(|e| {
+            error!("DESKTOP_LOGIN_URL environment variable not set: {}", e);
+            "http://localhost:5173/staging/login".to_string()
+        });
         Self {
             db,
             jwt_config: jwt_config.unwrap_or_default(),
@@ -138,6 +136,49 @@ impl AuthService {
     fn generate_random_string(&self, _length: usize) -> String {
         // Use UUID for simplicity - generates a 32 character hex string
         Uuid::new_v4().to_string().replace("-", "")
+    }
+
+    /// Try to associate any pending login tokens with the user
+    /// This looks for unused login tokens and associates them with the user
+    async fn try_associate_login_token_with_user(
+        &self,
+        user: &eur_remote_db::User,
+        token: &String,
+    ) {
+        info!(
+            "Attempting to associate login token with user: {}",
+            user.username
+        );
+
+        // Hardcoded example: Look for a specific login token to demonstrate the functionality
+        // In practice, you would extract the login token from the OAuth flow
+        // let login_token_value = "example_desktop_login_token_123"; // This would come from the OAuth flow
+
+        match self.db.get_login_token_by_token(token).await {
+            Ok(login_token) => {
+                if login_token.user_id.is_none() {
+                    // Token exists and is unused, associate it with the user
+                    let update_request = UpdateLoginTokenRequest { user_id: user.id };
+
+                    match self.db.update_login_token_user(token, update_request).await {
+                        Ok(_) => {
+                            info!(
+                                "Successfully associated login token '{}' with user: {}",
+                                token, user.username
+                            );
+                        }
+                        Err(e) => {
+                            error!("Failed to update login token with user_id: {}", e);
+                        }
+                    }
+                } else {
+                    info!("Login token '{}' is already associated with a user", token);
+                }
+            }
+            Err(_) => {
+                info!("No login token '{}' found or token has expired", token);
+            }
+        }
     }
 
     /// Register a new user (not in proto yet, but implementing for completeness)
@@ -416,6 +457,14 @@ impl AuthService {
                         user
                     }
                     Err(_) => {
+                        // If token is not present throw error
+                        let login_token = creds.login_token;
+
+                        if login_token.is_none() {
+                            error!("Login token is missing");
+                            return Err(Status::unauthenticated("Login token is missing"));
+                        }
+
                         // Create new user from Google info
                         info!("Creating new user from Google OAuth: {}", user_info.email);
 
@@ -472,6 +521,11 @@ impl AuthService {
                             error!("Failed to create OAuth credentials: {}", e);
                             return Err(Status::internal("Failed to create OAuth credentials"));
                         }
+
+                        // Check if there's a login token to associate with this user
+                        // The login token could be passed through the state parameter or request metadata
+                        self.try_associate_login_token_with_user(&new_user, &login_token.unwrap())
+                            .await;
 
                         new_user
                     }
