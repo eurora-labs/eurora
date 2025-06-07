@@ -142,6 +142,9 @@ importers:
       '@eurora/prosemirror-tauri-bindings':
         specifier: workspace:*
         version: link:../../packages/prosemirror/tauri-bindings
+      '@eurora/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
