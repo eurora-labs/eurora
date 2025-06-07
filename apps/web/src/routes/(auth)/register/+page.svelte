@@ -9,7 +9,7 @@
 	import { authService } from '@eurora/shared/services/auth-service';
 	import { RegisterRequestSchema } from '@eurora/proto/auth_service';
 	import { superForm } from 'sveltekit-superforms';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 
@@ -49,7 +49,7 @@
 			confirmPassword: '',
 		},
 		{
-			validators: zodClient(registerSchema),
+			validators: zodClient(registerSchema as unknown as ZodObjectType),
 		},
 	);
 
@@ -159,7 +159,7 @@
 				<!-- Social Registration Buttons -->
 				<SocialAuthButtons
 					mode="register"
-					onApple={handleAppleRegister}
+					disabled={$submitting}
 					onGoogle={handleGoogleRegister}
 					onGitHub={handleGitHubRegister}
 				/>
