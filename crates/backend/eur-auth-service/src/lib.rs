@@ -42,7 +42,7 @@ impl AuthService {
     pub fn new(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Self {
         let desktop_login_url = std::env::var("DESKTOP_LOGIN_URL").unwrap_or_else(|e| {
             error!("DESKTOP_LOGIN_URL environment variable not set: {}", e);
-            "http://localhost:5173/staging/login".to_string()
+            "http://localhost:5173/login".to_string()
         });
         Self {
             db,
@@ -801,7 +801,7 @@ impl ProtoAuthService for AuthService {
         Ok(Response::new(GetLoginTokenResponse {
             token: token.clone(),
             expires_in,
-            url: format!("{}?token={}", self.desktop_login_url, token),
+            url: format!("{}/{}", self.desktop_login_url, token),
         }))
     }
 
