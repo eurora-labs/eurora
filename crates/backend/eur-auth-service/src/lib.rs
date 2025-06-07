@@ -9,8 +9,8 @@ use eur_proto::proto_auth_service::{
     TokenResponse, login_request::Credential, proto_auth_service_server::ProtoAuthService,
 };
 use eur_remote_db::{
-    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
-    CreateUserRequest, DatabaseManager,
+    CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
+    CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
 };
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use oauth2::TokenResponse as OAuth2TokenResponse;
@@ -708,7 +708,26 @@ impl ProtoAuthService for AuthService {
         _request: Request<()>,
     ) -> Result<Response<GetLoginTokenResponse>, Status> {
         let token = self.generate_random_string(64);
-        let expires_in = 60 * 20;
+        let expires_in = 60 * 20; // 20 minutes in seconds
+        let expires_at = Utc::now() + Duration::seconds(expires_in as i64);
+
+        info!("Generating login token with expiration: {}", expires_at);
+
+        // Save token to database
+        let create_request = CreateLoginTokenRequest {
+            token: token.clone(),
+            expires_at,
+        };
+
+        match self.db.create_login_token(create_request).await {
+            Ok(_) => {
+                info!("Login token saved to database successfully");
+            }
+            Err(e) => {
+                error!("Failed to save login token to database: {}", e);
+                return Err(Status::internal("Failed to generate login token"));
+            }
+        }
 
         Ok(Response::new(GetLoginTokenResponse {
             token: token.clone(),
