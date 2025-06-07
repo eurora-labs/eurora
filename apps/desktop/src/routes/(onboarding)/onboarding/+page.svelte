@@ -2,8 +2,10 @@
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { open } from '@tauri-apps/plugin-shell';
-	function openLogin() {
-		open('https://www.google.com');
+	import { authService } from '@eurora/shared/services/auth-service';
+	async function openLogin() {
+		const loginToken = await authService.getLoginToken();
+		open(loginToken.url);
 	}
 </script>
 
@@ -22,7 +24,9 @@
 					class="group cursor-pointer border-white/20 backdrop-blur-md transition-all duration-300 hover:bg-white/15"
 				>
 					<Card.Header class="pb-6 text-center">
-						<Card.Title class="mb-2 text-2xl font-semibold">Log in or Sign up</Card.Title>
+						<Card.Title class="mb-2 text-2xl font-semibold"
+							>Log in or Sign up</Card.Title
+						>
 						<Card.Description class="">
 							Sign in to your existing account or create a new one
 						</Card.Description>
@@ -44,7 +48,8 @@
 					class="group cursor-pointer border-white/20 backdrop-blur-md transition-all duration-300 hover:bg-white/15"
 				>
 					<Card.Header class="pb-6 text-center">
-						<Card.Title class="mb-2 text-2xl font-semibold">Local Connection</Card.Title>
+						<Card.Title class="mb-2 text-2xl font-semibold">Local Connection</Card.Title
+						>
 						<Card.Description class="">
 							Connect to your local AI model for offline usage
 						</Card.Description>
