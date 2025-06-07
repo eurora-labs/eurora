@@ -1,11 +1,15 @@
 syntax = "proto3";
+
+import "google/protobuf/empty.proto";
 package auth.v1;
+
 
 service ProtoAuthService {
     rpc Login (LoginRequest) returns (TokenResponse);
     rpc Register (RegisterRequest) returns (TokenResponse);
     rpc RefreshToken (RefreshTokenRequest) returns (TokenResponse);
     rpc GetThirdPartyAuthUrl (ThirdPartyAuthUrlRequest) returns (ThirdPartyAuthUrlResponse);
+    rpc GetLoginToken (google.protobuf.Empty) returns (GetLoginTokenResponse);
 }
 
 message LoginRequest {
@@ -54,4 +58,11 @@ message TokenResponse {
     string access_token = 1;
     string refresh_token = 2;
     int64 expires_in = 3;
+}
+
+
+message GetLoginTokenResponse {
+    string token = 1;
+    int64 expires_in = 2;
+    string url = 3;
 }
