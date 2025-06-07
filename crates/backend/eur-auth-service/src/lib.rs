@@ -15,6 +15,8 @@ use eur_remote_db::{
 };
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use oauth2::TokenResponse as OAuth2TokenResponse;
+use rand::TryRngCore;
+use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
@@ -133,10 +135,19 @@ impl AuthService {
         eur_auth::validate_token(token, &self.jwt_config)
     }
 
-    /// Generate a cryptographically secure random string
-    fn generate_random_string(&self, _length: usize) -> String {
-        // Use UUID for simplicity - generates a 32 character hex string
-        Uuid::new_v4().to_string().replace("-", "")
+    fn generate_random_string(&self, length: usize) -> String {
+        let byte_len = length.div_ceil(2); // round up for odd lengths
+        let mut bytes = vec![0u8; byte_len];
+        OsRng
+            .try_fill_bytes(&mut bytes)
+            .map_err(|e| {
+                error!("Failed to generate random bytes: {}", e);
+                Status::internal("Failed to generate random bytes")
+            })
+            .unwrap(); // cryptographically secure
+        let mut hex = hex::encode(bytes);
+        hex.truncate(length); // exact length
+        hex
     }
 
     /// Try to associate any pending login tokens with the user
@@ -767,7 +778,7 @@ impl ProtoAuthService for AuthService {
     ) -> Result<Response<GetLoginTokenResponse>, Status> {
         let token = self.generate_random_string(64);
         let expires_in = 60 * 20; // 20 minutes in seconds
-        let expires_at = Utc::now() + Duration::seconds(expires_in as i64);
+        let expires_at = Utc::now() + Duration::seconds(expires_in);
 
         info!("Generating login token with expiration: {}", expires_at);
 
