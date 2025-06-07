@@ -28,6 +28,7 @@ message ThirdPartyCredentials {
     Provider provider = 1;
     string code = 2;
     string state = 3;
+    optional string login_token = 4;
 }
 
 enum Provider {
