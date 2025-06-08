@@ -17,6 +17,7 @@
 		"build:ui": "turbo run build --filter @eurora/ui...",
 		"dev:web": "pnpm --filter @eurora/web dev",
 		"build:web": "turbo run build --filter @eurora/web...",
+		"preview:web": "pnpm --filter @eurora/web preview",
 		"dev:docs": "pnpm --filter @eurora/docs dev",
 		"tauri": "tauri",
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
