@@ -6,9 +6,10 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::types::{
-    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
-    CreateUserRequest, OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken,
-    UpdateOAuthCredentialsRequest, UpdatePasswordRequest, UpdateUserRequest, User,
+    CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
+    CreateRefreshTokenRequest, CreateUserRequest, LoginToken, OAuthCredentials, OAuthState,
+    PasswordCredentials, RefreshToken, UpdateLoginTokenRequest, UpdateOAuthCredentialsRequest,
+    UpdatePasswordRequest, UpdateUserRequest, User,
 };
 #[derive(Debug)]
 pub struct DatabaseManager {
@@ -606,6 +607,105 @@ impl DatabaseManager {
         let result = sqlx::query(
             r#"
             DELETE FROM oauth_state
+            WHERE expires_at < now()
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    // Login token management methods
+    pub async fn create_login_token(
+        &self,
+        request: CreateLoginTokenRequest,
+    ) -> Result<LoginToken, sqlx::Error> {
+        let id = Uuid::new_v4();
+        let now = Utc::now();
+
+        let login_token = sqlx::query_as::<_, LoginToken>(
+            r#"
+            INSERT INTO login_tokens (id, token, expires_at, user_id, consumed, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(&request.token)
+        .bind(request.expires_at)
+        .bind(None::<Uuid>) // user_id starts as NULL
+        .bind(false) // consumed starts as false
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(login_token)
+    }
+
+    pub async fn get_login_token_by_token(&self, token: &str) -> Result<LoginToken, sqlx::Error> {
+        let login_token = sqlx::query_as::<_, LoginToken>(
+            r#"
+            SELECT id, token, consumed, expires_at, user_id, created_at, updated_at
+            FROM login_tokens
+            WHERE token = $1 AND expires_at > now()
+            "#,
+        )
+        .bind(token)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(login_token)
+    }
+
+    pub async fn update_login_token_user(
+        &self,
+        token: &str,
+        request: UpdateLoginTokenRequest,
+    ) -> Result<LoginToken, sqlx::Error> {
+        let now = Utc::now();
+
+        let login_token = sqlx::query_as::<_, LoginToken>(
+            r#"
+            UPDATE login_tokens
+            SET user_id = $2, updated_at = $3
+            WHERE token = $1 AND expires_at > now()
+            RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
+            "#,
+        )
+        .bind(token)
+        .bind(request.user_id)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(login_token)
+    }
+
+    pub async fn consume_login_token(&self, token: &str) -> Result<LoginToken, sqlx::Error> {
+        let now = Utc::now();
+
+        let login_token = sqlx::query_as::<_, LoginToken>(
+            r#"
+            UPDATE login_tokens
+            SET consumed = true, updated_at = $2
+            WHERE token = $1 AND expires_at > now()
+            RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
+            "#,
+        )
+        .bind(token)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(login_token)
+    }
+
+    pub async fn cleanup_expired_login_tokens(&self) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM login_tokens
             WHERE expires_at < now()
             "#,
         )
