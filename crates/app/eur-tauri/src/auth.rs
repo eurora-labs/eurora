@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use eur_client_auth::AuthClient;
+use eur_auth_client::AuthClient;
 use eur_proto::proto_auth_service::LoginRequest;
 use eur_secret::{Sensitive, secret};
 use serde::{Deserialize, Serialize};
@@ -25,11 +25,9 @@ impl AuthManager {
     pub(super) const REFRESH_TOKEN_HANDLE: &'static str = "AUTH_REFRESH_TOKEN";
 
     pub async fn new() -> Result<Self> {
-        let auth_url = std::env::var("AUTH_SERVICE_URL")
-            .map_err(|_| anyhow!("AUTH_SERVICE_URL environment variable not set"))?;
         let refresh_offset = std::env::var("JWT_REFRESH_OFFSET").unwrap_or("15".to_string());
         Ok(Self {
-            auth_client: AuthClient::connect(&auth_url).await?,
+            auth_client: AuthClient::new(None).await?,
             jwt_config: JwtConfig {
                 refresh_offset: refresh_offset
                     .parse()
@@ -38,8 +36,12 @@ impl AuthManager {
         })
     }
 
-    pub async fn login(&self, data: LoginRequest) -> Result<Sensitive<String>> {
-        let response = self.auth_client.login(data).await?;
+    pub async fn login(
+        &self,
+        login: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Result<Sensitive<String>> {
+        let response = self.auth_client.login_by_password(login, password).await?;
 
         // Store tokens securely
         store_access_token(response.access_token.clone())?;
