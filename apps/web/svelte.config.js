@@ -13,19 +13,19 @@ const config = {
 		adapter: adapterStatic({
 			pages: 'dist',
 			assets: 'dist',
-			fallback: null,
+			fallback: 'index.html',
 			precompress: true,
-			strict: true
+			strict: true,
 		}),
 		paths: {
 			// Ensure assets are loaded correctly on GitHub Pages
-			assets: ''
-		}
+			assets: '',
+		},
 	},
 	compilerOptions: {
 		css: 'injected',
-		enableSourcemap: true
-	}
+		enableSourcemap: true,
+	},
 };
 
 export default config;
