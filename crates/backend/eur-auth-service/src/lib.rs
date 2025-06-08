@@ -471,7 +471,7 @@ impl AuthService {
                     }
                     Err(_) => {
                         // If token is not present throw error
-                        let login_token = creds.login_token;
+                        let login_token = creds.login_token.clone();
 
                         if login_token.is_none() {
                             error!("Login token is missing");
@@ -535,18 +535,16 @@ impl AuthService {
                             return Err(Status::internal("Failed to create OAuth credentials"));
                         }
 
-                        // Check if there's a login token to associate with this user
-                        // The login token could be passed through the state parameter or request metadata
-                        if let Some(token) = login_token {
-                            self.try_associate_login_token_with_user(&new_user, &token)
-                                .await;
-                        }
-
                         new_user
                     }
                 }
             }
         };
+
+        if let Some(token) = creds.login_token {
+            self.try_associate_login_token_with_user(&user, &token)
+                .await;
+        }
 
         // Generate JWT tokens
         let (access_token, refresh_token) = self
