@@ -1,32 +1,27 @@
 //! The Eurora authentication service that provides gRPC endpoints for user authentication.
 
 use anyhow::{Result, anyhow};
-use base64::{Engine as _, engine::general_purpose};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
-use eur_proto::proto_auth_service::ThirdPartyCredentials;
-use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthService;
 use eur_proto::proto_auth_service::{
-    EmailPasswordCredentials, LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse,
-    login_request::Credential,
-};
-use eur_proto::proto_auth_service::{
-    Provider, ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse,
+    EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
+    Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
+    ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
+    proto_auth_service_server::ProtoAuthService,
 };
 use eur_remote_db::{
-    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
-    CreateUserRequest, DatabaseManager,
+    CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
+    CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager, UpdateLoginTokenRequest,
 };
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
-use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, RedirectUrl,
-    TokenResponse as OAuth2TokenResponse, TokenUrl, basic::BasicClient,
-};
-use rand::{Rng, thread_rng};
+use oauth2::TokenResponse as OAuth2TokenResponse;
+use rand::TryRngCore;
+use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
+use url::Url;
 use uuid::Uuid;
 
 // Re-export shared types for convenience
@@ -40,14 +35,20 @@ use oauth::google::create_google_oauth_client;
 pub struct AuthService {
     db: Arc<DatabaseManager>,
     jwt_config: JwtConfig,
+    desktop_login_url: String,
 }
 
 impl AuthService {
     /// Create a new AuthService instance
     pub fn new(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Self {
+        let desktop_login_url = std::env::var("DESKTOP_LOGIN_URL").unwrap_or_else(|e| {
+            error!("DESKTOP_LOGIN_URL environment variable not set: {}", e);
+            "http://localhost:5173/login".to_string()
+        });
         Self {
             db,
             jwt_config: jwt_config.unwrap_or_default(),
+            desktop_login_url,
         }
     }
 
@@ -135,10 +136,58 @@ impl AuthService {
         eur_auth::validate_token(token, &self.jwt_config)
     }
 
-    /// Generate a cryptographically secure random string
-    fn generate_random_string(&self, _length: usize) -> String {
-        // Use UUID for simplicity - generates a 32 character hex string
-        Uuid::new_v4().to_string().replace("-", "")
+    fn generate_random_string(&self, length: usize) -> Result<String, Status> {
+        let byte_len = length.div_ceil(2); // round up for odd lengths
+        let mut bytes = vec![0u8; byte_len];
+        OsRng.try_fill_bytes(&mut bytes).map_err(|e| {
+            error!("Failed to generate random bytes: {}", e);
+            Status::internal("Failed to generate random bytes")
+        })?;
+
+        let mut hex = hex::encode(bytes);
+        hex.truncate(length); // exact length
+        Ok(hex)
+    }
+
+    /// Try to associate any pending login tokens with the user
+    /// This looks for unused login tokens and associates them with the user
+    async fn try_associate_login_token_with_user(&self, user: &eur_remote_db::User, token: &str) {
+        info!(
+            "Attempting to associate login token with user: {}",
+            user.username
+        );
+
+        // Hardcoded example: Look for a specific login token to demonstrate the functionality
+        // In practice, you would extract the login token from the OAuth flow
+        // let login_token_value = "example_desktop_login_token_123"; // This would come from the OAuth flow
+
+        match self.db.get_login_token_by_token(token).await {
+            Ok(login_token) => {
+                if login_token.user_id.is_none() && !login_token.consumed {
+                    // Token exists and is unused, associate it with the user
+                    let update_request = UpdateLoginTokenRequest { user_id: user.id };
+
+                    match self.db.update_login_token_user(token, update_request).await {
+                        Ok(_) => {
+                            info!(
+                                "Successfully associated login token '{}' with user: {}",
+                                token, user.username
+                            );
+                        }
+                        Err(e) => {
+                            error!("Failed to update login token with user_id: {}", e);
+                        }
+                    }
+                } else if login_token.consumed {
+                    info!("Login token '{}' has already been consumed", token);
+                } else {
+                    info!("Login token '{}' is already associated with a user", token);
+                }
+            }
+            Err(_) => {
+                info!("No login token '{}' found or token has expired", token);
+            }
+        }
     }
 
     /// Register a new user (not in proto yet, but implementing for completeness)
@@ -417,6 +466,14 @@ impl AuthService {
                         user
                     }
                     Err(_) => {
+                        // If token is not present throw error
+                        let login_token = creds.login_token.clone();
+
+                        if login_token.is_none() {
+                            error!("Login token is missing");
+                            return Err(Status::unauthenticated("Login token is missing"));
+                        }
+
                         // Create new user from Google info
                         info!("Creating new user from Google OAuth: {}", user_info.email);
 
@@ -479,6 +536,11 @@ impl AuthService {
                 }
             }
         };
+
+        if let Some(token) = creds.login_token {
+            self.try_associate_login_token_with_user(&user, &token)
+                .await;
+        }
 
         // Generate JWT tokens
         let (access_token, refresh_token) = self
@@ -626,6 +688,7 @@ impl ProtoAuthService for AuthService {
 
         Ok(Response::new(response))
     }
+
     async fn get_third_party_auth_url(
         &self,
         request: Request<ThirdPartyAuthUrlRequest>,
@@ -650,8 +713,8 @@ impl ProtoAuthService for AuthService {
                 })?;
 
                 // Generate random state and PKCE verifier
-                let state = self.generate_random_string(32);
-                let pkce_verifier = self.generate_random_string(64);
+                let state = self.generate_random_string(32)?;
+                let pkce_verifier = self.generate_random_string(64)?;
 
                 // Get redirect URI from Google client config
                 let google_config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
@@ -701,6 +764,124 @@ impl ProtoAuthService for AuthService {
         };
 
         let response = ThirdPartyAuthUrlResponse { url: auth_url };
+        Ok(Response::new(response))
+    }
+
+    async fn get_login_token(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<GetLoginTokenResponse>, Status> {
+        let token = self.generate_random_string(64)?;
+        let expires_in = 60 * 20; // 20 minutes in seconds
+        let expires_at = Utc::now() + Duration::seconds(expires_in);
+
+        let mut url = Url::parse(&self.desktop_login_url).map_err(|e| {
+            error!("Invalid desktop login URL: {}", e);
+            Status::internal("Invalid desktop login URL configuration")
+        })?;
+        url.path_segments_mut()
+            .map_err(|_| Status::internal("Cannot modify URL path"))?
+            .push(&token);
+
+        info!("Generating login token with expiration: {}", expires_at);
+
+        // Save token to database
+        let create_request = CreateLoginTokenRequest {
+            token: token.clone(),
+            expires_at,
+        };
+
+        match self.db.create_login_token(create_request).await {
+            Ok(_) => {
+                info!("Login token saved to database successfully");
+            }
+            Err(e) => {
+                error!("Failed to save login token to database: {}", e);
+                return Err(Status::internal("Failed to generate login token"));
+            }
+        }
+
+        Ok(Response::new(GetLoginTokenResponse {
+            token: token.clone(),
+            expires_in,
+            url: url.to_string(),
+        }))
+    }
+
+    async fn login_by_login_token(
+        &self,
+        request: Request<LoginByLoginTokenRequest>,
+    ) -> Result<Response<TokenResponse>, Status> {
+        let req = request.into_inner();
+        let token = &req.token;
+
+        info!("Login by login token request received for token: {}", token);
+
+        // Get the login token from database
+        let login_token = match self.db.get_login_token_by_token(token).await {
+            Ok(login_token) => login_token,
+            Err(_) => {
+                warn!("Login token not found or expired: {}", token);
+                return Err(Status::unauthenticated("Invalid or expired login token"));
+            }
+        };
+
+        // Check if user_id is empty (token not associated with user)
+        if login_token.user_id.is_none() {
+            info!(
+                "Login token not yet associated with user, client should keep polling: {}",
+                token
+            );
+            return Err(Status::unavailable(
+                "Login token pending user authentication",
+            ));
+        }
+
+        // Check if token is already consumed
+        if login_token.consumed {
+            warn!("Login token already consumed: {}", token);
+            return Err(Status::unauthenticated("Invalid login token"));
+        }
+
+        // Get the user associated with the token
+        let user_id = login_token.user_id.unwrap();
+        let user = match self.db.get_user_by_id(user_id).await {
+            Ok(user) => user,
+            Err(_) => {
+                error!("User not found for login token: {}", token);
+                return Err(Status::internal("User not found"));
+            }
+        };
+
+        // Mark the token as consumed
+        if let Err(e) = self.db.consume_login_token(token).await {
+            error!("Failed to consume login token: {}", e);
+            return Err(Status::internal("Failed to process login token"));
+        }
+
+        // Generate JWT tokens for the user
+        let (access_token, refresh_token) = match self
+            .generate_tokens(&user.id.to_string(), &user.username, &user.email)
+            .await
+        {
+            Ok(tokens) => tokens,
+            Err(e) => {
+                error!("Token generation error: {}", e);
+                return Err(Status::internal("Authentication error"));
+            }
+        };
+
+        info!(
+            "Login by login token successful for user: {}",
+            user.username
+        );
+
+        let response = TokenResponse {
+            access_token,
+            refresh_token,
+            expires_in: self.jwt_config.access_token_expiry_hours * 3600,
+        };
+
         Ok(Response::new(response))
     }
 }
