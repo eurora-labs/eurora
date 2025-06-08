@@ -13,7 +13,7 @@ const config = {
 		adapter: adapterStatic({
 			pages: 'dist',
 			assets: 'dist',
-			fallback: 'index.html',
+			fallback: '200.html',
 			precompress: true,
 			strict: true,
 		}),
