@@ -1,15 +1,14 @@
 //! Core authentication manager that handles all token operations autonomously.
 
+use crate::{
+    JwtConfig, token_storage::TokenStorage, validate_access_token, validate_refresh_token,
+};
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Duration, Utc};
+use eur_auth_client::{AuthClient, Credential, EmailPasswordCredentials, LoginRequest};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
-
-use crate::{
-    JwtConfig, grpc_client::AuthGrpcClient, token_storage::TokenStorage, validate_access_token,
-    validate_refresh_token,
-};
 
 /// User information returned after successful authentication
 #[derive(Debug)]
@@ -42,7 +41,7 @@ pub struct RegisterData {
 /// Core authentication manager that handles all token operations
 pub struct AuthManager {
     token_storage: Arc<dyn TokenStorage>,
-    grpc_client: Arc<RwLock<Option<AuthGrpcClient>>>,
+    grpc_client: Arc<RwLock<Option<AuthClient>>>,
     jwt_config: JwtConfig,
     refresh_threshold: Duration, // Refresh when token expires in X minutes
     current_user: Arc<RwLock<Option<UserInfo>>>,
@@ -58,7 +57,7 @@ impl AuthManager {
 
         // Try to connect to gRPC service if URL provided
         let grpc_client = if let Some(url) = service_url {
-            match AuthGrpcClient::new(&url).await {
+            match AuthClient::new(Some(url)).await {
                 Ok(client) => Some(client),
                 Err(e) => {
                     warn!("Failed to connect to auth service: {}", e);
@@ -93,7 +92,7 @@ impl AuthManager {
             .ok_or_else(|| anyhow!("Auth service not available"))?;
 
         let response = client
-            .login(&credentials.login, &credentials.password)
+            .login_by_password(credentials.login, credentials.password)
             .await?;
 
         // Store tokens securely
@@ -270,5 +269,32 @@ impl AuthManager {
             email: claims.email,
             display_name: None, // Not stored in JWT
         })
+    }
+
+    pub async fn login_by_login_token(&self, login_token: String) -> Result<UserInfo> {
+        let mut client_guard = self.grpc_client.write().await;
+        let client = client_guard
+            .as_mut()
+            .ok_or_else(|| anyhow!("Auth service not available"))?;
+
+        let response = client.login_by_login_token(&login_token).await?;
+
+        // Store tokens securely
+        self.token_storage
+            .store_access_token(&response.access_token)
+            .await?;
+        self.token_storage
+            .store_refresh_token(&response.refresh_token)
+            .await?;
+
+        // Extract user info from token
+        let user_info = self.extract_user_info(&response.access_token)?;
+
+        // Update current user
+        let mut user_guard = self.current_user.write().await;
+        *user_guard = Some(user_info.clone());
+
+        info!("User logged in successfully: {}", user_info.username);
+        Ok(user_info)
     }
 }
