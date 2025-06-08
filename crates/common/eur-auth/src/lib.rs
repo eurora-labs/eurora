@@ -4,12 +4,10 @@
 //! that can be used across different services in the Eurora ecosystem.
 
 mod auth_manager;
-mod grpc_client;
 mod token_storage;
 mod user;
 
 pub use auth_manager::{AuthManager, LoginCredentials, RegisterData, UserInfo};
-pub use grpc_client::AuthGrpcClient;
 pub use token_storage::{SecureTokenStorage, TokenStorage};
 pub use user::User;
 

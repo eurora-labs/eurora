@@ -12,7 +12,7 @@ serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
 uuid = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 anyhow = { workspace = true }
-eur-client-auth = { workspace = true }
+eur-auth-client = { workspace = true }
 base64 = "0.22.1"
 eur-proto = { workspace = true }
 tokio = { workspace = true }
