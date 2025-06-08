@@ -17,7 +17,7 @@
 			// 	return;
 			// }
 
-			const isLoginSuccess = await taurrpc.auth.poll_for_login();
+			const isLoginSuccess = await taurrpc.auth.poll_for_login(loginToken.token);
 			if (!isLoginSuccess) {
 				console.log('Login not successful');
 				return;
