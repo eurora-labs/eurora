@@ -321,7 +321,10 @@ fn main() {
             //     .unwrap();
 
             let router = Router::new()
-                // .export_config(typescript_config)
+                .export_config(
+                    specta_typescript::Typescript::default()
+                        .bigint(specta_typescript::BigIntExportBehavior::BigInt),
+                )
                 .merge(AuthApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
