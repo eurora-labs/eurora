@@ -2134,6 +2134,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "eur-auth-client",
  "eur-proto",
  "eur-secret",
  "jsonwebtoken",
@@ -2150,6 +2151,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-auth-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "eur-proto",
+ "tokio",
+ "tonic 0.13.1",
+ "tracing",
+]
+
+[[package]]
 name = "eur-auth-service"
 version = "0.0.1"
 dependencies = [
@@ -2163,12 +2175,13 @@ dependencies = [
  "eur-proto",
  "eur-remote-db",
  "futures",
+ "hex",
  "image 0.25.6",
  "jsonwebtoken",
  "oauth2",
  "openidconnect",
  "prost",
- "rand 0.8.5",
+ "rand 0.9.1",
  "reqwest",
  "serde",
  "serde_urlencoded",
@@ -2180,18 +2193,6 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid",
-]
-
-[[package]]
-name = "eur-client-auth"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "eur-client-grpc",
- "eur-proto",
- "tokio",
- "tonic 0.13.1",
- "tracing",
 ]
 
 [[package]]
@@ -2419,8 +2420,7 @@ dependencies = [
  "dirs",
  "dotenv",
  "eur-activity",
- "eur-auth",
- "eur-client-auth",
+ "eur-auth-client",
  "eur-client-grpc",
  "eur-client-questions",
  "eur-native-messaging",
@@ -2505,7 +2505,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
- "eur-client-auth",
+ "eur-auth-client",
  "eur-proto",
  "eur-secret",
  "image 0.25.6",

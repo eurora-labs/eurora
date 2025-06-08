@@ -118,3 +118,25 @@ pub struct CreateOAuthStateRequest {
     pub ip_address: Option<ipnet::IpNet>,
     pub expires_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoginToken {
+    pub id: Uuid,
+    pub token: String,
+    pub consumed: bool,
+    pub expires_at: DateTime<Utc>,
+    pub user_id: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateLoginTokenRequest {
+    pub token: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateLoginTokenRequest {
+    pub user_id: Uuid,
+}
