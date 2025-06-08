@@ -5,7 +5,7 @@ use crate::{
 };
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Duration, Utc};
-use eur_auth_client::{AuthClient, Credential, EmailPasswordCredentials, LoginRequest};
+use eur_auth_client::AuthClient;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
