@@ -151,11 +151,7 @@ impl AuthService {
 
     /// Try to associate any pending login tokens with the user
     /// This looks for unused login tokens and associates them with the user
-    async fn try_associate_login_token_with_user(
-        &self,
-        user: &eur_remote_db::User,
-        token: &String,
-    ) {
+    async fn try_associate_login_token_with_user(&self, user: &eur_remote_db::User, token: &str) {
         info!(
             "Attempting to associate login token with user: {}",
             user.username
