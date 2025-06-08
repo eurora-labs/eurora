@@ -4,6 +4,7 @@ use eur_auth_client::AuthClient;
 use eur_proto::proto_auth_service::{GetLoginTokenResponse, LoginRequest};
 use eur_secret::{Sensitive, secret};
 use serde::{Deserialize, Serialize};
+use tracing::info;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     sub: String,
@@ -93,6 +94,7 @@ impl AuthManager {
 
     pub async fn get_login_token(&self) -> Result<GetLoginTokenResponse> {
         let token = self.auth_client.get_login_token().await?;
+        info!("Login token: {}", token.token);
         Ok(token)
     }
     pub async fn login_by_login_token(&self, login_token: String) -> Result<Sensitive<String>> {

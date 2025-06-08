@@ -15,7 +15,10 @@ pub struct LoginToken {
 /// Authentication API trait for TauRPC procedures
 #[taurpc::procedures(path = "auth")]
 pub trait AuthApi {
-    async fn poll_for_login<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
+    async fn poll_for_login<R: Runtime>(
+        app_handle: AppHandle<R>,
+        login_token: String,
+    ) -> Result<bool, String>;
     async fn get_login_token<R: Runtime>(app_handle: AppHandle<R>) -> Result<LoginToken, String>;
 }
 
@@ -45,15 +48,16 @@ impl AuthApi for AuthApiImpl {
         }
     }
 
-    async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        // Try to get the login token, if it doesn't error, return true
+    async fn poll_for_login<R: Runtime>(
+        self,
+        app_handle: AppHandle<R>,
+        login_token: String,
+    ) -> Result<bool, String> {
         if let Some(auth_manager) = app_handle.try_state::<AuthManager>() {
-            let result = auth_manager
-                .get_login_token()
-                .await
-                .map(|_| true)
-                .map_err(|_| false);
-            Ok(result.unwrap())
+            match auth_manager.login_by_login_token(login_token).await {
+                Ok(_) => Ok(true),
+                Err(_) => Ok(false),
+            }
         } else {
             Ok(false)
         }
