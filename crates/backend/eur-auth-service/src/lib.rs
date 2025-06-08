@@ -135,19 +135,17 @@ impl AuthService {
         eur_auth::validate_token(token, &self.jwt_config)
     }
 
-    fn generate_random_string(&self, length: usize) -> String {
+    fn generate_random_string(&self, length: usize) -> Result<String, Status> {
         let byte_len = length.div_ceil(2); // round up for odd lengths
         let mut bytes = vec![0u8; byte_len];
-        OsRng
-            .try_fill_bytes(&mut bytes)
-            .map_err(|e| {
-                error!("Failed to generate random bytes: {}", e);
-                Status::internal("Failed to generate random bytes")
-            })
-            .unwrap(); // cryptographically secure
+        OsRng.try_fill_bytes(&mut bytes).map_err(|e| {
+            error!("Failed to generate random bytes: {}", e);
+            Status::internal("Failed to generate random bytes")
+        })?;
+
         let mut hex = hex::encode(bytes);
         hex.truncate(length); // exact length
-        hex
+        Ok(hex)
     }
 
     /// Try to associate any pending login tokens with the user
@@ -718,8 +716,8 @@ impl ProtoAuthService for AuthService {
                 })?;
 
                 // Generate random state and PKCE verifier
-                let state = self.generate_random_string(32);
-                let pkce_verifier = self.generate_random_string(64);
+                let state = self.generate_random_string(32)?;
+                let pkce_verifier = self.generate_random_string(64)?;
 
                 // Get redirect URI from Google client config
                 let google_config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
@@ -776,7 +774,7 @@ impl ProtoAuthService for AuthService {
         &self,
         _request: Request<()>,
     ) -> Result<Response<GetLoginTokenResponse>, Status> {
-        let token = self.generate_random_string(64);
+        let token = self.generate_random_string(64)?;
         let expires_in = 60 * 20; // 20 minutes in seconds
         let expires_at = Utc::now() + Duration::seconds(expires_in);
 
