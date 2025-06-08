@@ -8,6 +8,8 @@ import {
 	type RegisterRequest,
 	Provider,
 	type ThirdPartyAuthUrlResponse,
+	type LoginByLoginTokenRequest,
+	type GetLoginTokenResponse,
 } from '@eurora/proto/auth_service';
 
 class AuthService {
@@ -37,6 +39,14 @@ class AuthService {
 	public async getThirdPartyAuthUrl(provider: Provider): Promise<ThirdPartyAuthUrlResponse> {
 		return await this.client.getThirdPartyAuthUrl({ provider });
 	}
+
+	public async getLoginToken(): Promise<GetLoginTokenResponse> {
+		return await this.client.getLoginToken({});
+	}
+
+	public async loginByLoginToken(data: LoginByLoginTokenRequest): Promise<TokenResponse> {
+		return await this.client.loginByLoginToken(data);
+	}
 }
 
 export const authService = new AuthService();
@@ -47,4 +57,6 @@ export type {
 	RefreshTokenRequest,
 	Provider,
 	ThirdPartyAuthUrlResponse,
+	GetLoginTokenResponse,
+	LoginByLoginTokenRequest,
 };
