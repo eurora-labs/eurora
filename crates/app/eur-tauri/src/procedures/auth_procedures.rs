@@ -18,6 +18,10 @@ pub trait AuthApi {
         app_handle: AppHandle<R>,
     ) -> Result<Option<UserInfo>, String>;
     async fn is_authenticated<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
+    async fn login_by_login_token<R: Runtime>(
+        app_handle: AppHandle<R>,
+        login_token: String,
+    ) -> Result<UserInfo, String>;
 }
 
 /// Implementation of the AuthApi trait
@@ -76,6 +80,22 @@ impl AuthApi for AuthApiImpl {
         } else {
             // If auth manager is not available, assume not authenticated
             Ok(false)
+        }
+    }
+
+    async fn login_by_login_token<R: Runtime>(
+        self,
+        app_handle: AppHandle<R>,
+        login_token: String,
+    ) -> Result<UserInfo, String> {
+        // Try to get auth manager from app state
+        if let Some(auth_manager) = app_handle.try_state::<SharedAuthManager>() {
+            let auth = auth_manager.lock().await;
+            auth.login_by_login_token(login_token)
+                .await
+                .map_err(|e| e.to_string())
+        } else {
+            Err("Auth manager not available".to_string())
         }
     }
 }

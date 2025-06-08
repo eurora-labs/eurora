@@ -54,8 +54,8 @@ eur-secret = { path = "crates/app/eur-secret" }
 eur-user = { path = "crates/app/eur-user" }
 eur-auth = { path = "crates/common/eur-auth" }
 eur-tauri = { path = "crates/app/eur-tauri" }
-eur-client-auth = { path = "crates/proto/eur-client-auth" }
 eur-proto = { path = "crates/proto/eur-proto" }
+eur-auth-client = { path = "crates/common/eur-auth-client" }
 
 
 [profile.release]
