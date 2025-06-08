@@ -21,6 +21,7 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
+use url::Url;
 use uuid::Uuid;
 
 // Re-export shared types for convenience
@@ -536,8 +537,10 @@ impl AuthService {
 
                         // Check if there's a login token to associate with this user
                         // The login token could be passed through the state parameter or request metadata
-                        self.try_associate_login_token_with_user(&new_user, &login_token.unwrap())
-                            .await;
+                        if let Some(token) = login_token {
+                            self.try_associate_login_token_with_user(&new_user, &token)
+                                .await;
+                        }
 
                         new_user
                     }
@@ -778,6 +781,14 @@ impl ProtoAuthService for AuthService {
         let expires_in = 60 * 20; // 20 minutes in seconds
         let expires_at = Utc::now() + Duration::seconds(expires_in);
 
+        let mut url = Url::parse(&self.desktop_login_url).map_err(|e| {
+            error!("Invalid desktop login URL: {}", e);
+            Status::internal("Invalid desktop login URL configuration")
+        })?;
+        url.path_segments_mut()
+            .map_err(|_| Status::internal("Cannot modify URL path"))?
+            .push(&token);
+
         info!("Generating login token with expiration: {}", expires_at);
 
         // Save token to database
@@ -799,7 +810,7 @@ impl ProtoAuthService for AuthService {
         Ok(Response::new(GetLoginTokenResponse {
             token: token.clone(),
             expires_in,
-            url: format!("{}/{}", self.desktop_login_url, token),
+            url: url.to_string(),
         }))
     }
 
