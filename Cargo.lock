@@ -2420,7 +2420,6 @@ dependencies = [
  "dirs",
  "dotenv",
  "eur-activity",
- "eur-auth",
  "eur-auth-client",
  "eur-client-grpc",
  "eur-client-questions",
