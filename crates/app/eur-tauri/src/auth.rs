@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use eur_auth_client::AuthClient;
-use eur_proto::proto_auth_service::LoginRequest;
+use eur_proto::proto_auth_service::{GetLoginTokenResponse, LoginRequest};
 use eur_secret::{Sensitive, secret};
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
@@ -83,6 +83,20 @@ impl AuthManager {
         let refresh_token = self.get_refresh_token()?;
 
         let response = self.auth_client.refresh_token(&refresh_token.0).await?;
+
+        // Store tokens securely
+        store_access_token(response.access_token.clone())?;
+        store_refresh_token(response.refresh_token.clone())?;
+
+        Ok(Sensitive(response.access_token))
+    }
+
+    pub async fn get_login_token(&self) -> Result<GetLoginTokenResponse> {
+        let token = self.auth_client.get_login_token().await?;
+        Ok(token)
+    }
+    pub async fn login_by_login_token(&self, login_token: String) -> Result<Sensitive<String>> {
+        let response = self.auth_client.login_by_login_token(login_token).await?;
 
         // Store tokens securely
         store_access_token(response.access_token.clone())?;
