@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time;
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::{error, info};
+use tracing::info;
 mod focus_tracker;
 pub use focus_tracker::FocusEvent;
 
