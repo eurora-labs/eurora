@@ -1,6 +1,7 @@
 //! gRPC client for communicating with the eur-auth-service.
 
 use anyhow::{Ok, Result, anyhow};
+use eur_proto::proto_auth_service::GetLoginTokenResponse;
 pub use eur_proto::proto_auth_service::{
     EmailPasswordCredentials, LoginByLoginTokenRequest, LoginRequest, RefreshTokenRequest,
     RegisterRequest, TokenResponse, login_request::Credential,
@@ -113,6 +114,15 @@ impl AuthClient {
                 error!("Login by login token failed: {}", e);
                 anyhow!("Login by login token failed: {}", e)
             })?;
+
+        Ok(response.into_inner())
+    }
+
+    pub async fn get_login_token(&self) -> Result<GetLoginTokenResponse> {
+        let response = self.client.clone().get_login_token(()).await.map_err(|e| {
+            error!("Get login token failed: {}", e);
+            anyhow!("Get login token failed: {}", e)
+        })?;
 
         Ok(response.into_inner())
     }

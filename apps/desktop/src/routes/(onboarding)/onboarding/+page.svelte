@@ -2,10 +2,30 @@
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { open } from '@tauri-apps/plugin-shell';
-	import { authService } from '@eurora/shared/services/auth-service';
+
+	// import tauri auth procedures
+	import { createTauRPCProxy } from '@eurora/tauri-bindings';
+	const taurrpc = createTauRPCProxy();
 	async function openLogin() {
-		const loginToken = await authService.getLoginToken();
-		open(loginToken.url);
+		const loginToken = await taurrpc.auth.get_login_token();
+		await open(loginToken.url);
+
+		// Attempt to login by token every 5 seconds
+		const interval = setInterval(async () => {
+			// if (loginToken.expires_in < Date.now()) {
+			// 	clearInterval(interval);
+			// 	return;
+			// }
+
+			const isLoginSuccess = await taurrpc.auth.poll_for_login();
+			if (!isLoginSuccess) {
+				console.log('Login not successful');
+				return;
+			}
+			console.log('Login successful');
+			clearInterval(interval);
+			// window.location.href = '/';
+		}, 5000);
 	}
 </script>
 
