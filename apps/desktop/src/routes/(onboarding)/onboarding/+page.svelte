@@ -2,8 +2,30 @@
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { open } from '@tauri-apps/plugin-shell';
-	function openLogin() {
-		open('https://www.google.com');
+
+	// import tauri auth procedures
+	import { createTauRPCProxy } from '@eurora/tauri-bindings';
+	const taurrpc = createTauRPCProxy();
+	async function openLogin() {
+		const loginToken = await taurrpc.auth.get_login_token();
+		await open(loginToken.url);
+
+		// Attempt to login by token every 5 seconds
+		const interval = setInterval(async () => {
+			// if (loginToken.expires_in < Date.now()) {
+			// 	clearInterval(interval);
+			// 	return;
+			// }
+
+			const isLoginSuccess = await taurrpc.auth.poll_for_login(loginToken.token);
+			if (!isLoginSuccess) {
+				console.log('Login not successful');
+				return;
+			}
+			console.log('Login successful');
+			clearInterval(interval);
+			// window.location.href = '/';
+		}, 5000);
 	}
 </script>
 
@@ -22,7 +44,9 @@
 					class="group cursor-pointer border-white/20 backdrop-blur-md transition-all duration-300 hover:bg-white/15"
 				>
 					<Card.Header class="pb-6 text-center">
-						<Card.Title class="mb-2 text-2xl font-semibold">Log in or Sign up</Card.Title>
+						<Card.Title class="mb-2 text-2xl font-semibold"
+							>Log in or Sign up</Card.Title
+						>
 						<Card.Description class="">
 							Sign in to your existing account or create a new one
 						</Card.Description>
@@ -44,7 +68,8 @@
 					class="group cursor-pointer border-white/20 backdrop-blur-md transition-all duration-300 hover:bg-white/15"
 				>
 					<Card.Header class="pb-6 text-center">
-						<Card.Title class="mb-2 text-2xl font-semibold">Local Connection</Card.Title>
+						<Card.Title class="mb-2 text-2xl font-semibold">Local Connection</Card.Title
+						>
 						<Card.Description class="">
 							Connect to your local AI model for offline usage
 						</Card.Description>
