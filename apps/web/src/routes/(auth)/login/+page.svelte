@@ -17,8 +17,8 @@
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 
 	onMount(() => {
-		let loginToken = page.url.searchParams.get('loginToken');
-		let challengeMethod = page.url.searchParams.get('challengeMethod');
+		let loginToken = page.url.searchParams.get('code_challenge');
+		let challengeMethod = page.url.searchParams.get('code_challenge_method');
 		if (loginToken && challengeMethod) {
 			sessionStorage.setItem('loginToken', loginToken);
 			sessionStorage.setItem('challengeMethod', challengeMethod);
