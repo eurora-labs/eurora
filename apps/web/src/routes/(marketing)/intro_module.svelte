@@ -124,10 +124,7 @@
 						<Card.Root class="card-content aspect-video w-full">
 							<Card.Content class="flex h-full flex-col items-center justify-center">
 								<div class="icon-animation flex items-center justify-center">
-									<SiYoutube
-										color="rgb(147 51 234 / var(--tw-text-opacity, 1))"
-										size={64}
-									/>
+									<SiYoutube color="rgb(147 51 234 / var(--tw-text-opacity, 1))" size={64} />
 								</div>
 								<Card.Title class="title-animation">YouTube Videos</Card.Title>
 							</Card.Content>

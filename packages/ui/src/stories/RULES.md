@@ -26,15 +26,15 @@ For components with many variants, states, or configurations, consider implement
 
 1. **Interactive Story** (`ComponentName.stories.svelte`):
 
-   - Single story with full Storybook controls
-   - Allows developers to test all component properties
-   - Primary entry point for component testing
+    - Single story with full Storybook controls
+    - Allows developers to test all component properties
+    - Primary entry point for component testing
 
 2. **Showcase Story** (`AllComponentName.stories.svelte`):
-   - Comprehensive display of all variants and states
-   - No interactive controls (set `controls: { disable: true }`)
-   - Organized with clear section headings
-   - Serves as visual documentation and design reference
+    - Comprehensive display of all variants and states
+    - No interactive controls (set `controls: { disable: true }`)
+    - Organized with clear section headings
+    - Serves as visual documentation and design reference
 
 **When to use dual pattern:**
 
@@ -60,7 +60,8 @@ For components with many variants, states, or configurations, consider implement
 		parameters: {
 			docs: {
 				description: {
-					component: 'Clear, concise description of the component purpose and functionality.',
+					component:
+						'Clear, concise description of the component purpose and functionality.',
 				},
 			},
 			layout: 'centered', // or 'padded' for larger components
@@ -146,12 +147,12 @@ For components with many variants, states, or configurations:
 - **Clear Organization**: Use section headings and proper spacing
 - **Title**: `Components / ComponentName / All [ComponentName]s`
 - **Sections to Include**:
-  1. **Default**: Basic component usage
-  2. **Variants**: All available visual variants
-  3. **Sizes**: All available size options (if applicable)
-  4. **States**: Disabled, loading, error, active states
-  5. **With Features**: Icons, links, special functionality
-  6. **Use Cases**: Specific scenarios or configurations
+    1. **Default**: Basic component usage
+    2. **Variants**: All available visual variants
+    3. **Sizes**: All available size options (if applicable)
+    4. **States**: Disabled, loading, error, active states
+    5. **With Features**: Icons, links, special functionality
+    6. **Use Cases**: Specific scenarios or configurations
 
 ### Component-Specific Considerations
 

@@ -14,8 +14,8 @@ export function videoExtension(): SveltePMExtension {
 				schema: videoSchema,
 				// component: Video,
 				nodeView: (editor: any) =>
-					SvelteNodeView.fromComponent(editor, Video as unknown as Component)
-			}
-		}
+					SvelteNodeView.fromComponent(editor, Video as unknown as Component),
+			},
+		},
 	} satisfies SveltePMExtension;
 }

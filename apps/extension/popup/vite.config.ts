@@ -8,16 +8,16 @@ export default defineConfig({
 		emptyOutDir: true,
 		reportCompressedSize: true,
 		commonjsOptions: {
-			transformMixedEsModules: true
+			transformMixedEsModules: true,
 		},
-		cssCodeSplit: true
+		cssCodeSplit: true,
 	},
 	resolve: {
 		alias: {
 			'@eurora/katex': path.resolve(
 				__dirname,
-				'../../../packages/custom-components/katex/src/lib/index.ts'
-			)
-		}
-	}
+				'../../../packages/custom-components/katex/src/lib/index.ts',
+			),
+		},
+	},
 });

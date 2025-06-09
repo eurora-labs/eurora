@@ -1,13 +1,12 @@
 use anyhow::{Result, anyhow};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use eur_auth_client::AuthClient;
-use eur_proto::proto_auth_service::{GetLoginTokenResponse, LoginRequest};
 use eur_secret::{Sensitive, secret};
 use rand::TryRngCore;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tracing::{error, info, warn};
+use tracing::error;
 
 // Re-export shared types for convenience
 #[derive(Debug, Serialize, Deserialize)]

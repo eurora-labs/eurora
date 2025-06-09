@@ -14,8 +14,8 @@ export function transcriptExtension() {
 				schema: transcriptSchema,
 				// component: Transcript,
 				nodeView: (editor: any) =>
-					SvelteNodeView.fromComponent(editor, Transcript as unknown as Component)
-			}
-		}
+					SvelteNodeView.fromComponent(editor, Transcript as unknown as Component),
+			},
+		},
 	} satisfies SveltePMExtension;
 }

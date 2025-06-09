@@ -9,13 +9,13 @@
 
 	export const transcriptAttrs: TranscriptAttrs = {
 		id: undefined,
-		text: undefined
+		text: undefined,
 	};
 
 	export const transcriptSchema: NodeSpec = {
 		attrs: Object.entries(transcriptAttrs).reduce(
 			(acc, [key, value]) => ({ ...acc, [key]: { default: value } }),
-			{}
+			{},
 		),
 		content: 'inline+',
 		group: 'inline',
@@ -31,17 +31,17 @@
 					if (dom instanceof HTMLElement) {
 						return {
 							id: dom.getAttribute('id'),
-							text: dom.getAttribute('data-text')
+							text: dom.getAttribute('data-text'),
 						};
 					}
 					return null;
-				}
-			}
+				},
+			},
 		],
 		toDOM(node: PMNode) {
 			const { id, text } = node.attrs;
 			return ['span', { id, class: 'transcript' }];
-		}
+		},
 	};
 </script>
 

@@ -4,7 +4,7 @@
 		CardContent,
 		CardHeader,
 		CardTitle,
-		CardDescription
+		CardDescription,
 	} from '$lib/custom-components/video-card/index.js';
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 
@@ -15,11 +15,11 @@
 			docs: {
 				description: {
 					component:
-						'A responsive video card component with flexible layout. Features video content with text overlay, supporting both left and right alignment. Automatically adapts from column layout on mobile to row layout on desktop.'
-				}
+						'A responsive video card component with flexible layout. Features video content with text overlay, supporting both left and right alignment. Automatically adapts from column layout on mobile to row layout on desktop.',
+				},
 			},
-			layout: 'padded'
-		}
+			layout: 'padded',
+		},
 	});
 </script>
 

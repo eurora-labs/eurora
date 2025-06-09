@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Menubar as MenubarPrimitive } from "bits-ui";
-	import CircleIcon from "@lucide/svelte/icons/circle";
-	import { cn, type WithoutChild } from "$lib/utils.js";
+	import { Menubar as MenubarPrimitive } from 'bits-ui';
+	import CircleIcon from '@lucide/svelte/icons/circle';
+	import { cn, type WithoutChild } from '$lib/utils.js';
 
 	let {
 		ref = $bindable(null),
@@ -16,7 +16,7 @@
 	data-slot="menubar-radio-item"
 	class={cn(
 		"focus:bg-accent focus:text-accent-foreground rounded-xs outline-hidden relative flex cursor-default select-none items-center gap-2 py-1.5 pl-8 pr-2 text-sm data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-		className
+		className,
 	)}
 	{...restProps}
 >

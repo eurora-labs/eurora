@@ -2,9 +2,9 @@
 version: v2
 clean: true
 inputs:
-  - directory: "proto"
+    - directory: 'proto'
 plugins:
-  - local: protoc-gen-es
-    out: packages/proto/src/lib/gen
-    opt:
-      - target=ts
+    - local: protoc-gen-es
+      out: packages/proto/src/lib/gen
+      opt:
+          - target=ts

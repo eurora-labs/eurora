@@ -1,4 +1,4 @@
-import type { Component, ComponentProps, Snippet } from "svelte";
+import type { Component, ComponentProps, Snippet } from 'svelte';
 
 /**
  * A helper class to make it easy to identify Svelte components in
@@ -21,7 +21,7 @@ export class RenderComponentConfig<TComponent extends Component> {
 	props: ComponentProps<TComponent> | Record<string, never>;
 	constructor(
 		component: TComponent,
-		props: ComponentProps<TComponent> | Record<string, never> = {}
+		props: ComponentProps<TComponent> | Record<string, never> = {},
 	) {
 		this.component = component;
 		this.props = props;

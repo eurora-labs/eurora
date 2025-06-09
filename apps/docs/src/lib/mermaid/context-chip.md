@@ -9,5 +9,6 @@ sequenceDiagram
 
     VideoChip->>+Tauri: getData()
     Tauri->>-VideoChip: {transcript: string}
-    
+
     VideoChip->>-User: Displays pop-over with transcript
+```

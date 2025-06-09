@@ -207,7 +207,9 @@
 					<div class="py-6 text-center text-sm">
 						<div class="mb-2">🔍</div>
 						<div>No results found</div>
-						<div class="text-muted-foreground mt-1 text-xs">Try a different search term</div>
+						<div class="text-muted-foreground mt-1 text-xs">
+							Try a different search term
+						</div>
 					</div>
 				</Command.Empty>
 				<Command.Group heading="Suggestions">

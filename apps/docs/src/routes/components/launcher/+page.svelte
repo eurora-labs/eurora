@@ -10,7 +10,7 @@
 		Film,
 		YoutubeIcon,
 		HardDrive,
-		FileTextIcon,
+		FileTextIcon
 	} from '@lucide/svelte';
 
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
@@ -23,7 +23,7 @@
 
 	let exampleInput = $state({
 		text: '',
-		extensions: [transcriptExtension()],
+		extensions: [transcriptExtension()]
 	});
 
 	function addExerciseSheet() {
@@ -36,8 +36,8 @@
 				from.pos,
 				nodes.transcript.createChecked(
 					{ id: 'transcript-1', text: 'Exercise Sheet 2' },
-					schema.text(' '),
-				),
+					schema.text(' ')
+				)
 			);
 
 			dispatch?.(tr);

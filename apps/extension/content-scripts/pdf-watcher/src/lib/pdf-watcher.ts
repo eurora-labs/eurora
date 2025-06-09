@@ -26,15 +26,15 @@ interface PdfState extends Partial<ProtoPdfState> {
 						console.error('Error generating PDF report:', {
 							url: window.location.href,
 							error: errorMessage,
-							stack: error instanceof Error ? error.stack : undefined
+							stack: error instanceof Error ? error.stack : undefined,
 						});
 						response({
 							success: false,
 							error: contextualError,
 							context: {
 								url: window.location.href,
-								timestamp: new Date().toISOString()
-							}
+								timestamp: new Date().toISOString(),
+							},
 						});
 					});
 
@@ -57,7 +57,7 @@ interface PdfState extends Partial<ProtoPdfState> {
 			url: window.location.href,
 			title: document.title,
 			content,
-			selectedText: window.getSelection().toString() ?? ''
+			selectedText: window.getSelection().toString() ?? '',
 		};
 	}
 
