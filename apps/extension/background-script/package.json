@@ -42,7 +42,7 @@
 		"typescript-eslint": "^8.31.1",
 		"vite": "^6.3.5",
 		"vite-plugin-dts": "^4.5.3",
-		"vitest": "^3.2.0"
+		"vitest": "^3.2.3"
 	},
 	"dependencies": {
 		"@sentry/vite-plugin": "^3.3.1",
