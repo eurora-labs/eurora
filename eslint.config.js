@@ -15,11 +15,11 @@ export default ts.config(
 		languageOptions: {
 			globals: {
 				...globals.browser,
-				...globals.node
+				...globals.node,
 			},
 			parserOptions: {
-				projectService: true
-			}
+				projectService: true,
+			},
 		},
 		rules: {
 			'@typescript-eslint/no-namespace': 'off',
@@ -30,8 +30,8 @@ export default ts.config(
 				{
 					argsIgnorePattern: '^_',
 					varsIgnorePattern: '^_',
-					caughtErrorsIgnorePattern: '^_'
-				}
+					caughtErrorsIgnorePattern: '^_',
+				},
 			],
 			'@typescript-eslint/return-await': ['error', 'always'],
 			'@typescript-eslint/promise-function-async': 'error',
@@ -45,7 +45,7 @@ export default ts.config(
 					alphabetize: {
 						order: 'asc',
 						orderImportKind: 'asc',
-						caseInsensitive: false
+						caseInsensitive: false,
 					},
 					groups: [
 						'index',
@@ -55,16 +55,16 @@ export default ts.config(
 						'external',
 						'builtin',
 						'object',
-						'type'
+						'type',
 					],
-					'newlines-between': 'never'
-				}
+					'newlines-between': 'never',
+				},
 			],
 			'import-x/no-unresolved': [
 				'error',
 				{
-					ignore: ['^\\$app', '^\\$env']
-				}
+					ignore: ['^\\$app', '^\\$env'],
+				},
 			],
 			'import-x/no-relative-packages': 'error', // Don't allow packages to have relative imports between each other
 			'func-style': [2, 'declaration'],
@@ -75,14 +75,14 @@ export default ts.config(
 				{
 					button: true,
 					submit: true,
-					reset: true
-				}
-			]
+					reset: true,
+				},
+			],
 		},
 		settings: {
 			'import-x/extensions': ['.ts'],
 			'import-x/parsers': {
-				'@typescript-eslint/parser': ['.ts']
+				'@typescript-eslint/parser': ['.ts'],
 			},
 			'import-x/resolver': {
 				typescript: {
@@ -93,26 +93,26 @@ export default ts.config(
 						'./apps/web/.svelte-kit/tsconfig.json',
 						'./packages/**/tsconfig.json',
 						'./packages/ui/.svelte-kit/tsconfig.json',
-						'./packages/shared/.svelte-kit/tsconfig.json'
-					]
-				}
-			}
+						'./packages/shared/.svelte-kit/tsconfig.json',
+					],
+				},
+			},
 		},
 		plugins: {
-			'import-x': pluginImportX
-		}
+			'import-x': pluginImportX,
+		},
 	},
 	{
 		files: ['**/*.svelte'],
-		...ts.configs.disableTypeChecked
+		...ts.configs.disableTypeChecked,
 	},
 	{
 		files: ['**/*.svelte'],
 		languageOptions: {
 			parserOptions: {
-				parser: ts.parser
-			}
-		}
+				parser: ts.parser,
+			},
+		},
 	},
 	{
 		ignores: [
@@ -142,7 +142,7 @@ export default ts.config(
 			'crates/',
 			'packages/ui/storybook-static',
 			// Storybook Meta type wrapper
-			'packages/ui/src/stories/**/*.stories.ts'
-		]
-	}
+			'packages/ui/src/stories/**/*.stories.ts',
+		],
+	},
 );

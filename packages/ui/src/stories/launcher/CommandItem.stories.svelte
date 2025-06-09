@@ -9,7 +9,8 @@
 			layout: 'centered',
 			docs: {
 				description: {
-					component: 'Individual command items that can be selected within a command palette.',
+					component:
+						'Individual command items that can be selected within a command palette.',
 				},
 			},
 		},

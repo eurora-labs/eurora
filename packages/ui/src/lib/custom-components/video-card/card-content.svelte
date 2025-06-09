@@ -26,7 +26,7 @@
 		'flex-col gap-6',
 		/* Desktop: row layout */
 		alignment === 'right' ? 'md:flex-row-reverse md:gap-0' : 'md:flex-row md:gap-0',
-		className
+		className,
 	)}
 	{...restProps}
 >

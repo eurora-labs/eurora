@@ -6,19 +6,19 @@ This file contains the proposed change for integrating the ExtensionFactory in `
 
 ```svelte
 <script lang="ts">
-  // ... existing imports
-  import { transcriptExtension } from '@eurora/ext-transcript';
-  import { videoExtension } from '@eurora/ext-video';
-  
-  // ... other code
+	// ... existing imports
+	import { transcriptExtension } from '@eurora/ext-transcript';
+	import { videoExtension } from '@eurora/ext-video';
 
-  // Query object for the Launcher.Input component
-  let searchQuery = $state({
-    text: '',
-    extensions: [transcriptExtension(), videoExtension()]
-  });
-  
-  // ... rest of the file
+	// ... other code
+
+	// Query object for the Launcher.Input component
+	let searchQuery = $state({
+		text: '',
+		extensions: [transcriptExtension(), videoExtension()],
+	});
+
+	// ... rest of the file
 </script>
 ```
 
@@ -26,22 +26,22 @@ This file contains the proposed change for integrating the ExtensionFactory in `
 
 ```svelte
 <script lang="ts">
-  // ... existing imports
-  
-  // Replace individual extension imports with the factory import
-  import { extensionFactory } from '@eurora/prosemirror-factory';
-  // Import to ensure extensions are registered
-  import '@eurora/prosemirror-factory/register-extensions';
-  
-  // ... other code
+	// ... existing imports
 
-  // Query object for the Launcher.Input component using the factory
-  let searchQuery = $state({
-    text: '',
-    extensions: extensionFactory.getExtensions()
-  });
-  
-  // ... rest of the file
+	// Replace individual extension imports with the factory import
+	import { extensionFactory } from '@eurora/prosemirror-factory';
+	// Import to ensure extensions are registered
+	import '@eurora/prosemirror-factory/register-extensions';
+
+	// ... other code
+
+	// Query object for the Launcher.Input component using the factory
+	let searchQuery = $state({
+		text: '',
+		extensions: extensionFactory.getExtensions(),
+	});
+
+	// ... rest of the file
 </script>
 ```
 
@@ -51,29 +51,29 @@ If you need to use specific extensions only:
 
 ```svelte
 <script lang="ts">
-  // ... existing imports
-  
-  // Replace individual extension imports with the factory import
-  import { extensionFactory } from '@eurora/prosemirror-factory';
-  // Import to ensure extensions are registered
-  import '@eurora/prosemirror-factory/register-extensions';
-  
-  // Define constants for extension IDs
-  const VIDEO_EXTENSION_ID = '9370B14D-B61C-4CE2-BDE7-B18684E8731A';
-  const TRANSCRIPT_EXTENSION_ID = 'D8215655-A880-4B0F-8EFA-0B6B447F8AF3';
-  
-  // ... other code
+	// ... existing imports
 
-  // Query object for the Launcher.Input component using specific extensions
-  let searchQuery = $state({
-    text: '',
-    extensions: [
-      extensionFactory.getExtension(VIDEO_EXTENSION_ID),
-      extensionFactory.getExtension(TRANSCRIPT_EXTENSION_ID)
-    ].filter(Boolean) // Filter out any undefined extensions
-  });
-  
-  // ... rest of the file
+	// Replace individual extension imports with the factory import
+	import { extensionFactory } from '@eurora/prosemirror-factory';
+	// Import to ensure extensions are registered
+	import '@eurora/prosemirror-factory/register-extensions';
+
+	// Define constants for extension IDs
+	const VIDEO_EXTENSION_ID = '9370B14D-B61C-4CE2-BDE7-B18684E8731A';
+	const TRANSCRIPT_EXTENSION_ID = 'D8215655-A880-4B0F-8EFA-0B6B447F8AF3';
+
+	// ... other code
+
+	// Query object for the Launcher.Input component using specific extensions
+	let searchQuery = $state({
+		text: '',
+		extensions: [
+			extensionFactory.getExtension(VIDEO_EXTENSION_ID),
+			extensionFactory.getExtension(TRANSCRIPT_EXTENSION_ID),
+		].filter(Boolean), // Filter out any undefined extensions
+	});
+
+	// ... rest of the file
 </script>
 ```
 

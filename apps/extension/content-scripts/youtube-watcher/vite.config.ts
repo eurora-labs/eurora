@@ -8,8 +8,8 @@ export default defineConfig({
 	plugins: [
 		dts({
 			entryRoot: 'src',
-			tsconfigPath: path.join(__dirname, 'tsconfig.json')
-		})
+			tsconfigPath: path.join(__dirname, 'tsconfig.json'),
+		}),
 	],
 	// Uncomment this if you are using workers.
 	// worker: {
@@ -21,12 +21,12 @@ export default defineConfig({
 		// outDir: '../../../dist/apps/content-scripts/youtube-watcher',
 		outDir: path.resolve(
 			__dirname,
-			'../../../../extensions/chromium/content-scripts/youtube-watcher'
+			'../../../../extensions/chromium/content-scripts/youtube-watcher',
 		),
 		emptyOutDir: true,
 		reportCompressedSize: true,
 		commonjsOptions: {
-			transformMixedEsModules: true
+			transformMixedEsModules: true,
 		},
 		lib: {
 			// Could also be a dictionary or array of multiple entry points.
@@ -35,7 +35,7 @@ export default defineConfig({
 			fileName: 'index',
 			// Change this to the formats you want to support.
 			// Don't forget to update your package.json as well.
-			formats: ['es']
+			formats: ['es'],
 		},
 		rollupOptions: {
 			// External packages that should not be bundled into your library.
@@ -43,9 +43,9 @@ export default defineConfig({
 			output: {
 				entryFileNames: 'main.js',
 				chunkFileNames: 'main-[name].js',
-				assetFileNames: 'assets/[name].[ext]'
-			}
-		}
+				assetFileNames: 'assets/[name].[ext]',
+			},
+		},
 	},
 	test: {
 		watch: false,
@@ -55,16 +55,16 @@ export default defineConfig({
 		reporters: ['default'],
 		coverage: {
 			reportsDirectory: '../../../coverage/apps/content-scripts/youtube-watcher',
-			provider: 'v8'
-		}
+			provider: 'v8',
+		},
 	},
 	resolve: {
 		alias: {
 			'@eurora/youtube-transcripts': path.resolve(
 				__dirname,
-				'../../../../packages/website-modules/youtube/youtube-transcripts/src/index.ts'
+				'../../../../packages/website-modules/youtube/youtube-transcripts/src/index.ts',
 			),
-			'@eurora/proto/*': path.resolve(__dirname, '../../../../packages/proto/src/lib/*')
-		}
-	}
+			'@eurora/proto/*': path.resolve(__dirname, '../../../../packages/proto/src/lib/*'),
+		},
+	},
 });

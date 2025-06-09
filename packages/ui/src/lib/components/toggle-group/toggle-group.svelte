@@ -1,25 +1,25 @@
 <script lang="ts" module>
-	import { getContext, setContext } from "svelte";
-	import type { ToggleVariants } from "$lib/components/toggle/index.js";
+	import { getContext, setContext } from 'svelte';
+	import type { ToggleVariants } from '$lib/components/toggle/index.js';
 	export function setToggleGroupCtx(props: ToggleVariants) {
-		setContext("toggleGroup", props);
+		setContext('toggleGroup', props);
 	}
 
 	export function getToggleGroupCtx() {
-		return getContext<ToggleVariants>("toggleGroup");
+		return getContext<ToggleVariants>('toggleGroup');
 	}
 </script>
 
 <script lang="ts">
-	import { ToggleGroup as ToggleGroupPrimitive } from "bits-ui";
-	import { cn } from "$lib/utils.js";
+	import { ToggleGroup as ToggleGroupPrimitive } from 'bits-ui';
+	import { cn } from '$lib/utils.js';
 
 	let {
 		ref = $bindable(null),
 		value = $bindable(),
 		class: className,
-		size = "default",
-		variant = "default",
+		size = 'default',
+		variant = 'default',
 		...restProps
 	}: ToggleGroupPrimitive.RootProps & ToggleVariants = $props();
 
@@ -40,8 +40,8 @@ get along, so we shut typescript up by casting `value` to `never`.
 	data-variant={variant}
 	data-size={size}
 	class={cn(
-		"group/toggle-group data-[variant=outline]:shadow-xs flex w-fit items-center rounded-md",
-		className
+		'group/toggle-group data-[variant=outline]:shadow-xs flex w-fit items-center rounded-md',
+		className,
 	)}
 	{...restProps}
 />

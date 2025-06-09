@@ -5,8 +5,8 @@ chrome.runtime.sendMessage({
 	type: 'SEND_TO_NATIVE',
 	payload: {
 		videoId: window.location.search?.split('v=')[1]?.split('&')[0] || '',
-		transcript: ''
-	}
+		transcript: '',
+	},
 });
 
 // Listen for responses from service worker

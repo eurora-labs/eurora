@@ -6,8 +6,8 @@ const preview: Preview = {
 		controls: {
 			matchers: {
 				color: /(background|color)$/i,
-				date: /Date$/i
-			}
+				date: /Date$/i,
+			},
 		},
 		docs: {
 			extractComponentDescription: (component, { notes }) => {
@@ -15,9 +15,9 @@ const preview: Preview = {
 					return typeof notes === 'string' ? notes : notes.markdown || notes.text;
 				}
 				return null;
-			}
-		}
-	}
+			},
+		},
+	},
 };
 
 export default preview;

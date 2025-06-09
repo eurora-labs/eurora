@@ -12,7 +12,7 @@ use eur_proto::proto_auth_service::{
 };
 use eur_remote_db::{
     CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
-    CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager, UpdateLoginTokenRequest,
+    CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
 };
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use oauth2::TokenResponse as OAuth2TokenResponse;
@@ -22,7 +22,6 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
-use url::Url;
 use uuid::Uuid;
 
 // Re-export shared types for convenience

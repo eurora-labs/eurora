@@ -4,15 +4,15 @@
 		type CarouselProps,
 		type EmblaContext,
 		setEmblaContext,
-	} from "./context.js";
-	import { cn, type WithElementRef } from "$lib/utils.js";
+	} from './context.js';
+	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	let {
 		ref = $bindable(null),
 		opts = {},
 		plugins = [],
 		setApi = () => {},
-		orientation = "horizontal",
+		orientation = 'horizontal',
 		class: className,
 		children,
 		...restProps
@@ -56,16 +56,16 @@
 	$effect(() => {
 		if (carouselState.api) {
 			onSelect(carouselState.api);
-			carouselState.api.on("select", onSelect);
-			carouselState.api.on("reInit", onSelect);
+			carouselState.api.on('select', onSelect);
+			carouselState.api.on('reInit', onSelect);
 		}
 	});
 
 	function handleKeyDown(e: KeyboardEvent) {
-		if (e.key === "ArrowLeft") {
+		if (e.key === 'ArrowLeft') {
 			e.preventDefault();
 			scrollPrev();
-		} else if (e.key === "ArrowRight") {
+		} else if (e.key === 'ArrowRight') {
 			e.preventDefault();
 			scrollNext();
 		}
@@ -83,7 +83,7 @@
 
 	$effect(() => {
 		return () => {
-			carouselState.api?.off("select", onSelect);
+			carouselState.api?.off('select', onSelect);
 		};
 	});
 </script>
@@ -91,7 +91,7 @@
 <div
 	bind:this={ref}
 	data-slot="carousel"
-	class={cn("relative", className)}
+	class={cn('relative', className)}
 	role="region"
 	aria-roledescription="carousel"
 	{...restProps}
