@@ -30,7 +30,7 @@
 	<CommandPrimitive.Input
 		class={cn(
 			'custom-input flex w-full rounded-md border-none bg-transparent shadow-none outline-none focus:border-transparent focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50',
-			className
+			className,
 		)}
 		bind:ref
 		bind:value

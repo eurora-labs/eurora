@@ -15,8 +15,8 @@ export async function createNodeSpec(pm_node: SveltePMNode<any>): Promise<NodeSp
 				props: {
 					node,
 					attrs: node.attrs,
-					contentDOM: () => undefined
-				}
+					contentDOM: () => undefined,
+				},
 			}) as any;
 			if (!comp.ref) return staticSpec;
 			const spec = htmlToDOMOutputSpec(comp.ref);
@@ -29,16 +29,16 @@ export async function createNodeSpec(pm_node: SveltePMNode<any>): Promise<NodeSp
 				getAttrs: (dom: HTMLElement | string) => {
 					if (dom instanceof HTMLElement) {
 						return getAttrsWithOutputSpec(staticSpec, dom, {
-							selector: []
+							selector: [],
 						});
 					}
 					return null;
-				}
-			}
+				},
+			},
 		];
 	} else if (!component && schema?.toDOM === undefined) {
 		throw Error(
-			`You must provide either Svelte component or schema.toDOM method for your Svelte PMNode!`
+			`You must provide either Svelte component or schema.toDOM method for your Svelte PMNode!`,
 		);
 	}
 	return schema;
@@ -56,8 +56,8 @@ export async function createSpec(node: SveltePMNode<any>): Promise<readonly [str
 		props: {
 			node: undefined,
 			attrs,
-			contentDOM: () => undefined
-		} as any
+			contentDOM: () => undefined,
+		} as any,
 	})) as any;
 	const spec = htmlToDOMOutputSpec(comp.ref);
 	return spec as [string, ...any[]];

@@ -15,7 +15,7 @@
 	bind:this={ref}
 	class={cn(
 		'text-token-text-primary w-full focus-visible:outline-2 focus-visible:outline-offset-[-4px]',
-		className
+		className,
 	)}
 	{...restProps}
 >

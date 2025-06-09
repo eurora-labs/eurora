@@ -8,8 +8,8 @@ export function paragraphExtension() {
 			paragraph: {
 				attrs: paragraphAttrs,
 				schema: paragraphSchema,
-				component: Paragraph as any
-			}
-		}
+				component: Paragraph as any,
+			},
+		},
 	} satisfies SveltePMExtension;
 }
