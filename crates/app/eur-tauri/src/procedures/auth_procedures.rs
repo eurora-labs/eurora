@@ -32,7 +32,10 @@ impl AuthApi for AuthApiImpl {
     ) -> Result<LoginToken, String> {
         // Try to get auth manager from app state
         if let Some(auth_manager) = app_handle.try_state::<AuthManager>() {
-            let (code_verifier, code_challenge) = auth_manager.get_login_tokens().await.unwrap();
+            let (code_verifier, code_challenge) = auth_manager
+                .get_login_tokens()
+                .await
+                .map_err(|e| format!("Failed to get login tokens: {}", e))?;
             let expires_in: i64 = 60 * 20;
 
             let base_url = std::env::var("AUTH_BASE_URL")
@@ -48,7 +51,7 @@ impl AuthApi for AuthApiImpl {
                 &Sensitive(code_verifier.clone()),
                 secret::Namespace::BuildKind,
             )
-            .unwrap();
+            .map_err(|e| format!("Failed to persist code verifier: {}", e))?;
             Ok(LoginToken {
                 code_challenge,
                 expires_in,
