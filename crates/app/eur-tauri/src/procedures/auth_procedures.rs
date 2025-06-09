@@ -61,10 +61,7 @@ impl AuthApi for AuthApiImpl {
             let login_token = secret::retrieve(LOGIN_CODE_VERIFIER, secret::Namespace::BuildKind)
                 .unwrap()
                 .unwrap();
-            match auth_manager
-                .login_by_login_token(login_token.to_string())
-                .await
-            {
+            match auth_manager.login_by_login_token(login_token.0).await {
                 Ok(_) => Ok(true),
                 Err(_) => Ok(false),
             }
