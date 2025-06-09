@@ -99,7 +99,7 @@
 					/>
 					<Button
 						onclick={sendMessage}
-						class="absolute bottom-2 right-2 shadow-sm transition-shadow hover:shadow-md"
+						class="absolute right-2 bottom-2 shadow-sm transition-shadow hover:shadow-md"
 						size="icon"
 					>
 						<SendHorizontal />

@@ -23,7 +23,7 @@ function connectToNativeHost(): Promise<boolean> {
 						if (tab.id) {
 							chrome.tabs.sendMessage(tab.id, {
 								type: 'NATIVE_RESPONSE',
-								payload: response
+								payload: response,
 							});
 						}
 					});
@@ -84,14 +84,14 @@ function sendMessageToNativeHost(payload: any, tabId?: number) {
 		// Return error to caller
 		const errorResponse = {
 			status: 'error',
-			error: error instanceof Error ? error.message : String(error)
+			error: error instanceof Error ? error.message : String(error),
 		};
 
 		// Notify content script of failure
 		if (tabId) {
 			chrome.tabs.sendMessage(tabId, {
 				type: 'NATIVE_RESPONSE',
-				payload: errorResponse
+				payload: errorResponse,
 			});
 		}
 
@@ -110,7 +110,7 @@ function sendMessageToNativeHost(payload: any, tabId?: number) {
 // // Initialize the connection when the service worker starts
 connectToNativeHost().then((connected) => {
 	console.log(
-		`Native messaging service worker initialized, connection status: ${connected ? 'connected' : 'failed'}`
+		`Native messaging service worker initialized, connection status: ${connected ? 'connected' : 'failed'}`,
 	);
 	nativePort.onMessage.addListener(async (message, sender) => {
 		switch (message.type) {
@@ -169,7 +169,7 @@ async function handleGenerateSnapshot() {
 				} else {
 					resolve(response);
 				}
-			})
+			}),
 		);
 
 		return { success: true, ...response };
@@ -177,7 +177,7 @@ async function handleGenerateSnapshot() {
 		console.error('Error generating snapshot:', error);
 		return {
 			success: false,
-			error: String(error)
+			error: String(error),
 		};
 	}
 }
@@ -210,7 +210,7 @@ async function handleGenerateReport() {
 				} else {
 					resolve(response);
 				}
-			})
+			}),
 		);
 
 		return { success: true, ...response };
@@ -218,7 +218,7 @@ async function handleGenerateReport() {
 		console.error('Error generating report:', error);
 		return {
 			success: false,
-			error: String(error)
+			error: String(error),
 		};
 	}
 }

@@ -50,8 +50,8 @@ import '@eurora/prosemirror-factory/register-extensions';
 
 // In your component
 let searchQuery = $state({
-  text: '',
-  extensions: extensionFactory.getExtensions()
+	text: '',
+	extensions: extensionFactory.getExtensions(),
 });
 ```
 
@@ -61,11 +61,11 @@ The package provides several utility functions to work with extensions:
 
 ```typescript
 import {
-  getExtensionsByNamePattern,
-  getExtensionsByNodeType,
-  createSchemaConfig,
-  groupExtensionsByCategory,
-  hasRequiredExtensions
+	getExtensionsByNamePattern,
+	getExtensionsByNodeType,
+	createSchemaConfig,
+	groupExtensionsByCategory,
+	hasRequiredExtensions,
 } from '@eurora/prosemirror-factory/utils';
 
 // Get extensions by pattern
@@ -73,8 +73,8 @@ const mediaExtensions = getExtensionsByNamePattern(/video|audio/i);
 
 // Check if required extensions are available
 const hasRequired = hasRequiredExtensions([
-  '9370B14D-B61C-4CE2-BDE7-B18684E8731A', // video
-  'D8215655-A880-4B0F-8EFA-0B6B447F8AF3'  // transcript
+	'9370B14D-B61C-4CE2-BDE7-B18684E8731A', // video
+	'D8215655-A880-4B0F-8EFA-0B6B447F8AF3', // transcript
 ]);
 ```
 
@@ -103,11 +103,11 @@ Extensions should follow this structure to work with the factory:
 export const ID = 'A-UNIQUE-UUID';
 
 export function myExtension() {
-  return {
-    id: ID,
-    name: 'my-extension',
-    // Other extension properties...
-  };
+	return {
+		id: ID,
+		name: 'my-extension',
+		// Other extension properties...
+	};
 }
 ```
 
