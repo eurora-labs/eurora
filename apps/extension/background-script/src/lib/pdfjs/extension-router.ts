@@ -31,7 +31,7 @@ limitations under the License.
 		// Chromium OS
 		'filesystem',
 		// Chromium OS, shorthand for filesystem:<origin>/external/
-		'drive'
+		'drive',
 	];
 
 	/**
@@ -98,7 +98,7 @@ limitations under the License.
 				chrome.tabs.update(details.tabId, { url });
 			}
 		},
-		{ url: [{ urlPrefix: CRX_BASE_URL }] }
+		{ url: [{ urlPrefix: CRX_BASE_URL }] },
 	);
 
 	console.log('Set up extension URL router.');

@@ -21,13 +21,13 @@
 		transcript: undefined,
 		text: undefined,
 		name: undefined,
-		currentFrame: undefined
+		currentFrame: undefined,
 	};
 
 	export const videoSchema: NodeSpec = {
 		attrs: Object.entries(videoAttrs).reduce(
 			(acc, [key, value]) => ({ ...acc, [key]: { default: value } }),
-			{}
+			{},
 		),
 		content: 'inline+',
 		group: 'inline',
@@ -44,17 +44,17 @@
 						return {
 							id: dom.getAttribute('id'),
 							text: dom.getAttribute('data-text'),
-							name: dom.getAttribute('data-name')
+							name: dom.getAttribute('data-name'),
 						};
 					}
 					return null;
-				}
-			}
+				},
+			},
 		],
 		toDOM(node: PMNode) {
 			const { id, text, name } = node.attrs;
 			return ['span', { id, 'data-text': text, 'data-name': name, class: 'video' }];
-		}
+		},
 	};
 </script>
 

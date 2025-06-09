@@ -13,8 +13,8 @@ export function youtubeVideoExtension(): SveltePMExtension {
 				attrs: videoAttrs,
 				schema: videoSchema,
 				nodeView: (editor: any) =>
-					SvelteNodeView.fromComponent(editor, YoutubeVideo as unknown as Component)
-			}
-		}
+					SvelteNodeView.fromComponent(editor, YoutubeVideo as unknown as Component),
+			},
+		},
 	} satisfies SveltePMExtension;
 }

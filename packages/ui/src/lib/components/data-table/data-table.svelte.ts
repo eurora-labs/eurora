@@ -4,7 +4,7 @@ import {
 	type TableOptionsResolved,
 	type TableState,
 	createTable,
-} from "@tanstack/table-core";
+} from '@tanstack/table-core';
 
 /**
  * Creates a reactive TanStack table object for Svelte.
@@ -40,12 +40,12 @@ export function createSvelteTable<TData extends RowData>(options: TableOptions<T
 			renderFallbackValue: null,
 			mergeOptions: (
 				defaultOptions: TableOptions<TData>,
-				options: Partial<TableOptions<TData>>
+				options: Partial<TableOptions<TData>>,
 			) => {
 				return mergeObjects(defaultOptions, options);
 			},
 		},
-		options
+		options,
 	);
 
 	const table = createTable(resolvedOptions);
@@ -92,7 +92,7 @@ export function mergeObjects<Sources extends readonly MaybeThunk<any>[]>(
 	...sources: Sources
 ): Intersection<{ [K in keyof Sources]: Sources[K] }> {
 	const resolve = <T extends object>(src: MaybeThunk<T>): T | undefined =>
-		typeof src === "function" ? (src() ?? undefined) : src;
+		typeof src === 'function' ? (src() ?? undefined) : src;
 
 	const findSourceWithKey = (key: PropertyKey) => {
 		for (let i = sources.length - 1; i >= 0; i--) {

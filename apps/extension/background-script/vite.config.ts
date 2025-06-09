@@ -9,8 +9,8 @@ export default defineConfig({
 	plugins: [
 		dts({
 			entryRoot: 'src',
-			tsconfigPath: path.join(__dirname, 'tsconfig.json')
-		})
+			tsconfigPath: path.join(__dirname, 'tsconfig.json'),
+		}),
 		// sentryVitePlugin({
 		// 	org: 'eurora-labs',
 		// 	project: 'apps_extension_background-script'
@@ -28,7 +28,7 @@ export default defineConfig({
 		reportCompressedSize: true,
 
 		commonjsOptions: {
-			transformMixedEsModules: true
+			transformMixedEsModules: true,
 		},
 
 		lib: {
@@ -38,24 +38,24 @@ export default defineConfig({
 			fileName: 'index',
 			// Change this to the formats you want to support.
 			// Don't forget to update your package.json as well.
-			formats: ['es']
+			formats: ['es'],
 		},
 
 		rollupOptions: {
 			// External packages that should not be bundled into your library.
 			external: [],
 			input: {
-				main: 'src/index.ts'
+				main: 'src/index.ts',
 				// 'service-worker/messaging-worker': 'src/lib/service-worker/messaging-worker.ts'
 			},
 			output: {
 				entryFileNames: '[name].js',
 				chunkFileNames: 'chunks/[name]-[hash].js',
-				assetFileNames: 'assets/[name].[ext]'
-			}
+				assetFileNames: 'assets/[name].[ext]',
+			},
 		},
 
-		sourcemap: true
+		sourcemap: true,
 	},
 	// test: {
 	// 	watch: false,
@@ -70,7 +70,7 @@ export default defineConfig({
 	// },
 	resolve: {
 		alias: {
-			'@eurora/proto/*': path.resolve(__dirname, '../../../packages/proto/src/*')
-		}
-	}
+			'@eurora/proto/*': path.resolve(__dirname, '../../../packages/proto/src/*'),
+		},
+	},
 });

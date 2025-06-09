@@ -54,7 +54,7 @@ chrome.webRequest.onSendHeaders.addListener(
 		forgetReferrerEventually(tabId);
 	},
 	{ urls: ['*://*/*'], types: ['main_frame', 'sub_frame'] },
-	['requestHeaders', 'extraHeaders']
+	['requestHeaders', 'extraHeaders'],
 );
 
 function forgetReferrerEventually(tabId) {
@@ -136,23 +136,23 @@ function setStickyReferrer(dnrRequestId, tabId, url, referer, callback) {
 			// The viewer and background are presumed to have the same origin:
 			initiatorDomains: [location.hostname], // = chrome.runtime.id.
 			resourceTypes: ['xmlhttprequest'],
-			tabIds: [tabId]
+			tabIds: [tabId],
 		},
 		action: {
 			type: 'modifyHeaders',
-			requestHeaders: [{ operation: 'set', header: 'referer', value: referer }]
-		}
+			requestHeaders: [{ operation: 'set', header: 'referer', value: referer }],
+		},
 	};
 	chrome.declarativeNetRequest.updateSessionRules(
 		{ removeRuleIds: [dnrRequestId], addRules: [rule] } as any,
-		callback
+		callback,
 	);
 }
 
 function unsetStickyReferrer(dnrRequestId) {
 	if (dnrRequestId) {
 		chrome.declarativeNetRequest.updateSessionRules({
-			removeRuleIds: [dnrRequestId]
+			removeRuleIds: [dnrRequestId],
 		});
 	}
 }

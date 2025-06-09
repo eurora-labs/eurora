@@ -104,7 +104,10 @@
 							<User class="mr-2 h-4 w-4" />
 							Clickable Primary
 						</ContextChip>
-						<ContextChip variant="destructive" onClick={() => alert('Destructive clicked!')}>
+						<ContextChip
+							variant="destructive"
+							onClick={() => alert('Destructive clicked!')}
+						>
 							Remove Tag
 						</ContextChip>
 					</div>

@@ -3,6 +3,6 @@
 </script>
 
 <div class="flex h-screen w-screen">
-	<div class="w-2/3 p-8 h-full">{@render children?.()}</div>
-	<div class="w-1/3 h-full">static image</div>
+	<div class="h-full w-2/3 p-8">{@render children?.()}</div>
+	<div class="h-full w-1/3">static image</div>
 </div>
