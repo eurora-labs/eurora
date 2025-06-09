@@ -23,11 +23,11 @@
 		"@eurora/ui": "workspace:*",
 		"@tailwindcss/vite": "^4.1.7",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
-		"@lucide/svelte": "^0.511.0",
+		"@lucide/svelte": "^0.513.0",
 		"@sveltejs/adapter-auto": "^6.0.0",
 		"@sveltejs/adapter-static": "^3.0.8",
-		"@sveltejs/kit": "^2.21.1",
-		"@sveltejs/vite-plugin-svelte": "^5.0.3",
+		"@sveltejs/kit": "^2.21.3",
+		"@sveltejs/vite-plugin-svelte": "^5.1.0",
 		"@tailwindcss/postcss": "^4.1.8",
 		"autoprefixer": "^10.4.21",
 		"bits-ui": "^2.4.0",
@@ -39,7 +39,7 @@
 		"postcss-import": "^16.1.0",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
-		"svelte": "^5.33.14",
+		"svelte": "^5.33.18",
 		"svelte-check": "^4.2.1",
 		"svelte-sonner": "^1.0.4",
 		"tailwind-merge": "^3.3.0",
@@ -49,6 +49,6 @@
 		"typescript": "5.8.3",
 		"vaul-svelte": "1.0.0-next.7",
 		"vite": "^6.3.5",
-		"vitest": "^3.2.0"
+		"vitest": "^3.2.3"
 	}
 }
