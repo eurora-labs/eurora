@@ -17,17 +17,27 @@
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 
 	onMount(() => {
-		let loginToken = page.url.searchParams.get('code_challenge');
-		let challengeMethod = page.url.searchParams.get('code_challenge_method');
-		if (loginToken && challengeMethod) {
-			sessionStorage.setItem('loginToken', loginToken);
-			sessionStorage.setItem('challengeMethod', challengeMethod);
-			goto('/login');
+		try {
+			let loginToken = page.url.searchParams.get('code_challenge');
+			let challengeMethod = page.url.searchParams.get('code_challenge_method');
+			if (loginToken && challengeMethod) {
+				if (loginToken.length !== 43 || challengeMethod !== 'S256') {
+					console.error('Invalid login token or challenge method');
+					goto('/login?error=invalid_login_token');
+					return;
+				}
+				sessionStorage.setItem('loginToken', loginToken);
+				sessionStorage.setItem('challengeMethod', challengeMethod);
+				goto('/login');
+				return;
+			}
+			loginToken = sessionStorage.getItem('loginToken');
+			challengeMethod = sessionStorage.getItem('challengeMethod');
+		} catch (error) {
+			console.error('Invalid login token or challenge method');
+			goto('/login?error=invalid_login_token');
 			return;
 		}
-
-		loginToken = sessionStorage.getItem('loginToken');
-		challengeMethod = sessionStorage.getItem('challengeMethod');
 	});
 	// Define form schema
 	const loginSchema = z.object({
