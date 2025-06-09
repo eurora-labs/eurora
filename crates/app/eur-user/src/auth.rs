@@ -3,8 +3,13 @@ use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use eur_auth_client::AuthClient;
 use eur_proto::proto_auth_service::{GetLoginTokenResponse, LoginRequest};
 use eur_secret::{Sensitive, secret};
+use rand::TryRngCore;
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use sha2::{Digest, Sha256};
+use tracing::{error, info, warn};
+
+// Re-export shared types for convenience
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     sub: String,
@@ -72,9 +77,19 @@ impl AuthManager {
     }
 
     pub async fn get_or_refresh_access_token(&self) -> Result<Sensitive<String>> {
-        // Check if refresh_threshold has passed
-        if self.get_access_token_payload().unwrap().exp < chrono::Utc::now().timestamp() {
-            return self.refresh_tokens().await;
+        // Check if token has expired or is close to expiration
+        match self.get_access_token_payload() {
+            Ok(claims) => {
+                let now = chrono::Utc::now().timestamp();
+                let expiry_with_offset = claims.exp - self.jwt_config.refresh_offset;
+                if now < expiry_with_offset {
+                    // Token is still valid
+                    return self.get_access_token();
+                }
+            }
+            Err(_) => {
+                // Token is invalid or missing, try to refresh
+            }
         }
 
         self.refresh_tokens().await
@@ -92,10 +107,20 @@ impl AuthManager {
         Ok(Sensitive(response.access_token))
     }
 
-    pub async fn get_login_token(&self) -> Result<GetLoginTokenResponse> {
-        let token = self.auth_client.get_login_token().await?;
-        info!("Login token: {}", token.token);
-        Ok(token)
+    pub async fn get_login_tokens(&self) -> Result<(String, String)> {
+        let mut verifier_bytes = vec![0u8; 32];
+        OsRng.try_fill_bytes(&mut verifier_bytes).map_err(|e| {
+            error!("Failed to generate random bytes: {}", e);
+            anyhow!("Failed to generate random bytes")
+        })?;
+
+        let code_verifier = URL_SAFE_NO_PAD.encode(verifier_bytes);
+        let mut hasher = Sha256::new();
+        hasher.update(&code_verifier);
+        let code_challenge_raw = hasher.finalize();
+        let code_challenge = URL_SAFE_NO_PAD.encode(code_challenge_raw);
+
+        Ok((code_verifier, code_challenge))
     }
     pub async fn login_by_login_token(&self, login_token: String) -> Result<Sensitive<String>> {
         let response = self.auth_client.login_by_login_token(login_token).await?;
@@ -110,11 +135,17 @@ impl AuthManager {
 
 fn extract_claims(token: &str) -> Result<Claims> {
     let mut parts = token.splitn(3, '.');
-    let _header_b64 = parts.next().unwrap();
-    let payload_b64 = parts.next().unwrap();
-    let payload = URL_SAFE_NO_PAD.decode(payload_b64).ok().unwrap();
-    let payload_json: Claims = serde_json::from_slice(&payload).ok().unwrap();
-
+    let _header_b64 = parts
+        .next()
+        .ok_or_else(|| anyhow!("Invalid JWT format: missing header"))?;
+    let payload_b64 = parts
+        .next()
+        .ok_or_else(|| anyhow!("Invalid JWT format: missing payload"))?;
+    let payload = URL_SAFE_NO_PAD
+        .decode(payload_b64)
+        .map_err(|e| anyhow!("Failed to decode JWT payload: {}", e))?;
+    let payload_json: Claims = serde_json::from_slice(&payload)
+        .map_err(|e| anyhow!("Failed to parse JWT claims: {}", e))?;
     Ok(payload_json)
 }
 

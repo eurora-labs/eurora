@@ -2431,6 +2431,7 @@ dependencies = [
  "eur-renderer",
  "eur-secret",
  "eur-timeline",
+ "eur-user",
  "eur-vision",
  "futures",
  "image 0.25.6",
@@ -2509,9 +2510,12 @@ dependencies = [
  "eur-proto",
  "eur-secret",
  "image 0.25.6",
+ "rand 0.9.1",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
