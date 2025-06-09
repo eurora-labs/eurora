@@ -1,13 +1,21 @@
+use anyhow::{Result, anyhow};
+use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
+use eur_secret::{Sensitive, secret};
 use libsqlite3_sys::sqlite3_auto_extension;
+use rand::TryRngCore;
+use rand::rngs::OsRng;
 use sqlite_vec::sqlite3_vec_init;
 use sqlx::Column;
 use sqlx::TypeInfo;
 use sqlx::migrate::MigrateDatabase;
+use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::types::Uuid;
+use std::str::FromStr;
 use std::time::Duration;
 use tracing::debug;
+use tracing::info;
 
 use crate::types::{Activity, ActivityAsset, ChatMessage, Conversation};
 
@@ -22,21 +30,26 @@ impl DatabaseManager {
             database_path
         );
         let connection_string = format!("sqlite:{}", database_path);
+        debug!("Initializing database connection");
 
         unsafe {
             sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
         }
 
-        // Create the database if it doesn't exist
-        if !sqlx::Sqlite::database_exists(&connection_string).await? {
-            sqlx::Sqlite::create_database(&connection_string).await?;
-        }
+        let key = init_key().map_err(|e| sqlx::Error::Configuration(e.into()))?;
+        let opts = SqliteConnectOptions::from_str(&connection_string)?
+            .pragma("key", format!("'{}'", key.0))
+            .pragma("kdf_iter", "64000")
+            .pragma("cipher_page_size", "4096")
+            .pragma("cipher_hmac_algorithm", "HMAC_SHA512")
+            .pragma("cipher_kdf_algorithm", "PBKDF2_HMAC_SHA512")
+            .create_if_missing(true);
 
         let pool = SqlitePoolOptions::new()
             .max_connections(50)
-            .min_connections(3) // Minimum number of idle connections
+            .min_connections(3)
             .acquire_timeout(Duration::from_secs(10))
-            .connect(&connection_string)
+            .connect_with(opts)
             .await?;
 
         // Enable WAL mode
@@ -45,30 +58,27 @@ impl DatabaseManager {
             .await?;
 
         // Enable SQLite's query result caching
-        // PRAGMA cache_size = -2000; -- Set cache size to 2MB
-        // PRAGMA temp_store = MEMORY; -- Store temporary tables and indices in memory
-        sqlx::query("PRAGMA cache_size = -2000;")
+        sqlx::query("PRAGMA cache_size = 2000;")
             .execute(&pool)
             .await?;
+
         sqlx::query("PRAGMA temp_store = MEMORY;")
             .execute(&pool)
             .await?;
 
         let db_manager = DatabaseManager { pool };
 
-        // Run migrations after establishing the connection
-        Self::run_migrations(&db_manager.pool).await?;
+        // Run migrations after establishing the connection and setting up encryption
+        Self::run_migrations(&db_manager.pool)
+            .await
+            .map_err(|e| sqlx::Error::Migrate(Box::new(e)))?;
 
         Ok(db_manager)
     }
 
-    async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
-        let mut migrator = sqlx::migrate!("./src/migrations");
-        migrator.set_ignore_missing(true);
-        match migrator.run(pool).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e.into()),
-        }
+    async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::migrate::MigrateError> {
+        let migrator = sqlx::migrate!("src/migrations");
+        migrator.run(pool).await
     }
 
     pub async fn insert_conversation(
@@ -232,10 +242,11 @@ impl DatabaseManager {
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
-            INSERT INTO activity_asset (activity_id, data, created_at, updated_At)
-            VALUES (?, ?, ?)
+            INSERT INTO activity_asset (id, activity_id, data, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
             "#,
         )
+        .bind(Uuid::new_v4().to_string())
         .bind(activity_id)
         .bind(asset.data.clone())
         .bind(asset.created_at.clone())
@@ -244,5 +255,27 @@ impl DatabaseManager {
         .await?;
 
         Ok(())
+    }
+}
+
+const PERSONAL_DB_KEY_HANDLE: &str = "PERSONAL_DB_KEY";
+
+fn init_key() -> Result<Sensitive<String>> {
+    let key = secret::retrieve(PERSONAL_DB_KEY_HANDLE, secret::Namespace::Global)?;
+    if let Some(key) = key {
+        Ok(key)
+    } else {
+        let mut key = [0u8; 32];
+        OsRng
+            .try_fill_bytes(&mut key)
+            .map_err(|e| anyhow!("Failed to generate random key: {}", e))?;
+        let b64_key = general_purpose::STANDARD.encode(key);
+        secret::persist(
+            PERSONAL_DB_KEY_HANDLE,
+            &eur_secret::Sensitive(b64_key.clone()),
+            secret::Namespace::Global,
+        )
+        .map_err(|e| anyhow!("Failed to persist key: {}", e))?;
+        Ok(Sensitive(b64_key))
     }
 }
