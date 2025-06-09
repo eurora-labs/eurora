@@ -30,15 +30,15 @@ impl DatabaseManager {
             database_path
         );
         let connection_string = format!("sqlite:{}", database_path);
-        eprintln!("Connection string: {}", connection_string);
+        debug!("Initializing database connection");
 
         unsafe {
             sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
         }
 
-        let key = init_key().unwrap();
+        let key = init_key().map_err(|e| sqlx::Error::Configuration(e.into()))?;
         let opts = SqliteConnectOptions::from_str(&connection_string)?
-            .pragma("key", key.0)
+            .pragma("key", format!("'{}'", key.0))
             .pragma("kdf_iter", "64000")
             .pragma("cipher_page_size", "4096")
             .pragma("cipher_hmac_algorithm", "HMAC_SHA512")
@@ -266,7 +266,9 @@ fn init_key() -> Result<Sensitive<String>> {
         Ok(key)
     } else {
         let mut key = [0u8; 32];
-        OsRng.try_fill_bytes(&mut key)?;
+        OsRng
+            .try_fill_bytes(&mut key)
+            .map_err(|e| anyhow!("Failed to generate random key: {}", e))?;
         let b64_key = general_purpose::STANDARD.encode(key);
         secret::persist(
             PERSONAL_DB_KEY_HANDLE,
