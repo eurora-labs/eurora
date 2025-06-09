@@ -31,16 +31,16 @@
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@internationalized/date": "^3.8.1",
-		"@lucide/svelte": "^0.511.0",
+		"@lucide/svelte": "^0.513.0",
 		"@playwright/test": "^1.52.0",
 		"@sveltejs/adapter-static": "^3.0.8",
-		"@sveltejs/kit": "^2.21.1",
+		"@sveltejs/kit": "^2.21.3",
 		"@sveltejs/package": "^2.3.11",
-		"@sveltejs/vite-plugin-svelte": "^5.0.0",
+		"@sveltejs/vite-plugin-svelte": "^5.1.0",
 		"@storybook/addon-docs": "^8.6.12",
 		"@storybook/addon-essentials": "^8.6.12",
 		"@storybook/addon-links": "^8.6.12",
-		"@storybook/addon-svelte-csf": "5.0.0-next.23",
+		"@storybook/addon-svelte-csf": "5.0.3",
 		"zod": "^3.25.49",
 		"@storybook/blocks": "^8.6.12",
 		"@storybook/experimental-addon-test": "^8.6.12",
@@ -79,7 +79,7 @@
 		"prettier-plugin-svelte": "^3.3.3",
 		"prettier-plugin-tailwindcss": "^0.6.12",
 		"publint": "^0.3.12",
-		"svelte": "^5.33.14",
+		"svelte": "^5.33.18",
 		"svelte-check": "^4.2.1",
 		"svelte-sonner": "^1.0.4",
 		"sveltekit-superforms": "^2.25.0",
@@ -91,7 +91,7 @@
 		"typescript-eslint": "^8.31.1",
 		"vaul-svelte": "1.0.0-next.7",
 		"vite": "^6.3.5",
-		"vitest": "^3.2.0"
+		"vitest": "^3.2.3"
 	},
 	"exports": {
 		"./*.svelte": {
