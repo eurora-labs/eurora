@@ -133,6 +133,7 @@ pub struct LoginToken {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateLoginTokenRequest {
     pub token: String,
+    pub user_id: Uuid,
     pub expires_at: DateTime<Utc>,
 }
 
