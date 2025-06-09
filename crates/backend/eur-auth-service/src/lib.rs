@@ -1,6 +1,7 @@
 //! The Eurora authentication service that provides gRPC endpoints for user authentication.
 
 use anyhow::{Result, anyhow};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
 use eur_proto::proto_auth_service::{
@@ -156,36 +157,21 @@ impl AuthService {
             "Attempting to associate login token with user: {}",
             user.username
         );
+        let create_request = CreateLoginTokenRequest {
+            token: token.to_string(),
+            expires_at: Utc::now() + Duration::minutes(20),
+            user_id: user.id,
+        };
 
-        // Hardcoded example: Look for a specific login token to demonstrate the functionality
-        // In practice, you would extract the login token from the OAuth flow
-        // let login_token_value = "example_desktop_login_token_123"; // This would come from the OAuth flow
-
-        match self.db.get_login_token_by_token(token).await {
-            Ok(login_token) => {
-                if login_token.user_id.is_none() && !login_token.consumed {
-                    // Token exists and is unused, associate it with the user
-                    let update_request = UpdateLoginTokenRequest { user_id: user.id };
-
-                    match self.db.update_login_token_user(token, update_request).await {
-                        Ok(_) => {
-                            info!(
-                                "Successfully associated login token '{}' with user: {}",
-                                token, user.username
-                            );
-                        }
-                        Err(e) => {
-                            error!("Failed to update login token with user_id: {}", e);
-                        }
-                    }
-                } else if login_token.consumed {
-                    info!("Login token '{}' has already been consumed", token);
-                } else {
-                    info!("Login token '{}' is already associated with a user", token);
-                }
+        match self.db.create_login_token(create_request).await {
+            Ok(_) => {
+                info!(
+                    "Successfully associated login token '{}' with user: {}",
+                    token, user.username
+                );
             }
-            Err(_) => {
-                info!("No login token '{}' found or token has expired", token);
+            Err(e) => {
+                error!("Failed to update login token with user_id: {}", e);
             }
         }
     }
@@ -292,7 +278,6 @@ impl AuthService {
         creds: ThirdPartyCredentials,
     ) -> Result<Response<TokenResponse>, Status> {
         info!("Handling Google login");
-
         // Extract code and state from credentials
         let code = &creds.code;
         let state = &creds.state;
@@ -325,6 +310,9 @@ impl AuthService {
         }
 
         info!("OAuth state validated successfully for state: {}", state);
+
+        // Extract PKCE verifier for token exchange
+        let pkce_verifier = oauth_state.pkce_verifier.clone();
 
         info!("Exchanging authorization code for access token");
 
@@ -374,6 +362,7 @@ impl AuthService {
 
         let token_result = client
             .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
+            .set_pkce_verifier(oauth2::PkceCodeVerifier::new(pkce_verifier))
             .request_async(&http_client)
             .await
             .map_err(|e| {
@@ -468,10 +457,15 @@ impl AuthService {
                     Err(_) => {
                         // If token is not present throw error
                         let login_token = creds.login_token.clone();
+                        let challenge_method = creds.challenge_method.clone();
 
                         if login_token.is_none() {
                             error!("Login token is missing");
                             return Err(Status::unauthenticated("Login token is missing"));
+                        }
+                        if challenge_method.is_none() {
+                            error!("Challenge method is missing");
+                            return Err(Status::unauthenticated("Challenge method is missing"));
                         }
 
                         // Create new user from Google info
@@ -771,41 +765,7 @@ impl ProtoAuthService for AuthService {
         &self,
         _request: Request<()>,
     ) -> Result<Response<GetLoginTokenResponse>, Status> {
-        let token = self.generate_random_string(64)?;
-        let expires_in = 60 * 20; // 20 minutes in seconds
-        let expires_at = Utc::now() + Duration::seconds(expires_in);
-
-        let mut url = Url::parse(&self.desktop_login_url).map_err(|e| {
-            error!("Invalid desktop login URL: {}", e);
-            Status::internal("Invalid desktop login URL configuration")
-        })?;
-        url.path_segments_mut()
-            .map_err(|_| Status::internal("Cannot modify URL path"))?
-            .push(&token);
-
-        info!("Generating login token with expiration: {}", expires_at);
-
-        // Save token to database
-        let create_request = CreateLoginTokenRequest {
-            token: token.clone(),
-            expires_at,
-        };
-
-        match self.db.create_login_token(create_request).await {
-            Ok(_) => {
-                info!("Login token saved to database successfully");
-            }
-            Err(e) => {
-                error!("Failed to save login token to database: {}", e);
-                return Err(Status::internal("Failed to generate login token"));
-            }
-        }
-
-        Ok(Response::new(GetLoginTokenResponse {
-            token: token.clone(),
-            expires_in,
-            url: url.to_string(),
-        }))
+        Err(Status::unimplemented("get_login_token not implemented"))
     }
 
     async fn login_by_login_token(
@@ -813,12 +773,23 @@ impl ProtoAuthService for AuthService {
         request: Request<LoginByLoginTokenRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
         let req = request.into_inner();
-        let token = &req.token;
+        let token = req.token;
+
+        if token.is_empty() {
+            warn!("Login by login token request received with empty token");
+            return Err(Status::invalid_argument("Login token is required"));
+        }
+
+        // Hash the token
+        let mut hasher = Sha256::new();
+        hasher.update(token);
+        let code_challenge = hasher.finalize();
+        let token = URL_SAFE_NO_PAD.encode(code_challenge);
 
         info!("Login by login token request received for token: {}", token);
 
         // Get the login token from database
-        let login_token = match self.db.get_login_token_by_token(token).await {
+        let login_token = match self.db.get_login_token_by_token(&token).await {
             Ok(login_token) => login_token,
             Err(_) => {
                 warn!("Login token not found or expired: {}", token);
@@ -854,7 +825,7 @@ impl ProtoAuthService for AuthService {
         };
 
         // Mark the token as consumed
-        if let Err(e) = self.db.consume_login_token(token).await {
+        if let Err(e) = self.db.consume_login_token(&token).await {
             error!("Failed to consume login token: {}", e);
             return Err(Status::internal("Failed to process login token"));
         }
