@@ -25,7 +25,7 @@ eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 # eur-auth = { path = "../../common/eur-auth" }
 backtrace = { version = "0.3.75", optional = true }
 console-subscriber = "0.4.1"
-reqwest = { version = "0.12.18", features = ["json", "native-tls"] }
+reqwest = { version = "0.12.19", features = ["json", "native-tls"] }
 serde.workspace = true
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
 tauri = { version = "^2.5.1", features = ["unstable"] }
