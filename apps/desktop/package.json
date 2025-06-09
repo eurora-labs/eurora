@@ -43,8 +43,8 @@
 		"@playwright/test": "^1.52.0",
 		"@sveltejs/adapter-node": "^5.2.12",
 		"@sveltejs/adapter-static": "^3.0.8",
-		"@sveltejs/kit": "^2.21.1",
-		"@sveltejs/vite-plugin-svelte": "^5.0.3",
+		"@sveltejs/kit": "^2.21.3",
+		"@sveltejs/vite-plugin-svelte": "^5.1.0",
 		"@tauri-apps/api": "^2.5.0",
 		"@tauri-apps/plugin-dialog": "^2.2.1",
 		"@tauri-apps/plugin-fs": "^2.2.1",
@@ -63,18 +63,18 @@
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
 		"katex": "^0.16.22",
-		"@lucide/svelte": "^0.511.0",
+		"@lucide/svelte": "^0.513.0",
 		"postcss-nesting": "^13.0.1",
 		"postcss-pxtorem": "^6.1.0",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
 		"prettier-plugin-tailwindcss": "^0.6.12",
-		"svelte": "^5.33.14",
+		"svelte": "^5.33.18",
 		"svelte-check": "^4.2.1",
 		"tinykeys": "^2.1.0",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "^8.31.1",
 		"vite": "^6.3.5",
-		"vitest": "^3.2.0"
+		"vitest": "^3.2.3"
 	}
 }
