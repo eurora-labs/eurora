@@ -35,7 +35,10 @@ impl AuthApi for AuthApiImpl {
             let (code_verifier, code_challenge) = auth_manager.get_login_tokens().await.unwrap();
             let expires_in: i64 = 60 * 20;
 
-            let mut url = Url::parse("http://localhost:5173/login").unwrap();
+            let base_url = std::env::var("AUTH_BASE_URL")
+                .unwrap_or_else(|_| "http://localhost:5173".to_string());
+            let mut url = Url::parse(&format!("{}/login", base_url))
+                .map_err(|e| format!("Invalid AUTH_BASE_URL: {}", e))?;
             // Add code challenge as parameter
             url.query_pairs_mut()
                 .append_pair("code_challenge", &code_challenge)
@@ -59,8 +62,8 @@ impl AuthApi for AuthApiImpl {
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
         if let Some(auth_manager) = app_handle.try_state::<AuthManager>() {
             let login_token = secret::retrieve(LOGIN_CODE_VERIFIER, secret::Namespace::BuildKind)
-                .unwrap()
-                .unwrap();
+                .map_err(|e| format!("Failed to retrieve login token: {}", e))?
+                .ok_or_else(|| "Login token not found".to_string())?;
             match auth_manager.login_by_login_token(login_token.0).await {
                 Ok(_) => Ok(true),
                 Err(_) => Ok(false),
