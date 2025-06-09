@@ -135,11 +135,17 @@ impl AuthManager {
 
 fn extract_claims(token: &str) -> Result<Claims> {
     let mut parts = token.splitn(3, '.');
-    let _header_b64 = parts.next().unwrap();
-    let payload_b64 = parts.next().unwrap();
-    let payload = URL_SAFE_NO_PAD.decode(payload_b64).ok().unwrap();
-    let payload_json: Claims = serde_json::from_slice(&payload).ok().unwrap();
-
+    let _header_b64 = parts
+        .next()
+        .ok_or_else(|| anyhow!("Invalid JWT format: missing header"))?;
+    let payload_b64 = parts
+        .next()
+        .ok_or_else(|| anyhow!("Invalid JWT format: missing payload"))?;
+    let payload = URL_SAFE_NO_PAD
+        .decode(payload_b64)
+        .map_err(|e| anyhow!("Failed to decode JWT payload: {}", e))?;
+    let payload_json: Claims = serde_json::from_slice(&payload)
+        .map_err(|e| anyhow!("Failed to parse JWT claims: {}", e))?;
     Ok(payload_json)
 }
 
