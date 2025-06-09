@@ -33,6 +33,10 @@ impl DatabaseManager {
 
         let opts = SqliteConnectOptions::from_str(&connection_string)?
             .pragma("key", "placeholder")
+            .pragma("kdf_iter", "64000")
+            .pragma("cipher_page_size", "4096")
+            .pragma("cipher_hmac_algorithm", "HMAC_SHA512")
+            .pragma("cipher_kdf_algorithm", "PBKDF2_HMAC_SHA512")
             .create_if_missing(true);
 
         let pool = SqlitePoolOptions::new()
@@ -45,51 +49,34 @@ impl DatabaseManager {
         sqlx::query("PRAGMA rekey = 'placeholder';")
             .execute(&pool)
             .await?;
+
         // Enable WAL mode
         sqlx::query("PRAGMA journal_mode = WAL;")
             .execute(&pool)
             .await?;
-        sqlx::query("PRAGMA cipher_page_size = 4096;")
-            .execute(&pool)
-            .await?;
-
-        sqlx::query("PRAGMA kdf_iter = 64000;")
-            .execute(&pool)
-            .await?;
-
-        sqlx::query("PRAGMA cipher_hmac_algorithm = 'HMAC-SHA512';")
-            .execute(&pool)
-            .await?;
-
-        sqlx::query("PRAGMA cipher_kdf_algorithm = 'PBKDF2-HMAC-SHA512';")
-            .execute(&pool)
-            .await?;
 
         // Enable SQLite's query result caching
-        // PRAGMA cache_size = 2000; -- Set cache size to 2MB
-        // PRAGMA temp_store = MEMORY; -- Store temporary tables and indices in memory
         sqlx::query("PRAGMA cache_size = 2000;")
             .execute(&pool)
             .await?;
+
         sqlx::query("PRAGMA temp_store = MEMORY;")
             .execute(&pool)
             .await?;
 
         let db_manager = DatabaseManager { pool };
 
-        // Run migrations after establishing the connection
-        Self::run_migrations(&db_manager.pool).await?;
+        // Run migrations after establishing the connection and setting up encryption
+        Self::run_migrations(&db_manager.pool)
+            .await
+            .map_err(|e| sqlx::Error::Migrate(Box::new(e)))?;
 
         Ok(db_manager)
     }
 
-    async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
-        let mut migrator = sqlx::migrate!("./src/migrations");
-        migrator.set_ignore_missing(true);
-        match migrator.run(pool).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e.into()),
-        }
+    async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::migrate::MigrateError> {
+        let migrator = sqlx::migrate!("src/migrations");
+        migrator.run(pool).await
     }
 
     pub async fn insert_conversation(
@@ -253,10 +240,11 @@ impl DatabaseManager {
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
-            INSERT INTO activity_asset (activity_id, data, created_at, updated_At)
-            VALUES (?, ?, ?)
+            INSERT INTO activity_asset (id, activity_id, data, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
             "#,
         )
+        .bind(Uuid::new_v4().to_string())
         .bind(activity_id)
         .bind(asset.data.clone())
         .bind(asset.created_at.clone())
