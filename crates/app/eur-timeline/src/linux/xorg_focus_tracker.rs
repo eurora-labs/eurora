@@ -56,27 +56,37 @@ where
             // Check if this is an active window change
             if atom == net_active_window && window == root {
                 // Active window changed
-                new_window = active_window(&conn, root, net_active_window)?;
-                should_emit_focus_event = true;
+                match active_window(&conn, root, net_active_window) {
+                    Ok(win) => {
+                        new_window = win;
+                        should_emit_focus_event = true;
 
-                // Update monitoring for the new focused window
-                if let Some(old_win) = current_focused_window {
-                    // Stop monitoring the old window
-                    let _ = conn.change_window_attributes(
-                        old_win,
-                        &ChangeWindowAttributesAux::new().event_mask(EventMask::NO_EVENT),
-                    );
-                }
+                        // Update monitoring for the new focused window
+                        if let Some(old_win) = current_focused_window {
+                            // Stop monitoring the old window
+                            let _ = conn.change_window_attributes(
+                                old_win,
+                                &ChangeWindowAttributesAux::new().event_mask(EventMask::NO_EVENT),
+                            );
+                        }
 
-                if let Some(new_win) = new_window {
-                    // Start monitoring the new window for title changes
-                    let _ = conn.change_window_attributes(
-                        new_win,
-                        &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
-                    );
-                    current_focused_window = Some(new_win);
-                } else {
-                    current_focused_window = None;
+                        if let Some(new_win) = new_window {
+                            // Start monitoring the new window for title changes
+                            let _ = conn.change_window_attributes(
+                                new_win,
+                                &ChangeWindowAttributesAux::new()
+                                    .event_mask(EventMask::PROPERTY_CHANGE),
+                            );
+                            current_focused_window = Some(new_win);
+                        } else {
+                            current_focused_window = None;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to get active window: {}", e);
+                        // Continue processing other events instead of crashing
+                        continue;
+                    }
                 }
             }
             // Check if this is a title change on the currently focused window
@@ -92,20 +102,35 @@ where
                     Some(w) => w,
                     None => continue,
                 };
-                let title = window_name(&conn, win, net_wm_name, utf8_string)?;
-                let proc =
-                    process_name(&conn, win, net_wm_pid).unwrap_or_else(|_| "<unknown>".into());
+
+                // Handle window property queries with graceful error handling
+                let title = window_name(&conn, win, net_wm_name, utf8_string).unwrap_or_else(|e| {
+                    eprintln!("Failed to get window title for window {}: {}", win, e);
+                    "<unknown title>".to_string()
+                });
+
+                let proc = process_name(&conn, win, net_wm_pid).unwrap_or_else(|e| {
+                    eprintln!("Failed to get process name for window {}: {}", win, e);
+                    "<unknown>".to_string()
+                });
+
                 let icon = get_icon_data(&conn, win, net_wm_icon)
                     .ok()
                     .and_then(|d| convert_icon_to_base64(&d).ok())
-                    .unwrap_or_default();
+                    .unwrap_or_else(|| {
+                        // Don't log icon failures as they're common and not critical
+                        String::new()
+                    });
 
                 // ── Invoke user-supplied handler ──────────────────────────────────
-                on_focus(FocusEvent {
+                if let Err(e) = on_focus(FocusEvent {
                     process: proc,
                     title,
                     icon_base64: icon,
-                })?;
+                }) {
+                    eprintln!("Focus event handler failed: {}", e);
+                    // Continue processing instead of propagating the error
+                }
             }
         }
 
@@ -230,8 +255,8 @@ fn convert_icon_to_base64(icon_data: &[u32]) -> Result<String> {
         return Err(anyhow::anyhow!("Invalid icon data"));
     }
 
-    let width = icon_data[0] as u32;
-    let height = icon_data[1] as u32;
+    let width = icon_data[0];
+    let height = icon_data[1];
 
     if width == 0 || height == 0 || width > 1024 || height > 1024 {
         return Err(anyhow::anyhow!("Invalid icon dimensions"));
