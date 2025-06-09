@@ -2,10 +2,14 @@
 -- Created: 2025-05-27 08:44:27
 -- Description: Creates users and password_credentials tables for authentication
 
+----------------------------------------------------------------
 -- Enable UUID extension if not already enabled
+----------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+----------------------------------------------------------------
 -- Create users table
+----------------------------------------------------------------
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(255) UNIQUE NOT NULL,
@@ -16,7 +20,9 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+----------------------------------------------------------------
 -- Create password_credentials table
+----------------------------------------------------------------
 CREATE TABLE password_credentials (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL,
@@ -31,23 +37,32 @@ CREATE TABLE password_credentials (
         ON DELETE CASCADE
 );
 
+----------------------------------------------------------------
 -- Create indexes for performance
+----------------------------------------------------------------
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_password_credentials_user_id ON password_credentials(user_id);
 
+----------------------------------------------------------------
 -- Create unique constraint to ensure one-to-one relationship
+----------------------------------------------------------------
 CREATE UNIQUE INDEX idx_password_credentials_user_id_unique ON password_credentials(user_id);
 
+----------------------------------------------------------------
 -- Add trigger to automatically update updated_at timestamp for users table
+----------------------------------------------------------------
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = now();
+    NEW.updated_at := now();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
+----------------------------------------------------------------
+-- Add triggers to automatically update updated_at timestamp
+----------------------------------------------------------------
 CREATE TRIGGER update_users_updated_at 
     BEFORE UPDATE ON users 
     FOR EACH ROW 
@@ -58,7 +73,9 @@ CREATE TRIGGER update_password_credentials_updated_at
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
 
+----------------------------------------------------------------
 -- Add comments for documentation
+----------------------------------------------------------------
 COMMENT ON TABLE users IS 'User accounts for authentication';
 COMMENT ON TABLE password_credentials IS 'Password credentials linked to user accounts';
 COMMENT ON COLUMN users.id IS 'Primary key UUID for user';
