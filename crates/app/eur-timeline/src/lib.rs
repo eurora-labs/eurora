@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time;
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::info;
+use tracing::{error, info, warn};
 mod focus_tracker;
 pub use focus_tracker::FocusEvent;
 
@@ -239,23 +239,42 @@ impl Timeline {
         {
             let tx = tx.clone(); // move into the thread
             std::thread::spawn(move || {
-                let tracker = focus_tracker::FocusTracker::new(
-                    platform::impl_focus_tracker::ImplFocusTracker::new(),
-                );
+                loop {
+                    let tracker = focus_tracker::FocusTracker::new(
+                        platform::impl_focus_tracker::ImplFocusTracker::new(),
+                    );
 
-                // this never blocks: it just ships events into the channel
-                tracker
-                    .track_focus(move |event| {
+                    info!("Starting focus tracker...");
+
+                    // Clone tx for this iteration
+                    let tx_clone = tx.clone();
+
+                    // this never blocks: it just ships events into the channel
+                    let result = tracker.track_focus(move |event| {
                         eprintln!("▶ {}: {}", event.process, event.title);
 
-                        // ignore the tracker’s own window, if desired
+                        // ignore the tracker's own window, if desired
                         if event.process != "eur-tauri" {
-                            // it’s OK if the receiver has gone away
-                            let _ = tx.send(event);
+                            // it's OK if the receiver has gone away
+                            let _ = tx_clone.send(event);
                         }
                         Ok(())
-                    })
-                    .expect("focus tracker crashed");
+                    });
+
+                    // Handle focus tracker errors gracefully
+                    match result {
+                        Ok(_) => {
+                            warn!("Focus tracker ended unexpectedly, restarting...");
+                        }
+                        Err(e) => {
+                            error!("Focus tracker crashed with error: {:?}", e);
+                            warn!("Restarting focus tracker in 1 second...");
+                        }
+                    }
+
+                    // Wait a bit before restarting to avoid rapid restart loops
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                }
             });
         }
 
