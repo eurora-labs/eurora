@@ -1,5 +1,10 @@
+use anyhow::{Result, anyhow};
+use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
+use eur_secret::{Sensitive, secret};
 use libsqlite3_sys::sqlite3_auto_extension;
+use rand::TryRngCore;
+use rand::rngs::OsRng;
 use sqlite_vec::sqlite3_vec_init;
 use sqlx::Column;
 use sqlx::TypeInfo;
@@ -31,8 +36,9 @@ impl DatabaseManager {
             sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
         }
 
+        let key = init_key().unwrap();
         let opts = SqliteConnectOptions::from_str(&connection_string)?
-            .pragma("key", "placeholder")
+            .pragma("key", key.0)
             .pragma("kdf_iter", "64000")
             .pragma("cipher_page_size", "4096")
             .pragma("cipher_hmac_algorithm", "HMAC_SHA512")
@@ -44,10 +50,6 @@ impl DatabaseManager {
             .min_connections(3)
             .acquire_timeout(Duration::from_secs(10))
             .connect_with(opts)
-            .await?;
-
-        sqlx::query("PRAGMA rekey = 'placeholder';")
-            .execute(&pool)
             .await?;
 
         // Enable WAL mode
@@ -253,5 +255,25 @@ impl DatabaseManager {
         .await?;
 
         Ok(())
+    }
+}
+
+const PERSONAL_DB_KEY_HANDLE: &str = "PERSONAL_DB_KEY";
+
+fn init_key() -> Result<Sensitive<String>> {
+    let key = secret::retrieve(PERSONAL_DB_KEY_HANDLE, secret::Namespace::Global)?;
+    if let Some(key) = key {
+        Ok(key)
+    } else {
+        let mut key = [0u8; 32];
+        OsRng.try_fill_bytes(&mut key)?;
+        let b64_key = general_purpose::STANDARD.encode(key);
+        secret::persist(
+            PERSONAL_DB_KEY_HANDLE,
+            &eur_secret::Sensitive(b64_key.clone()),
+            secret::Namespace::Global,
+        )
+        .map_err(|e| anyhow!("Failed to persist key: {}", e))?;
+        Ok(Sensitive(b64_key))
     }
 }
