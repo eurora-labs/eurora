@@ -33,7 +33,7 @@
 		query,
 		placeholder = 'Type something',
 		onkeydown,
-		class: className
+		class: className,
 	}: Props = $props();
 
 	export async function init(queryParam?: Query) {
@@ -64,17 +64,17 @@
 
 		view = new EditorView(
 			{
-				mount: editorRef
+				mount: editorRef,
 			},
 			{
 				state: EditorState.create({
 					schema: created.schema,
 					plugins: [...created.plugins, placeholderPlugin(placeholder)],
-					doc: mainNode
+					doc: mainNode,
 				}),
 				nodeViews: created.nodeViews,
-				markViews: created.markViews
-			}
+				markViews: created.markViews,
+			},
 		);
 	}
 
@@ -99,7 +99,11 @@
 
 				const state = view.state;
 				const tr = state.tr;
-				tr.replaceWith(0, state.doc.content.size, DOMParser.fromSchema(state.schema).parse(doc));
+				tr.replaceWith(
+					0,
+					state.doc.content.size,
+					DOMParser.fromSchema(state.schema).parse(doc),
+				);
 				view.dispatch(tr);
 
 				// Update the query reference
@@ -130,7 +134,7 @@
 						p.textContent = newQuery.text;
 						return DOMParser.fromSchema(created.schema).parse(p);
 					})()
-				: currentState.doc
+				: currentState.doc,
 		});
 
 		// Update the view with the new state
@@ -139,14 +143,14 @@
 		// Update nodeViews and markViews
 		view.setProps({
 			nodeViews: created.nodeViews,
-			markViews: created.markViews
+			markViews: created.markViews,
 		});
 	}
 
 	// Helper function to check if extensions have changed
 	function hasExtensionsChanged(
 		oldExts: SveltePMExtension[],
-		newExts: SveltePMExtension[]
+		newExts: SveltePMExtension[],
 	): boolean {
 		if (oldExts.length !== newExts.length) return true;
 
@@ -184,10 +188,10 @@
 			nodes.transcript.createChecked(
 				{
 					id: 'transcript-1',
-					text: 'Some transcript with attrs'
+					text: 'Some transcript with attrs',
 				},
-				schema.text('transcript')
-			)
+				schema.text('transcript'),
+			),
 		);
 
 		view?.dispatch(tr);
@@ -225,7 +229,7 @@
 				update(view);
 
 				return { update };
-			}
+			},
 		});
 	}
 </script>
@@ -250,20 +254,20 @@
 		display: none;
 	}
 	:global(.ProseMirror) {
-		border-top: 0;
-		overflow-wrap: break-word;
-		outline: none;
-		white-space: pre-wrap;
-		width: 100%;
 		align-items: anchor-center;
+		width: 100%;
+		border-top: 0;
+		outline: none;
 		line-height: 100px;
+		white-space: pre-wrap;
+		overflow-wrap: break-word;
 	}
 
 	:global(.ProseMirror[data-placeholder])::before {
-		color: rgba(0, 0, 0, 0.2);
 		position: absolute;
 		content: attr(data-placeholder);
-		pointer-events: none;
+		color: rgba(0, 0, 0, 0.2);
 		line-height: 100px;
+		pointer-events: none;
 	}
 </style>

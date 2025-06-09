@@ -6,8 +6,8 @@ chrome.runtime.sendMessage({
 	payload: {
 		url: window.location.href,
 		title: document.title,
-		content: ''
-	}
+		content: '',
+	},
 });
 
 // Listen for responses from service worker

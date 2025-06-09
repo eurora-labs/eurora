@@ -3,7 +3,7 @@ import { ProtoImage, ProtoImageFormat } from '@eurora/proto/shared';
 import {
 	ProtoNativeYoutubeState,
 	ProtoNativeStateType,
-	ProtoNativeYoutubeSnapshot
+	ProtoNativeYoutubeSnapshot,
 } from '@eurora/proto/native_messaging';
 
 interface EurImage extends Partial<ProtoImage> {
@@ -39,7 +39,7 @@ interface EurImage extends Partial<ProtoImage> {
 			dataBase64: canvas.toDataURL('image/jpeg').split(',')[1],
 			width: canvas.width,
 			height: canvas.height,
-			format: ProtoImageFormat.JPEG
+			format: ProtoImageFormat.JPEG,
 		};
 	}
 
@@ -60,8 +60,8 @@ interface EurImage extends Partial<ProtoImage> {
 				type: 'SEND_TO_NATIVE',
 				payload: {
 					videoId,
-					transcript
-				}
+					transcript,
+				},
 			},
 			(response) => {
 				if (chrome.runtime.lastError) {
@@ -69,7 +69,7 @@ interface EurImage extends Partial<ProtoImage> {
 				} else if (response) {
 					console.log('Transcript sent successfully, response:', response);
 				}
-			}
+			},
 		);
 	}
 
@@ -95,8 +95,8 @@ interface EurImage extends Partial<ProtoImage> {
 						payload: {
 							videoId,
 							error: error.message || 'Unknown error',
-							transcript: null
-						}
+							transcript: null,
+						},
 					});
 				});
 		} else if (type === 'PLAY') {
@@ -120,7 +120,7 @@ interface EurImage extends Partial<ProtoImage> {
 					videoFrameBase64: videoFrame.dataBase64,
 					videoFrameWidth: videoFrame.width,
 					videoFrameHeight: videoFrame.height,
-					videoFrameFormat: videoFrame.format
+					videoFrameFormat: videoFrame.format,
 				};
 
 				if (!videoTranscript) {
@@ -142,7 +142,7 @@ interface EurImage extends Partial<ProtoImage> {
 					url: window.location.href,
 					videoId: videoId,
 					error: errorMessage,
-					stack: error instanceof Error ? error.stack : undefined
+					stack: error instanceof Error ? error.stack : undefined,
 				});
 				response({
 					success: false,
@@ -150,8 +150,8 @@ interface EurImage extends Partial<ProtoImage> {
 					context: {
 						url: window.location.href,
 						videoId: videoId,
-						timestamp: new Date().toISOString()
-					}
+						timestamp: new Date().toISOString(),
+					},
 				});
 			}
 
@@ -167,7 +167,7 @@ interface EurImage extends Partial<ProtoImage> {
 				videoFrameBase64: videoFrame.dataBase64,
 				videoFrameWidth: videoFrame.width,
 				videoFrameHeight: videoFrame.height,
-				videoFrameFormat: videoFrame.format
+				videoFrameFormat: videoFrame.format,
 			};
 
 			response(reportData);

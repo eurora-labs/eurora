@@ -124,14 +124,14 @@ export const commands = {
 		(state, dispatch) => {
 			const {
 				selection: { from, to },
-				tr
+				tr,
 			} = state;
 			dispatch &&
 				dispatch(
 					tr
 						.replace(start ?? from, end ?? to, slice)
 						.setMeta('paste', true)
-						.setMeta('uiEvent', 'paste')
+						.setMeta('uiEvent', 'paste'),
 				);
 			return true;
 		},
@@ -168,14 +168,14 @@ export const commands = {
 			const range = new NodeRange(
 					state.selection.$from,
 					state.selection.$to,
-					state.selection.$from.depth
+					state.selection.$from.depth,
 				),
 				wrapping = findWrapping(range, nodeType, attrs);
 			if (wrapping) {
 				dispatch && dispatch(state.tr.wrap(range, wrapping));
 			}
 			return !!wrapping;
-		}
+		},
 };
 
 export type Commands = typeof commands;

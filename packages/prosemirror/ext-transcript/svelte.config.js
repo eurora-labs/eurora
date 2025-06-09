@@ -8,6 +8,6 @@ export default {
 				return { runes: false };
 			}
 			return { runes: true };
-		}
-	}
+		},
+	},
 };

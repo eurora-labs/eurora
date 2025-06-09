@@ -22,28 +22,28 @@ const config = {
 			// fallback: 'index.html',
 			fallback: null,
 			precompress: true,
-			strict: false
+			strict: false,
 			// manifest: 'manifest.json'
 		}),
 		appDir: 'app',
 		paths: {
-			relative: true
+			relative: true,
 		},
 		csp: {
 			directives: {
-				'script-src': ['unsafe-inline', 'unsafe-eval', 'self']
+				'script-src': ['unsafe-inline', 'unsafe-eval', 'self'],
 			},
 			reportOnly: {
 				'script-src': ['self'],
-				'report-uri': ['/']
+				'report-uri': ['/'],
 			},
-			mode: 'auto'
-		}
+			mode: 'auto',
+		},
 	},
 	compilerOptions: {
 		css: 'injected',
-		enableSourcemap: true
-	}
+		enableSourcemap: true,
+	},
 	// paths: {
 	//     base: "./"
 	// }

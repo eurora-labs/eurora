@@ -33,7 +33,7 @@ export function createSearchQuery(text: string = ''): {
 } {
 	return {
 		text,
-		extensions: extensionFactory.getExtensions()
+		extensions: extensionFactory.getExtensions(),
 	};
 }
 
@@ -45,7 +45,7 @@ export function initializeEditorWithExtensions(editorElement: HTMLElement): void
 	// Define required extension IDs
 	const requiredExtensions = [
 		'9370B14D-B61C-4CE2-BDE7-B18684E8731A', // video
-		'D8215655-A880-4B0F-8EFA-0B6B447F8AF3' // transcript
+		'D8215655-A880-4B0F-8EFA-0B6B447F8AF3', // transcript
 	];
 
 	// Check if required extensions are available
@@ -85,6 +85,6 @@ export function registerCustomExtension(id: string, creator: () => SveltePMExten
 	// Log available extensions after registration
 	console.log(
 		`Extension ${id} registered. Available extensions:`,
-		extensionFactory.getExtensionIds()
+		extensionFactory.getExtensionIds(),
 	);
 }
