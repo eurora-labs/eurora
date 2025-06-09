@@ -2320,10 +2320,13 @@ name = "eur-personal-db"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "chrono",
+ "eur-secret",
  "futures",
  "image 0.25.6",
  "libsqlite3-sys",
+ "rand 0.9.1",
  "serde",
  "serde_json",
  "sqlite-vec",
