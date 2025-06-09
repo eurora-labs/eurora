@@ -40,7 +40,7 @@ import { Readability } from '@mozilla/readability';
 					language: article.lang,
 					excerpt: article.excerpt,
 
-					length: article.length
+					length: article.length,
 				};
 
 				// Add selected_text if available
@@ -73,7 +73,7 @@ import { Readability } from '@mozilla/readability';
 			'.entry-content',
 			'#content',
 			'.content',
-			'main'
+			'main',
 		];
 
 		for (const selector of selectors) {
@@ -82,7 +82,7 @@ import { Readability } from '@mozilla/readability';
 				// Remove any script tags, ads, etc.
 				const clonedElement = element.cloneNode(true) as HTMLElement;
 				const scriptsAndAds = clonedElement.querySelectorAll(
-					'script, style, iframe, .ad, .advertisement, .sidebar, nav, header, footer'
+					'script, style, iframe, .ad, .advertisement, .sidebar, nav, header, footer',
 				);
 
 				scriptsAndAds.forEach((el) => el.remove());
@@ -96,7 +96,7 @@ import { Readability } from '@mozilla/readability';
 		// but exclude common non-content elements
 		const body = document.body.cloneNode(true) as HTMLElement;
 		const nonContentElements = body.querySelectorAll(
-			'header, footer, nav, aside, script, style, iframe, .ad, .advertisement, .sidebar'
+			'header, footer, nav, aside, script, style, iframe, .ad, .advertisement, .sidebar',
 		);
 		nonContentElements.forEach((el) => el.remove());
 

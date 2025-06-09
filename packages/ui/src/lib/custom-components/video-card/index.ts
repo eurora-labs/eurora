@@ -15,5 +15,5 @@ export {
 	Content as CardContent,
 	Header as CardHeader,
 	Title as CardTitle,
-	Description as CardDescription
+	Description as CardDescription,
 };

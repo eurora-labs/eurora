@@ -56,7 +56,8 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 		storageSync.set(values, function () {
 			if (chrome.runtime.lastError) {
 				console.error(
-					'Failed to migrate settings due to an error: ' + chrome.runtime.lastError.message
+					'Failed to migrate settings due to an error: ' +
+						chrome.runtime.lastError.message,
 				);
 				return;
 			}
@@ -85,7 +86,7 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 				'textLayerMode',
 				'showPreviousViewOnLoad',
 				'disablePageMode',
-				'viewOnLoad'
+				'viewOnLoad',
 			],
 			function (items: any) {
 				// Migration code for https://github.com/mozilla/pdf.js/pull/7635.
@@ -93,13 +94,13 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 					if (items.enableHandToolOnLoad) {
 						storageSync.set(
 							{
-								cursorToolOnLoad: 1
+								cursorToolOnLoad: 1,
 							},
 							function () {
 								if (!chrome.runtime.lastError) {
 									storageSync.remove('enableHandToolOnLoad');
 								}
-							}
+							},
 						);
 					} else {
 						storageSync.remove('enableHandToolOnLoad');
@@ -110,13 +111,16 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 					if (items.disableTextLayer) {
 						storageSync.set(
 							{
-								textLayerMode: 0
+								textLayerMode: 0,
 							},
 							function () {
 								if (!chrome.runtime.lastError) {
-									storageSync.remove(['disableTextLayer', 'enhanceTextSelection']);
+									storageSync.remove([
+										'disableTextLayer',
+										'enhanceTextSelection',
+									]);
 								}
-							}
+							},
 						);
 					} else {
 						storageSync.remove(['disableTextLayer', 'enhanceTextSelection']);
@@ -127,19 +131,22 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 					if (!items.showPreviousViewOnLoad) {
 						storageSync.set(
 							{
-								viewOnLoad: 1
+								viewOnLoad: 1,
 							},
 							function () {
 								if (!chrome.runtime.lastError) {
-									storageSync.remove(['showPreviousViewOnLoad', 'disablePageMode']);
+									storageSync.remove([
+										'showPreviousViewOnLoad',
+										'disablePageMode',
+									]);
 								}
-							}
+							},
 						);
 					} else {
 						storageSync.remove(['showPreviousViewOnLoad', 'disablePageMode']);
 					}
 				}
-			}
+			},
 		);
 	}
 });

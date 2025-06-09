@@ -20,9 +20,9 @@ This file provides a high-level overview of the project and the expected product
 
 - Built using Tauri framework (Rust backend + web frontend)
 - Monorepo structure with:
-  - apps/ - Application frontends
-  - crates/ - Rust backend code
-  - packages/ - Frontend packages and components
-  - proto/ - Protocol definitions
-  - extensions/ - Browser extensions
-  - scripts/ - Utility scripts
+    - apps/ - Application frontends
+    - crates/ - Rust backend code
+    - packages/ - Frontend packages and components
+    - proto/ - Protocol definitions
+    - extensions/ - Browser extensions
+    - scripts/ - Utility scripts

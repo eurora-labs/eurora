@@ -38,10 +38,10 @@
 						code,
 						state,
 						loginToken,
-						challengeMethod,
+						challengeMethod
 					},
-					case: 'thirdParty',
-				},
+					case: 'thirdParty'
+				}
 			});
 
 			const tokens = await authService.login(loginData);

@@ -7,16 +7,16 @@ const config: StorybookConfig = {
 		'@storybook/addon-essentials',
 		'@storybook/addon-docs',
 		'@storybook/addon-svelte-csf',
-		'storybook-dark-mode'
+		'storybook-dark-mode',
 	],
 	framework: {
 		name: '@storybook/sveltekit',
-		options: {}
+		options: {},
 	},
 	typescript: {
-		check: false
+		check: false,
 	},
-	staticDirs: ['../static']
+	staticDirs: ['../static'],
 };
 
 export default config;

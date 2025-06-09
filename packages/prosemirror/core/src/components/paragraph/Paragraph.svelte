@@ -6,15 +6,15 @@
 	}
 
 	export const paragraphAttrs: ParagraphAttrs = {
-		indent: 0
+		indent: 0,
 	};
 
 	export const paragraphSchema: NodeSpec = {
 		attrs: {
-			indent: { default: 0 }
+			indent: { default: 0 },
 		},
 		content: 'inline*',
-		group: 'block'
+		group: 'block',
 	};
 </script>
 

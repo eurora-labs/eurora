@@ -35,7 +35,7 @@ chrome.storage.session.get({ hasPdfRedirector: false }, async (items: any) => {
 		// Dynamic rules persist across extension updates. We don't expect other
 		// dynamic rules, so just remove them all.
 		await chrome.declarativeNetRequest.updateDynamicRules({
-			removeRuleIds: rules.map((r) => r.id)
+			removeRuleIds: rules.map((r) => r.id),
 		});
 	}
 	await registerPdfRedirectRule();
@@ -67,8 +67,8 @@ async function registerPdfRedirectRule() {
 			// match, so we just concatenate the URL as is without modifications.
 			// TODO: use "?file=\\0" when DNR supports transformations as proposed at
 			// https://github.com/w3c/webextensions/issues/636#issuecomment-2165978322
-			regexSubstitution: VIEWER_URL + '?DNR:\\0'
-		}
+			regexSubstitution: VIEWER_URL + '?DNR:\\0',
+		},
 	};
 
 	// Rules in order of prority (highest priority rule first).
@@ -78,18 +78,18 @@ async function registerPdfRedirectRule() {
 			// Do not redirect for URLs containing pdfjs.action=download.
 			condition: {
 				urlFilter: 'pdfjs.action=download',
-				resourceTypes: ['main_frame', 'sub_frame']
+				resourceTypes: ['main_frame', 'sub_frame'],
 			},
-			action: ACTION_IGNORE_OTHER_RULES
+			action: ACTION_IGNORE_OTHER_RULES,
 		},
 		{
 			// Redirect local PDF files if isAllowedFileSchemeAccess is true. No-op
 			// otherwise and then handled by webNavigation.onBeforeNavigate below.
 			condition: {
 				regexFilter: '^file://.*\\.pdf$',
-				resourceTypes: ['main_frame', 'sub_frame']
+				resourceTypes: ['main_frame', 'sub_frame'],
 			},
-			action: ACTION_REDIRECT_TO_VIEWER
+			action: ACTION_REDIRECT_TO_VIEWER,
 		},
 		{
 			// Respect the Content-Disposition:attachment header in sub_frame. But:
@@ -102,11 +102,11 @@ async function registerPdfRedirectRule() {
 				responseHeaders: [
 					{
 						header: 'content-disposition',
-						values: ['attachment*']
-					}
-				]
+						values: ['attachment*'],
+					},
+				],
 			},
-			action: ACTION_IGNORE_OTHER_RULES
+			action: ACTION_IGNORE_OTHER_RULES,
 		},
 		{
 			// If the query string contains "=download", do not unconditionally force
@@ -119,11 +119,11 @@ async function registerPdfRedirectRule() {
 				responseHeaders: [
 					{
 						header: 'content-disposition',
-						values: ['attachment*']
-					}
-				]
+						values: ['attachment*'],
+					},
+				],
 			},
-			action: ACTION_IGNORE_OTHER_RULES
+			action: ACTION_IGNORE_OTHER_RULES,
 		},
 		{
 			// Regular http(s) PDF requests.
@@ -136,11 +136,11 @@ async function registerPdfRedirectRule() {
 				responseHeaders: [
 					{
 						header: 'content-type',
-						values: ['application/pdf', 'application/pdf;*']
-					}
-				]
+						values: ['application/pdf', 'application/pdf;*'],
+					},
+				],
 			},
-			action: ACTION_REDIRECT_TO_VIEWER
+			action: ACTION_REDIRECT_TO_VIEWER,
 		},
 		{
 			// Wrong MIME-type, but a PDF file according to the file name in the URL.
@@ -153,11 +153,11 @@ async function registerPdfRedirectRule() {
 				responseHeaders: [
 					{
 						header: 'content-type',
-						values: ['application/octet-stream', 'application/octet-stream;*']
-					}
-				]
+						values: ['application/octet-stream', 'application/octet-stream;*'],
+					},
+				],
 			},
-			action: ACTION_REDIRECT_TO_VIEWER
+			action: ACTION_REDIRECT_TO_VIEWER,
 		},
 		{
 			// Wrong MIME-type, but a PDF file according to Content-Disposition.
@@ -170,8 +170,8 @@ async function registerPdfRedirectRule() {
 				responseHeaders: [
 					{
 						header: 'content-disposition',
-						values: ['*.pdf', '*.pdf"*', "*.pdf'*"]
-					}
+						values: ['*.pdf', '*.pdf"*', "*.pdf'*"],
+					},
 				],
 				// We only want to match by content-disposition if Content-Type is set
 				// to application/octet-stream. The responseHeaders condition is a
@@ -184,12 +184,12 @@ async function registerPdfRedirectRule() {
 				excludedResponseHeaders: [
 					{
 						header: 'content-type',
-						excludedValues: ['application/octet-stream', 'application/octet-stream;*']
-					}
-				]
+						excludedValues: ['application/octet-stream', 'application/octet-stream;*'],
+					},
+				],
 			},
-			action: ACTION_REDIRECT_TO_VIEWER
-		}
+			action: ACTION_REDIRECT_TO_VIEWER,
+		},
 	];
 	for (const [i, rule] of addRules.entries() as any) {
 		// id must be unique and at least 1, but i starts at 0. So add +1.
@@ -208,7 +208,7 @@ async function registerPdfRedirectRule() {
 			throw new Error('DNR responseHeaders condition is not supported.');
 		}
 		await chrome.declarativeNetRequest.updateDynamicRules({
-			addRules
+			addRules,
 		} as any);
 	} catch (e) {
 		// When we do not register DNR rules for any reason, fall back to catching
@@ -230,11 +230,11 @@ async function isHeaderConditionSupported() {
 					id: ruleId,
 					condition: {
 						responseHeaders: [{ header: 'whatever' }],
-						urlFilter: '|does_not_match_anything'
+						urlFilter: '|does_not_match_anything',
 					},
-					action: { type: 'block' }
-				} as any
-			]
+					action: { type: 'block' },
+				} as any,
+			],
 		});
 	} catch {
 		return false; // responseHeaders condition not supported.
@@ -249,18 +249,18 @@ async function isHeaderConditionSupported() {
 					id: ruleId,
 					condition: {
 						responseHeaders: [],
-						urlFilter: '|does_not_match_anything'
+						urlFilter: '|does_not_match_anything',
 					},
-					action: { type: 'block' }
-				} as any
-			]
+					action: { type: 'block' },
+				} as any,
+			],
 		});
 		return false; // Validation skipped = feature disabled.
 	} catch {
 		return true; // Validation worked = feature enabled.
 	} finally {
 		await chrome.declarativeNetRequest.updateSessionRules({
-			removeRuleIds: [ruleId]
+			removeRuleIds: [ruleId],
 		});
 	}
 }
@@ -295,7 +295,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(
 				}
 
 				chrome.tabs.update(details.tabId, {
-					url: getViewerURL(details.url)
+					url: getViewerURL(details.url),
 				});
 			});
 		}
@@ -304,14 +304,14 @@ chrome.webNavigation.onBeforeNavigate.addListener(
 		url: [
 			{
 				urlPrefix: 'file://',
-				pathSuffix: '.pdf'
+				pathSuffix: '.pdf',
 			},
 			{
 				urlPrefix: 'file://',
-				pathSuffix: '.PDF'
-			}
-		]
-	}
+				pathSuffix: '.PDF',
+			},
+		],
+	},
 );
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
@@ -352,11 +352,11 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
 				windowId: sender.tab.windowId,
 				index: sender.tab.index + 1,
 				url,
-				openerTabId: sender.tab.id
+				openerTabId: sender.tab.id,
 			});
 		} else {
 			chrome.tabs.update(sender.tab.id, {
-				url
+				url,
 			});
 		}
 		return undefined;

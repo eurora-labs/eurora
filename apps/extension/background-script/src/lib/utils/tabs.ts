@@ -10,7 +10,7 @@ export async function getCurrentTab() {
 	try {
 		const [tab] = await chrome.tabs.query({
 			active: true,
-			currentWindow: true
+			currentWindow: true,
 		});
 
 		return tab;
@@ -28,7 +28,7 @@ export async function getCurrentTab() {
 export async function getTabsByUrlPattern(urlPattern) {
 	try {
 		return await chrome.tabs.query({
-			url: urlPattern
+			url: urlPattern,
 		});
 	} catch (error) {
 		console.error('Error getting tabs by URL pattern:', error);

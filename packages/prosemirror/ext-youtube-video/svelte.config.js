@@ -10,14 +10,14 @@ const config = {
 			assets: 'build',
 			fallback: 'index.html',
 			precompress: true,
-			strict: false
-		})
+			strict: false,
+		}),
 	},
 	compilerOptions: {
 		css: 'injected',
 		enableSourcemap: true,
-		runes: true
-	}
+		runes: true,
+	},
 };
 
 export default config;

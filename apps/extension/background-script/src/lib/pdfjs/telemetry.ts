@@ -48,7 +48,7 @@ limitations under the License.
 	const localStorage = {
 		telemetryLastTime: 0,
 		telemetryDeduplicationId: '',
-		telemetryLastVersion: ''
+		telemetryLastVersion: '',
 	};
 
 	chrome.alarms.onAlarm.addListener((alarm) => {
@@ -109,7 +109,7 @@ limitations under the License.
 				method: 'POST',
 				headers: new Headers({
 					'Deduplication-Id': deduplication_id,
-					'Extension-Version': extension_version
+					'Extension-Version': extension_version,
 				}),
 				// Set mode=cors so that the above custom headers are included in the
 				// request.
@@ -117,7 +117,7 @@ limitations under the License.
 				// Omits credentials such as cookies in the requests, which guarantees
 				// that the server cannot track the client via HTTP cookies.
 				credentials: 'omit',
-				cache: 'no-store'
+				cache: 'no-store',
 			});
 		});
 	}
