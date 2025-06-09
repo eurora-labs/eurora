@@ -44,7 +44,7 @@
 		"protolint": "^0.55.2",
 		"@bufbuild/buf": "^1.53.0",
 		"eslint-plugin-svelte": "3.9.0",
-		"@bufbuild/protobuf": "^2.2.5",
+		"@bufbuild/protobuf": "^2.5.2",
 		"@bufbuild/protoc-gen-es": "^2.2.5",
 		"@connectrpc/connect": "^2.0.2",
 		"@connectrpc/connect-web": "^2.0.2",
