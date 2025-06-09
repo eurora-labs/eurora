@@ -634,7 +634,7 @@ impl DatabaseManager {
         .bind(id)
         .bind(&request.token)
         .bind(request.expires_at)
-        .bind(None::<Uuid>) // user_id starts as NULL
+        .bind(request.user_id)
         .bind(false) // consumed starts as false
         .bind(now)
         .bind(now)
@@ -653,30 +653,6 @@ impl DatabaseManager {
             "#,
         )
         .bind(token)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(login_token)
-    }
-
-    pub async fn update_login_token_user(
-        &self,
-        token: &str,
-        request: UpdateLoginTokenRequest,
-    ) -> Result<LoginToken, sqlx::Error> {
-        let now = Utc::now();
-
-        let login_token = sqlx::query_as::<_, LoginToken>(
-            r#"
-            UPDATE login_tokens
-            SET user_id = $2, updated_at = $3
-            WHERE token = $1 AND expires_at > now()
-            RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
-            "#,
-        )
-        .bind(token)
-        .bind(request.user_id)
-        .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
