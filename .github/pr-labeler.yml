@@ -1,0 +1,17 @@
+# https://github.com/actions/labeler#basic-examples
+
+rust:
+    - changed-files:
+          - any-glob-to-any-file: crates/**/*
+
+'@eurora/desktop':
+    - changed-files:
+          - any-glob-to-any-file: apps/desktop/**/*
+
+'@eurora/web':
+    - changed-files:
+          - any-glob-to-any-file: apps/web/**/*
+
+'@eurora/ui':
+    - changed-files:
+          - any-glob-to-any-file: packages/ui/**/*

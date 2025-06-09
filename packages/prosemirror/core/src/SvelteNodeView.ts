@@ -7,7 +7,7 @@ import type {
 	EditorView,
 	NodeView,
 	NodeViewConstructor,
-	ViewMutationRecord
+	ViewMutationRecord,
 } from 'prosemirror-view';
 
 export interface SvelteNodeViewProps<A extends Attrs> {
@@ -46,7 +46,7 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		decorations: readonly Decoration[],
 		innerDecorations: DecorationSource,
 		editor: Editor,
-		component?: Component<SvelteNodeViewProps<A>>
+		component?: Component<SvelteNodeViewProps<A>>,
 	) {
 		this.node = node;
 		this.view = view;
@@ -59,7 +59,7 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 	get dom() {
 		if (!this._dom) {
 			throw Error(
-				'@my-org/core: Accessing uninitialized dom inside SvelteNodeView! Check your "init" method'
+				'@my-org/core: Accessing uninitialized dom inside SvelteNodeView! Check your "init" method',
 			);
 		}
 		return this._dom;
@@ -79,13 +79,14 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 				if (this.contentDOM) {
 					node.appendChild(this.contentDOM);
 				}
-			}
+			},
 		};
 	}
 
 	init = (): this => {
 		const toDOM = this.node.type.spec.toDOM;
-		if (!toDOM) throw Error(`@my-org/core: node "${this.node.type}" was not given a toDOM method!`);
+		if (!toDOM)
+			throw Error(`@my-org/core: node "${this.node.type}" was not given a toDOM method!`);
 		const { contentDOM } = DOMSerializer.renderSpec(document, toDOM(this.node));
 		// this._dom = dom as HTMLElement
 		this.contentDOM = contentDOM;
@@ -95,7 +96,7 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 			// This allows init() to return immediately while the component mounts in the background
 			this.mounted = mount(this.component!, {
 				target: this.dom,
-				props: this.props
+				props: this.props,
 			}) as MountedComponent;
 		} else {
 			this._dom.appendChild(contentDOM!);
@@ -117,7 +118,7 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 	update = (
 		node: PMNode,
 		decorations: readonly Decoration[],
-		innerDecorations: DecorationSource
+		innerDecorations: DecorationSource,
 	): boolean => {
 		// if (!newNode.sameMarkup(this.node)) return false
 		if (node.type.name !== this.node.type.name) {
@@ -148,14 +149,14 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 
 	static fromComponent<A extends Attrs>(
 		editor: Editor,
-		component?: Component<SvelteNodeViewProps<A>>
+		component?: Component<SvelteNodeViewProps<A>>,
 	): NodeViewConstructor {
 		return (
 			node: PMNode,
 			view: EditorView,
 			getPos: () => number | undefined,
 			decorations: readonly Decoration[],
-			innerDecorations: DecorationSource
+			innerDecorations: DecorationSource,
 		) => new this(node, view, getPos, decorations, innerDecorations, editor, component).init();
 	}
 }

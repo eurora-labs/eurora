@@ -26,7 +26,7 @@
 		if (!query) {
 			query = {
 				text: '',
-				extensions: []
+				extensions: [],
 			};
 		}
 		ref?.sendQuery(query);
@@ -38,7 +38,7 @@
 	bind:value
 	class={cn(
 		className,
-		'ProsemirrorEditor h-fit min-h-[100px] text-[40px] text-black/50 shadow-none'
+		'ProsemirrorEditor h-fit min-h-[100px] text-[40px] text-black/50 shadow-none',
 	)}
 	{...restProps}
 />

@@ -10,8 +10,8 @@ export default defineConfig({
 		port: 1420,
 		strictPort: false,
 		fs: {
-			strict: false,
-		},
+			strict: false
+		}
 	},
 	envPrefix: ['VITE_', 'TAURI_'],
 
@@ -22,7 +22,7 @@ export default defineConfig({
 		// minify production builds
 		minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
 		// ship sourcemaps for better sentry error reports
-		sourcemap: true,
+		sourcemap: true
 	},
 
 	// test: {
@@ -56,15 +56,15 @@ export default defineConfig({
 		alias: {
 			'@eurora/ai-chat': path.resolve(
 				__dirname,
-				'../../packages/custom-components/ai-chat/src/lib/index.ts',
+				'../../packages/custom-components/ai-chat/src/lib/index.ts'
 			),
 			'@eurora/proto/*': path.resolve(__dirname, '../../packages/proto/src/lib/*'),
 			'@eurora/katex': path.resolve(
 				__dirname,
-				'../../packages/custom-components/katex/src/lib/index.ts',
-			),
-		},
-	},
+				'../../packages/custom-components/katex/src/lib/index.ts'
+			)
+		}
+	}
 });
 
 function debounceReload() {
@@ -94,11 +94,11 @@ function debounceReload() {
 						longDelay = false;
 						server.hot.send({ type: 'full-reload' });
 					},
-					longDelay ? 5000 : 250,
+					longDelay ? 5000 : 250
 				);
 				server.hot.send('gb:reload');
 				return []; // Prevent immediate reload.
 			}
-		},
+		}
 	} as any;
 }

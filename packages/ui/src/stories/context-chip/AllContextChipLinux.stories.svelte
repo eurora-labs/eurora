@@ -115,7 +115,10 @@
 							<User class="mr-2 h-4 w-4" />
 							Clickable Primary
 						</ContextChip>
-						<ContextChip variant="destructive" onClick={() => alert('Destructive clicked!')}>
+						<ContextChip
+							variant="destructive"
+							onClick={() => alert('Destructive clicked!')}
+						>
 							Remove Tag
 						</ContextChip>
 					</div>
@@ -153,10 +156,10 @@
 				<div class="mt-8 p-4 bg-blue-900/20 rounded-lg border border-blue-500/30">
 					<h3 class="text-md font-semibold mb-2 text-blue-300">Linux Desktop Styling</h3>
 					<p class="text-sm text-blue-200">
-						This story demonstrates how Context Chips appear on Linux desktop applications. The <code
-							class="bg-blue-800/50 px-1 rounded">linux-app</code
-						> class has been added to the body, which triggers solid background styling instead of backdrop
-						blur effects for better compatibility with Linux desktop environments.
+						This story demonstrates how Context Chips appear on Linux desktop
+						applications. The <code class="bg-blue-800/50 px-1 rounded">linux-app</code>
+						class has been added to the body, which triggers solid background styling instead
+						of backdrop blur effects for better compatibility with Linux desktop environments.
 					</p>
 				</div>
 			</div>

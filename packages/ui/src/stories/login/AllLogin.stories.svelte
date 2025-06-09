@@ -89,7 +89,9 @@
 				<div class="w-full max-w-md">
 					<div class="p-6 border rounded-lg bg-card">
 						<div class="space-y-4">
-							<h3 class="text-lg font-semibold text-center">Sign in to your account</h3>
+							<h3 class="text-lg font-semibold text-center">
+								Sign in to your account
+							</h3>
 							<div class="space-y-3">
 								<button
 									class="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -179,12 +181,16 @@
 				<h2 class="text-lg font-semibold mb-4 text-white">Usage Examples</h2>
 				<div class="space-y-4">
 					<div class="text-sm text-gray-300">
-						<p class="mb-2"><strong>Default State:</strong> Clean form ready for user input</p>
 						<p class="mb-2">
-							<strong>Error States:</strong> Various error messages for different failure scenarios
+							<strong>Default State:</strong> Clean form ready for user input
 						</p>
 						<p class="mb-2">
-							<strong>Social Authentication:</strong> Multiple OAuth providers for quick sign-in
+							<strong>Error States:</strong> Various error messages for different failure
+							scenarios
+						</p>
+						<p class="mb-2">
+							<strong>Social Authentication:</strong> Multiple OAuth providers for quick
+							sign-in
 						</p>
 						<p class="mb-2">
 							<strong>Form Validation:</strong> Client-side validation with real-time feedback

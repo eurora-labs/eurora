@@ -1,7 +1,7 @@
 export function htmlToDOMOutputSpec(
 	el: HTMLElement,
 	collected: any[] = [],
-	recursed: { holeFound: boolean } = { holeFound: false }
+	recursed: { holeFound: boolean } = { holeFound: false },
 ): any[] {
 	collected.push(el.tagName.toLowerCase());
 	const attrs = {} as { [attr: string]: string };
@@ -12,7 +12,7 @@ export function htmlToDOMOutputSpec(
 		if (attr.name === 'data-hole') {
 			if (recursed.holeFound) {
 				throw Error(
-					'@my-org/core: Duplicate holes provided! Remember to only set "data-hole" attribute once!'
+					'@my-org/core: Duplicate holes provided! Remember to only set "data-hole" attribute once!',
 				);
 			}
 			recursed.holeFound = true;
@@ -30,7 +30,7 @@ export function htmlToDOMOutputSpec(
 	if (el.children.length > 0) {
 		collected = Array.from(el.children).reduce(
 			(acc, cur) => [...acc, htmlToDOMOutputSpec(cur as HTMLElement, [], recursed)],
-			collected
+			collected,
 		);
 	}
 	return collected;
