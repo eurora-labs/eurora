@@ -77,9 +77,19 @@ impl AuthManager {
     }
 
     pub async fn get_or_refresh_access_token(&self) -> Result<Sensitive<String>> {
-        // Check if refresh_threshold has passed
-        if self.get_access_token_payload().unwrap().exp < chrono::Utc::now().timestamp() {
-            return self.refresh_tokens().await;
+        // Check if token has expired or is close to expiration
+        match self.get_access_token_payload() {
+            Ok(claims) => {
+                let now = chrono::Utc::now().timestamp();
+                let expiry_with_offset = claims.exp - self.jwt_config.refresh_offset;
+                if now < expiry_with_offset {
+                    // Token is still valid
+                    return self.get_access_token();
+                }
+            }
+            Err(_) => {
+                // Token is invalid or missing, try to refresh
+            }
         }
 
         self.refresh_tokens().await
