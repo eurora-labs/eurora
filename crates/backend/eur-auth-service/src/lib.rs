@@ -311,6 +311,9 @@ impl AuthService {
 
         info!("OAuth state validated successfully for state: {}", state);
 
+        // Extract PKCE verifier for token exchange
+        let pkce_verifier = oauth_state.pkce_verifier.clone();
+
         info!("Exchanging authorization code for access token");
 
         // Create OAuth client for token exchange
@@ -359,6 +362,7 @@ impl AuthService {
 
         let token_result = client
             .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
+            .set_pkce_verifier(oauth2::PkceCodeVerifier::new(pkce_verifier))
             .request_async(&http_client)
             .await
             .map_err(|e| {
