@@ -83,8 +83,8 @@
 			Your Open Source AI Assistant
 		</h1>
 		<p class="mx-4 mb-8 text-xl font-medium text-gray-500 md:mx-48">
-			Eurora is a fully Open Source AI Assistant that understands context, respects your
-			privacy, and works across all your devices. Experience AI on your own terms.
+			Eurora is a fully Open Source AI Assistant that understands context, respects your privacy,
+			and works across all your devices. Experience AI on your own terms.
 		</p>
 		<div class="flex h-[calc(100vh-350px)] flex-col justify-center">
 			{#if !formSubmitted}
@@ -116,12 +116,9 @@
 				</form>
 			{:else}
 				<div class="mx-auto w-full max-w-lg text-center">
-					<h3 class="mb-4 text-2xl font-bold text-purple-600">
-						Thanks for your interest!
-					</h3>
+					<h3 class="mb-4 text-2xl font-bold text-purple-600">Thanks for your interest!</h3>
 					<p class="text-gray-600">
-						We'll keep you updated on our progress and let you know when Eurora is
-						ready.
+						We'll keep you updated on our progress and let you know when Eurora is ready.
 					</p>
 				</div>
 			{/if}
@@ -153,8 +150,8 @@
 	<div class="mb-16 text-center">
 		<h1 class="mb-6 text-5xl font-bold">Intelligence Without Compromise</h1>
 		<p class="mx-auto mb-8 max-w-3xl text-xl text-gray-600">
-			Eurora is a fully Open Source AI assistant that understands context, respects your
-			privacy, and works across all your devices. Experience AI on your own terms.
+			Eurora is a fully Open Source AI assistant that understands context, respects your privacy,
+			and works across all your devices. Experience AI on your own terms.
 		</p>
 		<!-- <div class="flex justify-center gap-4">
             <Sheet.Root>
@@ -190,8 +187,8 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora understands context and remembers previous conversations, providing more
-					accurate and relevant responses than traditional AI assistants.
+					Eurora understands context and remembers previous conversations, providing more accurate
+					and relevant responses than traditional AI assistants.
 				</p>
 				<!-- <Button variant="link" href="/features" class="p-0">
 					Learn more
@@ -208,9 +205,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora gives you full access to the code that runs on your device and handles
-					your data. You can even run both the app and server on your own hardware as well
-					as connect LLM's of your choosing.
+					Eurora gives you full access to the code that runs on your device and handles your data.
+					You can even run both the app and server on your own hardware as well as connect LLM's of
+					your choosing.
 				</p>
 				<!-- <Button variant="link" href="/open-source" class="p-0">
 					Learn more
@@ -228,8 +225,8 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Your data never leaves your device without your permission. Eurora is designed
-					with privacy at its core, giving you complete control over your information.
+					Your data never leaves your device without your permission. Eurora is designed with
+					privacy at its core, giving you complete control over your information.
 				</p>
 				<!-- <Button variant="link" href="/privacy" class="p-0">
 					Learn more
@@ -317,8 +314,7 @@
 			<Card.Root class="p-6">
 				<Card.Header>
 					<Card.Title>For Learning</Card.Title>
-					<Card.Description>Enhance your education and skill development</Card.Description
-					>
+					<Card.Description>Enhance your education and skill development</Card.Description>
 				</Card.Header>
 				<Card.Content>
 					<ul class="mb-4 space-y-3">
@@ -352,9 +348,7 @@
 							>
 								<span class="text-xs text-purple-600">✓</span>
 							</div>
-							<span
-								>Ask how new knowledge relates to previous concepts you've learned
-							</span>
+							<span>Ask how new knowledge relates to previous concepts you've learned </span>
 						</li>
 					</ul>
 				</Card.Content>
@@ -362,9 +356,7 @@
 			<Card.Root class="p-6">
 				<Card.Header>
 					<Card.Title>For Work</Card.Title>
-					<Card.Description
-						>Boost your productivity and streamline workflows</Card.Description
-					>
+					<Card.Description>Boost your productivity and streamline workflows</Card.Description>
 				</Card.Header>
 				<Card.Content>
 					<ul class="mb-4 space-y-3">
@@ -415,23 +407,19 @@
 					<Brain class="h-6 w-6 text-purple-600" />
 					<Card.Title>Advanced AI Understanding</Card.Title>
 				</div>
-				<Card.Description
-					>Supercharged context for lightning-fast responses</Card.Description
-				>
+				<Card.Description>Supercharged context for lightning-fast responses</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora's intelligent context utilization delivers responses up to 98% faster
-					than traditional AI assistants, while maintaining exceptional accuracy and
-					relevance to your specific needs.
+					Eurora's intelligent context utilization delivers responses up to 98% faster than
+					traditional AI assistants, while maintaining exceptional accuracy and relevance to your
+					specific needs.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Context Advantages:</h4>
 					<ul class="list-disc space-y-1 pl-5 text-gray-600">
 						<li>Accelerated response times with smart context prioritization</li>
-						<li>
-							Efficient processing of previous interactions for near-instant answers
-						</li>
+						<li>Efficient processing of previous interactions for near-instant answers</li>
 						<li>Contextual memory that reduces redundant information processing</li>
 						<li>Adaptive learning system that gets faster the more you use it</li>
 					</ul>
@@ -448,9 +436,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora is completely open source and can be self-hosted by individuals or
-					companies. Take full control of your AI assistant by running it on your own
-					hardware, ensuring complete data sovereignty and customization options.
+					Eurora is completely open source and can be self-hosted by individuals or companies. Take
+					full control of your AI assistant by running it on your own hardware, ensuring complete
+					data sovereignty and customization options.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Hosting Benefits:</h4>
@@ -474,9 +462,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora is written in Rust, a language designed for performance, reliability, and
-					security. This implementation choice ensures memory safety, eliminates common
-					vulnerabilities, and provides robust protection for your sensitive data.
+					Eurora is written in Rust, a language designed for performance, reliability, and security.
+					This implementation choice ensures memory safety, eliminates common vulnerabilities, and
+					provides robust protection for your sensitive data.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Rust Advantages:</h4>
@@ -500,9 +488,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Unlike other AI assistants, Eurora is designed with privacy at its core. Your
-					data never leaves your device without your explicit permission, and you have
-					complete control over what information is shared.
+					Unlike other AI assistants, Eurora is designed with privacy at its core. Your data never
+					leaves your device without your explicit permission, and you have complete control over
+					what information is shared.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Privacy Features:</h4>
@@ -525,9 +513,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora is optimized for speed, with local processing capabilities that allow it
-					to function even without an internet connection. When online, it leverages cloud
-					resources for more complex tasks while maintaining responsiveness.
+					Eurora is optimized for speed, with local processing capabilities that allow it to
+					function even without an internet connection. When online, it leverages cloud resources
+					for more complex tasks while maintaining responsiveness.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Performance Highlights:</h4>
@@ -551,9 +539,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Use Eurora across all your devices with perfect synchronization. Whether you're
-					on your phone, tablet, computer, or browser, Eurora provides a consistent
-					experience with your preferences and history available everywhere.
+					Use Eurora across all your devices with perfect synchronization. Whether you're on your
+					phone, tablet, computer, or browser, Eurora provides a consistent experience with your
+					preferences and history available everywhere.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Available Platforms:</h4>
@@ -575,16 +563,14 @@
 					<Layers class="h-6 w-6 text-purple-600" />
 					<Card.Title>Powerful Integrations</Card.Title>
 				</div>
-				<Card.Description
-					>Seamless access to your files and productivity tools</Card.Description
-				>
+				<Card.Description>Seamless access to your files and productivity tools</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-6 text-gray-600">
-					Eurora seamlessly integrates with your file storage systems and productivity
-					tools, giving you instant access to your content wherever it lives. Whether your
-					files are stored in the cloud or on your device, Eurora can search, analyze, and
-					help you work with them efficiently.
+					Eurora seamlessly integrates with your file storage systems and productivity tools, giving
+					you instant access to your content wherever it lives. Whether your files are stored in the
+					cloud or on your device, Eurora can search, analyze, and help you work with them
+					efficiently.
 				</p>
 
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -636,15 +622,12 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora's conversational abilities go beyond simple command-response
-					interactions. Have natural, flowing conversations with follow-up questions,
-					clarifications, and even humor.
+					Eurora's conversational abilities go beyond simple command-response interactions. Have
+					natural, flowing conversations with follow-up questions, clarifications, and even humor.
 				</p>
 				<div class="mb-4 rounded-md border border-gray-200 bg-gray-50 p-4">
 					<div class="mb-3 flex gap-2">
-						<div
-							class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300"
-						>
+						<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300">
 							<span class="text-sm font-medium">You</span>
 						</div>
 						<div class="flex-1 rounded-md bg-blue-50 p-2">
@@ -652,25 +635,20 @@
 						</div>
 					</div>
 					<div class="mb-3 flex gap-2">
-						<div
-							class="flex h-8 w-8 items-center justify-center rounded-full bg-purple-300"
-						>
+						<div class="flex h-8 w-8 items-center justify-center rounded-full bg-purple-300">
 							<span class="text-sm font-medium">AI</span>
 						</div>
 						<div class="flex-1 rounded-md bg-purple-50 p-2">
-							I'd be happy to help plan your Japan trip! What are you most interested
-							in experiencing there - culture, food, nature, or something else?
+							I'd be happy to help plan your Japan trip! What are you most interested in
+							experiencing there - culture, food, nature, or something else?
 						</div>
 					</div>
 					<div class="flex gap-2">
-						<div
-							class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300"
-						>
+						<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300">
 							<span class="text-sm font-medium">You</span>
 						</div>
 						<div class="flex-1 rounded-md bg-blue-50 p-2">
-							I love food and traditional culture. And I'd like to see cherry
-							blossoms.
+							I love food and traditional culture. And I'd like to see cherry blossoms.
 						</div>
 					</div>
 				</div>
@@ -687,9 +665,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Developers can extend Eurora's capabilities with custom plugins and
-					integrations. Our comprehensive API and SDK make it easy to build powerful
-					extensions that leverage Eurora's AI capabilities.
+					Developers can extend Eurora's capabilities with custom plugins and integrations. Our
+					comprehensive API and SDK make it easy to build powerful extensions that leverage Eurora's
+					AI capabilities.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Developer Resources:</h4>
@@ -723,22 +701,22 @@
 				<div class="space-y-2">
 					<h3 class="text-lg font-medium">Advanced Image Generation</h3>
 					<p class="text-gray-600">
-						Create stunning, customized images from text descriptions with our upcoming
-						image generation feature.
+						Create stunning, customized images from text descriptions with our upcoming image
+						generation feature.
 					</p>
 				</div>
 				<div class="space-y-2">
 					<h3 class="text-lg font-medium">Voice Assistant Mode</h3>
 					<p class="text-gray-600">
-						Interact with Eurora using just your voice, with advanced speech recognition
-						and natural responses.
+						Interact with Eurora using just your voice, with advanced speech recognition and natural
+						responses.
 					</p>
 				</div>
 				<div class="space-y-2">
 					<h3 class="text-lg font-medium">Collaborative Workspaces</h3>
 					<p class="text-gray-600">
-						Work together with teammates using shared AI workspaces for collaborative
-						projects and brainstorming.
+						Work together with teammates using shared AI workspaces for collaborative projects and
+						brainstorming.
 					</p>
 				</div>
 			</div>
@@ -754,9 +732,8 @@
 			<Card.Root class="p-6">
 				<Card.Content>
 					<p class="mb-4 italic text-gray-600">
-						"Eurora has given me a newfound confidence in my ability to use AI. It's
-						like having a personal tutor that can explain complex topics in a way that
-						makes sense."
+						"Eurora has given me a newfound confidence in my ability to use AI. It's like having a
+						personal tutor that can explain complex topics in a way that makes sense."
 					</p>
 					<div class="flex items-center">
 						<div class="mr-3 h-10 w-10 rounded-full bg-gray-200"></div>
@@ -771,8 +748,8 @@
 			<Card.Root class="p-6">
 				<Card.Content>
 					<p class="mb-4 italic text-gray-600">
-						"As a developer, I appreciate how Eurora integrates with all my tools. The
-						API is well-documented and the customization options are fantastic."
+						"As a developer, I appreciate how Eurora integrates with all my tools. The API is
+						well-documented and the customization options are fantastic."
 					</p>
 					<div class="flex items-center">
 						<div class="mr-3 h-10 w-10 rounded-full bg-gray-200"></div>
@@ -787,9 +764,8 @@
 			<Card.Root class="p-6">
 				<Card.Content>
 					<p class="mb-4 italic text-gray-600">
-						"I use Eurora daily for my studies. It helps me understand complex topics
-						and saves me hours of research time. The contextual understanding is
-						impressive."
+						"I use Eurora daily for my studies. It helps me understand complex topics and saves me
+						hours of research time. The contextual understanding is impressive."
 					</p>
 					<div class="flex items-center">
 						<div class="mr-3 h-10 w-10 rounded-full bg-gray-200"></div>
@@ -806,17 +782,13 @@
 	<!-- Call to Action -->
 	<Card.Root class="hidden border-none bg-purple-50 p-8">
 		<Card.Content class="text-center">
-			<h2 class="mb-4 text-3xl font-bold">
-				Ready to Experience Intelligence Without Compromise?
-			</h2>
+			<h2 class="mb-4 text-3xl font-bold">Ready to Experience Intelligence Without Compromise?</h2>
 			<p class="mx-auto mb-6 max-w-2xl text-xl text-gray-600">
 				Join thousands of users who are already experiencing the future of AI assistance.
 			</p>
 			<div class="flex justify-center gap-4">
 				<Button href="/download" size="lg" class="px-8">Download Now</Button>
-				<Button href="/pricing" variant="outline" size="lg" class="px-8"
-					>View Pricing</Button
-				>
+				<Button href="/pricing" variant="outline" size="lg" class="px-8">View Pricing</Button>
 			</div>
 		</Card.Content>
 	</Card.Root>

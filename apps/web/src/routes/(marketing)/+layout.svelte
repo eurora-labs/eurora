@@ -24,9 +24,8 @@
 			<ShieldAlert class="size-4" />
 			<Alert.Title>Heads up!</Alert.Title>
 			<Alert.Description
-				>All existing text on this website is placeholder and doesn't represent anything
-				about the product, it's features, the team behind it, or any other factual
-				information.</Alert.Description
+				>All existing text on this website is placeholder and doesn't represent anything about the
+				product, it's features, the team behind it, or any other factual information.</Alert.Description
 			>
 		</Alert.Root>
 		<Button variant="destructive" class="ml-2" onclick={dismissAlert}>Dismiss</Button>
