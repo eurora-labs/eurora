@@ -26,7 +26,9 @@
 		// The backend will validate the state parameter against the stored OAuth state
 		// and return an error if the state is invalid or expired
 		const loginToken = sessionStorage.getItem('loginToken') ?? undefined;
+		const challengeMethod = sessionStorage.getItem('challengeMethod') ?? undefined;
 		if (loginToken) sessionStorage.removeItem('loginToken');
+		if (challengeMethod) sessionStorage.removeItem('challengeMethod');
 
 		try {
 			const loginData = create(LoginRequestSchema, {
@@ -36,6 +38,7 @@
 						code,
 						state,
 						loginToken,
+						challengeMethod,
 					},
 					case: 'thirdParty',
 				},

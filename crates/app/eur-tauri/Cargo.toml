@@ -82,6 +82,8 @@ taurpc = "0.5.0"
 base64 = "0.22.1"
 eur-auth-client = { workspace = true }
 dotenv = "0.15.0"
+eur-user = { workspace = true }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-trafficlights-positioner = { git = "https://github.com/gitbutlerapp/tauri-plugin-trafficlights-positioner", branch = "v2" }
 

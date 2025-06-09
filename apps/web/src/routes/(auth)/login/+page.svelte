@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { create } from '@bufbuild/protobuf';
+	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import * as Form from '@eurora/ui/components/form/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
@@ -11,8 +13,32 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
+	import { page } from '$app/state';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 
+	onMount(() => {
+		try {
+			let loginToken = page.url.searchParams.get('code_challenge');
+			let challengeMethod = page.url.searchParams.get('code_challenge_method');
+			if (loginToken && challengeMethod) {
+				if (loginToken.length !== 43 || challengeMethod !== 'S256') {
+					console.error('Invalid login token or challenge method');
+					goto('/login?error=invalid_login_token');
+					return;
+				}
+				sessionStorage.setItem('loginToken', loginToken);
+				sessionStorage.setItem('challengeMethod', challengeMethod);
+				goto('/login');
+				return;
+			}
+			loginToken = sessionStorage.getItem('loginToken');
+			challengeMethod = sessionStorage.getItem('challengeMethod');
+		} catch (error) {
+			console.error('Invalid login token or challenge method');
+			goto('/login?error=invalid_login_token');
+			return;
+		}
+	});
 	// Define form schema
 	const loginSchema = z.object({
 		login: z.string().min(1, 'Username or email is required'),

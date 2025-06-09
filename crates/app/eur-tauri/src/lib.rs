@@ -17,7 +17,6 @@
 // pub mod commands;
 
 // pub mod logs;
-pub mod auth;
 pub mod procedures;
 pub mod shared_types;
 pub mod window;

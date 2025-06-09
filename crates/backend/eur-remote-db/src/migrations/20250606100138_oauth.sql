@@ -2,7 +2,9 @@
 -- Created: 2025-06-06
 -- Adds oauth_credentials and refresh_tokens tables
 
--- Enable uuid extension if not already enabled
+----------------------------------------------------------------
+-- Enable UUID extension if not already enabled
+----------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 ----------------------------------------------------------------
@@ -29,7 +31,9 @@ CREATE TABLE oauth_credentials (
     CONSTRAINT ck_oauth_provider CHECK (provider IN ('google', 'github'))
 );
 
+----------------------------------------------------------------
 -- Uniqueness: one row per provider/user, one row per provider_account
+----------------------------------------------------------------
 CREATE UNIQUE INDEX idx_oauth_credentials_provider_user
     ON oauth_credentials(provider, provider_user_id);
 
@@ -55,6 +59,9 @@ CREATE TABLE refresh_tokens (
         ON DELETE CASCADE
 );
 
+----------------------------------------------------------------
+-- Create indexes for performance
+----------------------------------------------------------------
 CREATE INDEX idx_refresh_tokens_user_id
     ON refresh_tokens(user_id);
 
@@ -65,14 +72,6 @@ CREATE INDEX idx_refresh_tokens_active
 ----------------------------------------------------------------
 -- updated_at triggers
 ----------------------------------------------------------------
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at := now();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 CREATE TRIGGER trg_oauth_credentials_updated
     BEFORE UPDATE ON oauth_credentials
     FOR EACH ROW

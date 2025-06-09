@@ -30,6 +30,7 @@ message ThirdPartyCredentials {
     string code = 2;
     string state = 3;
     optional string login_token = 4;
+    optional string challenge_method = 5;
 }
 
 enum Provider {

@@ -9,10 +9,9 @@ use eur_client_questions::QuestionsClient;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
+use eur_secret::secret;
 use eur_tauri::{
-    WindowState,
-    auth::AuthManager,
-    create_launcher, create_window,
+    WindowState, create_launcher, create_window,
     procedures::{
         auth_procedures::{AuthApi, AuthApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
@@ -23,10 +22,8 @@ use eur_tauri::{
     },
     shared_types::{SharedOpenAIClient, create_shared_timeline},
 };
+use eur_user::auth::AuthManager;
 use eur_vision::{capture_focused_region_rgba, image_to_base64};
-use futures::{StreamExt, TryFutureExt};
-// use secret_service::{ApiKeyStatus, SecretService};
-use eur_secret::secret;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::plugin::TauriPlugin;
@@ -42,7 +39,6 @@ static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 use tracing::{error, info};
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
-type SharedAuthManager = Arc<tokio::sync::Mutex<AuthManager>>;
 
 async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> SharedPersonalDb {
     let db_path = get_db_path(app_handle);
