@@ -10,12 +10,12 @@ CREATE TABLE login_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     token VARCHAR(128) NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    user_id UUID,
+    user_id UUID NOT NULL,
     consumed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     
-    -- Foreign key constraint (optional, can be null initially)
+    -- Foreign key constraint
     CONSTRAINT fk_login_tokens_user_id 
         FOREIGN KEY (user_id) 
         REFERENCES users(id) 
@@ -39,7 +39,7 @@ COMMENT ON TABLE login_tokens IS 'Desktop login tokens for secure authentication
 COMMENT ON COLUMN login_tokens.id IS 'Primary key UUID for login token record';
 COMMENT ON COLUMN login_tokens.token IS 'Unique login token string';
 COMMENT ON COLUMN login_tokens.expires_at IS 'When the token expires';
-COMMENT ON COLUMN login_tokens.user_id IS 'Optional foreign key to users table, filled after user creation';
+COMMENT ON COLUMN login_tokens.user_id IS 'Foreign key to users table';
 COMMENT ON COLUMN login_tokens.consumed IS 'Whether the token has been used for login';
 COMMENT ON COLUMN login_tokens.created_at IS 'Timestamp when token was created';
 COMMENT ON COLUMN login_tokens.updated_at IS 'Timestamp when token was last updated';
