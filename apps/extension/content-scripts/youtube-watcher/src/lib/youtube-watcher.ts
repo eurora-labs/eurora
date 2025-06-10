@@ -1,36 +1,30 @@
+import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import { YoutubeChromeMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from '@eurora/youtube-transcripts';
 import { ProtoImage, ProtoImageFormat } from '@eurora/proto/shared';
 import {
 	ProtoNativeYoutubeState,
-	ProtoNativeStateType,
 	ProtoNativeYoutubeSnapshot,
 } from '@eurora/proto/native_messaging';
 
 interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
 }
-
-(() => {
-	let videoId = getCurrentVideoId();
-	let videoTranscript = null;
-	let canvas = document.createElement('canvas');
-	let context = canvas.getContext('2d');
-
-	if (!videoId) return;
-
-	// Make sure we get the YouTube player element
-	let youtubePlayer: HTMLVideoElement | null = null;
-
-	// Function to initialize/get the YouTube player
-	function getYouTubePlayer(): HTMLVideoElement | null {
-		// Try to find the video element if we don't have it yet
-		if (!youtubePlayer) {
-			youtubePlayer = document.querySelector('video.html5-main-video') as HTMLVideoElement;
-		}
-		return youtubePlayer;
+class YoutubeWatcher extends Watcher<WatcherParams> {
+	listen(message: YoutubeChromeMessage) {
+		throw new Error('Method not implemented.');
 	}
 
-	function getCurrentVideoFrame(): EurImage {
+	public generateAssets<T = ProtoNativeYoutubeState>(): Promise<T> {
+		return Promise.resolve(null);
+	}
+
+	public generateSnapshot<T = ProtoNativeYoutubeSnapshot>(): Promise<T> {
+		return Promise.resolve(null);
+	}
+
+	getCurrentVideoFrame(): EurImage {
+		const { youtubePlayer, canvas, context } = this.params;
 		if (!youtubePlayer) return null;
 
 		context.drawImage(youtubePlayer, 0, 0, canvas.width, canvas.height);
@@ -43,9 +37,8 @@ interface EurImage extends Partial<ProtoImage> {
 		};
 	}
 
-	// Function to get current timestamp (or -1 if no video playing)
-	function getCurrentVideoTime(): number {
-		const player = getYouTubePlayer();
+	getCurrentVideoTime(): number {
+		const player = this.getYouTubePlayer();
 		if (!player) return -1.0;
 
 		// Check if the video is actually loaded and playable
@@ -53,6 +46,40 @@ interface EurImage extends Partial<ProtoImage> {
 
 		return player.currentTime;
 	}
+
+	getYouTubePlayer(): HTMLVideoElement | null {
+		const { youtubePlayer } = this.params;
+		// Try to find the video element if we don't have it yet
+		if (!youtubePlayer) {
+			this.params.youtubePlayer = document.querySelector(
+				'video.html5-main-video',
+			) as HTMLVideoElement;
+		}
+		return this.params.youtubePlayer;
+	}
+}
+
+(() => {
+	const watcher = new YoutubeWatcher({
+		videoId: getCurrentVideoId(),
+		videoTranscript: null,
+		canvas: document.createElement('canvas'),
+		context: document.createElement('canvas').getContext('2d'),
+		youtubePlayer: null,
+	});
+	let videoId = getCurrentVideoId();
+	let videoTranscript = null;
+	let canvas = document.createElement('canvas');
+	let context = canvas.getContext('2d');
+
+	if (!videoId) return;
+
+	// Make sure we get the YouTube player element
+	let youtubePlayer: HTMLVideoElement | null = null;
+
+	// Function to initialize/get the YouTube player
+
+	// Function to get current timestamp (or -1 if no video playing)
 
 	async function sendTranscriptToBackground(transcript: any) {
 		chrome.runtime.sendMessage(
@@ -74,6 +101,8 @@ interface EurImage extends Partial<ProtoImage> {
 	}
 
 	let youtubeLeftControls: HTMLElement;
+
+	chrome.runtime.onMessage.addListener(watcher.listen);
 
 	// Listen for messages from the extension
 	chrome.runtime.onMessage.addListener((obj, sender, response) => {
