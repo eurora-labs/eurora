@@ -1,61 +1,112 @@
+import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher.js';
+import { ArticleChromeMessage, type ArticleMessageType, type WatcherParams } from './types.js';
 import { ProtoArticleState } from '@eurora/proto/tauri_ipc';
-import { ProtoNativeArticleAsset } from '@eurora/proto/native_messaging';
+import {
+	ProtoNativeArticleAsset,
+	ProtoNativeArticleAssetSchema,
+} from '@eurora/proto/native_messaging';
+import { create } from '@eurora/proto/util.js';
 import { Readability } from '@mozilla/readability';
 
-(() => {
-	console.log('Article Watcher content script loaded');
+class ArticleWatcher extends Watcher<WatcherParams> {
+	constructor(params: WatcherParams) {
+		super(params);
+	}
 
-	window.addEventListener('load', () => {
-		const clone = document.cloneNode(true) as Document;
-		const article = new Readability(clone).parse();
-
-		console.log('Parsed article:', article);
-	});
-
-	// Listen for messages from the extension
-	chrome.runtime.onMessage.addListener((obj, sender, response) => {
+	public listen(
+		obj: ArticleChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
 		const { type } = obj;
 
 		switch (type) {
 			case 'NEW':
-				// const article = new Readability(document).parse();
-				// console.log('New article:', article);
+				this.handleNew(obj, sender, response);
 				break;
 			case 'GENERATE_ASSETS':
-				console.log('Generating article report for URL:', window.location.href);
-
-				const clone = document.cloneNode(true) as Document;
-				const article = new Readability(clone).parse();
-
-				console.log('Parsed article:', article);
-
-				// Prepare report data
-				const reportData: ProtoNativeArticleAsset = {
-					type: 'ARTICLE_ASSET',
-					content: article.content,
-					textContent: article.textContent,
-
-					title: article.title,
-					siteName: article.siteName,
-					language: article.lang,
-					excerpt: article.excerpt,
-
-					length: article.length,
-				};
-
-				// Add selected_text if available
-				const selectedText = window.getSelection()?.toString();
-				if (selectedText) {
-					reportData.selectedText = selectedText;
-				}
-
-				// Send response back to background script
-				response(reportData);
-				return true; // Important: indicates we'll send response asynchronously
+				this.handleGenerateAssets(obj, sender, response);
+				break;
+			case 'GENERATE_SNAPSHOT':
+				this.handleGenerateSnapshot(obj, sender, response);
+				break;
 			default:
 				response();
 		}
-	});
+	}
+
+	public handleNew(
+		obj: ArticleChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
+		console.log('Article Watcher: New article detected');
+		// Parse article on page load for caching
+		const clone = document.cloneNode(true) as Document;
+		const article = new Readability(clone).parse();
+		console.log('Parsed article:', article);
+		response();
+	}
+
+	public handleGenerateAssets(
+		obj: ArticleChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
+		console.log('Generating article report for URL:', window.location.href);
+
+		try {
+			const clone = document.cloneNode(true) as Document;
+			const article = new Readability(clone).parse();
+
+			console.log('Parsed article:', article);
+
+			// Prepare report data
+			const reportData = create(ProtoNativeArticleAssetSchema, {
+				type: 'ARTICLE_ASSET',
+				content: article?.content || '',
+				textContent: article?.textContent || '',
+				title: article?.title || document.title,
+				siteName: article?.siteName || '',
+				language: article?.lang || '',
+				excerpt: article?.excerpt || '',
+				length: article?.length || 0,
+				selectedText: window.getSelection()?.toString() || '',
+			});
+
+			// Send response back to background script
+			response(reportData);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			const contextualError = `Failed to generate article assets for ${window.location.href}: ${errorMessage}`;
+			console.error('Error generating article report:', {
+				url: window.location.href,
+				error: errorMessage,
+				stack: error instanceof Error ? error.stack : undefined,
+			});
+			response({
+				success: false,
+				error: contextualError,
+				context: {
+					url: window.location.href,
+					timestamp: new Date().toISOString(),
+				},
+			});
+		}
+
+		return true; // Important: indicates we'll send response asynchronously
+	}
+
+	public handleGenerateSnapshot(
+		obj: ArticleChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
+		console.log('Generating article snapshot');
+		// For articles, snapshot is the same as assets for now
+		this.handleGenerateAssets(obj, sender, response);
+		return true;
+	}
 
 	/**
 	 * Extracts the main content from an article page
@@ -63,7 +114,7 @@ import { Readability } from '@mozilla/readability';
 	 * using common patterns for article pages. For production use, this would need
 	 * to be more sophisticated and handle different site layouts.
 	 */
-	function extractArticleContent(): string {
+	private extractArticleContent(): string {
 		// Try to find content using common article containers
 		const selectors = [
 			'article',
@@ -102,4 +153,19 @@ import { Readability } from '@mozilla/readability';
 
 		return body.textContent?.trim() || '';
 	}
+}
+
+(() => {
+	console.log('Article Watcher content script loaded');
+
+	const watcher = new ArticleWatcher({});
+
+	// Parse article on page load
+	window.addEventListener('load', () => {
+		const clone = document.cloneNode(true) as Document;
+		const article = new Readability(clone).parse();
+		console.log('Parsed article on load:', article);
+	});
+
+	chrome.runtime.onMessage.addListener(watcher.listen.bind(watcher));
 })();
