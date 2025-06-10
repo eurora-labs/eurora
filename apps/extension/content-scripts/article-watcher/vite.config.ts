@@ -56,6 +56,10 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			'@eurora/proto/*': path.resolve(__dirname, '../../../../packages/proto/src/lib/*'),
+			'@eurora/chrome-ext-shared/*': path.resolve(
+				__dirname,
+				'../../../../packages/chrome-ext-shared/src/lib/*',
+			),
 		},
 	},
 });
