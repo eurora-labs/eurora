@@ -3,8 +3,6 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
-	"module": "index.ts",
-	"main": "index.ts",
 	"exports": {
 		".": {
 			"types": "./index.ts",
@@ -24,11 +22,11 @@
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:e2e": "playwright test"
 	},
-	"dependencies": {
-		"@eurora/youtube-transcripts": "workspace:*"
-	},
 	"devDependencies": {
+		"@eurora/youtube-transcripts": "workspace:*",
 		"@eurora/proto": "workspace:*",
+		"@eurora/shared": "workspace:*",
+		"@eurora/chrome-ext-shared": "workspace:*",
 		"@eslint/compat": "^1.2.9",
 		"@eslint/js": "^9.25.1",
 		"rxjs": "^7.8.2",
