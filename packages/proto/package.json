@@ -24,6 +24,10 @@
 		"rxjs": "^7.8.2"
 	},
 	"exports": {
+		"./*.js": {
+			"types": "./dist/lib/*.d.ts",
+			"default": "./dist/lib/*.js"
+		},
 		"./auth_service": {
 			"types": "./dist/lib/auth_service.d.ts",
 			"default": "./dist/lib/auth_service.js"
