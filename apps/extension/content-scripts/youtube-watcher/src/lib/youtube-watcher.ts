@@ -7,46 +7,55 @@ import {
 	ProtoNativeYoutubeState,
 	ProtoNativeYoutubeSnapshot,
 	ProtoNativeYoutubeStateSchema,
+	ProtoNativeYoutubeSnapshotSchema,
 } from '@eurora/proto/native_messaging';
 
 interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
 }
 class YoutubeWatcher extends Watcher<WatcherParams> {
-	public listen(message: YoutubeChromeMessage) {
-		const {
-			message: { type },
-		} = message;
+	public listen(
+		obj: YoutubeChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
+		const { type } = obj;
 
 		switch (type) {
 			case 'NEW':
-				this.handleNew(message);
+				this.handleNew(obj, sender, response);
 				break;
 			case 'PLAY':
-				this.handlePlay(message);
+				this.handlePlay(obj, sender, response);
 				break;
 			case 'GENERATE_ASSETS':
-				this.handleGenerateAssets(message);
+				console.log(this);
+				this.handleGenerateAssets(obj, sender, response);
 				break;
 			case 'GENERATE_SNAPSHOT':
-				this.handleGenerateSnapshot(message);
+				console.log(this);
+				this.handleGenerateSnapshot(obj, sender, response);
 				break;
 		}
 	}
 
-	public handlePlay(message: YoutubeChromeMessage) {
-		const {
-			message: { value },
-		} = message;
+	public handlePlay(
+		obj: YoutubeChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
+		const { value } = obj;
 		if (this.params.youtubePlayer) {
 			this.params.youtubePlayer.currentTime = value;
 		}
 	}
 
-	public handleNew(message: YoutubeChromeMessage) {
-		const {
-			message: { videoId },
-		} = message;
+	public handleNew(
+		obj: YoutubeChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
+		const { videoId } = obj;
 		const currentVideoId = getCurrentVideoId();
 		if (!currentVideoId) {
 			this.params.videoId = undefined;
@@ -72,12 +81,12 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 			});
 	}
 
-	public handleGenerateAssets(message: YoutubeChromeMessage) {
-		const {
-			message: { videoId },
-			sender,
-			response,
-		} = message;
+	public handleGenerateAssets(
+		obj: YoutubeChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
+		const { videoId } = obj;
 		try {
 			// Get current timestamp
 			const currentTime = this.getCurrentVideoTime();
@@ -130,7 +139,27 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		return true; // Important: indicates we'll send response asynchronously
 	}
 
-	public handleGenerateSnapshot(message: YoutubeChromeMessage) {}
+	public handleGenerateSnapshot(
+		obj: YoutubeChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
+		console.log('Generating snapshots for YouTube video');
+		const currentTime = this.getCurrentVideoTime();
+		const videoFrame = this.getCurrentVideoFrame();
+
+		const reportData = create(ProtoNativeYoutubeSnapshotSchema, {
+			type: 'YOUTUBE_SNAPSHOT',
+			currentTime: Math.round(currentTime),
+			videoFrameBase64: videoFrame.dataBase64,
+			videoFrameWidth: videoFrame.width,
+			videoFrameHeight: videoFrame.height,
+			videoFrameFormat: videoFrame.format,
+		});
+
+		response(reportData);
+		return true;
+	}
 
 	getCurrentVideoFrame(): EurImage {
 		const { youtubePlayer, canvas, context } = this.params;
@@ -211,7 +240,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 
 	let youtubeLeftControls: HTMLElement;
 
-	chrome.runtime.onMessage.addListener(watcher.listen);
+	chrome.runtime.onMessage.addListener(watcher.listen.bind(watcher));
 
 	// Listen for messages from the extension
 	// chrome.runtime.onMessage.addListener((obj, sender, response) => {
