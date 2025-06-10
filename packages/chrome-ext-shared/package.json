@@ -76,13 +76,13 @@
 		"vitest": "^3.2.3"
 	},
 	"exports": {
+		"./*.js": {
+			"import": "./dist/*.js",
+			"types": "./dist/*.d.ts"
+		},
 		"./*.svelte": {
 			"svelte": "./dist/*.svelte",
 			"types": "./dist/*.svelte.d.ts"
-		},
-		"./*": {
-			"import": "./dist/*.js",
-			"types": "./dist/*.d.ts"
 		},
 		"./*.css": {
 			"import": "./dist/styles/*.css"
