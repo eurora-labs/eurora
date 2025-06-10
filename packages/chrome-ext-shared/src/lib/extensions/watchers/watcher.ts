@@ -1,6 +1,6 @@
 export type MessageType = 'NEW' | 'GENERATE_ASSETS' | 'GENERATE_SNAPSHOT';
 
-export type ChromeObj = any & { type: MessageType };
+export type ChromeObj = { type: MessageType; [key: string]: unknown };
 
 export abstract class Watcher<T> {
 	public params: T;
