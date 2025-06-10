@@ -797,3 +797,43 @@ This file tracks key architectural and design decisions made during the project'
 - Updated Google OAuth client to support custom state parameters
 - Implemented state consumption to prevent replay attacks
 - Added proper CSRF protection for OAuth callback flow
+
+[2025-06-10 14:31:00] - Refactored PDF and Article watchers to follow YouTube watcher architectural pattern
+
+**Decision:** Migrated PDF and Article content script watchers to extend the base Watcher class from chrome-ext-shared package, following the same pattern as the YouTube watcher.
+
+**Rationale:**
+
+- Establishes consistent architecture across all content script watchers
+- Leverages shared base class for common functionality (listen, handleNew, handleGenerateAssets, handleGenerateSnapshot)
+- Improves maintainability by centralizing watcher behavior patterns
+- Follows DRY principle by eliminating duplicated message handling logic
+- Provides type safety through shared interfaces and message types
+
+**Implementation Details:**
+
+- **PDF Watcher Refactoring:**
+
+    - Created `types.ts` with PdfMessageType and WatcherParams interfaces
+    - Refactored PdfWatcher class to extend Watcher<WatcherParams>
+    - Implemented all required abstract methods from base class
+    - Added chrome-ext-shared dependency to package.json
+    - Updated vite.config.ts with chrome-ext-shared alias
+    - Maintained existing PDF parsing functionality using PDFViewerApplication
+
+- **Article Watcher Refactoring:**
+    - Created `types.ts` with ArticleMessageType and WatcherParams interfaces
+    - Refactored ArticleWatcher class to extend Watcher<WatcherParams>
+    - Implemented all required abstract methods from base class
+    - Added chrome-ext-shared dependency to package.json
+    - Updated vite.config.ts with chrome-ext-shared alias
+    - Used create() function with ProtoNativeArticleAssetSchema for proper protobuf message creation
+    - Maintained existing Readability-based article parsing functionality
+
+**Benefits:**
+
+- Consistent message handling across all content script watchers
+- Shared type definitions prevent interface mismatches
+- Easier to add new watcher types following established pattern
+- Centralized error handling and response patterns
+- Better code organization and separation of concerns
