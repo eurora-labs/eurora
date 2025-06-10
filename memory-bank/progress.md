@@ -122,3 +122,5 @@ This file tracks the project's progress using a task list format.
 [2025-06-03 13:21:00] - Implemented visually pleasing onboarding UI with modern card-based layout
 
 [2025-06-05 15:57:40] - Implemented comprehensive Google OAuth integration for eur-auth-service
+
+[2025-06-10 14:31:00] - Refactored PDF and Article watchers to follow YouTube watcher pattern using base Watcher class
