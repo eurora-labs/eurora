@@ -1,12 +1,7 @@
-import { MessageType, ChromeMessage } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import { MessageType, ChromeObj } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 
 type CustomMessageType = 'PLAY';
 export type YoutubeMessageType = MessageType | CustomMessageType;
-export class YoutubeChromeMessage implements ChromeMessage {
-	message: any & { type: YoutubeMessageType };
-	sender: chrome.runtime.MessageSender;
-	response: (response?: any) => void;
-}
 
 export interface WatcherParams {
 	videoId?: string;
@@ -15,3 +10,5 @@ export interface WatcherParams {
 	context: CanvasRenderingContext2D;
 	youtubePlayer: HTMLVideoElement | null;
 }
+
+export type YoutubeChromeMessage = ChromeObj & { type: YoutubeMessageType };
