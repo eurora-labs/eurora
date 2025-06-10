@@ -14,6 +14,7 @@ export abstract class Watcher<T> {
 	}
 
 	abstract listen(message: ChromeMessage): void;
-	abstract generateAssets<T>(): Promise<T>;
-	abstract generateSnapshot<T>(): Promise<T>;
+	abstract handleNew(message: ChromeMessage): void;
+	abstract handleGenerateAssets(message: ChromeMessage): void;
+	abstract handleGenerateSnapshot(message: ChromeMessage): void;
 }

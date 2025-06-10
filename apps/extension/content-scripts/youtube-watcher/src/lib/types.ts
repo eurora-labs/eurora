@@ -7,9 +7,10 @@ export class YoutubeChromeMessage implements ChromeMessage {
 	sender: chrome.runtime.MessageSender;
 	response: (response?: any) => void;
 }
+
 export interface WatcherParams {
-	videoId: string;
-	videoTranscript: any;
+	videoId?: string;
+	videoTranscript?: any;
 	canvas: HTMLCanvasElement;
 	context: CanvasRenderingContext2D;
 	youtubePlayer: HTMLVideoElement | null;
