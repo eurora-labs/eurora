@@ -1,10 +1,6 @@
 export type MessageType = 'NEW' | 'GENERATE_ASSETS' | 'GENERATE_SNAPSHOT';
 
-export type ChromeMessage = {
-	message: any & { type: MessageType };
-	sender: chrome.runtime.MessageSender;
-	response: (response?: any) => void;
-};
+export type ChromeObj = any & { type: MessageType };
 
 export abstract class Watcher<T> {
 	public params: T;
@@ -13,8 +9,24 @@ export abstract class Watcher<T> {
 		this.params = params;
 	}
 
-	abstract listen(message: ChromeMessage): void;
-	abstract handleNew(message: ChromeMessage): void;
-	abstract handleGenerateAssets(message: ChromeMessage): void;
-	abstract handleGenerateSnapshot(message: ChromeMessage): void;
+	abstract listen(
+		obj: ChromeObj,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	): void;
+	abstract handleNew(
+		obj: ChromeObj,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	): void;
+	abstract handleGenerateAssets(
+		obj: ChromeObj,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	): void;
+	abstract handleGenerateSnapshot(
+		obj: ChromeObj,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	): void;
 }
