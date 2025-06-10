@@ -29,11 +29,9 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				this.handlePlay(obj, sender, response);
 				break;
 			case 'GENERATE_ASSETS':
-				console.log(this);
 				this.handleGenerateAssets(obj, sender, response);
 				break;
 			case 'GENERATE_SNAPSHOT':
-				console.log(this);
 				this.handleGenerateSnapshot(obj, sender, response);
 				break;
 		}
@@ -55,7 +53,6 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		sender: chrome.runtime.MessageSender,
 		response: (response?: any) => void,
 	) {
-		const { videoId } = obj;
 		const currentVideoId = getCurrentVideoId();
 		if (!currentVideoId) {
 			this.params.videoId = undefined;
@@ -73,7 +70,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				chrome.runtime.sendMessage({
 					type: 'SEND_TO_NATIVE',
 					payload: {
-						videoId,
+						videoId: this.params.videoId,
 						error: error.message || 'Unknown error',
 						transcript: null,
 					},
@@ -86,7 +83,6 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		sender: chrome.runtime.MessageSender,
 		response: (response?: any) => void,
 	) {
-		const { videoId } = obj;
 		try {
 			// Get current timestamp
 			const currentTime = this.getCurrentVideoTime();
@@ -130,7 +126,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				error: contextualError,
 				context: {
 					url: window.location.href,
-					videoId: videoId,
+					videoId: this.params.videoId,
 					timestamp: new Date().toISOString(),
 				},
 			});
