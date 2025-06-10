@@ -455,6 +455,9 @@ importers:
       '@eslint/js':
         specifier: ^9.25.1
         version: 9.28.0
+      '@eurora/chrome-ext-shared':
+        specifier: workspace:*
+        version: link:../../../../packages/chrome-ext-shared
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../../../../packages/eslint-config
@@ -518,6 +521,9 @@ importers:
       '@eslint/js':
         specifier: ^9.25.1
         version: 9.28.0
+      '@eurora/chrome-ext-shared':
+        specifier: workspace:*
+        version: link:../../../../packages/chrome-ext-shared
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../../../../packages/eslint-config
