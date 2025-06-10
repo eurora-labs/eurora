@@ -1,5 +1,5 @@
 {
-	"name": "@eurora/extension-youtube-watcher",
+	"name": "@chrome/youtube-watcher",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
