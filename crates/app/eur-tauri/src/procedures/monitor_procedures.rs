@@ -2,7 +2,7 @@ use eur_vision::{capture_monitor_by_name, image_to_base64};
 
 #[taurpc::procedures(
     path = "monitor",
-    export_to = "../../../packages/tauri-bindings/src/lib/gen/bindings.ts"
+    export_to = "../../../apps/desktop/src/lib/bindings/bindings.ts"
 )]
 pub trait MonitorApi {
     async fn capture_monitor(monitor_name: String) -> Result<String, String>;
