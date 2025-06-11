@@ -42,7 +42,6 @@ const config = {
 	},
 	compilerOptions: {
 		css: 'injected',
-		enableSourcemap: true,
 	},
 	// paths: {
 	//     base: "./"
