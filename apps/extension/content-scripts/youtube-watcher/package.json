@@ -24,7 +24,6 @@
 	},
 	"devDependencies": {
 		"@eurora/youtube-transcripts": "workspace:*",
-		"@eurora/proto": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/chrome-ext-shared": "workspace:*",
 		"@eslint/compat": "^1.2.9",
