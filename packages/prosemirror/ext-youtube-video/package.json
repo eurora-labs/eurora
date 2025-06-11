@@ -3,9 +3,13 @@
 	"version": "0.0.1",
 	"type": "module",
 	"exports": {
-		".": {
-			"types": "./dist/index.js",
-			"svelte": "./dist/index.js"
+		"./*.js": {
+			"import": "./dist/*.js",
+			"types": "./dist/*.d.ts"
+		},
+		"./*.svelte": {
+			"svelte": "./dist/*.svelte",
+			"types": "./dist/*.d.ts"
 		}
 	},
 	"files": [
@@ -26,10 +30,10 @@
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
+		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "catalog:svelte",
 		"@sveltejs/package": "^2.3.2",
-		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
 		"svelte-preprocess": "^6.0.3",
