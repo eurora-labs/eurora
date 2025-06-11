@@ -1,6 +1,6 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher.js';
 import { PdfChromeMessage, type PdfMessageType, type WatcherParams } from './types.js';
-import { ProtoPdfState } from '@eurora/proto/tauri_ipc';
+import { ProtoPdfState } from '@eurora/shared/proto/tauri_ipc_pb.js';
 
 interface PdfState extends Partial<ProtoPdfState> {
 	type: 'PDF_STATE';

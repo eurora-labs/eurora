@@ -7,7 +7,7 @@
 	import * as Separator from '@eurora/ui/components/separator/index';
 	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
 	import { authService } from '@eurora/shared/services/auth-service';
-	import { RegisterRequestSchema } from '@eurora/proto/auth_service';
+	import { RegisterRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
@@ -21,7 +21,7 @@
 				.min(3, 'Username must be at least 3 characters long')
 				.regex(
 					/^[a-zA-Z0-9_-]+$/,
-					'Username can only contain letters, numbers, hyphens, and underscores'
+					'Username can only contain letters, numbers, hyphens, and underscores',
 				),
 			email: z.string().email('Please enter a valid email address'),
 			displayName: z.string().optional(),
@@ -30,13 +30,13 @@
 				.min(8, 'Password must be at least 8 characters long')
 				.regex(
 					/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-					'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+					'Password must contain at least one uppercase letter, one lowercase letter, and one number',
 				),
-			confirmPassword: z.string().min(1, 'Please confirm your password')
+			confirmPassword: z.string().min(1, 'Please confirm your password'),
 		})
 		.refine((data) => data.password === data.confirmPassword, {
 			message: 'Passwords do not match',
-			path: ['confirmPassword']
+			path: ['confirmPassword'],
 		});
 
 	// Initialize form with client-side validation only
@@ -46,11 +46,11 @@
 			email: '',
 			displayName: '',
 			password: '',
-			confirmPassword: ''
+			confirmPassword: '',
 		},
 		{
-			validators: zodClient(registerSchema as unknown as ZodObjectType)
-		}
+			validators: zodClient(registerSchema as unknown as ZodObjectType),
+		},
 	);
 
 	const { form: formData, enhance, errors, submitting } = form;
@@ -68,7 +68,7 @@
 				username: $formData.username,
 				email: $formData.email,
 				password: $formData.password,
-				displayName: $formData.displayName || undefined
+				displayName: $formData.displayName || undefined,
 			});
 
 			console.log('Registering user:', registerData);
@@ -80,7 +80,8 @@
 			success = true;
 		} catch (err) {
 			console.error('Registration error:', err);
-			submitError = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+			submitError =
+				err instanceof Error ? err.message : 'Registration failed. Please try again.';
 		}
 	}
 
@@ -121,13 +122,17 @@
 	<div class="w-full max-w-md space-y-8">
 		<div class="text-center">
 			<h1 class="text-3xl font-bold tracking-tight">Create your account</h1>
-			<p class="text-muted-foreground mt-2">Join Eurora Labs and unlock AI-powered productivity</p>
+			<p class="text-muted-foreground mt-2">
+				Join Eurora Labs and unlock AI-powered productivity
+			</p>
 		</div>
 
 		{#if success}
 			<Card.Root class="p-6">
 				<div class="space-y-4 text-center">
-					<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+					<div
+						class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100"
+					>
 						<svg
 							class="h-6 w-6 text-green-600"
 							fill="none"
@@ -165,7 +170,9 @@
 						<Separator.Root class="w-full" />
 					</div>
 					<div class="relative flex justify-center text-xs uppercase">
-						<span class="bg-background text-muted-foreground px-2">Or register with email</span>
+						<span class="bg-background text-muted-foreground px-2"
+							>Or register with email</span
+						>
 					</div>
 				</div>
 
@@ -222,7 +229,9 @@
 								/>
 							{/snippet}
 						</Form.Control>
-						<Form.Description>This is how your name will appear to other users</Form.Description>
+						<Form.Description
+							>This is how your name will appear to other users</Form.Description
+						>
 						<Form.FieldErrors />
 					</Form.Field>
 
@@ -243,7 +252,9 @@
 										class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
 										onclick={togglePasswordVisibility}
 										disabled={$submitting}
-										aria-label={showPassword ? 'Hide password' : 'Show password'}
+										aria-label={showPassword
+											? 'Hide password'
+											: 'Show password'}
 									>
 										{#if showPassword}
 											<EyeOff class="h-4 w-4" />
@@ -277,7 +288,9 @@
 										class="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
 										onclick={toggleConfirmPasswordVisibility}
 										disabled={$submitting}
-										aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+										aria-label={showConfirmPassword
+											? 'Hide password'
+											: 'Show password'}
 									>
 										{#if showConfirmPassword}
 											<EyeOff class="h-4 w-4" />
@@ -305,7 +318,9 @@
 			<div class="text-center">
 				<p class="text-muted-foreground text-sm">
 					Already have an account?
-					<Button variant="link" href="/login" class="h-auto p-0 font-normal">Sign in here</Button>
+					<Button variant="link" href="/login" class="h-auto p-0 font-normal"
+						>Sign in here</Button
+					>
 				</p>
 			</div>
 		{/if}

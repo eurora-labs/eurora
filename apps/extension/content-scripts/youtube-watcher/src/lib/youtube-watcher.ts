@@ -1,14 +1,15 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher.js';
 import { YoutubeChromeMessage, type YoutubeMessageType, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from '@eurora/youtube-transcripts';
-import { ProtoImage, ProtoImageFormat } from '@eurora/proto/shared';
-import { create } from '@eurora/proto/util.js';
+
+import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
+import { create } from '@eurora/shared/util/grpc';
 import {
 	ProtoNativeYoutubeState,
 	ProtoNativeYoutubeSnapshot,
 	ProtoNativeYoutubeStateSchema,
 	ProtoNativeYoutubeSnapshotSchema,
-} from '@eurora/proto/native_messaging';
+} from '@eurora/shared/proto/native_messaging_pb.js';
 
 interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
