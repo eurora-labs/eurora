@@ -6,6 +6,6 @@ export default defineConfig({
 	plugins: [sveltekit(), tailwindcss()],
 	test: {
 		include: ['src/**/*.(test|spec).?(m)[jt]s?(x)'],
-		environment: 'jsdom'
-	}
+		environment: 'jsdom',
+	},
 });

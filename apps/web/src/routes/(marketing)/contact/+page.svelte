@@ -9,7 +9,8 @@
 	<div class="mb-12 text-center">
 		<h1 class="mb-4 text-4xl font-bold">Contact Us</h1>
 		<p class="mx-auto max-w-2xl text-xl text-gray-600">
-			Have questions or want to learn more about Eurora? We're here to help. Reach out to our team.
+			Have questions or want to learn more about Eurora? We're here to help. Reach out to our
+			team.
 		</p>
 	</div>
 
@@ -17,7 +18,9 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<Card.Title>Send Us a Message</Card.Title>
-				<Card.Description>Fill out the form below and we'll get back to you soon.</Card.Description>
+				<Card.Description
+					>Fill out the form below and we'll get back to you soon.</Card.Description
+				>
 			</Card.Header>
 			<Card.Content>
 				<form class="space-y-4">
@@ -53,7 +56,9 @@
 			<Card.Root class="p-6">
 				<Card.Header>
 					<Card.Title>Contact Information</Card.Title>
-					<Card.Description>Reach out to us directly using the information below.</Card.Description>
+					<Card.Description
+						>Reach out to us directly using the information below.</Card.Description
+					>
 				</Card.Header>
 				<Card.Content>
 					<div class="space-y-4">
@@ -121,8 +126,8 @@
 				<div>
 					<h3 class="mb-2 text-lg font-medium">How do I get started with Eurora?</h3>
 					<p class="text-gray-600">
-						Getting started is easy! Simply download the app from our website or app store, create
-						an account, and follow the onboarding process.
+						Getting started is easy! Simply download the app from our website or app
+						store, create an account, and follow the onboarding process.
 					</p>
 				</div>
 				<div>
@@ -134,8 +139,8 @@
 				<div>
 					<h3 class="mb-2 text-lg font-medium">How secure is my data with Eurora?</h3>
 					<p class="text-gray-600">
-						We take security seriously. All data is encrypted end-to-end, and we never share your
-						information with third parties without your explicit consent.
+						We take security seriously. All data is encrypted end-to-end, and we never
+						share your information with third parties without your explicit consent.
 					</p>
 				</div>
 			</div>
