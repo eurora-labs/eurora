@@ -13,13 +13,12 @@ const config = {
 			assets: 'build',
 			fallback: 'index.html',
 			precompress: true,
-			strict: false
-		})
+			strict: false,
+		}),
 	},
 	compilerOptions: {
 		css: 'injected',
-		enableSourcemap: true
-	}
+	},
 };
 
 export default config;
