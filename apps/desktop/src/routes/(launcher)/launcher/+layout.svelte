@@ -13,7 +13,7 @@
 		if (!mainRef) return;
 		try {
 			// Use TauRPC resize_launcher_window
-			taurpc.window.resize_launcher_window(mainRef.scrollHeight, scaleFactor);
+			// taurpc.window.resize_launcher_window(mainRef.scrollHeight, scaleFactor);
 		} catch (error) {
 			console.error('Failed to resize window:', error);
 		}

@@ -16,12 +16,12 @@
 	const buttonText = {
 		login: {
 			google: 'Continue with Google',
-			github: 'Continue with GitHub'
+			github: 'Continue with GitHub',
 		},
 		register: {
 			google: 'Register with Google',
-			github: 'Register with GitHub'
-		}
+			github: 'Register with GitHub',
+		},
 	};
 </script>
 

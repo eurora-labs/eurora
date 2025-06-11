@@ -12,15 +12,15 @@ export type Query = { text: string; assets: string[] }
 
 export type ResponseChunk = { chunk: string }
 
-const ARGS_MAP = { 'context_chip':'{"get":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"],"initialize_openai_client":[]}', 'auth':'{"get_login_token":[],"poll_for_login":[]}', '':'{"send_query":["channel","query"]}', 'window':'{"get_scale_factor":["height"],"resize_launcher_window":["height","scale_factor"]}', 'monitor':'{"capture_monitor":["monitor_name"]}' }
-export type Router = { 'context_chip': { get: () => Promise<ContextChip[]> },
-'': { send_query: (channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string> },
+const ARGS_MAP = { 'window':'{"resize_launcher_window":["height","scale_factor"],"get_scale_factor":["height"]}', 'context_chip':'{"get":[]}', '':'{"send_query":["channel","query"]}', 'third_party':'{"save_api_key":["api_key"],"check_api_key_exists":[],"initialize_openai_client":[]}', 'monitor':'{"capture_monitor":["monitor_name"]}', 'auth':'{"poll_for_login":[],"get_login_token":[]}' }
+export type Router = { 'window': { get_scale_factor: (height: number) => Promise<number>, 
+resize_launcher_window: (height: number, scaleFactor: number) => Promise<null> },
 'monitor': { capture_monitor: (monitorName: string) => Promise<string> },
+'': { send_query: (channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string> },
+'context_chip': { get: () => Promise<ContextChip[]> },
 'third_party': { check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>, 
 initialize_openai_client: () => Promise<boolean> },
-'window': { get_scale_factor: (height: number) => Promise<number>, 
-resize_launcher_window: (height: number, scaleFactor: number) => Promise<null> },
 'auth': { poll_for_login: () => Promise<boolean>, 
 get_login_token: () => Promise<LoginToken> } };
 

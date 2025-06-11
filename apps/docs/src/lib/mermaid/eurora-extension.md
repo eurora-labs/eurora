@@ -135,9 +135,9 @@ The extension is organized into three main components:
 
 2. **Content Scripts**: Specialized scripts that run in the context of web pages to extract content:
 
-   - **YouTube Watcher**: Extracts video information, transcripts, and captures frames from YouTube videos
-   - **PDF Watcher**: Extracts content from PDF documents viewed in the browser
-   - **Article Watcher**: Uses Mozilla's Readability library to extract clean content from article pages
+    - **YouTube Watcher**: Extracts video information, transcripts, and captures frames from YouTube videos
+    - **PDF Watcher**: Extracts content from PDF documents viewed in the browser
+    - **Article Watcher**: Uses Mozilla's Readability library to extract clean content from article pages
 
 3. **Popup UI**: Provides a user interface for the extension, showing the Eurora logo and links to the website and GitHub repository.
 

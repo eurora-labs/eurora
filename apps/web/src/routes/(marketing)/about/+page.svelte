@@ -12,8 +12,8 @@
 	<div class="mb-12 text-center">
 		<h1 class="mb-4 text-4xl font-bold">About Us</h1>
 		<p class="mx-auto max-w-2xl text-xl text-gray-600">
-			Meet the team behind Eurora. We're passionate about creating intelligent AI solutions that
-			respect your privacy.
+			Meet the team behind Eurora. We're passionate about creating intelligent AI solutions
+			that respect your privacy.
 		</p>
 	</div>
 
@@ -27,15 +27,15 @@
 		</Card.Header>
 		<Card.Content>
 			<p class="mb-4 text-gray-600">
-				At Eurora, we believe in intelligence without compromise. Our mission is to create AI tools
-				that enhance human capabilities while maintaining the highest standards of privacy and
-				security. We're committed to developing technology that works for people, not the other way
-				around.
+				At Eurora, we believe in intelligence without compromise. Our mission is to create
+				AI tools that enhance human capabilities while maintaining the highest standards of
+				privacy and security. We're committed to developing technology that works for
+				people, not the other way around.
 			</p>
 			<p class="text-gray-600">
-				Founded in 2025, our team brings together expertise in artificial intelligence, privacy
-				engineering, and user experience design to build the next generation of AI assistants that
-				you can truly trust.
+				Founded in 2025, our team brings together expertise in artificial intelligence,
+				privacy engineering, and user experience design to build the next generation of AI
+				assistants that you can truly trust.
 			</p>
 		</Card.Content>
 	</Card.Root>
@@ -66,9 +66,10 @@
 							<Briefcase class="h-4 w-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Demonstrated breadth of experience from sales to management, driving new product
-							adoption and revenue growth with over 30 years of experience working for manufacturers
-							such as Apple, Adobe, Avid, DDN Storage and Northrop Grumman.
+							Demonstrated breadth of experience from sales to management, driving new
+							product adoption and revenue growth with over 30 years of experience
+							working for manufacturers such as Apple, Adobe, Avid, DDN Storage and
+							Northrop Grumman.
 						</p>
 					</div>
 					<div>
@@ -76,8 +77,8 @@
 							<GraduationCap class="h-4 w-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
-							MBA from Pepperdine University, BS in Business Administration with a minor in Finance
-							from the University of Southern California.
+							MBA from Pepperdine University, BS in Business Administration with a
+							minor in Finance from the University of Southern California.
 						</p>
 					</div>
 					<div class="mt-4 flex justify-center gap-3">
@@ -115,9 +116,10 @@
 							<Briefcase class="h-4 w-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Founder and CTO of Eurora Labs, previously Head of Engineering and Machine Learning at
-							Cuebric. Led development of award-winning AI solutions, specializing in software
-							architecture, machine learning, and computer vision.
+							Founder and CTO of Eurora Labs, previously Head of Engineering and
+							Machine Learning at Cuebric. Led development of award-winning AI
+							solutions, specializing in software architecture, machine learning, and
+							computer vision.
 						</p>
 					</div>
 					<div>
@@ -125,8 +127,8 @@
 							<GraduationCap class="h-4 w-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
-							BS in Computer Science from Avans University of Applied Sciences; graduate studies in
-							AI at Maastricht University.
+							BS in Computer Science from Avans University of Applied Sciences;
+							graduate studies in AI at Maastricht University.
 						</p>
 					</div>
 					<div class="mt-4 flex justify-center gap-3">
@@ -165,10 +167,10 @@
 							<Briefcase class="h-4 w-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
-							Co-founder of ArtisansPR, with deep expertise in media, entertainment, and tech
-							communications. Serves on HPA’s Awards Committee and formerly chaired SMPTE
-							Hollywood’s Board. Founding Board Member of EIPMA and frequent panel moderator for
-							NAB, SMPTE, and others.
+							Co-founder of ArtisansPR, with deep expertise in media, entertainment,
+							and tech communications. Serves on HPA’s Awards Committee and formerly
+							chaired SMPTE Hollywood’s Board. Founding Board Member of EIPMA and
+							frequent panel moderator for NAB, SMPTE, and others.
 						</p>
 					</div>
 					<div>
@@ -198,9 +200,9 @@
 		<Card.Content class="text-center">
 			<h2 class="mb-4 text-2xl font-bold">Join Our Team</h2>
 			<p class="mx-auto mb-6 max-w-2xl text-gray-600">
-				We're always looking for talented individuals who are passionate about AI, privacy, and
-				creating exceptional user experiences. Check out our open positions and become part of our
-				journey.
+				We're always looking for talented individuals who are passionate about AI, privacy,
+				and creating exceptional user experiences. Check out our open positions and become
+				part of our journey.
 			</p>
 			<Button href="/contact" variant="default">View Open Positions</Button>
 		</Card.Content>
@@ -215,8 +217,8 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="text-gray-600">
-					We believe that privacy is a fundamental right. All our products are designed with privacy
-					as a core principle, not an afterthought.
+					We believe that privacy is a fundamental right. All our products are designed
+					with privacy as a core principle, not an afterthought.
 				</p>
 			</Card.Content>
 		</Card.Root>
@@ -227,8 +229,8 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="text-gray-600">
-					We create technology that adapts to how people work, not the other way around. Our
-					products are intuitive, accessible, and designed for real human needs.
+					We create technology that adapts to how people work, not the other way around.
+					Our products are intuitive, accessible, and designed for real human needs.
 				</p>
 			</Card.Content>
 		</Card.Root>
@@ -239,8 +241,8 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="text-gray-600">
-					We're committed to developing AI that is fair, transparent, and beneficial to society. We
-					actively work to identify and mitigate biases in our systems.
+					We're committed to developing AI that is fair, transparent, and beneficial to
+					society. We actively work to identify and mitigate biases in our systems.
 				</p>
 			</Card.Content>
 		</Card.Root>
@@ -251,8 +253,8 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="text-gray-600">
-					We're never satisfied with the status quo. We continuously push the boundaries of what's
-					possible to deliver ever-improving experiences to our users.
+					We're never satisfied with the status quo. We continuously push the boundaries
+					of what's possible to deliver ever-improving experiences to our users.
 				</p>
 			</Card.Content>
 		</Card.Root>

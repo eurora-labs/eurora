@@ -11,28 +11,28 @@
 		{
 			title: 'Chat 1',
 			url: '#',
-			icon: House
+			icon: House,
 		},
 		{
 			title: 'Chat 2',
 			url: '#',
-			icon: Inbox
+			icon: Inbox,
 		},
 		{
 			title: 'Chat 3',
 			url: '#',
-			icon: Calendar
+			icon: Calendar,
 		},
 		{
 			title: 'Chat 4',
 			url: '#',
-			icon: Search
+			icon: Search,
 		},
 		{
 			title: 'Chat 5',
 			url: '#',
-			icon: Settings
-		}
+			icon: Settings,
+		},
 	];
 </script>
 

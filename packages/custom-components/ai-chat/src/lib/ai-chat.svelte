@@ -20,7 +20,7 @@
 				const previousMessage = messages[messages.length - 1];
 				scrollView.scrollTo({
 					top: previousMessage.offsetTop - 200,
-					behavior: 'smooth'
+					behavior: 'smooth',
 				});
 			}
 		}
