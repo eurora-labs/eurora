@@ -12,17 +12,17 @@ export type Query = { text: string; assets: string[] }
 
 export type ResponseChunk = { chunk: string }
 
-const ARGS_MAP = { 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"],"initialize_openai_client":[]}', 'window':'{"resize_launcher_window":["height","scale_factor"],"get_scale_factor":["height"]}', 'context_chip':'{"get":[]}', '':'{"send_query":["channel","query"]}', 'auth':'{"poll_for_login":[],"get_login_token":[]}', 'monitor':'{"capture_monitor":["monitor_name"]}' }
-export type Router = { 'window': { get_scale_factor: (height: number) => Promise<number>, 
-resize_launcher_window: (height: number, scaleFactor: number) => Promise<null> },
-'monitor': { capture_monitor: (monitorName: string) => Promise<string> },
+const ARGS_MAP = { 'context_chip':'{"get":[]}', '':'{"send_query":["channel","query"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"],"initialize_openai_client":[]}', 'auth':'{"poll_for_login":[],"get_login_token":[]}', 'monitor':'{"capture_monitor":["monitor_name"]}', 'window':'{"get_scale_factor":["height"],"resize_launcher_window":["height","scale_factor"]}' }
+export type Router = { 'context_chip': { get: () => Promise<ContextChip[]> },
 'auth': { poll_for_login: () => Promise<boolean>, 
 get_login_token: () => Promise<LoginToken> },
-'context_chip': { get: () => Promise<ContextChip[]> },
-'': { send_query: (channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string> },
 'third_party': { check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>, 
-initialize_openai_client: () => Promise<boolean> } };
+initialize_openai_client: () => Promise<boolean> },
+'': { send_query: (channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string> },
+'window': { get_scale_factor: (height: number) => Promise<number>, 
+resize_launcher_window: (height: number, scaleFactor: number) => Promise<null> },
+'monitor': { capture_monitor: (monitorName: string) => Promise<string> } };
 
 
 export type { InferCommandOutput }
