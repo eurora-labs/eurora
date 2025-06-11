@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LoginRequestSchema, Provider } from '@eurora/proto/auth_service';
+	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
 	import { create } from '@bufbuild/protobuf';
 	import { onMount } from 'svelte';
 	import { authService } from '@eurora/shared/services/auth-service';
@@ -38,10 +38,10 @@
 						code,
 						state,
 						loginToken,
-						challengeMethod
+						challengeMethod,
 					},
-					case: 'thirdParty'
-				}
+					case: 'thirdParty',
+				},
 			});
 
 			const tokens = await authService.login(loginData);
