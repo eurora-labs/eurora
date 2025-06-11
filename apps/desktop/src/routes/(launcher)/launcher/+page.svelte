@@ -19,7 +19,7 @@
 		type ResponseChunk,
 		type Query,
 		type ContextChip,
-	} from '@eurora/tauri-bindings';
+	} from '$lib/bindings/bindings.js';
 	import { create } from '@eurora/shared/util/grpc';
 
 	// Import the Launcher component
