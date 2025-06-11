@@ -8,7 +8,7 @@
 			"types": "./dist/*.d.ts"
 		},
 		"./*.svelte": {
-			"import": "./dist/*.svelte",
+			"svelte": "./dist/*.svelte",
 			"types": "./dist/*.d.ts"
 		}
 	},
