@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Input } from '@eurora/ui/components/input/index';
-	import { invoke } from '@tauri-apps/api/core';
-	import { createTauRPCProxy } from '@eurora/tauri-bindings';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import { onMount } from 'svelte';
 
 	// Create TauRPC proxy
@@ -61,8 +60,8 @@
 	<div class="mb-4">
 		<h2 class="mb-2 text-xl font-bold">Welcome to Eurora</h2>
 		<p class="text-gray-600">
-			Please enter your OpenAI API key to get started. Your key will be stored securely in your
-			system's keyring.
+			Please enter your OpenAI API key to get started. Your key will be stored securely in
+			your system's keyring.
 		</p>
 	</div>
 
@@ -74,7 +73,8 @@
 					<p class="text-sm text-red-500">{error}</p>
 				{/if}
 				<p class="text-xs text-gray-500">
-					Your API key is stored securely and is only used to communicate with OpenAI's services.
+					Your API key is stored securely and is only used to communicate with OpenAI's
+					services.
 				</p>
 			</div>
 		</form>

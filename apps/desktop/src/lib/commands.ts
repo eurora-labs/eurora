@@ -1,5 +1,5 @@
 import type { Editor } from '@eurora/prosemirror-core';
-import type { ContextChip } from '@eurora/tauri-bindings';
+import type { ContextChip } from '$lib/bindings/bindings.js';
 
 export function executeCommand(editorRef: Editor, command: ContextChip) {
 	if (!editorRef) return;
@@ -12,8 +12,8 @@ export function executeCommand(editorRef: Editor, command: ContextChip) {
 			command.position ?? 0,
 			nodes[command.extension_id].createChecked(
 				{ id: command.id, name: command.name, ...command.attrs },
-				schema.text(command.name ?? ' ')
-			)
+				schema.text(command.name ?? ' '),
+			),
 		);
 		dispatch?.(tr);
 	});
