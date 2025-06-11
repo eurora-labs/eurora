@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createTauRPCProxy } from '@eurora/tauri-bindings';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import { onMount } from 'svelte';
 
 	// Create TauRPC proxy
