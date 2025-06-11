@@ -8,8 +8,8 @@
 	<div class="mb-12 text-center">
 		<h1 class="mb-4 text-4xl font-bold">Simple, Transparent Pricing</h1>
 		<p class="mx-auto max-w-2xl text-xl text-gray-600">
-			Choose the plan that works best for you. All plans include core features with different usage
-			limits.
+			Choose the plan that works best for you. All plans include core features with different
+			usage limits.
 		</p>
 	</div>
 
@@ -247,22 +247,26 @@
 					<div>
 						<h3 class="mb-1 text-lg font-medium">Can I change plans later?</h3>
 						<p class="text-gray-600">
-							Yes, you can upgrade or downgrade your plan at any time. Changes take effect at the
-							start of your next billing cycle.
+							Yes, you can upgrade or downgrade your plan at any time. Changes take
+							effect at the start of your next billing cycle.
 						</p>
 					</div>
 					<div>
-						<h3 class="mb-1 text-lg font-medium">Is there a free trial for paid plans?</h3>
+						<h3 class="mb-1 text-lg font-medium">
+							Is there a free trial for paid plans?
+						</h3>
 						<p class="text-gray-600">
-							Yes, both Pro and Enterprise plans come with a 14-day free trial. No credit card
-							required to start.
+							Yes, both Pro and Enterprise plans come with a 14-day free trial. No
+							credit card required to start.
 						</p>
 					</div>
 					<div>
-						<h3 class="mb-1 text-lg font-medium">What payment methods do you accept?</h3>
+						<h3 class="mb-1 text-lg font-medium">
+							What payment methods do you accept?
+						</h3>
 						<p class="text-gray-600">
-							We accept all major credit cards, PayPal, and for Enterprise customers, we also offer
-							invoicing.
+							We accept all major credit cards, PayPal, and for Enterprise customers,
+							we also offer invoicing.
 						</p>
 					</div>
 				</div>
@@ -272,12 +276,13 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<Card.Title>Need Help Choosing?</Card.Title>
-				<Card.Description>Our team is here to help you find the right plan</Card.Description>
+				<Card.Description>Our team is here to help you find the right plan</Card.Description
+				>
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-6 text-gray-600">
-					Not sure which plan is right for you? Our team can help you assess your needs and
-					recommend the best option for your use case.
+					Not sure which plan is right for you? Our team can help you assess your needs
+					and recommend the best option for your use case.
 				</p>
 				<div class="space-y-4">
 					<Button variant="outline" class="w-full">Schedule a Demo</Button>
