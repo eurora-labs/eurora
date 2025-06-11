@@ -22,9 +22,7 @@
 		"tauri": "tauri",
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",
-		"proto:compile": ". ./.venv/bin/activate && pnpm proto:python && pnpm proto:typescript",
-		"proto:python": "python scripts/proto/compile_python.py",
-		"proto:typescript": "buf generate && turbo run build --filter @eurora/proto --force",
+		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
 		"test:e2e": "cd apps/desktop && pnpm test:e2e"
 	},
 	"devDependencies": {
