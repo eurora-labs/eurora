@@ -2489,7 +2489,6 @@ dependencies = [
  "eur-native-messaging",
  "eur-prompt-kit",
  "eur-proto",
- "eur-screen-capture",
  "image 0.25.6",
  "parking_lot",
  "serde",
