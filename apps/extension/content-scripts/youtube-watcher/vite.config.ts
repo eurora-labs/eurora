@@ -64,7 +64,6 @@ export default defineConfig({
 				__dirname,
 				'../../../../packages/website-modules/youtube/youtube-transcripts/src/index.ts',
 			),
-			'@eurora/proto/*': path.resolve(__dirname, '../../../../packages/proto/src/lib/*'),
 		},
 	},
 });

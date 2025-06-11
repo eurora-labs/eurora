@@ -7,7 +7,7 @@
 
 	// import SystemChatMessage from '$lib/components/SystemChatMessage.svelte';
 	// import UserChatMessage from '$lib/components/UserChatMessage.svelte';
-	import type { ProtoChatMessage } from '@eurora/proto/questions_service';
+	import type { ProtoChatMessage } from '@eurora/shared/proto/questions_service_pb.js';
 	import { Katex } from '@eurora/katex';
 
 	interface Props {

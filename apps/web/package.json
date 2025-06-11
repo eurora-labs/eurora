@@ -28,7 +28,6 @@
 	},
 	"devDependencies": {
 		"@eurora/eslint-config": "workspace:*",
-		"@eurora/proto": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@eurora/shared": "workspace:*",

@@ -3,7 +3,10 @@
 	import { invoke, Channel } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 
-	import type { ProtoChatMessage } from '@eurora/proto/questions_service';
+	import {
+		ProtoChatMessageSchema,
+		type ProtoChatMessage,
+	} from '@eurora/shared/proto/questions_service_pb.js';
 	import { onMount } from 'svelte';
 	import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
@@ -15,8 +18,9 @@
 		createTauRPCProxy,
 		type ResponseChunk,
 		type Query,
-		type ContextChip
+		type ContextChip,
 	} from '@eurora/tauri-bindings';
+	import { create } from '@eurora/shared/util/grpc';
 
 	// Import the Launcher component
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
@@ -59,8 +63,8 @@
 		text: '',
 		extensions: [
 			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A'),
-			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092')
-		] as SveltePMExtension[]
+			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092'),
+		] as SveltePMExtension[],
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
 	let transcript = $state<string | null>(null);
@@ -86,7 +90,7 @@
 
 	// Set up event listener for chat responses
 	listen<string>('chat_response', (event) => {
-		messages.push({ role: 'system', content: event.payload });
+		messages.push(create(ProtoChatMessageSchema, { role: 'system', content: event.payload }));
 	});
 
 	listen<string>('add_video_context_chip', (event) => {});
@@ -114,7 +118,7 @@
 			// Submit the current input
 			searchQuery.text = '';
 			const query = processQuery(editorRef!);
-			messages.push({ role: 'user', content: query.text });
+			messages.push(create(ProtoChatMessageSchema, { role: 'user', content: query.text }));
 			askQuestion(query);
 		} else if (event.payload.length === 1 || event.payload === 'Space') {
 			// Handle regular character keys and space
@@ -172,7 +176,7 @@
 						currentMonitorName,
 						'offset:',
 						offsetX,
-						offsetY
+						offsetY,
 					);
 				}
 			}
@@ -283,7 +287,7 @@
 			try {
 				const question = searchQuery.text;
 				searchQuery.text = '';
-				messages.push({ role: 'user', content: question });
+				messages.push(create(ProtoChatMessageSchema, { role: 'user', content: question }));
 				const query = processQuery(editorRef!);
 				await askQuestion(query);
 				// Responses will come through the event listener
@@ -302,8 +306,8 @@
 				0,
 				nodes['9370B14D-B61C-4CE2-BDE7-B18684E8731A'].createChecked(
 					{ id: 'video-1', name: 'Some video with attrs' },
-					schema.text('video')
-				)
+					schema.text('video'),
+				),
 			);
 			dispatch?.(tr);
 		});
@@ -314,16 +318,18 @@
 			// Convert QueryAssets to Query type expected by TauRPC
 			const tauRpcQuery: Query = {
 				text: query.text,
-				assets: query.assets
+				assets: query.assets,
 			};
 
 			const onEvent = (response: ResponseChunk) => {
 				if (response.chunk === '') {
 					// Initial message
-					messages.push({
-						role: 'system',
-						content: ''
-					});
+					messages.push(
+						create(ProtoChatMessageSchema, {
+							role: 'system',
+							content: '',
+						}),
+					);
 				} else {
 					// Append chunk to the last message
 					if (messages.length > 0) {
@@ -340,10 +346,12 @@
 			// so we skip the conversation refresh for now
 		} catch (error) {
 			console.error('Failed to get answer:', error);
-			messages.push({
-				role: 'system',
-				content: 'Error: Failed to get response from server' + error
-			});
+			messages.push(
+				create(ProtoChatMessageSchema, {
+					role: 'system',
+					content: 'Error: Failed to get response from server' + error,
+				}),
+			);
 		}
 	}
 
