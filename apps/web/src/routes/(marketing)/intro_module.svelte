@@ -30,7 +30,7 @@
 	const cards = Array.from({ length: totalCards }, (_, i) => ({
 		id: i + 1,
 		visible: false,
-		animationDelay: i * cardStaggerDelay + 'ms'
+		animationDelay: i * cardStaggerDelay + 'ms',
 	}));
 
 	let visibleCards: number[] = [];
@@ -48,7 +48,7 @@
 				() => {
 					visibleCards = [...visibleCards, card.id];
 				},
-				delay + index * cardStaggerDelay
+				delay + index * cardStaggerDelay,
 			);
 		});
 
@@ -57,7 +57,7 @@
 			() => {
 				showTagLine = true;
 			},
-			delay + cards.length * cardStaggerDelay + 400
+			delay + cards.length * cardStaggerDelay + 400,
 		);
 	}
 
@@ -124,7 +124,10 @@
 						<Card.Root class="card-content aspect-video w-full">
 							<Card.Content class="flex h-full flex-col items-center justify-center">
 								<div class="icon-animation flex items-center justify-center">
-									<SiYoutube color="rgb(147 51 234 / var(--tw-text-opacity, 1))" size={64} />
+									<SiYoutube
+										color="rgb(147 51 234 / var(--tw-text-opacity, 1))"
+										size={64}
+									/>
 								</div>
 								<Card.Title class="title-animation">YouTube Videos</Card.Title>
 							</Card.Content>
@@ -202,7 +205,7 @@
 						const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
 						window.scrollTo({
 							top: window.scrollY + taglineRect.top + 100,
-							behavior: 'smooth'
+							behavior: 'smooth',
 						});
 					}}
 				>
@@ -288,10 +291,10 @@
 
 	.cursor-blink {
 		display: inline-block;
-		color: #9333ea; /* Purple color to match the theme */
-		animation: blink 1.5s infinite;
-		font-weight: 300;
 		margin-left: 2px;
+		color: #9333ea; /* Purple color to match the theme */
+		font-weight: 300;
+		animation: blink 1.5s infinite;
 	}
 
 	/* Input box grow animation */
@@ -314,20 +317,20 @@
 
 	/* Card entrance animation with staggered delay */
 	.card-entrance {
-		opacity: 0;
 		transform: translateY(30px) scale(0.95);
 		animation: slideIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 		animation-delay: var(--animation-delay, 0ms);
+		opacity: 0;
 	}
 
 	@keyframes slideIn {
 		0% {
-			opacity: 0;
 			transform: translateY(30px) scale(0.95);
+			opacity: 0;
 		}
 		100% {
-			opacity: 1;
 			transform: translateY(0) scale(1);
+			opacity: 1;
 		}
 	}
 
@@ -343,44 +346,44 @@
 	}
 
 	.icon-animation {
-		opacity: 0;
 		transform: scale(0.8);
 		animation: fadeScale 0.5s ease-out forwards;
 		animation-delay: calc(var(--animation-delay, 0ms) + 100ms);
+		opacity: 0;
 	}
 
 	.title-animation {
-		opacity: 0;
 		transform: translateY(10px);
 		animation: fadeUp 0.5s ease-out forwards;
 		animation-delay: calc(var(--animation-delay, 0ms) + 200ms);
+		opacity: 0;
 	}
 
 	@keyframes fadeScale {
 		to {
-			opacity: 1;
 			transform: scale(1);
+			opacity: 1;
 		}
 	}
 
 	@keyframes fadeUp {
 		to {
-			opacity: 1;
 			transform: translateY(0);
+			opacity: 1;
 		}
 	}
 
 	/* Tagline animations */
 	.tagline-entrance {
-		opacity: 0;
 		animation: fadeIn 0.8s ease-out forwards;
+		opacity: 0;
 	}
 
 	.fade-in-up {
-		opacity: 0;
 		transform: translateY(20px);
 		animation: fadeInUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 		animation-delay: var(--animation-delay, 0ms);
+		opacity: 0;
 	}
 
 	@keyframes fadeIn {
@@ -391,8 +394,8 @@
 
 	@keyframes fadeInUp {
 		to {
-			opacity: 1;
 			transform: translateY(0);
+			opacity: 1;
 		}
 	}
 </style>
