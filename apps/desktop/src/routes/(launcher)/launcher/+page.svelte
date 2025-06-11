@@ -187,11 +187,16 @@
 
 	// Listen for background image event
 	listen<string>('background_image', (event) => {
+		const scrollY = window.scrollY;
+		window.scrollTo(0, 0);
+		taurpc.window.resize_launcher_window(window.outerHeight + scrollY, 1.0).then(() => {
+			window.scrollTo(0, 0);
+		});
 		backgroundImage = event.payload;
 
 		if (backdropCustom2Ref) {
 			backdropCustom2Ref.style.backgroundImage = `url('${event.payload}')`;
-			backdropCustom2Ref.style.backgroundSize = '100%';
+			backdropCustom2Ref.style.backgroundSize = 'cover';
 			backdropCustom2Ref.style.backgroundPosition = 'center';
 			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
 		}
@@ -270,9 +275,9 @@
 		});
 
 	// Use TauRPC for window resize
-	taurpc.window.resize_launcher_window(100, 1.0).then(() => {
-		console.log('Window resized to 100px');
-	});
+	// taurpc.window.resize_launcher_window(100, 1.0).then(() => {
+	// 	console.log('Window resized to 100px');
+	// });
 
 	// Auto-scroll to bottom when new messages arrive
 	$effect(() => {});
@@ -282,7 +287,7 @@
 		// when typing in the input field
 		// event.preventDefault();
 		if (event.key === 'Enter' && !event.shiftKey) {
-			await taurpc.window.resize_launcher_window(100, 1.0);
+			// await taurpc.window.resize_launcher_window(100, 1.0);
 
 			try {
 				const question = searchQuery.text;
@@ -359,9 +364,9 @@
 	function onApiKeySaved() {
 		hasApiKey = true;
 		// Resize the window after API key is saved using TauRPC
-		taurpc.window.resize_launcher_window(100, 1.0).catch((error) => {
-			console.error('Failed to resize window:', error);
-		});
+		// taurpc.window.resize_launcher_window(100, 1.0).catch((error) => {
+		// 	console.error('Failed to resize window:', error);
+		// });
 	}
 </script>
 
