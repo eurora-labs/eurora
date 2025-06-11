@@ -1,5 +1,4 @@
 import { Editor } from '@eurora/prosemirror-core';
-import { Fragment, Node } from 'prosemirror-model';
 
 export interface QueryAssets {
 	text: string;

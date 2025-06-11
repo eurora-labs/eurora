@@ -10,20 +10,20 @@
 		Film,
 		YoutubeIcon,
 		HardDrive,
-		FileTextIcon
+		FileTextIcon,
 	} from '@lucide/svelte';
 
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
 
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
-	import { transcriptExtension } from '@eurora/ext-transcript';
+	import { transcriptExtension } from '@eurora/ext-transcript/index.js';
 	import { Editor as ProsemirrorEditor, TextSelection } from '@eurora/prosemirror-core';
 	let editorRef: ProsemirrorEditor | undefined = $state(undefined);
 
 	let exampleInput = $state({
 		text: '',
-		extensions: [transcriptExtension()]
+		extensions: [transcriptExtension()],
 	});
 
 	function addExerciseSheet() {
@@ -36,8 +36,8 @@
 				from.pos,
 				nodes.transcript.createChecked(
 					{ id: 'transcript-1', text: 'Exercise Sheet 2' },
-					schema.text(' ')
-				)
+					schema.text(' '),
+				),
 			);
 
 			dispatch?.(tr);

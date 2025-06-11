@@ -12,7 +12,7 @@
 	import ApiKeyForm from './api-key-form.svelte';
 	import { executeCommand } from '$lib/commands.js';
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
-	import { processQuery, type QueryAssets } from '@eurora/prosemirror-tauri-bindings';
+	import { processQuery, type QueryAssets } from '$lib/query-util.js';
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
 	import {
 		createTauRPCProxy,
@@ -26,7 +26,7 @@
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
 	import { Editor as ProsemirrorEditor, type SveltePMExtension } from '@eurora/prosemirror-core';
 	// Import the extension factory instead of individual extensions
-	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory';
+	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
 
 	// Create TauRPC proxy
 	const taurpc = createTauRPCProxy();

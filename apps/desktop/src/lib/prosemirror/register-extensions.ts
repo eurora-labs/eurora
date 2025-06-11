@@ -1,9 +1,9 @@
-import { extensionFactory } from './index.js';
+import { extensionFactory } from './factory.js';
 
 // Import extensions
-import { videoExtension, videoExtensionID } from '@eurora/ext-video';
-import { transcriptExtension, transcriptExtensionID } from '@eurora/ext-transcript';
-import { youtubeVideoExtension, youtubeVideoExtensionID } from '@eurora/ext-youtube-video';
+import { videoExtension, videoExtensionID } from '@eurora/ext-video/index.js';
+import { transcriptExtension, transcriptExtensionID } from '@eurora/ext-transcript/index.js';
+import { youtubeVideoExtension, youtubeVideoExtensionID } from '@eurora/ext-youtube-video/index.js';
 
 /**
  * Register all known core extensions
