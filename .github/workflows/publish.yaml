@@ -70,7 +70,7 @@ jobs:
             - name: Install Protoc
               uses: arduino/setup-protoc@v3
             - name: Compile Protobuf
-              run: pnpm proto:typescript
+              run: pnpm proto:compile
             - name: Build SvelteKit
               run: pnpm build:desktop -- --mode ${{ env.vitemode }}
               env:
