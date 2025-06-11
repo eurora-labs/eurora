@@ -4,7 +4,7 @@ use tauri::{Manager, Runtime};
 
 #[taurpc::procedures(
     path = "system",
-    export_to = "../../../packages/tauri-bindings/src/lib/gen/bindings.ts"
+    export_to = "../../../apps/desktop/src/lib/bindings/bindings.ts"
 )]
 pub trait SystemApi {
     async fn check_grpc_server_connection(server_address: Option<String>)
