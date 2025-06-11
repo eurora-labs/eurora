@@ -26,5 +26,3 @@ vite.config.ts.timestamp-*
 # Sentry Config File
 .env.sentry-build-plugin
 
-src/lib/bindings/*
-!src/lib/bindings/.gitkeep
