@@ -25,7 +25,7 @@
 				formId,
 				submitText,
 				target: '#' + targetElementID,
-				css: '' //undocumented but required for iframe styling
+				css: '', //undocumented but required for iframe styling
 			});
 		}
 	};

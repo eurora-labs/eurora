@@ -1,7 +1,16 @@
 <script lang="ts">
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import { Sparkles, Brain, Shield, Zap, Globe, Layers, MessageSquare, Code } from '@lucide/svelte';
+	import {
+		Sparkles,
+		Brain,
+		Shield,
+		Zap,
+		Globe,
+		Layers,
+		MessageSquare,
+		Code,
+	} from '@lucide/svelte';
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">
@@ -23,9 +32,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora's advanced AI models can understand complex queries, remember context from previous
-					conversations, and provide more accurate and relevant responses than traditional AI
-					assistants.
+					Eurora's advanced AI models can understand complex queries, remember context
+					from previous conversations, and provide more accurate and relevant responses
+					than traditional AI assistants.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Key Capabilities:</h4>
@@ -49,9 +58,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Unlike other AI assistants, Eurora is designed with privacy at its core. Your data never
-					leaves your device without your explicit permission, and you have complete control over
-					what information is shared.
+					Unlike other AI assistants, Eurora is designed with privacy at its core. Your
+					data never leaves your device without your explicit permission, and you have
+					complete control over what information is shared.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Privacy Features:</h4>
@@ -75,9 +84,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora is optimized for speed, with local processing capabilities that allow it to
-					function even without an internet connection. When online, it leverages cloud resources
-					for more complex tasks while maintaining responsiveness.
+					Eurora is optimized for speed, with local processing capabilities that allow it
+					to function even without an internet connection. When online, it leverages cloud
+					resources for more complex tasks while maintaining responsiveness.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Performance Highlights:</h4>
@@ -101,9 +110,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Use Eurora across all your devices with perfect synchronization. Whether you're on your
-					phone, tablet, computer, or browser, Eurora provides a consistent experience with your
-					preferences and history available everywhere.
+					Use Eurora across all your devices with perfect synchronization. Whether you're
+					on your phone, tablet, computer, or browser, Eurora provides a consistent
+					experience with your preferences and history available everywhere.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Available Platforms:</h4>
@@ -129,9 +138,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-6 text-gray-600">
-					Eurora seamlessly integrates with the tools and services you already use, making it a
-					central hub for your digital life. From productivity apps to creative tools, Eurora
-					enhances your workflow without disrupting it.
+					Eurora seamlessly integrates with the tools and services you already use, making
+					it a central hub for your digital life. From productivity apps to creative
+					tools, Eurora enhances your workflow without disrupting it.
 				</p>
 
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -183,12 +192,15 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Eurora's conversational abilities go beyond simple command-response interactions. Have
-					natural, flowing conversations with follow-up questions, clarifications, and even humor.
+					Eurora's conversational abilities go beyond simple command-response
+					interactions. Have natural, flowing conversations with follow-up questions,
+					clarifications, and even humor.
 				</p>
 				<div class="mb-4 rounded-md border border-gray-200 bg-gray-50 p-4">
 					<div class="mb-3 flex gap-2">
-						<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300">
+						<div
+							class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300"
+						>
 							<span class="text-sm font-medium">You</span>
 						</div>
 						<div class="flex-1 rounded-md bg-blue-50 p-2">
@@ -196,20 +208,25 @@
 						</div>
 					</div>
 					<div class="mb-3 flex gap-2">
-						<div class="flex h-8 w-8 items-center justify-center rounded-full bg-purple-300">
+						<div
+							class="flex h-8 w-8 items-center justify-center rounded-full bg-purple-300"
+						>
 							<span class="text-sm font-medium">AI</span>
 						</div>
 						<div class="flex-1 rounded-md bg-purple-50 p-2">
-							I'd be happy to help plan your Japan trip! What are you most interested in
-							experiencing there - culture, food, nature, or something else?
+							I'd be happy to help plan your Japan trip! What are you most interested
+							in experiencing there - culture, food, nature, or something else?
 						</div>
 					</div>
 					<div class="flex gap-2">
-						<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300">
+						<div
+							class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-300"
+						>
 							<span class="text-sm font-medium">You</span>
 						</div>
 						<div class="flex-1 rounded-md bg-blue-50 p-2">
-							I love food and traditional culture. And I'd like to see cherry blossoms.
+							I love food and traditional culture. And I'd like to see cherry
+							blossoms.
 						</div>
 					</div>
 				</div>
@@ -226,9 +243,9 @@
 			</Card.Header>
 			<Card.Content>
 				<p class="mb-4 text-gray-600">
-					Developers can extend Eurora's capabilities with custom plugins and integrations. Our
-					comprehensive API and SDK make it easy to build powerful extensions that leverage Eurora's
-					AI capabilities.
+					Developers can extend Eurora's capabilities with custom plugins and
+					integrations. Our comprehensive API and SDK make it easy to build powerful
+					extensions that leverage Eurora's AI capabilities.
 				</p>
 				<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 					<h4 class="mb-2 font-medium">Developer Resources:</h4>
@@ -262,22 +279,22 @@
 				<div class="space-y-2">
 					<h3 class="text-lg font-medium">Advanced Image Generation</h3>
 					<p class="text-gray-600">
-						Create stunning, customized images from text descriptions with our upcoming image
-						generation feature.
+						Create stunning, customized images from text descriptions with our upcoming
+						image generation feature.
 					</p>
 				</div>
 				<div class="space-y-2">
 					<h3 class="text-lg font-medium">Voice Assistant Mode</h3>
 					<p class="text-gray-600">
-						Interact with Eurora using just your voice, with advanced speech recognition and natural
-						responses.
+						Interact with Eurora using just your voice, with advanced speech recognition
+						and natural responses.
 					</p>
 				</div>
 				<div class="space-y-2">
 					<h3 class="text-lg font-medium">Collaborative Workspaces</h3>
 					<p class="text-gray-600">
-						Work together with teammates using shared AI workspaces for collaborative projects and
-						brainstorming.
+						Work together with teammates using shared AI workspaces for collaborative
+						projects and brainstorming.
 					</p>
 				</div>
 			</div>
