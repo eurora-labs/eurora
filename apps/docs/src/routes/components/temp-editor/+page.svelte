@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core';
 	import type { Query } from '@eurora/prosemirror-core';
-	import { transcriptExtension } from '@eurora/ext-transcript';
+	import { transcriptExtension } from '@eurora/ext-transcript/index.js';
 	import { onMount } from 'svelte';
 
 	let editorRef: ProsemirrorEditor | null = $state(null);
 
 	const exampleInput: Query = {
 		text: 'Where in ',
-		extensions: []
+		extensions: [],
 	};
 
 	onMount(() => {
@@ -42,10 +42,10 @@
 			1,
 			nodes.equation.create(
 				{
-					latex: 'a^2 = \\sqrt{b^2 + c^2}'
+					latex: 'a^2 = \\sqrt{b^2 + c^2}',
 				},
-				schema.text('Mah equation')
-			)
+				schema.text('Mah equation'),
+			),
 		);
 		// Try both approaches to ensure they both work
 		// Approach 1: Using attrs
@@ -73,8 +73,8 @@
 				position,
 				nodes.transcript.createChecked(
 					{ id: 'transcript-1', text: 'Some transcript with attrs' },
-					schema.text('transcript')
-				)
+					schema.text('transcript'),
+				),
 			);
 			dispatch?.(tr);
 		});
