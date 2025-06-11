@@ -10,7 +10,7 @@ import {
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
 	type GetLoginTokenResponse,
-} from '@eurora/proto/auth_service';
+} from '$lib/protos/auth_service_pb.js';
 
 class AuthService {
 	private readonly client: Client<typeof ProtoAuthService>;

@@ -59,7 +59,6 @@
 		"prettier-plugin-tailwindcss": "^0.6.12",
 		"@connectrpc/connect": "^2.0.2",
 		"@connectrpc/connect-web": "^2.0.2",
-		"@eurora/proto": "workspace:*",
 		"publint": "^0.3.12",
 		"svelte": "^5.33.18",
 		"svelte-check": "^4.2.1",
