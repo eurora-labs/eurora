@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
-	import { create } from '@bufbuild/protobuf';
+	import { create } from '@eurora/shared/util/grpc';
 	import { onMount } from 'svelte';
 	import { authService } from '@eurora/shared/services/auth-service';
 	onMount(async () => {
