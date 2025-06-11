@@ -6,8 +6,8 @@ const config = {
 	preprocess: vitePreprocess({ script: true }),
 	kit: {
 		adapter: staticAdapter({
-			pages: 'build',
-			assets: 'build',
+			pages: 'dist',
+			assets: 'dist',
 			fallback: 'index.html',
 			precompress: true,
 			strict: false,
@@ -15,7 +15,7 @@ const config = {
 	},
 	compilerOptions: {
 		css: 'injected',
-		enableSourcemap: true,
+
 		runes: true,
 	},
 };
