@@ -68,9 +68,5 @@ export default defineConfig({
 	// 		provider: 'v8'
 	// 	}
 	// },
-	resolve: {
-		alias: {
-			'@eurora/proto/*': path.resolve(__dirname, '../../../packages/proto/src/*'),
-		},
-	},
+	resolve: {},
 });
