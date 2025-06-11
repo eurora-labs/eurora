@@ -117,9 +117,6 @@ importers:
       '@eurora/prosemirror-factory':
         specifier: workspace:*
         version: link:../../packages/prosemirror/factory
-      '@eurora/proto':
-        specifier: workspace:*
-        version: link:../../packages/proto
       '@eurora/tauri-bindings':
         specifier: workspace:*
         version: link:../../packages/tauri-bindings
@@ -401,9 +398,6 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../../../packages/eslint-config
-      '@eurora/proto':
-        specifier: workspace:*
-        version: link:../../../packages/proto
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../../../packages/typescript-config
@@ -461,9 +455,9 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../../../../packages/eslint-config
-      '@eurora/proto':
+      '@eurora/shared':
         specifier: workspace:*
-        version: link:../../../../packages/proto
+        version: link:../../../../packages/shared
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../../../../packages/typescript-config
@@ -527,9 +521,9 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../../../../packages/eslint-config
-      '@eurora/proto':
+      '@eurora/shared':
         specifier: workspace:*
-        version: link:../../../../packages/proto
+        version: link:../../../../packages/shared
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../../../../packages/typescript-config
@@ -593,9 +587,6 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../../../../packages/eslint-config
-      '@eurora/proto':
-        specifier: workspace:*
-        version: link:../../../../packages/proto
       '@eurora/shared':
         specifier: workspace:*
         version: link:../../../../packages/shared
@@ -724,9 +715,6 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
-      '@eurora/proto':
-        specifier: workspace:*
-        version: link:../../packages/proto
       '@eurora/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -838,9 +826,6 @@ importers:
       '@eurora/prosemirror-core':
         specifier: workspace:*
         version: link:../prosemirror/core
-      '@eurora/proto':
-        specifier: workspace:*
-        version: link:../proto
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
@@ -1454,7 +1439,7 @@ importers:
         specifier: ^0.7.7
         version: 0.7.39(svelte@5.33.18)(typescript@5.8.3)
 
-  packages/proto:
+  packages/shared:
     devDependencies:
       '@bufbuild/buf':
         specifier: ^1.53.0
@@ -1465,21 +1450,6 @@ importers:
       '@bufbuild/protoc-gen-es':
         specifier: ^2.5.2
         version: 2.5.2(@bufbuild/protobuf@2.5.2)
-      '@eurora/eslint-config':
-        specifier: workspace:*
-        version: link:../eslint-config
-      '@eurora/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      rxjs:
-        specifier: ^7.8.2
-        version: 7.8.2
-      typescript:
-        specifier: ^5.8.3
-        version: 5.8.3
-
-  packages/shared:
-    devDependencies:
       '@connectrpc/connect':
         specifier: ^2.0.2
         version: 2.0.2(@bufbuild/protobuf@2.5.2)
@@ -1498,9 +1468,6 @@ importers:
       '@eurora/prosemirror-core':
         specifier: workspace:*
         version: link:../prosemirror/core
-      '@eurora/proto':
-        specifier: workspace:*
-        version: link:../proto
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
