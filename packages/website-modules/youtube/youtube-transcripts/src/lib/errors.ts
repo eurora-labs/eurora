@@ -25,7 +25,7 @@ Also make sure there are no open issues already describing your problem!
 	private static _buildErrorMessage(videoId: string, causeMsg?: string): string {
 		let message = CouldNotRetrieveTranscript.ERROR_MESSAGE.replace(
 			'{video_url}',
-			WATCH_URL.replace('{video_id}', videoId)
+			WATCH_URL.replace('{video_id}', videoId),
 		);
 		if (causeMsg) {
 			message +=
@@ -56,7 +56,7 @@ export class InvalidVideoId extends CouldNotRetrieveTranscript {
 
 Do NOT call: \`YouTubeTranscriptApi.getTranscript("https://www.youtube.com/watch?v=${videoId}")\`
 Instead call: \`YouTubeTranscriptApi.getTranscript("${videoId}")\`
-`
+`,
 		);
 	}
 }
@@ -70,7 +70,7 @@ One of the following can be done to work around this:
 - Manually solve the captcha in a browser and rely on the resulting cookie
 - Use a different IP address
 - Wait until the ban on your IP has been lifted
-`
+`,
 		);
 	}
 }
@@ -120,7 +120,7 @@ export class FailedToCreateConsentCookie extends CouldNotRetrieveTranscript {
 export class NoTranscriptFound extends CouldNotRetrieveTranscript {
 	constructor(videoId: string, requestedLanguageCodes: string[], transcriptData: unknown) {
 		const msg = `No transcripts were found for any of the requested language codes: ${requestedLanguageCodes.join(
-			', '
+			', ',
 		)}
 
 ${JSON.stringify(transcriptData, null, 2)}`;

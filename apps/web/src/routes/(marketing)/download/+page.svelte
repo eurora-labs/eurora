@@ -16,11 +16,15 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<Card.Title>Desktop Applications</Card.Title>
-				<Card.Description>Download Eurora for your desktop operating system.</Card.Description>
+				<Card.Description
+					>Download Eurora for your desktop operating system.</Card.Description
+				>
 			</Card.Header>
 			<Card.Content>
 				<div class="space-y-4">
-					<div class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
 							<Monitor class="h-8 w-8 text-blue-600" />
 							<div>
@@ -34,7 +38,9 @@
 						</Button>
 					</div>
 
-					<div class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
 							<Laptop class="h-8 w-8 text-gray-800" />
 							<div>
@@ -48,7 +54,9 @@
 						</Button>
 					</div>
 
-					<div class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
 							<Monitor class="h-8 w-8 text-orange-600" />
 							<div>
@@ -72,7 +80,9 @@
 			</Card.Header>
 			<Card.Content>
 				<div class="space-y-4">
-					<div class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
 							<Globe class="h-8 w-8 text-blue-500" />
 							<div>
@@ -86,9 +96,15 @@
 						</Button>
 					</div>
 
-					<div class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
-							<svg class="h-8 w-8 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+							<svg
+								class="h-8 w-8 text-blue-600"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+							>
 								<path
 									d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm7.369 18.769C17.728 20.187 14.954 21 12 21s-5.728-.813-7.369-2.231a9.954 9.954 0 01-2.385-3.647A9.954 9.954 0 013 12c0-1.087.175-2.134.496-3.113a9.897 9.897 0 012.385-3.647C7.522 3.813 10.296 3 12 3s4.478.813 6.119 2.24a9.897 9.897 0 012.385 3.647A9.954 9.954 0 0121 12a9.954 9.954 0 01-.496 3.122 9.954 9.954 0 01-2.385 3.647zM12 4.8a7.2 7.2 0 100 14.4 7.2 7.2 0 000-14.4zm0 12.6a5.4 5.4 0 110-10.8 5.4 5.4 0 010 10.8z"
 								/>
@@ -104,9 +120,15 @@
 						</Button>
 					</div>
 
-					<div class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50">
+					<div
+						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
+					>
 						<div class="flex items-center gap-3">
-							<svg class="h-8 w-8 text-blue-800" viewBox="0 0 24 24" fill="currentColor">
+							<svg
+								class="h-8 w-8 text-blue-800"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+							>
 								<path
 									d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.824a9.176 9.176 0 110 18.352 9.176 9.176 0 010-18.352zm-1.176 2.824v6.353h-2.353l3.529 5.294 3.529-5.294h-2.353V5.647h-2.353z"
 								/>
@@ -188,14 +210,18 @@
 						<li>Download the macOS disk image (.dmg) file</li>
 						<li>Open the disk image and drag Eurora to the Applications folder</li>
 						<li>Open Eurora from the Applications folder</li>
-						<li>If prompted about security settings, follow the instructions to allow the app</li>
+						<li>
+							If prompted about security settings, follow the instructions to allow
+							the app
+						</li>
 					</ol>
 				</div>
 				<div>
 					<h3 class="mb-2 text-lg font-medium">Linux Installation</h3>
 					<ol class="list-decimal space-y-1 pl-5 text-gray-600">
 						<li>
-							Download the appropriate package for your distribution (.deb, .rpm, or .AppImage)
+							Download the appropriate package for your distribution (.deb, .rpm, or
+							.AppImage)
 						</li>
 						<li>For .deb: <code>sudo dpkg -i eurora.deb</code></li>
 						<li>For .rpm: <code>sudo rpm -i eurora.rpm</code></li>

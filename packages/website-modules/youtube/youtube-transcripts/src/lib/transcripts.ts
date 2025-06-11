@@ -10,7 +10,7 @@ import {
 	TranslationLanguageNotAvailable,
 	NoTranscriptAvailable,
 	FailedToCreateConsentCookie,
-	InvalidVideoId
+	InvalidVideoId,
 } from './errors.js';
 import { unescape } from './html_unescaping.js';
 import { WATCH_URL } from './settings.js';
@@ -131,7 +131,7 @@ export class TranscriptList {
 		translationLanguages: Array<{
 			language: string;
 			language_code: string;
-		}>
+		}>,
 	) {
 		this.videoId = videoId;
 		this._manuallyCreatedTranscripts = manuallyCreatedTranscripts;
@@ -144,12 +144,14 @@ export class TranscriptList {
 			get(url: string, extraHeaders?: Record<string, string>): Promise<Response>;
 		},
 		videoId: string,
-		captionsJson: any
+		captionsJson: any,
 	): TranscriptList {
-		const translationLanguages = (captionsJson.translationLanguages ?? []).map((langObj: any) => ({
-			language: langObj.languageName.simpleText,
-			language_code: langObj.languageCode
-		}));
+		const translationLanguages = (captionsJson.translationLanguages ?? []).map(
+			(langObj: any) => ({
+				language: langObj.languageName.simpleText,
+				language_code: langObj.languageCode,
+			}),
+		);
 
 		const manuallyCreatedTranscripts: Record<string, Transcript> = {};
 		const generatedTranscripts: Record<string, Transcript> = {};
@@ -164,7 +166,7 @@ export class TranscriptList {
 				caption.name.simpleText,
 				caption.languageCode,
 				isAsr,
-				caption.isTranslatable ? translationLanguages : []
+				caption.isTranslatable ? translationLanguages : [],
 			);
 		}
 
@@ -172,7 +174,7 @@ export class TranscriptList {
 			videoId,
 			manuallyCreatedTranscripts,
 			generatedTranscripts,
-			translationLanguages
+			translationLanguages,
 		);
 	}
 
@@ -182,7 +184,7 @@ export class TranscriptList {
 	[Symbol.iterator](): Iterator<Transcript> {
 		let combined = [
 			...Object.values(this._manuallyCreatedTranscripts),
-			...Object.values(this._generatedTranscripts)
+			...Object.values(this._generatedTranscripts),
 		];
 		let pointer = 0;
 
@@ -193,7 +195,7 @@ export class TranscriptList {
 				} else {
 					return { done: true, value: null as unknown as Transcript };
 				}
-			}
+			},
 		};
 	}
 
@@ -204,7 +206,7 @@ export class TranscriptList {
 	public findTranscript(languageCodes: string[]): Transcript {
 		return this._findTranscript(languageCodes, [
 			this._manuallyCreatedTranscripts,
-			this._generatedTranscripts
+			this._generatedTranscripts,
 		]);
 	}
 
@@ -224,7 +226,7 @@ export class TranscriptList {
 
 	private _findTranscript(
 		languageCodes: string[],
-		transcriptDicts: Array<Record<string, Transcript>>
+		transcriptDicts: Array<Record<string, Transcript>>,
 	): Transcript {
 		for (const lang of languageCodes) {
 			for (const dict of transcriptDicts) {
@@ -290,7 +292,7 @@ export class Transcript {
 		translationLanguages: Array<{
 			language: string;
 			language_code: string;
-		}>
+		}>,
 	) {
 		this._httpClient = httpClient;
 		this.videoId = videoId;
@@ -332,7 +334,7 @@ export class Transcript {
 			this._translationLanguagesDict[languageCode],
 			languageCode,
 			true,
-			[]
+			[],
 		);
 	}
 
@@ -357,7 +359,7 @@ class _TranscriptParser {
 		'del',
 		'ins',
 		'sub',
-		'sup'
+		'sup',
 	];
 
 	constructor(preserveFormatting: boolean) {
@@ -393,7 +395,7 @@ class _TranscriptParser {
 				return {
 					text: unescape(cleanedText),
 					start: parseFloat(startAttr),
-					duration: parseFloat(durAttr)
+					duration: parseFloat(durAttr),
 				};
 			});
 	}

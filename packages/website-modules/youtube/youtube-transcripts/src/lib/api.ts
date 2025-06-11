@@ -37,7 +37,7 @@ export class YouTubeTranscriptApi {
 	public static async listTranscripts(
 		videoId: string,
 		proxies?: FetchOptions['proxies'],
-		cookies?: FetchOptions['cookies']
+		cookies?: FetchOptions['cookies'],
 	): Promise<any /* Actually returns a TranscriptList object */> {
 		// The original Python code uses a requests.Session and loads cookies from a file.
 		// In the browser, cookies are automatically managed or must be attached in headers manually.
@@ -56,12 +56,12 @@ export class YouTubeTranscriptApi {
 						'Accept-Language': 'en-US',
 						// If you needed to pass cookies manually, you might do:
 						// Cookie: cookies ?? "",
-						...(extraHeaders ?? {})
-					}
+						...(extraHeaders ?? {}),
+					},
 					// No direct 'proxy' usage in the browser unless you set up a custom proxy server
 				});
 				return resp;
-			}
+			},
 		};
 
 		// We do not handle cookie loading from a file in the browser environment
@@ -80,7 +80,7 @@ export class YouTubeTranscriptApi {
 		continueAfterError = false,
 		proxies?: FetchOptions['proxies'],
 		cookies?: FetchOptions['cookies'],
-		preserveFormatting = false
+		preserveFormatting = false,
 	): Promise<[Record<string, any[]>, string[]]> {
 		// data: videoId -> transcript array
 		const data: Record<string, any[]> = {};
@@ -94,7 +94,7 @@ export class YouTubeTranscriptApi {
 					languages,
 					proxies,
 					cookies,
-					preserveFormatting
+					preserveFormatting,
 				);
 				data[videoId] = transcript;
 			} catch (error) {
@@ -116,7 +116,7 @@ export class YouTubeTranscriptApi {
 		languages: string[] = ['en'],
 		proxies?: FetchOptions['proxies'],
 		cookies?: FetchOptions['cookies'],
-		preserveFormatting = false
+		preserveFormatting = false,
 	): Promise<any[]> {
 		// This is a convenience method that calls `listTranscripts(...)`
 		// and tries to find and fetch the correct one.

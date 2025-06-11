@@ -66,10 +66,9 @@ export class SRTFormatter extends Formatter {
 		const sec = Math.floor(seconds) % 60;
 		const min = Math.floor(Math.floor(seconds) / 60) % 60;
 		const hr = Math.floor(Math.floor(seconds) / 3600);
-		return `${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(
-			2,
-			'0'
-		)},${String(ms).padStart(3, '0')}`;
+		return `${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(
+			sec,
+		).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
 	}
 
 	public formatTranscript(transcript: TranscriptLine[]): string {
@@ -98,10 +97,9 @@ export class WebVTTFormatter extends Formatter {
 		const sec = Math.floor(seconds) % 60;
 		const min = Math.floor(Math.floor(seconds) / 60) % 60;
 		const hr = Math.floor(Math.floor(seconds) / 3600);
-		return `${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(
-			2,
-			'0'
-		)}.${String(ms).padStart(3, '0')}`;
+		return `${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(
+			sec,
+		).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
 	}
 
 	public formatTranscript(transcript: TranscriptLine[]): string {
@@ -127,7 +125,7 @@ export class FormatterLoader {
 		pretty: PrettyPrintFormatter,
 		text: TextFormatter,
 		webvtt: WebVTTFormatter,
-		srt: SRTFormatter
+		srt: SRTFormatter,
 	};
 
 	public static load(formatterType: string = 'pretty'): Formatter {
@@ -135,8 +133,8 @@ export class FormatterLoader {
 		if (!Ctor) {
 			throw new Error(
 				`The format '${formatterType}' is not supported. Choose one of: ${Object.keys(
-					FormatterLoader.TYPES
-				).join(', ')}`
+					FormatterLoader.TYPES,
+				).join(', ')}`,
 			);
 		}
 		return new Ctor();
