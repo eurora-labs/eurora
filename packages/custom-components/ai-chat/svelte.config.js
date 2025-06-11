@@ -9,9 +9,9 @@ const config = {
 
 	kit: {
 		adapter: adapter({
-			strict: false
-		})
-	}
+			strict: false,
+		}),
+	},
 };
 
 export default config;
