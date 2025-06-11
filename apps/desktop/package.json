@@ -19,11 +19,11 @@
 	"dependencies": {
 		"@eurora/ai-chat": "workspace:*",
 		"@eurora/katex": "workspace:*",
-		"@eurora/prosemirror-core": "workspace:*",
-		"@eurora/prosemirror-factory": "workspace:*"
+		"@eurora/prosemirror-core": "workspace:*"
 	},
 	"devDependencies": {
 		"@eurora/shared": "workspace:*",
+		"@eurora/ext-youtube-video": "workspace:*",
 		"@eslint/compat": "^1.2.9",
 		"@eslint/js": "^9.25.1",
 		"postcss": "^8.5.3",
@@ -36,7 +36,6 @@
 		"@eurora/ext-transcript": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"@eurora/typescript-config": "workspace:*",
-		"@eurora/prosemirror-tauri-bindings": "workspace:*",
 		"taurpc": "^1.8.1",
 		"uuid": "^11.1.0",
 		"@playwright/test": "^1.52.0",
