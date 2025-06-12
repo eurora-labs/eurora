@@ -307,6 +307,3 @@ extensions/chromium/contentstyle.css
 *.mp4
 *.webm
 *.mkv
-
-apps/desktop/src/lib/bindings/*
-!apps/desktop/src/lib/bindings/.gitkeep
