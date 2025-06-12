@@ -16,7 +16,7 @@ tonic = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 tracing = { workspace = true }
 eur-proto = { path = "../../proto/eur-proto" }
-taurpc = "0.5.0"
+taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "feature/sorted_args_and_router_params" }
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
 tauri-specta = { version = "2.0.0-rc.21", features = [

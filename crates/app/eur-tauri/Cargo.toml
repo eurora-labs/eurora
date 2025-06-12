@@ -78,7 +78,7 @@ tauri-specta = { version = "2.0.0-rc.21", features = [
     "javascript",
     "typescript",
 ] }
-taurpc = "0.5.0"
+taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "feature/sorted_args_and_router_params" }
 base64 = "0.22.1"
 eur-auth-client = { workspace = true }
 dotenv = "0.15.0"
