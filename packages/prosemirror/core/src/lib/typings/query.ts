@@ -1,4 +1,4 @@
-import { SveltePMExtension } from './extension.js';
+import type { SveltePMExtension } from '$lib/typings/extension.js';
 
 export interface Query {
 	text: string;
