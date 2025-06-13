@@ -73,33 +73,6 @@ jobs:
               uses: arduino/setup-protoc@v3
             - name: Compile Protobuf
               run: pnpm proto:typescript
-            - name: Generate Tauri Bindings
-              run: |
-                  # Start the dev server in the background to generate bindings
-                  pnpm dev:desktop &
-                  DEV_PID=$!
-
-                  # Wait for bindings to be generated (check for the bindings file)
-                  echo "Waiting for bindings to be generated..."
-                  timeout=60
-                  while [ $timeout -gt 0 ]; do
-                    if [ -f "apps/desktop/src/lib/bindings/bindings.ts" ]; then
-                      echo "Bindings generated successfully!"
-                      break
-                    fi
-                    sleep 2
-                    timeout=$((timeout - 2))
-                  done
-
-                  # Kill the dev server
-                  kill $DEV_PID || true
-                  wait $DEV_PID 2>/dev/null || true
-
-                  # Verify bindings were created
-                  if [ ! -f "apps/desktop/src/lib/bindings/bindings.ts" ]; then
-                    echo "Error: Bindings were not generated"
-                    exit 1
-                  fi
             - name: Build SvelteKit
               run: pnpm build:desktop -- --mode ${{ env.vitemode }}
               env:
