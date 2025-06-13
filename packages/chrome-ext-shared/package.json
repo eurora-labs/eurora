@@ -75,7 +75,7 @@
 		"vitest": "^3.2.3"
 	},
 	"exports": {
-		"./*.js": {
+		"./*": {
 			"import": "./dist/*.js",
 			"types": "./dist/*.d.ts"
 		},
