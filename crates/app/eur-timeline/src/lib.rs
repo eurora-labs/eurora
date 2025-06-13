@@ -5,7 +5,6 @@
 //! 3 seconds and maintaining a rolling history.
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use eur_activity::select_strategy_for_process;
 use eur_prompt_kit::LLMMessage;
 use parking_lot::RwLock;
@@ -30,7 +29,6 @@ mod platform;
 #[path = "windows/mod.rs"]
 mod platform;
 
-use eur_activity;
 use eur_activity::{ActivityStrategy, DisplayAsset};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -74,6 +72,9 @@ impl Timeline {
 
     pub fn add_activity(&self, activity: eur_activity::Activity) {
         let mut activities = self.activities.write();
+        if activities.len() >= self.capacity {
+            activities.remove(0);
+        }
         activities.push(activity);
     }
     pub fn get_context_chips(&self) -> Vec<eur_activity::ContextChip> {
