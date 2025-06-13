@@ -62,7 +62,7 @@
 	import { Label } from '@eurora/ui/components/label/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Popover from '@eurora/ui/components/popover/index';
-	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index.js';
+	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
 	import { SiYoutube } from '@icons-pack/svelte-simple-icons';
 	export interface Props extends SvelteNodeViewProps<VideoAttrs> {
 		ref: HTMLElement;

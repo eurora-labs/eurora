@@ -10,7 +10,7 @@
 		"**/*.css"
 	],
 	"exports": {
-		"./*.js": {
+		"./*": {
 			"import": "./dist/*.js",
 			"types": "./dist/*.d.ts"
 		},

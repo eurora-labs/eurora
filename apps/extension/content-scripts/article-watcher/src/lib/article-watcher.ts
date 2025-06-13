@@ -1,4 +1,4 @@
-import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher.js';
+import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { ArticleChromeMessage, type ArticleMessageType, type WatcherParams } from './types.js';
 import { ProtoNativeArticleAssetSchema } from '@eurora/shared/proto/native_messaging_pb.js';
 import { create } from '@eurora/shared/util/grpc';
