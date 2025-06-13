@@ -18,10 +18,12 @@
 	},
 	"dependencies": {
 		"@eurora/ai-chat": "workspace:*",
-		"@eurora/katex": "workspace:*",
-		"@eurora/prosemirror-core": "workspace:*"
+		"@eurora/katex": "workspace:*"
 	},
 	"devDependencies": {
+		"@eurora/prosemirror-core": "workspace:*",
+		"prosemirror-model": "^1.25.1",
+		"prosemirror-view": "^1.33.5",
 		"@eurora/shared": "workspace:*",
 		"@eurora/ext-youtube-video": "workspace:*",
 		"@eslint/compat": "^1.2.9",

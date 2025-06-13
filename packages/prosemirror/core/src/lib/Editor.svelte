@@ -6,12 +6,12 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { dropCursor } from 'prosemirror-dropcursor';
 	import { gapCursor } from 'prosemirror-gapcursor';
-	import type { Query, Cmd } from './typings/index.js';
-	import type { SveltePMExtension } from './typings/extension.js';
-	import { createExtensions } from './createExtensions.js';
-	import { paragraphExtension } from './components/paragraph/extension.js';
-	import { type Commands, commands as defaultCommands } from './commands.js';
-	// import './Editor.css';
+	import type { Query, Cmd } from '$lib/typings/index.js';
+	import type { SveltePMExtension } from '$lib/typings/extension.js';
+	import { createExtensions } from '$lib/createExtensions.js';
+	import { paragraphExtension } from '$lib/components/paragraph/extension.js';
+	import { type Commands, commands as defaultCommands } from '$lib/commands.js';
+	// import '$lib/Editor.css';
 	import type { ClassValue } from 'svelte/elements';
 	export interface Props {
 		value?: string;
