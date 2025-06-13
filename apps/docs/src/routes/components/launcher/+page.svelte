@@ -18,7 +18,7 @@
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
 	import { transcriptExtension } from '@eurora/ext-transcript/index.js';
-	import { Editor as ProsemirrorEditor, TextSelection } from '@eurora/prosemirror-core';
+	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core/index.js';
 	let editorRef: ProsemirrorEditor | undefined = $state(undefined);
 
 	let exampleInput = $state({
