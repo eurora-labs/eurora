@@ -24,7 +24,10 @@
 
 	// Import the Launcher component
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
-	import { Editor as ProsemirrorEditor, type SveltePMExtension } from '@eurora/prosemirror-core';
+	import {
+		Editor as ProsemirrorEditor,
+		type SveltePMExtension,
+	} from '@eurora/prosemirror-core/index.js';
 	// Import the extension factory instead of individual extensions
 	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
 
