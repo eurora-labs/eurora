@@ -5,7 +5,6 @@
 //! 3 seconds and maintaining a rolling history.
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use eur_activity::select_strategy_for_process;
 use eur_prompt_kit::LLMMessage;
 use parking_lot::RwLock;
@@ -30,45 +29,23 @@ mod platform;
 #[path = "windows/mod.rs"]
 mod platform;
 
-use eur_activity;
 use eur_activity::{ActivityStrategy, DisplayAsset};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SystemState {}
 
-/// A Fragment represents a snapshot of system state at a single point in time
-#[derive(Clone, Debug)]
-pub struct Fragment {
-    /// When this fragment was captured
-    pub timestamp: DateTime<Utc>,
-    // pub system_state: Option<SystemState>,
-
-    // Screenshot data, if available
-    // pub screenshot: Option<Vec<u8>>,
-
-    // Additional metadata about this fragment
-    // #[serde(default)]
-    // pub metadata: serde_json::Value,
-}
-
 /// A reference to a Timeline that can be safely shared between threads
 pub type TimelineRef = Arc<Timeline>;
 
-/// Timeline store that holds fragments of system state over time
+/// Timeline store that holds activities of system state over time
 pub struct Timeline {
     /// The activities stored in the timeline
     activities: Arc<RwLock<Vec<eur_activity::Activity>>>,
 
-    /// The activities new stored in the timeline
-    // activities_new: Arc<RwLock<Vec<ActivityStrategy>>>,
-
-    /// The fragments stored in the timeline
-    fragments: Arc<RwLock<Vec<Fragment>>>,
-
-    /// How many fragments to keep in history
+    /// How many activities to keep in history
     capacity: usize,
 
-    /// How often to capture a new fragment (in seconds)
+    /// How often to capture a new activity (in seconds)
     interval_seconds: u64,
 }
 
@@ -79,7 +56,6 @@ impl Timeline {
         info!("Timeline created.");
         Timeline {
             activities: Arc::new(RwLock::new(Vec::new())),
-            fragments: Arc::new(RwLock::new(Vec::with_capacity(capacity))),
             capacity,
             interval_seconds,
         }
@@ -89,43 +65,16 @@ impl Timeline {
     pub fn clone_ref(&self) -> TimelineRef {
         Arc::new(Timeline {
             activities: Arc::clone(&self.activities),
-            fragments: Arc::clone(&self.fragments),
             capacity: self.capacity,
             interval_seconds: self.interval_seconds,
         })
     }
 
-    /// Get a fragment from the specified number of seconds ago
-    pub fn get_fragment_from_seconds_ago(&self, seconds_ago: u64) -> Option<Fragment> {
-        let index = (seconds_ago / self.interval_seconds) as usize;
-        self.get_fragment_at_index(index)
-    }
-
-    /// Get a fragment at the specified index
-    pub fn get_fragment_at_index(&self, index: usize) -> Option<Fragment> {
-        let fragments = self.fragments.read();
-        if index >= fragments.len() {
-            return None;
-        }
-
-        // Calculate the actual index, accounting for the circular buffer
-        let actual_index = (fragments.len() - 1) - index;
-        fragments.get(actual_index).cloned()
-    }
-
-    /// Get all fragments in chronological order (oldest first)
-    pub fn get_all_fragments(&self) -> Vec<Fragment> {
-        let fragments = self.fragments.read();
-        fragments.clone()
-    }
-
-    pub fn get_most_recent_fragment(&self) -> Option<Fragment> {
-        let fragments = self.fragments.read();
-        fragments.last().cloned()
-    }
-
     pub fn add_activity(&self, activity: eur_activity::Activity) {
         let mut activities = self.activities.write();
+        if activities.len() >= self.capacity {
+            activities.remove(0);
+        }
         activities.push(activity);
     }
     pub fn get_context_chips(&self) -> Vec<eur_activity::ContextChip> {
@@ -313,6 +262,6 @@ impl Timeline {
 
 /// Create a new timeline with default settings
 pub fn create_default_timeline() -> Timeline {
-    // Default to 1 hour of history (1200 fragments at 3-second intervals)
+    // Default to 1 hour of history (1200 activities at 3-second intervals)
     Timeline::new(1200, 3)
 }
