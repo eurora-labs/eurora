@@ -8,14 +8,12 @@ use rand::rngs::OsRng;
 use sqlite_vec::sqlite3_vec_init;
 use sqlx::Column;
 use sqlx::TypeInfo;
-use sqlx::migrate::MigrateDatabase;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::types::Uuid;
 use std::str::FromStr;
 use std::time::Duration;
 use tracing::debug;
-use tracing::info;
 
 use crate::types::{Activity, ActivityAsset, ChatMessage, Conversation};
 
