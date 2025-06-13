@@ -1,4 +1,5 @@
 import { default as Video, videoAttrs, videoSchema } from './Video.svelte';
+import { Editor } from '@eurora/prosemirror-core';
 import type { Component } from 'svelte';
 
 import { type SveltePMExtension } from '@eurora/prosemirror-core';
@@ -13,7 +14,7 @@ export function videoExtension(): SveltePMExtension {
 				attrs: videoAttrs,
 				schema: videoSchema,
 				// component: Video,
-				nodeView: (editor: any) =>
+				nodeView: (editor: Editor) =>
 					SvelteNodeView.fromComponent(editor, Video as unknown as Component),
 			},
 		},

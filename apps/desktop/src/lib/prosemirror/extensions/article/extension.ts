@@ -1,4 +1,5 @@
 import { default as Article, articleAttrs, articleSchema } from './Article.svelte';
+import { Editor } from '@eurora/prosemirror-core';
 import type { Component } from 'svelte';
 
 import { type SveltePMExtension } from '@eurora/prosemirror-core';
@@ -13,7 +14,7 @@ export function articleExtension(): SveltePMExtension {
 				attrs: articleAttrs,
 				schema: articleSchema,
 				// component: Article,
-				nodeView: (editor: any) =>
+				nodeView: (editor: Editor) =>
 					SvelteNodeView.fromComponent(editor, Article as unknown as Component),
 			},
 		},
