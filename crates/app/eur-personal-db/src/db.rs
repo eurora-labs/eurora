@@ -43,6 +43,9 @@ impl DatabaseManager {
             .pragma("cipher_page_size", "4096")
             .pragma("cipher_hmac_algorithm", "HMAC_SHA512")
             .pragma("cipher_kdf_algorithm", "PBKDF2_HMAC_SHA512")
+            .pragma("journal_mode", "WAL")
+            .pragma("cache_size", "2000")
+            .pragma("temp_store", "MEMORY")
             .create_if_missing(true);
 
         let pool = SqlitePoolOptions::new()
@@ -50,20 +53,6 @@ impl DatabaseManager {
             .min_connections(3)
             .acquire_timeout(Duration::from_secs(10))
             .connect_with(opts)
-            .await?;
-
-        // Enable WAL mode
-        sqlx::query("PRAGMA journal_mode = WAL;")
-            .execute(&pool)
-            .await?;
-
-        // Enable SQLite's query result caching
-        sqlx::query("PRAGMA cache_size = 2000;")
-            .execute(&pool)
-            .await?;
-
-        sqlx::query("PRAGMA temp_store = MEMORY;")
-            .execute(&pool)
             .await?;
 
         let db_manager = DatabaseManager { pool };
@@ -261,7 +250,8 @@ impl DatabaseManager {
 const PERSONAL_DB_KEY_HANDLE: &str = "PERSONAL_DB_KEY";
 
 fn init_key() -> Result<Sensitive<String>> {
-    let key = secret::retrieve(PERSONAL_DB_KEY_HANDLE, secret::Namespace::Global)?;
+    let key = secret::retrieve(PERSONAL_DB_KEY_HANDLE, secret::Namespace::Global)
+        .map_err(|e| anyhow!("Failed to retrieve key: {}", e))?;
     if let Some(key) = key {
         Ok(key)
     } else {
