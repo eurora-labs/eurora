@@ -1,5 +1,5 @@
 import { default as Transcript, transcriptAttrs, transcriptSchema } from './Transcript.svelte';
-import { Editor, type SveltePMExtension, SvelteNodeView } from '@eurora/prosemirror-core/index.js';
+import { Editor, type SveltePMExtension, SvelteNodeView } from '@eurora/prosemirror-core/index';
 import type { Component } from 'svelte';
 
 export const ID = 'D8215655-A880-4B0F-8EFA-0B6B447F8AF3';

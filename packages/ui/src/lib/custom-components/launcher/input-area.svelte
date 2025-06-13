@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core/index.js';
+	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core/index';
 	import type { ClassValue } from 'svelte/elements';
 
 	export interface Props {

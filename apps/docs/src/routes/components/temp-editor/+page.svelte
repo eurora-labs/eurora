@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core/index.js';
-	import { transcriptExtension } from '@eurora/ext-transcript/index.js';
+	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core/index';
+	import { transcriptExtension } from '@eurora/ext-transcript/index';
 	import { onMount } from 'svelte';
 
 	let editorRef: ProsemirrorEditor | null = $state(null);

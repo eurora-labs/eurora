@@ -1,4 +1,4 @@
-import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher.js';
+import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { YoutubeChromeMessage, type YoutubeMessageType, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from '@eurora/youtube-transcripts';
 

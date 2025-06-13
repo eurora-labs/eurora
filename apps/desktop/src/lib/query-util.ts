@@ -1,4 +1,4 @@
-import { Editor } from '@eurora/prosemirror-core/index.js';
+import { Editor } from '@eurora/prosemirror-core/index';
 
 export interface QueryAssets {
 	text: string;

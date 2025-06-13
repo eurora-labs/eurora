@@ -1,9 +1,9 @@
 import { extensionFactory } from './factory.js';
 
 // Import extensions
-import { videoExtension, videoExtensionID } from '@eurora/ext-video/index.js';
-import { transcriptExtension, transcriptExtensionID } from '@eurora/ext-transcript/index.js';
-import { youtubeVideoExtension, youtubeVideoExtensionID } from '@eurora/ext-youtube-video/index.js';
+import { videoExtension, videoExtensionID } from '@eurora/ext-video/index';
+import { transcriptExtension, transcriptExtensionID } from '@eurora/ext-transcript/index';
+import { youtubeVideoExtension, youtubeVideoExtensionID } from '@eurora/ext-youtube-video/index';
 import { articleExtension, articleExtensionID } from '$lib/prosemirror/extensions/article/index.js';
 
 /**

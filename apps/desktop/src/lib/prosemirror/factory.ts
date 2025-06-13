@@ -1,4 +1,4 @@
-import type { SveltePMExtension } from '@eurora/prosemirror-core/index.js';
+import type { SveltePMExtension } from '@eurora/prosemirror-core/index';
 
 /**
  * Type definition for extension creator functions
