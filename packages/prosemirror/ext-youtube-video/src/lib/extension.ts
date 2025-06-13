@@ -3,6 +3,7 @@ import type { Component } from 'svelte';
 
 import type { SveltePMExtension } from '@eurora/prosemirror-core';
 import { SvelteNodeView } from '@eurora/prosemirror-core';
+import { Editor } from '@eurora/prosemirror-core';
 export const ID = '7c7b59bb-d44d-431a-9f4d-64240172e092';
 
 export function youtubeVideoExtension(): SveltePMExtension {
@@ -12,7 +13,7 @@ export function youtubeVideoExtension(): SveltePMExtension {
 			[ID]: {
 				attrs: videoAttrs,
 				schema: videoSchema,
-				nodeView: (editor: any) =>
+				nodeView: (editor: Editor) =>
 					SvelteNodeView.fromComponent(editor, YoutubeVideo as unknown as Component),
 			},
 		},
