@@ -8736,8 +8736,9 @@ dependencies = [
 
 [[package]]
 name = "taurpc"
-version = "0.5.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fsorted_args_and_router_params#c6e7dae799633a74acdad0c2a8d70a78c9284c8e"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9c82102620c5d56eafdc268383430e84b57d3e32bb90dacf43d4afb2a6f5006"
 dependencies = [
  "anyhow",
  "heck 0.5.0",
@@ -8755,8 +8756,9 @@ dependencies = [
 
 [[package]]
 name = "taurpc-macros"
-version = "0.5.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fsorted_args_and_router_params#c6e7dae799633a74acdad0c2a8d70a78c9284c8e"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52dac96e03af03e6454eedeb76be7248dbee4b5094b546aa20e8dc25fd01b734"
 dependencies = [
  "proc-macro2",
  "quote",
