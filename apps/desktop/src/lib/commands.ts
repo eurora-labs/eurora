@@ -1,4 +1,4 @@
-import type { Editor } from '@eurora/prosemirror-core';
+import { Editor } from '@eurora/prosemirror-core/index.js';
 import type { ContextChip } from '$lib/bindings/bindings.js';
 
 export function executeCommand(editorRef: Editor, command: ContextChip) {

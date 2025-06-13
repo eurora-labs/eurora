@@ -1,12 +1,11 @@
-import { type NodeSpec, Schema } from 'prosemirror-model';
+import { Schema } from 'prosemirror-model';
 import { default as Editor } from './Editor.svelte';
-import { SveltePMExtension, PMExtension, ExtensionData, Initialized } from './typings/index.js';
+import type { SveltePMExtension, ExtensionData, Initialized } from '$lib/typings/index.js';
 import { createNodeSpec } from './extensions/createNodeSpec.js';
 import { keymap } from 'prosemirror-keymap';
 import { schema as defaultSchema } from 'prosemirror-schema-basic';
 import { addListNodes } from 'prosemirror-schema-list';
-import { NodeViewConstructor } from 'prosemirror-view';
-import { Command, Plugin } from 'prosemirror-state';
+import { type Command, Plugin } from 'prosemirror-state';
 
 export async function createExtensions(
 	editor: Editor,
