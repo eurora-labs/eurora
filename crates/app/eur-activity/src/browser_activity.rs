@@ -94,15 +94,20 @@ impl From<ProtoYoutubeState> for YoutubeAsset {
     }
 }
 
-impl From<ProtoArticleState> for ArticleAsset {
-    fn from(article: ProtoArticleState) -> Self {
-        ArticleAsset {
+impl ArticleAsset {
+    pub fn try_from(state: ProtoArticleState) -> Result<Self, ActivityError> {
+        Ok(ArticleAsset {
             id: uuid::Uuid::new_v4().to_string(),
             _url: "".to_string(),
-            // title: article.title,
             title: "article asset".to_string(),
-            content: article.content,
-        }
+            content: state.content,
+        })
+    }
+}
+
+impl From<ProtoArticleState> for ArticleAsset {
+    fn from(article: ProtoArticleState) -> Self {
+        Self::try_from(article).expect("Failed to convert ProtoArticleState to ArticleAsset")
     }
 }
 
@@ -173,7 +178,7 @@ impl ActivityAsset for ArticleAsset {
         Some(ContextChip {
             id: self.id.clone(),
             name: "article".to_string(),
-            extension_id: "None".to_string(),
+            extension_id: "309f0906-d48c-4439-9751-7bcf915cdfc5".to_string(),
             attrs: HashMap::new(),
             icon: None,
             position: Some(0),
