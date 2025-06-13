@@ -51,8 +51,8 @@
 			},
 		],
 		toDOM(node: PMNode) {
-			const { id, text } = node.attrs;
-			return ['span', { id, class: 'article' }];
+			const { id, text, name } = node.attrs;
+			return ['span', { id, class: 'article', 'data-text': text, 'data-name': name }];
 		},
 	};
 </script>
