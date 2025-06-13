@@ -1,4 +1,4 @@
-import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher.js';
+import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { PdfChromeMessage, type PdfMessageType, type WatcherParams } from './types.js';
 import { ProtoPdfState } from '@eurora/shared/proto/tauri_ipc_pb.js';
 

@@ -7,7 +7,7 @@
 		ocrText?: string;
 	}
 
-	export interface VideoAttrs {
+	export interface ArticleAttrs {
 		id?: string;
 		transcript?: string;
 		text?: string;
@@ -15,7 +15,7 @@
 		currentFrame?: Frame;
 	}
 
-	export const videoAttrs: VideoAttrs = {
+	export const articleAttrs: ArticleAttrs = {
 		id: undefined,
 		transcript: undefined,
 		text: undefined,
@@ -23,8 +23,8 @@
 		currentFrame: undefined,
 	};
 
-	export const videoSchema: NodeSpec = {
-		attrs: Object.entries(videoAttrs).reduce(
+	export const articleSchema: NodeSpec = {
+		attrs: Object.entries(articleAttrs).reduce(
 			(acc, [key, value]) => ({ ...acc, [key]: { default: value } }),
 			{},
 		),
@@ -37,7 +37,7 @@
 
 		parseDOM: [
 			{
-				tag: 'span.video', // Changed from figure
+				tag: 'span.article', // Changed from figure
 				getAttrs: (dom: HTMLElement | string) => {
 					if (dom instanceof HTMLElement) {
 						return {
@@ -52,7 +52,7 @@
 		],
 		toDOM(node: PMNode) {
 			const { id, text, name } = node.attrs;
-			return ['span', { id, 'data-text': text, 'data-name': name, class: 'video' }];
+			return ['span', { id, class: 'article', 'data-text': text, 'data-name': name }];
 		},
 	};
 </script>
@@ -63,15 +63,14 @@
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Popover from '@eurora/ui/components/popover/index';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
-	import { SiYoutube } from '@icons-pack/svelte-simple-icons';
-	export interface Props extends SvelteNodeViewProps<VideoAttrs> {
+	export interface Props extends SvelteNodeViewProps<ArticleAttrs> {
 		ref: HTMLElement;
-		attrs: VideoAttrs;
+		attrs: ArticleAttrs;
 	}
 
 	let { ref, attrs }: Props = $props();
 
-	export { ref, attrs };
+	export { ref, attrs, articleAttrs, articleSchema };
 
 	function handleClick(event: MouseEvent) {
 		alert('some longer script');
@@ -89,10 +88,9 @@
 
 <Popover.Root>
 	<Popover.Trigger>
-		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>
-			<SiYoutube size={24} />
-			{attrs.name}
-		</ContextChip>
+		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}
+			>{attrs.name}</ContextChip
+		>
 	</Popover.Trigger>
 	<Popover.Content class="w-80">
 		<div class="grid gap-4">
