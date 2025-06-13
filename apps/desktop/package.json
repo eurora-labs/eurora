@@ -22,6 +22,8 @@
 		"@eurora/prosemirror-core": "workspace:*"
 	},
 	"devDependencies": {
+		"prosemirror-model": "^1.25.1",
+		"prosemirror-view": "^1.33.5",
 		"@eurora/shared": "workspace:*",
 		"@eurora/ext-youtube-video": "workspace:*",
 		"@eslint/compat": "^1.2.9",
