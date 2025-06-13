@@ -27,7 +27,7 @@
 	import {
 		Editor as ProsemirrorEditor,
 		type SveltePMExtension,
-	} from '@eurora/prosemirror-core/index.js';
+	} from '@eurora/prosemirror-core/index';
 	// Import the extension factory instead of individual extensions
 	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
 
