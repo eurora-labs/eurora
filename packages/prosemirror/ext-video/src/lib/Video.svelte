@@ -1,7 +1,6 @@
 <script lang="ts" module>
 	import type { NodeSpec } from 'prosemirror-model';
 	import { Node as PMNode } from 'prosemirror-model';
-	import type { NodeProps } from '@eurora/prosemirror-core';
 
 	export interface Frame {
 		id: string;
@@ -63,7 +62,7 @@
 	import { Label } from '@eurora/ui/components/label/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Popover from '@eurora/ui/components/popover/index';
-	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core';
+	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
 	export interface Props extends SvelteNodeViewProps<VideoAttrs> {
 		ref: HTMLElement;
 		attrs: VideoAttrs;
