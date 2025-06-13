@@ -8,8 +8,8 @@ use uuid::Uuid;
 use crate::types::{
     CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
     CreateRefreshTokenRequest, CreateUserRequest, LoginToken, OAuthCredentials, OAuthState,
-    PasswordCredentials, RefreshToken, UpdateOAuthCredentialsRequest,
-    UpdatePasswordRequest, UpdateUserRequest, User,
+    PasswordCredentials, RefreshToken, UpdateOAuthCredentialsRequest, UpdatePasswordRequest,
+    UpdateUserRequest, User,
 };
 #[derive(Debug)]
 pub struct DatabaseManager {
