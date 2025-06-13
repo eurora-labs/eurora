@@ -46,7 +46,7 @@
 
 <script lang="ts">
 	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
-	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index.js';
+	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
 	export interface Props extends SvelteNodeViewProps<TranscriptAttrs> {
 		ref: HTMLElement;
 		attrs: TranscriptAttrs;
