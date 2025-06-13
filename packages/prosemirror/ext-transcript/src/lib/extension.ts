@@ -1,4 +1,5 @@
 import { default as Transcript, transcriptAttrs, transcriptSchema } from './Transcript.svelte';
+import { Editor } from '@eurora/prosemirror-core';
 import type { Component } from 'svelte';
 
 import { type SveltePMExtension } from '@eurora/prosemirror-core';
@@ -13,7 +14,7 @@ export function transcriptExtension() {
 				attrs: transcriptAttrs,
 				schema: transcriptSchema,
 				// component: Transcript,
-				nodeView: (editor: any) =>
+				nodeView: (editor: Editor) =>
 					SvelteNodeView.fromComponent(editor, Transcript as unknown as Component),
 			},
 		},
