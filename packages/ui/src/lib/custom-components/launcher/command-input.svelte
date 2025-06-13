@@ -2,8 +2,7 @@
 	import { Command as CommandPrimitive } from 'bits-ui';
 	import { cn } from '$lib/utils.js';
 	import InputArea from './input-area.svelte';
-	import type { Query } from '@eurora/prosemirror-core';
-	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core';
+	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core/index.js';
 	import { Search } from '@lucide/svelte';
 
 	interface Props extends CommandPrimitive.InputProps {
