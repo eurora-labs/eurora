@@ -126,12 +126,11 @@ impl Timeline {
 
     pub fn add_activity(&self, activity: eur_activity::Activity) {
         let mut activities = self.activities.write();
-        // eprintln!("Adding activity: {:?}", activity);
         activities.push(activity);
     }
     pub fn get_context_chips(&self) -> Vec<eur_activity::ContextChip> {
         let activities = self.activities.read();
-        eprintln!("Number of activities: {:?}", activities.len());
+        info!("Number of activities: {:?}", activities.len());
         if activities.is_empty() {
             return Vec::new();
         }
@@ -147,7 +146,7 @@ impl Timeline {
 
         let last_activity = activities.last().unwrap();
 
-        eprintln!(
+        info!(
             "Number of snapshots: {:?}",
             last_activity.snapshots.len() as u32
         );
@@ -251,7 +250,7 @@ impl Timeline {
 
                     // this never blocks: it just ships events into the channel
                     let result = tracker.track_focus(move |event| {
-                        eprintln!("▶ {}: {}", event.process, event.title);
+                        info!("▶ {}: {}", event.process, event.title);
 
                         // ignore the tracker's own window, if desired
                         if event.process != "eur-tauri" {
@@ -304,7 +303,7 @@ impl Timeline {
                         .start_collection_activity(strategy, &mut String::new())
                         .await;
                 }
-                eprintln!("block is done"); // printed when the task ends
+                info!("block is done"); // printed when the task ends
             }));
         }
 
