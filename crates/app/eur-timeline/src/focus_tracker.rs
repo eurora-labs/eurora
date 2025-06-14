@@ -11,8 +11,10 @@ pub struct FocusTracker {
 }
 
 impl FocusTracker {
-    pub fn new(impl_focus_tracker: ImplFocusTracker) -> Self {
-        Self { impl_focus_tracker }
+    pub fn new() -> Self {
+        Self {
+            impl_focus_tracker: ImplFocusTracker::new(),
+        }
     }
 }
 
