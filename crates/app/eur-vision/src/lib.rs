@@ -132,7 +132,10 @@ pub fn capture_region(
 
     capture_monitor_region(monitor, x, y, width, height)
 }
-pub fn capture_monitor_by_name(monitor_name: String) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+pub fn get_all_monitors() -> Result<Vec<Monitor>> {
+    Ok(Monitor::all()?)
+}
+pub fn capture_monitor_by_id(monitor_id: String) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
     let monitors = Monitor::all()?;
     if monitors.is_empty() {
         return Err(anyhow!("No monitors found"));
@@ -140,26 +143,41 @@ pub fn capture_monitor_by_name(monitor_name: String) -> Result<ImageBuffer<Rgba<
     if monitors.len() == 1 {
         return Ok(monitors[0].capture_image()?);
     }
+    let requested = monitor_id
+        .parse::<u32>()
+        .map_err(|_| anyhow!("Invalid monitor id '{}'", monitor_id))?;
+
     let some_monitor = monitors
         .into_iter()
-        .find(|monitor| monitor.name().unwrap_or_default() == monitor_name)
-        .ok_or_else(|| anyhow!("Monitor '{}' not found", monitor_name))?;
+        .find(|m| m.id().unwrap_or_default() == requested)
+        .ok_or_else(|| anyhow!("Monitor '{}' not found", monitor_id))?;
 
     Ok(some_monitor.capture_image()?)
 }
 
 pub fn capture_focused_region_rgba(
-    monitor_name: String,
+    monitor_id: String,
     x: u32,
     y: u32,
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
-    let monitor = Monitor::all()?
+    let monitors = Monitor::all()?;
+    if monitors.is_empty() {
+        return Err(anyhow!("No monitors found"));
+    }
+    if monitors.len() == 1 {
+        return Ok(monitors[0].capture_image()?);
+    }
+    let requested = monitor_id
+        .parse::<u32>()
+        .map_err(|_| anyhow!("Invalid monitor id '{}'", monitor_id))?;
+
+    let some_monitor = monitors
         .into_iter()
-        .find(|monitor| monitor.name().unwrap() == monitor_name)
-        .ok_or_else(|| anyhow!("No monitors found"))?;
-    capture_monitor_region_rgba(monitor, x, y, width, height)
+        .find(|m| m.id().unwrap_or_default() == requested)
+        .ok_or_else(|| anyhow!("Monitor '{}' not found", monitor_id))?;
+    capture_monitor_region_rgba(some_monitor, x, y, width, height)
 }
 
 pub fn capture_region_rgba(
@@ -168,10 +186,6 @@ pub fn capture_region_rgba(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
-    eprintln!(
-        "capture_region_rgba: x: {}, y: {}, width: {}, height: {}",
-        x, y, width, height
-    );
     // Get the primary monitor
     let monitor = Monitor::all()?
         .into_iter()
