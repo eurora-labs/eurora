@@ -2437,7 +2437,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "xcap 0.3.3",
+ "xcap",
 ]
 
 [[package]]
@@ -2583,7 +2583,7 @@ dependencies = [
  "rusty-tesseract",
  "tokio",
  "wgpu",
- "xcap 0.6.0",
+ "xcap",
 ]
 
 [[package]]
@@ -4664,7 +4664,7 @@ dependencies = [
  "objc2 0.6.1",
  "objc2-app-kit",
  "objc2-core-foundation",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "once_cell",
  "png",
  "serde",
@@ -5063,7 +5063,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-core-image",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "objc2-quartz-core 0.3.0",
 ]
 
@@ -5081,7 +5081,7 @@ dependencies = [
  "objc2-core-graphics",
  "objc2-core-image",
  "objc2-core-video",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "objc2-quartz-core 0.3.0",
 ]
 
@@ -5092,7 +5092,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2fe5d8f6b9904a2028e9168bbdc77d06f944a39a0aef7076857db09f1298c9a"
 dependencies = [
  "objc2 0.6.1",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
 ]
 
 [[package]]
@@ -5103,15 +5103,16 @@ checksum = "6c1948a9be5f469deadbd6bcb86ad7ff9e47b4f632380139722f7d9840c0d42c"
 dependencies = [
  "bitflags 2.9.0",
  "objc2 0.6.1",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
 ]
 
 [[package]]
 name = "objc2-core-audio"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38591d29e45e81cb27870334467361ed788e7cfad7f85c1d30b1b6263fff3c2a"
+checksum = "ca44961e888e19313b808f23497073e3f6b3c22bb485056674c8b49f3b025c82"
 dependencies = [
+ "dispatch2 0.3.0",
  "objc2 0.6.1",
  "objc2-core-audio-types",
  "objc2-core-foundation",
@@ -5119,9 +5120,9 @@ dependencies = [
 
 [[package]]
 name = "objc2-core-audio-types"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ffa9f6942675c6828092dd365f32c771eac9b983126b79e2ebc385954bfdf06"
+checksum = "c0f1cc99bb07ad2ddb6527ddf83db6a15271bb036b3eb94b801cd44fdc666ee1"
 dependencies = [
  "bitflags 2.9.0",
  "objc2 0.6.1",
@@ -5135,7 +5136,7 @@ checksum = "1f860f8e841f6d32f754836f51e6bc7777cd7e7053cf18528233f6811d3eceb4"
 dependencies = [
  "bitflags 2.9.0",
  "objc2 0.6.1",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
 ]
 
 [[package]]
@@ -5153,17 +5154,18 @@ dependencies = [
 
 [[package]]
 name = "objc2-core-graphics"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8dca602628b65356b6513290a21a6405b4d4027b8b250f0b98dddbb28b7de02"
+checksum = "989c6c68c13021b5c2d6b71456ebb0f9dc78d752e86a98da7c716f4f9470f5a4"
 dependencies = [
  "bitflags 2.9.0",
  "block2 0.6.1",
+ "dispatch2 0.3.0",
  "libc",
  "objc2 0.6.1",
  "objc2-core-foundation",
  "objc2-io-surface",
- "objc2-metal 0.3.0",
+ "objc2-metal 0.3.1",
 ]
 
 [[package]]
@@ -5173,17 +5175,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ffa6bea72bf42c78b0b34e89c0bafac877d5f80bf91e159a5d96ea7f693ca56"
 dependencies = [
  "objc2 0.6.1",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
 ]
 
 [[package]]
 name = "objc2-core-media"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95e0a1c424381b18712871e6984d0446c2d4952925a412fc606bd029d7b103ef"
+checksum = "f0b7afa6822e2fa20dfc88d10186b2432bf8560b5ed73ec9d31efd78277bc878"
 dependencies = [
  "bitflags 2.9.0",
  "block2 0.6.1",
+ "dispatch2 0.3.0",
  "objc2 0.6.1",
  "objc2-core-audio",
  "objc2-core-audio-types",
@@ -5193,9 +5196,9 @@ dependencies = [
 
 [[package]]
 name = "objc2-core-video"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d83ac30509ad2a9ac0f9b5e9cb7a50c08ee2cc99ac8e2217a5481eee437a2f9"
+checksum = "1989c3e76c7e978cab0ba9e6f4961cd00ed14ca21121444cc26877403bfb6303"
 dependencies = [
  "bitflags 2.9.0",
  "block2 0.6.1",
@@ -5203,7 +5206,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-io-surface",
- "objc2-metal 0.3.0",
+ "objc2-metal 0.3.1",
 ]
 
 [[package]]
@@ -5235,9 +5238,9 @@ dependencies = [
 
 [[package]]
 name = "objc2-foundation"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a21c6c9014b82c39515db5b396f91645182611c97d24637cf56ac01e5f8d998"
+checksum = "900831247d2fe1a09a683278e5384cfb8c80c79fe6b166f9d14bfdde0ea1b03c"
 dependencies = [
  "bitflags 2.9.0",
  "block2 0.6.1",
@@ -5258,9 +5261,9 @@ dependencies = [
 
 [[package]]
 name = "objc2-io-surface"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "161a8b87e32610086e1a7a9e9ec39f84459db7b3a0881c1f16ca5a2605581c19"
+checksum = "7282e9ac92529fa3457ce90ebb15f4ecbc383e8338060960760fa2cf75420c3c"
 dependencies = [
  "bitflags 2.9.0",
  "objc2 0.6.1",
@@ -5281,13 +5284,13 @@ dependencies = [
 
 [[package]]
 name = "objc2-metal"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01c41bc8b0e50ea7a5304a56f25e0066f526e99641b46fd7b9ad4421dd35bff6"
+checksum = "7f246c183239540aab1782457b35ab2040d4259175bd1d0c58e46ada7b47a874"
 dependencies = [
  "bitflags 2.9.0",
  "objc2 0.6.1",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
 ]
 
 [[package]]
@@ -5299,7 +5302,7 @@ dependencies = [
  "bitflags 2.9.0",
  "objc2 0.6.1",
  "objc2-app-kit",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
 ]
 
 [[package]]
@@ -5323,7 +5326,7 @@ checksum = "6fb3794501bb1bee12f08dcad8c61f2a5875791ad1c6f47faa71a0f033f20071"
 dependencies = [
  "bitflags 2.9.0",
  "objc2 0.6.1",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
 ]
 
 [[package]]
@@ -5335,7 +5338,7 @@ dependencies = [
  "bitflags 2.9.0",
  "objc2 0.6.1",
  "objc2-core-foundation",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
 ]
 
 [[package]]
@@ -5349,7 +5352,7 @@ dependencies = [
  "objc2 0.6.1",
  "objc2-app-kit",
  "objc2-core-foundation",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
 ]
 
 [[package]]
@@ -5575,7 +5578,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "732c71caeaa72c065bb69d7ea08717bd3f4863a4f451402fc9513e29dbd5261b"
 dependencies = [
  "objc2 0.6.1",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "objc2-osa-kit",
  "serde",
  "serde_json",
@@ -6732,7 +6735,7 @@ dependencies = [
  "objc2 0.6.1",
  "objc2-app-kit",
  "objc2-core-foundation",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "raw-window-handle",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -8190,7 +8193,7 @@ dependencies = [
  "ndk-sys 0.6.0+11769913",
  "objc2 0.6.1",
  "objc2-app-kit",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "once_cell",
  "parking_lot",
  "raw-window-handle",
@@ -8274,7 +8277,7 @@ dependencies = [
  "muda",
  "objc2 0.6.1",
  "objc2-app-kit",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "objc2-ui-kit",
  "percent-encoding",
  "plist",
@@ -8472,7 +8475,7 @@ dependencies = [
  "fern",
  "log",
  "objc2 0.6.1",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "serde",
  "serde_json",
  "serde_repr",
@@ -8655,7 +8658,7 @@ dependencies = [
  "log",
  "objc2 0.6.1",
  "objc2-app-kit",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "once_cell",
  "percent-encoding",
  "raw-window-handle",
@@ -9363,7 +9366,7 @@ dependencies = [
  "objc2-app-kit",
  "objc2-core-foundation",
  "objc2-core-graphics",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "once_cell",
  "png",
  "serde",
@@ -10217,7 +10220,7 @@ dependencies = [
  "objc2 0.6.1",
  "objc2-app-kit",
  "objc2-core-foundation",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "raw-window-handle",
  "windows-sys 0.59.0",
  "windows-version",
@@ -10241,16 +10244,6 @@ checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
 dependencies = [
  "windows-core 0.58.0",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f919aee0a93304be7f62e8e5027811bbba96bcb1de84d6618be56e43f8a32a1"
-dependencies = [
- "windows-core 0.59.0",
- "windows-targets 0.53.0",
 ]
 
 [[package]]
@@ -10314,19 +10307,6 @@ dependencies = [
 
 [[package]]
 name = "windows-core"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "810ce18ed2112484b0d4e15d022e5f598113e220c53e373fb31e67e21670c1ce"
-dependencies = [
- "windows-implement 0.59.0",
- "windows-interface 0.59.1",
- "windows-result 0.3.2",
- "windows-strings 0.3.1",
- "windows-targets 0.53.0",
-]
-
-[[package]]
-name = "windows-core"
 version = "0.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4763c1de310c86d75a878046489e2e5ba02c649d185f21c67d4cf8a56d098980"
@@ -10353,17 +10333,6 @@ name = "windows-implement"
 version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bbd5b46c938e506ecbce286b6628a02171d56153ba733b6c741fc627ec9579b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.101",
-]
-
-[[package]]
-name = "windows-implement"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83577b051e2f49a058c308f17f273b570a6a758386fc291b5f6a934dd84e48c1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -10846,7 +10815,7 @@ dependencies = [
  "objc2 0.6.1",
  "objc2-app-kit",
  "objc2-core-foundation",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "objc2-ui-kit",
  "objc2-web-kit",
  "once_cell",
@@ -10925,31 +10894,8 @@ dependencies = [
 
 [[package]]
 name = "xcap"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "161f900a1f2e909bae226f27dfb626d73af12f3441ca77b418efc5a851fba232"
-dependencies = [
- "dbus",
- "image",
- "log",
- "objc2 0.6.1",
- "objc2-app-kit",
- "objc2-core-foundation",
- "objc2-core-graphics",
- "objc2-foundation 0.3.0",
- "percent-encoding",
- "scopeguard",
- "thiserror 2.0.12",
- "widestring",
- "windows 0.59.0",
- "xcb",
-]
-
-[[package]]
-name = "xcap"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef2d00d06bcbe2c8e00092190fbd54f85a181473a5ccff8ccc8e01fffef94454"
+source = "git+https://github.com/AndreRoelofs/xcap.git?branch=master#f7828a0f53d072b5c2df569409382f14565a4a31"
 dependencies = [
  "dispatch2 0.3.0",
  "image",
@@ -10963,7 +10909,7 @@ dependencies = [
  "objc2-core-graphics",
  "objc2-core-media",
  "objc2-core-video",
- "objc2-foundation 0.3.0",
+ "objc2-foundation 0.3.1",
  "percent-encoding",
  "pipewire",
  "rand 0.9.1",
