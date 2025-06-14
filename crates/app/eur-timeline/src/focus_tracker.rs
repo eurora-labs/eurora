@@ -11,7 +11,7 @@ pub struct FocusTracker {
 }
 
 impl FocusTracker {
-    pub(crate) fn new(impl_focus_tracker: ImplFocusTracker) -> Self {
+    pub fn new(impl_focus_tracker: ImplFocusTracker) -> Self {
         Self { impl_focus_tracker }
     }
 }
