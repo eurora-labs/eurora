@@ -10,7 +10,7 @@ tokio = { workspace = true }
 image = { workspace = true }
 rusty-tesseract = "1.1.10"
 anyhow = { workspace = true }
-xcap = { version = "0.6.0" }
+xcap = { git = "https://github.com/AndreRoelofs/xcap.git", branch = "master" }
 wgpu = "25.0.2"
 bytemuck = "1.23.1"
 pollster = "0.4.0"
