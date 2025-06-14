@@ -23,9 +23,12 @@ use eur_tauri::{
     shared_types::{SharedOpenAIClient, create_shared_timeline},
 };
 use eur_user::auth::AuthManager;
-use eur_vision::{capture_focused_region_rgba, image_to_base64};
-use std::sync::atomic::{AtomicBool, Ordering};
+use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
 use std::sync::{Arc, Mutex};
+use std::{
+    any::Any,
+    sync::atomic::{AtomicBool, Ordering},
+};
 use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Emitter, Wry};
 use tauri::{Manager, generate_context};
@@ -218,7 +221,23 @@ fn main() {
                             .register(control_space_shortcut)?;
                     }
 
-                    #[cfg(any(target_os = "linux", target_os = "windows"))]
+                    #[cfg(target_os = "windows")]
+                    {
+                        let super_space_shortcut =
+                            Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+                        let launcher_label = launcher_window.label().to_string();
+
+                        app_handle.plugin(shortcut_plugin(
+                            super_space_shortcut,
+                            launcher_label.clone(),
+                        ))?;
+
+                        app_handle
+                            .global_shortcut()
+                            .register(super_space_shortcut)?;
+                    }
+
+                    #[cfg(target_os = "linux")]
                     {
                         let super_space_shortcut =
                             Shortcut::new(Some(Modifiers::SUPER), Code::Space);
@@ -371,42 +390,42 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 let mut launcher_y = 0;
                 let mut launcher_width = 1024; // Default width
                 let mut launcher_height = 200; // Default height
-                let mut monitor_name = "".to_string();
+                let mut monitor_id = "".to_string();
                 let mut monitor_width = 1920u32; // Default monitor width
                 let mut monitor_height = 1080u32; // Default monitor height
 
                 // Get cursor position and center launcher on that screen
                 if let Ok(cursor_position) = launcher.cursor_position() {
-                    if let Ok(monitors) = launcher.available_monitors() {
+                    if let Ok(monitors) = get_all_monitors() {
                         for monitor in monitors {
-                            monitor_name = monitor.name().unwrap().to_string();
-                            let size = monitor.size();
-                            let position = monitor.position();
-                            let scale_factor = monitor.scale_factor();
+                            monitor_id = monitor.id().unwrap().to_string();
+                            monitor_width = monitor.width().unwrap();
+                            monitor_height = monitor.height().unwrap();
+                            let monitor_x = monitor.x().unwrap();
+                            let monitor_y = monitor.y().unwrap();
+                            let scale_factor = monitor.scale_factor().unwrap() as f64;
 
-                            eprintln!("Monitor size: {:?}", size);
-                            eprintln!("Monitor position: {:?}", position);
+                            eprintln!("Monitor width: {:?}", monitor_width);
+                            eprintln!("Monitor height: {:?}", monitor_height);
+                            eprintln!("Monitor x: {:?}", monitor_x);
+                            eprintln!("Monitor y: {:?}", monitor_y);
                             eprintln!("Monitor scale factor: {:?}", scale_factor);
 
                             // Check if cursor is on this monitor
-                            if cursor_position.x >= position.x as f64
-                                && cursor_position.x <= (position.x + size.width as i32) as f64
-                                && cursor_position.y >= position.y as f64
-                                && cursor_position.y <= (position.y + size.height as i32) as f64
+                            if cursor_position.x >= monitor_x as f64
+                                && cursor_position.x <= (monitor_x + monitor_width as i32) as f64
+                                && cursor_position.y >= monitor_y as f64
+                                && cursor_position.y <= (monitor_y + monitor_height as i32) as f64
                             {
-                                // Store monitor dimensions
-                                monitor_width = size.width;
-                                monitor_height = size.height;
-
                                 // Center the launcher on this monitor
                                 let window_size = launcher.inner_size().unwrap();
 
                                 eprintln!("Window size: {:?}", window_size);
 
-                                launcher_x =
-                                    position.x + (size.width as i32 - window_size.width as i32) / 2;
-                                launcher_y = position.y
-                                    + (size.height as i32 - window_size.height as i32) / 4;
+                                launcher_x = monitor_x
+                                    + (monitor_width as i32 - window_size.width as i32) / 2;
+                                launcher_y = monitor_y
+                                    + (monitor_height as i32 - window_size.height as i32) / 4;
 
                                 eprintln!("Launcher position: ({}, {})", launcher_x, launcher_y);
 
@@ -421,9 +440,9 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                                     ))
                                     .expect("Failed to set launcher position");
 
-                                launcher_x = ((size.width as i32 as f64) / 2.0) as i32
+                                launcher_x = ((monitor_width as i32 as f64) / 2.0) as i32
                                     - (window_size.width as f64 / 2.0) as i32;
-                                launcher_y = ((size.height as i32 as f64) / 4.0) as i32
+                                launcher_y = ((monitor_height as i32 as f64) / 4.0) as i32
                                     - (window_size.height as f64 / 4.0) as i32;
                                 launcher_width = window_size.width;
                                 launcher_height = window_size.height;
@@ -435,7 +454,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 let start_record = std::time::Instant::now();
                 // Capture the screen region behind the launcher
                 match capture_focused_region_rgba(
-                    monitor_name.clone(),
+                    monitor_id.clone(),
                     launcher_x as u32,
                     launcher_y as u32,
                     launcher_width,
@@ -473,7 +492,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 // Emit an event to notify that the launcher has been opened
                 // Include positioning information for proper background alignment
                 let launcher_info = serde_json::json!({
-                    "monitor_name": monitor_name.clone(),
+                    "monitor_id": monitor_id.clone(),
                     "launcher_x": launcher_x,
                     "launcher_y": launcher_y,
                     "launcher_width": launcher_width,
