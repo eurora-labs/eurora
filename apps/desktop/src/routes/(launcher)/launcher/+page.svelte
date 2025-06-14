@@ -81,7 +81,7 @@
 	let currentConversationId = $state<string | null>(null);
 	const displayAssets = $state<DisplayAsset[]>([]);
 	let backgroundImage = $state<string | null>(null);
-	let currentMonitorName = $state<string>('');
+	let currentMonitorId = $state<string>('');
 	let launcherInfo = $state<{
 		monitor_name: string;
 		launcher_x: number;
@@ -147,14 +147,14 @@
 
 		// Store the launcher information from the event payload
 		launcherInfo = event.payload;
-		currentMonitorName = launcherInfo?.monitor_name || '';
+		currentMonitorId = launcherInfo?.monitor_id || '';
 		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
 
 		// Capture full monitor after launcher is opened to replace the small background
 		try {
-			if (currentMonitorName && launcherInfo) {
+			if (currentMonitorId && launcherInfo) {
 				// Capture the full monitor using the monitor name from the event
-				const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorName);
+				const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorId);
 
 				// Replace the background image with the full monitor capture
 				// Position it so it appears as if looking through transparent glass
@@ -177,7 +177,7 @@
 
 					console.log(
 						'Full monitor background captured and positioned for monitor:',
-						currentMonitorName,
+						currentMonitorId,
 						'offset:',
 						offsetX,
 						offsetY,
