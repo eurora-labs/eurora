@@ -14,20 +14,20 @@ use std::time::Duration;
 use tokio::time;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{error, info, warn};
-mod focus_tracker;
+pub mod focus_tracker;
 pub use focus_tracker::FocusEvent;
 
 #[cfg(target_os = "linux")]
 #[path = "linux/mod.rs"]
-mod platform;
+pub mod platform;
 
 #[cfg(target_os = "macos")]
 #[path = "macos/mod.rs"]
-mod platform;
+pub mod platform;
 
 #[cfg(target_os = "windows")]
 #[path = "windows/mod.rs"]
-mod platform;
+pub mod platform;
 
 use eur_activity::{ActivityStrategy, DisplayAsset};
 
@@ -188,9 +188,7 @@ impl Timeline {
             let tx = tx.clone(); // move into the thread
             std::thread::spawn(move || {
                 loop {
-                    let tracker = focus_tracker::FocusTracker::new(
-                        platform::impl_focus_tracker::ImplFocusTracker::new(),
-                    );
+                    let tracker = focus_tracker::FocusTracker::new();
 
                     info!("Starting focus tracker...");
 
