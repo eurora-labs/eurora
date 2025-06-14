@@ -188,9 +188,7 @@ impl Timeline {
             let tx = tx.clone(); // move into the thread
             std::thread::spawn(move || {
                 loop {
-                    let tracker = focus_tracker::FocusTracker::new(
-                        platform::impl_focus_tracker::ImplFocusTracker::new(),
-                    );
+                    let tracker = focus_tracker::FocusTracker::new();
 
                     info!("Starting focus tracker...");
 
