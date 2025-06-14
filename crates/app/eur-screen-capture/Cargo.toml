@@ -6,7 +6,7 @@ authors = ["Eurora <eurora@company.com>"]
 description = "Screen and window capture utility using xcap"
 
 [dependencies]
-xcap = "0.3.3"
+xcap = { git = "https://github.com/AndreRoelofs/xcap.git", branch = "master" }
 tokio = { workspace = true, default-features = false }
 image.workspace = true
 anyhow = { workspace = true }
