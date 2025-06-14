@@ -12,7 +12,7 @@ use super::utils;
 pub(crate) struct ImplFocusTracker {}
 
 impl ImplFocusTracker {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {}
     }
 }
@@ -54,33 +54,32 @@ impl ImplFocusTracker {
                     None => true,
                 };
 
-                if focus_changed {
-                    match utils::get_window_info(current_hwnd) {
-                        Ok((title, process)) => {
-                            // Also check if title changed for the same window
-                            let title_changed = match &prev_title {
-                                Some(prev_t) => *prev_t != title,
-                                None => true,
-                            };
+                match utils::get_window_info(current_hwnd) {
+                    Ok((title, process)) => {
+                        // Also check if title changed for the same window
+                        let title_changed = match &prev_title {
+                            Some(prev_t) => *prev_t != title,
+                            None => true,
+                        };
 
-                            if focus_changed || title_changed {
-                                let icon_base64 = get_window_icon(current_hwnd).unwrap_or_default();
-                                
-                                if let Err(e) = on_focus(FocusEvent {
-                                    process,
-                                    title: title.clone(),
-                                    icon_base64,
-                                }) {
-                                    eprintln!("Focus event handler failed: {}", e);
-                                }
-                                
-                                prev_hwnd = Some(current_hwnd);
-                                prev_title = Some(title);
+                        // Trigger handler if either window focus or title has changed
+                        if focus_changed || title_changed {
+                            let icon_base64 = get_window_icon(current_hwnd).unwrap_or_default();
+                            
+                            if let Err(e) = on_focus(FocusEvent {
+                                process,
+                                title: title.clone(),
+                                icon_base64,
+                            }) {
+                                eprintln!("Focus event handler failed: {}", e);
                             }
+                            
+                            prev_hwnd = Some(current_hwnd);
+                            prev_title = Some(title);
                         }
-                        Err(e) => {
-                            eprintln!("Failed to get window info: {}", e);
-                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to get window info: {}", e);
                     }
                 }
             } else {
