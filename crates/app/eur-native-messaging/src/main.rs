@@ -5,7 +5,11 @@ use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process;
 use tonic::transport::Server;
-
+use tracing::info;
+use tracing_subscriber::{
+    filter::{EnvFilter, LevelFilter},
+    fmt,
+};
 // Import the PORT constant from lib.rs
 use eur_native_messaging::PORT;
 
@@ -113,11 +117,11 @@ fn ensure_single_instance() -> Result<()> {
 
         // Check if the process is still running
         if is_process_running(pid) {
-            eprintln!("Found existing instance with PID {}. Killing it...", pid);
+            info!("Found existing instance with PID {}. Killing it...", pid);
             // Kill the existing process
             kill_process(pid)?;
         } else {
-            eprintln!("Found stale lock file. Removing it...");
+            info!("Found stale lock file. Removing it...");
         }
 
         // Remove the lock file (whether it was stale or we killed the process)
@@ -137,7 +141,7 @@ fn ensure_single_instance() -> Result<()> {
     // Register a shutdown handler to remove the lock file when the process exits
     let lock_file_path_clone = lock_file_path.clone();
     ctrlc::set_handler(move || {
-        eprintln!("Received shutdown signal. Cleaning up...");
+        info!("Received shutdown signal. Cleaning up...");
         let _ = fs::remove_file(&lock_file_path_clone);
         process::exit(0);
     })
@@ -151,13 +155,18 @@ async fn main() -> Result<()> {
     // Ensure only one instance is running
     ensure_single_instance()?;
 
-    let _guard = sentry::init((
-        "https://d4c60ef8f9c19d59dba4b1c12477818e@o4508907847352320.ingest.de.sentry.io/4508993773764688",
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            ..Default::default()
-        },
-    ));
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
+        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+
+    fmt().with_env_filter(filter).init();
+    // let _guard = sentry::init((
+    //     "https://d4c60ef8f9c19d59dba4b1c12477818e@o4508907847352320.ingest.de.sentry.io/4508993773764688",
+    //     sentry::ClientOptions {
+    //         release: sentry::release_name!(),
+    //         ..Default::default()
+    //     },
+    // ));
 
     // Create the gRPC server
     let (grpc_server, _) = server::TauriIpcServer::new();

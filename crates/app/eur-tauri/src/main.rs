@@ -6,6 +6,11 @@
 use anyhow::Result;
 use dotenv::dotenv;
 use eur_client_questions::QuestionsClient;
+use tauri_plugin_log::{Target, TargetKind};
+use tracing_subscriber::{
+    filter::{EnvFilter, LevelFilter},
+    fmt,
+};
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
@@ -49,7 +54,7 @@ async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> Shared
         DatabaseManager::new(&db_path)
             .await
             .map_err(|e| {
-                eprintln!("Failed to create database manager: {}", e);
+                info!("Failed to create database manager: {}", e);
                 e
             })
             .unwrap(),
@@ -82,6 +87,11 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
 
 fn main() {
     dotenv().ok();
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
+        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+
+    fmt().with_env_filter(filter).init();
     // let _guard = sentry::init((
     //     "https://5181d08d2bfcb209a768ab99e1e48f1b@o4508907847352320.ingest.de.sentry.io/4508907850694736",
     //     sentry::ClientOptions {
@@ -93,14 +103,14 @@ fn main() {
     // Regular application startup
     let tauri_context = generate_context!();
 
-    // eprintln!("Starting Tauri application...");
+    // info!("Starting Tauri application...");
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
         .block_on(async {
-            // println!("Setting tokio runtime");
+            // info!("Setting tokio runtime");
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let builder = tauri::Builder::default()
@@ -204,7 +214,7 @@ fn main() {
                         }
                     });
 
-                    // println!("Setting up global shortcut");
+                    // info!("Setting up global shortcut");
 
                     // If macos, use Control + Space
                     #[cfg(target_os = "macos")]
@@ -279,11 +289,11 @@ fn main() {
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
-                .plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Error)
-                        .build(),
-                )
+                // .plugin(
+                //     tauri_plugin_log::Builder::default()
+                //         .level(log::LevelFilter::Error)
+                //         .build(),
+                // )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
                 // .plugin(
@@ -405,11 +415,11 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                             let monitor_y = monitor.y().unwrap();
                             let scale_factor = monitor.scale_factor().unwrap() as f64;
 
-                            eprintln!("Monitor width: {:?}", monitor_width);
-                            eprintln!("Monitor height: {:?}", monitor_height);
-                            eprintln!("Monitor x: {:?}", monitor_x);
-                            eprintln!("Monitor y: {:?}", monitor_y);
-                            eprintln!("Monitor scale factor: {:?}", scale_factor);
+                            info!("Monitor width: {:?}", monitor_width);
+                            info!("Monitor height: {:?}", monitor_height);
+                            info!("Monitor x: {:?}", monitor_x);
+                            info!("Monitor y: {:?}", monitor_y);
+                            info!("Monitor scale factor: {:?}", scale_factor);
 
                             // Check if cursor is on this monitor
                             if cursor_position.x >= monitor_x as f64
@@ -420,14 +430,14 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                                 // Center the launcher on this monitor
                                 let window_size = launcher.inner_size().unwrap();
 
-                                eprintln!("Window size: {:?}", window_size);
+                                info!("Window size: {:?}", window_size);
 
                                 launcher_x = monitor_x
                                     + (monitor_width as i32 - window_size.width as i32) / 2;
                                 launcher_y = monitor_y
                                     + (monitor_height as i32 - window_size.height as i32) / 4;
 
-                                eprintln!("Launcher position: ({}, {})", launcher_x, launcher_y);
+                                info!("Launcher position: ({}, {})", launcher_x, launcher_y);
 
                                 launcher
                                     .set_position(tauri::Position::Physical(
@@ -467,9 +477,9 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                             false => image::DynamicImage::ImageRgba8(img.clone()).to_rgb8(),
                         };
 
-                        eprintln!("Captured image size: {:?}", img.dimensions());
+                        info!("Captured image size: {:?}", img.dimensions());
                         let duration = t0.elapsed();
-                        println!("Capture of background area completed in: {:?}", duration);
+                        info!("Capture of background area completed in: {:?}", duration);
 
                         // Convert the image to base64
                         if let Ok(base64_image) = image_to_base64(img) {
@@ -484,7 +494,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                     }
                 }
                 let duration = start_record.elapsed();
-                println!("Capture of background area completed in: {:?}", duration);
+                info!("Capture of background area completed in: {:?}", duration);
 
                 // Only show the launcher if it was previously hidden
                 launcher.show().expect("Failed to show launcher window");
