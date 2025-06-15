@@ -40,7 +40,7 @@ impl Timeline {
     /// Create a new timeline with the specified capacity
     pub fn new(capacity: usize, interval_seconds: u64) -> Self {
         // Browser strategy registration is now handled within eur_activity::REGISTRY initialization.
-        eprintln!("Timeline created.");
+        info!("Timeline created.");
         Timeline {
             activities: Arc::new(RwLock::new(Vec::new())),
             capacity,
@@ -66,7 +66,7 @@ impl Timeline {
     }
     pub fn get_context_chips(&self) -> Vec<eur_activity::ContextChip> {
         let activities = self.activities.read();
-        eprintln!("Number of activities: {:?}", activities.len());
+        info!("Number of activities: {:?}", activities.len());
         if activities.is_empty() {
             return Vec::new();
         }
@@ -82,7 +82,7 @@ impl Timeline {
 
         let last_activity = activities.last().unwrap();
 
-        eprintln!(
+        info!(
             "Number of snapshots: {:?}",
             last_activity.snapshots.len() as u32
         );
@@ -159,7 +159,7 @@ impl Timeline {
                     }
                 }
                 Err(e) => {
-                    eprintln!("Failed to retrieve snapshots: {:?}", e);
+                    info!("Failed to retrieve snapshots: {:?}", e);
                     // error!("Failed to retrieve snapshots: {:?}", e);
                 }
             }
@@ -177,7 +177,7 @@ impl Timeline {
             let tracker = ferrous_focus::FocusTracker::new();
             std::thread::spawn(move || {
                 loop {
-                    eprintln!("Starting focus tracker...");
+                    info!("Starting focus tracker...");
 
                     // Clone tx for this iteration
                     let tx_clone = tx.clone();
@@ -187,7 +187,7 @@ impl Timeline {
                         tracker.track_focus(|window: FocusedWindow| -> FerrousFocusResult<()> {
                             let process_name = window.process_name.clone().unwrap();
                             let window_title = window.window_title.clone().unwrap();
-                            eprintln!("▶ {}: {}", process_name, window_title);
+                            info!("▶ {}: {}", process_name, window_title);
                             if process_name != "eur-tauri" {
                                 let _ = tx_clone.send(window);
                             }
@@ -240,7 +240,7 @@ impl Timeline {
                         .start_collection_activity(strategy, &mut String::new())
                         .await;
                 }
-                eprintln!("block is done"); // printed when the task ends
+                info!("block is done"); // printed when the task ends
             }));
         }
 
