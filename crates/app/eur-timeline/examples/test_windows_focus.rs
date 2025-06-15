@@ -3,6 +3,7 @@
 //! Run with: cargo run --example test_windows_focus
 
 use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
+use tracing::info;
 fn main() -> anyhow::Result<()> {
     info!("Starting Windows focus tracker test...");
     info!("Switch between different applications to see focus events.");
