@@ -8,6 +8,8 @@ description = "Timeline storage for capturing system state over time"
 [dependencies]
 eur-proto = { path = "../../proto/eur-proto" }
 image.workspace = true
+ferrous-focus = { path = "../../../../../ferrous-focus" }
+# ferrous-focus = { git = "https://github.com/eurora-labs/ferrous-focus.git", branch = "main" }
 eur-native-messaging = { path = "../eur-native-messaging" }
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 eur-activity = { path = "../eur-activity" }
@@ -25,7 +27,7 @@ tonic = { workspace = true }
 x11rb = "0.13.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.59.0", features = [
+windows-sys = { version = "0.60.2", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",

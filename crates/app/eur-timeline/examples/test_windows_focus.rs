@@ -2,8 +2,7 @@
 //!
 //! Run with: cargo run --example test_windows_focus
 
-use eur_timeline::{FocusEvent, focus_tracker::FocusTracker};
-
+use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
 fn main() -> anyhow::Result<()> {
     println!("Starting Windows focus tracker test...");
     println!("Switch between different applications to see focus events.");
@@ -11,16 +10,16 @@ fn main() -> anyhow::Result<()> {
 
     let tracker = FocusTracker::new();
 
-    tracker.track_focus(|event: FocusEvent| {
+    tracker.track_focus(|event: FocusedWindow| -> FerrousFocusResult<()> {
         println!("Focus changed:");
-        println!("  Process: {}", event.process);
-        println!("  Title: {}", event.title);
+        println!("  Process: {}", event.process_name.unwrap());
+        println!("  Title: {}", event.window_title.unwrap());
         println!(
             "  Icon: {}",
-            if event.icon_base64.is_empty() {
-                "No icon"
-            } else {
+            if event.icon.is_some() {
                 "Icon available"
+            } else {
+                "No icon"
             }
         );
         println!("  ---");

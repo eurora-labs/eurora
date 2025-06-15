@@ -6,6 +6,7 @@
 use anyhow::Result;
 use dotenv::dotenv;
 use eur_client_questions::QuestionsClient;
+use tauri_plugin_log::{Target, TargetKind};
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
@@ -286,14 +287,14 @@ fn main() {
                 )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
-                // .plugin(
-                //     tauri_plugin_log::Builder::default()
-                //         .targets([
-                //             Target::new(TargetKind::Stdout),
-                //             Target::new(TargetKind::LogDir { file_name: None }),
-                //         ])
-                //         .build(),
-                // )
+                .plugin(
+                    tauri_plugin_log::Builder::default()
+                        .targets([
+                            Target::new(TargetKind::Stdout),
+                            Target::new(TargetKind::LogDir { file_name: None }),
+                        ])
+                        .build(),
+                )
                 .on_window_event(|window, event| match event {
                     #[cfg(target_os = "macos")]
                     tauri::WindowEvent::CloseRequested { .. } => {
