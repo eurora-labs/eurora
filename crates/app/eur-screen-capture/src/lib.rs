@@ -84,16 +84,16 @@ fn record() {
 
     // Check if the platform is supported
     if !scap::is_supported() {
-        println!("Platform not supported");
+        info!("Platform not supported");
         return;
     }
 
     // Check if we have permission to capture screen
     // If we don't, request it.
     if !scap::has_permission() {
-        println!("Requesting permission...");
+        info!("Requesting permission...");
         if !scap::request_permission() {
-            println!("Permission denied for");
+            info!("Permission denied for");
             return;
         }
     }
@@ -106,14 +106,14 @@ fn record() {
     for t in targets {
         match t {
             Target::Window(window) => {
-                // println!("window :{:?}", window)
+                // info!("window :{:?}", window)
             }
             Target::Display(display) => {
-                println!("display :{:?}", display)
+                info!("display :{:?}", display)
             }
         }
     }
-    // println!("targets {:?}", targets);
+    // info!("targets {:?}", targets);
     // Create Options
     let options = Options {
         fps: framerate,
@@ -135,7 +135,7 @@ fn record() {
 
     // Create Recorder with options
     let mut recorder = Capturer::build(options).unwrap_or_else(|err| {
-        println!("Problem with building Capturer: {err}");
+        info!("Problem with building Capturer: {err}");
         process::exit(1);
     });
 
@@ -153,7 +153,7 @@ fn record() {
                     start_time = frame.display_time;
                 }
 
-                println!(
+                info!(
                     "Recieved BGRA frame {} of width {} and height {} and time {}",
                     i,
                     frame.width,
@@ -192,7 +192,7 @@ fn record() {
     let status = ffmpeg.wait().unwrap();
 
     if status.success() {
-        println!("✅ HLS output written to {}/index.m3u8", output_dir);
+        info!("✅ HLS output written to {}/index.m3u8", output_dir);
     } else {
         info!("❌ FFmpeg exited with error: {:?}", status);
     }

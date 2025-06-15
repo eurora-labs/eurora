@@ -1,4 +1,5 @@
 use dotenv::dotenv;
+
 use eur_auth::JwtConfig;
 use eur_auth_service::AuthService;
 use eur_ocr_service::OcrService;
@@ -12,7 +13,7 @@ use tonic::transport::Server;
 use tonic_health::{pb::health_server, server::HealthReporter};
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer, ExposeHeaders};
-use tracing::Level;
+use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
