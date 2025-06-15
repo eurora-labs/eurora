@@ -62,12 +62,12 @@ impl ProtoOcrService for OcrService {
         &self,
         request: Request<TranscribeImageRequest>,
     ) -> Result<Response<TranscribeImageResponse>, Status> {
-        eprintln!("Received OCR request");
+        info!("Received OCR request");
 
         // Authenticate the request
         let _claims = match authenticate_request(&request, &self.jwt_config) {
             Ok(claims) => {
-                eprintln!("Authenticated OCR request for user: {}", claims.username);
+                info!("Authenticated OCR request for user: {}", claims.username);
                 claims
             }
             Err(e) => {
