@@ -29,8 +29,8 @@ async fn main() -> Result<()> {
     let db_manager = match DatabaseManager::new(&database_url).await {
         Ok(db) => Arc::new(db),
         Err(e) => {
-            eprintln!("Failed to connect to database: {}", e);
-            eprintln!("Make sure PostgreSQL is running and DATABASE_URL is set correctly");
+            info!("Failed to connect to database: {}", e);
+            info!("Make sure PostgreSQL is running and DATABASE_URL is set correctly");
             return Ok(());
         }
     };

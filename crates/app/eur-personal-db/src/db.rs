@@ -13,7 +13,7 @@ use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::types::Uuid;
 use std::str::FromStr;
 use std::time::Duration;
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::types::{Activity, ActivityAsset, ChatMessage, Conversation};
 
@@ -141,8 +141,8 @@ impl DatabaseManager {
         // Use future to wait in parallel
         // let (conversation, messages) = try_join!(conversation, messages)?;
 
-        eprintln!("Conversation: {:?}", conversation);
-        // eprintln!("Messages: {:?}", messages);
+        info!("Conversation: {:?}", conversation);
+        // info!("Messages: {:?}", messages);
 
         // Ok((conversation, messages))
         Ok((conversation, vec![]))
