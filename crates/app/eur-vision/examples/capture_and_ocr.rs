@@ -9,7 +9,7 @@ fn main() -> Result<()> {
     if !screenshot_dir.exists() {
         fs::create_dir_all(screenshot_dir)?;
     }
-    println!("Running multi-monitor capture method...");
+    info!("Running multi-monitor capture method...");
     let start = Instant::now();
 
     // Capture all monitors
@@ -23,16 +23,16 @@ fn main() -> Result<()> {
     }
 
     let duration = start.elapsed();
-    println!("Multi-monitor capture completed in: {:?}", duration);
-    println!("Number of monitors captured: {}", images.len());
+    info!("Multi-monitor capture completed in: {:?}", duration);
+    info!("Number of monitors captured: {}", images.len());
 
     // Save each captured image
     for (i, image) in images.iter().enumerate() {
         let filename = screenshot_dir.join(format!("monitor_{}.png", i));
         image.save(&filename)?;
-        println!("Monitor {} image saved to: {}", i, filename.display());
+        info!("Monitor {} image saved to: {}", i, filename.display());
     }
 
-    println!("All capture methods completed successfully!");
+    info!("All capture methods completed successfully!");
     Ok(())
 }

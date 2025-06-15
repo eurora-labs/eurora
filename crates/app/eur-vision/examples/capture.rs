@@ -21,44 +21,44 @@ fn main() -> Result<()> {
     for method in methods {
         match method {
             CaptureMethod::Basic => {
-                println!("Running basic capture method...");
+                info!("Running basic capture method...");
                 let start = Instant::now();
 
                 // Perform basic capture
                 let image = capture_monitor()?;
 
                 let duration = start.elapsed();
-                println!("Basic capture completed in: {:?}", duration);
+                info!("Basic capture completed in: {:?}", duration);
 
                 // Save the captured image
                 let filename = screenshot_dir.join("basic_capture.png");
                 image.save(&filename)?;
-                println!("Image saved to: {}", filename.display());
+                info!("Image saved to: {}", filename.display());
             }
 
             CaptureMethod::AllMonitors => {
-                println!("Running multi-monitor capture method...");
+                info!("Running multi-monitor capture method...");
                 let start = Instant::now();
 
                 // Capture all monitors
                 let images = capture_all_monitors()?;
 
                 let duration = start.elapsed();
-                println!("Multi-monitor capture completed in: {:?}", duration);
-                println!("Number of monitors captured: {}", images.len());
+                info!("Multi-monitor capture completed in: {:?}", duration);
+                info!("Number of monitors captured: {}", images.len());
 
                 // Save each captured image
                 for (i, image) in images.iter().enumerate() {
                     let filename = screenshot_dir.join(format!("monitor_{}.png", i));
                     image.save(&filename)?;
-                    println!("Monitor {} image saved to: {}", i, filename.display());
+                    info!("Monitor {} image saved to: {}", i, filename.display());
                 }
             }
         }
 
-        println!("-----------------------------------");
+        info!("-----------------------------------");
     }
 
-    println!("All capture methods completed successfully!");
+    info!("All capture methods completed successfully!");
     Ok(())
 }

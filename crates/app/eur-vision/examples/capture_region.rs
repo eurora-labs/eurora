@@ -11,7 +11,7 @@ fn main() -> Result<()> {
         fs::create_dir_all(screenshot_dir)?;
     }
 
-    println!("Running region capture...");
+    info!("Running region capture...");
     let start = Instant::now();
 
     let monitor = Monitor::all()?
@@ -26,8 +26,8 @@ fn main() -> Result<()> {
     let image = capture_monitor_region(monitor, start_x as u32, 0, width as u32, height as u32)?;
     let duration = start.elapsed();
 
-    println!("Region capture completed in: {:?}", duration);
-    println!(
+    info!("Region capture completed in: {:?}", duration);
+    info!(
         "Captured image dimensions: {}x{}",
         image.width(),
         image.height()
@@ -36,10 +36,10 @@ fn main() -> Result<()> {
     // Save the captured image
     let filename = screenshot_dir.join("region_capture.png");
     image.save(&filename)?;
-    println!("Region image saved to: {}", filename.display());
+    info!("Region image saved to: {}", filename.display());
 
-    println!("-----------------------------------");
-    println!("Region capture completed successfully!");
+    info!("-----------------------------------");
+    info!("Region capture completed successfully!");
 
     Ok(())
 }
