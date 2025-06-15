@@ -19,7 +19,7 @@ fn main() -> Result<()> {
     for image in &images {
         // TODO: remove this code
         let result_text = tess.recognize(&image::DynamicImage::ImageRgba8(image.clone()));
-        eprintln!("Recognized text: {}", result_text);
+        info!("Recognized text: {}", result_text);
     }
 
     let duration = start.elapsed();
