@@ -2,7 +2,7 @@ use anyhow::Result;
 use eur_ocr::{self, OcrStrategy};
 use eur_vision::capture_all_monitors;
 use std::{fs, path::Path, time::Instant};
-
+use tracing::info;
 fn main() -> Result<()> {
     // Create screenshots directory if it doesn't exist
     let screenshot_dir = Path::new("examples/screenshots");
