@@ -7,6 +7,7 @@
 use anyhow::Result;
 use eur_activity::select_strategy_for_process;
 use eur_prompt_kit::LLMMessage;
+use ferrous_focus::{FerrousFocusResult, FocusedWindow};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -14,20 +15,6 @@ use std::time::Duration;
 use tokio::time;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{error, info, warn};
-pub mod focus_tracker;
-pub use focus_tracker::FocusEvent;
-
-#[cfg(target_os = "linux")]
-#[path = "linux/mod.rs"]
-pub mod platform;
-
-#[cfg(target_os = "macos")]
-#[path = "macos/mod.rs"]
-pub mod platform;
-
-#[cfg(target_os = "windows")]
-#[path = "windows/mod.rs"]
-pub mod platform;
 
 use eur_activity::{ActivityStrategy, DisplayAsset};
 
@@ -181,31 +168,31 @@ impl Timeline {
 
     /// Start the timeline collection process
     pub async fn start_collection(&self) -> Result<()> {
-        let (tx, mut rx) = mpsc::unbounded_channel::<FocusEvent>();
+        let (tx, mut rx) = mpsc::unbounded_channel::<FocusedWindow>();
 
         // ----------------------------------  X11 thread
         {
             let tx = tx.clone(); // move into the thread
+
+            let tracker = ferrous_focus::FocusTracker::new();
             std::thread::spawn(move || {
                 loop {
-                    let tracker = focus_tracker::FocusTracker::new();
-
                     info!("Starting focus tracker...");
 
                     // Clone tx for this iteration
                     let tx_clone = tx.clone();
 
                     // this never blocks: it just ships events into the channel
-                    let result = tracker.track_focus(move |event| {
-                        info!("▶ {}: {}", event.process, event.title);
-
-                        // ignore the tracker's own window, if desired
-                        if event.process != "eur-tauri" {
-                            // it's OK if the receiver has gone away
-                            let _ = tx_clone.send(event);
-                        }
-                        Ok(())
-                    });
+                    let result =
+                        tracker.track_focus(|window: FocusedWindow| -> FerrousFocusResult<()> {
+                            let process_name = window.process_name.clone().unwrap();
+                            let window_title = window.window_title.clone().unwrap();
+                            info!("▶ {}: {}", process_name, window_title);
+                            if process_name != "eur-tauri" {
+                                let _ = tx_clone.send(window);
+                            }
+                            Ok(())
+                        });
 
                     // Handle focus tracker errors gracefully
                     match result {
@@ -238,10 +225,13 @@ impl Timeline {
             let timeline = timeline.clone_ref();
             current_job = Some(tokio::spawn(async move {
                 // build a strategy for the newly-focused window
+                let process_name = event.process_name.unwrap();
+                let window_title = event.window_title.unwrap();
+                let icon = event.icon.unwrap();
                 if let Ok(strategy) = select_strategy_for_process(
-                    &event.process,
-                    format!("{}: {}", event.process, event.title),
-                    event.icon_base64,
+                    &process_name,
+                    format!("{}: {}", process_name, window_title),
+                    icon,
                 )
                 .await
                 {
