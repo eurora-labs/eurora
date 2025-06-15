@@ -201,7 +201,7 @@ pub fn capture_region_rgba(
     // // TODO: remove this code
     // let tess = eur_ocr::TesseractOcr {};
     // let result_text = tess.recognize(&image::DynamicImage::ImageRgb8(image.clone()));
-    // eprintln!("Recognized text: {}", result_text);
+    // info!("Recognized text: {}", result_text);
 
     Ok(image)
 }
@@ -223,7 +223,7 @@ pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
     // let rgb = image::DynamicImage::ImageRgba8(image).to_rgb8();
     // // let rgb = rgba_to_rgb(image);
     // let duration = start.elapsed();
-    // eprintln!("Conversion to RGB completed in: {:?}", duration);
+    // info!("Conversion to RGB completed in: {:?}", duration);
 
     image
         .write_to(&mut cursor, image::ImageFormat::Jpeg)
@@ -242,7 +242,7 @@ pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
 //     let rgb = image::DynamicImage::ImageRgba8(image).to_rgb8();
 //     // let rgb = rgba_to_rgb(image);
 //     let duration = start.elapsed();
-//     eprintln!("Conversion to RGB completed in: {:?}", duration);
+//     info!("Conversion to RGB completed in: {:?}", duration);
 
 //     rgb.write_to(&mut cursor, image::ImageFormat::Jpeg)
 //         .map_err(|e| anyhow!("Failed to encode image: {}", e))?;

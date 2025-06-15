@@ -7,6 +7,7 @@ pub use eur_proto::native_messaging::ProtoNativeArticleAsset;
 pub use eur_proto::native_messaging::ProtoNativeYoutubeState;
 pub use eur_proto::shared::ProtoImage;
 use serde::Deserialize;
+use tracing::info;
 
 #[derive(Deserialize)]
 struct TranscriptLine {
@@ -32,7 +33,7 @@ pub struct NativeYoutubeState(pub ProtoNativeYoutubeState);
 
 impl From<&serde_json::Map<String, serde_json::Value>> for NativeYoutubeState {
     fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
-        eprintln!("NativeYoutubeState::from obj: {:?}", obj);
+        info!("NativeYoutubeState::from obj: {:?}", obj);
         NativeYoutubeState(ProtoNativeYoutubeState {
             r#type: obj.get("type").unwrap().as_str().unwrap().to_string(),
             url: obj.get("url").unwrap().as_str().unwrap().to_string(),
@@ -156,7 +157,7 @@ pub struct PdfState(pub ProtoPdfState);
 
 impl From<&serde_json::Map<String, serde_json::Value>> for PdfState {
     fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
-        eprintln!("PdfState::from obj: {:?}", obj);
+        info!("PdfState::from obj: {:?}", obj);
         PdfState(ProtoPdfState {
             url: obj.get("url").unwrap().as_str().unwrap().to_string(),
             title: obj.get("title").unwrap().as_str().unwrap().to_string(),
