@@ -52,7 +52,7 @@ fn convert_chat_message(message: &ProtoChatMessage) -> ChatCompletionRequestMess
 
 /// Process a video-related question and return an AI-generated response.
 pub async fn video_question(request: VideoQuestionRequest) -> Result<VideoQuestionResponse> {
-    info!("Received video question request in service");
+    eprintln!("Received video question request in service");
     debug!("State: {:?}", request.state);
 
     let messages = request.messages;
@@ -74,10 +74,10 @@ pub async fn video_question(request: VideoQuestionRequest) -> Result<VideoQuesti
     let current_time = state.current_time;
 
     let flat_transcript = flatten_transcript_with_highlight(&transcript, current_time, None);
-    info!("Finished processing request");
+    eprintln!("Finished processing request");
 
     let completion = send_video_request_to_llm(&messages, &image_base64, &flat_transcript).await?;
-    info!("Finished sending request to LLM");
+    eprintln!("Finished sending request to LLM");
 
     let content = completion.ok_or_else(|| anyhow!("No response content from LLM"))?;
     debug!("Response: {}", content);
@@ -87,7 +87,7 @@ pub async fn video_question(request: VideoQuestionRequest) -> Result<VideoQuesti
 
 /// Process an article-related question and return an AI-generated response.
 pub async fn article_question(request: ArticleQuestionRequest) -> Result<ArticleQuestionResponse> {
-    info!("Received article question request in service");
+    eprintln!("Received article question request in service");
 
     let messages = request.messages;
     let state = request
@@ -95,7 +95,7 @@ pub async fn article_question(request: ArticleQuestionRequest) -> Result<Article
         .ok_or_else(|| anyhow!("Missing state in request"))?;
 
     let completion = send_article_request_to_llm(&messages, &state).await?;
-    info!("Finished sending request to LLM");
+    eprintln!("Finished sending request to LLM");
 
     let content = completion.ok_or_else(|| anyhow!("No response content from LLM"))?;
 
@@ -104,7 +104,7 @@ pub async fn article_question(request: ArticleQuestionRequest) -> Result<Article
 
 /// Process a PDF-related question and return an AI-generated response.
 pub async fn pdf_question(request: PdfQuestionRequest) -> Result<PdfQuestionResponse> {
-    info!("Received PDF question request in service");
+    eprintln!("Received PDF question request in service");
     debug!("State: {:?}", request.state);
 
     let messages = request.messages;
@@ -113,7 +113,7 @@ pub async fn pdf_question(request: PdfQuestionRequest) -> Result<PdfQuestionResp
         .ok_or_else(|| anyhow!("Missing state in request"))?;
 
     let completion = send_pdf_request_to_llm(&messages, &state).await?;
-    info!("Finished sending request to LLM");
+    eprintln!("Finished sending request to LLM");
 
     let content = completion.ok_or_else(|| anyhow!("No response content from LLM"))?;
 
@@ -126,7 +126,7 @@ async fn send_video_request_to_llm(
     image_base64: &str,
     flat_transcript: &str,
 ) -> Result<Option<String>> {
-    info!("Sending video request to LLM");
+    eprintln!("Sending video request to LLM");
     debug!("Transcript: {}", flat_transcript);
 
     let client = init_openai_client();
@@ -210,7 +210,7 @@ async fn send_article_request_to_llm(
     messages: &[ProtoChatMessage],
     state: &ProtoArticleState,
 ) -> Result<Option<String>> {
-    info!("Sending article request to LLM");
+    eprintln!("Sending article request to LLM");
 
     let client = init_openai_client();
 
@@ -293,7 +293,7 @@ async fn send_pdf_request_to_llm(
     messages: &[ProtoChatMessage],
     state: &ProtoPdfState,
 ) -> Result<Option<String>> {
-    info!("Sending PDF request to LLM");
+    eprintln!("Sending PDF request to LLM");
 
     let client = init_openai_client();
 
