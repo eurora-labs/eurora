@@ -368,7 +368,7 @@ pub async fn blur_image(
         ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, corrected_data).unwrap()
     };
     // image.save("../../output.png").unwrap();
-    // println!("Saved output.png");
+    // info!("Saved output.png");
 
     rgba_to_rgb(&image)
 }
