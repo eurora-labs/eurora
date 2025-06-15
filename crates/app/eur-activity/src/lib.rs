@@ -141,13 +141,13 @@ pub async fn select_strategy_for_process(
     icon: IconData,
 ) -> Result<Box<dyn ActivityStrategy>> {
     // Log the process name
-    info!("Selecting strategy for process: {}", process_name);
+    eprintln!("Selecting strategy for process: {}", process_name);
 
     // Check if this is a browser process
     if BrowserStrategy::get_supported_processes().contains(&process_name) {
         // For browser processes, create the BrowserStrategy directly
         // This avoids the need to block on an async function
-        info!(
+        eprintln!(
             "Creating BrowserStrategy for browser process: {}",
             process_name
         );

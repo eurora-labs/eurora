@@ -28,7 +28,7 @@ impl AuthClient {
 
         let client = ProtoAuthServiceClient::new(channel);
 
-        info!("Connected to auth service at {}", base_url);
+        eprintln!("Connected to auth service at {}", base_url);
         Ok(Self { client })
     }
 

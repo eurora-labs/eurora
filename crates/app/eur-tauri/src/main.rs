@@ -6,7 +6,7 @@
 use anyhow::Result;
 use dotenv::dotenv;
 use eur_client_questions::QuestionsClient;
-use tauri_plugin_log::{Target, TargetKind};
+// use tauri_plugin_log::{Target, TargetKind};
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
@@ -156,7 +156,7 @@ fn main() {
                             .await
                             .expect("AuthManager initialization failed");
                         app_handle_auth.manage(auth_manager);
-                        info!("Auth manager initialized");
+                        eprintln!("Auth manager initialized");
                     });
 
                     // Initialize OpenAI client if API key exists
@@ -169,9 +169,9 @@ fn main() {
                             let state: tauri::State<SharedOpenAIClient> = app_handle_openai.state();
                             let mut guard = state.lock().await;
                             *guard = Some(client);
-                            info!("OpenAI client initialized with API key from keyring");
+                            eprintln!("OpenAI client initialized with API key from keyring");
                         } else {
-                            info!("No API key found in keyring, OpenAI client not initialized");
+                            eprintln!("No API key found in keyring, OpenAI client not initialized");
                         }
                     });
 
@@ -189,7 +189,7 @@ fn main() {
                         if let Err(e) = timeline_clone.start_collection().await {
                             error!("Failed to start timeline collection: {}", e);
                         } else {
-                            info!("Timeline collection started successfully");
+                            eprintln!("Timeline collection started successfully");
                         }
                     });
 
@@ -199,7 +199,7 @@ fn main() {
                         match create_grpc_ipc_client().await {
                             Ok(ipc_client) => {
                                 ipc_handle.manage(ipc_client.clone());
-                                info!("gRPC IPC client initialized");
+                                eprintln!("gRPC IPC client initialized");
                             }
                             Err(e) => error!("Failed to initialize gRPC IPC client: {}", e),
                         }
@@ -287,14 +287,14 @@ fn main() {
                 )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
-                .plugin(
-                    tauri_plugin_log::Builder::default()
-                        .targets([
-                            Target::new(TargetKind::Stdout),
-                            Target::new(TargetKind::LogDir { file_name: None }),
-                        ])
-                        .build(),
-                )
+                // .plugin(
+                //     tauri_plugin_log::Builder::default()
+                //         .targets([
+                //             Target::new(TargetKind::Stdout),
+                //             Target::new(TargetKind::LogDir { file_name: None }),
+                //         ])
+                //         .build(),
+                // )
                 .on_window_event(|window, event| match event {
                     #[cfg(target_os = "macos")]
                     tauri::WindowEvent::CloseRequested { .. } => {
