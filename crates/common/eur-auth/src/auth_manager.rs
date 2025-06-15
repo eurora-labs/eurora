@@ -78,7 +78,7 @@ impl AuthManager {
 
         // Try to restore user session from stored tokens
         if let Err(e) = manager.restore_session().await {
-            eprintln!("No valid session to restore: {}", e);
+            info!("No valid session to restore: {}", e);
         }
 
         Ok(manager)
@@ -110,7 +110,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = Some(user_info.clone());
 
-        eprintln!("User logged in successfully: {}", user_info.username);
+        info!("User logged in successfully: {}", user_info.username);
         Ok(user_info)
     }
 
@@ -145,7 +145,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = Some(user_info.clone());
 
-        eprintln!("User registered successfully: {}", user_info.username);
+        info!("User registered successfully: {}", user_info.username);
         Ok(user_info)
     }
 
@@ -156,7 +156,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = None;
 
-        eprintln!("User logged out successfully");
+        info!("User logged out successfully");
         Ok(())
     }
 
@@ -233,7 +233,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = Some(user_info);
 
-        eprintln!("Access token refreshed successfully");
+        info!("Access token refreshed successfully");
         Ok(())
     }
 
@@ -251,7 +251,7 @@ impl AuthManager {
                 let mut user_guard = self.current_user.write().await;
                 *user_guard = Some(user_info.clone());
 
-                eprintln!("Session restored for user: {}", user_info.username);
+                info!("Session restored for user: {}", user_info.username);
                 return Ok(());
             }
         }
@@ -294,7 +294,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = Some(user_info.clone());
 
-        eprintln!("User logged in successfully: {}", user_info.username);
+        info!("User logged in successfully: {}", user_info.username);
         Ok(user_info)
     }
 }
