@@ -3,6 +3,7 @@ use base64::prelude::*;
 pub use eur_proto::ipc::ProtoYoutubeSnapshot;
 pub use eur_proto::native_messaging::ProtoNativeYoutubeSnapshot;
 pub use eur_proto::shared::ProtoImage;
+use tracing::info;
 
 // Wrapper type for ProtoYoutubeSnapshot
 pub struct YoutubeSnapshot(pub ProtoYoutubeSnapshot);
@@ -12,7 +13,7 @@ pub struct NativeYoutubeSnapshot(pub ProtoNativeYoutubeSnapshot);
 
 impl From<&serde_json::Map<String, serde_json::Value>> for NativeYoutubeSnapshot {
     fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
-        eprintln!("NativeYoutubeSnapshot::from obj: {:?}", obj);
+        info!("NativeYoutubeSnapshot::from obj: {:?}", obj);
         NativeYoutubeSnapshot(ProtoNativeYoutubeSnapshot {
             r#type: obj.get("type").unwrap().as_str().unwrap().to_string(),
             current_time: obj.get("currentTime").unwrap().as_f64().unwrap() as f32,

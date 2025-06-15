@@ -2199,6 +2199,8 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tonic-build",
+ "tracing",
+ "tracing-subscriber",
  "winreg 0.55.0",
 ]
 

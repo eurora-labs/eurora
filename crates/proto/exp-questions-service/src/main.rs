@@ -27,7 +27,7 @@ impl QuestionsService for QuestionsServiceImpl {
         &self,
         request: Request<VideoQuestionRequest>,
     ) -> Result<Response<VideoQuestionResponse>, Status> {
-        eprintln!("Received video question request");
+        info!("Received video question request");
 
         // Get the inner request from the gRPC wrapper
         let request = request.into_inner();
@@ -47,7 +47,7 @@ impl QuestionsService for QuestionsServiceImpl {
         &self,
         request: Request<ArticleQuestionRequest>,
     ) -> Result<Response<ArticleQuestionResponse>, Status> {
-        eprintln!("Received article question request");
+        info!("Received article question request");
 
         // Get the inner request from the gRPC wrapper
         let request = request.into_inner();
@@ -67,7 +67,7 @@ impl QuestionsService for QuestionsServiceImpl {
         &self,
         request: Request<PdfQuestionRequest>,
     ) -> Result<Response<PdfQuestionResponse>, Status> {
-        eprintln!("Received PDF question request");
+        info!("Received PDF question request");
 
         // Get the inner request from the gRPC wrapper
         let request = request.into_inner();
@@ -101,7 +101,7 @@ async fn main() -> Result<()> {
         .parse()
         .map_err(|e| anyhow!("Failed to parse address: {}", e))?;
 
-    eprintln!("Questions service starting on {}", addr);
+    info!("Questions service starting on {}", addr);
 
     // Create the service
     let service = QuestionsServiceImpl::default();

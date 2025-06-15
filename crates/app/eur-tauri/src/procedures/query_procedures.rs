@@ -2,6 +2,7 @@ use crate::shared_types::{SharedOpenAIClient, SharedTimeline};
 use futures::StreamExt;
 use tauri::ipc::Channel;
 use tauri::{Manager, Runtime};
+use tracing::info;
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
     chunk: String,
@@ -58,7 +59,7 @@ impl QueryApi for QueryApiImpl {
             .ok_or_else(|| "OpenAI client not initialized".to_string())?;
 
         // Create new conversation and store it in SQLite
-        eprintln!("Creating new conversation with title: {}", title);
+        info!("Creating new conversation with title: {}", title);
 
         let mut complete_response = String::new();
 
