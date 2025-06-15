@@ -4,17 +4,17 @@
 
 use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
 fn main() -> anyhow::Result<()> {
-    println!("Starting Windows focus tracker test...");
-    println!("Switch between different applications to see focus events.");
-    println!("Press Ctrl+C to exit.");
+    info!("Starting Windows focus tracker test...");
+    info!("Switch between different applications to see focus events.");
+    info!("Press Ctrl+C to exit.");
 
     let tracker = FocusTracker::new();
 
     tracker.track_focus(|event: FocusedWindow| -> FerrousFocusResult<()> {
-        println!("Focus changed:");
-        println!("  Process: {}", event.process_name.unwrap());
-        println!("  Title: {}", event.window_title.unwrap());
-        println!(
+        info!("Focus changed:");
+        info!("  Process: {}", event.process_name.unwrap());
+        info!("  Title: {}", event.window_title.unwrap());
+        info!(
             "  Icon: {}",
             if event.icon.is_some() {
                 "Icon available"
@@ -22,7 +22,7 @@ fn main() -> anyhow::Result<()> {
                 "No icon"
             }
         );
-        println!("  ---");
+        info!("  ---");
         Ok(())
     })?;
 
