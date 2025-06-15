@@ -7,6 +7,10 @@ use anyhow::Result;
 use dotenv::dotenv;
 use eur_client_questions::QuestionsClient;
 use tauri_plugin_log::{Target, TargetKind};
+use tracing_subscriber::{
+    filter::{EnvFilter, LevelFilter},
+    fmt,
+};
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
@@ -83,7 +87,11 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
 
 fn main() {
     dotenv().ok();
-    tracing_subscriber::fmt::init();
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
+        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+
+    fmt().with_env_filter(filter).init();
     // let _guard = sentry::init((
     //     "https://5181d08d2bfcb209a768ab99e1e48f1b@o4508907847352320.ingest.de.sentry.io/4508907850694736",
     //     sentry::ClientOptions {
@@ -102,7 +110,7 @@ fn main() {
         .build()
         .unwrap()
         .block_on(async {
-            // println!("Setting tokio runtime");
+            // info!("Setting tokio runtime");
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let builder = tauri::Builder::default()
@@ -206,7 +214,7 @@ fn main() {
                         }
                     });
 
-                    // println!("Setting up global shortcut");
+                    // info!("Setting up global shortcut");
 
                     // If macos, use Control + Space
                     #[cfg(target_os = "macos")]
@@ -471,7 +479,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
 
                         info!("Captured image size: {:?}", img.dimensions());
                         let duration = t0.elapsed();
-                        println!("Capture of background area completed in: {:?}", duration);
+                        info!("Capture of background area completed in: {:?}", duration);
 
                         // Convert the image to base64
                         if let Ok(base64_image) = image_to_base64(img) {
@@ -486,7 +494,7 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                     }
                 }
                 let duration = start_record.elapsed();
-                println!("Capture of background area completed in: {:?}", duration);
+                info!("Capture of background area completed in: {:?}", duration);
 
                 // Only show the launcher if it was previously hidden
                 launcher.show().expect("Failed to show launcher window");
