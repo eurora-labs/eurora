@@ -6,7 +6,10 @@ use std::path::PathBuf;
 use std::process;
 use tonic::transport::Server;
 use tracing::info;
-
+use tracing_subscriber::{
+    filter::{EnvFilter, LevelFilter},
+    fmt,
+};
 // Import the PORT constant from lib.rs
 use eur_native_messaging::PORT;
 
@@ -152,7 +155,11 @@ async fn main() -> Result<()> {
     // Ensure only one instance is running
     ensure_single_instance()?;
 
-    tracing_subscriber::fmt::init();
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
+        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+
+    fmt().with_env_filter(filter).init();
     // let _guard = sentry::init((
     //     "https://d4c60ef8f9c19d59dba4b1c12477818e@o4508907847352320.ingest.de.sentry.io/4508993773764688",
     //     sentry::ClientOptions {

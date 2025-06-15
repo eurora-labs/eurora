@@ -1,5 +1,16 @@
-use scap::Target;
-use scap::capturer::Capturer;
+use image::Rgb;
+use image::imageops::FilterType;
+use image::{DynamicImage, ImageBuffer};
+use scap::{Target, get_all_targets};
+use scap::{
+    capturer::{Area, Capturer, Options, Point, Size},
+    frame::Frame,
+};
+use std::{
+    fs,
+    io::Write,
+    process::{self, Command, Stdio},
+};
 
 struct ScreenRecorder {
     target: Target,
@@ -84,16 +95,16 @@ fn record() {
 
     // Check if the platform is supported
     if !scap::is_supported() {
-        info!("Platform not supported");
+        println!("Platform not supported");
         return;
     }
 
     // Check if we have permission to capture screen
     // If we don't, request it.
     if !scap::has_permission() {
-        info!("Requesting permission...");
+        println!("Requesting permission...");
         if !scap::request_permission() {
-            info!("Permission denied for");
+            println!("Permission denied for");
             return;
         }
     }
@@ -106,14 +117,14 @@ fn record() {
     for t in targets {
         match t {
             Target::Window(window) => {
-                // info!("window :{:?}", window)
+                // println!("window :{:?}", window)
             }
             Target::Display(display) => {
-                info!("display :{:?}", display)
+                println!("display :{:?}", display)
             }
         }
     }
-    // info!("targets {:?}", targets);
+    // println!("targets {:?}", targets);
     // Create Options
     let options = Options {
         fps: framerate,
@@ -135,7 +146,7 @@ fn record() {
 
     // Create Recorder with options
     let mut recorder = Capturer::build(options).unwrap_or_else(|err| {
-        info!("Problem with building Capturer: {err}");
+        println!("Problem with building Capturer: {err}");
         process::exit(1);
     });
 
@@ -153,7 +164,7 @@ fn record() {
                     start_time = frame.display_time;
                 }
 
-                info!(
+                println!(
                     "Recieved BGRA frame {} of width {} and height {} and time {}",
                     i,
                     frame.width,
@@ -192,8 +203,8 @@ fn record() {
     let status = ffmpeg.wait().unwrap();
 
     if status.success() {
-        info!("✅ HLS output written to {}/index.m3u8", output_dir);
+        println!("✅ HLS output written to {}/index.m3u8", output_dir);
     } else {
-        info!("❌ FFmpeg exited with error: {:?}", status);
+        eprintln!("❌ FFmpeg exited with error: {:?}", status);
     }
 }
