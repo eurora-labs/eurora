@@ -1,4 +1,5 @@
 use tauri::AppHandle;
+use tracing::info;
 pub(crate) mod state {
 
     use std::{collections::BTreeMap, sync::Arc};
@@ -85,7 +86,7 @@ pub fn create_launcher(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
-    eprintln!("creating window '{label}' created at '{window_relative_url}'");
+    info!("creating window '{label}' created at '{window_relative_url}'");
 
     let window = tauri::WebviewWindowBuilder::new(
         handle,
@@ -114,7 +115,7 @@ pub fn create(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
-    tracing::info!("creating window '{label}' created at '{window_relative_url}'");
+    info!("creating window '{label}' created at '{window_relative_url}'");
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,

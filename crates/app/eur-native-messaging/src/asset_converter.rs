@@ -3,6 +3,7 @@ pub use crate::asset_context::{
 };
 use anyhow::Error;
 use eur_proto::ipc::StateResponse;
+use tracing::info;
 
 pub struct JSONToProtoAssetConverter;
 
@@ -11,7 +12,7 @@ impl JSONToProtoAssetConverter {
         let json =
             serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(object.clone())?;
 
-        eprintln!("JSONToProtoConverter::convert json: {:?}", json);
+        info!("JSONToProtoConverter::convert json: {:?}", json);
 
         // Check for success field and provide detailed error context
         let success = json
@@ -26,7 +27,7 @@ impl JSONToProtoAssetConverter {
                 .get("error")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Unknown error");
-            eprintln!(
+            info!(
                 "Asset conversion failed - success: false, error: {}, full response: {:?}",
                 error_msg, json
             );
@@ -60,7 +61,7 @@ impl JSONToProtoAssetConverter {
                 Ok(StateResponse { state: Some(state) })
             }
             unknown_type => {
-                eprintln!(
+                info!(
                     "Unsupported asset type '{}' in JSON: {:?}",
                     unknown_type, json
                 );

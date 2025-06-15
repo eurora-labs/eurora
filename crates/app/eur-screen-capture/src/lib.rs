@@ -1,5 +1,16 @@
-use scap::Target;
-use scap::capturer::Capturer;
+use image::Rgb;
+use image::imageops::FilterType;
+use image::{DynamicImage, ImageBuffer};
+use scap::{Target, get_all_targets};
+use scap::{
+    capturer::{Area, Capturer, Options, Point, Size},
+    frame::Frame,
+};
+use std::{
+    fs,
+    io::Write,
+    process::{self, Command, Stdio},
+};
 
 struct ScreenRecorder {
     target: Target,

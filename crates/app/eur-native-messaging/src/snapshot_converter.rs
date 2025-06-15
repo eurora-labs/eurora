@@ -1,7 +1,7 @@
 use crate::snapshot_context::{NativeYoutubeSnapshot, YoutubeSnapshot}; // Use snapshot context types
 use anyhow::{anyhow, Error}; // Import anyhow macro and Error
 use eur_proto::ipc::SnapshotResponse; // Import necessary proto types
-
+use tracing::info;
 pub struct JSONToProtoSnapshotConverter;
 
 impl JSONToProtoSnapshotConverter {
@@ -9,16 +9,16 @@ impl JSONToProtoSnapshotConverter {
         let json =
             serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(object.clone())?;
 
-        eprintln!("JSONToProtoSnapshotConverter::convert json: {:?}", json); // Corrected eprintln message
+        info!("JSONToProtoSnapshotConverter::convert json: {:?}", json); // Corrected eprintln message
 
         // Check for success field, common in native messaging responses
         if let Some(success) = json.get("success") {
             if !success.as_bool().unwrap_or(false) {
-                eprintln!("Snapshot generation failed in extension: {:?}", json);
+                info!("Snapshot generation failed in extension: {:?}", json);
                 return Err(anyhow!("Snapshot generation failed in extension"));
             }
         } else {
-            eprintln!("Missing 'success' field in snapshot response: {:?}", json);
+            info!("Missing 'success' field in snapshot response: {:?}", json);
             return Err(anyhow!("Missing 'success' field in snapshot response"));
         }
 

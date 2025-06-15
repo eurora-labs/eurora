@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, ContextChip};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -8,6 +6,8 @@ use eur_proto::ipc::{
     self, ProtoArticleState, ProtoPdfState, ProtoYoutubeSnapshot, ProtoYoutubeState, StateRequest,
 };
 use eur_proto::shared::ProtoImageFormat;
+use std::collections::HashMap;
+use tracing::info;
 
 use image::DynamicImage;
 use tokio::sync::Mutex;
@@ -372,19 +372,19 @@ impl ActivityStrategy for BrowserStrategy {
         // Process the response
         match &state_response.state {
             Some(ipc::state_response::State::Youtube(youtube)) => {
-                eprintln!("Collected Youtube state");
+                info!("Collected Youtube state");
                 return Ok(vec![Box::new(YoutubeAsset::from(youtube.clone()))]);
             }
             Some(ipc::state_response::State::Article(article)) => {
-                eprintln!("Collected Article state");
+                info!("Collected Article state");
                 return Ok(vec![Box::new(ArticleAsset::from(article.clone()))]);
             }
             Some(ipc::state_response::State::Pdf(_pdf)) => {
-                eprintln!("Collected Pdf state (not implemented yet)");
+                info!("Collected Pdf state (not implemented yet)");
                 // PDF handling could be implemented here if needed
             }
             None => {
-                eprintln!("No state received from browser");
+                info!("No state received from browser");
             }
         }
 
@@ -393,7 +393,7 @@ impl ActivityStrategy for BrowserStrategy {
     }
 
     async fn retrieve_snapshots(&mut self) -> Result<Vec<Box<dyn crate::ActivitySnapshot>>> {
-        eprintln!("Retrieving snapshots from browser");
+        info!("Retrieving snapshots from browser");
         let mut client = self.client.lock().await.clone();
 
         // Make a direct gRPC call to get the state
@@ -406,7 +406,7 @@ impl ActivityStrategy for BrowserStrategy {
                 return Ok(vec![Box::new(YoutubeSnapshot::from(youtube.clone()))]);
             }
             None => {
-                eprintln!("No snapshot received from browser");
+                info!("No snapshot received from browser");
             }
         }
 

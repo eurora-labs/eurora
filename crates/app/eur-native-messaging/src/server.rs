@@ -1,14 +1,14 @@
 use anyhow::{anyhow, Result};
+use eur_proto::ipc::{SnapshotResponse, StateRequest, StateResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::io::{self, Read, Write};
 use std::sync::Arc;
-
-use eur_proto::ipc::{SnapshotResponse, StateRequest, StateResponse};
 use std::{error::Error, io::ErrorKind, pin::Pin};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};
+use tracing::info;
 
 use crate::asset_converter::JSONToProtoAssetConverter;
 use crate::snapshot_converter::JSONToProtoSnapshotConverter;
@@ -106,7 +106,7 @@ impl TauriIpcServer {
                 Some(native_message) = native_rx.recv() => {
                     // Process incoming native messages (if any)
                     // This is for handling incoming messages from the browser
-                    eprintln!("Received native message: {:?}", native_message);
+                    info!("Received native message: {:?}", native_message);
                 }
                 else => break,
             }
@@ -147,7 +147,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
     type GetStateStreamingStream = ResponseStream;
 
     async fn get_state(&self, _req: Request<StateRequest>) -> IpcResult<StateResponse> {
-        eprintln!("Received get_state request");
+        info!("Received get_state request");
 
         // Send GENERATE_REPORT request via native messaging
         match self.send_native_message("GENERATE_ASSETS", json!({})).await {
@@ -157,14 +157,14 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                 Ok(Response::new(state_response.unwrap()))
             }
             Err(e) => {
-                eprintln!("Error in native messaging: {}", e);
+                info!("Error in native messaging: {}", e);
                 Err(Status::internal(format!("Native messaging error: {}", e)))
             }
         }
     }
 
     async fn get_snapshot(&self, _req: Request<StateRequest>) -> IpcResult<SnapshotResponse> {
-        eprintln!("Received get_snapshot request");
+        info!("Received get_snapshot request");
 
         // Send GENERATE_REPORT request via native messaging
         match self
@@ -177,7 +177,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                 Ok(Response::new(snapshot_response.unwrap()))
             }
             Err(e) => {
-                eprintln!("Error in native messaging: {}", e);
+                info!("Error in native messaging: {}", e);
                 Err(Status::internal(format!("Native messaging error: {}", e)))
             }
         }
@@ -198,14 +198,14 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
             while let Some(request) = in_stream.next().await {
                 match request {
                     Ok(_) => {
-                        eprintln!("Received gather state request");
+                        info!("Received gather state request");
                         // Send GENERATE_REPORT request via native messaging
                         match server_clone
                             .send_native_message("GENERATE_REPORT", json!({}))
                             .await
                         {
                             Ok(response) => {
-                                // eprintln!("Received GENERATE_REPORT response {:?}", response);
+                                // info!("Received GENERATE_REPORT response {:?}", response);
 
                                 let state_response = JSONToProtoAssetConverter::convert(&response);
 
@@ -215,19 +215,19 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                                         // Unlike the previous implementation, we don't break the loop here
                                     }
                                     Err(e) => {
-                                        eprintln!("Error sending response: {}", e);
+                                        info!("Error sending response: {}", e);
                                         break; // Channel closed, client disconnected
                                     }
                                 }
                             }
                             Err(e) => {
-                                eprintln!("Error in native messaging: {}", e);
+                                info!("Error in native messaging: {}", e);
                                 match tx.send(Err(e)).await {
                                     Ok(_) => {
                                         // Error message sent, but we continue processing
                                     }
                                     Err(e) => {
-                                        eprintln!("Error sending error response: {}", e);
+                                        info!("Error sending error response: {}", e);
                                         break; // Channel closed, client disconnected
                                     }
                                 }
@@ -235,10 +235,10 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                         }
                     }
                     Err(err) => {
-                        eprintln!("Error in gather state: {}", err);
+                        info!("Error in gather state: {}", err);
                         if let Some(io_err) = match_for_io_error(&err) {
                             if io_err.kind() == ErrorKind::BrokenPipe {
-                                eprintln!("Browser connection closed: broken pipe");
+                                info!("Browser connection closed: broken pipe");
                                 break;
                             }
                         }
@@ -247,14 +247,14 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                                 // Continue processing after error
                             }
                             Err(e) => {
-                                eprintln!("Error sending state response: {}", e);
+                                info!("Error sending state response: {}", e);
                                 break;
                             }
                         }
                     }
                 }
             }
-            eprintln!("Browser connection closed: stream ended");
+            info!("Browser connection closed: stream ended");
         });
 
         let out_stream = ReceiverStream::new(rx);
