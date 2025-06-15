@@ -2477,6 +2477,7 @@ dependencies = [
  "pollster",
  "rusty-tesseract",
  "tokio",
+ "tracing",
  "wgpu",
  "xcap",
 ]

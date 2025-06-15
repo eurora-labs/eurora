@@ -10,8 +10,8 @@ xcap = { git = "https://github.com/AndreRoelofs/xcap.git", branch = "master" }
 tokio = { workspace = true, default-features = false }
 image.workspace = true
 anyhow = { workspace = true }
-tracing = "0.1.40"
-tracing-subscriber = "0.3.17"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 ctrlc = "3.4.7"
 chrono = { workspace = true }
 sysinfo = "0.35.2"
