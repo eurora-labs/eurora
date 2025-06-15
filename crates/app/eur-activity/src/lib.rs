@@ -19,6 +19,7 @@ use anyhow::{Context, Result};
 pub use browser_activity::BrowserStrategy;
 use default_activity::DefaultStrategy;
 pub use error::ActivityError;
+use ferrous_focus::IconData;
 
 #[taurpc::ipc_type]
 pub struct ContextChip {
@@ -137,7 +138,7 @@ impl Activity {
 pub async fn select_strategy_for_process(
     process_name: &str,
     display_name: String,
-    icon: String,
+    icon: IconData,
 ) -> Result<Box<dyn ActivityStrategy>> {
     // Log the process name
     info!("Selecting strategy for process: {}", process_name);
@@ -150,7 +151,8 @@ pub async fn select_strategy_for_process(
             "Creating BrowserStrategy for browser process: {}",
             process_name
         );
-        let strategy = BrowserStrategy::new(display_name, icon, process_name.to_string())
+        // let strategy = BrowserStrategy::new(display_name, icon, process_name.to_string())
+        let strategy = BrowserStrategy::new(display_name, "".to_string(), process_name.to_string())
             .await
             .context(format!(
                 "Failed to create browser strategy for process: {}",
@@ -159,7 +161,8 @@ pub async fn select_strategy_for_process(
         return Ok(Box::new(strategy) as Box<dyn ActivityStrategy>);
     }
 
-    DefaultStrategy::new(display_name, icon, process_name.to_string())
+    // DefaultStrategy::new(display_name, icon, process_name.to_string())
+    DefaultStrategy::new(display_name, "".to_string(), process_name.to_string())
         .context(format!(
             "Failed to create default strategy for process: {}",
             process_name
@@ -251,7 +254,7 @@ mod tests {
         let result = select_strategy_for_process(
             "firefox",
             "Firefox Browser".to_string(),
-            "icon_data".to_string(),
+            IconData::default(),
         )
         .await;
 
@@ -266,7 +269,7 @@ mod tests {
         let result = select_strategy_for_process(
             "unknown_process",
             "Unknown App".to_string(),
-            "icon_data".to_string(),
+            IconData::default(),
         )
         .await;
 
