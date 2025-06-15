@@ -15,22 +15,19 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
-
     // Note: This example requires a PostgreSQL database to be running
     // You would typically get this from environment variables
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/eurora".to_string());
 
-    info!("Connecting to database...");
+    eprintln!("Connecting to database...");
 
     // Initialize database manager
     let db_manager = match DatabaseManager::new(&database_url).await {
         Ok(db) => Arc::new(db),
         Err(e) => {
-            info!("Failed to connect to database: {}", e);
-            info!("Make sure PostgreSQL is running and DATABASE_URL is set correctly");
+            eprintln!("Failed to connect to database: {}", e);
+            eprintln!("Make sure PostgreSQL is running and DATABASE_URL is set correctly");
             return Ok(());
         }
     };
@@ -45,10 +42,10 @@ async fn main() -> Result<()> {
     // Create auth service
     let auth_service = AuthService::new(db_manager, Some(jwt_config));
 
-    info!("Auth service initialized successfully!");
+    eprintln!("Auth service initialized successfully!");
 
     // Example 1: Register a new user
-    info!("\n=== Registering a new user ===");
+    eprintln!("\n=== Registering a new user ===");
     let register_result = auth_service
         .register_user(
             "john_doe",
@@ -60,19 +57,19 @@ async fn main() -> Result<()> {
 
     match register_result {
         Ok(login_response) => {
-            info!("✅ User registered successfully!");
-            info!("Access token: {}...", &login_response.access_token[..20]);
-            info!("Refresh token: {}...", &login_response.refresh_token[..20]);
-            info!("Expires in: {} seconds", login_response.expires_in);
+            eprintln!("✅ User registered successfully!");
+            eprintln!("Access token: {}...", &login_response.access_token[..20]);
+            eprintln!("Refresh token: {}...", &login_response.refresh_token[..20]);
+            eprintln!("Expires in: {} seconds", login_response.expires_in);
         }
         Err(e) => {
-            info!("❌ Registration failed: {}", e);
+            eprintln!("❌ Registration failed: {}", e);
             // User might already exist, which is fine for this example
         }
     }
 
     // Example 2: Login to get tokens for demonstration
-    info!("\n=== Logging in to get tokens for demonstration ===");
+    eprintln!("\n=== Logging in to get tokens for demonstration ===");
     let login_result = auth_service
         .register_user(
             "demo_user",
@@ -84,12 +81,12 @@ async fn main() -> Result<()> {
 
     let (access_token, refresh_token) = match login_result {
         Ok(response) => {
-            info!("✅ Demo user created/logged in successfully!");
+            eprintln!("✅ Demo user created/logged in successfully!");
             (response.access_token, response.refresh_token)
         }
         Err(_) => {
             // User might already exist, try to create a different one
-            info!("Demo user exists, creating alternative user...");
+            eprintln!("Demo user exists, creating alternative user...");
             let alt_result = auth_service
                 .register_user(
                     &format!("demo_user_{}", chrono::Utc::now().timestamp()),
@@ -101,11 +98,11 @@ async fn main() -> Result<()> {
 
             match alt_result {
                 Ok(response) => {
-                    info!("✅ Alternative demo user created successfully!");
+                    eprintln!("✅ Alternative demo user created successfully!");
                     (response.access_token, response.refresh_token)
                 }
                 Err(e) => {
-                    info!("❌ Failed to create demo user: {}", e);
+                    eprintln!("❌ Failed to create demo user: {}", e);
                     return Ok(());
                 }
             }
@@ -113,15 +110,15 @@ async fn main() -> Result<()> {
     };
 
     // Example 3: Token validation
-    info!("\n=== Token validation example ===");
+    eprintln!("\n=== Token validation example ===");
     match auth_service.validate_token(&access_token) {
         Ok(claims) => {
-            info!("✅ Access token is valid!");
-            info!("User ID: {}", claims.sub);
-            info!("Username: {}", claims.username);
-            info!("Email: {}", claims.email);
-            info!("Token type: {}", claims.token_type);
-            info!(
+            eprintln!("✅ Access token is valid!");
+            eprintln!("User ID: {}", claims.sub);
+            eprintln!("Username: {}", claims.username);
+            eprintln!("Email: {}", claims.email);
+            eprintln!("Token type: {}", claims.token_type);
+            eprintln!(
                 "Expires at: {}",
                 chrono::DateTime::from_timestamp(claims.exp as i64, 0)
                     .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
@@ -129,44 +126,44 @@ async fn main() -> Result<()> {
             );
         }
         Err(e) => {
-            info!("❌ Access token validation failed: {}", e);
+            eprintln!("❌ Access token validation failed: {}", e);
         }
     }
 
     // Example 4: Refresh a token
-    info!("\n=== Token refresh example ===");
+    eprintln!("\n=== Token refresh example ===");
     match auth_service.refresh_access_token(&refresh_token).await {
         Ok(new_response) => {
-            info!("✅ Token refreshed successfully!");
-            info!("New access token: {}...", &new_response.access_token[..20]);
-            info!(
+            eprintln!("✅ Token refreshed successfully!");
+            eprintln!("New access token: {}...", &new_response.access_token[..20]);
+            eprintln!(
                 "New refresh token: {}...",
                 &new_response.refresh_token[..20]
             );
-            info!("Expires in: {} seconds", new_response.expires_in);
+            eprintln!("Expires in: {} seconds", new_response.expires_in);
 
             // Validate the new access token to show it works
             match auth_service.validate_token(&new_response.access_token) {
                 Ok(claims) => {
-                    info!("✅ New access token is valid!");
-                    info!("Username: {}", claims.username);
+                    eprintln!("✅ New access token is valid!");
+                    eprintln!("Username: {}", claims.username);
                 }
                 Err(e) => {
-                    info!("❌ New access token validation failed: {}", e);
+                    eprintln!("❌ New access token validation failed: {}", e);
                 }
             }
         }
         Err(e) => {
-            info!("❌ Token refresh failed: {}", e);
+            eprintln!("❌ Token refresh failed: {}", e);
         }
     }
 
-    info!("\n🎉 Auth service example completed!");
-    info!("\nAvailable methods:");
-    info!("- register_user(username, email, password, display_name)");
-    info!("- login() - via gRPC ProtoAuthService trait");
-    info!("- refresh_token(refresh_token)");
-    info!("- validate_token(token)");
+    eprintln!("\n🎉 Auth service example completed!");
+    eprintln!("\nAvailable methods:");
+    eprintln!("- register_user(username, email, password, display_name)");
+    eprintln!("- login() - via gRPC ProtoAuthService trait");
+    eprintln!("- refresh_token(refresh_token)");
+    eprintln!("- validate_token(token)");
 
     Ok(())
 }
