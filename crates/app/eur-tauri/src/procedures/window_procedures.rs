@@ -1,4 +1,5 @@
 use tauri::{Manager, Runtime};
+use tracing::info;
 #[taurpc::procedures(
     path = "window",
     export_to = "../../../apps/desktop/src/lib/bindings/bindings.ts"
@@ -38,7 +39,7 @@ impl WindowApi for WindowApiImpl {
         height: u32,
         scale_factor: f64,
     ) -> Result<(), String> {
-        eprintln!(
+        info!(
             "resize_launcher_window: height: {}, scale_factor: {}",
             height, scale_factor
         );

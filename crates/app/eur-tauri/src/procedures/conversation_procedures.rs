@@ -76,8 +76,8 @@ impl ConversationApi for ConversationApiImpl {
         query: QueryAssets,
         channel: Channel<DownloadEvent>,
     ) -> Result<String, String> {
-        eprintln!("Asking question: {}", query.text);
-        eprintln!("Conversation ID: {}", conversation_id);
+        info!("Asking question: {}", query.text);
+        info!("Conversation ID: {}", conversation_id);
 
         let db = app_handle.state::<SharedPersonalDb>().clone();
 
@@ -104,7 +104,7 @@ impl ConversationApi for ConversationApiImpl {
 
         if conversation_id == "NEW" {
             // Create new conversation and store it in SQLite
-            eprintln!("Creating new conversation with title: {}", title);
+            info!("Creating new conversation with title: {}", title);
 
             let conversation = db
                 .insert_conversation(&title, Utc::now(), Utc::now())
@@ -113,7 +113,7 @@ impl ConversationApi for ConversationApiImpl {
 
             conversation_id = conversation.id.clone();
 
-            eprintln!("New conversation ID: {}", conversation_id);
+            info!("New conversation ID: {}", conversation_id);
 
             db.insert_chat_message(
                 &conversation_id,
@@ -167,7 +167,7 @@ impl ConversationApi for ConversationApiImpl {
             )
             .await
             .map_err(|e| format!("Failed to insert chat message: {}", e))?;
-            eprintln!(
+            info!(
                 "Added assistant response to conversation {}",
                 conversation_id
             );
@@ -183,8 +183,8 @@ impl ConversationApi for ConversationApiImpl {
         question: String,
         channel: Channel<DownloadEvent>,
     ) -> Result<(), String> {
-        eprintln!("Continuing conversation: {}", conversation_id);
-        eprintln!("Asking question: {}", question);
+        info!("Continuing conversation: {}", conversation_id);
+        info!("Asking question: {}", question);
 
         let db = app_handle.state::<SharedPersonalDb>().clone();
 
@@ -268,7 +268,7 @@ impl ConversationApi for ConversationApiImpl {
             )
             .await
             .unwrap();
-            eprintln!(
+            info!(
                 "Added assistant response to conversation {}",
                 conversation_id
             );
