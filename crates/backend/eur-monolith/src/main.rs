@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Invalid MONOLITH_ADDR format");
     let ocr_service = OcrService::new(Some(jwt_config.clone()));
     let auth_service = AuthService::new(db_manager, Some(jwt_config));
-    tracing::info!("Starting gRPC server at {}", addr);
+    eprintln!("Starting gRPC server at {}", addr);
 
     let cors = CorsLayer::permissive();
 
@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::signal::ctrl_c()
                 .await
                 .expect("Failed to install CTRL+C signal handler");
-            tracing::info!("Shutting down gracefully...");
+            eprintln!("Shutting down gracefully...");
         })
         .await?;
 

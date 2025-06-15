@@ -114,7 +114,7 @@ pub fn create(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
-    tracing::info!("creating window '{label}' created at '{window_relative_url}'");
+    eprintln!("creating window '{label}' created at '{window_relative_url}'");
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,
