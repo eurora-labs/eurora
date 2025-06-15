@@ -194,6 +194,6 @@ fn record() {
     if status.success() {
         println!("✅ HLS output written to {}/index.m3u8", output_dir);
     } else {
-        eprintln!("❌ FFmpeg exited with error: {:?}", status);
+        info!("❌ FFmpeg exited with error: {:?}", status);
     }
 }
