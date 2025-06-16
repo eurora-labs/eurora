@@ -12,5 +12,5 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     #[serde(skip_serializing)]
-    pub(super) access_token: RefCell<Option<Sensitive<String>>>,
+    pub(super) _access_token: RefCell<Option<Sensitive<String>>>,
 }
