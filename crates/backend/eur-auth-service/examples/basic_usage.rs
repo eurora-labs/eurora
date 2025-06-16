@@ -8,7 +8,6 @@
 //! 5. Validate tokens
 
 use anyhow::Result;
-use chrono;
 use eur_auth_service::{AuthService, JwtConfig};
 use eur_remote_db::DatabaseManager;
 use std::sync::Arc;
