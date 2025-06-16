@@ -35,6 +35,7 @@ use oauth::google::create_google_oauth_client;
 pub struct AuthService {
     db: Arc<DatabaseManager>,
     jwt_config: JwtConfig,
+    #[allow(dead_code)]
     desktop_login_url: String,
 }
 
@@ -136,7 +137,7 @@ impl AuthService {
         eur_auth::validate_token(token, &self.jwt_config)
     }
 
-    fn generate_random_string(&self, length: usize) -> Result<String, Status> {
+    fn generate_random_string(&self, length: usize) -> Result<String> {
         let byte_len = length.div_ceil(2); // round up for odd lengths
         let mut bytes = vec![0u8; byte_len];
         OsRng.try_fill_bytes(&mut bytes).map_err(|e| {
@@ -587,12 +588,10 @@ impl AuthService {
 
     async fn handle_github_login(
         &self,
-        creds: ThirdPartyCredentials,
+        _creds: ThirdPartyCredentials,
     ) -> Result<Response<TokenResponse>, Status> {
         info!("Handling GitHub login");
-
-        // TODO: Implement GitHub login
-        Err(Status::unimplemented("GitHub login not implemented"))
+        todo!()
     }
 }
 
@@ -706,8 +705,8 @@ impl ProtoAuthService for AuthService {
                 })?;
 
                 // Generate random state and PKCE verifier
-                let state = self.generate_random_string(32)?;
-                let pkce_verifier = self.generate_random_string(64)?;
+                let state = self.generate_random_string(32).unwrap();
+                let pkce_verifier = self.generate_random_string(64).unwrap();
 
                 // Get redirect URI from Google client config
                 let google_config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
