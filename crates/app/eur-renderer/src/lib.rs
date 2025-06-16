@@ -17,12 +17,6 @@ struct UniformData {
     blur: f32,
 }
 
-struct Renderer {}
-
-impl Renderer {
-    pub fn new() {}
-}
-
 fn create_shader() -> wgpu::ShaderModuleDescriptor<'static> {
     wgpu::ShaderModuleDescriptor {
         label: Some("Shader"),
@@ -141,7 +135,7 @@ pub async fn blur_image(
         ],
     };
 
-    /// handle texture
+    // handle texture
     let texture_data: &[u8] = img.as_raw();
 
     let texture_size = wgpu::Extent3d {
@@ -187,7 +181,7 @@ pub async fn blur_image(
     // === Bind group layout ===
 
     let opacity = UniformData {
-        opacity: opacity,
+        opacity,
         texel_size_x: 1.0 / width as f32,
         texel_size_y: 1.0 / height as f32,
         blur,
