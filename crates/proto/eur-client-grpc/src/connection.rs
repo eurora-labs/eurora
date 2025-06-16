@@ -3,6 +3,7 @@ use std::time::Duration;
 use tonic::transport::Channel;
 
 /// Builder for creating service clients
+#[derive(Default)]
 pub struct ClientBuilder {
     base_url: String,
     timeout_seconds: u64,

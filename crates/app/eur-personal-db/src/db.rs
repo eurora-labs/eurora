@@ -6,8 +6,6 @@ use libsqlite3_sys::sqlite3_auto_extension;
 use rand::TryRngCore;
 use rand::rngs::OsRng;
 use sqlite_vec::sqlite3_vec_init;
-use sqlx::Column;
-use sqlx::TypeInfo;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::types::Uuid;
@@ -31,7 +29,14 @@ impl DatabaseManager {
         debug!("Initializing database connection");
 
         unsafe {
-            sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
+            sqlite3_auto_extension(Some(std::mem::transmute::<
+                *const (),
+                unsafe extern "C" fn(
+                    *mut libsqlite3_sys::sqlite3,
+                    *mut *mut i8,
+                    *const libsqlite3_sys::sqlite3_api_routines,
+                ) -> i32,
+            >(sqlite3_vec_init as *const ())));
         }
 
         let key = init_key().map_err(|e| sqlx::Error::Configuration(e.into()))?;
