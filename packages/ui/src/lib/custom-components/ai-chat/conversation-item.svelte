@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Katex } from '@eurora/katex';
+	import { Katex } from '$lib/custom-components/katex/index';
 	import Bot from '@lucide/svelte/icons/bot';
 
 	let { isAgent, text = $bindable(), finishRendering, class: className } = $props();
