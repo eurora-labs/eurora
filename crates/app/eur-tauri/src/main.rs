@@ -6,7 +6,6 @@
 use anyhow::Result;
 use dotenv::dotenv;
 use eur_client_questions::QuestionsClient;
-use tauri_plugin_log::{Target, TargetKind};
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
@@ -29,11 +28,8 @@ use eur_tauri::{
 };
 use eur_user::auth::AuthManager;
 use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::{
-    any::Any,
-    sync::atomic::{AtomicBool, Ordering},
-};
 use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Emitter, Wry};
 use tauri::{Manager, generate_context};
@@ -117,7 +113,7 @@ fn main() {
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
-                    let main_window =
+                    let _main_window =
                         create_window(tauri_app.handle(), "main", "onboarding".into())
                             // create_window(tauri_app.handle(), "main", "index.html".into())
                             .expect("Failed to create main window");
@@ -185,7 +181,7 @@ fn main() {
                     });
 
                     // Initialize conversation storage
-                    let db_path = get_db_path(app_handle);
+                    let _db_path = get_db_path(app_handle);
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         let db = create_shared_database_manager(&db_app_handle).await;

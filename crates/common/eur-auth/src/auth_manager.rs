@@ -196,10 +196,7 @@ impl AuthManager {
     /// Check if user is authenticated
     pub async fn is_authenticated(&self) -> bool {
         // Check if we have a valid access token
-        match self.get_valid_token().await {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        self.get_valid_token().await.is_ok()
     }
 
     /// Refresh access token using refresh token
