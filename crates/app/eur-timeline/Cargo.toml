@@ -8,8 +8,7 @@ description = "Timeline storage for capturing system state over time"
 [dependencies]
 eur-proto = { path = "../../proto/eur-proto" }
 image.workspace = true
-ferrous-focus = { path = "../../../../../ferrous-focus" }
-# ferrous-focus = { git = "https://github.com/eurora-labs/ferrous-focus.git", branch = "main" }
+ferrous-focus = { version = "0.2.5" }
 eur-native-messaging = { path = "../eur-native-messaging" }
 eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 eur-activity = { path = "../eur-activity" }
