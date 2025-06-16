@@ -6,7 +6,6 @@ use eur_ocr::{self, OcrStrategy};
 use eur_proto::proto_ocr_service::proto_ocr_service_server::ProtoOcrService;
 use eur_proto::proto_ocr_service::{TranscribeImageRequest, TranscribeImageResponse};
 use eur_proto::shared::ProtoImage;
-use futures;
 use futures::future;
 use tonic::{Request, Response, Status};
 use tracing::{info, warn};
@@ -35,17 +34,9 @@ pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> 
     validate_access_token(token, jwt_config)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct OcrService {
     jwt_config: JwtConfig,
-}
-
-impl Default for OcrService {
-    fn default() -> Self {
-        Self {
-            jwt_config: JwtConfig::default(),
-        }
-    }
 }
 
 impl OcrService {

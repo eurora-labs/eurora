@@ -5,11 +5,9 @@
 
 mod auth_manager;
 mod token_storage;
-mod user;
 
 pub use auth_manager::{AuthManager, LoginCredentials, RegisterData, UserInfo};
 pub use token_storage::{SecureTokenStorage, TokenStorage};
-pub use user::User;
 
 use anyhow::{Result, anyhow};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};

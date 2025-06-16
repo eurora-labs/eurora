@@ -5,7 +5,6 @@ use dotenv::dotenv;
 use eur_prompt_kit::{LLMMessage, MessageContent, Role};
 use eur_util::flatten_transcript_with_highlight;
 use futures::Stream;
-use image;
 use openai_api_rs::v1::chat_completion::{
     self, ChatCompletionRequest, ChatCompletionResponseForStream,
 };
