@@ -1,7 +1,7 @@
 use crate::user::User;
 
 pub struct Controller {
-    user: User,
+    _user: User,
 }
 
 impl Controller {}

@@ -104,14 +104,11 @@ impl Activity {
     pub fn get_display_assets(&self) -> Vec<DisplayAsset> {
         self.assets
             .iter()
-            .filter_map(|asset| {
+            .map(|asset| {
                 if let Some(icon) = asset.get_icon() {
-                    Some(DisplayAsset::new(asset.get_name().clone(), icon.clone()))
+                    DisplayAsset::new(asset.get_name().clone(), icon.clone())
                 } else {
-                    Some(DisplayAsset::new(
-                        asset.get_name().clone(),
-                        self.icon.clone(),
-                    ))
+                    DisplayAsset::new(asset.get_name().clone(), self.icon.clone())
                 }
             })
             .collect()
@@ -138,7 +135,7 @@ impl Activity {
 pub async fn select_strategy_for_process(
     process_name: &str,
     display_name: String,
-    icon: IconData,
+    _icon: IconData,
 ) -> Result<Box<dyn ActivityStrategy>> {
     // Log the process name
     info!("Selecting strategy for process: {}", process_name);
