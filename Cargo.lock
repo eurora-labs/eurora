@@ -2550,16 +2550,18 @@ dependencies = [
 
 [[package]]
 name = "ferrous-focus"
-version = "0.1.0"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2bc4d62525e7e00ed5d392eec82477a9c6d996222a3a8f1cdb36874f1f00e96"
 dependencies = [
  "dispatch2 0.3.0",
+ "fxhash",
  "objc2 0.6.1",
  "objc2-app-kit",
  "objc2-core-foundation",
  "swayipc",
  "thiserror 2.0.12",
  "tracing",
- "tracing-subscriber",
  "wayland-client",
  "windows-sys 0.60.2",
  "x11rb",
