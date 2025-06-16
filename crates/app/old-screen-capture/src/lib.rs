@@ -1,3 +1,4 @@
+#[allow(clippy::all)]
 use image::Rgb;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageBuffer};
