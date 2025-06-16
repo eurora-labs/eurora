@@ -6,8 +6,8 @@
 	import { Textarea } from '@eurora/ui/components/textarea/index';
 
 	let messages: Message[] = $state([]);
-	let inputField;
-	let scrollView;
+	let inputField: HTMLTextAreaElement;
+	let scrollView: any;
 	let scrollContainer;
 
 	// export let onSendMessage: (message: string) => Promise<void>;
@@ -16,7 +16,7 @@
 	function scrollIntoView() {
 		if (scrollView) {
 			const messages = scrollView.querySelector('#conversation')?.children;
-			if (messages?.length > 1) {
+			if (messages && messages.length > 1) {
 				const previousMessage = messages[messages.length - 1];
 				scrollView.scrollTo({
 					top: previousMessage.offsetTop - 200,
@@ -36,7 +36,7 @@
 		await onSendMessage(inputValue);
 	};
 
-	function handleKeydown(e) {
+	function handleKeydown(e: KeyboardEvent) {
 		e.stopPropagation();
 		e.stopImmediatePropagation();
 
@@ -46,12 +46,12 @@
 		}
 	}
 
-	function handleKeyup(e) {
+	function handleKeyup(e: KeyboardEvent) {
 		e.stopPropagation();
 		e.stopImmediatePropagation();
 	}
 
-	function handleKeypress(e) {
+	function handleKeypress(e: KeyboardEvent) {
 		e.stopPropagation();
 		e.stopImmediatePropagation();
 	}
@@ -90,7 +90,7 @@
 			<div class="p-4">
 				<div class="relative rounded-lg bg-white shadow-lg ring-1 ring-black/5">
 					<Textarea
-						bind:this={inputField}
+						bind:this={inputField as any}
 						onkeydown={handleKeydown}
 						onkeypress={handleKeypress}
 						onkeyup={handleKeyup}
