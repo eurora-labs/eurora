@@ -1,6 +1,7 @@
 <script lang="ts" module>
 	export interface ChatProps {
-		messages?: MessageType[];
+		messages?: any[];
+		// messages?: MessageType[];
 		class?: string;
 	}
 </script>
