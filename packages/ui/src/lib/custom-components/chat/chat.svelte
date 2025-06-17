@@ -26,9 +26,11 @@
 				<Message.Content>{message.content}</Message.Content>
 				{#if message.sources && message.sources.length > 0}
 					<Message.Footer>
-						{#each message.sources as source}
-							<Message.Source>{@html source}</Message.Source>
-						{/each}
+						<Message.Source>
+							{#each message.sources as source}
+								{@html source}
+							{/each}
+						</Message.Source>
 					</Message.Footer>
 				{/if}
 			</Message.Root>
