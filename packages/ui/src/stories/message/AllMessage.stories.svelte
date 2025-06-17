@@ -25,7 +25,7 @@
 <Story name="Basic Conversation Items">
 	<StoryContainer class="p-0">
 		{#snippet children()}
-			<div class="backdrop-blur-2xl">
+			<div>
 				<div class="space-y-8 p-6">
 					<div>
 						<h2 class="text-lg font-semibold mb-4 text-white">Basic User Message</h2>
@@ -188,7 +188,7 @@
 <Story name="Conversation Items With Sources">
 	<StoryContainer class="p-0">
 		{#snippet children()}
-			<div class="backdrop-blur-2xl h-screen">
+			<div class="h-screen">
 				<div class="space-y-8 p-6">
 					<div class="space-y-4">
 						<h2 class="text-lg font-semibold mb-4 text-white">Answer with Source</h2>
