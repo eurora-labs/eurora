@@ -370,7 +370,7 @@ function handleScroll() {
 <Story name="Short Conversation">
 	<StoryContainer class="p-0">
 		{#snippet children()}
-			<div class="backdrop-blur-2xl h-[600px] w-full">
+			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Short Conversation (3-4 messages)
@@ -385,7 +385,7 @@ function handleScroll() {
 <Story name="Medium Conversation">
 	<StoryContainer class="p-0">
 		{#snippet children()}
-			<div class="backdrop-blur-2xl h-[600px] w-full">
+			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Medium Conversation (8-10 messages)
@@ -400,7 +400,7 @@ function handleScroll() {
 <Story name="Long Conversation with Scrolling">
 	<StoryContainer class="p-0">
 		{#snippet children()}
-			<div class="backdrop-blur-2xl h-[600px] w-full">
+			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Long Conversation (15+ messages with scrolling)
@@ -415,7 +415,7 @@ function handleScroll() {
 <Story name="Mixed Content with Sources">
 	<StoryContainer class="p-0">
 		{#snippet children()}
-			<div class="backdrop-blur-2xl h-[600px] w-full">
+			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Mixed Content with Various Sources
@@ -430,7 +430,7 @@ function handleScroll() {
 <Story name="Interactive Chat Behavior">
 	<StoryContainer class="p-0">
 		{#snippet children()}
-			<div class="backdrop-blur-2xl h-[600px] w-full">
+			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Interactive Chat with Auto-scroll
