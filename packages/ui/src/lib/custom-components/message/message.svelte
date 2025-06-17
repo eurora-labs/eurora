@@ -1,6 +1,6 @@
 <script lang="ts" module>
-	export const conversationItemVariants = tv({
-		base: 'conversation-item flex w-fit items-center gap-2 py-2 px-4 rounded-2xl [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+	export const messageVariants = tv({
+		base: 'message flex flex-col w-fit items-center gap-2 py-2 rounded-2xl [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
 		variants: {
 			variant: {
 				default: 'justify-self-end max-w-[50%] w-fit bg-white/20 text-black font-medium',
@@ -12,10 +12,10 @@
 		},
 	});
 
-	export type ConversationItemVariant = VariantProps<typeof conversationItemVariants>['variant'];
+	export type MessageVariant = VariantProps<typeof messageVariants>['variant'];
 
-	export type ConversationItemProps = {
-		variant?: ConversationItemVariant;
+	export type MessageProps = {
+		variant?: MessageVariant;
 		class?: string;
 		href?: string;
 		onclick?: ((event: MouseEvent) => void) | undefined;
@@ -35,21 +35,17 @@
 		variant = 'default',
 		children,
 		...restProps
-	}: ConversationItemProps = $props();
+	}: MessageProps = $props();
 </script>
 
-<article
-	bind:this={ref}
-	class={cn(conversationItemVariants({ variant }), className)}
-	{...restProps}
->
+<article bind:this={ref} class={cn(messageVariants({ variant }), className)} {...restProps}>
 	{@render children?.()}
 </article>
 
 <style lang="postcss">
 	@reference "tailwindcss";
 	/* Apply solid background for Linux desktop app */
-	:global(body.linux-app .conversation-item) {
+	:global(body.linux-app .message) {
 		@apply bg-black/20 backdrop-blur-none blur-none;
 	}
 </style>
