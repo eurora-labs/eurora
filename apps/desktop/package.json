@@ -16,10 +16,6 @@
 		"tauri": "tauri",
 		"prepare": "svelte-kit sync"
 	},
-	"dependencies": {
-		"@eurora/ai-chat": "workspace:*",
-		"@eurora/katex": "workspace:*"
-	},
 	"devDependencies": {
 		"@eurora/prosemirror-core": "workspace:*",
 		"prosemirror-model": "^1.25.1",
