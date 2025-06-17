@@ -1,4 +1,4 @@
-import Root from './ai-chat.svelte';
+import Root from './chat.svelte';
 
 export {
 	Root,
