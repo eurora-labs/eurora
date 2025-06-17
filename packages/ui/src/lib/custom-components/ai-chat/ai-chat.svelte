@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ConversationItem from './conversation-item.svelte';
+	import { ConversationItem } from '$lib/custom-components/conversation-item/index';
 	import SendHorizontal from '@lucide/svelte/icons/send-horizontal';
 	import type Message from './message.js';
 	import { Button } from '@eurora/ui/components/button/index';
