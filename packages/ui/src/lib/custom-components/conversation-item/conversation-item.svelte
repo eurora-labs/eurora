@@ -1,10 +1,10 @@
 <script lang="ts" module>
 	export const conversationItemVariants = tv({
-		base: 'conversation-item flex w-fit items-center gap-2 mx-2 p-2 bg-white/20 rounded-2xl [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+		base: 'conversation-item flex w-fit items-center gap-2 py-2 px-4 rounded-2xl [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
 		variants: {
 			variant: {
-				default: 'justify-self-end',
-				agent: 'justify-self-start border border-input',
+				default: 'justify-self-end max-w-[50%] w-fit bg-white/20 text-black font-medium',
+				agent: 'justify-self-start w-fit bg-white/40 text-black font-medium',
 			},
 		},
 		defaultVariants: {

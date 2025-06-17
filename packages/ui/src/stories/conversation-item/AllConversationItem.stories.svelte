@@ -22,14 +22,14 @@
 </script>
 
 <Story name="All Conversation Items">
-	<StoryContainer>
+	<StoryContainer class="p-0">
 		{#snippet children()}
-			<div class="backdrop-blur-lg">
+			<div class="backdrop-blur-2xl">
 				<div class="space-y-8 p-6">
 					<div>
 						<h2 class="text-lg font-semibold mb-4 text-white">Basic User Message</h2>
 						<ConversationItem variant="default" finishRendering={() => {}}>
-							Hello, how can I help you today?
+							What's a fun fact I didn't know?
 						</ConversationItem>
 					</div>
 
