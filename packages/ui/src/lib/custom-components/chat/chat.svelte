@@ -1,17 +1,21 @@
+<script lang="ts" module>
+	export interface ChatProps {
+		messages?: MessageType[];
+		class?: string;
+	}
+</script>
+
 <script lang="ts">
 	import { ScrollArea } from '$lib/components/scroll-area/index.js';
 	import type MessageType from './message.js';
 	import * as Message from '$lib/custom-components/message/index.js';
 
-	interface Props {
-		messages?: MessageType[];
-		class?: string;
-	}
+	let { messages = $bindable<MessageType[]>([]), class: className }: ChatProps = $props();
 
-	let { messages = [], class: className }: Props = $props();
+	let scrollAreaRef = $state<HTMLDivElement>();
 </script>
 
-<ScrollArea class="w-full {className}">
+<ScrollArea ref={scrollAreaRef} class="w-full {className}">
 	<div class="space-y-4 p-4">
 		{#each messages as message}
 			<Message.Root
