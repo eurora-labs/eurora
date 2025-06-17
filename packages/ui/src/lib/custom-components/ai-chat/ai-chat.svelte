@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { ConversationItem } from '$lib/custom-components/conversation-item/index';
+	import * as Message from '$lib/custom-components/message/index';
 	import SendHorizontal from '@lucide/svelte/icons/send-horizontal';
-	import type Message from './message.js';
+	import type MessageType from './message.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Textarea } from '@eurora/ui/components/textarea/index';
 
-	let messages: Message[] = $state([]);
+	let messages: MessageType[] = $state([]);
 	let inputField: HTMLTextAreaElement;
 	let scrollView: any;
 	let scrollContainer;
@@ -56,7 +56,7 @@
 		e.stopImmediatePropagation();
 	}
 
-	export function addMessage(message: Message) {
+	export function addMessage(message: MessageType) {
 		messages.push(message);
 		scrollIntoView();
 	}
@@ -74,14 +74,14 @@
 			id="conversation"
 		>
 			{#each messages as message}
-				<ConversationItem
+				<Message.Root
 					finishRendering={() => {
 						scrollIntoView();
 					}}
-					isAgent={message.role === 'system'}
-					bind:text={message.content}
 					class={message.role === 'user' ? 'ml-auto' : 'mr-auto'}
-				/>
+				>
+					<Message.Content>{message.content}</Message.Content>
+				</Message.Root>
 			{/each}
 		</div>
 	</div>
