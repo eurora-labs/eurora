@@ -9,32 +9,32 @@
 	import { unified } from 'unified';
 
 	async function renderKatex(elem: HTMLElement, math: string) {
-		console.log('math', math);
+		try {
+			math = math
+				.replace(/\\\[/g, '$$$')
+				.replace(/\\\]/g, '$$$')
+				.replace(/\\\(/g, '$$$')
+				.replace(/\\\)/g, '$$$')
+				.replace(/```math/g, '$$$')
+				.replace(/```latex/g, '$$$')
+				.replace(/```/g, '$$$');
 
-		math = math.replace(/\\\[/g, '$$$').replace(/\\\]/g, '$$$');
+			const file = await unified()
+				.use(remarkParse)
+				.use(remarkMath, { singleDollarTextMath: false })
+				.use(remarkRehype, { allowDangerousHtml: true })
+				.use(rehypeRaw)
+				.use(remarkGfm)
+				.use(rehypeKatex, { output: 'htmlAndMathml', displayMode: true } as any)
+				.use(rehypeStringify)
+				.process(math);
 
-		math = math.replace(/\\\(/g, '$$$').replace(/\\\)/g, '$$$');
-
-		math = math.replace(/```math/g, '$$$');
-		math = math.replace(/```latex/g, '$$$');
-
-		math = math.replace(/```/g, '$$$');
-
-		console.log('changed math', math);
-
-		const file = await unified()
-			.use(remarkParse)
-			.use(remarkMath, { singleDollarTextMath: false })
-			.use(remarkRehype, { allowDangerousHtml: true })
-			.use(rehypeRaw)
-			.use(remarkGfm)
-			.use(rehypeKatex, { output: 'htmlAndMathml', displayMode: true } as any)
-			.use(rehypeStringify)
-			.process(math);
-
-		elem.innerHTML = String(file);
-
-		finishRendering();
+			elem.innerHTML = String(file);
+		} catch (error) {
+			console.error('Failed to render Katex:', error);
+		} finally {
+			finishRendering();
+		}
 	}
 
 	let { finishRendering, math = $bindable() } = $props();
