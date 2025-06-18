@@ -95,7 +95,7 @@ pub fn create_launcher(
         // #[cfg(debug_assertions)]
         // tauri::WebviewUrl::External(Url::parse("http://localhost:1420/launcher").unwrap()),
         // #[cfg(not(debug_assertions))]
-        // tauri::WebviewUrl::External(Url::parse("http://tauri.localhost/launcher").unwrap()),
+        // tauri::WebviewUrl::External(Url::parse("http://tauri.localhost/l`auncher").unwrap()),
     )
     .resizable(true)
     .inner_size(1024.0, 500.0)
