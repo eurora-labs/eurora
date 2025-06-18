@@ -123,15 +123,6 @@ impl ActivityAsset for YoutubeAsset {
     }
 
     fn construct_message(&self) -> LLMMessage {
-        info!("Constructing message for YoutubeAsset");
-        info!(
-            "YoutubeAsset transcript: {:#?}",
-            self.transcript
-                .iter()
-                .map(|line| line.text.clone())
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
         LLMMessage {
             role: Role::User,
             content: MessageContent::Image(ImageContent {
