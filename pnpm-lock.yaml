@@ -1057,7 +1057,7 @@ importers:
         version: 3.4.0(prettier@3.5.3)(svelte@5.34.5)
       prettier-plugin-tailwindcss:
         specifier: ^0.6.12
-        version: 0.6.12(prettier-plugin-css-order@2.1.2(postcss@8.5.6)(prettier@3.5.3))(prettier-plugin-svelte@3.4.0(prettier@3.5.3)(svelte@5.34.5))(prettier@3.5.3)
+        version: 0.6.12(prettier-plugin-css-order@2.1.2(postcss@8.5.3)(prettier@3.5.3))(prettier-plugin-svelte@3.4.0(prettier@3.5.3)(svelte@5.34.5))(prettier@3.5.3)
       publint:
         specifier: ^0.3.12
         version: 0.3.12
@@ -1592,6 +1592,9 @@ importers:
       '@eurora/prosemirror-core':
         specifier: workspace:*
         version: link:../prosemirror/core
+      '@eurora/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
