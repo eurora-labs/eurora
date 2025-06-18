@@ -1,5 +1,6 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
+	import Katex from '$lib/components/katex.svelte';
 	import { invoke, Channel } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 
@@ -154,11 +155,11 @@
 
 	// Listen for background image event
 	listen<string>('background_image', (event) => {
-		const scrollY = window.scrollY;
-		window.scrollTo(0, 0);
-		taurpc.window.resize_launcher_window(window.outerHeight + scrollY, 1.0).then(() => {
-			window.scrollTo(0, 0);
-		});
+		// const scrollY = window.scrollY;
+		// window.scrollTo(0, 0);
+		// taurpc.window.resize_launcher_window(window.outerHeight + scrollY, 1.0).then(() => {
+		// 	window.scrollTo(0, 0);
+		// });
 		backgroundImage = event.payload;
 
 		if (backdropCustom2Ref) {
@@ -397,13 +398,16 @@
 			</div>
 
 			<!-- <Chat class="w-full" {messages} /> -->
-			<Chat class="w-full">
+			<Chat class="w-full max-h-full overflow-auto">
 				{#each messages as message}
 					<Message.Root
 						variant={message.role === 'user' ? 'default' : 'agent'}
 						finishRendering={() => {}}
 					>
-						<Message.Content>{message.content}</Message.Content>
+						<Message.Content>
+							<!-- {message.content} -->
+							<Katex math={message.content} finishRendering={() => {}} />
+						</Message.Content>
 					</Message.Root>
 				{/each}
 			</Chat>
@@ -416,6 +420,7 @@
 ></div>
 
 <style lang="postcss">
+	@reference 'tailwindcss';
 	.backdrop-custom {
 		z-index: 2;
 		backdrop-filter: none;
