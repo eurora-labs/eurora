@@ -52,18 +52,6 @@ export default defineConfig({
 	// 		}
 	// 	]
 	// },
-	resolve: {
-		alias: {
-			'@eurora/ai-chat': path.resolve(
-				__dirname,
-				'../../packages/custom-components/ai-chat/src/lib/index.ts',
-			),
-			'@eurora/katex': path.resolve(
-				__dirname,
-				'../../packages/custom-components/katex/src/lib/index.ts',
-			),
-		},
-	},
 });
 
 function debounceReload() {
