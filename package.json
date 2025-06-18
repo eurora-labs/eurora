@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"build": "turbo run build ",
-		"build:desktop": "turbo run build --filter @eurora/desktop...",
+		"build:desktop": "turbo run build --filter @eurora/desktop",
 		"dev": "turbo run dev",
 		"lint": "turbo run //#globallint --no-daemon",
 		"format": "prettier --write .",
