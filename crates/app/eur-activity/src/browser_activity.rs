@@ -45,6 +45,7 @@ struct TranscriptLine {
     _duration: f32,
 }
 
+#[derive(Debug)]
 struct YoutubeAsset {
     pub id: String,
     pub _url: String,
@@ -122,6 +123,15 @@ impl ActivityAsset for YoutubeAsset {
     }
 
     fn construct_message(&self) -> LLMMessage {
+        info!("Constructing message for YoutubeAsset");
+        info!(
+            "YoutubeAsset transcript: {:#?}",
+            self.transcript
+                .iter()
+                .map(|line| line.text.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
         LLMMessage {
             role: Role::User,
             content: MessageContent::Image(ImageContent {
