@@ -3,7 +3,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{
-    self, ProtoArticleState, ProtoPdfState, ProtoYoutubeSnapshot, ProtoYoutubeState, StateRequest,
+    self, ProtoArticleSnapshot, ProtoArticleState, ProtoPdfState, ProtoYoutubeSnapshot,
+    ProtoYoutubeState, StateRequest,
 };
 use eur_proto::shared::ProtoImageFormat;
 use std::collections::HashMap;
@@ -190,6 +191,16 @@ pub struct ArticleSnapshot {
     pub highlight: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
+}
+
+impl From<ProtoArticleSnapshot> for ArticleSnapshot {
+    fn from(snapshot: ProtoArticleSnapshot) -> Self {
+        ArticleSnapshot {
+            highlight: Some(snapshot.highlighted_content),
+            created_at: chrono::Utc::now().timestamp() as u64,
+            updated_at: chrono::Utc::now().timestamp() as u64,
+        }
+    }
 }
 
 impl ArticleSnapshot {
@@ -404,6 +415,9 @@ impl ActivityStrategy for BrowserStrategy {
         match &state_response.snapshot {
             Some(ipc::snapshot_response::Snapshot::Youtube(youtube)) => {
                 return Ok(vec![Box::new(YoutubeSnapshot::from(youtube.clone()))]);
+            }
+            Some(ipc::snapshot_response::Snapshot::Article(article)) => {
+                return Ok(vec![Box::new(ArticleSnapshot::from(article.clone()))]);
             }
             None => {
                 info!("No snapshot received from browser");
