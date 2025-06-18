@@ -468,10 +468,11 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 ) {
                     Ok(img) => {
                         let t0 = std::time::Instant::now();
-                        let img = match cfg!(target_os = "linux") {
-                            true => pollster::block_on(eur_renderer::blur_image(&img, 0.1, 36.0)),
-                            false => image::DynamicImage::ImageRgba8(img.clone()).to_rgb8(),
-                        };
+                        let img = pollster::block_on(eur_renderer::blur_image(&img, 0.1, 36.0));
+                        // let img = match cfg!(target_os = "linux") {
+                        //     true => pollster::block_on(eur_renderer::blur_image(&img, 0.1, 36.0)),
+                        //     false => image::DynamicImage::ImageRgba8(img.clone()).to_rgb8(),
+                        // };
 
                         info!("Captured image size: {:?}", img.dimensions());
                         let duration = t0.elapsed();
