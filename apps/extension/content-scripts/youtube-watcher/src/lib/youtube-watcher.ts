@@ -26,8 +26,9 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		if (!videoId) {
 			videoId = this.params.videoId;
 		}
-		this.params.videoTranscript = await this.youtubeTranscriptApi.fetch(videoId, ['en']);
-		console.log('Transcript created', this.params.videoTranscript);
+		this.params.videoTranscript = (
+			await this.youtubeTranscriptApi.fetch(videoId, ['en'])
+		).snippets;
 		return this.params.videoTranscript;
 	}
 
@@ -104,8 +105,6 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 			// Get current timestamp
 			const currentTime = this.getCurrentVideoTime();
 
-			console.log('video transcript', this.params.videoTranscript);
-			console.log('video transcript is empty', !this.params.videoTranscript);
 			const videoFrame = this.getCurrentVideoFrame();
 			const reportData = create(ProtoNativeYoutubeStateSchema, {
 				type: 'YOUTUBE_STATE',
@@ -120,14 +119,11 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				videoFrameHeight: videoFrame.height,
 				videoFrameFormat: videoFrame.format,
 			});
-			console.log('transcript', reportData.transcript);
-			console.log(!reportData.transcript);
 			if (reportData.transcript === '') {
 				this.ensureTranscript()
 					.then((transcript) => {
 						reportData.transcript = JSON.stringify(transcript);
-						console.log('Generated assets for YouTube video:', reportData);
-						console.log('Generated transcript for YouTube video:', transcript);
+						console.log(reportData);
 						response(reportData);
 					})
 					.catch((error) => {
@@ -139,6 +135,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				return true;
 			} else {
 				response(reportData);
+				console.log(reportData);
 				return true;
 			}
 		} catch (error) {
