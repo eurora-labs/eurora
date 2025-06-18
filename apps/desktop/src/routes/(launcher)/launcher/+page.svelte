@@ -8,7 +8,8 @@
 		type ProtoChatMessage,
 	} from '@eurora/shared/proto/questions_service_pb.js';
 	import { onMount } from 'svelte';
-	import MessageArea from './message-area.svelte';
+	import { Chat } from '@eurora/ui/custom-components/chat/index';
+	// import MessageArea from './message-area.svelte';
 	import ApiKeyForm from './api-key-form.svelte';
 	import { executeCommand } from '$lib/commands.js';
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
@@ -83,7 +84,7 @@
 	let backgroundImage = $state<string | null>(null);
 	let currentMonitorId = $state<string>('');
 	let launcherInfo = $state<{
-		monitor_name: string;
+		monitor_id: string;
 		launcher_x: number;
 		launcher_y: number;
 		launcher_width: number;
@@ -431,7 +432,7 @@
 			</div>
 
 			<div class="message-scroll-area w-full flex-grow overflow-auto">
-				<MessageArea {messages} />
+				<Chat {messages} />
 			</div>
 		{/if}
 	</div>
