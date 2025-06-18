@@ -93,45 +93,6 @@
 		monitor_height: number;
 	} | null>(null);
 
-	// Set up event listener for chat responses
-	listen<string>('chat_response', (event) => {
-		messages.push(create(ProtoChatMessageSchema, { role: 'system', content: event.payload }));
-	});
-
-	listen<string>('add_video_context_chip', (event) => {});
-
-	// Listen for key events from the Rust backend
-	listen<string>('key_event', (event) => {
-		console.log('Received key event:', event.payload);
-
-		// Handle special keys
-		if (event.payload === 'Escape') {
-			// Clear input field and reset conversation
-			searchQuery.text = '';
-			currentConversationId = 'NEW';
-			messages.splice(0, messages.length);
-		} else if (
-			event.payload === 'Backspace' ||
-			event.payload === 'Delete' ||
-			event.payload === '\b'
-		) {
-			// Handle backspace key
-			if (searchQuery.text.length > 0) {
-				searchQuery.text = searchQuery.text.slice(0, -1);
-			}
-		} else if (event.payload === 'Enter') {
-			// Submit the current input
-			searchQuery.text = '';
-			const query = processQuery(editorRef!);
-			messages.push(create(ProtoChatMessageSchema, { role: 'user', content: query.text }));
-			askQuestion(query);
-		} else if (event.payload.length === 1 || event.payload === 'Space') {
-			// Handle regular character keys and space
-			const char = event.payload === 'Space' ? ' ' : event.payload;
-			searchQuery.text += char;
-		}
-	});
-
 	// Listen for launcher closed event to clear messages and reset conversation
 	listen('launcher_closed', () => {
 		// Clear messages array
@@ -295,10 +256,11 @@
 			// await taurpc.window.resize_launcher_window(100, 1.0);
 
 			try {
-				const question = searchQuery.text;
-				clearQuery();
-				messages.push(create(ProtoChatMessageSchema, { role: 'user', content: question }));
 				const query = processQuery(editorRef!);
+				messages.push(
+					create(ProtoChatMessageSchema, { role: 'user', content: query.text }),
+				);
+				clearQuery();
 				await askQuestion(query);
 				// Responses will come through the event listener
 			} catch (error) {
@@ -340,21 +302,13 @@
 				text: query.text,
 				assets: query.assets,
 			};
+			messages.push(create(ProtoChatMessageSchema, { role: 'agent', content: '' }));
+			const agentMessage = messages.at(-1);
 
 			const onEvent = (response: ResponseChunk) => {
-				if (response.chunk === '') {
-					// Initial message
-					messages.push(
-						create(ProtoChatMessageSchema, {
-							role: 'system',
-							content: '',
-						}),
-					);
-				} else {
-					// Append chunk to the last message
-					if (messages.length > 0) {
-						messages.at(-1)!.content += response.chunk;
-					}
+				// Append chunk to the last message
+				if (agentMessage) {
+					agentMessage.content += response.chunk;
 				}
 				console.log(`got response chunk: ${response.chunk}`);
 			};
@@ -441,9 +395,7 @@
 				</Launcher.Root>
 			</div>
 
-			<div class="message-scroll-area w-full flex-grow overflow-auto">
-				<Chat {messages} />
-			</div>
+			<Chat class="w-full" {messages} />
 		{/if}
 	</div>
 </div>
