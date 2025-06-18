@@ -43,12 +43,12 @@ impl WindowApi for WindowApiImpl {
             "resize_launcher_window: height: {}, scale_factor: {}",
             height, scale_factor
         );
-        // let window = app_handle.get_window("launcher").unwrap();
-        // let new_height = height as f64 * scale_factor;
-        // let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
-        //     width: 1024,
-        //     height: new_height as u32,
-        // }));
+        let window = app_handle.get_window("launcher").unwrap();
+        let new_height = height as f64 * scale_factor;
+        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
+            width: 1024,
+            height: new_height as u32,
+        }));
         Ok(())
     }
 }
