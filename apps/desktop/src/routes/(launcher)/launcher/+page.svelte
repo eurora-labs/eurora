@@ -3,6 +3,7 @@
 	import { invoke, Channel } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 
+	import * as Message from '@eurora/ui/custom-components/message/index';
 	import {
 		ProtoChatMessageSchema,
 		type ProtoChatMessage,
@@ -113,42 +114,42 @@
 		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
 
 		// Capture full monitor after launcher is opened to replace the small background
-		try {
-			if (currentMonitorId && launcherInfo) {
-				// Capture the full monitor using the monitor name from the event
-				const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorId);
+		// try {
+		// 	if (currentMonitorId && launcherInfo) {
+		// 		// Capture the full monitor using the monitor name from the event
+		// 		const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorId);
 
-				// Replace the background image with the full monitor capture
-				// Position it so it appears as if looking through transparent glass
-				if (backdropCustom2Ref && fullMonitorImage) {
-					// Calculate the position offset to align the background properly
-					// The background should be positioned so that the launcher area shows
-					// the same content as if it were transparent
-					const offsetX = -launcherInfo.launcher_x;
-					const offsetY = -launcherInfo.launcher_y;
+		// 		// Replace the background image with the full monitor capture
+		// 		// Position it so it appears as if looking through transparent glass
+		// 		if (backdropCustom2Ref && fullMonitorImage) {
+		// 			// Calculate the position offset to align the background properly
+		// 			// The background should be positioned so that the launcher area shows
+		// 			// the same content as if it were transparent
+		// 			const offsetX = -launcherInfo.launcher_x;
+		// 			const offsetY = -launcherInfo.launcher_y;
 
-					backdropCustom2Ref.style.backgroundImage = `url('${fullMonitorImage}')`;
-					// backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
-					backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
-					backdropCustom2Ref.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
-					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-					// backdropCustom2Ref.style.backgroundClip = 'content-box';
+		// 			backdropCustom2Ref.style.backgroundImage = `url('${fullMonitorImage}')`;
+		// 			// backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
+		// 			backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
+		// 			backdropCustom2Ref.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
+		// 			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+		// 			// backdropCustom2Ref.style.backgroundClip = 'content-box';
 
-					// Update the backgroundImage state
-					backgroundImage = fullMonitorImage;
+		// 			// Update the backgroundImage state
+		// 			backgroundImage = fullMonitorImage;
 
-					console.log(
-						'Full monitor background captured and positioned for monitor:',
-						currentMonitorId,
-						'offset:',
-						offsetX,
-						offsetY,
-					);
-				}
-			}
-		} catch (error) {
-			console.error('Failed to capture full monitor background:', error);
-		}
+		// 			console.log(
+		// 				'Full monitor background captured and positioned for monitor:',
+		// 				currentMonitorId,
+		// 				'offset:',
+		// 				offsetX,
+		// 				offsetY,
+		// 			);
+		// 		}
+		// 	}
+		// } catch (error) {
+		// 	console.error('Failed to capture full monitor background:', error);
+		// }
 	});
 
 	// Listen for background image event
@@ -395,7 +396,17 @@
 				</Launcher.Root>
 			</div>
 
-			<Chat class="w-full" {messages} />
+			<!-- <Chat class="w-full" {messages} /> -->
+			<Chat class="w-full">
+				{#each messages as message}
+					<Message.Root
+						variant={message.role === 'user' ? 'default' : 'agent'}
+						finishRendering={() => {}}
+					>
+						<Message.Content>{message.content}</Message.Content>
+					</Message.Root>
+				{/each}
+			</Chat>
 		{/if}
 	</div>
 </div>
@@ -407,16 +418,18 @@
 <style lang="postcss">
 	.backdrop-custom {
 		z-index: 2;
-		backdrop-filter: blur(18px);
-		-webkit-backdrop-filter: blur(18px);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
 		background-color: rgba(255, 255, 255, 0.2);
+		background: transparent;
 	}
 
 	.backdrop-custom-2 {
 		z-index: 1;
 		width: 100%;
 		height: 100%;
-
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
 		background-color: rgba(0, 0, 0, 1);
 	}
 	:global(body.linux-app .backdrop-custom) {
