@@ -394,8 +394,8 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 // Variables to store launcher position and size
                 let mut launcher_x = 0;
                 let mut launcher_y = 0;
-                let mut launcher_width = 1024; // Default width
-                let mut launcher_height = 200; // Default height
+                let mut launcher_width = 512; // Default width
+                let mut launcher_height = 500; // Default height
                 let mut monitor_id = "".to_string();
                 let mut monitor_width = 1920u32; // Default monitor width
                 let mut monitor_height = 1080u32; // Default monitor height
@@ -428,8 +428,13 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
 
                                 info!("Window size: {:?}", window_size);
 
-                                launcher_x = monitor_x
-                                    + (monitor_width as i32 - window_size.width as i32) / 2;
+                                // launcher_x = (monitor_x as f64
+                                //     + (monitor_width as f64 - window_size.width as f64) / 1.5)
+                                //     as i32;
+                                launcher_x = (monitor_x as f64 * scale_factor) as i32
+                                    + ((monitor_width as f64 * scale_factor
+                                        - window_size.width as f64)
+                                        / 2.0) as i32;
                                 launcher_y = monitor_y
                                     + (monitor_height as i32 - window_size.height as i32) / 4;
 
