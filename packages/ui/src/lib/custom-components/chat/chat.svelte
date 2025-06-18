@@ -19,10 +19,11 @@
 <ScrollArea ref={scrollAreaRef} class="w-full {className}">
 	<div class="space-y-4 p-4">
 		{#each messages as message}
-			<Message.Root
+			<!-- <Message.Root
 				variant={message.role === 'user' ? 'default' : 'agent'}
 				finishRendering={() => {}}
-			>
+			> -->
+			<Message.Root variant="default" finishRendering={() => {}}>
 				<Message.Content>{message.content}</Message.Content>
 				{#if message.sources && message.sources.length > 0}
 					<Message.Footer>

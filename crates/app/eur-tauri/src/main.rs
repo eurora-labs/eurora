@@ -128,7 +128,7 @@ fn main() {
                     #[cfg(debug_assertions)]
                     {
                         // main_window.open_devtools();
-                        // launcher_window.open_devtools();
+                        launcher_window.open_devtools();
                     }
 
                     // Ensure launcher is hidden on startup for Windows
