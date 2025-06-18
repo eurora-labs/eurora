@@ -296,7 +296,7 @@
 
 			try {
 				const question = searchQuery.text;
-				searchQuery.text = '';
+				clearQuery();
 				messages.push(create(ProtoChatMessageSchema, { role: 'user', content: question }));
 				const query = processQuery(editorRef!);
 				await askQuestion(query);
@@ -305,6 +305,16 @@
 				console.error('Error:', error);
 			}
 		}
+	}
+
+	async function clearQuery() {
+		if (!editorRef) return;
+		searchQuery.text = '';
+		editorRef.cmd((state, dispatch) => {
+			const tr = state.tr;
+			tr.delete(0, state.doc.content.size);
+			dispatch?.(tr);
+		});
 	}
 
 	async function addVideoExtension() {
