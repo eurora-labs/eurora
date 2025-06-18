@@ -31,7 +31,7 @@
 	<div class="w-full max-w-md">
 		<Login
 			submitError={args.submitError}
-			onsubmit={(event) => {
+			onsubmit={(event: any) => {
 				event.preventDefault();
 				alert('Form submitted!');
 			}}
