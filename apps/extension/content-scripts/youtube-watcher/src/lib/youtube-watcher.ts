@@ -1,6 +1,7 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { YoutubeChromeMessage, type YoutubeMessageType, type WatcherParams } from './types.js';
-import { YouTubeTranscriptApi } from '@eurora/youtube-transcripts';
+import { YouTubeTranscriptApi } from './transcript/index.js';
+// import { YouTubeTranscriptApi } from '@eurora/youtube-transcripts';
 
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import { create } from '@eurora/shared/util/grpc';
@@ -15,11 +16,21 @@ interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
 }
 class YoutubeWatcher extends Watcher<WatcherParams> {
-	private async ensureTranscript(): Promise<void> {
-		if (!this.params.videoTranscript && this.params.videoId) {
-			this.params.videoTranscript = await getYouTubeTranscript(this.params.videoId);
-		}
+	private youtubeTranscriptApi: YouTubeTranscriptApi;
+	constructor(params: WatcherParams) {
+		super(params);
+		this.youtubeTranscriptApi = new YouTubeTranscriptApi();
 	}
+
+	private async ensureTranscript(videoId?: string): Promise<any> {
+		if (!videoId) {
+			videoId = this.params.videoId;
+		}
+		this.params.videoTranscript = await this.youtubeTranscriptApi.fetch(videoId, ['en']);
+		console.log('Transcript created', this.params.videoTranscript);
+		return this.params.videoTranscript;
+	}
+
 	public listen(
 		obj: YoutubeChromeMessage,
 		sender: chrome.runtime.MessageSender,
@@ -67,7 +78,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		}
 		this.params.videoId = currentVideoId;
 
-		getYouTubeTranscript(currentVideoId)
+		this.ensureTranscript(currentVideoId)
 			.then((transcript) => {
 				this.params.videoTranscript = transcript;
 			})
@@ -93,23 +104,30 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 			// Get current timestamp
 			const currentTime = this.getCurrentVideoTime();
 
+			console.log('video transcript', this.params.videoTranscript);
+			console.log('video transcript is empty', !this.params.videoTranscript);
 			const videoFrame = this.getCurrentVideoFrame();
 			const reportData = create(ProtoNativeYoutubeStateSchema, {
 				type: 'YOUTUBE_STATE',
 				url: window.location.href,
 				title: document.title,
-				transcript: JSON.stringify(this.params.videoTranscript),
+				transcript: this.params.videoTranscript
+					? JSON.stringify(this.params.videoTranscript)
+					: '',
 				currentTime: Math.round(currentTime),
 				videoFrameBase64: videoFrame.dataBase64,
 				videoFrameWidth: videoFrame.width,
 				videoFrameHeight: videoFrame.height,
 				videoFrameFormat: videoFrame.format,
 			});
-
-			if (!this.params.videoTranscript) {
+			console.log('transcript', reportData.transcript);
+			console.log(!reportData.transcript);
+			if (reportData.transcript === '') {
 				this.ensureTranscript()
-					.then(() => {
-						reportData.transcript = JSON.stringify(this.params.videoTranscript);
+					.then((transcript) => {
+						reportData.transcript = JSON.stringify(transcript);
+						console.log('Generated assets for YouTube video:', reportData);
+						console.log('Generated transcript for YouTube video:', transcript);
 						response(reportData);
 					})
 					.catch((error) => {
@@ -221,8 +239,4 @@ function getCurrentVideoId() {
 		return window.location.search.split('v=')[1].split('&')[0];
 	}
 	return null;
-}
-
-async function getYouTubeTranscript(videoId: string) {
-	return await YouTubeTranscriptApi.getTranscript(videoId);
 }
