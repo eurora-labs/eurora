@@ -29,7 +29,7 @@
 		"@eslint/js": "^9.29.0",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
-		"@playwright/test": "^1.53.0",
+		"@playwright/test": "^1.53.1",
 		"@testing-library/jest-dom": "^6.6.3",
 		"@types/chrome": "^0.0.326",
 		"eslint": "^9.29.0",
@@ -41,7 +41,7 @@
 		"typescript-eslint": "^8.34.1",
 		"vite": "^6.3.5",
 		"vite-plugin-dts": "^4.5.3",
-		"vitest": "^3.2.3"
+		"vitest": "^3.2.4"
 	},
 	"dependencies": {
 		"@sentry/vite-plugin": "^3.3.1",
