@@ -148,13 +148,13 @@ importers:
         specifier: ^5.2.12
         version: 5.2.12(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/adapter-static':
-        specifier: ^3.0.8
+        specifier: catalog:svelte
         version: 3.0.8(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/kit':
-        specifier: ^2.21.5
+        specifier: catalog:svelte
         version: 2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@sveltejs/vite-plugin-svelte':
-        specifier: ^5.1.0
+        specifier: catalog:svelte
         version: 5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@tailwindcss/postcss':
         specifier: ^4.1.10
@@ -265,10 +265,10 @@ importers:
         specifier: ^11.1.2
         version: 11.1.2
       svelte:
-        specifier: ^5.34.5
+        specifier: catalog:svelte
         version: 5.34.5
       svelte-check:
-        specifier: ^4.2.1
+        specifier: catalog:svelte
         version: 4.2.1(picomatch@4.0.2)(svelte@5.34.5)(typescript@5.8.3)
       taurpc:
         specifier: ^1.8.1
@@ -289,10 +289,10 @@ importers:
         specifier: ^11.1.0
         version: 11.1.0
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
   apps/docs:
@@ -322,13 +322,13 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/adapter-static':
-        specifier: ^3.0.8
+        specifier: catalog:svelte
         version: 3.0.8(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/kit':
-        specifier: ^2.21.5
+        specifier: catalog:svelte
         version: 2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@sveltejs/vite-plugin-svelte':
-        specifier: ^5.1.0
+        specifier: catalog:svelte
         version: 5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@tailwindcss/postcss':
         specifier: ^4.1.10
@@ -367,10 +367,10 @@ importers:
         specifier: ^3.3.3
         version: 3.4.0(prettier@3.5.3)(svelte@5.34.5)
       svelte:
-        specifier: ^5.34.5
+        specifier: catalog:svelte
         version: 5.34.5
       svelte-check:
-        specifier: ^4.2.1
+        specifier: catalog:svelte
         version: 4.2.1(picomatch@4.0.2)(svelte@5.34.5)(typescript@5.8.3)
       svelte-sonner:
         specifier: ^1.0.5
@@ -394,10 +394,10 @@ importers:
         specifier: 1.0.0-next.7
         version: 1.0.0-next.7(svelte@5.34.5)
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
   apps/extension/background-script:
@@ -452,13 +452,13 @@ importers:
         specifier: ^8.34.1
         version: 8.34.1(eslint@9.29.0(jiti@2.4.2))(typescript@5.8.3)
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vite-plugin-dts:
         specifier: ^4.5.3
         version: 4.5.4(@types/node@22.15.21)(rollup@4.41.1)(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
   apps/extension/content-scripts/article-watcher:
@@ -518,13 +518,13 @@ importers:
         specifier: ^8.34.1
         version: 8.34.1(eslint@9.29.0(jiti@2.4.2))(typescript@5.8.3)
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vite-plugin-dts:
         specifier: ^4.5.3
         version: 4.5.4(@types/node@22.15.21)(rollup@4.41.1)(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
   apps/extension/content-scripts/pdf-watcher:
@@ -584,13 +584,13 @@ importers:
         specifier: ^8.34.1
         version: 8.34.1(eslint@9.29.0(jiti@2.4.2))(typescript@5.8.3)
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vite-plugin-dts:
         specifier: ^4.5.3
         version: 4.5.4(@types/node@22.15.21)(rollup@4.41.1)(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
   apps/extension/content-scripts/youtube-watcher:
@@ -647,13 +647,13 @@ importers:
         specifier: ^8.34.1
         version: 8.34.1(eslint@9.29.0(jiti@2.4.2))(typescript@5.8.3)
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vite-plugin-dts:
         specifier: ^4.5.3
         version: 4.5.4(@types/node@22.15.21)(rollup@4.41.1)(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
   apps/extension/popup:
@@ -677,13 +677,13 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/adapter-static':
-        specifier: ^3.0.8
+        specifier: catalog:svelte
         version: 3.0.8(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/kit':
-        specifier: ^2.21.5
+        specifier: catalog:svelte
         version: 2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@sveltejs/vite-plugin-svelte':
-        specifier: ^5.1.0
+        specifier: catalog:svelte
         version: 5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       eslint:
         specifier: ^9.29.0
@@ -698,10 +698,10 @@ importers:
         specifier: ^3.3.3
         version: 3.4.0(prettier@3.5.3)(svelte@5.34.5)
       svelte:
-        specifier: ^5.34.5
+        specifier: catalog:svelte
         version: 5.34.5
       svelte-check:
-        specifier: ^4.2.1
+        specifier: catalog:svelte
         version: 4.2.1(picomatch@4.0.2)(svelte@5.34.5)(typescript@5.8.3)
       sveltekit-adapter-chrome-extension:
         specifier: ^2.0.0
@@ -713,10 +713,10 @@ importers:
         specifier: 5.8.3
         version: 5.8.3
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
   apps/web:
@@ -743,13 +743,13 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/adapter-static':
-        specifier: ^3.0.8
+        specifier: catalog:svelte
         version: 3.0.8(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/kit':
-        specifier: ^2.21.5
+        specifier: catalog:svelte
         version: 2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@sveltejs/vite-plugin-svelte':
-        specifier: ^5.1.0
+        specifier: catalog:svelte
         version: 5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@tailwindcss/container-queries':
         specifier: ^0.1.1
@@ -785,10 +785,10 @@ importers:
         specifier: ^3.3.3
         version: 3.4.0(prettier@3.5.3)(svelte@5.34.5)
       svelte:
-        specifier: ^5.34.5
+        specifier: catalog:svelte
         version: 5.34.5
       svelte-check:
-        specifier: ^4.2.1
+        specifier: catalog:svelte
         version: 4.2.1(picomatch@4.0.2)(svelte@5.34.5)(typescript@5.8.3)
       sveltekit-superforms:
         specifier: ^2.27.0
@@ -806,10 +806,10 @@ importers:
         specifier: 5.8.3
         version: 5.8.3
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
       zod:
         specifier: ^3.25.67
@@ -848,16 +848,16 @@ importers:
         specifier: ^1.53.0
         version: 1.53.0
       '@sveltejs/adapter-static':
-        specifier: ^3.0.8
+        specifier: catalog:svelte
         version: 3.0.8(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/kit':
-        specifier: ^2.21.5
+        specifier: catalog:svelte
         version: 2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@sveltejs/package':
         specifier: ^2.3.11
         version: 2.3.11(svelte@5.34.5)(typescript@5.8.3)
       '@sveltejs/vite-plugin-svelte':
-        specifier: ^5.1.0
+        specifier: catalog:svelte
         version: 5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@tailwindcss/container-queries':
         specifier: ^0.1.1
@@ -947,10 +947,10 @@ importers:
         specifier: ^0.3.12
         version: 0.3.12
       svelte:
-        specifier: ^5.34.5
+        specifier: catalog:svelte
         version: 5.34.5
       svelte-check:
-        specifier: ^4.2.1
+        specifier: catalog:svelte
         version: 4.2.1(picomatch@4.0.2)(svelte@5.34.5)(typescript@5.8.3)
       svelte-sonner:
         specifier: ^1.0.5
@@ -980,10 +980,10 @@ importers:
         specifier: 1.0.0-next.7
         version: 1.0.0-next.7(svelte@5.34.5)
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
   packages/eslint-config:
@@ -1271,16 +1271,16 @@ importers:
         specifier: ^1.53.0
         version: 1.53.0
       '@sveltejs/adapter-static':
-        specifier: ^3.0.8
+        specifier: catalog:svelte
         version: 3.0.8(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/kit':
-        specifier: ^2.21.5
+        specifier: catalog:svelte
         version: 2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@sveltejs/package':
         specifier: ^2.3.11
         version: 2.3.11(svelte@5.34.5)(typescript@5.8.3)
       '@sveltejs/vite-plugin-svelte':
-        specifier: ^5.1.0
+        specifier: catalog:svelte
         version: 5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@tailwindcss/container-queries':
         specifier: ^0.1.1
@@ -1367,10 +1367,10 @@ importers:
         specifier: ^0.3.12
         version: 0.3.12
       svelte:
-        specifier: ^5.34.5
+        specifier: catalog:svelte
         version: 5.34.5
       svelte-check:
-        specifier: ^4.2.1
+        specifier: catalog:svelte
         version: 4.2.1(picomatch@4.0.2)(svelte@5.34.5)(typescript@5.8.3)
       svelte-sonner:
         specifier: ^1.0.5
@@ -1400,10 +1400,10 @@ importers:
         specifier: 1.0.0-next.7
         version: 1.0.0-next.7(svelte@5.34.5)
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
   packages/typescript-config: {}
@@ -1472,16 +1472,16 @@ importers:
         specifier: ^8.6.12
         version: 8.6.14(storybook@8.6.14(prettier@3.5.3))
       '@sveltejs/adapter-static':
-        specifier: ^3.0.8
+        specifier: catalog:svelte
         version: 3.0.8(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
       '@sveltejs/kit':
-        specifier: ^2.21.5
+        specifier: catalog:svelte
         version: 2.21.5(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@sveltejs/package':
         specifier: ^2.3.11
         version: 2.3.11(svelte@5.34.5)(typescript@5.8.3)
       '@sveltejs/vite-plugin-svelte':
-        specifier: ^5.1.0
+        specifier: catalog:svelte
         version: 5.1.0(svelte@5.34.5)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0))
       '@tailwindcss/container-queries':
         specifier: ^0.1.1
@@ -1580,10 +1580,10 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(storybook@8.6.14(prettier@3.5.3))
       svelte:
-        specifier: ^5.34.5
+        specifier: catalog:svelte
         version: 5.34.5
       svelte-check:
-        specifier: ^4.2.1
+        specifier: catalog:svelte
         version: 4.2.1(picomatch@4.0.2)(svelte@5.34.5)(typescript@5.8.3)
       svelte-sonner:
         specifier: ^1.0.5
@@ -1613,10 +1613,10 @@ importers:
         specifier: 1.0.0-next.7
         version: 1.0.0-next.7(svelte@5.34.5)
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
       zod:
         specifier: ^3.25.67
