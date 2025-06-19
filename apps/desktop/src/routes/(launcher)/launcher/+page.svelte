@@ -290,7 +290,7 @@
 				0,
 				nodes['9370B14D-B61C-4CE2-BDE7-B18684E8731A'].createChecked(
 					{ id: 'video-1', name: 'Some video with attrs' },
-					schema.text('video'),
+					schema.text(' '),
 				),
 			);
 			dispatch?.(tr);
@@ -398,7 +398,7 @@
 			</div>
 
 			<!-- <Chat class="w-full" {messages} /> -->
-			<Chat class="w-full max-h-full overflow-auto">
+			<Chat class="w-full">
 				{#each messages as message}
 					<Message.Root
 						variant={message.role === 'user' ? 'default' : 'agent'}
@@ -414,8 +414,18 @@
 		{/if}
 	</div>
 </div>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0">
+	<filter id="blur-bright" filterUnits="objectBoundingBox">
+		<feGaussianBlur in="SourceGraphic" stdDeviation="36" edgeMode="duplicate" result="blur" />
+		<feFlood flood-color="#ffffff" flood-opacity="0.1" result="white" />
+		<feComposite in="white" in2="blur" operator="over" />
+	</filter>
+</svg>
+
 <div
 	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
+	style="filter:url(#blur-bright)"
 	bind:this={backdropCustom2Ref}
 ></div>
 
@@ -435,7 +445,6 @@
 		height: 100%;
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
-		background-color: rgba(0, 0, 0, 1);
 	}
 	:global(body.linux-app .backdrop-custom) {
 		backdrop-filter: none;
