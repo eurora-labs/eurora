@@ -27,12 +27,19 @@
 	"devDependencies": {
 		"@eslint/compat": "^1.3.0",
 		"@eslint/js": "^9.29.0",
+<<<<<<< HEAD
+=======
 		"@eurora/shared": "workspace:*",
+>>>>>>> 1146a13417247a9527c694bb6f739a74dd541c08
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@internationalized/date": "^3.8.1",
+<<<<<<< HEAD
+		"@lucide/svelte": "^0.517.0",
+=======
 		"@lucide/svelte": "^0.516.0",
+>>>>>>> 1146a13417247a9527c694bb6f739a74dd541c08
 		"@playwright/test": "^1.53.0",
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.21.5",
@@ -41,8 +48,13 @@
 		"@storybook/addon-docs": "^8.6.12",
 		"@storybook/addon-essentials": "^8.6.12",
 		"@storybook/addon-links": "^8.6.12",
+<<<<<<< HEAD
+		"@storybook/addon-svelte-csf": "5.0.3",
+		"zod": "^3.25.67",
+=======
 		"zod": "^3.25.67",
 		"@storybook/addon-svelte-csf": "5.0.0-next.23",
+>>>>>>> 1146a13417247a9527c694bb6f739a74dd541c08
 		"@storybook/blocks": "^8.6.12",
 		"@storybook/experimental-addon-test": "^8.6.12",
 		"@storybook/svelte": "^8.6.12",
@@ -59,7 +71,11 @@
 		"storybook": "^8.6.12",
 		"storybook-dark-mode": "^4.0.2",
 		"autoprefixer": "^10.4.21",
+<<<<<<< HEAD
+		"bits-ui": "^2.8.1",
+=======
 		"bits-ui": "^2.8.0",
+>>>>>>> 1146a13417247a9527c694bb6f739a74dd541c08
 		"clsx": "^2.1.1",
 		"embla-carousel-svelte": "^8.6.0",
 		"eslint": "^9.29.0",
@@ -67,12 +83,17 @@
 		"eslint-plugin-svelte": "^2.46.1",
 		"globals": "^15.14.0",
 		"jsdom": "^25.0.1",
+<<<<<<< HEAD
+		"layerchart": "2.0.0-next.17",
+		"mode-watcher": "^1.0.8",
+=======
 		"mode-watcher": "^1.0.8",
 		"layerchart": "2.0.0-next.22",
+>>>>>>> 1146a13417247a9527c694bb6f739a74dd541c08
 		"paneforge": "1.0.0-next.5",
 		"postcss": "^8.5.6",
 		"postcss-cli": "^11.0.0",
-		"postcss-import": "^16.1.0",
+		"postcss-import": "^16.1.1",
 		"postcss-minify": "^1.1.0",
 		"postcss-nesting": "^13.0.2",
 		"postcss-pxtorem": "^6.1.0",
@@ -80,7 +101,11 @@
 		"prettier-plugin-svelte": "^3.3.3",
 		"prettier-plugin-tailwindcss": "^0.6.12",
 		"publint": "^0.3.12",
+<<<<<<< HEAD
+		"svelte": "^5.34.5",
+=======
 		"svelte": "^5.34.3",
+>>>>>>> 1146a13417247a9527c694bb6f739a74dd541c08
 		"svelte-check": "^4.2.1",
 		"svelte-sonner": "^1.0.5",
 		"sveltekit-superforms": "^2.27.0",
@@ -92,7 +117,7 @@
 		"typescript-eslint": "^8.34.1",
 		"vaul-svelte": "1.0.0-next.7",
 		"vite": "^6.3.5",
-		"vitest": "^3.2.3"
+		"vitest": "^3.2.4"
 	},
 	"exports": {
 		"./*.svelte": {
