@@ -26,6 +26,7 @@ export function processQuery(editorRef: Editor): QueryAssets {
 		else if (node.type && node.type !== 'doc' && node.type !== 'paragraph') {
 			// If the type looks like a UUID (has hyphens and is long), add it to the query
 			if (node.type.includes('-') || node.type.length > 10) {
+				console.log('node: ', node);
 				query.text += ' ' + node.attrs.id;
 				query.assets.push(node.attrs.id);
 			}
