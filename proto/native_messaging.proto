@@ -6,6 +6,7 @@ enum ProtoNativeStateType {
     YOUTUBE_STATE = 0;
     ARTICLE_STATE = 1;
     PDF_STATE = 2;
+    TWITTER_STATE = 3;
 }
 
 message ProtoNativeYoutubeState {
@@ -45,5 +46,19 @@ message ProtoNativeArticleAsset {
 
 message ProtoNativeArticleSnapshot {
     string type = 1;
-    string highlighted_text = 2; 
+    string highlighted_text = 2;
+}
+
+message ProtoNativeTwitterState {
+    string type = 1;
+    string url = 2;
+    string title = 3;
+    string tweets = 4; // JSON string containing array of tweet objects
+    string timestamp = 5;
+}
+
+message ProtoNativeTwitterSnapshot {
+    string type = 1;
+    string tweets = 2; // JSON string containing array of tweet objects
+    string timestamp = 3;
 }

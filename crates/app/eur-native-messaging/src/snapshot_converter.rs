@@ -1,5 +1,6 @@
 use crate::snapshot_context::{
-    ArticleSnapshot, NativeArticleSnapshot, NativeYoutubeSnapshot, YoutubeSnapshot,
+    ArticleSnapshot, NativeArticleSnapshot, NativeTwitterSnapshot, NativeYoutubeSnapshot,
+    TwitterSnapshot, YoutubeSnapshot,
 }; // Use snapshot context types
 use anyhow::{anyhow, Error}; // Import anyhow macro and Error
 use eur_proto::ipc::SnapshotResponse; // Import necessary proto types
@@ -61,8 +62,23 @@ impl JSONToProtoSnapshotConverter {
                     snapshot: Some(snapshot_field),
                 })
             }
+            "TWITTER_SNAPSHOT" => {
+                // Convert JSON to NativeTwitterSnapshot
+                let native_snapshot = NativeTwitterSnapshot::from(&json);
+
+                // Convert NativeTwitterSnapshot to TwitterSnapshot
+                let twitter_snapshot = TwitterSnapshot::try_from(&native_snapshot)
+                    .map_err(|e| anyhow!("Failed to convert Twitter snapshot: {}", e))?;
+
+                // Create the snapshot field for the response
+                let snapshot_field =
+                    eur_proto::ipc::snapshot_response::Snapshot::Twitter(twitter_snapshot.0);
+                Ok(SnapshotResponse {
+                    snapshot: Some(snapshot_field),
+                })
+            }
             // Add cases for other snapshot types here if needed in the future
-            // e.g., "ARTICLE_SNAPSHOT", "PDF_SNAPSHOT"
+            // e.g., "PDF_SNAPSHOT"
             _ => Err(anyhow!("Unsupported snapshot type: {}", snapshot_type)),
         }
     }
