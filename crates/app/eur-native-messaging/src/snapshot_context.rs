@@ -12,13 +12,14 @@ pub struct NativeArticleSnapshot(pub ArticleSnapshot);
 impl From<&serde_json::Map<String, serde_json::Value>> for NativeArticleSnapshot {
     fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
         info!("NativeArticleSnapshot::from obj: {:?}", obj);
+        let highlighted_content = obj
+            .get("highlightedText")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+
         NativeArticleSnapshot(ArticleSnapshot(ProtoArticleSnapshot {
-            highlighted_content: obj
-                .get("highlightedText")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string(),
+            highlighted_content,
         }))
     }
 }
