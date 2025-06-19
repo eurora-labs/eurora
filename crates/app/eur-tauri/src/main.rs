@@ -405,11 +405,12 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                     if let Ok(monitors) = get_all_monitors() {
                         for monitor in monitors {
                             monitor_id = monitor.id().unwrap().to_string();
-                            monitor_width = monitor.width().unwrap();
-                            monitor_height = monitor.height().unwrap();
-                            let monitor_x = monitor.x().unwrap();
-                            let monitor_y = monitor.y().unwrap();
                             let scale_factor = monitor.scale_factor().unwrap() as f64;
+                            monitor_width = (monitor.width().unwrap() as f64 * scale_factor) as u32;
+                            monitor_height =
+                                (monitor.height().unwrap() as f64 * scale_factor) as u32;
+                            let monitor_x = (monitor.x().unwrap() as f64 * scale_factor) as i32;
+                            let monitor_y = (monitor.y().unwrap() as f64 * scale_factor) as i32;
 
                             info!("Monitor width: {:?}", monitor_width);
                             info!("Monitor height: {:?}", monitor_height);
@@ -428,13 +429,12 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
 
                                 info!("Window size: {:?}", window_size);
 
-                                // launcher_x = (monitor_x as f64
-                                //     + (monitor_width as f64 - window_size.width as f64) / 1.5)
-                                //     as i32;
-                                launcher_x = (monitor_x as f64 * scale_factor) as i32
-                                    + ((monitor_width as f64 * scale_factor
-                                        - window_size.width as f64)
-                                        / 2.0) as i32;
+                                launcher_x = monitor_x
+                                    + (monitor_width as i32 - window_size.width as i32) / 2;
+                                // launcher_x = (monitor_x as f64 * scale_factor) as i32
+                                //     + ((monitor_width as f64 * scale_factor
+                                //         - window_size.width as f64)
+                                //         / 2.0) as i32;
                                 launcher_y = monitor_y
                                     + (monitor_height as i32 - window_size.height as i32) / 4;
 
@@ -473,7 +473,8 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                 ) {
                     Ok(img) => {
                         let t0 = std::time::Instant::now();
-                        let img = pollster::block_on(eur_renderer::blur_image(&img, 0.1, 36.0));
+                        let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
+                        // let img = pollster::block_on(eur_renderer::blur_image(&img, 0.1, 36.0));
                         // let img = match cfg!(target_os = "linux") {
                         //     true => pollster::block_on(eur_renderer::blur_image(&img, 0.1, 36.0)),
                         //     false => image::DynamicImage::ImageRgba8(img.clone()).to_rgb8(),
