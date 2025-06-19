@@ -1,6 +1,9 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { ArticleChromeMessage, type ArticleMessageType, type WatcherParams } from './types.js';
-import { ProtoNativeArticleAssetSchema } from '@eurora/shared/proto/native_messaging_pb.js';
+import {
+	ProtoNativeArticleAssetSchema,
+	ProtoNativeArticleSnapshotSchema,
+} from '@eurora/shared/proto/native_messaging_pb.js';
 import { create } from '@eurora/shared/util/grpc';
 import { Readability } from '@mozilla/readability';
 
@@ -99,8 +102,13 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 		response: (response?: any) => void,
 	) {
 		console.log('Generating article snapshot');
-		// For articles, snapshot is the same as assets for now
-		this.handleGenerateAssets(obj, sender, response);
+		// get what the user has highlighted
+		const selectedText = window.getSelection()?.toString() || '';
+		const snapshot = create(ProtoNativeArticleSnapshotSchema, {
+			type: 'ARTICLE_SNAPSHOT',
+			highlightedText: selectedText,
+		});
+		response(snapshot);
 		return true;
 	}
 
