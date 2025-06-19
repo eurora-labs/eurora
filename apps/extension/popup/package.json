@@ -28,21 +28,21 @@
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
-		"@sveltejs/adapter-static": "^3.0.8",
+		"@sveltejs/adapter-static": "catalog:svelte",
 		"sveltekit-adapter-chrome-extension": "^2.0.0",
 		"@sveltejs/adapter-auto": "^4.0.0",
-		"@sveltejs/kit": "^2.21.5",
-		"@sveltejs/vite-plugin-svelte": "^5.1.0",
+		"@sveltejs/kit": "catalog:svelte",
+		"@sveltejs/vite-plugin-svelte": "catalog:svelte",
 		"eslint": "^9.29.0",
 		"@lucide/svelte": "^0.517.0",
 		"perfect-arrows": "^0.3.7",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
-		"svelte": "^5.34.5",
-		"svelte-check": "^4.2.1",
+		"svelte": "catalog:svelte",
+		"svelte-check": "catalog:svelte",
 		"tslib": "^2.8.1",
 		"typescript": "5.8.3",
-		"vite": "^6.3.5",
-		"vitest": "^3.2.4"
+		"vite": "catalog:",
+		"vitest": "catalog:"
 	}
 }
