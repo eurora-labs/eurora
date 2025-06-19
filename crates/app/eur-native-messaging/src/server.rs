@@ -153,8 +153,11 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         match self.send_native_message("GENERATE_ASSETS", json!({})).await {
             Ok(response) => {
                 // Convert JSON response to StateResponse proto
-                let state_response = JSONToProtoAssetConverter::convert(&response);
-                Ok(Response::new(state_response.unwrap()))
+                let state_response =
+                    JSONToProtoAssetConverter::convert(&response).map_err(|e| {
+                        Status::internal(format!("Failed to convert JSON to StateResponse: {}", e))
+                    })?;
+                Ok(Response::new(state_response))
             }
             Err(e) => {
                 info!("Error in native messaging: {}", e);
@@ -173,8 +176,14 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         {
             Ok(response) => {
                 // Convert JSON response to SnapshotResponse proto
-                let snapshot_response = JSONToProtoSnapshotConverter::convert(&response);
-                Ok(Response::new(snapshot_response.unwrap()))
+                let snapshot_response =
+                    JSONToProtoSnapshotConverter::convert(&response).map_err(|e| {
+                        Status::internal(format!(
+                            "Failed to convert JSON to SnapshotResponse: {}",
+                            e
+                        ))
+                    })?;
+                Ok(Response::new(snapshot_response))
             }
             Err(e) => {
                 info!("Error in native messaging: {}", e);

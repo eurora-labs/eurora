@@ -5,6 +5,7 @@ import { videoExtension, videoExtensionID } from '@eurora/ext-video/index';
 import { transcriptExtension, transcriptExtensionID } from '@eurora/ext-transcript/index';
 import { youtubeVideoExtension, youtubeVideoExtensionID } from '@eurora/ext-youtube-video/index';
 import { articleExtension, articleExtensionID } from '$lib/prosemirror/extensions/article/index.js';
+import { twitterExtension, twitterExtensionID } from '@eurora/ext-twitter/index';
 
 /**
  * Register all known core extensions
@@ -16,6 +17,7 @@ export function registerCoreExtensions(): void {
 	extensionFactory.register(transcriptExtensionID, transcriptExtension);
 	extensionFactory.register(youtubeVideoExtensionID, youtubeVideoExtension);
 	extensionFactory.register(articleExtensionID, articleExtension);
+	extensionFactory.register(twitterExtensionID, twitterExtension);
 }
 
 // Option 1: Auto-register extensions when this module is imported
