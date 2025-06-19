@@ -1,4 +1,6 @@
-use crate::snapshot_context::{NativeYoutubeSnapshot, YoutubeSnapshot}; // Use snapshot context types
+use crate::snapshot_context::{
+    ArticleSnapshot, NativeArticleSnapshot, NativeYoutubeSnapshot, YoutubeSnapshot,
+}; // Use snapshot context types
 use anyhow::{anyhow, Error}; // Import anyhow macro and Error
 use eur_proto::ipc::SnapshotResponse; // Import necessary proto types
 use tracing::info;
@@ -40,6 +42,21 @@ impl JSONToProtoSnapshotConverter {
                 // Create the snapshot field for the response
                 let snapshot_field =
                     eur_proto::ipc::snapshot_response::Snapshot::Youtube(youtube_snapshot.0);
+                Ok(SnapshotResponse {
+                    snapshot: Some(snapshot_field),
+                })
+            }
+            "ARTICLE_SNAPSHOT" => {
+                // Convert JSON to NativeArticleSnapshot
+                let native_snapshot = NativeArticleSnapshot::from(&json);
+
+                // Convert NativeArticleSnapshot to ArticleSnapshot
+                let article_snapshot = ArticleSnapshot::try_from(&native_snapshot)
+                    .map_err(|e| anyhow!("Failed to convert article snapshot: {}", e))?;
+
+                // Create the snapshot field for the response
+                let snapshot_field =
+                    eur_proto::ipc::snapshot_response::Snapshot::Article(article_snapshot.0);
                 Ok(SnapshotResponse {
                     snapshot: Some(snapshot_field),
                 })
