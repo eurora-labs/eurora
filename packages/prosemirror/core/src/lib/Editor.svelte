@@ -174,29 +174,6 @@
 		return false;
 	}
 
-	export function addTranscriptNode() {
-		if (!view) return;
-		const state = view.state as EditorState;
-		const tr = state.tr;
-		const { schema } = state;
-		const nodes = schema.nodes;
-
-		const position = state.selection.$from;
-
-		tr.insert(
-			position.pos - position.textOffset,
-			nodes.transcript.createChecked(
-				{
-					id: 'transcript-1',
-					text: 'Some transcript with attrs',
-				},
-				schema.text('transcript'),
-			),
-		);
-
-		view?.dispatch(tr);
-	}
-
 	export async function sendQuery(newQuery?: Query) {
 		if (!view) {
 			await init(newQuery);
