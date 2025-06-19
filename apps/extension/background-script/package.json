@@ -41,10 +41,10 @@
 		"typescript-eslint": "^8.34.1",
 		"vite": "^6.3.5",
 		"vite-plugin-dts": "^4.5.3",
-		"vitest": "^3.2.3"
+		"vitest": "^3.2.4"
 	},
 	"dependencies": {
 		"@sentry/vite-plugin": "^3.3.1",
-		"@sentry/browser": "^9.29.0"
+		"@sentry/browser": "^9.30.0"
 	}
 }
