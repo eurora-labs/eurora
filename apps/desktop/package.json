@@ -50,7 +50,7 @@
 		"@tauri-apps/plugin-process": "^2.2.2",
 		"@tauri-apps/plugin-shell": "^2.2.2",
 		"@tauri-apps/plugin-store": "^2.2.1",
-		"@tauri-apps/plugin-updater": "^2.8.0",
+		"@tauri-apps/plugin-updater": "^2.8.1",
 		"@testing-library/jest-dom": "^6.6.3",
 		"@testing-library/svelte": "^5.2.7",
 		"eslint": "^9.29.0",
@@ -59,8 +59,6 @@
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
 		"katex": "^0.16.22",
-		"@lucide/svelte": "^0.516.0",
-		"postcss-nesting": "^13.0.2",
 		"rehype-katex": "^7.0.1",
 		"rehype-stringify": "^10.0.1",
 		"rehype-raw": "^7.0.0",
@@ -69,16 +67,18 @@
 		"remark-parse": "^11.0.0",
 		"remark-rehype": "^11.1.2",
 		"unified": "^11.0.5",
+		"@lucide/svelte": "^0.517.0",
+		"postcss-nesting": "^13.0.2",
 		"postcss-pxtorem": "^6.1.0",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
 		"prettier-plugin-tailwindcss": "^0.6.12",
-		"svelte": "^5.34.3",
+		"svelte": "^5.34.5",
 		"svelte-check": "^4.2.1",
 		"tinykeys": "^2.1.0",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "^8.34.1",
 		"vite": "^6.3.5",
-		"vitest": "^3.2.3"
+		"vitest": "^3.2.4"
 	}
 }
