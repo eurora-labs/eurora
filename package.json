@@ -23,6 +23,7 @@
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",
 		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
+		"proto:rust": "cargo build -p eur-proto",
 		"test:e2e": "cd apps/desktop && pnpm test:e2e"
 	},
 	"devDependencies": {
