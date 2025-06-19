@@ -15,9 +15,9 @@ catalog:
     '@vitest/ui': '3.2.4'
 catalogs:
     svelte:
-        'svelte': '5.34.5'
+        'svelte': '5.34.7'
         '@sveltejs/kit': '2.21.5'
-        'svelte-check': '4.2.1'
+        'svelte-check': '4.2.2'
         '@sveltejs/vite-plugin-svelte': '5.1.0'
         '@sveltejs/adapter-static': '3.0.8'
         '@sentry/sveltekit': '8.55.0'
