@@ -24,14 +24,18 @@ message StateResponse {
 message SnapshotResponse {
     oneof snapshot {
         ProtoYoutubeSnapshot youtube = 2;
+        ProtoArticleSnapshot article = 3;
     }
 }
 
 message ProtoYoutubeSnapshot {
     float current_time = 1;
     shared.ProtoImage video_frame = 2;
-
 }
+
+message ProtoArticleSnapshot {
+    string highlighted_content = 1;
+} 
 
 message ProtoTranscriptLine {
     string text = 1;
