@@ -9,6 +9,7 @@
 	}
 
 	export interface TweetAttrs {
+		id?: string;
 		url?: string;
 		title?: string;
 		tweets?: string; // JSON string containing array of tweet objects
@@ -18,6 +19,7 @@
 	}
 
 	export const tweetAttrs: TweetAttrs = {
+		id: undefined,
 		url: undefined,
 		title: undefined,
 		tweets: undefined,
@@ -44,6 +46,7 @@
 				getAttrs: (dom: HTMLElement | string) => {
 					if (dom instanceof HTMLElement) {
 						return {
+							id: dom.getAttribute('id'),
 							url: dom.getAttribute('data-url'),
 							title: dom.getAttribute('data-title'),
 							tweets: dom.getAttribute('data-tweets'),
@@ -57,10 +60,11 @@
 			},
 		],
 		toDOM(node: PMNode) {
-			const { url, title, tweets, timestamp, author, text } = node.attrs;
+			const { id, url, title, tweets, timestamp, author, text } = node.attrs;
 			return [
 				'span',
 				{
+					id,
 					'data-url': url,
 					'data-title': title,
 					'data-tweets': tweets,
