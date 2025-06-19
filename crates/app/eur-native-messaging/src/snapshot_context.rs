@@ -1,9 +1,38 @@
 use anyhow::{Context, Result};
 use base64::prelude::*;
-pub use eur_proto::ipc::ProtoYoutubeSnapshot;
+pub use eur_proto::ipc::{ProtoArticleSnapshot, ProtoYoutubeSnapshot};
 pub use eur_proto::native_messaging::ProtoNativeYoutubeSnapshot;
 pub use eur_proto::shared::ProtoImage;
 use tracing::info;
+
+pub struct ArticleSnapshot(pub ProtoArticleSnapshot);
+
+pub struct NativeArticleSnapshot(pub ArticleSnapshot);
+
+impl From<&serde_json::Map<String, serde_json::Value>> for NativeArticleSnapshot {
+    fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
+        info!("NativeArticleSnapshot::from obj: {:?}", obj);
+        let highlighted_content = obj
+            .get("highlightedText")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+
+        NativeArticleSnapshot(ArticleSnapshot(ProtoArticleSnapshot {
+            highlighted_content,
+        }))
+    }
+}
+
+impl TryFrom<&NativeArticleSnapshot> for ArticleSnapshot {
+    type Error = anyhow::Error;
+
+    fn try_from(obj: &NativeArticleSnapshot) -> Result<Self> {
+        Ok(ArticleSnapshot(ProtoArticleSnapshot {
+            highlighted_content: obj.0 .0.highlighted_content.clone(),
+        }))
+    }
+}
 
 // Wrapper type for ProtoYoutubeSnapshot
 pub struct YoutubeSnapshot(pub ProtoYoutubeSnapshot);
