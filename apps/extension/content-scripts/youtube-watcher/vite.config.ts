@@ -58,12 +58,4 @@ export default defineConfig({
 			provider: 'v8',
 		},
 	},
-	resolve: {
-		alias: {
-			'@eurora/youtube-transcripts': path.resolve(
-				__dirname,
-				'../../../../packages/website-modules/youtube/youtube-transcripts/src/index.ts',
-			),
-		},
-	},
 });
