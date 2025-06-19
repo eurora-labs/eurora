@@ -19,9 +19,19 @@
 		},
 		{
 			"all_frames": false,
+			"js": ["content-scripts/twitter-watcher/main.js"],
+			"matches": ["https://x.com/*", "https://twitter.com/*"],
+			"run_at": "document_start"
+		},
+		{
+			"all_frames": false,
 			"js": ["content-scripts/article-watcher/main.js"],
 			"matches": ["<all_urls>"],
-			"exclude_matches": ["https://*.youtube.com/*"],
+			"exclude_matches": [
+				"https://*.youtube.com/*",
+				"https://x.com/*",
+				"https://twitter.com/*"
+			],
 			"run_at": "document_start"
 		}
 	],

@@ -71,6 +71,7 @@
 			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A'),
 			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092'),
 			extensionFactory.getExtension('309f0906-d48c-4439-9751-7bcf915cdfc5'),
+			extensionFactory.getExtension('2c434895-d32c-485f-8525-c4394863b83a'),
 		] as SveltePMExtension[],
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
@@ -262,6 +263,7 @@
 				messages.push(
 					create(ProtoChatMessageSchema, { role: 'user', content: query.text }),
 				);
+				console.log('query', query);
 				clearQuery();
 				await askQuestion(query);
 				// Responses will come through the event listener
