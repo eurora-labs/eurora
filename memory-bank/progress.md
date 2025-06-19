@@ -124,3 +124,40 @@ This file tracks the project's progress using a task list format.
 [2025-06-05 15:57:40] - Implemented comprehensive Google OAuth integration for eur-auth-service
 
 [2025-06-10 14:31:00] - Refactored PDF and Article watchers to follow YouTube watcher pattern using base Watcher class
+
+[2025-06-19 18:45:00] - Implemented comprehensive Twitter watcher content script following YouTube watcher pattern:
+
+- Created Twitter-specific proto definitions in proto/native_messaging.proto
+- Added ProtoNativeTwitterState and ProtoNativeTwitterSnapshot message types
+- Compiled proto definitions to TypeScript using pnpm proto:typescript
+- Implemented TwitterWatcher class extending base Watcher with tweet text extraction
+- Added functionality to extract tweet texts from DOM elements with data-testid="tweetText"
+- Created proper TypeScript interfaces and message types
+- Built and deployed to extensions/chromium/content-scripts/twitter-watcher/
+
+[2025-06-19 18:51:00] - Completed Rust processing implementation for Twitter watcher:
+
+- Added ProtoTwitterState and ProtoTwitterSnapshot to proto/tauri_ipc.proto
+- Added ProtoTweet message type for structured tweet data
+- Updated StateResponse and SnapshotResponse unions to include Twitter types
+- Implemented TwitterTweet struct and conversion to ProtoTweet in asset_context.rs
+- Added NativeTwitterState and TwitterState wrapper types with JSON parsing
+- Updated asset_converter.rs to handle TWITTER_STATE conversion
+- Added Twitter match arms to browser_activity.rs for state and snapshot handling
+- Successfully compiled all Rust proto definitions and native messaging code
+- Twitter watcher now fully integrated into the Eurora native messaging pipeline
+
+[2025-06-19 19:14:00] - Completed comprehensive Twitter ProseMirror extension and snapshot implementation:
+
+- Created ext-twitter package in packages/prosemirror/ following YouTube video extension pattern
+- Implemented TwitterPost.svelte component with Twitter-specific UI using X icon
+- Added Twitter extension with GUID 2c434895-d32c-485f-8525-c4394863b83a
+- Created proper ProseMirror node schema for Twitter content with tweet attributes
+- Implemented popover interface showing tweet content, URL, title, author, and timestamp
+- Added Twitter snapshot support in Rust backend:
+    - Added ProtoTwitterSnapshot to proto/tauri_ipc.proto
+    - Implemented NativeTwitterSnapshot and TwitterSnapshot wrapper types
+    - Updated snapshot_context.rs with Twitter snapshot conversion logic
+    - Added TWITTER_SNAPSHOT case to snapshot_converter.rs
+    - Successfully compiled all Rust code without warnings
+- Twitter extension now fully integrated into both frontend ProseMirror and backend processing

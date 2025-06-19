@@ -3,8 +3,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{
-    self, ProtoArticleSnapshot, ProtoArticleState, ProtoPdfState, ProtoYoutubeSnapshot,
-    ProtoYoutubeState, StateRequest,
+    self, ProtoArticleSnapshot, ProtoArticleState, ProtoPdfState, ProtoTweet, ProtoTwitterSnapshot,
+    ProtoTwitterState, ProtoYoutubeSnapshot, ProtoYoutubeState, StateRequest,
 };
 use eur_proto::shared::ProtoImageFormat;
 use std::collections::HashMap;
@@ -61,6 +61,21 @@ struct ArticleAsset {
     pub content: String,
 }
 
+struct TwitterAsset {
+    pub id: String,
+    pub url: String,
+    pub title: String,
+    pub tweets: Vec<TwitterTweet>,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Clone)]
+struct TwitterTweet {
+    pub text: String,
+    pub timestamp: Option<String>,
+    pub author: Option<String>,
+}
+
 impl YoutubeAsset {
     pub fn try_from(state: ProtoYoutubeState) -> Result<Self, ActivityError> {
         let proto_image = state
@@ -110,6 +125,34 @@ impl ArticleAsset {
 impl From<ProtoArticleState> for ArticleAsset {
     fn from(article: ProtoArticleState) -> Self {
         Self::try_from(article).expect("Failed to convert ProtoArticleState to ArticleAsset")
+    }
+}
+
+impl TwitterAsset {
+    pub fn try_from(state: ProtoTwitterState) -> Result<Self, ActivityError> {
+        let tweets: Vec<TwitterTweet> = state
+            .tweets
+            .into_iter()
+            .map(|tweet| TwitterTweet {
+                text: tweet.text,
+                timestamp: tweet.timestamp,
+                author: tweet.author,
+            })
+            .collect();
+
+        Ok(TwitterAsset {
+            id: uuid::Uuid::new_v4().to_string(),
+            url: state.url,
+            title: state.title,
+            tweets,
+            timestamp: state.timestamp,
+        })
+    }
+}
+
+impl From<ProtoTwitterState> for TwitterAsset {
+    fn from(state: ProtoTwitterState) -> Self {
+        Self::try_from(state).expect("Failed to convert ProtoTwitterState to TwitterAsset")
     }
 }
 
@@ -185,6 +228,128 @@ impl ActivityAsset for ArticleAsset {
             icon: None,
             position: Some(0),
         })
+    }
+}
+
+impl ActivityAsset for TwitterAsset {
+    fn get_name(&self) -> &String {
+        &self.title
+    }
+
+    fn get_icon(&self) -> Option<&String> {
+        None
+    }
+
+    fn construct_message(&self) -> LLMMessage {
+        let tweet_texts: Vec<String> = self
+            .tweets
+            .iter()
+            .map(|tweet| {
+                let mut text = tweet.text.clone();
+                if let Some(author) = &tweet.author {
+                    text = format!("@{}: {}", author, text);
+                }
+                text
+            })
+            .collect();
+
+        LLMMessage {
+            role: Role::User,
+            content: MessageContent::Text(TextContent {
+                text: format!(
+                    "I am looking at Twitter content and have a question about it. \
+                Here are the tweets I'm seeing: \n\n{}",
+                    tweet_texts.join("\n\n")
+                ),
+            }),
+        }
+    }
+
+    fn get_context_chip(&self) -> Option<ContextChip> {
+        Some(ContextChip {
+            id: self.id.clone(),
+            name: "twitter".to_string(),
+            extension_id: "2c434895-d32c-485f-8525-c4394863b83a".to_string(),
+            attrs: HashMap::new(),
+            icon: None,
+            position: Some(0),
+        })
+    }
+}
+
+pub struct TwitterSnapshot {
+    pub tweets: Vec<TwitterTweet>,
+    pub created_at: u64,
+    pub updated_at: u64,
+}
+
+impl From<ProtoTwitterSnapshot> for TwitterSnapshot {
+    fn from(snapshot: ProtoTwitterSnapshot) -> Self {
+        TwitterSnapshot {
+            tweets: snapshot
+                .tweets
+                .into_iter()
+                .map(|tweet| TwitterTweet::from(tweet.clone()))
+                .collect(),
+            created_at: chrono::Utc::now().timestamp() as u64,
+            updated_at: chrono::Utc::now().timestamp() as u64,
+        }
+    }
+}
+
+impl From<ProtoTweet> for TwitterTweet {
+    fn from(tweet: ProtoTweet) -> Self {
+        TwitterTweet {
+            text: tweet.text,
+            timestamp: tweet.timestamp,
+            author: tweet.author,
+        }
+    }
+}
+
+impl ActivitySnapshot for TwitterSnapshot {
+    fn construct_message(&self) -> LLMMessage {
+        let tweet_texts: Vec<String> = self
+            .tweets
+            .iter()
+            .map(|tweet| {
+                let mut text = tweet.text.clone();
+                if let Some(author) = &tweet.author {
+                    text = format!("@{}: {}", author, text);
+                }
+                text
+            })
+            .collect();
+
+        LLMMessage {
+            role: Role::User,
+            content: MessageContent::Text(TextContent {
+                text: format!(
+                    "I am looking at Twitter content and have a question about it. \
+                Here are the tweets I'm seeing: \n\n{}",
+                    tweet_texts.join("\n\n")
+                ),
+            }),
+        }
+    }
+
+    fn get_updated_at(&self) -> u64 {
+        self.updated_at
+    }
+
+    fn get_created_at(&self) -> u64 {
+        self.created_at
+    }
+}
+
+impl TwitterSnapshot {
+    pub fn new(tweets: Vec<TwitterTweet>) -> Self {
+        let now = chrono::Utc::now().timestamp() as u64;
+        Self {
+            tweets,
+            created_at: now,
+            updated_at: now,
+        }
     }
 }
 
@@ -395,6 +560,10 @@ impl ActivityStrategy for BrowserStrategy {
                 info!("Collected Pdf state (not implemented yet)");
                 // PDF handling could be implemented here if needed
             }
+            Some(ipc::state_response::State::Twitter(twitter)) => {
+                info!("Collected Twitter state");
+                return Ok(vec![Box::new(TwitterAsset::from(twitter.clone()))]);
+            }
             None => {
                 info!("No state received from browser");
             }
@@ -419,6 +588,9 @@ impl ActivityStrategy for BrowserStrategy {
             }
             Some(ipc::snapshot_response::Snapshot::Article(article)) => {
                 return Ok(vec![Box::new(ArticleSnapshot::from(article.clone()))]);
+            }
+            Some(ipc::snapshot_response::Snapshot::Twitter(twitter)) => {
+                return Ok(vec![Box::new(TwitterSnapshot::from(twitter.clone()))]);
             }
             None => {
                 info!("No snapshot received from browser");

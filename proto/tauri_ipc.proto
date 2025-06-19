@@ -18,6 +18,7 @@ message StateResponse {
         ProtoYoutubeState youtube = 2;
         ProtoArticleState article = 3;
         ProtoPdfState pdf = 4;
+        ProtoTwitterState twitter = 5;
     }
 }
 
@@ -25,6 +26,7 @@ message SnapshotResponse {
     oneof snapshot {
         ProtoYoutubeSnapshot youtube = 2;
         ProtoArticleSnapshot article = 3;
+        ProtoTwitterSnapshot twitter = 4;
     }
 }
 
@@ -35,7 +37,12 @@ message ProtoYoutubeSnapshot {
 
 message ProtoArticleSnapshot {
     string highlighted_content = 1;
-} 
+}
+
+message ProtoTwitterSnapshot {
+    repeated ProtoTweet tweets = 1;
+    string timestamp = 2;
+}
 
 message ProtoTranscriptLine {
     string text = 1;
@@ -64,12 +71,25 @@ message ProtoArticleState {
     
     int32 length = 8;
 }
-
 message ProtoPdfState {
     string url = 1;
     string title = 2;
     string content = 3;
     string selectedText = 4;
 }
+
+message ProtoTwitterState {
+    string url = 1;
+    string title = 2;
+    repeated ProtoTweet tweets = 3;
+    string timestamp = 4;
+}
+
+message ProtoTweet {
+    string text = 1;
+    optional string timestamp = 2;
+    optional string author = 3;
+}
+
 
 
