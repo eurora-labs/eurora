@@ -159,14 +159,11 @@ async fn main() -> Result<()> {
         .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
         .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
 
-    fmt().with_env_filter(filter).init();
-    // let _guard = sentry::init((
-    //     "https://d4c60ef8f9c19d59dba4b1c12477818e@o4508907847352320.ingest.de.sentry.io/4508993773764688",
-    //     sentry::ClientOptions {
-    //         release: sentry::release_name!(),
-    //         ..Default::default()
-    //     },
-    // ));
+    // Write only to file
+    fmt()
+        .with_env_filter(filter)
+        .with_writer(File::create("eur-native-messaging.log")?)
+        .init();
 
     // Create the gRPC server
     let (grpc_server, _) = server::TauriIpcServer::new();

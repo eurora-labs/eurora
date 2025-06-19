@@ -42,3 +42,8 @@ message ProtoNativeArticleAsset {
 
     int32 length = 9;
 }
+
+message ProtoNativeArticleSnapshot {
+    string type = 1;
+    string highlighted_text = 2; 
+}
