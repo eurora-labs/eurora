@@ -1,8 +1,10 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
+	import Katex from '$lib/components/katex.svelte';
 	import { invoke, Channel } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 
+	import * as Message from '@eurora/ui/custom-components/message/index';
 	import {
 		ProtoChatMessageSchema,
 		type ProtoChatMessage,
@@ -93,45 +95,6 @@
 		monitor_height: number;
 	} | null>(null);
 
-	// Set up event listener for chat responses
-	listen<string>('chat_response', (event) => {
-		messages.push(create(ProtoChatMessageSchema, { role: 'system', content: event.payload }));
-	});
-
-	listen<string>('add_video_context_chip', (event) => {});
-
-	// Listen for key events from the Rust backend
-	listen<string>('key_event', (event) => {
-		console.log('Received key event:', event.payload);
-
-		// Handle special keys
-		if (event.payload === 'Escape') {
-			// Clear input field and reset conversation
-			searchQuery.text = '';
-			currentConversationId = 'NEW';
-			messages.splice(0, messages.length);
-		} else if (
-			event.payload === 'Backspace' ||
-			event.payload === 'Delete' ||
-			event.payload === '\b'
-		) {
-			// Handle backspace key
-			if (searchQuery.text.length > 0) {
-				searchQuery.text = searchQuery.text.slice(0, -1);
-			}
-		} else if (event.payload === 'Enter') {
-			// Submit the current input
-			searchQuery.text = '';
-			const query = processQuery(editorRef!);
-			messages.push(create(ProtoChatMessageSchema, { role: 'user', content: query.text }));
-			askQuestion(query);
-		} else if (event.payload.length === 1 || event.payload === 'Space') {
-			// Handle regular character keys and space
-			const char = event.payload === 'Space' ? ' ' : event.payload;
-			searchQuery.text += char;
-		}
-	});
-
 	// Listen for launcher closed event to clear messages and reset conversation
 	listen('launcher_closed', () => {
 		// Clear messages array
@@ -152,51 +115,51 @@
 		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
 
 		// Capture full monitor after launcher is opened to replace the small background
-		try {
-			if (currentMonitorId && launcherInfo) {
-				// Capture the full monitor using the monitor name from the event
-				const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorId);
+		// try {
+		// 	if (currentMonitorId && launcherInfo) {
+		// 		// Capture the full monitor using the monitor name from the event
+		// 		const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorId);
 
-				// Replace the background image with the full monitor capture
-				// Position it so it appears as if looking through transparent glass
-				if (backdropCustom2Ref && fullMonitorImage) {
-					// Calculate the position offset to align the background properly
-					// The background should be positioned so that the launcher area shows
-					// the same content as if it were transparent
-					const offsetX = -launcherInfo.launcher_x;
-					const offsetY = -launcherInfo.launcher_y;
+		// 		// Replace the background image with the full monitor capture
+		// 		// Position it so it appears as if looking through transparent glass
+		// 		if (backdropCustom2Ref && fullMonitorImage) {
+		// 			// Calculate the position offset to align the background properly
+		// 			// The background should be positioned so that the launcher area shows
+		// 			// the same content as if it were transparent
+		// 			const offsetX = -launcherInfo.launcher_x;
+		// 			const offsetY = -launcherInfo.launcher_y;
 
-					backdropCustom2Ref.style.backgroundImage = `url('${fullMonitorImage}')`;
-					// backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
-					backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
-					backdropCustom2Ref.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
-					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-					// backdropCustom2Ref.style.backgroundClip = 'content-box';
+		// 			backdropCustom2Ref.style.backgroundImage = `url('${fullMonitorImage}')`;
+		// 			// backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
+		// 			backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
+		// 			backdropCustom2Ref.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
+		// 			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+		// 			// backdropCustom2Ref.style.backgroundClip = 'content-box';
 
-					// Update the backgroundImage state
-					backgroundImage = fullMonitorImage;
+		// 			// Update the backgroundImage state
+		// 			backgroundImage = fullMonitorImage;
 
-					console.log(
-						'Full monitor background captured and positioned for monitor:',
-						currentMonitorId,
-						'offset:',
-						offsetX,
-						offsetY,
-					);
-				}
-			}
-		} catch (error) {
-			console.error('Failed to capture full monitor background:', error);
-		}
+		// 			console.log(
+		// 				'Full monitor background captured and positioned for monitor:',
+		// 				currentMonitorId,
+		// 				'offset:',
+		// 				offsetX,
+		// 				offsetY,
+		// 			);
+		// 		}
+		// 	}
+		// } catch (error) {
+		// 	console.error('Failed to capture full monitor background:', error);
+		// }
 	});
 
 	// Listen for background image event
 	listen<string>('background_image', (event) => {
-		const scrollY = window.scrollY;
-		window.scrollTo(0, 0);
-		taurpc.window.resize_launcher_window(window.outerHeight + scrollY, 1.0).then(() => {
-			window.scrollTo(0, 0);
-		});
+		// const scrollY = window.scrollY;
+		// window.scrollTo(0, 0);
+		// taurpc.window.resize_launcher_window(window.outerHeight + scrollY, 1.0).then(() => {
+		// 	window.scrollTo(0, 0);
+		// });
 		backgroundImage = event.payload;
 
 		if (backdropCustom2Ref) {
@@ -295,16 +258,27 @@
 			// await taurpc.window.resize_launcher_window(100, 1.0);
 
 			try {
-				const question = searchQuery.text;
-				searchQuery.text = '';
-				messages.push(create(ProtoChatMessageSchema, { role: 'user', content: question }));
 				const query = processQuery(editorRef!);
+				messages.push(
+					create(ProtoChatMessageSchema, { role: 'user', content: query.text }),
+				);
+				clearQuery();
 				await askQuestion(query);
 				// Responses will come through the event listener
 			} catch (error) {
 				console.error('Error:', error);
 			}
 		}
+	}
+
+	async function clearQuery() {
+		if (!editorRef) return;
+		searchQuery.text = '';
+		editorRef.cmd((state, dispatch) => {
+			const tr = state.tr;
+			tr.delete(0, state.doc.content.size);
+			dispatch?.(tr);
+		});
 	}
 
 	async function addVideoExtension() {
@@ -316,7 +290,7 @@
 				0,
 				nodes['9370B14D-B61C-4CE2-BDE7-B18684E8731A'].createChecked(
 					{ id: 'video-1', name: 'Some video with attrs' },
-					schema.text('video'),
+					schema.text(' '),
 				),
 			);
 			dispatch?.(tr);
@@ -330,21 +304,13 @@
 				text: query.text,
 				assets: query.assets,
 			};
+			messages.push(create(ProtoChatMessageSchema, { role: 'agent', content: '' }));
+			const agentMessage = messages.at(-1);
 
 			const onEvent = (response: ResponseChunk) => {
-				if (response.chunk === '') {
-					// Initial message
-					messages.push(
-						create(ProtoChatMessageSchema, {
-							role: 'system',
-							content: '',
-						}),
-					);
-				} else {
-					// Append chunk to the last message
-					if (messages.length > 0) {
-						messages.at(-1)!.content += response.chunk;
-					}
+				// Append chunk to the last message
+				if (agentMessage) {
+					agentMessage.content += response.chunk;
 				}
 				console.log(`got response chunk: ${response.chunk}`);
 			};
@@ -431,31 +397,54 @@
 				</Launcher.Root>
 			</div>
 
-			<div class="message-scroll-area w-full flex-grow overflow-auto">
-				<Chat {messages} />
-			</div>
+			<!-- <Chat class="w-full" {messages} /> -->
+			<Chat class="w-full">
+				{#each messages as message}
+					<Message.Root
+						variant={message.role === 'user' ? 'default' : 'agent'}
+						finishRendering={() => {}}
+					>
+						<Message.Content>
+							<!-- {message.content} -->
+							<Katex math={message.content} finishRendering={() => {}} />
+						</Message.Content>
+					</Message.Root>
+				{/each}
+			</Chat>
 		{/if}
 	</div>
 </div>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0">
+	<filter id="blur-bright" filterUnits="objectBoundingBox">
+		<feGaussianBlur in="SourceGraphic" stdDeviation="36" edgeMode="duplicate" result="blur" />
+		<feFlood flood-color="#ffffff" flood-opacity="0.1" result="white" />
+		<feComposite in="white" in2="blur" operator="over" />
+	</filter>
+</svg>
+
 <div
 	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
+	style="filter:url(#blur-bright)"
 	bind:this={backdropCustom2Ref}
 ></div>
 
 <style lang="postcss">
+	@reference 'tailwindcss';
 	.backdrop-custom {
 		z-index: 2;
-		backdrop-filter: blur(18px);
-		-webkit-backdrop-filter: blur(18px);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
 		background-color: rgba(255, 255, 255, 0.2);
+		background: transparent;
 	}
 
 	.backdrop-custom-2 {
 		z-index: 1;
 		width: 100%;
 		height: 100%;
-
-		background-color: rgba(0, 0, 0, 1);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
 	}
 	:global(body.linux-app .backdrop-custom) {
 		backdrop-filter: none;
