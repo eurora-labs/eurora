@@ -144,7 +144,8 @@
 				// Fall through to default
 			}
 		}
-		return attrs.title || 'Twitter Content';
+		return 'x.com';
+		// return attrs.title || 'Twitter Content';
 	}
 
 	// Get tweet count for display
