@@ -1,5 +1,6 @@
 pub use crate::asset_context::{
-    ArticleState, NativeArticleAsset, NativeYoutubeState, PdfState, YoutubeState,
+    ArticleState, NativeArticleAsset, NativeTwitterState, NativeYoutubeState, PdfState,
+    TwitterState, YoutubeState,
 };
 use anyhow::Error;
 use eur_proto::ipc::StateResponse;
@@ -60,12 +61,19 @@ impl JSONToProtoAssetConverter {
                 let state = eur_proto::ipc::state_response::State::Pdf(proto_state.0);
                 Ok(StateResponse { state: Some(state) })
             }
+            "TWITTER_STATE" => {
+                let native_state = NativeTwitterState::from(&json);
+                let proto_state = TwitterState::try_from(&native_state)
+                    .map_err(|e| anyhow::anyhow!("Failed to convert Twitter state: {}", e))?;
+                let state = eur_proto::ipc::state_response::State::Twitter(proto_state.0);
+                Ok(StateResponse { state: Some(state) })
+            }
             unknown_type => {
                 info!(
                     "Unsupported asset type '{}' in JSON: {:?}",
                     unknown_type, json
                 );
-                Err(anyhow::anyhow!("Unsupported asset type: '{}'. Supported types: YOUTUBE_STATE, ARTICLE_ASSET, PDF_STATE", unknown_type))
+                Err(anyhow::anyhow!("Unsupported asset type: '{}'. Supported types: YOUTUBE_STATE, ARTICLE_ASSET, PDF_STATE, TWITTER_STATE", unknown_type))
             }
         }
     }

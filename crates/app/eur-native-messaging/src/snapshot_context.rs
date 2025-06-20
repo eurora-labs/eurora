@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use base64::prelude::*;
-pub use eur_proto::ipc::{ProtoArticleSnapshot, ProtoYoutubeSnapshot};
+pub use eur_proto::ipc::{ProtoArticleSnapshot, ProtoTwitterSnapshot, ProtoYoutubeSnapshot};
+pub use eur_proto::native_messaging::ProtoNativeTwitterSnapshot;
 pub use eur_proto::native_messaging::ProtoNativeYoutubeSnapshot;
 pub use eur_proto::shared::ProtoImage;
 use tracing::info;
@@ -84,6 +85,33 @@ impl TryFrom<&NativeYoutubeSnapshot> for YoutubeSnapshot {
                 height: obj.0.video_frame_height,
                 format: obj.0.video_frame_format,
             }),
+        }))
+    }
+}
+
+// Twitter snapshot types - similar to article snapshots for now
+pub struct TwitterSnapshot(pub ProtoTwitterSnapshot);
+
+pub struct NativeTwitterSnapshot(pub ProtoNativeTwitterSnapshot);
+
+impl From<&serde_json::Map<String, serde_json::Value>> for NativeTwitterSnapshot {
+    fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
+        info!("NativeTwitterSnapshot::from obj: {:?}", obj);
+        NativeTwitterSnapshot(ProtoNativeTwitterSnapshot {
+            r#type: obj.get("type").unwrap().as_str().unwrap().to_string(),
+            tweets: obj.get("tweets").unwrap().as_str().unwrap().to_string(),
+            timestamp: obj.get("timestamp").unwrap().as_str().unwrap().to_string(),
+        })
+    }
+}
+
+impl TryFrom<&NativeTwitterSnapshot> for TwitterSnapshot {
+    type Error = anyhow::Error;
+
+    fn try_from(obj: &NativeTwitterSnapshot) -> Result<Self> {
+        Ok(TwitterSnapshot(ProtoTwitterSnapshot {
+            tweets: serde_json::from_str(&obj.0.tweets).unwrap_or_default(),
+            timestamp: obj.0.timestamp.clone(),
         }))
     }
 }
