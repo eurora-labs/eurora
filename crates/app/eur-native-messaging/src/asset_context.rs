@@ -1,9 +1,11 @@
 use anyhow::{Context, Result};
 use base64::prelude::*;
 pub use eur_proto::ipc::{
-    ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoYoutubeState,
+    ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoTweet, ProtoTwitterState,
+    ProtoYoutubeState,
 };
 pub use eur_proto::native_messaging::ProtoNativeArticleAsset;
+pub use eur_proto::native_messaging::ProtoNativeTwitterState;
 pub use eur_proto::native_messaging::ProtoNativeYoutubeState;
 pub use eur_proto::shared::ProtoImage;
 use serde::Deserialize;
@@ -16,12 +18,29 @@ struct TranscriptLine {
     duration: f32,
 }
 
+#[derive(Deserialize)]
+struct TwitterTweet {
+    text: String,
+    timestamp: Option<String>,
+    author: Option<String>,
+}
+
 impl From<TranscriptLine> for ProtoTranscriptLine {
     fn from(line: TranscriptLine) -> Self {
         ProtoTranscriptLine {
             text: line.text,
             start: line.start,
             duration: line.duration,
+        }
+    }
+}
+
+impl From<TwitterTweet> for ProtoTweet {
+    fn from(tweet: TwitterTweet) -> Self {
+        ProtoTweet {
+            text: tweet.text,
+            timestamp: tweet.timestamp,
+            author: tweet.author,
         }
     }
 }
@@ -169,5 +188,41 @@ impl From<&serde_json::Map<String, serde_json::Value>> for PdfState {
                 .unwrap()
                 .to_string(),
         })
+    }
+}
+
+// New wrapper type for ProtoTwitterState
+pub struct TwitterState(pub ProtoTwitterState);
+
+pub struct NativeTwitterState(pub ProtoNativeTwitterState);
+
+impl From<&serde_json::Map<String, serde_json::Value>> for NativeTwitterState {
+    fn from(obj: &serde_json::Map<String, serde_json::Value>) -> Self {
+        info!("NativeTwitterState::from obj: {:?}", obj);
+        NativeTwitterState(ProtoNativeTwitterState {
+            r#type: obj.get("type").unwrap().as_str().unwrap().to_string(),
+            url: obj.get("url").unwrap().as_str().unwrap().to_string(),
+            title: obj.get("title").unwrap().as_str().unwrap().to_string(),
+            tweets: obj.get("tweets").unwrap().as_str().unwrap().to_string(),
+            timestamp: obj.get("timestamp").unwrap().as_str().unwrap().to_string(),
+        })
+    }
+}
+
+impl TryFrom<&NativeTwitterState> for TwitterState {
+    type Error = anyhow::Error;
+
+    fn try_from(obj: &NativeTwitterState) -> Result<Self> {
+        // Parse the tweets string into Vec<TwitterTweet> and convert to Vec<ProtoTweet>
+        let tweets = serde_json::from_str::<Vec<TwitterTweet>>(obj.0.tweets.as_str())
+            .map(|tweets| tweets.into_iter().map(Into::into).collect())
+            .unwrap_or_else(|_| Vec::new());
+
+        Ok(TwitterState(ProtoTwitterState {
+            url: obj.0.url.clone(),
+            title: obj.0.title.clone(),
+            tweets,
+            timestamp: obj.0.timestamp.clone(),
+        }))
     }
 }
