@@ -22,7 +22,7 @@
 </script>
 
 <div
-	class="items-top flex h-[100px] border-none px-3 fixed top-0 left-0 w-full"
+	class="items-top flex h-[100px] border-none px-3 fixed top-0 left-0 w-full z-50"
 	data-command-input-wrapper=""
 >
 	<div class="flex justify-center items-center">
