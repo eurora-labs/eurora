@@ -27,7 +27,7 @@
 
 <script lang="ts">
 	import * as Command from '$lib/custom-components/launcher/index.js';
-	import StoryContainer from '../StoryContainer.svelte';
+	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
 	import {
 		Calendar,
 		Calculator,
@@ -46,7 +46,7 @@
 
 <!-- Basic Group -->
 <Story name="Basic Group">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading="Applications">
@@ -65,12 +65,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- Group without Heading -->
 <Story name="Without Heading">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
@@ -89,12 +89,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- Multiple Groups -->
 <Story name="Multiple Groups">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading="Applications">
@@ -135,12 +135,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- Groups with Shortcuts -->
 <Story name="With Shortcuts">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading="Quick Actions">
@@ -170,12 +170,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- Different Group Styles -->
 <Story name="Different Headings">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading="🚀 Quick Actions">
@@ -200,12 +200,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group heading={args.heading}>
@@ -224,5 +224,5 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 {/snippet}

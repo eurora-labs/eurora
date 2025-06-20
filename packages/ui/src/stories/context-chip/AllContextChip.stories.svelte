@@ -18,12 +18,12 @@
 </script>
 
 <script lang="ts">
-	import StoryContainer from '../StoryContainer.svelte';
+	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
 	import { ExternalLink, Hash, Tag, User, Calendar, MapPin, Clock } from '@lucide/svelte';
 </script>
 
 <Story name="All Context Chips">
-	<StoryContainer>
+	<StorybookContainer>
 		{#snippet children()}
 			<div class="space-y-8 p-6">
 				<div>
@@ -143,5 +143,5 @@
 				</div>
 			</div>
 		{/snippet}
-	</StoryContainer>
+	</StorybookContainer>
 </Story>

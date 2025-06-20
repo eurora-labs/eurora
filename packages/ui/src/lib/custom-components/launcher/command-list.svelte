@@ -10,7 +10,7 @@
 </script>
 
 <CommandPrimitive.List
-	class={cn('max-h-[300px] overflow-x-hidden overflow-y-auto', className)}
+	class={cn('max-h-[300px] overflow-x-hidden overflow-y-auto mt-[100px]', className)}
 	bind:ref
 	{...restProps}
 />
