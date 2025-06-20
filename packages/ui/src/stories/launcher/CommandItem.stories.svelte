@@ -28,7 +28,7 @@
 
 <script lang="ts">
 	import * as Command from '$lib/custom-components/launcher/index.js';
-	import StoryContainer from '../StoryContainer.svelte';
+	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
 	import {
 		Calendar,
 		Calculator,
@@ -43,7 +43,7 @@
 </script>
 
 <Story name="Basic Items">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
@@ -59,11 +59,11 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <Story name="With Icons">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
@@ -86,11 +86,11 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <Story name="With Shortcuts">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
@@ -117,11 +117,11 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <Story name="Colored Icons">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
@@ -148,11 +148,11 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <Story name="Disabled Items">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
@@ -176,11 +176,11 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
 				<Command.Group>
@@ -192,5 +192,5 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 {/snippet}
