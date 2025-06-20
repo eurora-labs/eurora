@@ -5,7 +5,7 @@
 		"target": "ESNext",
 		"lib": ["es6", "dom"],
 		"types": ["chrome", "vite/client"],
-		"strict": false,
+		"strict": true,
 		"noPropertyAccessFromIndexSignature": true,
 		"allowImportingTsExtensions": true,
 		"emitDeclarationOnly": true,
