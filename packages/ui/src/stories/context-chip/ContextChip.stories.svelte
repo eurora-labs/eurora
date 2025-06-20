@@ -42,13 +42,13 @@
 </script>
 
 <script lang="ts">
-	import StoryContainer from '../StoryContainer.svelte';
+	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
 	import { Hash } from '@lucide/svelte';
 </script>
 
 <!-- Interactive Context Chip -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<StoryContainer>
+	<StorybookContainer>
 		<ContextChip
 			variant={args.variant}
 			href={args.href}
@@ -66,7 +66,7 @@
 				Context Chip
 			{/if}
 		</ContextChip>
-	</StoryContainer>
+	</StorybookContainer>
 {/snippet}
 
 <Story name="Interactive" children={template} />
