@@ -53,6 +53,7 @@ message ProtoNativeTwitterState {
     string type = 1;
     string url = 2;
     string title = 3;
+    // TODO: Migrate stringified tweets to a repeated array
     string tweets = 4; // JSON string containing array of tweet objects
     string timestamp = 5;
 }
