@@ -107,7 +107,7 @@ This file tracks the project's progress using a task list format.
 
 [2025-06-02 18:38:00] - Added sample_background.jpg as background image to all launcher Storybook stories
 
-[2025-06-03 08:17:45] - Created reusable StoryContainer component and refactored all launcher story files to use it instead of duplicated container markup
+[2025-06-03 08:17:45] - Created reusable StorybookContainer component and refactored all launcher story files to use it instead of duplicated container markup
 
 [2025-06-03 08:26:00] - Refactored Button Storybook stories to separate showcase and interactive examples
 

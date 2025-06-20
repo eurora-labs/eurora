@@ -104,7 +104,7 @@
 import { writable, derived } from 'svelte/store';
 
 export const tasks = writable([]);
-export const completedTasks = derived(tasks, $tasks => 
+export const completedTasks = derived(tasks, $tasks =>
   $tasks.filter(task => task.completed)
 );
 
@@ -231,7 +231,7 @@ function createCartStore() {
       return [...items, { ...product, quantity: 1 }];
     }),
     removeItem: (id) => update(items => items.filter(item => item.id !== id)),
-    updateQuantity: (id, quantity) => update(items => 
+    updateQuantity: (id, quantity) => update(items =>
       items.map(item => item.id === id ? { ...item, quantity } : item)
     ),
     clear: () => set([])
@@ -239,7 +239,7 @@ function createCartStore() {
 }
 
 export const cart = createCartStore();
-export const cartTotal = derived(cart, $cart => 
+export const cartTotal = derived(cart, $cart =>
   $cart.reduce((total, item) => total + (item.price * item.quantity), 0)
 );`,
 			sources: [renderIcon(SiGithub)],
@@ -334,7 +334,7 @@ export const cartTotal = derived(cart, $cart =>
 function handleScroll() {
   const chatContainer = document.getElementById('chat');
   const shouldAutoScroll = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 10;
-  
+
   if (shouldAutoScroll) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
   }
@@ -365,11 +365,11 @@ function handleScroll() {
 </script>
 
 <script lang="ts">
-	import StoryContainer from '../StoryContainer.svelte';
+	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
 </script>
 
 <Story name="Short Conversation">
-	<StoryContainer class="p-0">
+	<StorybookContainer class="p-0">
 		{#snippet children()}
 			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
@@ -398,11 +398,11 @@ function handleScroll() {
 				</div>
 			</div>
 		{/snippet}
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <Story name="Medium Conversation">
-	<StoryContainer class="p-0">
+	<StorybookContainer class="p-0">
 		{#snippet children()}
 			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
@@ -431,11 +431,11 @@ function handleScroll() {
 				</div>
 			</div>
 		{/snippet}
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <Story name="Long Conversation with Scrolling">
-	<StoryContainer class="p-0">
+	<StorybookContainer class="p-0">
 		{#snippet children()}
 			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
@@ -464,11 +464,11 @@ function handleScroll() {
 				</div>
 			</div>
 		{/snippet}
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <Story name="Mixed Content with Sources">
-	<StoryContainer class="p-0">
+	<StorybookContainer class="p-0">
 		{#snippet children()}
 			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
@@ -497,11 +497,11 @@ function handleScroll() {
 				</div>
 			</div>
 		{/snippet}
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <Story name="Interactive Chat Behavior">
-	<StoryContainer class="p-0">
+	<StorybookContainer class="p-0">
 		{#snippet children()}
 			<div class="h-[600px] w-full">
 				<div class="h-full p-6">
@@ -530,5 +530,5 @@ function handleScroll() {
 				</div>
 			</div>
 		{/snippet}
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
