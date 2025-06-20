@@ -144,7 +144,7 @@
 				// Fall through to default
 			}
 		}
-		return 'x.com';
+		return 'content';
 		// return attrs.title || 'Twitter Content';
 	}
 
@@ -175,7 +175,7 @@
 	<Popover.Content class="w-96">
 		<div class="grid gap-4">
 			<div class="space-y-2">
-				<h4 class="font-medium leading-none">Twitter Content</h4>
+				<h4 class="font-medium leading-none">Twitter</h4>
 				<p class="text-muted-foreground text-sm">View and manage Twitter content.</p>
 			</div>
 			<div class="grid gap-2">

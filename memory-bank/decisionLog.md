@@ -674,9 +674,9 @@ This file tracks key architectural and design decisions made during the project'
 - Professional presentation for design reviews and stakeholder demonstrations
 - Consistent visual treatment across all launcher component stories
 
-[2025-06-03 08:17:50] - Created reusable StoryContainer component for Storybook stories
+[2025-06-03 08:17:50] - Created reusable StorybookContainer component for Storybook stories
 
-**Decision:** Extracted repeated container markup from launcher story files into a reusable [`StoryContainer.svelte`](packages/ui/src/stories/StoryContainer.svelte) component.
+**Decision:** Extracted repeated container markup from launcher story files into a reusable [`StorybookContainer.svelte`](packages/ui/src/stories/StorybookContainer.svelte) component.
 
 **Rationale:**
 
@@ -688,7 +688,7 @@ This file tracks key architectural and design decisions made during the project'
 
 **Implementation Details:**
 
-- Created [`StoryContainer.svelte`](packages/ui/src/stories/StoryContainer.svelte:1) with slot-based children rendering
+- Created [`StorybookContainer.svelte`](packages/ui/src/stories/StorybookContainer.svelte:1) with slot-based children rendering
 - Added CSS fallback background color (#f5f5f5) and secondary fallback image (grid pattern)
 - Marked background div with `role="presentation"` and `aria-hidden="true"` for accessibility
 - Updated all launcher story files to use the new component:
