@@ -367,7 +367,7 @@
 
 					<!-- Recent conversations list -->
 					{#if messages.length === 0}
-						<Launcher.List>
+						<Launcher.List class="mt-[100px]">
 							<!-- <Launcher.List hidden> -->
 							<Launcher.Group heading="Local Files">
 								<Launcher.Item onclick={addVideoExtension}>

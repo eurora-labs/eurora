@@ -27,7 +27,7 @@
 </script>
 
 <script lang="ts">
-	import StoryContainer from '../StoryContainer.svelte';
+	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
 	import {
 		Search,
 		Calculator,
@@ -47,7 +47,7 @@
 
 <!-- Default Command -->
 <Story name="Default">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.Input placeholder="Search" />
 			<Command.List>
@@ -76,12 +76,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- With Multiple Groups -->
 <Story name="With Groups">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.Input placeholder="Search" />
 			<Command.List>
@@ -136,12 +136,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- With Colored Icons -->
 <Story name="With Icons">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.Input placeholder="Search" />
 			<Command.List>
@@ -191,12 +191,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- Empty State -->
 <Story name="Empty">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root
 			value="xyz123nonexistent"
 			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
@@ -225,12 +225,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- Loading State -->
 <Story name="Loading">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.Input placeholder="Loading..." />
 			<Command.List>
@@ -253,12 +253,12 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <!-- Interactive Example -->
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root
 			bind:value={args.value}
 			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
@@ -282,5 +282,5 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 {/snippet}

@@ -33,30 +33,30 @@
 
 <script lang="ts">
 	import * as Command from '$lib/custom-components/launcher/index.js';
-	import StoryContainer from '../StoryContainer.svelte';
+	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
 </script>
 
 <Story name="Default">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.Input placeholder="Search" />
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 <Story name="With Value">
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root
 			value="calculator"
 			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
 		>
 			<Command.Input placeholder="Search" />
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 </Story>
 
 {#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
-	<StoryContainer>
+	<StorybookContainer>
 		<Command.Root
 			bind:value={args.value}
 			class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]"
@@ -71,5 +71,5 @@
 				</Command.Group>
 			</Command.List>
 		</Command.Root>
-	</StoryContainer>
+	</StorybookContainer>
 {/snippet}
