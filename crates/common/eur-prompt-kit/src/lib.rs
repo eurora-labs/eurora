@@ -1,9 +1,5 @@
-use anyhow::Result;
 use image::DynamicImage;
-use llm::{
-    builder::{LLMBackend, LLMBuilder},
-    chat::ChatMessage,
-};
+use llm::{builder::LLMBackend, chat::ChatMessage};
 
 mod service;
 pub use service::PromptKitService;
@@ -80,7 +76,9 @@ impl From<LLMMessage> for ChatMessage {
 
         message = match value.content {
             MessageContent::Text(TextContent { text }) => message.content(text),
-            MessageContent::Image(ImageContent { text, image }) => message.content(text.unwrap()),
+            MessageContent::Image(ImageContent { text, image: _ }) => {
+                message.content(text.unwrap())
+            }
         };
 
         message.build()
