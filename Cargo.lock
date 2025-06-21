@@ -2306,8 +2306,10 @@ name = "eur-prompt-kit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "futures",
  "image",
  "llm",
+ "openai-api-rs",
 ]
 
 [[package]]
@@ -4384,12 +4386,12 @@ checksum = "b4ce301924b7887e9d637144fdade93f9dfff9b60981d4ac161db09720d39aa5"
 [[package]]
 name = "llm"
 version = "1.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ad521901ec623a832bceff4eb0450053ac75d165b641b8f3112f28d1161f194"
+source = "git+https://github.com/AndreRoelofs/llm.git?branch=main#14724e714b95b35a5a8c30140acd0111112facdc"
 dependencies = [
  "async-trait",
  "axum 0.7.9",
  "base64 0.22.1",
+ "chrono",
  "clap",
  "colored",
  "dirs",
