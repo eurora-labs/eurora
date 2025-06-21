@@ -2306,10 +2306,12 @@ name = "eur-prompt-kit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "eur-util",
  "futures",
  "image",
  "llm",
  "openai-api-rs",
+ "tokio",
 ]
 
 [[package]]
@@ -2479,6 +2481,8 @@ name = "eur-util"
 version = "0.1.0"
 dependencies = [
  "eur-proto",
+ "once_cell",
+ "regex",
 ]
 
 [[package]]
