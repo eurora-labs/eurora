@@ -1,4 +1,4 @@
-use crate::shared_types::{SharedOpenAIClient, SharedTimeline};
+use crate::shared_types::{SharedPromptKitService, SharedTimeline};
 use futures::StreamExt;
 use tauri::ipc::Channel;
 use tauri::{Manager, Runtime};
@@ -52,39 +52,49 @@ impl QueryApi for QueryApiImpl {
             }),
         });
 
-        let state: tauri::State<SharedOpenAIClient> = app_handle.state();
+        let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;
         let client = guard
             .as_mut()
-            .ok_or_else(|| "OpenAI client not initialized".to_string())?;
+            .ok_or_else(|| "PromptKitService not initialized".to_string())?;
 
         // Create new conversation and store it in SQLite
         info!("Creating new conversation with title: {}", title);
 
         let mut complete_response = String::new();
 
-        let mut stream = client.video_question(messages).await?;
-
+        // Send initial empty chunk to signal start of streaming
         channel
             .send(ResponseChunk {
                 chunk: "".to_string(),
             })
-            .map_err(|e| format!("Failed to send response: {e}"))?;
+            .map_err(|e| format!("Failed to send initial response: {e}"))?;
 
-        while let Some(Ok(chunk)) = stream.next().await {
-            for message in chunk.choices {
-                let Some(message) = message.delta.content else {
-                    continue;
-                };
-                // Append to the complete response
-                complete_response.push_str(&message);
+        match client.chat_stream(messages).await {
+            Ok(mut stream) => {
+                info!("Starting to consume stream...");
+                while let Some(result) = stream.next().await {
+                    match result {
+                        Ok(chunk) => {
+                            // Append to the complete response
+                            complete_response.push_str(&chunk);
 
-                channel
-                    .send(ResponseChunk { chunk: message })
-                    .map_err(|e| format!("Failed to send response: {e}"))?;
+                            // Send the chunk to the frontend
+                            if let Err(e) = channel.send(ResponseChunk { chunk }) {
+                                return Err(format!("Failed to send response chunk: {e}"));
+                            }
+                        }
+                        Err(e) => {
+                            return Err(format!("Stream error: {}", e));
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                return Err(format!("Failed to create chat stream: {}", e));
             }
         }
 
-        Ok("".to_string())
+        Ok(complete_response)
     }
 }

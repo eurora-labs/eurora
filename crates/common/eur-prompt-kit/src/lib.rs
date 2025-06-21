@@ -6,6 +6,7 @@ use llm::{
 };
 
 mod service;
+pub use service::PromptKitService;
 
 #[derive(Debug, Default, Copy, Clone)]
 pub enum EurLLMService {
