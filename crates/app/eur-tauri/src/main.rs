@@ -150,8 +150,8 @@ fn main() {
                     app_handle.manage(questions_client.clone());
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
-                    let openai_client = create_shared_promptkit_client();
-                    app_handle.manage(openai_client.clone());
+                    let promptkit_client = create_shared_promptkit_client();
+                    app_handle.manage(promptkit_client.clone());
                     let current_conversation_id = Arc::new(None::<String>);
                     app_handle.manage(current_conversation_id.clone());
                     // let current_conversation = create_shared_current_conversation();
