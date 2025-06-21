@@ -1,0 +1,9 @@
+[package]
+name = "eur-prompt-kit"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+image = { workspace = true }
+llm = { version = "1.2.4", features = ["openai"] }
