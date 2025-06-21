@@ -1,12 +1,11 @@
 use crate::{EurLLMService, LLMMessage};
 use anyhow::Result;
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use llm::{
     builder::{LLMBackend, LLMBuilder},
     chat::ChatMessage,
     error::LLMError,
 };
-use std::pin::Pin;
 
 #[derive(Debug)]
 pub struct PromptKitService {
@@ -24,6 +23,7 @@ impl PromptKitService {
         Self { llm_backend }
     }
 
+    #[allow(dead_code)]
     async fn anonymize_text(text: String) -> Result<String> {
         // Send messages to self-hosted LLM with instruction to remove personal data
         let llm = LLMBuilder::new()
