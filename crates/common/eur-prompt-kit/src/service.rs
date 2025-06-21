@@ -25,7 +25,6 @@ impl PromptKitService {
         Self { llm_backend, model }
     }
 
-    #[allow(dead_code)]
     pub async fn anonymize_text(text: String) -> Result<String> {
         let base_url = "http://127.0.0.1:11434".to_string();
         let original_text = text.clone();
