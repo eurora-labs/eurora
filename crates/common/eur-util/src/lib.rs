@@ -1,4 +1,6 @@
 use eur_proto::ipc::ProtoTranscriptLine;
+use once_cell::sync::Lazy;
+use regex::Regex;
 
 pub fn flatten_transcript_with_highlight(
     transcript: Vec<ProtoTranscriptLine>,
@@ -18,4 +20,23 @@ pub fn flatten_transcript_with_highlight(
         }
     }
     flat_transcript
+}
+
+static EMAIL_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b").unwrap());
+pub fn redact_emails<S: AsRef<str>>(input: S) -> String {
+    EMAIL_RE
+        .replace_all(input.as_ref(), "<REDACTED>")
+        .into_owned()
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic() {
+        let original = "Contact me: user.name+tag@example.co.uk and admin@domain.com.";
+        let expected = "Contact me: <REDACTED> and <REDACTED>.";
+        assert_eq!(redact_emails(original), expected);
+    }
 }
