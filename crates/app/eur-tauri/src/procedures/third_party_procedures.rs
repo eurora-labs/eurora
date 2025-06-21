@@ -47,16 +47,12 @@ impl ThirdPartyApi for ThirdPartyApiImpl {
             .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
 
         // Initialize the OpenAI client with the API key
-        unsafe {
-            std::env::set_var("OPENAI_API_KEY", api_key.unwrap().0);
-        }
-
-        let openai_client = eur_prompt_kit::PromptKitService::default();
+        let promptkit_client = eur_prompt_kit::PromptKitService::default();
 
         // Store the client in the app state
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;
-        *guard = Some(openai_client);
+        *guard = Some(promptkit_client);
 
         Ok(true)
     }
