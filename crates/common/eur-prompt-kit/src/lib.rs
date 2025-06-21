@@ -20,6 +20,8 @@ impl From<EurLLMService> for LLMBackend {
             EurLLMService::OpenAI => LLMBackend::OpenAI,
             EurLLMService::Anthropic => LLMBackend::Anthropic,
             EurLLMService::Google => LLMBackend::Google,
+            EurLLMService::Eurora => todo!("Eurora backend not implemented"),
+            EurLLMService::Local => todo!("Local backend not implemented"),
             _ => LLMBackend::OpenAI,
         }
     }
