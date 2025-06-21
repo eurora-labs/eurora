@@ -1,23 +1,27 @@
 use crate::{EurLLMService, LLMMessage};
 use anyhow::Result;
+use futures::{Stream, StreamExt};
 use llm::{
-    LLMProvider,
     builder::{LLMBackend, LLMBuilder},
     chat::ChatMessage,
+    error::LLMError,
 };
+use std::pin::Pin;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct PromptKitService {
     llm_backend: EurLLMService,
+}
+
+impl Default for PromptKitService {
+    fn default() -> Self {
+        Self::new(EurLLMService::OpenAI)
+    }
 }
 
 impl PromptKitService {
     pub fn new(llm_backend: EurLLMService) -> Self {
         Self { llm_backend }
-    }
-
-    pub fn default() -> Self {
-        Self::new(EurLLMService::OpenAI)
     }
 
     async fn anonymize_text(text: String) -> Result<String> {
@@ -44,31 +48,27 @@ impl PromptKitService {
         Ok(response.text().unwrap_or_default())
     }
 
-    pub async fn chat(&self, messages: Vec<LLMMessage>) -> Result<String> {
+    pub async fn chat_stream(
+        &self,
+        messages: Vec<LLMMessage>,
+    ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
+    {
+        let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not found");
+
+        // Let's try with explicit configuration to ensure streaming works properly
         let llm = LLMBuilder::new()
             .backend(LLMBackend::from(self.llm_backend))
             .model("gpt-4o")
+            .api_key(api_key)
             .temperature(0.7)
-            .build()
-            .expect("Failed to build LLM");
-        let messages = messages
+            .stream(true)
+            .build()?;
+
+        let chat_messages = messages
             .into_iter()
             .map(|message| message.into())
-            .collect::<Vec<_>>();
-        match llm.chat_stream(&messages).await {
-            Ok(mut stream) => {
-                let stdout = io::stdout();
-                let mut handle = stdout.lock();
+            .collect::<Vec<ChatMessage>>();
 
-                while let Some(Ok(token)) = stream.next().await {
-                    handle.write_all(token.as_bytes()).unwrap();
-                    handle.flush().unwrap();
-                }
-                println!("\n\nStreaming completed.");
-            }
-            Err(e) => eprintln!("Chat error: {}", e),
-        };
-        let response = llm.chat(&messages).await;
-        Ok(response)
+        llm.chat_stream(&chat_messages).await
     }
 }
