@@ -96,28 +96,3 @@ impl From<ChatMessage> for LLMMessage {
         }
     }
 }
-
-pub async fn anonymize_text(text: String) -> Result<String> {
-    // Send messages to self-hosted LLM with instruction to remove personal data
-    // TODO: Switch back-end to local
-    let llm = LLMBuilder::new()
-        .backend(LLMBackend::OpenAI)
-        .model("gpt-4.5-turbo")
-        .temperature(0.7)
-        .stream(false)
-        .build()
-        .expect("Failed to build LLM (OpenAI)");
-    let messages = vec![
-        ChatMessage::user()
-            .content("Anonymize the text and remove any personal data from the next message: ")
-            .build(),
-        ChatMessage::user().content(text).build(),
-    ];
-
-    let response = match llm.chat(&messages).await {
-        Ok(response) => response,
-        Err(e) => return Err(e.into()),
-    };
-
-    Ok(response.text().unwrap_or_default())
-}
