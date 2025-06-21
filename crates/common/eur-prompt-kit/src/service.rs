@@ -3,6 +3,7 @@ use anyhow::Result;
 use llm::{
     LLMProvider,
     builder::{LLMBackend, LLMBuilder},
+    chat::ChatMessage,
 };
 
 #[derive(Debug, Default)]
@@ -17,6 +18,30 @@ impl PromptKitService {
 
     pub fn default() -> Self {
         Self::new(EurLLMService::OpenAI)
+    }
+
+    async fn anonymize_text(text: String) -> Result<String> {
+        // Send messages to self-hosted LLM with instruction to remove personal data
+        let llm = LLMBuilder::new()
+            .backend(LLMBackend::OpenAI)
+            .model("gpt-4.5-turbo")
+            .temperature(0.7)
+            .stream(false)
+            .build()
+            .expect("Failed to build LLM (OpenAI)");
+        let messages = vec![
+            ChatMessage::user()
+                .content("Anonymize the text and remove any personal data from the next message: ")
+                .build(),
+            ChatMessage::user().content(text).build(),
+        ];
+
+        let response = match llm.chat(&messages).await {
+            Ok(response) => response,
+            Err(e) => return Err(e.into()),
+        };
+
+        Ok(response.text().unwrap_or_default())
     }
 
     pub async fn chat(&self, messages: Vec<LLMMessage>) -> Result<String> {
@@ -45,16 +70,5 @@ impl PromptKitService {
         };
         let response = llm.chat(&messages).await;
         Ok(response)
-    }
-
-    fn build_llm(&self) -> Result<Box<dyn LLMProvider>> {
-        let llm = LLMBuilder::new()
-            .backend(LLMBackend::from(self.llm_backend))
-            .model("gpt-4o")
-            .temperature(0.7)
-            .stream(true)
-            .build()
-            .expect("Failed to build LLM");
-        Ok(llm)
     }
 }
