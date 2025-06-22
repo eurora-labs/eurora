@@ -77,8 +77,34 @@
 	}
 </script>
 
-<div class="container mx-auto w-full h-full px-4 pb-16">
+<div class="mx-auto w-full h-full px-4 pb-16">
 	<IntroModule />
+	<VideoCard.Card class="mt-16">
+		<VideoCard.Content
+			alignment="left"
+			mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+		>
+			<VideoCard.Header>
+				<VideoCard.Title>One Click To AI</VideoCard.Title>
+				<VideoCard.Description>
+					Eurora uses a single interface to help with anything and everything you need.
+				</VideoCard.Description>
+			</VideoCard.Header>
+		</VideoCard.Content>
+	</VideoCard.Card>
+	<VideoCard.Card class="mt-16">
+		<VideoCard.Content
+			mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+			alignment="right"
+		>
+			<VideoCard.Header>
+				<VideoCard.Title>Up to 98% faster responses</VideoCard.Title>
+				<VideoCard.Description>
+					Contextual understanding and faster responses.
+				</VideoCard.Description>
+			</VideoCard.Header>
+		</VideoCard.Content>
+	</VideoCard.Card>
 	<!-- Title and Subtitle -->
 	<div class="mx-auto my-16 text-center md:my-24">
 		<h1 class="mx-4 mb-6 pt-16 text-5xl font-bold leading-[60px] text-purple-600 md:mx-48">
