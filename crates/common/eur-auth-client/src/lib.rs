@@ -11,8 +11,9 @@ use tonic::transport::Channel;
 use tracing::{error, info};
 
 /// gRPC client for authentication service
+#[derive(Clone)]
 pub struct AuthClient {
-    client: ProtoAuthServiceClient<Channel>,
+    base_url: String,
 }
 
 impl AuthClient {
@@ -21,15 +22,19 @@ impl AuthClient {
         let base_url = base_url.unwrap_or(
             std::env::var("API_BASE_URL").unwrap_or("http://localhost:50051".to_string()),
         );
-        let channel = Channel::from_shared(base_url.clone())?
+        Ok(Self { base_url })
+    }
+
+    async fn try_init_client(&self) -> Result<Option<ProtoAuthServiceClient<Channel>>> {
+        let channel = Channel::from_shared(self.base_url.clone())?
             .connect()
             .await
             .map_err(|e| anyhow!("Failed to connect to auth service: {}", e))?;
 
         let client = ProtoAuthServiceClient::new(channel);
 
-        info!("Connected to auth service at {}", base_url);
-        Ok(Self { client })
+        info!("Connected to auth service at {}", self.base_url);
+        Ok(Some(client))
     }
 
     pub async fn login_by_password(
@@ -48,7 +53,12 @@ impl AuthClient {
 
     /// Login with email/username and password
     async fn login(&self, data: LoginRequest) -> Result<TokenResponse> {
-        let response = self.client.clone().login(data).await.map_err(|e| {
+        let mut client = self
+            .try_init_client()
+            .await
+            .expect("Failed to initialize client")
+            .unwrap();
+        let response = client.login(data).await.map_err(|e| {
             error!("Login failed: {}", e);
             anyhow!("Login failed: {}", e)
         })?;
@@ -64,9 +74,12 @@ impl AuthClient {
         password: impl Into<String>,
         display_name: Option<String>,
     ) -> Result<TokenResponse> {
-        let response = self
-            .client
-            .clone()
+        let mut client = self
+            .try_init_client()
+            .await
+            .expect("Failed to initialize client")
+            .unwrap();
+        let response = client
             .register(RegisterRequest {
                 username: username.into(),
                 email: email.into(),
@@ -84,9 +97,12 @@ impl AuthClient {
 
     /// Refresh access token using refresh token
     pub async fn refresh_token(&self, refresh_token: impl Into<String>) -> Result<TokenResponse> {
-        let response = self
-            .client
-            .clone()
+        let mut client = self
+            .try_init_client()
+            .await
+            .expect("Failed to initialize client")
+            .unwrap();
+        let response = client
             .refresh_token(RefreshTokenRequest {
                 refresh_token: refresh_token.into(),
             })
@@ -103,9 +119,12 @@ impl AuthClient {
         &self,
         login_token: impl Into<String>,
     ) -> Result<TokenResponse> {
-        let response = self
-            .client
-            .clone()
+        let mut client = self
+            .try_init_client()
+            .await
+            .expect("Failed to initialize client")
+            .unwrap();
+        let response = client
             .login_by_login_token(LoginByLoginTokenRequest {
                 token: login_token.into(),
             })
@@ -119,7 +138,12 @@ impl AuthClient {
     }
 
     pub async fn get_login_token(&self) -> Result<GetLoginTokenResponse> {
-        let response = self.client.clone().get_login_token(()).await.map_err(|e| {
+        let mut client = self
+            .try_init_client()
+            .await
+            .expect("Failed to initialize client")
+            .unwrap();
+        let response = client.get_login_token(()).await.map_err(|e| {
             error!("Get login token failed: {}", e);
             anyhow!("Get login token failed: {}", e)
         })?;
