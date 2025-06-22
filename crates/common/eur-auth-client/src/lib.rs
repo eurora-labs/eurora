@@ -55,9 +55,8 @@ impl AuthClient {
     async fn login(&self, data: LoginRequest) -> Result<TokenResponse> {
         let mut client = self
             .try_init_client()
-            .await
-            .expect("Failed to initialize client")
-            .unwrap();
+            .await?
+            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
         let response = client.login(data).await.map_err(|e| {
             error!("Login failed: {}", e);
             anyhow!("Login failed: {}", e)
@@ -76,9 +75,8 @@ impl AuthClient {
     ) -> Result<TokenResponse> {
         let mut client = self
             .try_init_client()
-            .await
-            .expect("Failed to initialize client")
-            .unwrap();
+            .await?
+            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
         let response = client
             .register(RegisterRequest {
                 username: username.into(),
@@ -99,9 +97,8 @@ impl AuthClient {
     pub async fn refresh_token(&self, refresh_token: impl Into<String>) -> Result<TokenResponse> {
         let mut client = self
             .try_init_client()
-            .await
-            .expect("Failed to initialize client")
-            .unwrap();
+            .await?
+            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
         let response = client
             .refresh_token(RefreshTokenRequest {
                 refresh_token: refresh_token.into(),
@@ -121,9 +118,8 @@ impl AuthClient {
     ) -> Result<TokenResponse> {
         let mut client = self
             .try_init_client()
-            .await
-            .expect("Failed to initialize client")
-            .unwrap();
+            .await?
+            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
         let response = client
             .login_by_login_token(LoginByLoginTokenRequest {
                 token: login_token.into(),
@@ -140,9 +136,8 @@ impl AuthClient {
     pub async fn get_login_token(&self) -> Result<GetLoginTokenResponse> {
         let mut client = self
             .try_init_client()
-            .await
-            .expect("Failed to initialize client")
-            .unwrap();
+            .await?
+            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
         let response = client.get_login_token(()).await.map_err(|e| {
             error!("Get login token failed: {}", e);
             anyhow!("Get login token failed: {}", e)
