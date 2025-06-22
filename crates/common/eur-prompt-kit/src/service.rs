@@ -26,20 +26,21 @@ impl PromptKitService {
     }
 
     pub async fn anonymize_text(text: String) -> Result<String> {
-        let base_url = "http://127.0.0.1:11434".to_string();
+        let base_url = std::env::var("OLLAMA_BASE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
+        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "deepseek-v2:16b".to_string());
         let original_text = text.clone();
-
         // Send messages to self-hosted LLM with instruction to remove personal data
         let llm = LLMBuilder::new()
             .backend(LLMBackend::Ollama)
             .base_url(base_url)
-            .model("deepseek-v2:16b")
+            .model(&model)
             .max_tokens(128)
             .temperature(0.1)
             .top_p(0.1)
             .stream(false)
             .build()
-            .expect("Failed to build LLM (Ollama)");
+            .map_err(|e| anyhow::anyhow!("Failed to build LLM (Ollama): {}", e))?;
 
         let messages = vec![
             ChatMessage::user()
@@ -60,14 +61,19 @@ Rules:
         };
 
         let response_text = response.text().unwrap_or_default();
+        let sensitive_words: Vec<String> = response_text
+            .split(',')
+            .map(|word| word.trim().to_string())
+            .filter(|word| !word.is_empty() && word.to_uppercase() != "NONE")
+            .collect();
 
-        let sensitive_words = response_text.split(',').collect::<Vec<&str>>();
-
-        let mut text = original_text.to_lowercase();
-        sensitive_words.iter().for_each(|word| {
-            let word = word.to_lowercase().to_string();
-            text = text.replace(&word, " <REDACTED> ");
-        });
+        let mut text = original_text;
+        for word in sensitive_words {
+            // Case-insensitive replacement using regex
+            let pattern = regex::Regex::new(&regex::escape(&word.trim()))
+                .map_err(|e| anyhow::anyhow!("Invalid regex pattern: {}", e))?;
+            text = pattern.replace_all(&text, " <REDACTED> ").to_string();
+        }
         text = redact_emails(text);
 
         Ok(text)
