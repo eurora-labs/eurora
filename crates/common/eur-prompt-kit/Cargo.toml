@@ -12,3 +12,4 @@ llm = { git = "https://github.com/AndreRoelofs/llm.git", branch = "main", featur
 openai-api-rs = { git = "https://github.com/AndreRoelofs/openai-api-rs.git", branch = "main" }
 tokio = { workspace = true }
 eur-util = { workspace = true }
+regex = "1.9.6"
