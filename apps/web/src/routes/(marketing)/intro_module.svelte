@@ -128,7 +128,7 @@
 									<span class="cursor-blink">|</span>
 								{/if}
 							</div>
-							<Mic class="text-white" size={40} />
+							<Mic class="text-black/80" size={40} />
 						</div>
 					</div>
 				</div>
@@ -148,7 +148,7 @@
 								</div>
 								<Card.Title
 									class="title-animation text-black/80 text-center text-2xl mt-4"
-									>Context-aware</Card.Title
+									>Context Aware</Card.Title
 								>
 								<Card.Description class="text-black/80 mt-2 text-xl"
 									>Prompt up to 17x faster</Card.Description
