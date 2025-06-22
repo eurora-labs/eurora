@@ -63,16 +63,16 @@ struct ArticleAsset {
 
 struct TwitterAsset {
     pub id: String,
-    pub url: String,
+    pub _url: String,
     pub title: String,
     pub tweets: Vec<TwitterTweet>,
-    pub timestamp: String,
+    pub _timestamp: String,
 }
 
 #[derive(Debug, Clone)]
-struct TwitterTweet {
+pub struct TwitterTweet {
     pub text: String,
-    pub timestamp: Option<String>,
+    pub _timestamp: Option<String>,
     pub author: Option<String>,
 }
 
@@ -135,17 +135,17 @@ impl TwitterAsset {
             .into_iter()
             .map(|tweet| TwitterTweet {
                 text: tweet.text,
-                timestamp: tweet.timestamp,
+                _timestamp: tweet.timestamp,
                 author: tweet.author,
             })
             .collect();
 
         Ok(TwitterAsset {
             id: uuid::Uuid::new_v4().to_string(),
-            url: state.url,
+            _url: state.url,
             title: state.title,
             tweets,
-            timestamp: state.timestamp,
+            _timestamp: state.timestamp,
         })
     }
 }
@@ -301,7 +301,7 @@ impl From<ProtoTweet> for TwitterTweet {
     fn from(tweet: ProtoTweet) -> Self {
         TwitterTweet {
             text: tweet.text,
-            timestamp: tweet.timestamp,
+            _timestamp: tweet.timestamp,
             author: tweet.author,
         }
     }
