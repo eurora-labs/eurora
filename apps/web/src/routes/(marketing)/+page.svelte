@@ -7,6 +7,7 @@
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
 	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
+	// import gradient.svg from static folder
 	import {
 		ArrowRight,
 		Brain,
@@ -76,16 +77,19 @@
 	}
 </script>
 
-<div class="container mx-auto max-w-5xl px-4 pb-16">
+<div class="container mx-auto w-full h-full px-4 pb-16">
+	<IntroModule />
 	<!-- Title and Subtitle -->
 	<div class="mx-auto my-16 text-center md:my-24">
 		<h1 class="mx-4 mb-6 pt-16 text-5xl font-bold leading-[60px] text-purple-600 md:mx-48">
 			Your Open Source AI Assistant
 		</h1>
+
 		<p class="mx-4 mb-8 text-xl font-medium text-gray-500 md:mx-48">
 			Eurora is a fully Open Source AI Assistant that understands context, respects your
 			privacy, and works across all your devices. Experience AI on your own terms.
 		</p>
+
 		<div class="flex h-[calc(100vh-350px)] flex-col justify-center">
 			{#if !formSubmitted}
 				<form

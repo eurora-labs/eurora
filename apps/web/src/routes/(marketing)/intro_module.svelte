@@ -1,7 +1,17 @@
 <script lang="ts">
 	// Removed Input import as we're using a custom div
 	import { onMount } from 'svelte';
-	import { Mic, ScrollText, Youtube, TvMinimalPlay, Globe } from '@lucide/svelte';
+	import {
+		Mic,
+		Globe,
+		UnlockIcon,
+		ShieldCheckIcon,
+		GaugeIcon,
+		RabbitIcon,
+		LaptopMinimalCheckIcon,
+		DownloadIcon,
+		ServerIcon,
+	} from '@lucide/svelte';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import JoinWaitlist from './join_waitlist.svelte';
@@ -13,7 +23,7 @@
 	let showCursor = false;
 
 	// Typing animation configuration
-	const instantTyping = false;
+	const instantTyping = true;
 	const firstPart = 'Explain ';
 	const secondPart = 'this';
 	const typingSpeed = instantTyping ? 0 : 150; // milliseconds per character
@@ -90,46 +100,59 @@
 	});
 </script>
 
-<div class="min-h-screen">
-	<div class="mx-auto px-4 pt-6" style="min-height: 55vh;">
-		<div class="grid grid-cols-12 gap-6">
+<img
+	src="/backgrounds/gradient.svg"
+	alt="Gradient"
+	class="h-screen w-full absolute top-0 left-0 z-0"
+/>
+<div class="min-h-screen mt-32 max-w-[100%] mx-auto">
+	<div class="flex justify-center">
+		<h1 class="mb-16 w-full mx-auto text-5xl font-bold text-white text-center z-10">
+			Your Open Source AI Assistant
+		</h1>
+	</div>
+
+	<div class="mx-auto px-4 pt-6 w-full z-10" style="min-height: 55vh;">
+		<div class="grid grid-cols-12 gap-8">
 			<!-- Input box centered in the first row -->
-			<div class="col-span-12 mb-4 flex justify-center">
+			<div class="col-span-12 mb-12 flex justify-center">
 				<div class="w-full md:w-3/4">
 					<div class="animate-grow relative">
 						<div
-							class="flex w-full items-center rounded-md border border-gray-300 bg-white px-3 py-4 shadow-lg md:px-4 md:py-6"
-							style="font-size: clamp(28px, 5vw, 54px); min-height: 80px; height: auto;"
+							class="flex w-full min-h-[100px] items-center text-4xl font-semibold rounded-2xl border border-gray-300 px-3 py-4 shadow-lg md:px-4 md:py-6 backdrop-blur-2xl bg-white/20"
 						>
 							<div class="flex-grow">
-								<span class="text-black">{inputValue}</span>
-								<span class="text-purple-600">{purpleText}</span>
+								<span class="text-black/80">{inputValue}</span>
+								<span class="text-black/80">{purpleText}</span>
 								{#if showCursor}
 									<span class="cursor-blink">|</span>
 								{/if}
 							</div>
-							<Mic class="h-8 w-8 text-gray-400" />
+							<Mic class="text-white" size={40} />
 						</div>
 					</div>
 				</div>
 			</div>
 
 			<!-- Three cards in a row below the input box -->
-			<div class="col-span-12 grid grid-cols-1 gap-6 md:grid-cols-12">
+			<div class="col-span-12 grid grid-cols-1 gap-6 md:grid-cols-12 mt-16">
 				{#if visibleCards.includes(1)}
 					<div
-						class="card-entrance col-span-12 mb-4 md:col-span-4 md:mb-0"
+						class="card-entrance col-span-12 md:col-span-4 backdrop-blur-2xl"
 						style="--animation-delay: 0ms;"
 					>
-						<Card.Root class="card-content aspect-video w-full">
+						<Card.Root class="card-content aspect-video w-full bg-white/20">
 							<Card.Content class="flex h-full flex-col items-center justify-center">
 								<div class="icon-animation flex items-center justify-center">
-									<SiYoutube
-										color="rgb(147 51 234 / var(--tw-text-opacity, 1))"
-										size={64}
-									/>
+									<GaugeIcon size={64} />
 								</div>
-								<Card.Title class="title-animation">YouTube Videos</Card.Title>
+								<Card.Title
+									class="title-animation text-black/80 text-center text-2xl mt-4"
+									>Context-aware</Card.Title
+								>
+								<Card.Description class="text-black/80 mt-2 text-xl"
+									>Prompt up to 17x faster</Card.Description
+								>
 							</Card.Content>
 						</Card.Root>
 					</div>
@@ -137,15 +160,20 @@
 
 				{#if visibleCards.includes(2)}
 					<div
-						class="card-entrance col-span-12 mb-4 md:col-span-4 md:mb-0"
+						class="card-entrance col-span-12 mb-4 md:col-span-4 md:mb-0 backdrop-blur-2xl"
 						style="--animation-delay: {cards[1].animationDelay};"
 					>
-						<Card.Root class="card-content aspect-video w-full">
+						<Card.Root class="card-content aspect-video w-full bg-white/20">
 							<Card.Content class="flex h-full flex-col items-center justify-center">
 								<div class="icon-animation flex items-center justify-center">
-									<ScrollText class="text-purple-600" size={64} />
+									<ShieldCheckIcon size={64} />
 								</div>
-								<Card.Title class="title-animation">PDF Documents</Card.Title>
+								<Card.Title class="title-animation text-black/80 mt-4 text-2xl"
+									>Secure and Private</Card.Title
+								>
+								<Card.Description class="text-black/80 mt-2 text-xl"
+									>End-to-end encryption</Card.Description
+								>
 							</Card.Content>
 						</Card.Root>
 					</div>
@@ -153,15 +181,20 @@
 
 				{#if visibleCards.includes(3)}
 					<div
-						class="card-entrance col-span-12 md:col-span-4"
+						class="card-entrance col-span-12 mb-4 md:col-span-4 md:mb-0 backdrop-blur-2xl"
 						style="--animation-delay: {cards[2].animationDelay};"
 					>
-						<Card.Root class="card-content aspect-video w-full">
+						<Card.Root class="card-content aspect-video w-full bg-white/20">
 							<Card.Content class="flex h-full flex-col items-center justify-center">
 								<div class="icon-animation flex items-center justify-center">
-									<Globe class="text-purple-600" size={64} />
+									<ServerIcon size={64} />
 								</div>
-								<Card.Title class="title-animation">Any Other Websites</Card.Title>
+								<Card.Title class="title-animation text-black/80 mt-4 text-2xl"
+									>Run Locally</Card.Title
+								>
+								<Card.Description class="text-black/80 mt-2 text-xl"
+									>For free, forever</Card.Description
+								>
 							</Card.Content>
 						</Card.Root>
 					</div>
@@ -172,13 +205,10 @@
 
 	{#if showTagLine}
 		<div
-			class="tagline-entrance mt-12 hidden px-4 text-center md:mt-24 md:block"
+			class="tagline-entrance mt-12 hidden px-4 text-center md:block"
 			bind:this={taglineComponent}
 		>
-			<h1 class="fade-in-up mb-4 text-3xl font-bold md:text-4xl">AI On Your Own Terms</h1>
-			<div class="fade-in-up" style="--animation-delay: 200ms;">
-				<JoinWaitlist />
-			</div>
+			<h1 class="fade-in-up mb-4 font-bold text-4xl">AI On Your Own Terms</h1>
 			<!-- <Sheet.Root>
                 <Sheet.Trigger class={buttonVariants({ variant: "default" })}
                   >Join Waitlist</Sheet.Trigger
@@ -197,14 +227,14 @@
                   </Sheet.Footer>
                 </Sheet.Content>
               </Sheet.Root> -->
-			<div class="fade-in-up hidden md:block" style="--animation-delay: 400ms;">
+			<div class="fade-in-up hidden md:block" style="--animation-delay: 200ms;">
 				<Button
 					class="mt-4 w-full px-4 py-2 sm:w-auto md:px-6 md:py-3"
-					variant="outline"
+					variant="default"
 					onclick={(e) => {
 						const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
 						window.scrollTo({
-							top: window.scrollY + taglineRect.top + 100,
+							top: window.scrollY + taglineRect.top + 200,
 							behavior: 'smooth',
 						});
 					}}
@@ -259,7 +289,7 @@
 	{/if}
 </div>
 
-<style>
+<style lang="postcss">
 	/* Mobile-first responsive design */
 	@media (max-width: 768px) {
 		.card-entrance {
