@@ -23,7 +23,7 @@
 	let showCursor = false;
 
 	// Typing animation configuration
-	const instantTyping = true;
+	const instantTyping = false;
 	const firstPart = 'Explain ';
 	const secondPart = 'this';
 	const typingSpeed = instantTyping ? 0 : 150; // milliseconds per character
@@ -102,55 +102,145 @@
 
 <img
 	src="/backgrounds/gradient.svg"
-	alt="Gradient"
+	alt="Background gradient for hero section"
 	class="h-screen w-full absolute top-0 left-0 z-0"
+	loading="eager"
+	decoding="async"
 />
-<div class="min-h-screen mt-32 max-w-[100%] mx-auto">
-	<div class="flex justify-center">
-		<h1 class="mb-16 w-full mx-auto text-5xl font-bold text-white text-center z-10">
+<!-- Main container with 4 equal rows -->
+<div class="h-screen flex flex-col max-w-[100%] mx-auto">
+	<!-- Row 1: Header (hidden on mobile, 25% on desktop) -->
+	<div class="hidden md:flex flex-1 items-center justify-center px-4">
+		<h1
+			class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-white text-center z-10"
+		>
 			Your Open Source AI Assistant
 		</h1>
 	</div>
 
-	<div class="mx-auto px-4 pt-6 w-full z-10" style="min-height: 55vh;">
-		<div class="grid grid-cols-12 gap-8">
-			<!-- Input box centered in the first row -->
-			<div class="col-span-12 mb-12 flex justify-center">
-				<div class="w-full md:w-3/4">
-					<div class="animate-grow relative">
-						<div
-							class="flex w-full min-h-[100px] items-center text-4xl font-semibold rounded-2xl border border-gray-300 px-3 py-4 shadow-lg md:px-4 md:py-6 backdrop-blur-2xl bg-white/20"
-						>
-							<div class="flex-grow">
-								<span class="text-black/80">{inputValue}</span>
-								<span class="text-black/80">{purpleText}</span>
-								{#if showCursor}
-									<span class="cursor-blink">|</span>
-								{/if}
-							</div>
-							<Mic class="text-black/80" size={40} />
-						</div>
+	<!-- Row 2: Input Box (33% on mobile, 25% on desktop) -->
+	<div class="flex-1 flex items-center justify-center px-4 md:items-start">
+		<div class="w-full max-w-2xl">
+			<div class="animate-grow relative">
+				<div
+					class="flex w-full min-h-[80px] sm:min-h-[100px] items-center text-2xl sm:text-3xl md:text-4xl font-semibold rounded-2xl border border-gray-300 px-3 py-4 shadow-lg md:px-4 md:py-6 backdrop-blur-2xl bg-white/20"
+				>
+					<div class="flex-grow">
+						<span class="text-black/80">{inputValue}</span>
+						<span class="text-black/80">{purpleText}</span>
+						{#if showCursor}
+							<span class="cursor-blink">|</span>
+						{/if}
 					</div>
+					<Mic class="text-black/80" size={32} />
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Row 3: Feature Cards (25% of screen height) -->
+	<div class="flex-1 flex items-center justify-center px-4">
+		<div class="w-full max-w-6xl">
+			<!-- Mobile: Vertical stacked cards (smaller) -->
+			<div class="md:hidden">
+				<div class="grid grid-cols-1 gap-3 max-w-sm mx-auto">
+					{#if visibleCards.includes(1)}
+						<div
+							class="card-entrance backdrop-blur-2xl"
+							style="--animation-delay: 0ms;"
+						>
+							<Card.Root class="card-content h-20 bg-white/20">
+								<Card.Content class="flex h-full items-center justify-center p-3">
+									<div
+										class="icon-animation flex items-center justify-center mr-3"
+									>
+										<GaugeIcon size={24} />
+									</div>
+									<div class="flex flex-col text-center">
+										<Card.Title
+											class="title-animation text-black/80 text-sm font-semibold"
+											>Context Aware</Card.Title
+										>
+										<Card.Description class="text-black/80 text-xs"
+											>17x faster prompts</Card.Description
+										>
+									</div>
+								</Card.Content>
+							</Card.Root>
+						</div>
+					{/if}
+
+					{#if visibleCards.includes(2)}
+						<div
+							class="card-entrance backdrop-blur-2xl"
+							style="--animation-delay: {cards[1].animationDelay};"
+						>
+							<Card.Root class="card-content h-20 bg-white/20">
+								<Card.Content class="flex h-full items-center justify-center p-3">
+									<div
+										class="icon-animation flex items-center justify-center mr-3"
+									>
+										<ShieldCheckIcon size={24} />
+									</div>
+									<div class="flex flex-col text-center">
+										<Card.Title
+											class="title-animation text-black/80 text-sm font-semibold"
+											>Secure & Private</Card.Title
+										>
+										<Card.Description class="text-black/80 text-xs"
+											>End-to-end encrypted</Card.Description
+										>
+									</div>
+								</Card.Content>
+							</Card.Root>
+						</div>
+					{/if}
+
+					{#if visibleCards.includes(3)}
+						<div
+							class="card-entrance backdrop-blur-2xl"
+							style="--animation-delay: {cards[2].animationDelay};"
+						>
+							<Card.Root class="card-content h-20 bg-white/20">
+								<Card.Content class="flex h-full items-center justify-center p-3">
+									<div
+										class="icon-animation flex items-center justify-center mr-3"
+									>
+										<ServerIcon size={24} />
+									</div>
+									<div class="flex flex-col text-center">
+										<Card.Title
+											class="title-animation text-black/80 text-sm font-semibold"
+											>Run Locally</Card.Title
+										>
+										<Card.Description class="text-black/80 text-xs"
+											>Free forever</Card.Description
+										>
+									</div>
+								</Card.Content>
+							</Card.Root>
+						</div>
+					{/if}
 				</div>
 			</div>
 
-			<!-- Three cards in a row below the input box -->
-			<div class="col-span-12 grid grid-cols-1 gap-6 md:grid-cols-12 mt-16">
+			<!-- Desktop: Grid layout -->
+			<div class="hidden md:grid grid-cols-3 gap-4">
 				{#if visibleCards.includes(1)}
-					<div
-						class="card-entrance col-span-12 md:col-span-4 backdrop-blur-2xl"
-						style="--animation-delay: 0ms;"
-					>
-						<Card.Root class="card-content aspect-video w-full bg-white/20">
-							<Card.Content class="flex h-full flex-col items-center justify-center">
+					<div class="card-entrance backdrop-blur-2xl" style="--animation-delay: 0ms;">
+						<Card.Root class="card-content h-full bg-white/20">
+							<Card.Content
+								class="flex h-full flex-col items-center justify-center p-4"
+							>
 								<div class="icon-animation flex items-center justify-center">
-									<GaugeIcon size={64} />
+									<GaugeIcon size={48} />
 								</div>
 								<Card.Title
-									class="title-animation text-black/80 text-center text-2xl mt-4"
+									class="title-animation text-black/80 text-center text-lg sm:text-xl mt-2"
 									>Context Aware</Card.Title
 								>
-								<Card.Description class="text-black/80 mt-2 text-xl"
+								<Card.Description
+									class="text-black/80 mt-1 text-sm sm:text-base text-center"
 									>Prompt up to 17x faster</Card.Description
 								>
 							</Card.Content>
@@ -160,18 +250,22 @@
 
 				{#if visibleCards.includes(2)}
 					<div
-						class="card-entrance col-span-12 mb-4 md:col-span-4 md:mb-0 backdrop-blur-2xl"
+						class="card-entrance backdrop-blur-2xl"
 						style="--animation-delay: {cards[1].animationDelay};"
 					>
-						<Card.Root class="card-content aspect-video w-full bg-white/20">
-							<Card.Content class="flex h-full flex-col items-center justify-center">
+						<Card.Root class="card-content h-full bg-white/20">
+							<Card.Content
+								class="flex h-full flex-col items-center justify-center p-4"
+							>
 								<div class="icon-animation flex items-center justify-center">
-									<ShieldCheckIcon size={64} />
+									<ShieldCheckIcon size={48} />
 								</div>
-								<Card.Title class="title-animation text-black/80 mt-4 text-2xl"
+								<Card.Title
+									class="title-animation text-black/80 text-center text-lg sm:text-xl mt-2"
 									>Secure and Private</Card.Title
 								>
-								<Card.Description class="text-black/80 mt-2 text-xl"
+								<Card.Description
+									class="text-black/80 mt-1 text-sm sm:text-base text-center"
 									>End-to-end encryption</Card.Description
 								>
 							</Card.Content>
@@ -181,18 +275,22 @@
 
 				{#if visibleCards.includes(3)}
 					<div
-						class="card-entrance col-span-12 mb-4 md:col-span-4 md:mb-0 backdrop-blur-2xl"
+						class="card-entrance backdrop-blur-2xl"
 						style="--animation-delay: {cards[2].animationDelay};"
 					>
-						<Card.Root class="card-content aspect-video w-full bg-white/20">
-							<Card.Content class="flex h-full flex-col items-center justify-center">
+						<Card.Root class="card-content h-full bg-white/20">
+							<Card.Content
+								class="flex h-full flex-col items-center justify-center p-4"
+							>
 								<div class="icon-animation flex items-center justify-center">
-									<ServerIcon size={64} />
+									<ServerIcon size={48} />
 								</div>
-								<Card.Title class="title-animation text-black/80 mt-4 text-2xl"
+								<Card.Title
+									class="title-animation text-black/80 text-center text-lg sm:text-xl mt-2"
 									>Run Locally</Card.Title
 								>
-								<Card.Description class="text-black/80 mt-2 text-xl"
+								<Card.Description
+									class="text-black/80 mt-1 text-sm sm:text-base text-center"
 									>For free, forever</Card.Description
 								>
 							</Card.Content>
@@ -203,90 +301,33 @@
 		</div>
 	</div>
 
-	{#if showTagLine}
-		<div
-			class="tagline-entrance mt-12 hidden px-4 text-center md:block"
-			bind:this={taglineComponent}
-		>
-			<h1 class="fade-in-up mb-4 font-bold text-4xl">AI On Your Own Terms</h1>
-			<!-- <Sheet.Root>
-                <Sheet.Trigger class={buttonVariants({ variant: "default" })}
-                  >Join Waitlist</Sheet.Trigger
-                >
-                <Sheet.Content side="right">
-                 
-                  <ScrollArea class="h-screen">
-                    <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
-                  </ScrollArea>
-                  
-                  <Sheet.Footer>
-                    <Skeleton class="w-full h-screen" />
-                    <Skeleton class="w-full h-screen" />
-                    <Skeleton class="w-full h-screen" />
-                   
-                  </Sheet.Footer>
-                </Sheet.Content>
-              </Sheet.Root> -->
-			<div class="fade-in-up hidden md:block" style="--animation-delay: 200ms;">
-				<Button
-					class="mt-4 w-full px-4 py-2 sm:w-auto md:px-6 md:py-3"
-					variant="default"
-					onclick={(e) => {
-						const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
-						window.scrollTo({
-							top: window.scrollY + taglineRect.top + 200,
-							behavior: 'smooth',
-						});
-					}}
-				>
-					Learn More
-				</Button>
+	<!-- Row 4: Tagline and CTA (25% of screen height) -->
+	<div class="flex-1 flex items-center justify-center px-4">
+		{#if showTagLine}
+			<div class="tagline-entrance text-center w-full max-w-4xl" bind:this={taglineComponent}>
+				<h1 class="fade-in-up mb-4 font-bold text-2xl sm:text-3xl md:text-4xl">
+					AI On Your Own Terms
+				</h1>
+				<div class="fade-in-up" style="--animation-delay: 200ms;">
+					<Button
+						class="mt-4 px-4 py-2 sm:px-6 sm:py-3"
+						variant="default"
+						onclick={(e) => {
+							const taglineRect = taglineComponent?.getBoundingClientRect() ?? {
+								top: 0,
+							};
+							window.scrollTo({
+								top: window.scrollY + taglineRect.top + 200,
+								behavior: 'smooth',
+							});
+						}}
+					>
+						Learn More
+					</Button>
+				</div>
 			</div>
-		</div>
-		<!-- <div class="text-center" bind:this={taglineComponent}>
-            <h1 class="text-5xl font-bold mb-6">Intelligence Without Compromise</h1>
-            <p class="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-                Eurora is a fully Open Source AI assistant that understands context, respects your privacy, and works across
-                all your devices. Experience AI on your own terms.
-            </p>
-            <div class="flex justify-center gap-4">
-                <Sheet.Root>
-                    <Sheet.Trigger class={buttonVariants({ variant: "default" })}
-                      >Join Waitlist</Sheet.Trigger
-                    >
-                    <Sheet.Content side="right">
-                     
-                      <ScrollArea class="h-screen">
-                        <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
-                      </ScrollArea>
-                      
-                      <Sheet.Footer>
-                        <Skeleton class="w-full h-screen" />
-                        <Skeleton class="w-full h-screen" />
-                        <Skeleton class="w-full h-screen" />
-                       
-                      </Sheet.Footer>
-                    </Sheet.Content>
-                  </Sheet.Root>
-
-                  <Button
-				class="px-6 py-3"
-                variant="outline"
-				onclick={(e) => {
-					const taglineRect = taglineComponent?.getBoundingClientRect() ?? { top: 0 };
-					// const buttonRect = (e.target as HTMLElement).getBoundingClientRect();
-					window.scrollTo({
-						top: window.scrollY + taglineRect.top - 100,
-						behavior: 'smooth'
-					});
-				}}
-			>
-				Learn More
-			</Button>
-                
-            </div>
-        </div> -->
-	{/if}
+		{/if}
+	</div>
 </div>
 
 <style lang="postcss">
@@ -299,13 +340,42 @@
 
 		/* Ensure cards have proper spacing on mobile */
 		:global(.card-content) {
-			margin-bottom: 1rem;
+			margin-bottom: 0.5rem;
 		}
 
 		/* Adjust icon size for mobile */
 		:global(.icon-animation svg) {
-			transform: scale(0.9);
+			transform: scale(0.8);
 		}
+
+		/* Adjust text sizes for mobile */
+		h1 {
+			font-size: 1.5rem !important;
+		}
+	}
+
+	/* Ensure proper height distribution for flex layout */
+	.flex-1 {
+		min-height: 0;
+	}
+
+	/* Horizontal scroll styling for mobile cards */
+	.overflow-x-auto {
+		scrollbar-width: none; /* Firefox */
+		-ms-overflow-style: none; /* Internet Explorer 10+ */
+	}
+
+	.overflow-x-auto::-webkit-scrollbar {
+		display: none; /* WebKit */
+	}
+
+	/* Smooth scroll snapping */
+	.snap-x {
+		scroll-snap-type: x mandatory;
+	}
+
+	.snap-center {
+		scroll-snap-align: center;
 	}
 
 	/* Cursor blinking animation */
