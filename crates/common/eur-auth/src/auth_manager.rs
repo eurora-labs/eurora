@@ -41,7 +41,7 @@ pub struct RegisterData {
 /// Core authentication manager that handles all token operations
 pub struct AuthManager {
     token_storage: Arc<dyn TokenStorage>,
-    grpc_client: Arc<RwLock<Option<AuthClient>>>,
+    grpc_client: Option<Arc<RwLock<Option<AuthClient>>>>,
     jwt_config: JwtConfig,
     refresh_threshold: Duration, // Refresh when token expires in X minutes
     current_user: Arc<RwLock<Option<UserInfo>>>,
@@ -70,7 +70,7 @@ impl AuthManager {
 
         let manager = Self {
             token_storage: Arc::from(token_storage),
-            grpc_client: Arc::new(RwLock::new(grpc_client)),
+            grpc_client: grpc_client.map(|client| Arc::new(RwLock::new(Some(client)))),
             jwt_config,
             refresh_threshold: Duration::minutes(5), // Refresh 5 minutes before expiry
             current_user: Arc::new(RwLock::new(None)),
@@ -86,7 +86,7 @@ impl AuthManager {
 
     /// Login with credentials
     pub async fn login(&self, credentials: LoginCredentials) -> Result<UserInfo> {
-        let mut client_guard = self.grpc_client.write().await;
+        let mut client_guard = self.grpc_client.as_ref().unwrap().write().await;
         let client = client_guard
             .as_mut()
             .ok_or_else(|| anyhow!("Auth service not available"))?;
@@ -116,7 +116,7 @@ impl AuthManager {
 
     /// Register a new user
     pub async fn register(&self, user_data: RegisterData) -> Result<UserInfo> {
-        let mut client_guard = self.grpc_client.write().await;
+        let mut client_guard = self.grpc_client.as_ref().unwrap().write().await;
         let client = client_guard
             .as_mut()
             .ok_or_else(|| anyhow!("Auth service not available"))?;
@@ -210,7 +210,7 @@ impl AuthManager {
         // Validate refresh token
         validate_refresh_token(&refresh_token, &self.jwt_config)?;
 
-        let mut client_guard = self.grpc_client.write().await;
+        let mut client_guard = self.grpc_client.as_ref().unwrap().write().await;
         let client = client_guard
             .as_mut()
             .ok_or_else(|| anyhow!("Auth service not available"))?;
@@ -269,7 +269,7 @@ impl AuthManager {
     }
 
     pub async fn login_by_login_token(&self, login_token: String) -> Result<UserInfo> {
-        let mut client_guard = self.grpc_client.write().await;
+        let mut client_guard = self.grpc_client.as_ref().unwrap().write().await;
         let client = client_guard
             .as_mut()
             .ok_or_else(|| anyhow!("Auth service not available"))?;
