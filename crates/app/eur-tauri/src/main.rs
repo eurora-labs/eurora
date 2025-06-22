@@ -13,6 +13,7 @@ use tracing_subscriber::{
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
+use eur_prompt_kit::PromptKitService;
 use eur_secret::secret;
 use eur_tauri::{
     WindowState, create_launcher, create_window,
@@ -24,7 +25,7 @@ use eur_tauri::{
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
-    shared_types::{SharedOpenAIClient, create_shared_timeline},
+    shared_types::{SharedPromptKitService, create_shared_timeline},
 };
 use eur_user::auth::AuthManager;
 use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
@@ -35,6 +36,7 @@ use tauri::{AppHandle, Emitter, Wry};
 use tauri::{Manager, generate_context};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use taurpc::Router;
+
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 
@@ -66,7 +68,7 @@ fn create_shared_client() -> SharedQuestionsClient {
     Arc::new(Mutex::new(None))
 }
 
-fn create_shared_openai_client() -> SharedOpenAIClient {
+fn create_shared_promptkit_client() -> SharedPromptKitService {
     Arc::new(async_mutex::Mutex::new(None))
 }
 
@@ -148,8 +150,8 @@ fn main() {
                     app_handle.manage(questions_client.clone());
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
-                    let openai_client = create_shared_openai_client();
-                    app_handle.manage(openai_client.clone());
+                    let promptkit_client = create_shared_promptkit_client();
+                    app_handle.manage(promptkit_client.clone());
                     let current_conversation_id = Arc::new(None::<String>);
                     app_handle.manage(current_conversation_id.clone());
                     // let current_conversation = create_shared_current_conversation();
@@ -168,15 +170,18 @@ fn main() {
                     let app_handle_openai = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         let api_key =
-                            secret::retrieve("OPEN_AI_API_KEY", secret::Namespace::Global).unwrap();
+                            secret::retrieve("OPENAI_API_KEY", secret::Namespace::Global).unwrap();
                         if api_key.is_some() {
-                            let client = eur_openai::OpenAI::with_api_key(&api_key.unwrap().0);
-                            let state: tauri::State<SharedOpenAIClient> = app_handle_openai.state();
+                            let prompt_kit_service = PromptKitService::default();
+
+                            // let client = eur_openai::OpenAI::with_api_key(&api_key.unwrap().0);
+                            let state: tauri::State<SharedPromptKitService> =
+                                app_handle_openai.state();
                             let mut guard = state.lock().await;
-                            *guard = Some(client);
-                            info!("OpenAI client initialized with API key from keyring");
+                            *guard = Some(prompt_kit_service);
+                            info!("PromptKitService initialized with API key from keyring");
                         } else {
-                            info!("No API key found in keyring, OpenAI client not initialized");
+                            info!("No API key found in keyring, PromptKitService not initialized");
                         }
                     });
 
