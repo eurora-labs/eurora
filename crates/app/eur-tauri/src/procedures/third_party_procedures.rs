@@ -53,7 +53,7 @@ impl ThirdPartyApi for ThirdPartyApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<bool, String> {
-        let api_key = secret::retrieve("OPENAI_API_KEY", secret::Namespace::Global)
+        let _api_key = secret::retrieve("OPENAI_API_KEY", secret::Namespace::Global)
             .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
 
         // Initialize the OpenAI client with the API key

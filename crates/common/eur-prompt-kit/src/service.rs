@@ -78,7 +78,7 @@ Rules:
         let mut text = original_text;
         for word in sensitive_words {
             // Case-insensitive replacement using regex
-            let pattern = regex::Regex::new(&regex::escape(&word.trim()))
+            let pattern = regex::Regex::new(&regex::escape(word.trim()))
                 .map_err(|e| anyhow::anyhow!("Invalid regex pattern: {}", e))?;
             text = pattern.replace_all(&text, " <REDACTED> ").to_string();
         }
