@@ -47,7 +47,7 @@
 		"@bufbuild/protoc-gen-es": "^2.5.2",
 		"@connectrpc/connect": "^2.0.2",
 		"@connectrpc/connect-web": "^2.0.2",
-		"tailwindcss": "^4.1.10",
+		"tailwindcss": "catalog:",
 		"ts-proto": "^2.7.5",
 		"turbo": "^2.5.2"
 	},
