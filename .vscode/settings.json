@@ -12,6 +12,7 @@
 		"numpy",
 		"oneshot",
 		"opencv",
+		"openrouter",
 		"pcss",
 		"promptkit",
 		"prosemirror",
