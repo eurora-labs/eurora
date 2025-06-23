@@ -2,6 +2,7 @@ use image::DynamicImage;
 use llm::{builder::LLMBackend, chat::ChatMessage};
 
 mod service;
+pub use service::OllamaConfig;
 pub use service::PromptKitService;
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -12,6 +13,7 @@ pub enum EurLLMService {
     Google,
     Eurora,
     Local,
+    Ollama,
 }
 
 impl From<EurLLMService> for LLMBackend {
@@ -22,7 +24,7 @@ impl From<EurLLMService> for LLMBackend {
             EurLLMService::Google => LLMBackend::Google,
             EurLLMService::Eurora => todo!("Eurora backend not implemented"),
             EurLLMService::Local => todo!("Local backend not implemented"),
-            _ => LLMBackend::OpenAI,
+            EurLLMService::Ollama => LLMBackend::Ollama,
         }
     }
 }

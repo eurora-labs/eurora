@@ -7,11 +7,19 @@ use llm::{
     chat::ChatMessage,
     error::LLMError,
 };
+use tracing::info;
+
+#[derive(Debug)]
+pub struct OllamaConfig {
+    pub base_url: String,
+    pub model: String,
+}
 
 #[derive(Debug)]
 pub struct PromptKitService {
     llm_backend: EurLLMService,
     model: String,
+    ollama_config: Option<OllamaConfig>,
 }
 
 impl Default for PromptKitService {
@@ -22,7 +30,11 @@ impl Default for PromptKitService {
 
 impl PromptKitService {
     pub fn new(llm_backend: EurLLMService, model: String) -> Self {
-        Self { llm_backend, model }
+        Self {
+            llm_backend,
+            model,
+            ollama_config: None,
+        }
     }
 
     pub async fn anonymize_text(text: String) -> Result<String> {
@@ -84,6 +96,21 @@ Rules:
         messages: Vec<LLMMessage>,
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
     {
+        match self.llm_backend {
+            EurLLMService::OpenAI => self._openai_chat_stream(messages).await,
+            EurLLMService::Ollama => self._ollama_chat_stream(messages).await,
+            _ => Err(LLMError::Generic(format!(
+                "Unsupported LLM backend: {:?}",
+                self.llm_backend
+            ))),
+        }
+    }
+
+    async fn _openai_chat_stream(
+        &self,
+        messages: Vec<LLMMessage>,
+    ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
+    {
         let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not found");
 
         // Let's try with explicit configuration to ensure streaming works properly
@@ -101,5 +128,36 @@ Rules:
             .collect::<Vec<ChatMessage>>();
 
         llm.chat_stream(&chat_messages).await
+    }
+
+    async fn _ollama_chat_stream(
+        &self,
+        messages: Vec<LLMMessage>,
+    ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
+    {
+        info!("Ollama config: {:#?}", self.ollama_config);
+        let ollama_config = self.ollama_config.as_ref().unwrap();
+        let llm = LLMBuilder::new()
+            .backend(LLMBackend::from(EurLLMService::Ollama))
+            .model(&self.model)
+            .base_url(&ollama_config.base_url)
+            .temperature(0.7)
+            .stream(true)
+            .build()
+            .expect("Failed to build LLM (Ollama)");
+
+        let chat_messages = messages
+            .into_iter()
+            .map(|message| message.into())
+            .collect::<Vec<ChatMessage>>();
+
+        llm.chat_stream(&chat_messages).await
+    }
+
+    pub async fn switch_to_ollama(&mut self, config: OllamaConfig) -> Result<(), String> {
+        self.llm_backend = EurLLMService::Ollama;
+        self.model = config.model.clone();
+        self.ollama_config = Some(config);
+        Ok(())
     }
 }
