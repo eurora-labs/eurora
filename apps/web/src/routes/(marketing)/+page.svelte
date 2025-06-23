@@ -80,7 +80,10 @@
 <div class="mx-auto w-full h-full px-4 pb-16">
 	<IntroModule />
 	<div class="py-[8rem]">
-		<VideoCard.Card class="w-[90%] mx-auto">
+		<VideoCard.Card
+			class="w-[90%] mx-auto bg-transparent"
+			style="background-image: url('backgrounds/video_card_1.png');"
+		>
 			<VideoCard.Content
 				alignment="left"
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
@@ -96,7 +99,10 @@
 		</VideoCard.Card>
 	</div>
 	<div class="py-[8rem]">
-		<VideoCard.Card class=" w-[90%] mx-auto">
+		<VideoCard.Card
+			class=" w-[90%] mx-auto bg-transparent"
+			style="background-image: url('backgrounds/video_card_2.png');"
+		>
 			<VideoCard.Content
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 				alignment="right"
@@ -110,86 +116,73 @@
 			</VideoCard.Content>
 		</VideoCard.Card>
 	</div>
-	<!-- Title and Subtitle -->
-	<div class="mx-auto my-16 text-center md:my-24">
-		<h1 class="mx-4 mb-6 pt-16 text-5xl font-bold leading-[60px] text-purple-600 md:mx-48">
-			Your Open Source AI Assistant
-		</h1>
 
-		<p class="mx-4 mb-8 text-xl font-medium text-gray-500 md:mx-48">
-			Eurora is a fully Open Source AI Assistant that understands context, respects your
-			privacy, and works across all your devices. Experience AI on your own terms.
-		</p>
-
-		<div class="flex h-[calc(100vh-350px)] flex-col justify-center">
-			{#if !formSubmitted}
-				<form
-					class="mx-auto flex w-full max-w-lg flex-col items-center space-y-4 md:flex-row md:space-x-4 md:space-y-0"
-				>
-					<div class="relative w-full text-lg">
-						<Mail
-							class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-purple-400"
-						/>
-						<Input
-							bind:value={emailField}
-							type="email"
-							placeholder="Enter your email"
-							class="rounded-lg border-2 border-purple-100 py-6 pl-10 text-sm shadow-sm transition-all duration-200 hover:shadow-md focus:border-purple-400"
-						/>
-					</div>
-					<!-- <div class="w-full mx-auto py-6 px-8 text-sm font-medium transition-colors">
-                            <JoinWaitlist/>
-                        </div> -->
-
-					<Button
-						type="submit"
-						onclick={submitEmail}
-						class="mx-auto w-full rounded-lg px-8 py-6 text-sm font-medium shadow-md transition-colors duration-200 hover:shadow-lg md:w-auto"
-					>
-						Join Waitlist
-					</Button>
-				</form>
-			{:else}
-				<div class="mx-auto w-full max-w-lg text-center">
-					<h3 class="mb-4 text-2xl font-bold text-purple-600">
-						Thanks for your interest!
-					</h3>
-					<p class="text-gray-600">
-						We'll keep you updated on our progress and let you know when Eurora is
-						ready.
-					</p>
-				</div>
-			{/if}
-		</div>
-		<!-- <div class="flex justify-center w-1/3 mx-auto">
-            <Input  type="email" placeholder="Enter your email"/>
-			<Button size="lg" class="px-8" variant="primary">
-				<ArrowRight class="mr-2 h-5 w-5" />
-				Download Now
-			</Button>
-		</div> -->
+	<div class="py-[8rem]">
+		<VideoCard.Card
+			class="w-[90%] mx-auto bg-transparent"
+			style="background-image: url('backgrounds/video_card_3.png');"
+		>
+			<VideoCard.Content
+				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+			>
+				<VideoCard.Header>
+					<VideoCard.Title
+						>Coming soon: Unified Search Across All Your Files
+					</VideoCard.Title>
+					<VideoCard.Description>
+						Make most of what you own without sharing it with a corporation
+					</VideoCard.Description>
+				</VideoCard.Header>
+			</VideoCard.Content>
+		</VideoCard.Card>
 	</div>
-	<!-- <IntroModule /> -->
-	<!-- <div class="pt-16 col-span-4">s
-        <div class="relative animate-grow">
-            <div
-                class="py-6 px-4 shadow-lg rounded-md border border-gray-300 bg-white w-full flex items-center"
-                style="font-size: 54px; height: 131px;"
-            >
-                <div class="flex-grow">
-                    <span class="text-black">{inputValue}</span>
-                    <span class="text-purple-600">{purpleText}</span>
-                </div>
-                <Mic class="h-8 w-8 text-gray-400" />
-            </div>
-        </div>
-    </div> -->
+
 	<!-- Hero Section -->
 	<div class="mb-16 text-center">
-		<h1 class="mb-6 text-5xl font-bold">Intelligence Without Compromise</h1>
+		<h1 class="mb-6 text-5xl font-bold">By The People, For The People</h1>
+		<Card.Root class="p-6 max-w-[70%] mx-auto">
+			<Card.Content>
+				<ul class="mb-4 space-y-3">
+					<li class="flex items-start">
+						<div
+							class="mr-2 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-purple-100"
+						>
+							<span class="text-xs text-purple-600">✓</span>
+						</div>
+						<span>Get instant explanations on complex topics</span>
+					</li>
+					<li class="flex items-start">
+						<div
+							class="mr-2 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-purple-100"
+						>
+							<span class="text-xs text-purple-600">✓</span>
+						</div>
+						<span>Get real-time translation of live lectures</span>
+					</li>
+					<li class="flex items-start">
+						<div
+							class="mr-2 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-purple-100"
+						>
+							<span class="text-xs text-purple-600">✓</span>
+						</div>
+						<span>Visualize homework problems and assignments</span>
+					</li>
+					<li class="flex items-start">
+						<div
+							class="mr-2 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-purple-100"
+						>
+							<span class="text-xs text-purple-600">✓</span>
+						</div>
+						<span
+							>Ask how new knowledge relates to previous concepts you've learned
+						</span>
+					</li>
+				</ul>
+			</Card.Content>
+		</Card.Root>
 		<p class="mx-auto mb-8 max-w-3xl text-xl text-gray-600">
-			Eurora is a fully Open Source AI assistant that understands context, respects your
-			privacy, and works across all your devices. Experience AI on your own terms.
+			Eurora AI is fully Open Source and and based in the Netherlands. Enjoy the utmost
+			protection offered by the European Union anywhere in the world.
 		</p>
 		<!-- <div class="flex justify-center gap-4">
             <Sheet.Root>
@@ -197,20 +190,20 @@
                   >Join Waitlist</Sheet.Trigger
                 >
                 <Sheet.Content side="right">
-                 
+
                   <ScrollArea class="h-screen">
                     <WaitlistForm portalId="242150186" formId="f0b52ee4-94ab-477c-9ac5-a13cb3086f9b" region="na2" />
                   </ScrollArea>
-                  
+
                   <Sheet.Footer>
                     <Skeleton class="w-full h-screen" />
                     <Skeleton class="w-full h-screen" />
                     <Skeleton class="w-full h-screen" />
-                   
+
                   </Sheet.Footer>
                 </Sheet.Content>
               </Sheet.Root>
-			
+
 		</div> -->
 	</div>
 
