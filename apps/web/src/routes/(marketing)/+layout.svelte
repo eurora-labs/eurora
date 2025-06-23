@@ -64,6 +64,3 @@
 </div>
 
 {@render children?.()}
-
-<style>
-</style>

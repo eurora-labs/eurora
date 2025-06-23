@@ -22,7 +22,7 @@
 		".svelte-kit/non-ambient.d.ts",
 		".svelte-kit/types/**/$types.d.ts",
 		"terrazzo.config.js",
-		"postcss.config.js",
+		"postcss.config.mjss",
 		"vite.config.js",
 		"vite.config.ts",
 		"vitest.workspace.ts",
