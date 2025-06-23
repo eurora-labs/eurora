@@ -9,6 +9,11 @@ pub trait ThirdPartyApi {
         base_url: String,
         model: String,
     ) -> Result<(), String>;
+    async fn switch_to_remote<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        api_key: String,
+        model: String,
+    ) -> Result<(), String>;
     async fn check_api_key_exists() -> Result<bool, String>;
     async fn save_api_key(api_key: String) -> Result<(), String>;
     async fn initialize_openai_client<R: Runtime>(
@@ -71,6 +76,22 @@ impl ThirdPartyApi for ThirdPartyApiImpl {
         let mut promptkit_client = eur_prompt_kit::PromptKitService::default();
         promptkit_client
             .switch_to_ollama(eur_prompt_kit::OllamaConfig { base_url, model })
+            .await?;
+        let state: tauri::State<SharedPromptKitService> = app_handle.state();
+        let mut guard = state.lock().await;
+        *guard = Some(promptkit_client);
+        Ok(())
+    }
+
+    async fn switch_to_remote<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        api_key: String,
+        model: String,
+    ) -> Result<(), String> {
+        let mut promptkit_client = eur_prompt_kit::PromptKitService::default();
+        promptkit_client
+            .switch_to_remote(eur_prompt_kit::RemoteConfig { api_key, model })
             .await?;
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;
