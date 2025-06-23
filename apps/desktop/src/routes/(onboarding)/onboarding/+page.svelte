@@ -76,7 +76,7 @@
 					</Card.Header>
 					<Card.Content class="flex justify-center">
 						<Button
-							href="/onboarding/llama"
+							href="/onboarding/local"
 							variant="secondary"
 							class="w-full rounded-lg px-6 py-3 font-medium transition-colors duration-200"
 							size="lg"
