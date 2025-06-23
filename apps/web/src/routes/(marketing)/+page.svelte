@@ -82,7 +82,7 @@
 	<div class="py-[8rem]">
 		<VideoCard.Card
 			class="w-[90%] mx-auto bg-transparent"
-			style="background-image: url('backgrounds/video_card_1.png');"
+			style="background-image: url('backgrounds/video_card_1.png'); background-size: cover;"
 		>
 			<VideoCard.Content
 				alignment="left"
@@ -101,7 +101,7 @@
 	<div class="py-[8rem]">
 		<VideoCard.Card
 			class=" w-[90%] mx-auto bg-transparent"
-			style="background-image: url('backgrounds/video_card_2.png');"
+			style="background-image: url('backgrounds/video_card_2.png'); background-size: cover;"
 		>
 			<VideoCard.Content
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
@@ -120,7 +120,7 @@
 	<div class="py-[8rem]">
 		<VideoCard.Card
 			class="w-[90%] mx-auto bg-transparent"
-			style="background-image: url('backgrounds/video_card_3.png');"
+			style="background-image: url('backgrounds/video_card_3.png'); background-size: cover;"
 		>
 			<VideoCard.Content
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
@@ -850,7 +850,7 @@
 	</Card.Root>
 </div>
 
-<style>
+<style lang="postcss">
 	/* Optional: Add a blinking cursor animation */
 	@keyframes blink {
 		0%,

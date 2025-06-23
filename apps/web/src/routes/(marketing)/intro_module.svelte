@@ -119,8 +119,9 @@
 	</div>
 
 	<!-- Row 2: Input Box (33% on mobile, 25% on desktop) -->
-	<div class="flex-1 flex items-center justify-center px-4 md:items-start">
-		<div class="w-full max-w-2xl">
+	<div class="flex-1 flex justify-center px-4">
+		<!-- Make self position to the top -->
+		<div class="w-full max-w-2xl self-center md:self-start">
 			<div class="animate-grow relative">
 				<div
 					class="flex w-full min-h-[80px] sm:min-h-[100px] items-center text-2xl sm:text-3xl md:text-4xl font-semibold rounded-2xl border border-gray-300 px-3 py-4 shadow-lg md:px-4 md:py-6 backdrop-blur-2xl bg-white/20"
@@ -140,7 +141,7 @@
 
 	<!-- Row 3: Feature Cards (25% of screen height) -->
 	<div class="flex-1 flex items-center justify-center px-4">
-		<div class="w-full max-w-6xl">
+		<div class="w-full h-full max-w-6xl">
 			<!-- Mobile: Vertical stacked cards (smaller) -->
 			<div class="md:hidden">
 				<div class="grid grid-cols-1 gap-3 max-w-sm mx-auto">
@@ -225,78 +226,83 @@
 			</div>
 
 			<!-- Desktop: Grid layout -->
-			<div class="hidden md:grid grid-cols-3 gap-4">
-				{#if visibleCards.includes(1)}
-					<div class="card-entrance backdrop-blur-2xl" style="--animation-delay: 0ms;">
-						<Card.Root class="card-content h-full bg-white/20">
-							<Card.Content
-								class="flex h-full flex-col items-center justify-center p-4"
-							>
-								<div class="icon-animation flex items-center justify-center">
-									<GaugeIcon size={48} />
-								</div>
-								<Card.Title
-									class="title-animation text-black/80 text-center text-lg sm:text-xl mt-2"
-									>Context Aware</Card.Title
+			<div class="hidden md:block">
+				<div class=" md:grid grid-cols-3 gap-4">
+					{#if visibleCards.includes(1)}
+						<div
+							class="card-entrance backdrop-blur-2xl"
+							style="--animation-delay: 0ms;"
+						>
+							<Card.Root class="card-content h-full bg-white/20">
+								<Card.Content
+									class="flex h-full flex-col items-center justify-center p-4"
 								>
-								<Card.Description
-									class="text-black/80 mt-1 text-sm sm:text-base text-center"
-									>Prompt up to 17x faster</Card.Description
-								>
-							</Card.Content>
-						</Card.Root>
-					</div>
-				{/if}
+									<div class="icon-animation flex items-center justify-center">
+										<GaugeIcon size={48} />
+									</div>
+									<Card.Title
+										class="title-animation text-black/80 text-center text-lg sm:text-xl mt-2"
+										>Context Aware</Card.Title
+									>
+									<Card.Description
+										class="text-black/80 mt-1 text-sm sm:text-base text-center"
+										>Prompt up to 17x faster</Card.Description
+									>
+								</Card.Content>
+							</Card.Root>
+						</div>
+					{/if}
 
-				{#if visibleCards.includes(2)}
-					<div
-						class="card-entrance backdrop-blur-2xl"
-						style="--animation-delay: {cards[1].animationDelay};"
-					>
-						<Card.Root class="card-content h-full bg-white/20">
-							<Card.Content
-								class="flex h-full flex-col items-center justify-center p-4"
-							>
-								<div class="icon-animation flex items-center justify-center">
-									<ShieldCheckIcon size={48} />
-								</div>
-								<Card.Title
-									class="title-animation text-black/80 text-center text-lg sm:text-xl mt-2"
-									>Secure and Private</Card.Title
+					{#if visibleCards.includes(2)}
+						<div
+							class="card-entrance backdrop-blur-2xl"
+							style="--animation-delay: {cards[1].animationDelay};"
+						>
+							<Card.Root class="card-content h-full bg-white/20">
+								<Card.Content
+									class="flex h-full flex-col items-center justify-center p-4"
 								>
-								<Card.Description
-									class="text-black/80 mt-1 text-sm sm:text-base text-center"
-									>End-to-end encryption</Card.Description
-								>
-							</Card.Content>
-						</Card.Root>
-					</div>
-				{/if}
+									<div class="icon-animation flex items-center justify-center">
+										<ShieldCheckIcon size={48} />
+									</div>
+									<Card.Title
+										class="title-animation text-black/80 text-center text-lg sm:text-xl mt-2"
+										>Secure and Private</Card.Title
+									>
+									<Card.Description
+										class="text-black/80 mt-1 text-sm sm:text-base text-center"
+										>End-to-end encryption</Card.Description
+									>
+								</Card.Content>
+							</Card.Root>
+						</div>
+					{/if}
 
-				{#if visibleCards.includes(3)}
-					<div
-						class="card-entrance backdrop-blur-2xl"
-						style="--animation-delay: {cards[2].animationDelay};"
-					>
-						<Card.Root class="card-content h-full bg-white/20">
-							<Card.Content
-								class="flex h-full flex-col items-center justify-center p-4"
-							>
-								<div class="icon-animation flex items-center justify-center">
-									<ServerIcon size={48} />
-								</div>
-								<Card.Title
-									class="title-animation text-black/80 text-center text-lg sm:text-xl mt-2"
-									>Run Locally</Card.Title
+					{#if visibleCards.includes(3)}
+						<div
+							class="card-entrance backdrop-blur-2xl"
+							style="--animation-delay: {cards[2].animationDelay};"
+						>
+							<Card.Root class="card-content h-full bg-white/20">
+								<Card.Content
+									class="flex h-full flex-col items-center justify-center p-4"
 								>
-								<Card.Description
-									class="text-black/80 mt-1 text-sm sm:text-base text-center"
-									>For free, forever</Card.Description
-								>
-							</Card.Content>
-						</Card.Root>
-					</div>
-				{/if}
+									<div class="icon-animation flex items-center justify-center">
+										<ServerIcon size={48} />
+									</div>
+									<Card.Title
+										class="title-animation text-black/80 text-center text-lg sm:text-xl mt-2"
+										>Run Locally</Card.Title
+									>
+									<Card.Description
+										class="text-black/80 mt-1 text-sm sm:text-base text-center"
+										>For free, forever</Card.Description
+									>
+								</Card.Content>
+							</Card.Root>
+						</div>
+					{/if}
+				</div>
 			</div>
 		</div>
 	</div>
