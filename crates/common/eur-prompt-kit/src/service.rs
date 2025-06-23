@@ -132,7 +132,14 @@ Rules:
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
     {
         info!("Ollama config: {:#?}", self.ollama_config);
-        let ollama_config = self.ollama_config.as_ref().unwrap();
+
+        let ollama_config = self
+            .ollama_config
+            .as_ref()
+            .ok_or_else(|| LLMError::Generic("Ollama config not set".to_string()))?;
+
+        info!("Ollama config: {:#?}", ollama_config);
+
         let llm = LLMBuilder::new()
             .backend(LLMBackend::from(EurLLMService::Ollama))
             .model(&self.model)
@@ -140,7 +147,7 @@ Rules:
             .temperature(0.7)
             .stream(true)
             .build()
-            .expect("Failed to build LLM (Ollama)");
+            .map_err(|e| LLMError::Generic(format!("Failed to build LLM (Ollama): {}", e)))?;
 
         let chat_messages = messages
             .into_iter()
@@ -151,16 +158,54 @@ Rules:
     }
 
     pub async fn switch_to_ollama(&mut self, config: OllamaConfig) -> Result<(), String> {
+        // Validate the configuration
+        if config.base_url.is_empty() {
+            return Err("Base URL cannot be empty".to_string());
+        }
+
+        if config.model.is_empty() {
+            return Err("Model name cannot be empty".to_string());
+        }
+
+        // Optionally validate URL format
+        if !config.base_url.starts_with("http://") && !config.base_url.starts_with("https://") {
+            return Err("Base URL must start with http:// or https://".to_string());
+        }
+
+        let version = reqwest::get(&format!("{}/api/version", config.base_url))
+            .await
+            .expect("Failed to get Ollama version")
+            .text()
+            .await
+            .expect("Failed to get Ollama version");
+
+        if version.is_empty() {
+            return Err("Failed to get Ollama version".to_string());
+        }
+
+        info!("Ollama version: {}", version);
         self.llm_backend = EurLLMService::Ollama;
         self.model = config.model.clone();
         self.ollama_config = Some(config);
+
         Ok(())
     }
 
     pub async fn switch_to_remote(&mut self, config: RemoteConfig) -> Result<(), String> {
+        // Validate the configuration
+        if config.model.is_empty() {
+            return Err("Model name cannot be empty".to_string());
+        }
+
+        if config.api_key.is_empty() {
+            return Err("API key cannot be empty".to_string());
+        }
+
+        // Add any additional validation specific to RemoteConfig
         self.llm_backend = EurLLMService::OpenAI;
         self.model = config.model.clone();
         self.remote_config = Some(config);
+
         Ok(())
     }
 }
