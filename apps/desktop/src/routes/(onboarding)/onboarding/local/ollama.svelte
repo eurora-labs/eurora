@@ -5,13 +5,28 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 
+	import { CheckIcon } from '@lucide/svelte';
+
 	const taurpc = createTauRPCProxy();
 
 	let ollamaUrl = $state('http://localhost:11434');
 	let modelName = $state('llama3.2:latest');
 
+	let isConnecting = $state(false);
+	let connectionStatus = $state<'success' | 'error' | 'idle'>('idle');
+
 	async function connect() {
-		await taurpc.third_party.switch_to_ollama(ollamaUrl, modelName);
+		isConnecting = true;
+		connectionStatus = 'idle';
+		try {
+			await taurpc.third_party.switch_to_ollama(ollamaUrl, modelName);
+			connectionStatus = 'success';
+		} catch (error) {
+			console.error(error);
+			connectionStatus = 'error';
+		} finally {
+			isConnecting = false;
+		}
 	}
 </script>
 
@@ -41,6 +56,18 @@
 		</div>
 	</Card.Content>
 	<Card.Footer class="flex justify-end">
-		<Button class="flex items-center gap-2" onclick={connect}>Connect</Button>
+		<Button
+			class="flex items-center gap-2"
+			onclick={connect}
+			disabled={isConnecting || connectionStatus === 'success'}
+		>
+			{#if connectionStatus === 'success'}
+				<CheckIcon />
+			{:else if connectionStatus === 'error'}
+				Error Connecting
+			{:else}
+				{isConnecting ? 'Connecting...' : 'Connect'}
+			{/if}
+		</Button>
 	</Card.Footer>
 </Card.Root>
