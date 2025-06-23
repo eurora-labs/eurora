@@ -24,15 +24,18 @@
 		'flex gap-0 overflow-hidden p-0',
 		/* Mobile: column layout with text at top, video at bottom */
 		'flex-col gap-6',
-		/* Desktop: row layout */
-		alignment === 'right' ? 'md:flex-row-reverse md:gap-0' : 'md:flex-row md:gap-0',
+		/* Desktop: row layout with responsive height */
+		'md:flex-row md:gap-0 md:h-[70vh] md:max-h-[1000px] md:min-h-[400px]',
 		className,
 	)}
 	{...restProps}
 >
-	<!-- Video content - first in DOM order but appears second (bottom) on mobile -->
+	<!-- Video content -->
 	<div
-		class="order-2 h-[250px] w-full overflow-hidden rounded-[24px] md:order-1 md:h-full md:w-3/5 md:rounded-[104px]"
+		class={cn(
+			'order-2 h-[250px] overflow-hidden rounded-[24px] md:h-full md:w-3/5 md:rounded-[104px]',
+			alignment === 'right' ? 'md:order-2' : 'md:order-1',
+		)}
 	>
 		<video class="h-full w-full object-cover" controls>
 			{#if webmSrc}
@@ -45,12 +48,19 @@
 		</video>
 	</div>
 
-	<!-- Text content - second in DOM order but appears first (top) on mobile -->
+	<!-- Text content -->
 	<div
-		class="order-1 flex w-full items-start justify-center px-4 md:order-2 md:w-2/5 md:items-center md:px-8"
+		class={cn(
+			'order-1 flex items-center justify-center px-4 md:w-2/5 md:px-8',
+			alignment === 'right' ? 'md:order-1' : 'md:order-2',
+		)}
 	>
 		<div class="flex w-full flex-col space-y-4">
 			{@render children?.()}
 		</div>
 	</div>
 </div>
+
+<style lang="postcss">
+	@reference 'tailwindcss';
+</style>
