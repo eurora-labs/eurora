@@ -12,7 +12,7 @@ export type Query = { text: string; assets: string[] }
 
 export type ResponseChunk = { chunk: string }
 
-const ARGS_MAP = { '':'{"send_query":["channel","query"]}', 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'third_party':'{"check_api_key_exists":[],"initialize_openai_client":[],"save_api_key":["api_key"],"switch_to_ollama":["base_url","model"]}', 'window':'{"get_scale_factor":["height"],"resize_launcher_window":["height","scale_factor"]}' }
+const ARGS_MAP = { '':'{"send_query":["channel","query"]}', 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'third_party':'{"check_api_key_exists":[],"initialize_openai_client":[],"save_api_key":["api_key"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["api_key","model"]}', 'window':'{"get_scale_factor":["height"],"resize_launcher_window":["height","scale_factor"]}' }
 export type Router = { "": {send_query: (channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
 "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
@@ -21,7 +21,8 @@ poll_for_login: () => Promise<boolean>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 initialize_openai_client: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>, 
-switch_to_ollama: (baseUrl: string, model: string) => Promise<null>},
+switch_to_ollama: (baseUrl: string, model: string) => Promise<null>, 
+switch_to_remote: (apiKey: string, model: string) => Promise<null>},
 "window": {get_scale_factor: (height: number) => Promise<number>, 
 resize_launcher_window: (height: number, scaleFactor: number) => Promise<null>} };
 

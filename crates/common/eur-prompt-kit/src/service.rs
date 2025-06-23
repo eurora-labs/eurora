@@ -1,4 +1,4 @@
-use crate::{EurLLMService, LLMMessage};
+use crate::{EurLLMService, LLMMessage, OllamaConfig, RemoteConfig};
 use anyhow::Result;
 use eur_util::redact_emails;
 use futures::Stream;
@@ -10,15 +10,10 @@ use llm::{
 use tracing::info;
 
 #[derive(Debug)]
-pub struct OllamaConfig {
-    pub base_url: String,
-    pub model: String,
-}
-
-#[derive(Debug)]
 pub struct PromptKitService {
     llm_backend: EurLLMService,
     model: String,
+    remote_config: Option<RemoteConfig>,
     ollama_config: Option<OllamaConfig>,
 }
 
@@ -34,6 +29,7 @@ impl PromptKitService {
             llm_backend,
             model,
             ollama_config: None,
+            remote_config: None,
         }
     }
 
@@ -158,6 +154,13 @@ Rules:
         self.llm_backend = EurLLMService::Ollama;
         self.model = config.model.clone();
         self.ollama_config = Some(config);
+        Ok(())
+    }
+
+    pub async fn switch_to_remote(&mut self, config: RemoteConfig) -> Result<(), String> {
+        self.llm_backend = EurLLMService::OpenAI;
+        self.model = config.model.clone();
+        self.remote_config = Some(config);
         Ok(())
     }
 }
