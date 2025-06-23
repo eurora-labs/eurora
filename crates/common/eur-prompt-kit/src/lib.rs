@@ -1,8 +1,9 @@
 use image::DynamicImage;
 use llm::{builder::LLMBackend, chat::ChatMessage};
 
+mod config;
 mod service;
-pub use service::OllamaConfig;
+pub use config::{OllamaConfig, RemoteConfig};
 pub use service::PromptKitService;
 
 #[derive(Debug, Default, Copy, Clone)]
