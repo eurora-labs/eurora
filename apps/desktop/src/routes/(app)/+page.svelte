@@ -39,7 +39,7 @@
 	</div>
 </div>
 
-<style>
+<style lang="postcss">
 	:host {
 		display: flex;
 		z-index: 9999;
