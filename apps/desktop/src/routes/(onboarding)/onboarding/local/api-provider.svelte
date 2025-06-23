@@ -23,6 +23,7 @@
 	const triggerContent = $derived(
 		providers.find((f) => f.value === apiProvider)?.label ?? 'Select provider',
 	);
+
 	const modelTriggerContent = $derived(
 		models[apiProvider as keyof typeof models]?.find((f) => f.value === model)?.label ??
 			'Select model',

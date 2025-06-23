@@ -1,10 +1,11 @@
 <script lang="ts">
-	import ApiProvider from './api-provider.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Card, CardContent, CardHeader, CardTitle } from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
 	import * as Select from '@eurora/ui/components/select/index';
+	import Ollama from './ollama.svelte';
+	import ApiProvider from './api-provider.svelte';
 
 	let apiProvider = $state('');
 	let apiKey = $state('');
@@ -54,36 +55,10 @@
 		</Card> -->
 
 		<!-- Right Column: Ollama Configuration -->
-		<Card>
-			<CardHeader>
-				<CardTitle>Ollama Configuration</CardTitle>
-			</CardHeader>
-			<CardContent class="space-y-4">
-				<div class="space-y-2">
-					<Label for="ollama-url">Ollama URL</Label>
-					<Input
-						id="ollama-url"
-						type="text"
-						placeholder="http://localhost:11434"
-						bind:value={ollamaUrl}
-					/>
-				</div>
-
-				<div class="space-y-2">
-					<Label for="model-name">Model Name</Label>
-					<Input
-						id="model-name"
-						type="text"
-						placeholder="llama2, codellama, etc."
-						bind:value={modelName}
-					/>
-				</div>
-			</CardContent>
-		</Card>
+		<Ollama />
 	</div>
 
 	<div class="flex justify-between items-end mt-auto pt-8">
 		<Button variant="outline" href="/onboarding">Back</Button>
-		<Button>Continue</Button>
 	</div>
 </div>
