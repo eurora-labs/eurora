@@ -1,4 +1,4 @@
-use crate::{EurLLMService, LLMMessage};
+use crate::{EurLLMService, LLMMessage, OllamaConfig, RemoteConfig};
 use anyhow::Result;
 use eur_util::redact_emails;
 use futures::Stream;
@@ -7,11 +7,14 @@ use llm::{
     chat::ChatMessage,
     error::LLMError,
 };
+use tracing::info;
 
 #[derive(Debug)]
 pub struct PromptKitService {
     llm_backend: EurLLMService,
     model: String,
+    remote_config: Option<RemoteConfig>,
+    ollama_config: Option<OllamaConfig>,
 }
 
 impl Default for PromptKitService {
@@ -22,7 +25,12 @@ impl Default for PromptKitService {
 
 impl PromptKitService {
     pub fn new(llm_backend: EurLLMService, model: String) -> Self {
-        Self { llm_backend, model }
+        Self {
+            llm_backend,
+            model,
+            ollama_config: None,
+            remote_config: None,
+        }
     }
 
     pub async fn anonymize_text(text: String) -> Result<String> {
@@ -70,7 +78,7 @@ Rules:
         let mut text = original_text;
         for word in sensitive_words {
             // Case-insensitive replacement using regex
-            let pattern = regex::Regex::new(&regex::escape(&word.trim()))
+            let pattern = regex::Regex::new(&regex::escape(word.trim()))
                 .map_err(|e| anyhow::anyhow!("Invalid regex pattern: {}", e))?;
             text = pattern.replace_all(&text, " <REDACTED> ").to_string();
         }
@@ -80,6 +88,21 @@ Rules:
     }
 
     pub async fn chat_stream(
+        &self,
+        messages: Vec<LLMMessage>,
+    ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
+    {
+        match self.llm_backend {
+            EurLLMService::OpenAI => self._openai_chat_stream(messages).await,
+            EurLLMService::Ollama => self._ollama_chat_stream(messages).await,
+            _ => Err(LLMError::Generic(format!(
+                "Unsupported LLM backend: {:?}",
+                self.llm_backend
+            ))),
+        }
+    }
+
+    async fn _openai_chat_stream(
         &self,
         messages: Vec<LLMMessage>,
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
@@ -101,5 +124,88 @@ Rules:
             .collect::<Vec<ChatMessage>>();
 
         llm.chat_stream(&chat_messages).await
+    }
+
+    async fn _ollama_chat_stream(
+        &self,
+        messages: Vec<LLMMessage>,
+    ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
+    {
+        info!("Ollama config: {:#?}", self.ollama_config);
+
+        let ollama_config = self
+            .ollama_config
+            .as_ref()
+            .ok_or_else(|| LLMError::Generic("Ollama config not set".to_string()))?;
+
+        info!("Ollama config: {:#?}", ollama_config);
+
+        let llm = LLMBuilder::new()
+            .backend(LLMBackend::from(EurLLMService::Ollama))
+            .model(&self.model)
+            .base_url(&ollama_config.base_url)
+            .temperature(0.7)
+            .stream(true)
+            .build()
+            .map_err(|e| LLMError::Generic(format!("Failed to build LLM (Ollama): {}", e)))?;
+
+        let chat_messages = messages
+            .into_iter()
+            .map(|message| message.into())
+            .collect::<Vec<ChatMessage>>();
+
+        llm.chat_stream(&chat_messages).await
+    }
+
+    pub async fn switch_to_ollama(&mut self, config: OllamaConfig) -> Result<(), String> {
+        // Validate the configuration
+        if config.base_url.is_empty() {
+            return Err("Base URL cannot be empty".to_string());
+        }
+
+        if config.model.is_empty() {
+            return Err("Model name cannot be empty".to_string());
+        }
+
+        // Optionally validate URL format
+        if !config.base_url.starts_with("http://") && !config.base_url.starts_with("https://") {
+            return Err("Base URL must start with http:// or https://".to_string());
+        }
+
+        let version = reqwest::get(&format!("{}/api/version", config.base_url))
+            .await
+            .expect("Failed to get Ollama version")
+            .text()
+            .await
+            .expect("Failed to get Ollama version");
+
+        if version.is_empty() {
+            return Err("Failed to get Ollama version".to_string());
+        }
+
+        info!("Ollama version: {}", version);
+        self.llm_backend = EurLLMService::Ollama;
+        self.model = config.model.clone();
+        self.ollama_config = Some(config);
+
+        Ok(())
+    }
+
+    pub async fn switch_to_remote(&mut self, config: RemoteConfig) -> Result<(), String> {
+        // Validate the configuration
+        if config.model.is_empty() {
+            return Err("Model name cannot be empty".to_string());
+        }
+
+        if config.api_key.is_empty() {
+            return Err("API key cannot be empty".to_string());
+        }
+
+        // Add any additional validation specific to RemoteConfig
+        self.llm_backend = EurLLMService::OpenAI;
+        self.model = config.model.clone();
+        self.remote_config = Some(config);
+
+        Ok(())
     }
 }

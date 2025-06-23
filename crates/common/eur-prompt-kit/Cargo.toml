@@ -13,3 +13,5 @@ openai-api-rs = { git = "https://github.com/AndreRoelofs/openai-api-rs.git", bra
 tokio = { workspace = true }
 eur-util = { workspace = true }
 regex = "1.9.6"
+tracing = { workspace = true }
+reqwest = "0.12"
