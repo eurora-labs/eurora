@@ -1168,7 +1168,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -2312,7 +2312,9 @@ dependencies = [
  "llm",
  "openai-api-rs",
  "regex",
+ "reqwest",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2560,7 +2562,7 @@ checksum = "0ce92ff622d6dadf7349484f42c93271a0d49b7cc4d466a936405bacbe10aa78"
 dependencies = [
  "cfg-if",
  "rustix 1.0.5",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4391,7 +4393,7 @@ checksum = "b4ce301924b7887e9d637144fdade93f9dfff9b60981d4ac161db09720d39aa5"
 [[package]]
 name = "llm"
 version = "1.3.1"
-source = "git+https://github.com/AndreRoelofs/llm.git?branch=main#14724e714b95b35a5a8c30140acd0111112facdc"
+source = "git+https://github.com/AndreRoelofs/llm.git?branch=main#8ec09ca9fcb25fd46a2341c5b08319782f0081ac"
 dependencies = [
  "async-trait",
  "axum 0.7.9",
