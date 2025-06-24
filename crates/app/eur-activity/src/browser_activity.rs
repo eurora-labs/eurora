@@ -500,7 +500,24 @@ pub struct BrowserStrategy {
 impl BrowserStrategy {
     /// Returns a static list of process names supported by this strategy
     pub fn get_supported_processes() -> Vec<&'static str> {
-        vec![
+        // Return different arrays based on platform
+        #[cfg(target_os = "windows")]
+        let processes = vec![
+            "firefox.exe",
+            "firefox-bin.exe",
+            "firefox-esr.exe",
+            "chrome.exe",
+            "chromium.exe",
+            "chromium-browser.exe",
+            "brave.exe",
+            "brave-browser.exe",
+            "opera.exe",
+            "vivaldi.exe",
+            "edge.exe",
+            "msedge.exe",
+        ];
+        #[cfg(not(target_os = "windows"))]
+        let processes = vec![
             "firefox",
             "firefox-bin",
             "firefox-esr",
@@ -514,7 +531,8 @@ impl BrowserStrategy {
             "edge",
             "msedge",
             "safari",
-        ]
+        ];
+        processes
     }
 
     /// Create a new BrowserStrategy with the given name
