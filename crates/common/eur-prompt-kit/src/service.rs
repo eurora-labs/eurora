@@ -137,14 +137,10 @@ Rules:
         messages: Vec<LLMMessage>,
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
     {
-        info!("Ollama config: {:#?}", self.ollama_config);
-
         let ollama_config = self
             .ollama_config
             .as_ref()
             .ok_or_else(|| LLMError::Generic("Ollama config not set".to_string()))?;
-
-        info!("Ollama config: {:#?}", ollama_config);
 
         let llm = LLMBuilder::new()
             .backend(LLMBackend::from(EurLLMService::Ollama))
