@@ -93,7 +93,8 @@ Rules:
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
     {
         match self.llm_backend {
-            EurLLMService::OpenAI => self._openai_chat_stream(messages).await,
+            EurLLMService::OpenAI => self._remote_chat_stream(messages).await,
+            EurLLMService::Anthropic => self._remote_chat_stream(messages).await,
             EurLLMService::Ollama => self._ollama_chat_stream(messages).await,
             _ => Err(LLMError::Generic(format!(
                 "Unsupported LLM backend: {:?}",
@@ -102,12 +103,17 @@ Rules:
         }
     }
 
-    async fn _openai_chat_stream(
+    async fn _remote_chat_stream(
         &self,
         messages: Vec<LLMMessage>,
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
     {
-        let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not found");
+        let remote_config = self
+            .remote_config
+            .as_ref()
+            .ok_or_else(|| LLMError::Generic("Remote config not set".to_string()))?;
+
+        let api_key = remote_config.api_key.clone();
 
         // Let's try with explicit configuration to ensure streaming works properly
         let llm = LLMBuilder::new()
@@ -191,7 +197,11 @@ Rules:
         Ok(())
     }
 
-    pub async fn switch_to_remote(&mut self, config: RemoteConfig) -> Result<(), String> {
+    pub async fn switch_to_remote(
+        &mut self,
+        provider: EurLLMService,
+        config: RemoteConfig,
+    ) -> Result<(), String> {
         // Validate the configuration
         if config.model.is_empty() {
             return Err("Model name cannot be empty".to_string());
@@ -202,7 +212,7 @@ Rules:
         }
 
         // Add any additional validation specific to RemoteConfig
-        self.llm_backend = EurLLMService::OpenAI;
+        self.llm_backend = provider;
         self.model = config.model.clone();
         self.remote_config = Some(config);
 
