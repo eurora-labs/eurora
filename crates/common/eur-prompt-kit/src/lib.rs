@@ -30,6 +30,20 @@ impl From<EurLLMService> for LLMBackend {
     }
 }
 
+impl From<String> for EurLLMService {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "openai" => EurLLMService::OpenAI,
+            "anthropic" => EurLLMService::Anthropic,
+            "google" => EurLLMService::Google,
+            "eurora" => EurLLMService::Eurora,
+            "local" => EurLLMService::Local,
+            "ollama" => EurLLMService::Ollama,
+            _ => EurLLMService::OpenAI,
+        }
+    }
+}
+
 pub enum Role {
     System,
     User,
