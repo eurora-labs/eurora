@@ -11,6 +11,7 @@ pub trait ThirdPartyApi {
     ) -> Result<(), String>;
     async fn switch_to_remote<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
+        provider: String,
         api_key: String,
         model: String,
     ) -> Result<(), String>;
@@ -53,9 +54,6 @@ impl ThirdPartyApi for ThirdPartyApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<bool, String> {
-        let _api_key = secret::retrieve("OPENAI_API_KEY", secret::Namespace::Global)
-            .map_err(|e| format!("Failed to retrieve API key: {}", e))?;
-
         // Initialize the OpenAI client with the API key
         let promptkit_client = eur_prompt_kit::PromptKitService::default();
 
@@ -86,12 +84,16 @@ impl ThirdPartyApi for ThirdPartyApiImpl {
     async fn switch_to_remote<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
+        provider: String,
         api_key: String,
         model: String,
     ) -> Result<(), String> {
         let mut promptkit_client = eur_prompt_kit::PromptKitService::default();
         promptkit_client
-            .switch_to_remote(eur_prompt_kit::RemoteConfig { api_key, model })
+            .switch_to_remote(
+                provider.into(),
+                eur_prompt_kit::RemoteConfig { api_key, model },
+            )
             .await?;
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;
