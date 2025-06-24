@@ -3,11 +3,9 @@ use anyhow::Result;
 use eur_util::redact_emails;
 use futures::Stream;
 use llm::{
-    backends::ollama::Ollama,
     builder::{LLMBackend, LLMBuilder},
     chat::ChatMessage,
     error::LLMError,
-    health::HealthProvider,
 };
 use tracing::info;
 
