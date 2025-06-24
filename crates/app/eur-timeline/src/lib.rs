@@ -188,7 +188,11 @@ impl Timeline {
                             let process_name = window.process_name.clone().unwrap();
                             let window_title = window.window_title.clone().unwrap();
                             info!("▶ {}: {}", process_name, window_title);
-                            if process_name != "eur-tauri" {
+                            #[cfg(target_os = "windows")]
+                            let eurora_process = "eur-tauri.exe";
+                            #[cfg(not(target_os = "windows"))]
+                            let eurora_process = "eur-tauri";
+                            if process_name != eurora_process {
                                 let _ = tx_clone.send(window);
                             }
                             Ok(())
