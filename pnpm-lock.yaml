@@ -983,8 +983,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.22
-        version: 2.0.0-next.22(svelte@5.34.7)
+        specifier: 2.0.0-next.25
+        version: 2.0.0-next.25(svelte@5.34.7)
       mode-watcher:
         specifier: ^1.0.8
         version: 1.0.8(svelte@5.34.7)
@@ -1455,8 +1455,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.22
-        version: 2.0.0-next.22(svelte@5.34.7)
+        specifier: 2.0.0-next.25
+        version: 2.0.0-next.25(svelte@5.34.7)
       mode-watcher:
         specifier: ^1.0.8
         version: 1.0.8(svelte@5.34.7)
@@ -1662,8 +1662,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.22
-        version: 2.0.0-next.22(svelte@5.34.7)
+        specifier: 2.0.0-next.25
+        version: 2.0.0-next.25(svelte@5.34.7)
       mode-watcher:
         specifier: ^1.0.8
         version: 1.0.8(svelte@5.34.7)
@@ -2028,8 +2028,8 @@ packages:
     peerDependencies:
       postcss-selector-parser: ^7.0.0
 
-  '@dagrejs/dagre@1.1.4':
-    resolution: {integrity: sha512-QUTc54Cg/wvmlEUxB+uvoPVKFazM1H18kVHBQNmK2NbrDR5ihOCR6CXLnDSZzMcSQKJtabPUWridBOlJM3WkDg==}
+  '@dagrejs/dagre@1.1.5':
+    resolution: {integrity: sha512-Ghgrh08s12DCL5SeiR6AoyE80mQELTWhJBRmXfFoqDiFkR458vPEdgTbbjA0T+9ETNxUblnD0QW55tfdvi5pjQ==}
 
   '@dagrejs/graphlib@2.2.4':
     resolution: {integrity: sha512-mepCf/e9+SKYy1d02/UkvSy6+6MoyXhVxP8lLDfA7BPE1X1d4dR0sZznmbM8/XVJ1GPM+Svnx7Xj6ZweByWUkw==}
@@ -5045,8 +5045,8 @@ packages:
   kolorist@1.8.0:
     resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
 
-  layerchart@2.0.0-next.22:
-    resolution: {integrity: sha512-MlHY9R8eBvr6GCFy2z8x65hFtnHcqSHlKAHwdxsa1Ke7abAFe7sWDLNoUS2WO/oIzQhxBgAGwYa1nSlgG3grsA==}
+  layerchart@2.0.0-next.25:
+    resolution: {integrity: sha512-ZClg3lK4p7c3rg3KZafA3G+3z6DyLHvnY5pHCufZ+iI+FFlKkXTLS3S3BNFgIl8xqLAxPYNp8LNZNLTpqjiNhQ==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -7457,7 +7457,7 @@ snapshots:
     dependencies:
       postcss-selector-parser: 7.1.0
 
-  '@dagrejs/dagre@1.1.4':
+  '@dagrejs/dagre@1.1.5':
     dependencies:
       '@dagrejs/graphlib': 2.2.4
 
@@ -10751,9 +10751,9 @@ snapshots:
 
   kolorist@1.8.0: {}
 
-  layerchart@2.0.0-next.22(svelte@5.34.7):
+  layerchart@2.0.0-next.25(svelte@5.34.7):
     dependencies:
-      '@dagrejs/dagre': 1.1.4
+      '@dagrejs/dagre': 1.1.5
       '@layerstack/svelte-actions': 1.0.1-next.12
       '@layerstack/svelte-state': 0.1.0-next.17
       '@layerstack/tailwind': 2.0.0-next.15
