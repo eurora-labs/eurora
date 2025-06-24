@@ -3,9 +3,11 @@ use anyhow::Result;
 use eur_util::redact_emails;
 use futures::Stream;
 use llm::{
+    backends::ollama::Ollama,
     builder::{LLMBackend, LLMBuilder},
     chat::ChatMessage,
     error::LLMError,
+    health::HealthProvider,
 };
 use tracing::info;
 
@@ -178,18 +180,20 @@ Rules:
             return Err("Base URL must start with http:// or https://".to_string());
         }
 
-        let version = reqwest::get(&format!("{}/api/version", config.base_url))
-            .await
-            .expect("Failed to get Ollama version")
-            .text()
-            .await
-            .expect("Failed to get Ollama version");
+        let llm = LLMBuilder::new()
+            .backend(LLMBackend::Ollama)
+            .base_url(&config.base_url)
+            .model(&config.model)
+            .build()
+            .map_err(|e| anyhow::anyhow!("Failed to build LLM (Ollama): {}", e))
+            .map_err(|e| e.to_string())?;
 
-        if version.is_empty() {
-            return Err("Failed to get Ollama version".to_string());
+        let is_healthy = llm.health_check().await;
+
+        if is_healthy.is_err() {
+            return Err("Ollama is not healthy".to_string());
         }
 
-        info!("Ollama version: {}", version);
         self.llm_backend = EurLLMService::Ollama;
         self.model = config.model.clone();
         self.ollama_config = Some(config);
