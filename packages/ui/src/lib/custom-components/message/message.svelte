@@ -43,6 +43,7 @@
 </article>
 
 <style lang="postcss">
+	@reference 'tailwindcss';
 	/* Apply solid background for Linux desktop app */
 	:global(body.linux-app .message) {
 		@apply bg-black/20 backdrop-blur-none blur-none;
