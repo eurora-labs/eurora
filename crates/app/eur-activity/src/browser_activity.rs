@@ -515,7 +515,6 @@ impl BrowserStrategy {
             "vivaldi.exe",
             "edge.exe",
             "msedge.exe",
-            "safari.exe",
         ];
         #[cfg(not(target_os = "windows"))]
         let processes = vec![
