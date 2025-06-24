@@ -80,8 +80,8 @@
 	let statusCode = $state<string | null>(null);
 	let messagesContainer: HTMLElement;
 	const conversations = $state<Conversation[]>([]);
-	let hasApiKey = $state(false);
-	let isCheckingApiKey = $state(true);
+	let hasApiKey = $state(true);
+	let isCheckingApiKey = $state(false);
 	let currentConversationId = $state<string | null>(null);
 	const displayAssets = $state<DisplayAsset[]>([]);
 	let backgroundImage = $state<string | null>(null);
@@ -189,7 +189,7 @@
 		document.addEventListener('keydown', handleEscapeKey);
 
 		// Check if API key exists
-		checkApiKey();
+		// checkApiKey();
 
 		// Clean up event listener when component is unmounted
 		return () => {
