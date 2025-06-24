@@ -3,17 +3,19 @@
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
+	import Button from '@eurora/ui/components/button/button.svelte';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import { CheckIcon } from '@lucide/svelte';
 
+	const tauRPC = createTauRPCProxy();
 	const providers = [
 		{ value: 'openai', label: 'OpenAI' },
 		{ value: 'anthropic', label: 'Anthropic' },
-		{ value: 'openrouter', label: 'OpenRouter' },
 	];
 
 	const models = {
-		openai: [{ value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' }],
-		anthropic: [{ value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' }],
-		openrouter: [{ value: 'llama3.2', label: 'Llama 3.2' }],
+		openai: [{ value: 'gpt-4o-2024-11-20', label: 'GPT-4o Latest' }],
+		anthropic: [{ value: 'claude-sonnet-4-20250514', label: 'Claude 4.0 Sonnet' }],
 	};
 
 	let apiProvider = $state<string>('');
@@ -28,9 +30,26 @@
 		models[apiProvider as keyof typeof models]?.find((f) => f.value === model)?.label ??
 			'Select model',
 	);
+
+	let isConnecting = $state(false);
+	let connectionStatus = $state<'success' | 'error' | 'pending'>('pending');
+
+	async function connect() {
+		isConnecting = true;
+		connectionStatus = 'pending';
+
+		try {
+			await tauRPC.third_party.switch_to_remote(apiProvider, apiKey, model);
+			connectionStatus = 'success';
+		} catch (error) {
+			connectionStatus = 'error';
+		} finally {
+			isConnecting = false;
+		}
+	}
 </script>
 
-<Card.Root>
+<Card.Root class="flex-1 justify-between">
 	<Card.Header>
 		<Card.Title>Remote Provider</Card.Title>
 	</Card.Header>
@@ -71,4 +90,19 @@
 			</Select.Content>
 		</Select.Root>
 	</Card.Content>
+	<Card.Footer class="flex justify-end">
+		<Button
+			variant="default"
+			onclick={connect}
+			disabled={isConnecting || connectionStatus === 'success'}
+		>
+			{#if connectionStatus === 'success'}
+				<CheckIcon />
+			{:else if connectionStatus === 'error'}
+				Error Connecting
+			{:else}
+				{isConnecting ? 'Connecting...' : 'Connect'}
+			{/if}
+		</Button>
+	</Card.Footer>
 </Card.Root>
