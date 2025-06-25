@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SiGithub } from '@icons-pack/svelte-simple-icons';
+	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Alert from '@eurora/ui/components/alert/index';
 	import * as EurIcons from '@eurora/ui/custom-icons/index';
