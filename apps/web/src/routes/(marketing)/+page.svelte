@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
+	import System from 'svelte-system-info';
 	import * as Card from '@eurora/ui/components/card/index';
 	import * as VideoCard from '@eurora/ui/custom-components/video-card/index';
 	import * as Sheet from '@eurora/ui/components/sheet/index';
@@ -32,10 +33,11 @@
 	} from '@lucide/svelte';
 	import IntroModule from './intro_module.svelte';
 
-	import { SiLinux } from '@icons-pack/svelte-simple-icons';
+	import { SiLinux, SiApple } from '@icons-pack/svelte-simple-icons';
 
 	import WaitlistForm from './waitlist_form.svelte';
 	import JoinWaitlist from './join_waitlist.svelte';
+	import type { SvelteComponent } from 'svelte';
 
 	let inputValue = $state('');
 	let purpleText = $state('');
@@ -49,6 +51,29 @@
 	const initialDelay = instantTyping ? 0 : 50; // milliseconds before typing starts
 
 	let emailField = $state('');
+
+	interface DownloadItem {
+		name: string;
+		url: string;
+		icon?: any;
+	}
+
+	let downloads: Record<string, DownloadItem> = {
+		linux: {
+			name: 'Linux',
+			url: '/download/linux',
+			icon: SiLinux,
+		},
+		macos: {
+			name: 'macOS',
+			url: '/download/macos',
+			icon: SiApple,
+		},
+		windows: {
+			name: 'Windows',
+			url: '/download/windows',
+		},
+	};
 
 	interface CardItem {
 		icon: typeof IconType;
@@ -106,25 +131,43 @@
 </script>
 
 <div class="mx-auto w-full h-full px-4 pb-16">
+	<div class="flex justify-center px-4 mt-32 h-[5%] items-center">
+		<h1
+			class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-shadow-xl text-center"
+		>
+			AI On Your Own Terms
+		</h1>
+	</div>
+
 	<div
-		class="h-screen flex flex-col max-w-[100%] mx-auto mt-32"
-		style="background-image: url('/images/linux_promo.png'); background-size: cover; background-position: center;"
+		class="h-screen flex flex-col max-w-[95%] mx-auto mt-8"
+		style="background-image: url('/images/linux_promo.png'); background-size: contain; background-position: start; background-repeat: no-repeat;"
 	>
-		<div class="flex justify-center px-4 mb-8 mt-4">
-			<h1
-				class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-shadow-xl text-center"
+		<div
+			class="flex flex-1 justify-center align-start px-4 gap-4 mt-8 download-button-container"
+		>
+			{#snippet downloadButtonSnippet()}
+				{@const downloadButton = downloads[System.OSName.toLowerCase()]}
+
+				<Button size="lg" class="w-full md:w-auto p-8 shadow-lg gap-4">
+					{#if downloadButton.icon}
+						{@const Icon = downloadButton.icon}
+						<Icon size={48} />
+					{/if}
+					Download for {downloadButton.name}
+				</Button>
+			{/snippet}
+			{@render downloadButtonSnippet()}
+			<Button size="lg" class="w-full md:w-auto p-8 shadow-lg" variant="secondary"
+				>Learn More</Button
 			>
-				AI On Your Own Terms
-			</h1>
-		</div>
-		<div class="flex flex-1 justify-center align-start px-4 gap-4">
-			<Button size="lg" class="w-full md:w-auto"><SiLinux /> Download For Linux</Button>
-			<Button size="lg" class="w-full md:w-auto" variant="secondary">Learn More</Button>
 		</div>
 		<div class="flex flex-1 flex-row w-full justify-center align-start px-4 gap-4 mt-16">
 			{#each cards as card}
 				{@const Icon = card.icon}
-				<Card.Root class="card-content h-20 bg-white/20 backdrop-blur-2xl w-1/5 h-fit ">
+				<Card.Root
+					class="card-content flex flex-col bg-white/20 backdrop-blur-2xl w-[20%] h-[40%] py-8 px-8"
+				>
 					<Card.Header class="flex flex-row gap-4 items-center">
 						<div class="flex flex-col text-center">
 							<Card.Title
@@ -980,5 +1023,12 @@
 			linear-gradient(0deg, #19366b 1px, transparent 1px),
 			linear-gradient(90deg, #19366b 1px, transparent 1px), #122547;
 		background-size: 60px 60px;
+	}
+
+	:global(.download-button-container) {
+		& svg {
+			width: 24px;
+			height: 24px;
+		}
 	}
 </style>
