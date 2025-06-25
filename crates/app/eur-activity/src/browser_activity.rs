@@ -117,7 +117,7 @@ impl ArticleAsset {
             id: uuid::Uuid::new_v4().to_string(),
             _url: "".to_string(),
             title: "article asset".to_string(),
-            content: state.content,
+            content: state.text_content,
         })
     }
 }
