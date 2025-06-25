@@ -138,53 +138,54 @@
 			AI On Your Own Terms
 		</h1>
 	</div>
-
-	<div
-		class="h-screen flex flex-col max-w-[95%] mx-auto mt-8 rounded-[32px]"
-		style="background-image: url('/images/linux_promo.png'); background-size: contain; background-position: start; background-repeat: no-repeat;"
-	>
+	<div class="mx-auto max-w-[95%] h-[80vh] overflow-hidden rounded-[36px] p-0">
 		<div
-			class="flex flex-1 justify-center align-start px-4 gap-4 mt-8 download-button-container"
+			class="h-screen flex flex-col w-full mx-auto mt-8 rounded-[36px]"
+			style="background-image: url('/images/linux_promo.png'); background-size: cover; background-position: center; background-repeat: no-repeat;"
 		>
-			{#snippet downloadButtonSnippet()}
-				{@const downloadButton = downloads[System.OSName.toLowerCase()]}
-
-				<Button size="lg" class="w-full md:w-auto p-8 shadow-lg gap-4">
-					{#if downloadButton.icon}
-						{@const Icon = downloadButton.icon}
-						<Icon size={48} />
-					{/if}
-					Download for {downloadButton.name}
-				</Button>
-			{/snippet}
-			{@render downloadButtonSnippet()}
-			<Button size="lg" class="w-full md:w-auto p-8 shadow-lg" variant="secondary"
-				>Learn More</Button
+			<div
+				class="flex flex-1 justify-center align-start px-4 gap-4 mt-8 download-button-container"
 			>
-		</div>
-		<div class="flex flex-1 flex-row w-full justify-center align-start px-4 gap-4 mt-16">
-			{#each cards as card}
-				{@const Icon = card.icon}
-				<Card.Root
-					class="card-content flex flex-col bg-white/20 backdrop-blur-2xl w-[20%] h-[200px] py-8 px-8 justify-center"
+				{#snippet downloadButtonSnippet()}
+					{@const downloadButton = downloads[System.OSName.toLowerCase()]}
+
+					<Button size="lg" class="w-full md:w-auto p-8 shadow-lg gap-4">
+						{#if downloadButton.icon}
+							{@const Icon = downloadButton.icon}
+							<Icon size={48} />
+						{/if}
+						Download for {downloadButton.name}
+					</Button>
+				{/snippet}
+				{@render downloadButtonSnippet()}
+				<Button size="lg" class="w-full md:w-auto p-8 shadow-lg" variant="secondary"
+					>Learn More</Button
 				>
-					<Card.Header class="flex flex-row gap-4 items-center">
-						<div class="flex flex-col text-center">
-							<Card.Title
-								class="title-animation text-white text-xl font-semibold flex flex-row items-center justify-start gap-4"
-							>
-								<Icon size={48} />
-								{card.title}
-							</Card.Title>
-							<Card.Description
-								class="text-white/80 text-lg font-thin flex flex-row justify-start pt-4"
-							>
-								{card.description}
-							</Card.Description>
-						</div>
-					</Card.Header>
-				</Card.Root>
-			{/each}
+			</div>
+			<div class="flex flex-1 flex-row w-full justify-center align-start px-4 gap-4 mt-16">
+				{#each cards as card}
+					{@const Icon = card.icon}
+					<Card.Root
+						class="card-content flex flex-col bg-white/20 backdrop-blur-2xl border-none w-[20%] min-w-[280px] h-[200px] py-8 justify-center"
+					>
+						<Card.Header class="flex flex-row gap-4 items-center justify-center">
+							<div class="flex flex-col text-center">
+								<Card.Title
+									class="title-animation text-white text-xl font-semibold flex flex-row items-center justify-center gap-4"
+								>
+									<Icon size={48} />
+									{card.title}
+								</Card.Title>
+								<Card.Description
+									class="text-white/80 text-lg font-thin flex flex-row justify-start pt-4"
+								>
+									{card.description}
+								</Card.Description>
+							</div>
+						</Card.Header>
+					</Card.Root>
+				{/each}
+			</div>
 		</div>
 	</div>
 	<!-- <IntroModule /> -->
