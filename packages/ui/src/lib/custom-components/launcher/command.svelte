@@ -18,4 +18,4 @@
 	bind:ref
 	bind:value
 	{...restProps}
-/>
+></CommandPrimitive.Root>
