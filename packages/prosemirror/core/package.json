@@ -16,7 +16,7 @@
 		},
 		"./*.svelte": {
 			"svelte": "./dist/*.svelte",
-			"types": "./dist/*.d.ts"
+			"types": "./dist/*.svelte.d.ts"
 		}
 	},
 	"scripts": {
@@ -30,6 +30,9 @@
 		"prepare": "svelte-kit sync",
 		"test": "vitest run --mode development",
 		"test:watch": "vitest --watch --mode development"
+	},
+	"peerDependencies": {
+		"svelte": "^5.0.0"
 	},
 	"devDependencies": {
 		"svelte": "catalog:svelte",

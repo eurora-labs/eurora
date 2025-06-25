@@ -1,11 +1,19 @@
+<script lang="ts" module>
+	export interface EditorProps {
+		value?: string;
+		query?: Query;
+		placeholder?: string;
+		class?: ClassValue;
+		onkeydown?: (event: KeyboardEvent) => void;
+	}
+</script>
+
 <script lang="ts">
-	import { EditorState, Plugin, TextSelection } from 'prosemirror-state';
+	import { EditorState, Plugin } from 'prosemirror-state';
 	import { Node as PMNode } from 'prosemirror-model';
 	import { DOMParser } from 'prosemirror-model';
 	import { EditorView } from 'prosemirror-view';
-	import { onDestroy, onMount } from 'svelte';
-	import { dropCursor } from 'prosemirror-dropcursor';
-	import { gapCursor } from 'prosemirror-gapcursor';
+	import { onDestroy } from 'svelte';
 	import type { Query, Cmd } from '$lib/typings/index.js';
 	import type { SveltePMExtension } from '$lib/typings/extension.js';
 	import { createExtensions } from '$lib/createExtensions.js';
@@ -13,19 +21,13 @@
 	import { type Commands, commands as defaultCommands } from '$lib/commands.js';
 	// import '$lib/Editor.css';
 	import type { ClassValue } from 'svelte/elements';
-	export interface Props {
-		value?: string;
-		query?: Query;
-		placeholder?: string;
-		class?: ClassValue;
-		onkeydown?: (event: KeyboardEvent) => void;
-	}
 
 	let editorRef: HTMLDivElement | null = $state(null);
 	let view: EditorView | null = null;
 	let currentExtensions: SveltePMExtension[] = [];
 	let commands: Commands = $state(defaultCommands);
 	let mainNode: PMNode | null = null;
+
 	export { view };
 
 	let {
@@ -34,7 +36,7 @@
 		placeholder = 'Type something',
 		onkeydown,
 		class: className,
-	}: Props = $props();
+	}: EditorProps = $props();
 
 	export async function init(queryParam?: Query) {
 		if (!editorRef) return;
