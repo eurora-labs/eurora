@@ -91,7 +91,7 @@
 		{
 			icon: GaugeIcon,
 			title: 'Extremely fast',
-			description: 'Up to 17x faster responses compared to using traditional LLM interfaces',
+			description: 'Up to 17x faster answers compared to using traditional LLM interfaces',
 		},
 		{
 			icon: ShieldCheckIcon,
@@ -167,22 +167,20 @@
 				{#each cards as card}
 					{@const Icon = card.icon}
 					<Card.Root
-						class="card-content flex flex-col bg-white/20 backdrop-blur-2xl border-none w-[20%] min-w-[280px] h-[200px] py-8 justify-center"
+						class="card-content flex flex-col bg-white/20 backdrop-blur-2xl border-none w-[20%] min-w-[280px] h-[200px] py-2 justify-start"
 					>
-						<Card.Header class="flex flex-row gap-4 items-center justify-center">
-							<div class="flex flex-col text-center">
-								<Card.Title
-									class="title-animation text-white text-xl font-semibold flex flex-row items-center justify-center gap-4"
-								>
-									<Icon size={48} />
-									{card.title}
-								</Card.Title>
-								<Card.Description
-									class="text-white/80 text-lg font-thin flex flex-row justify-start pt-4"
-								>
-									{card.description}
-								</Card.Description>
-							</div>
+						<Card.Header class="flex flex-col  items-start justify-center">
+							<Card.Title
+								class="title-animation text-white text-xl font-semibold flex flex-row items-center gap-4"
+							>
+								<Icon size={48} />
+								{card.title}
+							</Card.Title>
+							<Card.Description
+								class="text-white/80 text-lg font-thin flex flex-row justify-start pt-4"
+							>
+								{card.description}
+							</Card.Description>
 						</Card.Header>
 					</Card.Root>
 				{/each}
