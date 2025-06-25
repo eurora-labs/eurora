@@ -44,6 +44,7 @@ impl From<String> for EurLLMService {
     }
 }
 
+#[derive(Debug)]
 pub enum Role {
     System,
     User,
@@ -57,20 +58,23 @@ pub enum Role {
 //     Uri(String),
 // }
 
+#[derive(Debug)]
 pub struct TextContent {
     pub text: String,
 }
 
+#[derive(Debug)]
 pub struct ImageContent {
     pub text: Option<String>,
     pub image: DynamicImage,
 }
 
+#[derive(Debug)]
 pub enum MessageContent {
     Text(TextContent),
     Image(ImageContent),
 }
-
+#[derive(Debug)]
 pub struct LLMMessage {
     pub role: Role,
     pub content: MessageContent,
