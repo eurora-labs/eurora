@@ -3,11 +3,11 @@
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	export const messageVariants = tv({
-		base: 'message backdrop-blur-2xl bg-white/30 flex flex-col w-fit items-center gap-2 py-2 rounded-2xl [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+		base: 'message flex flex-col w-fit items-center gap-2 py-2 rounded-2xl [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
 		variants: {
 			variant: {
-				default: 'max-w-[50%] ml-auto w-fit text-black font-medium',
-				agent: 'max-w-[95%] mr-auto w-fit text-black font-medium',
+				default: 'max-w-[50%] bg-black/20 ml-auto w-fit text-white/80 font-medium',
+				agent: 'backdrop-blur-2xl bg-white/30 max-w-[95%] mr-auto w-fit text-black font-medium',
 			},
 		},
 		defaultVariants: {
@@ -45,7 +45,4 @@
 <style lang="postcss">
 	@reference 'tailwindcss';
 	/* Apply solid background for Linux desktop app */
-	:global(body.linux-app .message) {
-		@apply bg-black/20 backdrop-blur-none blur-none;
-	}
 </style>
