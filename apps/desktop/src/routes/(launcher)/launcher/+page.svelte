@@ -96,6 +96,28 @@
 		monitor_height: number;
 	} | null>(null);
 
+	// messages.push(
+	// 	create(ProtoChatMessageSchema, {
+	// 		role: 'user',
+	// 		content: 'What am I doing right now?',
+	// 	}),
+	// );
+
+	// messages.push(
+	// 	create(ProtoChatMessageSchema, {
+	// 		role: 'system',
+	// 		content:
+	// 			'You are currently looking at a website called Eurora AI. What would you like to know?',
+	// 	}),
+	// );
+
+	// messages.push(
+	// 	create(ProtoChatMessageSchema, {
+	// 		role: 'user',
+	// 		content: 'How do I install it?',
+	// 	}),
+	// );
+
 	// Listen for launcher closed event to clear messages and reset conversation
 	listen('launcher_closed', () => {
 		// Clear messages array
@@ -358,7 +380,7 @@
 			<div class="flex-none p-0">
 				<Launcher.Root class="rounded-lg border-none shadow-none">
 					<Launcher.Input
-						placeholder="Search"
+						placeholder="What can I help you with?"
 						bind:query={searchQuery}
 						bind:editorRef
 						onkeydown={handleKeydown}
