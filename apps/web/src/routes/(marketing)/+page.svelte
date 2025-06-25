@@ -167,7 +167,7 @@
 				{#each cards as card}
 					{@const Icon = card.icon}
 					<Card.Root
-						class="card-content flex flex-col bg-white/20 backdrop-blur-2xl border-none w-[20%] min-w-[280px] h-[200px] py-2 justify-start"
+						class="card-content flex flex-col bg-white/20 backdrop-blur-2xl border-none w-[20%] min-w-[280px] h-[250px] py-8 justify-start"
 					>
 						<Card.Header class="flex flex-col  items-start justify-center">
 							<Card.Title
