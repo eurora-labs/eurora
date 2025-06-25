@@ -1,10 +1,11 @@
 <script module lang="ts">
+	import CommandRoot from '$lib/custom-components/launcher/command.svelte';
 	import * as Command from '$lib/custom-components/launcher/index.js';
 	import { defineMeta, type StoryContext, type Args } from '@storybook/addon-svelte-csf';
 
 	const { Story } = defineMeta({
 		title: 'Components/Launcher/Command',
-		component: Command.Root,
+		component: CommandRoot,
 		parameters: {
 			layout: 'centered',
 			docs: {
