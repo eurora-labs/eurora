@@ -16,8 +16,6 @@
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import JoinWaitlist from './join_waitlist.svelte';
 
-	import { SiYoutube } from '@icons-pack/svelte-simple-icons';
-
 	// Animation state tracking
 	let typingComplete = false;
 	let showCursor = false;
@@ -100,20 +98,18 @@
 	});
 </script>
 
-<img
+<!-- <img
 	src="/backgrounds/gradient.svg"
 	alt="Background gradient for hero section"
 	class="h-screen w-full absolute top-0 left-0 z-0"
 	loading="eager"
 	decoding="async"
-/>
+/> -->
 <!-- Main container with 4 equal rows -->
 <div class="h-screen flex flex-col max-w-[100%] mx-auto">
 	<!-- Row 1: Header (hidden on mobile, 25% on desktop) -->
 	<div class="hidden md:flex flex-1 items-center justify-center px-4">
-		<h1
-			class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-white text-center z-10"
-		>
+		<h1 class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-center z-10">
 			Your Open Source AI Assistant
 		</h1>
 	</div>
