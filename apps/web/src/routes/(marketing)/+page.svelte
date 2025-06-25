@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
+	import System from 'svelte-system-info';
 	import * as Card from '@eurora/ui/components/card/index';
 	import * as VideoCard from '@eurora/ui/custom-components/video-card/index';
 	import * as Sheet from '@eurora/ui/components/sheet/index';
@@ -10,6 +11,7 @@
 	// import gradient.svg from static folder
 	import {
 		ArrowRight,
+		ServerIcon,
 		Brain,
 		Shield,
 		Zap,
@@ -21,17 +23,21 @@
 		GraduationCap,
 		Mail,
 		Linkedin,
+		ShieldCheckIcon,
+		GaugeIcon,
 		Github,
 		Layers,
 		Code,
 		Sparkles,
+		type Icon as IconType,
 	} from '@lucide/svelte';
 	import IntroModule from './intro_module.svelte';
 
-	// import { SiGithub, SiLinkedin} from '@icons-pack/svelte-simple-icons';
+	import { SiLinux, SiApple } from '@icons-pack/svelte-simple-icons';
 
 	import WaitlistForm from './waitlist_form.svelte';
 	import JoinWaitlist from './join_waitlist.svelte';
+	import type { SvelteComponent } from 'svelte';
 
 	let inputValue = $state('');
 	let purpleText = $state('');
@@ -45,6 +51,53 @@
 	const initialDelay = instantTyping ? 0 : 50; // milliseconds before typing starts
 
 	let emailField = $state('');
+
+	interface DownloadItem {
+		name: string;
+		url: string;
+		icon?: any;
+	}
+
+	let downloads: Record<string, DownloadItem> = {
+		linux: {
+			name: 'Linux',
+			url: '/download/linux',
+			icon: SiLinux,
+		},
+		macos: {
+			name: 'macOS',
+			url: '/download/macos',
+			icon: SiApple,
+		},
+		windows: {
+			name: 'Windows',
+			url: '/download/windows',
+		},
+	};
+
+	interface CardItem {
+		icon: typeof IconType;
+		title: string;
+		description: string;
+	}
+
+	let cards = $state<CardItem[]>([
+		{
+			icon: GaugeIcon,
+			title: 'Context Aware',
+			description: 'Up to 17x faster',
+		},
+		{
+			icon: ShieldCheckIcon,
+			title: 'Open Source',
+			description: 'You are in control',
+		},
+		{
+			icon: ServerIcon,
+			title: 'Run Locally',
+			description: 'For free, forever',
+		},
+	]);
 
 	function submitEmail() {
 		fetch(
@@ -78,12 +131,66 @@
 </script>
 
 <div class="mx-auto w-full h-full px-4 pb-16">
-	<IntroModule />
-	<div class="py-[8rem]">
-		<VideoCard.Card
-			class="w-[90%] mx-auto bg-transparent"
-			style="background-image: url('backgrounds/video_card_1.png'); background-size: cover;"
+	<div class="flex justify-center px-4 mt-32 h-[5%] items-center">
+		<h1
+			class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-shadow-xl text-center"
 		>
+			AI On Your Own Terms
+		</h1>
+	</div>
+	<div class="mx-auto max-w-[95%] h-[80vh] overflow-hidden rounded-[36px] p-0">
+		<div
+			class="h-screen flex flex-col w-full mx-auto mt-8 rounded-[36px]"
+			style="background-image: url('/images/linux_promo.png'); background-size: cover; background-position: center; background-repeat: no-repeat;"
+		>
+			<div
+				class="flex flex-1 justify-center align-start px-4 gap-4 mt-8 download-button-container"
+			>
+				{#snippet downloadButtonSnippet()}
+					{@const downloadButton = downloads[System.OSName.toLowerCase()]}
+
+					<Button size="lg" class="w-full md:w-auto p-8 shadow-lg gap-4">
+						{#if downloadButton.icon}
+							{@const Icon = downloadButton.icon}
+							<Icon size={48} />
+						{/if}
+						Download for {downloadButton.name}
+					</Button>
+				{/snippet}
+				{@render downloadButtonSnippet()}
+				<Button size="lg" class="w-full md:w-auto p-8 shadow-lg" variant="secondary"
+					>Learn More</Button
+				>
+			</div>
+			<div class="flex flex-1 flex-row w-full justify-center align-start px-4 gap-4 mt-16">
+				{#each cards as card}
+					{@const Icon = card.icon}
+					<Card.Root
+						class="card-content flex flex-col bg-white/20 backdrop-blur-2xl border-none w-[20%] min-w-[280px] h-[200px] py-8 justify-center"
+					>
+						<Card.Header class="flex flex-row gap-4 items-center justify-center">
+							<div class="flex flex-col text-center">
+								<Card.Title
+									class="title-animation text-white text-xl font-semibold flex flex-row items-center justify-center gap-4"
+								>
+									<Icon size={48} />
+									{card.title}
+								</Card.Title>
+								<Card.Description
+									class="text-white/80 text-lg font-thin flex flex-row justify-start pt-4"
+								>
+									{card.description}
+								</Card.Description>
+							</div>
+						</Card.Header>
+					</Card.Root>
+				{/each}
+			</div>
+		</div>
+	</div>
+	<!-- <IntroModule /> -->
+	<div class="py-[8rem]">
+		<VideoCard.Card class="w-[90%] mx-auto video-card border-white border-1 shadow-none">
 			<VideoCard.Content
 				alignment="left"
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
@@ -98,11 +205,9 @@
 			</VideoCard.Content>
 		</VideoCard.Card>
 	</div>
+
 	<div class="py-[8rem]">
-		<VideoCard.Card
-			class=" w-[90%] mx-auto bg-transparent"
-			style="background-image: url('backgrounds/video_card_2.png'); background-size: cover;"
-		>
+		<VideoCard.Card class="w-[90%] mx-auto video-card border-white border-1 shadow-none">
 			<VideoCard.Content
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 				alignment="right"
@@ -118,10 +223,7 @@
 	</div>
 
 	<div class="py-[8rem]">
-		<VideoCard.Card
-			class="w-[90%] mx-auto bg-transparent"
-			style="background-image: url('backgrounds/video_card_3.png'); background-size: cover;"
-		>
+		<VideoCard.Card class="w-[90%] mx-auto video-card border-white border-1 shadow-none">
 			<VideoCard.Content
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 			>
@@ -895,6 +997,25 @@
 		to {
 			transform: translateY(0);
 			opacity: 1;
+		}
+	}
+
+	:global(.video-card) {
+		/* background: #0e2040;
+		background: #061225;
+		background-image: radial-gradient(#fff 1px, transparent 1px);
+		background-image: radial-gradient(#061225 1px, transparent 1px);
+		background-size: 60px 60px; */
+		background:
+			linear-gradient(0deg, #19366b 1px, transparent 1px),
+			linear-gradient(90deg, #19366b 1px, transparent 1px), #122547;
+		background-size: 60px 60px;
+	}
+
+	:global(.download-button-container) {
+		& svg {
+			width: 24px;
+			height: 24px;
 		}
 	}
 </style>
