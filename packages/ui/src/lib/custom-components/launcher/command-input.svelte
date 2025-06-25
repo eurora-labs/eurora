@@ -21,10 +21,7 @@
 	}: Props = $props();
 </script>
 
-<div
-	class="items-top flex h-[100px] border-none px-3 fixed top-0 left-0 w-full z-50"
-	data-command-input-wrapper=""
->
+<div class="items-top flex h-[100px] border-none px-3 w-full" data-command-input-wrapper="">
 	<div class="flex justify-center items-center">
 		<Search class="opacity-30 shrink-0 " size="40" />
 	</div>

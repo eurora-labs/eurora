@@ -2,7 +2,7 @@
 	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Alert from '@eurora/ui/components/alert/index';
-	import * as EurIcons from '@eurora/ui/custom-icons/index';
+	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import { ShieldAlert, LogInIcon } from '@lucide/svelte';
 
 	import JoinWaitlist from './join_waitlist.svelte';
@@ -39,7 +39,7 @@
 >
 	<div class="flex items-center gap-2">
 		<Button variant="link" href="/" class="decoration-transparent">
-			<EurIcons.EuroraLogo style="width: 4rem; height: 4rem;" />
+			<EuroraLogo style="width: 4rem; height: 4rem;" />
 			<span class="text-lg">Eurora Labs</span>
 		</Button>
 	</div>

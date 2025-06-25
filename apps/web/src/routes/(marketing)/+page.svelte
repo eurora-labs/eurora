@@ -30,6 +30,7 @@
 		Code,
 		Sparkles,
 		type Icon as IconType,
+		EyeIcon,
 	} from '@lucide/svelte';
 	import IntroModule from './intro_module.svelte';
 
@@ -83,18 +84,18 @@
 
 	let cards = $state<CardItem[]>([
 		{
+			icon: EyeIcon,
+			title: 'Context aware',
+			description: 'Stop explaining yourself and start asking',
+		},
+		{
 			icon: GaugeIcon,
-			title: 'Context Aware',
-			description: 'Up to 17x faster',
+			title: 'Extremely fast',
+			description: 'Up to 17x faster responses compared to using traditional LLM interfaces',
 		},
 		{
 			icon: ShieldCheckIcon,
-			title: 'Open Source',
-			description: 'You are in control',
-		},
-		{
-			icon: ServerIcon,
-			title: 'Run Locally',
+			title: 'Can be run locally',
 			description: 'For free, forever',
 		},
 	]);
