@@ -16,8 +16,6 @@
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import JoinWaitlist from './join_waitlist.svelte';
 
-	import { SiYoutube } from '@icons-pack/svelte-simple-icons';
-
 	// Animation state tracking
 	let typingComplete = false;
 	let showCursor = false;
