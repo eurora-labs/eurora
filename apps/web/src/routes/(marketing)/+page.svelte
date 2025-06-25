@@ -10,6 +10,7 @@
 	// import gradient.svg from static folder
 	import {
 		ArrowRight,
+		ServerIcon,
 		Brain,
 		Shield,
 		Zap,
@@ -21,14 +22,17 @@
 		GraduationCap,
 		Mail,
 		Linkedin,
+		ShieldCheckIcon,
+		GaugeIcon,
 		Github,
 		Layers,
 		Code,
 		Sparkles,
+		type Icon as IconType,
 	} from '@lucide/svelte';
 	import IntroModule from './intro_module.svelte';
 
-	// import { SiGithub, SiLinkedin} from '@icons-pack/svelte-simple-icons';
+	import { SiLinux } from '@icons-pack/svelte-simple-icons';
 
 	import WaitlistForm from './waitlist_form.svelte';
 	import JoinWaitlist from './join_waitlist.svelte';
@@ -45,6 +49,30 @@
 	const initialDelay = instantTyping ? 0 : 50; // milliseconds before typing starts
 
 	let emailField = $state('');
+
+	interface CardItem {
+		icon: typeof IconType;
+		title: string;
+		description: string;
+	}
+
+	let cards = $state<CardItem[]>([
+		{
+			icon: GaugeIcon,
+			title: 'Context Aware',
+			description: 'Up to 17x faster responses',
+		},
+		{
+			icon: ShieldCheckIcon,
+			title: 'Open Source',
+			description: 'You are in control',
+		},
+		{
+			icon: ServerIcon,
+			title: 'Run Locally',
+			description: 'For free, forever',
+		},
+	]);
 
 	function submitEmail() {
 		fetch(
@@ -78,12 +106,61 @@
 </script>
 
 <div class="mx-auto w-full h-full px-4 pb-16">
-	<IntroModule />
+	<div
+		class="h-screen flex flex-col max-w-[100%] mx-auto mt-32"
+		style="background-image: url('/images/linux_promo.png'); background-size: cover; background-position: center;"
+	>
+		<div class="flex justify-center px-4 mb-8 mt-4">
+			<h1
+				class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-shadow-xl text-center"
+			>
+				AI On Your Own Terms
+			</h1>
+		</div>
+		<div class="flex flex-1 justify-center align-start px-4 gap-4">
+			<Button size="lg" class="w-full md:w-auto"><SiLinux /> Download For Linux</Button>
+			<Button size="lg" class="w-full md:w-auto" variant="secondary">Learn More</Button>
+		</div>
+		<div class="flex flex-1 flex-row w-full justify-center align-start px-4 gap-4 mt-16">
+			{#each cards as card}
+				{@const Icon = card.icon}
+				<Card.Root class="card-content h-20 bg-white/20 backdrop-blur-2xl w-1/5 h-fit ">
+					<Card.Header class="flex flex-row gap-4 items-center">
+						<div class="flex flex-col text-center">
+							<Card.Title
+								class="title-animation text-white text-xl font-semibold flex flex-row items-center justify-start gap-4"
+							>
+								<Icon size={48} />
+								{card.title}
+							</Card.Title>
+							<Card.Description
+								class="text-white/80 text-lg font-thin flex flex-row justify-start pt-4"
+							>
+								{card.description}
+							</Card.Description>
+						</div>
+					</Card.Header>
+
+					<!-- <Card.Content class="flex h-full items-center justify-center p-3 text-2xl">
+						<div class="icon-animation flex items-center justify-center mr-4">
+							<GaugeIcon size={47} />
+						</div>
+						<div class="flex flex-col text-center">
+							<Card.Title class="title-animation text-black/79 text-2xl font-thin"
+								>Context Aware</Card.Title
+							>
+							<Card.Description class="text-black/79 text-xl font-thin"
+								>16x faster prompts</Card.Description
+							>
+						</div>
+					</Card.Content> -->
+				</Card.Root>
+			{/each}
+		</div>
+	</div>
+	<!-- <IntroModule /> -->
 	<div class="py-[8rem]">
-		<VideoCard.Card
-			class="w-[90%] mx-auto bg-transparent"
-			style="background-image: url('backgrounds/video_card_1.png'); background-size: cover;"
-		>
+		<VideoCard.Card class="w-[90%] mx-auto video-card border-white border-1 shadow-none">
 			<VideoCard.Content
 				alignment="left"
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
@@ -98,11 +175,9 @@
 			</VideoCard.Content>
 		</VideoCard.Card>
 	</div>
+
 	<div class="py-[8rem]">
-		<VideoCard.Card
-			class=" w-[90%] mx-auto bg-transparent"
-			style="background-image: url('backgrounds/video_card_2.png'); background-size: cover;"
-		>
+		<VideoCard.Card class="w-[90%] mx-auto video-card border-white border-1 shadow-none">
 			<VideoCard.Content
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 				alignment="right"
@@ -118,10 +193,7 @@
 	</div>
 
 	<div class="py-[8rem]">
-		<VideoCard.Card
-			class="w-[90%] mx-auto bg-transparent"
-			style="background-image: url('backgrounds/video_card_3.png'); background-size: cover;"
-		>
+		<VideoCard.Card class="w-[90%] mx-auto video-card border-white border-1 shadow-none">
 			<VideoCard.Content
 				mp4Src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 			>
@@ -896,5 +968,17 @@
 			transform: translateY(0);
 			opacity: 1;
 		}
+	}
+
+	:global(.video-card) {
+		/* background: #0e2040;
+		background: #061225;
+		background-image: radial-gradient(#fff 1px, transparent 1px);
+		background-image: radial-gradient(#061225 1px, transparent 1px);
+		background-size: 60px 60px; */
+		background:
+			linear-gradient(0deg, #19366b 1px, transparent 1px),
+			linear-gradient(90deg, #19366b 1px, transparent 1px), #122547;
+		background-size: 60px 60px;
 	}
 </style>
