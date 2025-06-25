@@ -1,12 +1,12 @@
 <script module lang="ts">
-	import * as Chat from '$lib/custom-components/chat/index.js';
+	import { Chat } from '$lib/custom-components/chat/index.js';
 	import * as Message from '$lib/custom-components/message/index.js';
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { SiGithub, SiStackoverflow, SiReddit } from '@icons-pack/svelte-simple-icons';
 
 	const { Story } = defineMeta({
 		title: 'Components / Chat',
-		component: Chat.Root,
+		component: Chat,
 		parameters: {
 			docs: {
 				description: {
@@ -376,7 +376,7 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Short Conversation (3-4 messages)
 					</h2>
-					<Chat.Root class="h-[500px]">
+					<Chat class="h-[500px]">
 						{#each shortConversationMessages as message}
 							<Message.Root
 								variant={message.role === 'user' ? 'default' : 'agent'}
@@ -394,7 +394,7 @@ function handleScroll() {
 								{/if}
 							</Message.Root>
 						{/each}
-					</Chat.Root>
+					</Chat>
 				</div>
 			</div>
 		{/snippet}
@@ -409,7 +409,7 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Medium Conversation (8-10 messages)
 					</h2>
-					<Chat.Root class="h-[500px]">
+					<Chat class="h-[500px]">
 						{#each mediumConversationMessages as message}
 							<Message.Root
 								variant={message.role === 'user' ? 'default' : 'agent'}
@@ -427,7 +427,7 @@ function handleScroll() {
 								{/if}
 							</Message.Root>
 						{/each}
-					</Chat.Root>
+					</Chat>
 				</div>
 			</div>
 		{/snippet}
@@ -442,7 +442,7 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Long Conversation (15+ messages with scrolling)
 					</h2>
-					<Chat.Root class="h-[500px]">
+					<Chat class="h-[500px]">
 						{#each longConversationMessages as message}
 							<Message.Root
 								variant={message.role === 'user' ? 'default' : 'agent'}
@@ -460,7 +460,7 @@ function handleScroll() {
 								{/if}
 							</Message.Root>
 						{/each}
-					</Chat.Root>
+					</Chat>
 				</div>
 			</div>
 		{/snippet}
@@ -475,7 +475,7 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Mixed Content with Various Sources
 					</h2>
-					<Chat.Root class="h-[500px]">
+					<Chat class="h-[500px]">
 						{#each mixedContentMessages as message}
 							<Message.Root
 								variant={message.role === 'user' ? 'default' : 'agent'}
@@ -493,7 +493,7 @@ function handleScroll() {
 								{/if}
 							</Message.Root>
 						{/each}
-					</Chat.Root>
+					</Chat>
 				</div>
 			</div>
 		{/snippet}
@@ -508,7 +508,7 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Interactive Chat with Auto-scroll
 					</h2>
-					<Chat.Root class="h-[500px]">
+					<Chat class="h-[500px]">
 						{#each interactiveMessages as message}
 							<Message.Root
 								variant={message.role === 'user' ? 'default' : 'agent'}
@@ -526,7 +526,7 @@ function handleScroll() {
 								{/if}
 							</Message.Root>
 						{/each}
-					</Chat.Root>
+					</Chat>
 				</div>
 			</div>
 		{/snippet}
