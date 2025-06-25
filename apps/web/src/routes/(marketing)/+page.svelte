@@ -85,7 +85,7 @@
 		{
 			icon: GaugeIcon,
 			title: 'Context Aware',
-			description: 'Up to 17x faster responses',
+			description: 'Up to 17x faster',
 		},
 		{
 			icon: ShieldCheckIcon,
@@ -140,7 +140,7 @@
 	</div>
 
 	<div
-		class="h-screen flex flex-col max-w-[95%] mx-auto mt-8"
+		class="h-screen flex flex-col max-w-[95%] mx-auto mt-8 rounded-[32px]"
 		style="background-image: url('/images/linux_promo.png'); background-size: contain; background-position: start; background-repeat: no-repeat;"
 	>
 		<div
@@ -166,7 +166,7 @@
 			{#each cards as card}
 				{@const Icon = card.icon}
 				<Card.Root
-					class="card-content flex flex-col bg-white/20 backdrop-blur-2xl w-[20%] h-[40%] py-8 px-8"
+					class="card-content flex flex-col bg-white/20 backdrop-blur-2xl w-[20%] h-[200px] py-8 px-8 justify-center"
 				>
 					<Card.Header class="flex flex-row gap-4 items-center">
 						<div class="flex flex-col text-center">
@@ -183,20 +183,6 @@
 							</Card.Description>
 						</div>
 					</Card.Header>
-
-					<!-- <Card.Content class="flex h-full items-center justify-center p-3 text-2xl">
-						<div class="icon-animation flex items-center justify-center mr-4">
-							<GaugeIcon size={47} />
-						</div>
-						<div class="flex flex-col text-center">
-							<Card.Title class="title-animation text-black/79 text-2xl font-thin"
-								>Context Aware</Card.Title
-							>
-							<Card.Description class="text-black/79 text-xl font-thin"
-								>16x faster prompts</Card.Description
-							>
-						</div>
-					</Card.Content> -->
 				</Card.Root>
 			{/each}
 		</div>
