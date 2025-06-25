@@ -1,9 +1,10 @@
 <script lang="ts" module>
-	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core/index';
+	import { Editor } from '@eurora/prosemirror-core/index';
+	import type { Query } from '@eurora/prosemirror-core/index';
 	import type { ClassValue } from 'svelte/elements';
 
 	export interface Props {
-		ref?: ProsemirrorEditor;
+		ref?: Editor;
 		query?: Query;
 		value?: string;
 		class?: ClassValue;
@@ -33,7 +34,7 @@
 	});
 </script>
 
-<ProsemirrorEditor
+<Editor
 	bind:this={ref}
 	bind:value
 	class={cn(
