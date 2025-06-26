@@ -12,12 +12,16 @@ export type Query = { text: string; assets: string[] }
 
 export type ResponseChunk = { chunk: string }
 
-const ARGS_MAP = { '':'{"send_query":["channel","query"]}', 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'third_party':'{"check_api_key_exists":[],"initialize_openai_client":[],"save_api_key":["api_key"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'window':'{"get_scale_factor":["height"],"resize_launcher_window":["height","scale_factor"]}' }
+const ARGS_MAP = { '':'{"send_query":["channel","query"]}', 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'system':'{"check_grpc_server_connection":["server_address"],"get_endpoint_status":[],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"initialize_openai_client":[],"save_api_key":["api_key"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'window':'{"get_scale_factor":["height"],"resize_launcher_window":["height","scale_factor"]}' }
 export type Router = { "": {send_query: (channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
 "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
+"system": {check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
+get_endpoint_status: () => Promise<string>, 
+list_activities: () => Promise<ContextChip[]>, 
+send_key_to_launcher: (key: string) => Promise<null>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 initialize_openai_client: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>, 

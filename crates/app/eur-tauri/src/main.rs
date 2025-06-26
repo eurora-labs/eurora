@@ -22,6 +22,7 @@ use eur_tauri::{
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         query_procedures::{QueryApi, QueryApiImpl},
+        system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
@@ -354,6 +355,7 @@ fn main() {
                 .merge(AuthApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
+                .merge(SystemApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(WindowApiImpl.into_handler())
                 .merge(QueryApiImpl.into_handler());
