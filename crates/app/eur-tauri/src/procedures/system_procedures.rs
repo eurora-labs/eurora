@@ -3,10 +3,7 @@ use tauri::Emitter;
 use tauri::{Manager, Runtime};
 use tracing::info;
 
-#[taurpc::procedures(
-    path = "system",
-    export_to = "../../../apps/desktop/src/lib/bindings/bindings.ts"
-)]
+#[taurpc::procedures(path = "system")]
 pub trait SystemApi {
     async fn check_grpc_server_connection(server_address: Option<String>)
     -> Result<String, String>;
@@ -19,6 +16,10 @@ pub trait SystemApi {
         app_handle: tauri::AppHandle<R>,
         key: String,
     ) -> Result<(), String>;
+
+    async fn get_endpoint_status<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<String, String>;
 }
 
 #[derive(Clone)]
@@ -77,5 +78,12 @@ impl SystemApi for SystemApiImpl {
                 .map_err(|e| format!("Failed to send key event: {}", e))?;
         }
         Ok(())
+    }
+
+    async fn get_endpoint_status<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<String, String> {
+        Ok("Endpoint is reachable".to_string())
     }
 }
