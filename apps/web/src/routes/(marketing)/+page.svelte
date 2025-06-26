@@ -136,7 +136,7 @@
 		<h1
 			class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-shadow-xl text-center"
 		>
-			AI On Your Own Terms
+			Your Open Source AI Assistant
 		</h1>
 	</div>
 	<div class="mx-auto max-w-[95%] h-[80vh] overflow-hidden rounded-[36px] p-0">
