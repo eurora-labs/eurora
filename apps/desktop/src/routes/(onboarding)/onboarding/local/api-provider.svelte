@@ -1,3 +1,9 @@
+<script lang="ts" module>
+	export interface ApiProviderProps {
+		finished?: () => void;
+	}
+</script>
+
 <script lang="ts">
 	import * as Select from '@eurora/ui/components/select/index';
 	import * as Card from '@eurora/ui/components/card/index';
@@ -6,6 +12,8 @@
 	import Button from '@eurora/ui/components/button/button.svelte';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import { CheckIcon } from '@lucide/svelte';
+
+	let { finished }: ApiProviderProps = $props();
 
 	const tauRPC = createTauRPCProxy();
 	const providers = [
@@ -41,6 +49,7 @@
 		try {
 			await tauRPC.third_party.switch_to_remote(apiProvider, apiKey, model);
 			connectionStatus = 'success';
+			finished?.();
 		} catch (error) {
 			connectionStatus = 'error';
 		} finally {
