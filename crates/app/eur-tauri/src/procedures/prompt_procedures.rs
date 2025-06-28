@@ -41,7 +41,11 @@ impl PromptApi for PromptApiImpl {
             .await?;
 
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
-            .prompt_service_change(Some(promptkit_client.get_service_name().unwrap()))
+            .prompt_service_change(Some(
+                promptkit_client
+                    .get_service_name()
+                    .map_err(|e| e.to_string())?,
+            ))
             .map_err(|e| e.to_string())?;
 
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
@@ -68,7 +72,11 @@ impl PromptApi for PromptApiImpl {
             .await?;
 
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
-            .prompt_service_change(Some(promptkit_client.get_service_name().unwrap()))
+            .prompt_service_change(Some(
+                promptkit_client
+                    .get_service_name()
+                    .map_err(|e| e.to_string())?,
+            ))
             .map_err(|e| e.to_string())?;
 
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
@@ -87,7 +95,7 @@ impl PromptApi for PromptApiImpl {
         let client = guard
             .as_ref()
             .ok_or_else(|| "PromptKitService not initialized".to_string())?;
-        Ok(client.get_service_name().unwrap())
+        client.get_service_name().map_err(|e| e.to_string())
     }
 
     async fn disconnect<R: Runtime>(self, app_handle: tauri::AppHandle<R>) -> Result<(), String> {
@@ -97,6 +105,7 @@ impl PromptApi for PromptApiImpl {
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
             .prompt_service_change(None)
             .map_err(|e| e.to_string())?;
+
         Ok(())
     }
 }
