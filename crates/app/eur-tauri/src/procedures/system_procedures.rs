@@ -3,10 +3,7 @@ use tauri::Emitter;
 use tauri::{Manager, Runtime};
 use tracing::info;
 
-#[taurpc::procedures(
-    path = "system",
-    export_to = "../../../apps/desktop/src/lib/bindings/bindings.ts"
-)]
+#[taurpc::procedures(path = "system")]
 pub trait SystemApi {
     async fn check_grpc_server_connection(server_address: Option<String>)
     -> Result<String, String>;
