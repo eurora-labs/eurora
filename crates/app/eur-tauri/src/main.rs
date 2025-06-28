@@ -21,6 +21,7 @@ use eur_tauri::{
         auth_procedures::{AuthApi, AuthApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
+        prompt_procedures::{PromptApi, PromptApiImpl},
         query_procedures::{QueryApi, QueryApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
@@ -120,8 +121,6 @@ fn main() {
                         create_window(tauri_app.handle(), "main", "onboarding".into())
                             // create_window(tauri_app.handle(), "main", "index.html".into())
                             .expect("Failed to create main window");
-
-                    // Start the focus tracker
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
@@ -357,6 +356,7 @@ fn main() {
                 .merge(MonitorApiImpl.into_handler())
                 .merge(SystemApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
+                .merge(PromptApiImpl.into_handler())
                 .merge(WindowApiImpl.into_handler())
                 .merge(QueryApiImpl.into_handler());
             builder

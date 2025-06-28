@@ -26,7 +26,7 @@
 		isConnecting = true;
 		connectionStatus = 'idle';
 		try {
-			await taurpc.third_party.switch_to_ollama(ollamaUrl, modelName);
+			await taurpc.prompt.switch_to_ollama(ollamaUrl, modelName);
 			connectionStatus = 'success';
 			finished?.();
 		} catch (error) {

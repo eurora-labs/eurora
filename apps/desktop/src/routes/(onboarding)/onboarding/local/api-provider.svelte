@@ -47,7 +47,7 @@
 		connectionStatus = 'pending';
 
 		try {
-			await tauRPC.third_party.switch_to_remote(apiProvider, apiKey, model);
+			await tauRPC.prompt.switch_to_remote(apiProvider, apiKey, model);
 			connectionStatus = 'success';
 			finished?.();
 		} catch (error) {

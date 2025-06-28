@@ -16,10 +16,6 @@ pub trait SystemApi {
         app_handle: tauri::AppHandle<R>,
         key: String,
     ) -> Result<(), String>;
-
-    async fn get_endpoint_status<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<String, String>;
 }
 
 #[derive(Clone)]
@@ -78,12 +74,5 @@ impl SystemApi for SystemApiImpl {
                 .map_err(|e| format!("Failed to send key event: {}", e))?;
         }
         Ok(())
-    }
-
-    async fn get_endpoint_status<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<String, String> {
-        Ok("Endpoint is reachable".to_string())
     }
 }
