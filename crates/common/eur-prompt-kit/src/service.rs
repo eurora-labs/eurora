@@ -1,4 +1,4 @@
-use crate::{EurLLMService, LLMMessage, OllamaConfig, RemoteConfig};
+use crate::{LLMMessage, OllamaConfig, RemoteConfig, config::Config};
 use anyhow::Result;
 use eur_util::redact_emails;
 use futures::Stream;
@@ -7,30 +7,31 @@ use llm::{
     chat::ChatMessage,
     error::LLMError,
 };
-use tracing::info;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PromptKitService {
-    llm_backend: EurLLMService,
-    model: String,
-    remote_config: Option<RemoteConfig>,
-    ollama_config: Option<OllamaConfig>,
+    config: Option<Config>,
 }
 
 impl Default for PromptKitService {
     fn default() -> Self {
-        Self::new(EurLLMService::OpenAI, "gpt-4o".to_string())
+        Self::new(None)
     }
 }
 
 impl PromptKitService {
-    pub fn new(llm_backend: EurLLMService, model: String) -> Self {
-        Self {
-            llm_backend,
-            model,
-            ollama_config: None,
-            remote_config: None,
+    pub fn get_service_name(&self) -> Result<String> {
+        if let Some(config) = &self.config {
+            return Ok(config.get_display_name());
         }
+
+        Err(anyhow::anyhow!("No LLM backend configured"))
+    }
+}
+
+impl PromptKitService {
+    pub fn new(config: Option<Config>) -> Self {
+        Self { config }
     }
 
     pub async fn anonymize_text(text: String) -> Result<String> {
@@ -92,33 +93,32 @@ Rules:
         messages: Vec<LLMMessage>,
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
     {
-        match self.llm_backend {
-            EurLLMService::OpenAI => self._remote_chat_stream(messages).await,
-            EurLLMService::Anthropic => self._remote_chat_stream(messages).await,
-            EurLLMService::Ollama => self._ollama_chat_stream(messages).await,
-            _ => Err(LLMError::Generic(format!(
-                "Unsupported LLM backend: {:?}",
-                self.llm_backend
-            ))),
+        if self.config.is_none() {
+            return Err(LLMError::Generic("No LLM config set".to_string()));
+        }
+
+        let config = self.config.as_ref().unwrap();
+        match config {
+            Config::Ollama(config) => self._ollama_chat_stream(messages, config).await,
+            Config::Remote(config) => self._remote_chat_stream(messages, config).await,
+            _ => Err(LLMError::Generic("Unsupported LLM backend".to_string())),
         }
     }
 
     async fn _remote_chat_stream(
         &self,
         messages: Vec<LLMMessage>,
+        config: &RemoteConfig,
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
     {
-        let remote_config = self
-            .remote_config
-            .as_ref()
-            .ok_or_else(|| LLMError::Generic("Remote config not set".to_string()))?;
+        let remote_config = config;
 
         let api_key = remote_config.api_key.clone();
 
         // Let's try with explicit configuration to ensure streaming works properly
         let llm = LLMBuilder::new()
-            .backend(LLMBackend::from(self.llm_backend))
-            .model(&self.model)
+            .backend(LLMBackend::from(remote_config.provider))
+            .model(&remote_config.model)
             .api_key(api_key)
             .temperature(0.7)
             .stream(true)
@@ -135,17 +135,13 @@ Rules:
     async fn _ollama_chat_stream(
         &self,
         messages: Vec<LLMMessage>,
+        config: &OllamaConfig,
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
     {
-        let ollama_config = self
-            .ollama_config
-            .as_ref()
-            .ok_or_else(|| LLMError::Generic("Ollama config not set".to_string()))?;
-
         let llm = LLMBuilder::new()
-            .backend(LLMBackend::from(EurLLMService::Ollama))
-            .model(&self.model)
-            .base_url(&ollama_config.base_url)
+            .backend(LLMBackend::from(config.get_llm_backend()))
+            .model(&config.model)
+            .base_url(&config.base_url)
             .temperature(0.7)
             .stream(true)
             .build()
@@ -188,18 +184,12 @@ Rules:
             return Err("Ollama is not healthy".to_string());
         }
 
-        self.llm_backend = EurLLMService::Ollama;
-        self.model = config.model.clone();
-        self.ollama_config = Some(config);
+        self.config = Some(Config::Ollama(config));
 
         Ok(())
     }
 
-    pub async fn switch_to_remote(
-        &mut self,
-        provider: EurLLMService,
-        config: RemoteConfig,
-    ) -> Result<(), String> {
+    pub async fn switch_to_remote(&mut self, config: RemoteConfig) -> Result<(), String> {
         // Validate the configuration
         if config.model.is_empty() {
             return Err("Model name cannot be empty".to_string());
@@ -209,10 +199,7 @@ Rules:
             return Err("API key cannot be empty".to_string());
         }
 
-        // Add any additional validation specific to RemoteConfig
-        self.llm_backend = provider;
-        self.model = config.model.clone();
-        self.remote_config = Some(config);
+        self.config = Some(Config::Remote(config));
 
         Ok(())
     }
