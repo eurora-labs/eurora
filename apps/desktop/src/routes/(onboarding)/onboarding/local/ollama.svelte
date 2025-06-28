@@ -1,11 +1,18 @@
+<script lang="ts" module>
+	export interface OllamaProps {
+		finished?: () => void;
+	}
+</script>
+
 <script lang="ts">
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
-
 	import { CheckIcon } from '@lucide/svelte';
+
+	let { finished }: OllamaProps = $props();
 
 	const taurpc = createTauRPCProxy();
 
@@ -19,8 +26,9 @@
 		isConnecting = true;
 		connectionStatus = 'idle';
 		try {
-			await taurpc.third_party.switch_to_ollama(ollamaUrl, modelName);
+			await taurpc.prompt.switch_to_ollama(ollamaUrl, modelName);
 			connectionStatus = 'success';
+			finished?.();
 		} catch (error) {
 			console.error(error);
 			connectionStatus = 'error';
