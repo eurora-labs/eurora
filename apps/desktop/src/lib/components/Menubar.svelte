@@ -17,8 +17,8 @@
 			.on((name) => {
 				service_name = name || undefined;
 			})
-			.then((unlisten) => {
-				unlisten = unlisten;
+			.then((unlistenFn) => {
+				unlisten = unlistenFn;
 			});
 		return () => {
 			unlisten?.();
