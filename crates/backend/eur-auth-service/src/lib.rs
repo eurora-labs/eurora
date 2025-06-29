@@ -293,7 +293,7 @@ impl AuthService {
         }
 
         // Validate and consume the OAuth state
-        let oauth_state = match self.db.get_oauth_state_by_state(state).await {
+        let _oauth_state = match self.db.get_oauth_state_by_state(state).await {
             Ok(oauth_state) => oauth_state,
             Err(_) => {
                 warn!("Invalid or expired OAuth state: {}", state);
@@ -312,7 +312,7 @@ impl AuthService {
         info!("OAuth state validated successfully for state: {}", state);
 
         // Extract PKCE verifier for token exchange
-        let pkce_verifier = oauth_state.pkce_verifier.clone();
+        // let pkce_verifier = oauth_state.pkce_verifier.clone();
 
         info!("Exchanging authorization code for access token");
 
