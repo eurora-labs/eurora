@@ -48,7 +48,7 @@ jobs:
                   sudo apt-get install -y protobuf-compiler libglib2.0-dev libgtk-3-dev \
                     libpango1.0-dev libatk1.0-dev libgdk-pixbuf-2.0-dev libcairo2-dev \
                     pkg-config libjavascriptcoregtk-4.1-dev libsoup-3.0-dev \
-                    libwebkit2gtk-4.1-dev libpipewire-0.3-dev libc6 libc6-dev
+                    libwebkit2gtk-4.1-dev libpipewire-0.3-dev
 
             - run:
                   cargo fmt --all -- --check
@@ -86,7 +86,7 @@ jobs:
             - name: Create Dockerfile
               run: |
                   cat > Dockerfile << 'EOF'
-                  FROM debian:bookworm-slim
+                  FROM ubuntu:24.04
                   RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
                   RUN useradd -r -s /bin/false eurora
                   COPY target/release/eur-monolith /usr/local/bin/eur-monolith
