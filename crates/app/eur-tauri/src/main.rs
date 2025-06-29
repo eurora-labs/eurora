@@ -126,8 +126,14 @@ fn main() {
                         .icon(tauri_app.default_window_icon().unwrap().clone())
                         .menu(&menu)
                         .show_menu_on_left_click(true)
+                        .on_menu_event(move |app, event| {
+                            if event.id == "quit" {
+                                app.exit(0);
+                            }
+                        })
                         .build(tauri_app)
                         .expect("Failed to create tray icon");
+
                     let _main_window =
                         create_window(tauri_app.handle(), "main", "onboarding".into())
                             // create_window(tauri_app.handle(), "main", "index.html".into())
