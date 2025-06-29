@@ -9,6 +9,9 @@ publish = false
 [dependencies]
 eur-proto = { workspace = true }
 anyhow = { workspace = true }
-tonic = { workspace = true }
+tonic = { workspace = true, features = ["tls-native-roots", "channel"] }
+# rustls-native-certs = "0.8.1"
 tracing = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+
+tracing-subscriber = { workspace = true }
