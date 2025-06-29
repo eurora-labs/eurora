@@ -86,14 +86,13 @@ jobs:
             - name: Create Dockerfile
               run: |
                   cat > Dockerfile << 'EOF'
-                  FROM debian:bookworm-slim
+                  FROM ubuntu:24.04
                   RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
                   RUN useradd -r -s /bin/false eurora
                   COPY target/release/eur-monolith /usr/local/bin/eur-monolith
                   RUN chown eurora:eurora /usr/local/bin/eur-monolith
                   USER eurora
                   EXPOSE 50051
-                  ENV RUST_LOG=info
                   ENV MONOLITH_ADDR=[::]:50051
                   HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD timeout 3s bash -c "</dev/tcp/localhost/50051" || exit 1
                   CMD ["/usr/local/bin/eur-monolith"]
