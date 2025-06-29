@@ -770,6 +770,8 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<LoginByLoginTokenRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
+        info!("Login by login token request received");
+
         let req = request.into_inner();
         let token = req.token;
 
@@ -783,8 +785,6 @@ impl ProtoAuthService for AuthService {
         hasher.update(token);
         let code_challenge = hasher.finalize();
         let token = URL_SAFE_NO_PAD.encode(code_challenge);
-
-        info!("Login by login token request received for token: {}", token);
 
         // Get the login token from database
         let login_token = match self.db.get_login_token_by_token(&token).await {
