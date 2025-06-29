@@ -38,10 +38,10 @@ impl AuthApi for AuthApiImpl {
                 .map_err(|e| format!("Failed to get login tokens: {}", e))?;
             let expires_in: i64 = 60 * 20;
 
-            let base_url = std::env::var("AUTH_BASE_URL")
+            let base_url = std::env::var("AUTH_SERVICE_URL")
                 .unwrap_or_else(|_| "http://localhost:5173".to_string());
             let mut url = Url::parse(&format!("{}/login", base_url))
-                .map_err(|e| format!("Invalid AUTH_BASE_URL: {}", e))?;
+                .map_err(|e| format!("Invalid AUTH_SERVICE_URL: {}", e))?;
             // Add code challenge as parameter
             url.query_pairs_mut()
                 .append_pair("code_challenge", &code_challenge)
