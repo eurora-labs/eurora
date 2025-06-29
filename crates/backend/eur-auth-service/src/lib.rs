@@ -775,8 +775,6 @@ impl ProtoAuthService for AuthService {
         let req = request.into_inner();
         let token = req.token;
 
-        info!("Login by login token: {}", token);
-
         if token.is_empty() {
             warn!("Login by login token request received with empty token");
             return Err(Status::invalid_argument("Login token is required"));
