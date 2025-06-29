@@ -7,10 +7,7 @@ pub use eur_proto::proto_auth_service::{
     RegisterRequest, TokenResponse, login_request::Credential,
     proto_auth_service_client::ProtoAuthServiceClient,
 };
-use tonic::{
-    IntoRequest,
-    transport::{Channel, ClientTlsConfig},
-};
+use tonic::transport::{Channel, ClientTlsConfig};
 use tracing::{error, info};
 
 /// gRPC client for authentication service
