@@ -7,7 +7,10 @@ pub use eur_proto::proto_auth_service::{
     RegisterRequest, TokenResponse, login_request::Credential,
     proto_auth_service_client::ProtoAuthServiceClient,
 };
-use tonic::transport::Channel;
+use tonic::{
+    IntoRequest,
+    transport::{Channel, ClientTlsConfig},
+};
 use tracing::{error, info};
 
 /// gRPC client for authentication service
@@ -26,7 +29,9 @@ impl AuthClient {
     }
 
     async fn try_init_client(&self) -> Result<Option<ProtoAuthServiceClient<Channel>>> {
+        let tls = ClientTlsConfig::new().with_native_roots();
         let channel = Channel::from_shared(self.base_url.clone())?
+            .tls_config(tls)?
             .connect()
             .await
             .map_err(|e| anyhow!("Failed to connect to auth service: {}", e))?;
@@ -120,9 +125,10 @@ impl AuthClient {
             .try_init_client()
             .await?
             .ok_or_else(|| anyhow!("Failed to initialize client"))?;
+        let login_token = login_token.into();
         let response = client
             .login_by_login_token(LoginByLoginTokenRequest {
-                token: login_token.into(),
+                token: login_token.clone(),
             })
             .await
             .map_err(|e| {
