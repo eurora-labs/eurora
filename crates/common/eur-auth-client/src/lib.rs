@@ -62,11 +62,6 @@ impl AuthClient {
             .try_init_client()
             .await?
             .ok_or_else(|| anyhow!("Failed to initialize client"))?;
-        let new_data = data.clone();
-        let mut new_client = client.clone();
-        let new_request = new_client.login(new_data.clone()).into_request();
-        let metadata = new_request.metadata();
-        eprintln!("Metadata: {:#?}", metadata);
         let response = client.login(data).await.map_err(|e| {
             error!("Login failed: {}", e);
             anyhow!("Login failed: {}", e)
