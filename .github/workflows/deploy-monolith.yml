@@ -93,7 +93,6 @@ jobs:
                   RUN chown eurora:eurora /usr/local/bin/eur-monolith
                   USER eurora
                   EXPOSE 50051
-                  ENV RUST_LOG=info
                   ENV MONOLITH_ADDR=[::]:50051
                   HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD timeout 3s bash -c "</dev/tcp/localhost/50051" || exit 1
                   CMD ["/usr/local/bin/eur-monolith"]
