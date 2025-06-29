@@ -36,9 +36,12 @@ use std::sync::{Arc, Mutex};
 use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Emitter, Wry};
 use tauri::{Manager, generate_context};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use taurpc::Router;
-
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 
@@ -117,6 +120,20 @@ fn main() {
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
+                    let quit_i = MenuItem::with_id(tauri_app, "quit", "Quit", true, None::<&str>)?;
+                    let menu = Menu::with_items(tauri_app, &[&quit_i])?;
+                    TrayIconBuilder::new()
+                        .icon(tauri_app.default_window_icon().unwrap().clone())
+                        .menu(&menu)
+                        .show_menu_on_left_click(true)
+                        .on_menu_event(move |app, event| {
+                            if event.id == "quit" {
+                                app.exit(0);
+                            }
+                        })
+                        .build(tauri_app)
+                        .expect("Failed to create tray icon");
+
                     let _main_window =
                         create_window(tauri_app.handle(), "main", "onboarding".into())
                             // create_window(tauri_app.handle(), "main", "index.html".into())
