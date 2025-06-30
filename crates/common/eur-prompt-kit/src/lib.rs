@@ -1,9 +1,10 @@
+use eur_proto::proto_prompt_service::ProtoChatMessage;
 use image::DynamicImage;
 use llm::{builder::LLMBackend, chat::ChatMessage};
 
 mod config;
 mod service;
-pub use config::{OllamaConfig, RemoteConfig};
+pub use config::{EuroraConfig, OllamaConfig, RemoteConfig};
 pub use service::PromptKitService;
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -115,6 +116,37 @@ impl From<ChatMessage> for LLMMessage {
             content: MessageContent::Text(TextContent {
                 text: value.content.to_string(),
             }),
+        }
+    }
+}
+
+impl From<ProtoChatMessage> for LLMMessage {
+    fn from(value: ProtoChatMessage) -> Self {
+        LLMMessage {
+            role: match value.role.as_str() {
+                "user" => Role::User,
+                "system" => Role::System,
+                _ => Role::User,
+            },
+            content: MessageContent::Text(TextContent {
+                text: value.content,
+            }),
+        }
+    }
+}
+
+impl From<LLMMessage> for ProtoChatMessage {
+    fn from(value: LLMMessage) -> Self {
+        ProtoChatMessage {
+            role: match value.role {
+                Role::User => "user".to_string(),
+                Role::System => "system".to_string(),
+                _ => "user".to_string(),
+            },
+            content: match value.content {
+                MessageContent::Text(TextContent { text }) => text,
+                MessageContent::Image(ImageContent { text, image: _ }) => text.unwrap(),
+            },
         }
     }
 }

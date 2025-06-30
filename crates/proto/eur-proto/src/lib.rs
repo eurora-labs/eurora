@@ -36,6 +36,11 @@ pub mod generated {
         include!("gen/auth_service.rs");
         pub use super::*;
     }
+
+    pub mod proto_prompt_service {
+        include!("gen/prompt_service.rs");
+        pub use super::*;
+    }
 }
 
 // Convenience re-exports of the most commonly used types
