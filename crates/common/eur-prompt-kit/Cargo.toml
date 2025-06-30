@@ -14,3 +14,4 @@ tokio = { workspace = true }
 eur-util = { workspace = true }
 regex = "1.9.6"
 tracing = { workspace = true }
+eur-proto = { workspace = true }
