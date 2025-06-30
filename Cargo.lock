@@ -2349,6 +2349,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "eur-proto",
+ "eur-secret",
  "tokio",
  "tokio-stream",
  "tonic",
