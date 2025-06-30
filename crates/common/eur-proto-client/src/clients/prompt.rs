@@ -5,7 +5,11 @@ pub use eur_proto::proto_prompt_service::{
     ProtoChatMessage, SendPromptRequest, SendPromptResponse,
     proto_prompt_service_server::ProtoPromptService,
 };
-use tonic::{Streaming, transport::Channel};
+use eur_secret::secret;
+use tonic::{
+    Request, Status, Streaming, metadata::MetadataValue, service::interceptor::InterceptedService,
+    transport::Channel,
+};
 use tracing::info;
 
 #[derive(Clone)]
@@ -23,25 +27,34 @@ impl PromptClient {
 }
 
 impl PromptClient {
-    pub async fn try_init_client(&self) -> Result<Option<ProtoPromptServiceClient<Channel>>> {
+    pub async fn try_init_client(
+        &self,
+    ) -> Result<
+        ProtoPromptServiceClient<
+            InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
+        >,
+    > {
         let channel = get_secure_channel(self.base_url.clone())
             .await?
             .ok_or_else(|| anyhow!("Failed to initialize prompt channel"))?;
 
-        let client = ProtoPromptServiceClient::new(channel);
+        let access_token = secret::retrieve("AUTH_ACCESS_TOKEN", secret::Namespace::BuildKind)?;
+        let token: MetadataValue<_> = format!("Bearer {}", access_token.unwrap().0).parse()?;
+        let client =
+            ProtoPromptServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
+                req.metadata_mut().insert("authorization", token.clone());
+                Ok(req)
+            });
 
         info!("Connected to prompt service at {}", self.base_url);
-        Ok(Some(client))
+        Ok(client)
     }
 
     pub async fn send_prompt(
         &self,
         request: SendPromptRequest,
     ) -> Result<Streaming<SendPromptResponse>> {
-        let mut client = self
-            .try_init_client()
-            .await?
-            .ok_or_else(|| anyhow!("Failed to initialize prompt client"))?;
+        let mut client = self.try_init_client().await?;
 
         // Add timeout for the initial gRPC call
         let timeout_duration = std::time::Duration::from_secs(30);

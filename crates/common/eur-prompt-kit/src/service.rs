@@ -10,9 +10,7 @@ use llm::{
     chat::ChatMessage,
     error::LLMError,
 };
-use tokio::sync::mpsc;
-use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
-use tracing::warn;
+use tokio_stream::{Stream, StreamExt};
 
 #[derive(Debug, Clone)]
 pub struct PromptKitService {
