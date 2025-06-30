@@ -4,7 +4,7 @@ use llm::{builder::LLMBackend, chat::ChatMessage};
 
 mod config;
 mod service;
-pub use config::{OllamaConfig, RemoteConfig};
+pub use config::{EuroraConfig, OllamaConfig, RemoteConfig};
 pub use service::PromptKitService;
 
 #[derive(Debug, Default, Copy, Clone)]
