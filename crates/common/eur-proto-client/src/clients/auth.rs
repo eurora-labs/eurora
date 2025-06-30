@@ -24,7 +24,7 @@ impl AuthClient {
         Ok(Self { base_url })
     }
 
-    async fn try_init_client(&self) -> Result<Option<ProtoAuthServiceClient<Channel>>> {
+    async fn try_init_client(&self) -> Result<ProtoAuthServiceClient<Channel>> {
         let channel = get_secure_channel(self.base_url.clone())
             .await?
             .ok_or_else(|| anyhow!("Failed to initialize auth channel"))?;
@@ -32,7 +32,7 @@ impl AuthClient {
         let client = ProtoAuthServiceClient::new(channel);
 
         info!("Connected to auth service at {}", self.base_url);
-        Ok(Some(client))
+        Ok(client)
     }
 
     pub async fn login_by_password(
@@ -51,10 +51,7 @@ impl AuthClient {
 
     /// Login with email/username and password
     async fn login(&self, data: LoginRequest) -> Result<TokenResponse> {
-        let mut client = self
-            .try_init_client()
-            .await?
-            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
+        let mut client = self.try_init_client().await?;
         let response = client.login(data).await.map_err(|e| {
             error!("Login failed: {}", e);
             anyhow!("Login failed: {}", e)
@@ -71,10 +68,7 @@ impl AuthClient {
         password: impl Into<String>,
         display_name: Option<String>,
     ) -> Result<TokenResponse> {
-        let mut client = self
-            .try_init_client()
-            .await?
-            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
+        let mut client = self.try_init_client().await?;
         let response = client
             .register(RegisterRequest {
                 username: username.into(),
@@ -93,10 +87,7 @@ impl AuthClient {
 
     /// Refresh access token using refresh token
     pub async fn refresh_token(&self, refresh_token: impl Into<String>) -> Result<TokenResponse> {
-        let mut client = self
-            .try_init_client()
-            .await?
-            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
+        let mut client = self.try_init_client().await?;
         let response = client
             .refresh_token(RefreshTokenRequest {
                 refresh_token: refresh_token.into(),
@@ -114,10 +105,7 @@ impl AuthClient {
         &self,
         login_token: impl Into<String>,
     ) -> Result<TokenResponse> {
-        let mut client = self
-            .try_init_client()
-            .await?
-            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
+        let mut client = self.try_init_client().await?;
         let login_token = login_token.into();
         let response = client
             .login_by_login_token(LoginByLoginTokenRequest {
@@ -133,10 +121,7 @@ impl AuthClient {
     }
 
     pub async fn get_login_token(&self) -> Result<GetLoginTokenResponse> {
-        let mut client = self
-            .try_init_client()
-            .await?
-            .ok_or_else(|| anyhow!("Failed to initialize client"))?;
+        let mut client = self.try_init_client().await?;
         let response = client.get_login_token(()).await.map_err(|e| {
             error!("Get login token failed: {}", e);
             anyhow!("Get login token failed: {}", e)

@@ -14,3 +14,4 @@ tonic = { workspace = true, features = ["tls-native-roots", "channel"] }
 tracing = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
 tokio-stream = { workspace = true }
+eur-secret = { workspace = true }
