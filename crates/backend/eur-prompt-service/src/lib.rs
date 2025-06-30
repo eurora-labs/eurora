@@ -7,10 +7,9 @@ use eur_proto::proto_prompt_service::{
     proto_prompt_service_server::ProtoPromptService,
 };
 use std::pin::Pin;
-use tokio::sync::mpsc;
-use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
+use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
-use tracing::{info, warn};
+use tracing::info;
 
 /// Extract and validate JWT token from request metadata
 pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
@@ -71,6 +70,8 @@ impl ProtoPromptService for PromptService {
         &self,
         request: Request<SendPromptRequest>,
     ) -> SendPromptResult<Self::SendPromptStream> {
+        authenticate_request(&request, &self.jwt_config)
+            .map_err(|e| Status::unauthenticated(e.to_string()))?;
         info!("Received send_prompt request");
         let request_inner = request.into_inner();
 
