@@ -25,10 +25,64 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 // Re-export shared types for convenience
-pub use eur_auth::{Claims, JwtConfig};
+pub use eur_auth::{Claims, JwtConfig, validate_access_token, validate_refresh_token};
 pub mod oauth;
 
 use oauth::google::create_google_oauth_client;
+
+/// Extract and validate JWT token from request metadata
+pub fn authenticate_request_access_token<T>(
+    request: &Request<T>,
+    jwt_config: &JwtConfig,
+) -> Result<Claims> {
+    // Get authorization header
+    let auth_header = request
+        .metadata()
+        .get("authorization")
+        .ok_or_else(|| anyhow!("Missing authorization header"))?;
+
+    // Convert to string
+    let auth_str = auth_header
+        .to_str()
+        .map_err(|_| anyhow!("Invalid authorization header format"))?;
+
+    // Extract Bearer token
+    if !auth_str.starts_with("Bearer ") {
+        return Err(anyhow!("Authorization header must start with 'Bearer '"));
+    }
+
+    let token = &auth_str[7..]; // Remove "Bearer " prefix
+
+    // Validate access token using shared function
+    validate_access_token(token, jwt_config)
+}
+
+/// Extract and validate JWT token from request metadata
+pub fn authenticate_request_refresh_token<T>(
+    request: &Request<T>,
+    jwt_config: &JwtConfig,
+) -> Result<Claims> {
+    // Get authorization header
+    let auth_header = request
+        .metadata()
+        .get("authorization")
+        .ok_or_else(|| anyhow!("Missing authorization header"))?;
+
+    // Convert to string
+    let auth_str = auth_header
+        .to_str()
+        .map_err(|_| anyhow!("Invalid authorization header format"))?;
+
+    // Extract Bearer token
+    if !auth_str.starts_with("Bearer ") {
+        return Err(anyhow!("Authorization header must start with 'Bearer '"));
+    }
+
+    let token = &auth_str[7..]; // Remove "Bearer " prefix
+
+    // Validate refresh token using shared function
+    validate_refresh_token(token, jwt_config)
+}
 
 /// The main authentication service
 #[derive(Debug)]
@@ -662,6 +716,8 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<RefreshTokenRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
+        authenticate_request_refresh_token(&request, &self.jwt_config)
+            .map_err(|e| Status::unauthenticated(e.to_string()))?;
         let req = request.into_inner();
 
         info!("Refresh token request received");
