@@ -1,3 +1,4 @@
+use eur_proto::proto_prompt_service::ProtoChatMessage;
 use image::DynamicImage;
 use llm::{builder::LLMBackend, chat::ChatMessage};
 
@@ -114,6 +115,21 @@ impl From<ChatMessage> for LLMMessage {
             role: Role::User,
             content: MessageContent::Text(TextContent {
                 text: value.content.to_string(),
+            }),
+        }
+    }
+}
+
+impl From<ProtoChatMessage> for LLMMessage {
+    fn from(value: ProtoChatMessage) -> Self {
+        LLMMessage {
+            role: match value.role.as_str() {
+                "user" => Role::User,
+                "system" => Role::System,
+                _ => Role::User,
+            },
+            content: MessageContent::Text(TextContent {
+                text: value.content,
             }),
         }
     }
