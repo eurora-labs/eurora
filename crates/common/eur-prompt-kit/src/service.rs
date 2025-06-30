@@ -3,13 +3,16 @@ use crate::{
     config::{Config, EuroraConfig},
 };
 use anyhow::Result;
+use eur_proto_client::prompt::{PromptClient, SendPromptRequest};
 use eur_util::redact_emails;
-use futures::Stream;
 use llm::{
     builder::{LLMBackend, LLMBuilder},
     chat::ChatMessage,
     error::LLMError,
 };
+use tokio::sync::mpsc;
+use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
+use tracing::warn;
 
 #[derive(Debug, Clone)]
 pub struct PromptKitService {
@@ -104,8 +107,42 @@ Rules:
         match config {
             Config::Ollama(config) => self._ollama_chat_stream(messages, config).await,
             Config::Remote(config) => self._remote_chat_stream(messages, config).await,
+            Config::Eurora(config) => self._eurora_chat_stream(messages, config).await,
             _ => Err(LLMError::Generic("Unsupported LLM backend".to_string())),
         }
+    }
+
+    async fn _eurora_chat_stream(
+        &self,
+        messages: Vec<LLMMessage>,
+        _config: &EuroraConfig,
+    ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
+    {
+        let client = PromptClient::new(Some("http://localhost:50051".to_string()))
+            .await
+            .map_err(|e| LLMError::Generic(e.to_string()))?;
+
+        let (tx, rx) = mpsc::channel::<Result<String, LLMError>>(128);
+
+        let messages = messages.into_iter().map(|message| message.into()).collect();
+        let mut stream = client
+            .send_prompt(SendPromptRequest { messages })
+            .await
+            .map_err(|e| LLMError::Generic(e.to_string()))?;
+
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(message) => {
+                    tx.send(Ok(message.response)).await.unwrap();
+                }
+                Err(e) => {
+                    warn!("LLM error: {}", e);
+                    break;
+                }
+            }
+        }
+
+        Ok(Box::pin(ReceiverStream::new(rx)))
     }
 
     async fn _remote_chat_stream(
@@ -192,7 +229,7 @@ Rules:
         Ok(())
     }
 
-    pub async fn switch_to_remote(&mut self, config: RemoteConfig) -> Result<(), String> {
+    pub fn switch_to_remote(&mut self, config: RemoteConfig) -> Result<(), String> {
         // Validate the configuration
         if config.model.is_empty() {
             return Err("Model name cannot be empty".to_string());

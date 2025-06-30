@@ -11,7 +11,9 @@ llm = { git = "https://github.com/AndreRoelofs/llm.git", branch = "nightly", fea
 # llm = { version = "1.2.4", features = ["openai"] }
 openai-api-rs = { git = "https://github.com/AndreRoelofs/openai-api-rs.git", branch = "main" }
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
 eur-util = { workspace = true }
 regex = "1.9.6"
 tracing = { workspace = true }
 eur-proto = { workspace = true }
+eur-proto-client = { workspace = true }
