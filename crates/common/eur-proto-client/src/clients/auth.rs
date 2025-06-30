@@ -1,5 +1,4 @@
-//! gRPC client for communicating with the eur-auth-service.
-
+use crate::get_secure_channel;
 use anyhow::{Ok, Result, anyhow};
 use eur_proto::proto_auth_service::GetLoginTokenResponse;
 pub use eur_proto::proto_auth_service::{
@@ -7,7 +6,7 @@ pub use eur_proto::proto_auth_service::{
     RegisterRequest, TokenResponse, login_request::Credential,
     proto_auth_service_client::ProtoAuthServiceClient,
 };
-use tonic::transport::{Channel, ClientTlsConfig};
+use tonic::transport::Channel;
 use tracing::{error, info};
 
 /// gRPC client for authentication service
@@ -26,12 +25,9 @@ impl AuthClient {
     }
 
     async fn try_init_client(&self) -> Result<Option<ProtoAuthServiceClient<Channel>>> {
-        let tls = ClientTlsConfig::new().with_native_roots();
-        let channel = Channel::from_shared(self.base_url.clone())?
-            .tls_config(tls)?
-            .connect()
-            .await
-            .map_err(|e| anyhow!("Failed to connect to auth service: {}", e))?;
+        let channel = get_secure_channel(self.base_url.clone())
+            .await?
+            .ok_or_else(|| anyhow!("Failed to initialize auth channel"))?;
 
         let client = ProtoAuthServiceClient::new(channel);
 
