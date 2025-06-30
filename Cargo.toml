@@ -55,7 +55,7 @@ eur-user = { path = "crates/app/eur-user" }
 eur-auth = { path = "crates/common/eur-auth" }
 eur-tauri = { path = "crates/app/eur-tauri" }
 eur-proto = { path = "crates/proto/eur-proto" }
-eur-auth-client = { path = "crates/common/eur-auth-client" }
+eur-proto-client = { path = "crates/common/eur-proto-client" }
 eur-prompt-kit = { path = "crates/common/eur-prompt-kit" }
 eur-util = { path = "crates/common/eur-util" }
 

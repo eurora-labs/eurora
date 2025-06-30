@@ -1,17 +1,16 @@
+
 [package]
-name = "eur-auth-client"
+name = "eur-proto-client"
 version = "0.1.0"
 edition = "2024"
 authors = ["Eurora <eurora@company.com>"]
-description = "Eurora client authentication"
+description = "Eurora gRPC client"
 publish = false
 
 [dependencies]
 eur-proto = { workspace = true }
 anyhow = { workspace = true }
 tonic = { workspace = true, features = ["tls-native-roots", "channel"] }
-# rustls-native-certs = "0.8.1"
 tracing = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
-
-tracing-subscriber = { workspace = true }
+tokio-stream = { workspace = true }
