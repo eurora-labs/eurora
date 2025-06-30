@@ -1,12 +1,16 @@
-use crate::{LLMMessage, OllamaConfig, RemoteConfig, config::Config};
+use crate::{
+    LLMMessage, OllamaConfig, RemoteConfig,
+    config::{Config, EuroraConfig},
+};
 use anyhow::Result;
+use eur_proto_client::prompt::{PromptClient, SendPromptRequest};
 use eur_util::redact_emails;
-use futures::Stream;
 use llm::{
     builder::{LLMBackend, LLMBuilder},
     chat::ChatMessage,
     error::LLMError,
 };
+use tokio_stream::{Stream, StreamExt};
 
 #[derive(Debug, Clone)]
 pub struct PromptKitService {
@@ -101,8 +105,34 @@ Rules:
         match config {
             Config::Ollama(config) => self._ollama_chat_stream(messages, config).await,
             Config::Remote(config) => self._remote_chat_stream(messages, config).await,
-            _ => Err(LLMError::Generic("Unsupported LLM backend".to_string())),
+            Config::Eurora(config) => self._eurora_chat_stream(messages, config).await,
         }
+    }
+
+    async fn _eurora_chat_stream(
+        &self,
+        messages: Vec<LLMMessage>,
+        _config: &EuroraConfig,
+    ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
+    {
+        let client = PromptClient::new(None)
+            .await
+            .map_err(|e| LLMError::Generic(e.to_string()))?;
+
+        let messages = messages.into_iter().map(|message| message.into()).collect();
+        let stream = client
+            .send_prompt(SendPromptRequest { messages })
+            .await
+            .map_err(|e| LLMError::Generic(e.to_string()))?;
+
+        // Direct stream mapping without intermediate channels - much simpler!
+        let mapped_stream = stream.map(|result| {
+            result
+                .map(|response| response.response)
+                .map_err(|e| LLMError::Generic(e.to_string()))
+        });
+
+        Ok(Box::pin(mapped_stream))
     }
 
     async fn _remote_chat_stream(
@@ -189,7 +219,7 @@ Rules:
         Ok(())
     }
 
-    pub async fn switch_to_remote(&mut self, config: RemoteConfig) -> Result<(), String> {
+    pub fn switch_to_remote(&mut self, config: RemoteConfig) -> Result<(), String> {
         // Validate the configuration
         if config.model.is_empty() {
             return Err("Model name cannot be empty".to_string());
@@ -200,6 +230,12 @@ Rules:
         }
 
         self.config = Some(Config::Remote(config));
+
+        Ok(())
+    }
+
+    pub async fn switch_to_eurora(&mut self, config: EuroraConfig) -> Result<(), String> {
+        self.config = Some(Config::Eurora(config));
 
         Ok(())
     }
