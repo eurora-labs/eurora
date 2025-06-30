@@ -116,7 +116,7 @@ Rules:
         _config: &EuroraConfig,
     ) -> Result<std::pin::Pin<Box<dyn Stream<Item = Result<String, LLMError>> + Send>>, LLMError>
     {
-        let client = PromptClient::new(Some("http://localhost:50051".to_string()))
+        let client = PromptClient::new(None)
             .await
             .map_err(|e| LLMError::Generic(e.to_string()))?;
 
