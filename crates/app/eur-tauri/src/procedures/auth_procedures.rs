@@ -1,5 +1,10 @@
 //! Authentication procedures for the Tauri application.
 
+use crate::{
+    procedures::prompt_procedures::TauRpcPromptApiEventTrigger,
+    shared_types::SharedPromptKitService,
+};
+use eur_prompt_kit::EuroraConfig;
 use eur_secret::{Sensitive, secret};
 use eur_user::auth::AuthManager;
 use tauri::{AppHandle, Manager, Runtime};
@@ -68,7 +73,31 @@ impl AuthApi for AuthApiImpl {
                 .map_err(|e| format!("Failed to retrieve login token: {}", e))?
                 .ok_or_else(|| "Login token not found".to_string())?;
             match auth_manager.login_by_login_token(login_token.0).await {
-                Ok(_) => Ok(true),
+                Ok(_) => {
+                    secret::delete(LOGIN_CODE_VERIFIER, secret::Namespace::BuildKind)
+                        .map_err(|e| format!("Failed to remove login token: {}", e))?;
+
+                    let mut promptkit_client = eur_prompt_kit::PromptKitService::default();
+                    promptkit_client
+                        .switch_to_eurora(EuroraConfig {
+                            model: "default".to_string(),
+                        })
+                        .await?;
+
+                    TauRpcPromptApiEventTrigger::new(app_handle.clone())
+                        .prompt_service_change(Some(
+                            promptkit_client
+                                .get_service_name()
+                                .map_err(|e| e.to_string())?,
+                        ))
+                        .map_err(|e| e.to_string())?;
+
+                    let state: tauri::State<SharedPromptKitService> = app_handle.state();
+                    let mut guard = state.lock().await;
+                    *guard = Some(promptkit_client);
+
+                    Ok(true)
+                }
                 Err(_) => Ok(false),
             }
         } else {
