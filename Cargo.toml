@@ -59,6 +59,12 @@ eur-auth-client = { path = "crates/common/eur-auth-client" }
 eur-prompt-kit = { path = "crates/common/eur-prompt-kit" }
 eur-util = { path = "crates/common/eur-util" }
 
+eur-prompt-service = { path = "crates/backend/eur-prompt-service" }
+eur-auth-service = { path = "crates/backend/eur-auth-service" }
+eur-ocr-service = { path = "crates/backend/eur-ocr-service" }
+eur-remote-db = { path = "crates/backend/eur-remote-db" }
+eur-monolith = { path = "crates/backend/eur-monolith" }
+
 [profile.release]
 codegen-units = 1 # Compile crates one after another so the compiler can optimize better
 lto = true        # Enables link to optimizations
