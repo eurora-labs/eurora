@@ -134,3 +134,19 @@ impl From<ProtoChatMessage> for LLMMessage {
         }
     }
 }
+
+impl From<LLMMessage> for ProtoChatMessage {
+    fn from(value: LLMMessage) -> Self {
+        ProtoChatMessage {
+            role: match value.role {
+                Role::User => "user".to_string(),
+                Role::System => "system".to_string(),
+                _ => "user".to_string(),
+            },
+            content: match value.content {
+                MessageContent::Text(TextContent { text }) => text,
+                MessageContent::Image(ImageContent { text, image: _ }) => text.unwrap(),
+            },
+        }
+    }
+}

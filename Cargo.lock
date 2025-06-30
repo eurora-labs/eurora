@@ -2096,8 +2096,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "eur-auth-client",
  "eur-proto",
+ "eur-proto-client",
  "eur-secret",
  "jsonwebtoken",
  "serde",
@@ -2110,18 +2110,6 @@ dependencies = [
  "tonic",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "eur-auth-client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "eur-proto",
- "tokio",
- "tonic",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -2309,6 +2297,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "eur-proto",
+ "eur-proto-client",
  "eur-util",
  "futures",
  "image",
@@ -2316,6 +2305,7 @@ dependencies = [
  "openai-api-rs",
  "regex",
  "tokio",
+ "tokio-stream",
  "tracing",
 ]
 
@@ -2351,6 +2341,18 @@ dependencies = [
  "tokio",
  "tonic",
  "tonic-build",
+]
+
+[[package]]
+name = "eur-proto-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "eur-proto",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
 ]
 
 [[package]]
@@ -2403,7 +2405,6 @@ dependencies = [
  "dirs",
  "dotenv",
  "eur-activity",
- "eur-auth-client",
  "eur-client-grpc",
  "eur-client-questions",
  "eur-native-messaging",
@@ -2411,6 +2412,7 @@ dependencies = [
  "eur-personal-db",
  "eur-prompt-kit",
  "eur-proto",
+ "eur-proto-client",
  "eur-renderer",
  "eur-secret",
  "eur-timeline",
@@ -2489,8 +2491,8 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
- "eur-auth-client",
  "eur-proto",
+ "eur-proto-client",
  "eur-secret",
  "image",
  "rand 0.9.1",
