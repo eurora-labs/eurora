@@ -73,20 +73,44 @@ impl QueryApi for QueryApiImpl {
         match client.chat_stream(messages).await {
             Ok(mut stream) => {
                 info!("Starting to consume stream...");
-                while let Some(result) = stream.next().await {
-                    match result {
-                        Ok(chunk) => {
-                            // Append to the complete response
-                            complete_response.push_str(&chunk);
 
-                            // Send the chunk to the frontend
-                            if let Err(e) = channel.send(ResponseChunk { chunk }) {
-                                return Err(format!("Failed to send response chunk: {e}"));
+                // Add timeout for stream processing
+                let timeout_duration = std::time::Duration::from_secs(300); // 5 minutes
+                let stream_future = async {
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok(chunk) => {
+                                // Skip empty chunks to reduce noise
+                                if chunk.is_empty() {
+                                    continue;
+                                }
+
+                                // Append to the complete response
+                                complete_response.push_str(&chunk);
+
+                                // Send the chunk to the frontend
+                                if let Err(e) = channel.send(ResponseChunk { chunk }) {
+                                    return Err(format!("Failed to send response chunk: {e}"));
+                                }
+                            }
+                            Err(e) => {
+                                return Err(format!("Stream error: {}", e));
                             }
                         }
-                        Err(e) => {
-                            return Err(format!("Stream error: {}", e));
-                        }
+                    }
+                    Ok(())
+                };
+
+                // Apply timeout to stream processing
+                match tokio::time::timeout(timeout_duration, stream_future).await {
+                    Ok(Ok(())) => {
+                        info!("Stream completed successfully");
+                    }
+                    Ok(Err(e)) => {
+                        return Err(e);
+                    }
+                    Err(_) => {
+                        return Err("Stream processing timed out after 5 minutes".to_string());
                     }
                 }
             }

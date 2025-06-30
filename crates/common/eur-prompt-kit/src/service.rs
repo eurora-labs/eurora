@@ -130,17 +130,29 @@ Rules:
             .await
             .map_err(|e| LLMError::Generic(e.to_string()))?;
 
-        while let Some(item) = stream.next().await {
-            match item {
-                Ok(message) => {
-                    tx.send(Ok(message.response)).await.unwrap();
-                }
-                Err(e) => {
-                    warn!("LLM error: {}", e);
-                    break;
+        // Spawn task to handle stream processing asynchronously
+        tokio::spawn(async move {
+            while let Some(item) = stream.next().await {
+                match item {
+                    Ok(message) => {
+                        if let Err(e) = tx.send(Ok(message.response)).await {
+                            warn!("Failed to send message through channel: {}", e);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        warn!("gRPC stream error: {}", e);
+                        // Send error through channel instead of just breaking
+                        if let Err(send_err) = tx.send(Err(LLMError::Generic(e.to_string()))).await
+                        {
+                            warn!("Failed to send error through channel: {}", send_err);
+                        }
+                        break;
+                    }
                 }
             }
-        }
+            // Channel will be automatically closed when tx is dropped
+        });
 
         Ok(Box::pin(ReceiverStream::new(rx)))
     }
