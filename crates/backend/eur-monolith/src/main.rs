@@ -3,8 +3,10 @@ use dotenv::dotenv;
 use eur_auth::JwtConfig;
 use eur_auth_service::AuthService;
 use eur_ocr_service::OcrService;
+use eur_prompt_service::PromptService;
 use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer;
 use eur_proto::proto_ocr_service::proto_ocr_service_server::ProtoOcrServiceServer;
+use eur_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
 use eur_remote_db::DatabaseManager;
 use std::sync::Arc;
 use tonic::transport::Server;
@@ -52,7 +54,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse()
         .expect("Invalid MONOLITH_ADDR format");
     let ocr_service = OcrService::new(Some(jwt_config.clone()));
-    let auth_service = AuthService::new(db_manager, Some(jwt_config));
+    let auth_service = AuthService::new(db_manager, Some(jwt_config.clone()));
+    let prompt_service = PromptService::new(Some(jwt_config.clone()));
     info!("Starting gRPC server at {}", addr);
 
     let cors = CorsLayer::permissive();
@@ -64,6 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(health_service)
         .add_service(ProtoOcrServiceServer::new(ocr_service))
         .add_service(ProtoAuthServiceServer::new(auth_service))
+        .add_service(ProtoPromptServiceServer::new(prompt_service))
         .serve_with_shutdown(addr, async {
             tokio::signal::ctrl_c()
                 .await
