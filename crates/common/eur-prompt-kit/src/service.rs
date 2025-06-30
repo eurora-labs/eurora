@@ -1,4 +1,7 @@
-use crate::{LLMMessage, OllamaConfig, RemoteConfig, config::Config};
+use crate::{
+    LLMMessage, OllamaConfig, RemoteConfig,
+    config::{Config, EuroraConfig},
+};
 use anyhow::Result;
 use eur_util::redact_emails;
 use futures::Stream;
@@ -200,6 +203,12 @@ Rules:
         }
 
         self.config = Some(Config::Remote(config));
+
+        Ok(())
+    }
+
+    pub async fn switch_to_eurora(&mut self, config: EuroraConfig) -> Result<(), String> {
+        self.config = Some(Config::Eurora(config));
 
         Ok(())
     }
