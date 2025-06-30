@@ -63,13 +63,11 @@ impl PromptApi for PromptApiImpl {
         model: String,
     ) -> Result<(), String> {
         let mut promptkit_client = eur_prompt_kit::PromptKitService::default();
-        promptkit_client
-            .switch_to_remote(eur_prompt_kit::RemoteConfig {
-                provider: provider.into(),
-                api_key,
-                model,
-            })
-            .await?;
+        promptkit_client.switch_to_remote(eur_prompt_kit::RemoteConfig {
+            provider: provider.into(),
+            api_key,
+            model,
+        })?;
 
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
             .prompt_service_change(Some(
