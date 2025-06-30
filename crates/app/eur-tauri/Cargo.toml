@@ -80,7 +80,7 @@ tauri-specta = { version = "2.0.0-rc.21", features = [
 ] }
 taurpc = { version = "0.5.1" }
 base64 = "0.22.1"
-eur-auth-client = { workspace = true }
+eur-proto-client = { workspace = true }
 dotenv = "0.15.0"
 eur-user = { workspace = true }
 
