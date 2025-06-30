@@ -122,39 +122,20 @@ Rules:
             .await
             .map_err(|e| LLMError::Generic(e.to_string()))?;
 
-        let (tx, rx) = mpsc::channel::<Result<String, LLMError>>(128);
-
         let messages = messages.into_iter().map(|message| message.into()).collect();
-        let mut stream = client
+        let stream = client
             .send_prompt(SendPromptRequest { messages })
             .await
             .map_err(|e| LLMError::Generic(e.to_string()))?;
 
-        // Spawn task to handle stream processing asynchronously
-        tokio::spawn(async move {
-            while let Some(item) = stream.next().await {
-                match item {
-                    Ok(message) => {
-                        if let Err(e) = tx.send(Ok(message.response)).await {
-                            warn!("Failed to send message through channel: {}", e);
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        warn!("gRPC stream error: {}", e);
-                        // Send error through channel instead of just breaking
-                        if let Err(send_err) = tx.send(Err(LLMError::Generic(e.to_string()))).await
-                        {
-                            warn!("Failed to send error through channel: {}", send_err);
-                        }
-                        break;
-                    }
-                }
-            }
-            // Channel will be automatically closed when tx is dropped
+        // Direct stream mapping without intermediate channels - much simpler!
+        let mapped_stream = stream.map(|result| {
+            result
+                .map(|response| response.response)
+                .map_err(|e| LLMError::Generic(e.to_string()))
         });
 
-        Ok(Box::pin(ReceiverStream::new(rx)))
+        Ok(Box::pin(mapped_stream))
     }
 
     async fn _remote_chat_stream(
