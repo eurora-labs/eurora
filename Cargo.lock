@@ -2190,6 +2190,7 @@ dependencies = [
  "eur-auth",
  "eur-auth-service",
  "eur-ocr-service",
+ "eur-prompt-service",
  "eur-proto",
  "eur-remote-db",
  "futures",
@@ -2307,6 +2308,7 @@ name = "eur-prompt-kit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "eur-proto",
  "eur-util",
  "futures",
  "image",
@@ -2315,6 +2317,27 @@ dependencies = [
  "regex",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "eur-prompt-service"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "dotenv",
+ "eur-auth",
+ "eur-ocr",
+ "eur-prompt-kit",
+ "eur-proto",
+ "futures",
+ "image",
+ "prost",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
