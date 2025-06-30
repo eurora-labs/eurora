@@ -83,23 +83,29 @@ impl ProtoPromptService for PromptService {
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
+        // Spawn task without awaiting - this allows immediate return of the stream
         tokio::spawn(async move {
             while let Some(item) = stream.next().await {
                 match item {
                     Ok(message) => {
-                        tx.send(Ok(SendPromptResponse { response: message }))
-                            .await
-                            .unwrap();
+                        if let Err(e) = tx.send(Ok(SendPromptResponse { response: message })).await
+                        {
+                            warn!("Failed to send response through channel: {}", e);
+                            break;
+                        }
                     }
                     Err(e) => {
-                        warn!("LLM error: {}", e);
+                        warn!("LLM stream error: {}", e);
+                        // Send error as gRPC status instead of just breaking
+                        if let Err(send_err) = tx.send(Err(Status::internal(e.to_string()))).await {
+                            warn!("Failed to send error through channel: {}", send_err);
+                        }
                         break;
                     }
                 }
             }
-        })
-        .await
-        .map_err(|e| Status::internal(e.to_string()))?;
+            // Channel automatically closes when tx is dropped
+        });
 
         let output_stream = ReceiverStream::new(rx);
 

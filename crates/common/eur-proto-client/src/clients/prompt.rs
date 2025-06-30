@@ -43,7 +43,14 @@ impl PromptClient {
             .await?
             .ok_or_else(|| anyhow!("Failed to initialize prompt client"))?;
 
-        let stream = client.send_prompt(request).await?.into_inner();
+        // Add timeout for the initial gRPC call
+        let timeout_duration = std::time::Duration::from_secs(30);
+        let stream = tokio::time::timeout(timeout_duration, client.send_prompt(request))
+            .await
+            .map_err(|_| anyhow!("gRPC call timed out after 30 seconds"))?
+            .map_err(|e| anyhow!("gRPC call failed: {}", e))?
+            .into_inner();
+
         Ok(stream)
     }
 }
