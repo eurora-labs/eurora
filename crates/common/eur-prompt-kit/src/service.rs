@@ -106,7 +106,6 @@ Rules:
             Config::Ollama(config) => self._ollama_chat_stream(messages, config).await,
             Config::Remote(config) => self._remote_chat_stream(messages, config).await,
             Config::Eurora(config) => self._eurora_chat_stream(messages, config).await,
-            _ => Err(LLMError::Generic("Unsupported LLM backend".to_string())),
         }
     }
 
