@@ -82,14 +82,12 @@ This file tracks the project's progress using a task list format.
 ## Completed Implementation
 
 - **Enhanced eur-auth crate** with comprehensive authentication management:
-
     - Created `AuthManager` for autonomous token operations
     - Implemented `TokenStorage` trait with secure OS-level storage via `eur-secret`
     - Built `AuthGrpcClient` for communication with `eur-auth-service`
     - Added automatic token refresh functionality
 
 - **Integrated auth into Tauri application**:
-
     - Created `AuthProvider` service for other procedures to request authentication
     - Implemented `AuthApi` TauRPC procedures for frontend communication
     - Added auth manager initialization in `main.rs`
