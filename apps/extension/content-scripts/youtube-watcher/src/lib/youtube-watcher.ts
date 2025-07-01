@@ -1,13 +1,9 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
-import { YoutubeChromeMessage, type YoutubeMessageType, type WatcherParams } from './types.js';
+import { YoutubeChromeMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from './transcript/index.js';
-// import { YouTubeTranscriptApi } from '@eurora/youtube-transcripts';
-
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import { create } from '@eurora/shared/util/grpc';
 import {
-	ProtoNativeYoutubeState,
-	ProtoNativeYoutubeSnapshot,
 	ProtoNativeYoutubeStateSchema,
 	ProtoNativeYoutubeSnapshotSchema,
 } from '@eurora/shared/proto/native_messaging_pb.js';
@@ -104,8 +100,6 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		try {
 			// Get current timestamp
 			const currentTime = this.getCurrentVideoTime();
-
-			const videoFrame = this.getCurrentVideoFrame();
 			const reportData = create(ProtoNativeYoutubeStateSchema, {
 				type: 'YOUTUBE_STATE',
 				url: window.location.href,
@@ -114,10 +108,6 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 					? JSON.stringify(this.params.videoTranscript)
 					: '',
 				currentTime: Math.round(currentTime),
-				videoFrameBase64: videoFrame.dataBase64,
-				videoFrameWidth: videoFrame.width,
-				videoFrameHeight: videoFrame.height,
-				videoFrameFormat: videoFrame.format,
 			});
 			if (reportData.transcript === '') {
 				this.ensureTranscript()
@@ -184,16 +174,24 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	getCurrentVideoFrame(): EurImage {
-		const { youtubePlayer, canvas, context } = this.params;
+		const { youtubePlayer, canvas } = this.params;
 		if (!youtubePlayer) return null;
 
-		context.drawImage(youtubePlayer, 0, 0, canvas.width, canvas.height);
+		canvas.width = youtubePlayer.videoWidth;
+		canvas.height = youtubePlayer.videoHeight;
+
+		canvas.getContext('2d')?.drawImage(youtubePlayer, 0, 0, canvas.width, canvas.height);
+
+		// const link = document.createElement('a');
+		// link.href = canvas.toDataURL('image/png');
+		// link.download = 'youtube-snapshot.png';
+		// link.click();
 
 		return {
-			dataBase64: canvas.toDataURL('image/jpeg').split(',')[1],
+			dataBase64: canvas.toDataURL('image/png').split(',')[1],
 			width: canvas.width,
 			height: canvas.height,
-			format: ProtoImageFormat.JPEG,
+			format: ProtoImageFormat.PNG,
 		};
 	}
 

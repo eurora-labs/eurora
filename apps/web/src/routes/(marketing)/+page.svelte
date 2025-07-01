@@ -1,4 +1,5 @@
 <script lang="ts">
+	import VideoSection from './video-section.svelte';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import System from 'svelte-system-info';
 	import * as Card from '@eurora/ui/components/card/index';
@@ -139,6 +140,7 @@
 			Your Open Source AI Assistant
 		</h1>
 	</div>
+
 	<div class="mx-auto max-w-[95%] h-[80vh] overflow-hidden rounded-[36px] p-0">
 		<div
 			class="h-screen flex flex-col w-full mx-auto mt-8 rounded-[36px]"
@@ -163,6 +165,7 @@
 					>Learn More</Button
 				>
 			</div>
+
 			<div class="flex flex-1 flex-row w-full justify-center align-start px-4 gap-4 mt-16">
 				{#each cards as card}
 					{@const Icon = card.icon}
@@ -187,6 +190,21 @@
 			</div>
 		</div>
 	</div>
+	<VideoSection
+		title="One Click To AI"
+		subtitle="Eurora uses a single interface to help with anything and everything you need."
+		videoSrc="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+	/>
+	<VideoSection
+		title="Up to 98% Faster"
+		subtitle="Contextual understanding and faster responses."
+		videoSrc="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+	/>
+	<VideoSection
+		title="Coming Soon"
+		subtitle="Unified search across all your files."
+		videoSrc="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+	/>
 	<!-- <IntroModule /> -->
 	<div class="py-[8rem]">
 		<VideoCard.Card class="w-[90%] mx-auto video-card border-white border-1 shadow-none">
