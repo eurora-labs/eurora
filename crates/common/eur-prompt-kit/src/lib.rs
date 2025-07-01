@@ -4,6 +4,7 @@ use llm::{
     builder::LLMBackend,
     chat::{ChatMessage, ImageMime},
 };
+use tracing::error;
 
 mod config;
 mod service;
@@ -106,11 +107,15 @@ impl From<LLMMessage> for ChatMessage {
             MessageContent::Image(ImageContent { text, image }) => {
                 let mut buffer = Vec::new();
                 let mut cursor = std::io::Cursor::new(&mut buffer);
-                image.write_to(&mut cursor, ImageFormat::Png).unwrap();
+                image
+                    .write_to(&mut cursor, ImageFormat::Png)
+                    .map_err(|e| {
+                        error!("Failed to encode image as PNG: {}", e);
+                    })
+                    .unwrap();
 
-                // message.image(ImageMime::PNG, buffer)
                 message = message.image(ImageMime::PNG, buffer);
-                message.content(text.unwrap())
+                message.content(text.unwrap_or_default())
             }
         };
 
