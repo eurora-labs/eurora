@@ -52,7 +52,6 @@ struct YoutubeAsset {
     pub title: String,
     pub transcript: Vec<TranscriptLine>,
     pub _current_time: f32,
-    pub video_frame: DynamicImage,
 }
 struct ArticleAsset {
     pub id: String,
@@ -78,12 +77,6 @@ pub struct TwitterTweet {
 
 impl YoutubeAsset {
     pub fn try_from(state: ProtoYoutubeState) -> Result<Self, ActivityError> {
-        let proto_image = state
-            .video_frame
-            .ok_or_else(|| ActivityError::ProtocolBuffer("Missing video frame data".to_string()))?;
-
-        let video_frame = load_image_from_proto(proto_image)?;
-
         Ok(YoutubeAsset {
             id: uuid::Uuid::new_v4().to_string(),
             _url: state.url,
@@ -98,7 +91,6 @@ impl YoutubeAsset {
                 })
                 .collect(),
             _current_time: state.current_time,
-            video_frame,
         })
     }
 }
@@ -168,8 +160,8 @@ impl ActivityAsset for YoutubeAsset {
     fn construct_message(&self) -> LLMMessage {
         LLMMessage {
             role: Role::User,
-            content: MessageContent::Image(ImageContent {
-                text: Some(format!(
+            content: MessageContent::Text(TextContent {
+                text: format!(
                     "I am watching a video with id {} and have a question about it. \
                 Here's the transcript of the video: \n {}",
                     self.id,
@@ -178,8 +170,7 @@ impl ActivityAsset for YoutubeAsset {
                         .map(|line| format!("{} ({}s)", line.text, line.start))
                         .collect::<Vec<_>>()
                         .join("\n")
-                )),
-                image: self.video_frame.clone(),
+                ),
             }),
         }
     }
@@ -438,7 +429,7 @@ impl ActivitySnapshot for YoutubeSnapshot {
         LLMMessage {
             role: Role::User,
             content: MessageContent::Image(ImageContent {
-                text: None,
+                text: Some("This is last frame of the video".to_string()),
                 image: self.video_frame.clone(),
             }),
         }
@@ -738,7 +729,6 @@ mod tests {
             title: "Test Video".to_string(),
             transcript: vec![],
             current_time: 0.0,
-            video_frame: None,
         });
 
         assert_eq!(youtube_state.content_type(), "youtube");

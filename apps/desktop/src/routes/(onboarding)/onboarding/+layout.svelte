@@ -1,6 +1,4 @@
 <script lang="ts">
-	import '../app.pcss';
-	import '@eurora/ui/main.css';
 	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
 	import Menubar from '$lib/components/Menubar.svelte';
