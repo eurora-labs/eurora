@@ -134,7 +134,6 @@ The extension is organized into three main components:
 1. **Background Script**: Manages the extension lifecycle and coordinates communication between content scripts and the native application.
 
 2. **Content Scripts**: Specialized scripts that run in the context of web pages to extract content:
-
     - **YouTube Watcher**: Extracts video information, transcripts, and captures frames from YouTube videos
     - **PDF Watcher**: Extracts content from PDF documents viewed in the browser
     - **Article Watcher**: Uses Mozilla's Readability library to extract clean content from article pages
