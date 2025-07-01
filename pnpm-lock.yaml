@@ -989,8 +989,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.25
-        version: 2.0.0-next.25(svelte@5.34.7)
+        specifier: 2.0.0-next.27
+        version: 2.0.0-next.27(svelte@5.34.7)
       mode-watcher:
         specifier: ^1.0.8
         version: 1.0.8(svelte@5.34.7)
@@ -1461,8 +1461,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.25
-        version: 2.0.0-next.25(svelte@5.34.7)
+        specifier: 2.0.0-next.27
+        version: 2.0.0-next.27(svelte@5.34.7)
       mode-watcher:
         specifier: ^1.0.8
         version: 1.0.8(svelte@5.34.7)
@@ -1668,8 +1668,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.25
-        version: 2.0.0-next.25(svelte@5.34.7)
+        specifier: 2.0.0-next.27
+        version: 2.0.0-next.27(svelte@5.34.7)
       mode-watcher:
         specifier: ^1.0.8
         version: 1.0.8(svelte@5.34.7)
@@ -2248,8 +2248,17 @@ packages:
   '@floating-ui/core@1.7.1':
     resolution: {integrity: sha512-azI0DrjMMfIug/ExbBaeDVJXcY0a7EPvPjb2xAJPa4HeimBX+Z18HK8QQR3jb6356SnDDdxx+hinMLcJEDdOjw==}
 
+  '@floating-ui/core@1.7.2':
+    resolution: {integrity: sha512-wNB5ooIKHQc+Kui96jE/n69rHFWAVoxn5CAzL1Xdd8FG03cgY3MLO+GF9U3W737fYDSgPWA6MReKhBQBop6Pcw==}
+
   '@floating-ui/dom@1.7.1':
     resolution: {integrity: sha512-cwsmW/zyw5ltYTUeeYJ60CnQuPqmGwuGVhG9w0PRaRKkAyi38BT5CKrpIbb+jtahSwUl04cWzSx9ZOIxeS6RsQ==}
+
+  '@floating-ui/dom@1.7.2':
+    resolution: {integrity: sha512-7cfaOQuCS27HD7DX+6ib2OrnW+b4ZBwDNnCcT0uTyidcmyWb03FnQqJybDBoCnpdxwBSfA94UAYlRCt7mV+TbA==}
+
+  '@floating-ui/utils@0.2.10':
+    resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
 
   '@floating-ui/utils@0.2.9':
     resolution: {integrity: sha512-MDWhGtE+eHw5JW7lq4qhc5yRLS11ERl1c7Z6Xd0a58DozHES6EnNNwUWbMiG4J9Cgj053Bhk8zvlhFYKVhULwg==}
@@ -5042,8 +5051,8 @@ packages:
   kolorist@1.8.0:
     resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
 
-  layerchart@2.0.0-next.25:
-    resolution: {integrity: sha512-ZClg3lK4p7c3rg3KZafA3G+3z6DyLHvnY5pHCufZ+iI+FFlKkXTLS3S3BNFgIl8xqLAxPYNp8LNZNLTpqjiNhQ==}
+  layerchart@2.0.0-next.27:
+    resolution: {integrity: sha512-yt28xU8WzXq0AliX7eiC0JKZGQtO8M9FmHvt8sESNitSc/yC+fYeTghaO9lMRwcYCmi6D1NjbFyD9mWFeazNIQ==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -7612,10 +7621,21 @@ snapshots:
     dependencies:
       '@floating-ui/utils': 0.2.9
 
+  '@floating-ui/core@1.7.2':
+    dependencies:
+      '@floating-ui/utils': 0.2.10
+
   '@floating-ui/dom@1.7.1':
     dependencies:
       '@floating-ui/core': 1.7.1
       '@floating-ui/utils': 0.2.9
+
+  '@floating-ui/dom@1.7.2':
+    dependencies:
+      '@floating-ui/core': 1.7.2
+      '@floating-ui/utils': 0.2.10
+
+  '@floating-ui/utils@0.2.10': {}
 
   '@floating-ui/utils@0.2.9': {}
 
@@ -7695,7 +7715,7 @@ snapshots:
 
   '@layerstack/svelte-actions@1.0.1-next.12':
     dependencies:
-      '@floating-ui/dom': 1.7.1
+      '@floating-ui/dom': 1.7.2
       '@layerstack/utils': 2.0.0-next.12
       d3-scale: 4.0.2
 
@@ -10745,7 +10765,7 @@ snapshots:
 
   kolorist@1.8.0: {}
 
-  layerchart@2.0.0-next.25(svelte@5.34.7):
+  layerchart@2.0.0-next.27(svelte@5.34.7):
     dependencies:
       '@dagrejs/dagre': 1.1.5
       '@layerstack/svelte-actions': 1.0.1-next.12
