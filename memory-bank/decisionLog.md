@@ -755,21 +755,18 @@ This file tracks key architectural and design decisions made during the project'
 **Implementation Details:**
 
 - **URL Generation (`google.rs`):**
-
     - Created `GoogleOAuthClient` for generating authorization URLs
     - Uses oauth2 crate with proper Google OAuth endpoints
     - Requests OpenID Connect scopes (openid, email, profile)
     - Returns authorization URL and CSRF state token
 
 - **Callback Handler (`callback_handler.rs`):**
-
     - Created Axum-based HTTP server to handle OAuth callbacks
     - Exchanges authorization code for access tokens
     - Fetches user info from Google's userinfo endpoint
     - Calls auth service login with third-party credentials
 
 - **Auth Service Integration:**
-
     - Implemented `handle_third_party_login()` method in AuthService
     - Validates Google ID tokens by fetching user info
     - Creates new users automatically if they don't exist
@@ -813,7 +810,6 @@ This file tracks key architectural and design decisions made during the project'
 **Implementation Details:**
 
 - **PDF Watcher Refactoring:**
-
     - Created `types.ts` with PdfMessageType and WatcherParams interfaces
     - Refactored PdfWatcher class to extend Watcher<WatcherParams>
     - Implemented all required abstract methods from base class
