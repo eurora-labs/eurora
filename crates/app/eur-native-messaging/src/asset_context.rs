@@ -59,15 +59,6 @@ impl From<&serde_json::Map<String, serde_json::Value>> for NativeYoutubeState {
             title: obj.get("title").unwrap().as_str().unwrap().to_string(),
             transcript: obj.get("transcript").unwrap().as_str().unwrap().to_string(),
             current_time: obj.get("currentTime").unwrap().as_f64().unwrap() as f32,
-            video_frame_base64: obj
-                .get("videoFrameBase64")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string(),
-            video_frame_width: obj.get("videoFrameWidth").unwrap().as_i64().unwrap() as i32,
-            video_frame_height: obj.get("videoFrameHeight").unwrap().as_i64().unwrap() as i32,
-            video_frame_format: obj.get("videoFrameFormat").unwrap().as_i64().unwrap() as i32,
         })
     }
 }
@@ -76,19 +67,6 @@ impl TryFrom<&NativeYoutubeState> for YoutubeState {
     type Error = anyhow::Error;
 
     fn try_from(obj: &NativeYoutubeState) -> Result<Self> {
-        let video_frame_data = BASE64_STANDARD
-            .decode(obj.0.video_frame_base64.as_str())
-            .with_context(|| {
-                format!(
-                    "Failed to decode base64 video frame data: '{}'",
-                    obj.0
-                        .video_frame_base64
-                        .chars()
-                        .take(50)
-                        .collect::<String>()
-                )
-            })?;
-
         // Parse the transcript string into Vec<TranscriptLine> and convert to Vec<ProtoTranscriptLine>
         let transcript = serde_json::from_str::<Vec<TranscriptLine>>(obj.0.transcript.as_str())
             .map(|lines| lines.into_iter().map(Into::into).collect())
@@ -99,12 +77,6 @@ impl TryFrom<&NativeYoutubeState> for YoutubeState {
             title: obj.0.title.clone(),
             transcript,
             current_time: obj.0.current_time,
-            video_frame: Some(ProtoImage {
-                data: video_frame_data,
-                width: obj.0.video_frame_width,
-                height: obj.0.video_frame_height,
-                format: obj.0.video_frame_format,
-            }),
         }))
     }
 }

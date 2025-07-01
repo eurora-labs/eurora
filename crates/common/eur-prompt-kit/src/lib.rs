@@ -1,6 +1,9 @@
 use eur_proto::proto_prompt_service::ProtoChatMessage;
-use image::DynamicImage;
-use llm::{builder::LLMBackend, chat::ChatMessage};
+use image::{DynamicImage, ImageFormat};
+use llm::{
+    builder::LLMBackend,
+    chat::{ChatMessage, ImageMime},
+};
 
 mod config;
 mod service;
@@ -100,7 +103,13 @@ impl From<LLMMessage> for ChatMessage {
 
         message = match value.content {
             MessageContent::Text(TextContent { text }) => message.content(text),
-            MessageContent::Image(ImageContent { text, image: _ }) => {
+            MessageContent::Image(ImageContent { text, image }) => {
+                let mut buffer = Vec::new();
+                let mut cursor = std::io::Cursor::new(&mut buffer);
+                image.write_to(&mut cursor, ImageFormat::Png).unwrap();
+
+                // message.image(ImageMime::PNG, buffer)
+                message = message.image(ImageMime::PNG, buffer);
                 message.content(text.unwrap())
             }
         };
