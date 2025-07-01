@@ -25,7 +25,6 @@ packages/ui/src/stories/
 For components with many variants, states, or configurations, consider implementing a dual story pattern:
 
 1. **Interactive Story** (`ComponentName.stories.svelte`):
-
     - Single story with full Storybook controls
     - Allows developers to test all component properties
     - Primary entry point for component testing
