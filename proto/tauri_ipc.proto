@@ -56,7 +56,6 @@ message ProtoYoutubeState {
     string title = 2;
     repeated ProtoTranscriptLine transcript = 3;
     float current_time = 4;
-    shared.ProtoImage video_frame = 5;
 }
 
 message ProtoArticleState {

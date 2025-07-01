@@ -101,6 +101,20 @@ impl Timeline {
             .collect()
     }
 
+    pub fn construct_snapshot_messages(&self) -> Vec<LLMMessage> {
+        let activities = self.activities.read();
+        let last_activity = activities.last();
+
+        if let Some(activity) = last_activity {
+            let last_snapshot = activity.snapshots.last();
+            if let Some(snapshot) = last_snapshot {
+                return vec![snapshot.construct_message()];
+            }
+        }
+
+        vec![]
+    }
+
     pub async fn start_snapshot_collection(
         &self,
         _activity_strategy: Box<dyn ActivityStrategy>,
