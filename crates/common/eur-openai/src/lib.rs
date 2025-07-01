@@ -3,7 +3,6 @@ use base64::prelude::*;
 use config::{Config, Environment, File};
 use dotenv::dotenv;
 use eur_prompt_kit::{LLMMessage, MessageContent, Role};
-use eur_util::flatten_transcript_with_highlight;
 use futures::Stream;
 use openai_api_rs::v1::chat_completion::{
     self, ChatCompletionRequest, ChatCompletionResponseForStream,
@@ -199,72 +198,6 @@ impl OpenAI {
 
         let req =
             ChatCompletionRequest::new(GPT4_O_LATEST.to_string(), openai_messages).stream(true);
-
-        self.client
-            .chat_completion_stream(req)
-            .await
-            .map_err(|e| format!("Failed to create chat completion stream: {}", e))
-    }
-
-    pub async fn video_question_old(
-        &mut self,
-        messages: Vec<ProtoChatMessage>,
-        state: ProtoYoutubeState,
-    ) -> Result<impl Stream<Item = Result<ChatCompletionResponseForStream, APIError>>, String> {
-        // Convert video frame bytes to base64
-        let image_base64 = BASE64_STANDARD.encode(state.video_frame.unwrap().data);
-
-        let flat_transcript = flatten_transcript_with_highlight(
-            state.transcript,
-            state.current_time,
-            "%CURRENT%".to_string(),
-        );
-
-        // Create initial messages with system and user content
-        let mut chat_messages = vec![chat_completion::ChatCompletionMessage {
-            role: chat_completion::MessageRole::user,
-            content: chat_completion::Content::ImageUrl(vec![
-                chat_completion::ImageUrl {
-                    r#type: chat_completion::ContentType::text,
-                    text: Some(format!(
-                        "I am watching a video and have a question about it. \
-                        I attached the screenshot of the last moment in the video. \
-                        Here's the transcript of the whole video. \
-                        The current line is denoted with %CURRENT% tag:\n{}",
-                        flat_transcript
-                    )),
-                    image_url: None,
-                },
-                chat_completion::ImageUrl {
-                    r#type: chat_completion::ContentType::image_url,
-                    text: None,
-                    image_url: Some(chat_completion::ImageUrlType {
-                        url: format!("data:image/jpeg;base64,{image_base64}"),
-                    }),
-                },
-            ]),
-
-            name: None,
-            tool_calls: None,
-            tool_call_id: None,
-        }];
-
-        // Add conversation history
-        for message in messages.iter() {
-            chat_messages.push(chat_completion::ChatCompletionMessage {
-                role: if message.role == "user" {
-                    chat_completion::MessageRole::user
-                } else {
-                    chat_completion::MessageRole::assistant
-                },
-                content: chat_completion::Content::Text(message.content.clone()),
-                name: None,
-                tool_calls: None,
-                tool_call_id: None,
-            });
-        }
-
-        let req = ChatCompletionRequest::new(GPT4_O_LATEST.to_string(), chat_messages).stream(true);
 
         self.client
             .chat_completion_stream(req)

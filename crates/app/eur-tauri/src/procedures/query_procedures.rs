@@ -44,6 +44,7 @@ impl QueryApi for QueryApiImpl {
         let title: String = "Placeholder Title".to_string();
 
         let mut messages = timeline.construct_asset_messages();
+        messages.extend(timeline.construct_snapshot_messages());
 
         messages.push(eur_prompt_kit::LLMMessage {
             role: eur_prompt_kit::Role::User,

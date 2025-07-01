@@ -15,10 +15,6 @@ message ProtoNativeYoutubeState {
     string title = 3;
     string transcript = 4;
     float current_time = 5;
-    string video_frame_base64 = 6;
-    int32 video_frame_width = 7;
-    int32 video_frame_height = 8;
-    shared.ProtoImageFormat video_frame_format = 9;
 }
 
 message ProtoNativeYoutubeSnapshot {
