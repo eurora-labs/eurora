@@ -13,7 +13,7 @@ syn = "2.0" # collapse 2.0.101, 1.0.109, 1.0.109(build)
 toml_edit = "0.22" # collapse 0.22, 0.20, 0.19  
 regex-syntax = "0.8" # collapse 0.8, 0.6  
 rustix = "0.38" # collapse 0.38, 1.0, 0.38(build)  
-indexmap = "2.9" # collapse 2.9, 1.9  
+indexmap = "2.9" # collapse 2.10, 1.9  
 bstr = "1.11.1"
 insta = "1.41.1"
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
