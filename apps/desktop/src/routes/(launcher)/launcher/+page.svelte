@@ -88,28 +88,6 @@
 		monitor_height: number;
 	} | null>(null);
 
-	// messages.push(
-	// 	create(ProtoChatMessageSchema, {
-	// 		role: 'user',
-	// 		content: 'What am I doing right now?',
-	// 	}),
-	// );
-
-	// messages.push(
-	// 	create(ProtoChatMessageSchema, {
-	// 		role: 'system',
-	// 		content:
-	// 			'You are currently looking at a website called Eurora AI. What would you like to know?',
-	// 	}),
-	// );
-
-	// messages.push(
-	// 	create(ProtoChatMessageSchema, {
-	// 		role: 'user',
-	// 		content: 'How do I install it?',
-	// 	}),
-	// );
-
 	// Listen for launcher closed event to clear messages and reset conversation
 	listen('launcher_closed', () => {
 		// Clear messages array
@@ -167,6 +145,30 @@
 		// 	console.error('Failed to capture full monitor background:', error);
 		// }
 	});
+
+	function addExampleMessages() {
+		messages.push(
+			create(ProtoChatMessageSchema, {
+				role: 'user',
+				content: 'What am I doing right now?',
+			}),
+		);
+
+		messages.push(
+			create(ProtoChatMessageSchema, {
+				role: 'system',
+				content:
+					'You are currently looking at a website called Eurora AI. What would you like to know?',
+			}),
+		);
+
+		messages.push(
+			create(ProtoChatMessageSchema, {
+				role: 'user',
+				content: 'How do I install it?',
+			}),
+		);
+	}
 
 	// Listen for background image event
 	listen<string>('background_image', (event) => {
@@ -348,63 +350,60 @@
 	}
 </script>
 
-<div class="backdrop-custom relative flex h-full flex-col">
-	<div class="relative z-10 flex h-full flex-col">
-		{#if isCheckingApiKey}
-			<div class="flex h-full items-center justify-center">
-				<p class="text-gray-500">Checking API key...</p>
-			</div>
-		{:else if !hasApiKey}
-			<div class="flex h-full items-center justify-center">
-				<ApiKeyForm saved={() => onApiKeySaved()} />
-			</div>
-		{:else}
-			<!-- Launcher component -->
-			<div class="flex-none p-0">
-				<Launcher.Root class="rounded-lg border-none shadow-none">
-					<Launcher.Input
-						placeholder="What can I help you with?"
-						bind:query={searchQuery}
-						bind:editorRef
-						onkeydown={handleKeydown}
-						class="h-[100px] fixed top-0 left-[75px] w-full"
-					/>
+<div class="backdrop-custom relative flex h-full flex-col overflow-hidden">
+	{#if isCheckingApiKey}
+		<div class="flex h-full items-center justify-center">
+			<p class="text-gray-500">Checking API key...</p>
+		</div>
+	{:else if !hasApiKey}
+		<div class="flex h-full items-center justify-center">
+			<ApiKeyForm saved={() => onApiKeySaved()} />
+		</div>
+	{:else}
+		<!-- Launcher component -->
+		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 ">
+			<Launcher.Input
+				placeholder="What can I help you with?"
+				bind:query={searchQuery}
+				bind:editorRef
+				onkeydown={handleKeydown}
+				class="h-[100px] w-full"
+			/>
 
-					<!-- Recent conversations list -->
-					{#if messages.length === 0}
-						<Launcher.List>
-							<!-- <Launcher.List hidden> -->
-							<Launcher.Group heading="Local Files">
-								<Launcher.Item onclick={addVideoExtension}>
-									<HardDrive />
-									<span>Video</span>
-								</Launcher.Item>
-								<Launcher.Item>
-									<FileTextIcon />
-									<span>Notes</span>
-								</Launcher.Item>
-							</Launcher.Group>
-							<Launcher.Separator />
-							<Launcher.Group heading="Google Drive">
-								<Launcher.Item>
-									<SiGoogledrive />
-									<span>Presentation 1</span>
-								</Launcher.Item>
-								<Launcher.Item>
-									<SiGoogledrive />
-									<span>Report card</span>
-								</Launcher.Item>
-								<Launcher.Item>
-									<SiGoogledrive />
-									<span>Exercise sheet 3</span>
-								</Launcher.Item>
-							</Launcher.Group>
-						</Launcher.List>
-					{/if}
-				</Launcher.Root>
-			</div>
+			<!-- Recent conversations list -->
+			{#if messages.length === 0}
+				<Launcher.List class="h-full overflow-y-scroll p-0 m-0 max-h-full">
+					<!-- <Launcher.List hidden> -->
+					<Launcher.Group heading="Local Files">
+						<Launcher.Item onclick={addVideoExtension}>
+							<HardDrive />
+							<span>Video</span>
+						</Launcher.Item>
+						<Launcher.Item>
+							<FileTextIcon />
+							<span>Notes</span>
+						</Launcher.Item>
+					</Launcher.Group>
+					<Launcher.Separator />
+					<Launcher.Group heading="Google Drive">
+						<Launcher.Item>
+							<SiGoogledrive />
+							<span>Presentation 1</span>
+						</Launcher.Item>
+						<Launcher.Item>
+							<SiGoogledrive />
+							<span>Report card</span>
+						</Launcher.Item>
+						<Launcher.Item>
+							<SiGoogledrive />
+							<span>Exercise sheet 3</span>
+						</Launcher.Item>
+					</Launcher.Group>
+				</Launcher.List>
+			{/if}
+		</Launcher.Root>
 
-			<!-- <Chat class="w-full" {messages} /> -->
+		{#if messages.length > 0}
 			<Chat class="w-full ">
 				{#each messages as message}
 					<Message.Root
@@ -412,14 +411,13 @@
 						finishRendering={() => {}}
 					>
 						<Message.Content>
-							<!-- {message.content} -->
 							<Katex math={message.content} finishRendering={() => {}} />
 						</Message.Content>
 					</Message.Root>
 				{/each}
 			</Chat>
 		{/if}
-	</div>
+	{/if}
 </div>
 
 <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0">
