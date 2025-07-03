@@ -799,6 +799,9 @@ importers:
       '@eurora/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      '@eurora/prosemirror-core':
+        specifier: workspace:*
+        version: link:../../packages/prosemirror/core
       '@eurora/shared':
         specifier: workspace:*
         version: link:../../packages/shared
