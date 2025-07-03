@@ -24,6 +24,7 @@
 		"test:unit": "vitest"
 	},
 	"devDependencies": {
+		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
