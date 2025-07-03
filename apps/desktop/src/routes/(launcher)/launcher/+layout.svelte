@@ -35,6 +35,6 @@
 	});
 </script>
 
-<main bind:this={mainRef} class="h-fit min-h-[100px] flex-1 bg-transparent">
+<main bind:this={mainRef} class="h-screen min-h-[100px] bg-transparent">
 	{@render children?.()}
 </main>
