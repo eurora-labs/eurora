@@ -40,6 +40,7 @@
 	import WaitlistForm from './waitlist_form.svelte';
 	import JoinWaitlist from './join_waitlist.svelte';
 	import type { SvelteComponent } from 'svelte';
+	import StaticLauncher from './static-launcher.svelte';
 
 	let inputValue = $state('');
 	let purpleText = $state('');
@@ -141,14 +142,12 @@
 		</h1>
 	</div>
 
-	<div class="mx-auto max-w-[95%] h-[80vh] overflow-hidden rounded-[36px] p-0">
+	<div class="relative mx-auto max-w-[95%] h-[80vh] overflow-hidden rounded-[36px] p-0">
 		<div
 			class="h-screen flex flex-col w-full mx-auto mt-8 rounded-[36px]"
 			style="background-image: url('/images/linux_promo.png'); background-size: cover; background-position: center; background-repeat: no-repeat;"
 		>
-			<div
-				class="flex flex-1 justify-center align-start px-4 gap-4 mt-8 download-button-container"
-			>
+			<div class="flex justify-center align-start px-4 gap-4 my-8 download-button-container">
 				{#snippet downloadButtonSnippet()}
 					{@const downloadButton = downloads[System.OSName.toLowerCase()]}
 
@@ -165,6 +164,9 @@
 					>Learn More</Button
 				>
 			</div>
+			<StaticLauncher
+				class="backdrop-blur-2xl bg-white/20 rounded-xl mx-auto w-[50%] min-w-[850px]"
+			/>
 
 			<div class="flex flex-1 flex-row w-full justify-center align-start px-4 gap-4 mt-16">
 				{#each cards as card}
