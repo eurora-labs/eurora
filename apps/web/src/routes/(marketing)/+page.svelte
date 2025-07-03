@@ -145,7 +145,7 @@
 	<div class="relative mx-auto max-w-[95%] h-[80vh] overflow-hidden rounded-[36px] p-0">
 		<div
 			class="h-screen flex flex-col w-full mx-auto mt-8 rounded-[36px]"
-			style="background-image: url('/images/linux_promo.png'); background-size: cover; background-position: center; background-repeat: no-repeat;"
+			style="background-image: url('/images/promo.webp'); background-size: cover; background-position: center; background-repeat: no-repeat;"
 		>
 			<div class="flex justify-center align-start px-4 gap-4 my-8 download-button-container">
 				{#snippet downloadButtonSnippet()}
