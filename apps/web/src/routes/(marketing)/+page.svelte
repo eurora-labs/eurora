@@ -165,7 +165,7 @@
 				>
 			</div>
 			<StaticLauncher
-				class="backdrop-blur-2xl bg-white/20 rounded-xl mx-auto w-[50%] min-w-[850px]"
+				class="backdrop-blur-2xl bg-white/20 rounded-2xl mx-auto w-[50%] min-w-[850px]"
 			/>
 
 			<div class="flex flex-1 flex-row w-full justify-center align-start px-4 gap-4 mt-16">
