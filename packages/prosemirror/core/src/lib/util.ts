@@ -4,6 +4,13 @@ export interface QueryAssets {
 	text: string;
 	assets: string[];
 }
+
+/**
+ * Processes the editor query to extract text content and asset identifiers
+ * @param editorRef - The ProseMirror editor instance
+ * @returns QueryAssets object containing text and assets array
+ * @throws Error if editor view is not available
+ */
 export function processQuery(editorRef: Editor): QueryAssets {
 	const query: QueryAssets = { text: '', assets: [] };
 	const view = editorRef.view;
@@ -26,8 +33,7 @@ export function processQuery(editorRef: Editor): QueryAssets {
 		else if (node.type && node.type !== 'doc' && node.type !== 'paragraph') {
 			// If the type looks like a UUID (has hyphens and is long), add it to the query
 			if (node.type.includes('-') || node.type.length > 10) {
-				// query.text += ' ' + node.attrs.id;
-				query.assets.push(node.attrs.id);
+				query.assets.push(node.attrs?.id ?? '');
 			}
 		}
 
@@ -38,13 +44,18 @@ export function processQuery(editorRef: Editor): QueryAssets {
 	};
 
 	// Process the document content
-	if (stateJson.doc && stateJson.doc.content) {
+	if (stateJson.doc?.content) {
 		stateJson.doc.content.forEach(processNodeJson);
 	}
 
 	return query;
 }
 
+/**
+ * Clears the editor query
+ * @param editorRef - The ProseMirror editor instance
+ * @throws Error if editor view is not available
+ */
 export async function clearQuery(editorRef: Editor) {
 	editorRef.cmd((state, dispatch) => {
 		const tr = state.tr;
