@@ -78,6 +78,8 @@
 				markViews: created.markViews,
 			},
 		);
+		view.focus();
+		editorRef.focus();
 	}
 
 	export async function updateExtensions(newQuery: Query) {
