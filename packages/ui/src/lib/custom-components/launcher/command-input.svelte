@@ -23,11 +23,9 @@
 
 <div class="items-top flex h-[100px] border-none px-3 w-full" data-command-input-wrapper="">
 	<div class="flex justify-center items-center">
-		<Search class="opacity-30 shrink-0 " size="40" />
+		<Search class="opacity-30 shrink-0 text-black/80" size="40" />
 	</div>
 	<div class="mr-2 h-[100px] w-2 shrink-0"></div>
-
-	<!-- <Youtube class="mr-2 mt-6 shrink-0 opacity-50" size="70" style="color: rgba(0, 0, 0, 0.8); " /> -->
 	<CommandPrimitive.Input
 		class={cn(
 			'custom-input flex w-full rounded-md border-none bg-transparent shadow-none outline-none focus:border-transparent focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50',
