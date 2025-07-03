@@ -15,7 +15,7 @@
 	import ApiKeyForm from './api-key-form.svelte';
 	import { executeCommand } from '$lib/commands.js';
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
-	import { processQuery, type QueryAssets } from '$lib/query-util.js';
+	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
 	import {
 		createTauRPCProxy,
@@ -37,14 +37,6 @@
 	// Create TauRPC proxy
 	const taurpc = createTauRPCProxy();
 	// Define a type for Conversation based on what we know from main.rs
-	type ChatMessage = {
-		id: string;
-		role: string;
-		content: string;
-		visible: boolean;
-		created_at: number;
-		updated_at: number;
-	};
 
 	type Conversation = {
 		id: string;
@@ -286,23 +278,14 @@
 					create(ProtoChatMessageSchema, { role: 'user', content: query.text }),
 				);
 				console.log('query', query);
-				clearQuery();
+				searchQuery.text = '';
+				clearQuery(editorRef!);
 				await askQuestion(query);
 				// Responses will come through the event listener
 			} catch (error) {
 				console.error('Error:', error);
 			}
 		}
-	}
-
-	async function clearQuery() {
-		if (!editorRef) return;
-		searchQuery.text = '';
-		editorRef.cmd((state, dispatch) => {
-			const tr = state.tr;
-			tr.delete(0, state.doc.content.size);
-			dispatch?.(tr);
-		});
 	}
 
 	async function addVideoExtension() {
