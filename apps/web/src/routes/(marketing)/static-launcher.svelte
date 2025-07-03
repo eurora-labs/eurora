@@ -32,6 +32,7 @@
 		extensions: [],
 	});
 	let launcherInputRef: any = $state();
+	let placeholder = $state('');
 
 	let { class: className } = $props();
 
@@ -40,7 +41,13 @@
 	});
 
 	function handleKeydown(event: KeyboardEvent) {
+		if (placeholder.length > 0) {
+			event.preventDefault();
+			return;
+		}
+
 		if (event.key === 'Enter' && !event.shiftKey) {
+			placeholder = 'What can I help you with?';
 			event.preventDefault();
 			const value = processQuery(launcherInputRef);
 			messages.push(
@@ -54,9 +61,10 @@
 			messages.push(
 				create(ProtoChatMessageSchema, {
 					role: 'system',
-					content: 'Download it here: https://eurora.ai/download',
+					content: 'Download Eurora to get started',
 				}),
 			);
+			launcherInputRef.view?.focus();
 		}
 	}
 </script>
@@ -64,11 +72,12 @@
 <div class={cn('', className)}>
 	<Launcher.Root class="h-[100px]">
 		<Launcher.Input
-			placeholder=""
+			{placeholder}
 			bind:query={searchQuery}
 			bind:editorRef={launcherInputRef}
 			onkeydown={handleKeydown}
 			class="text-black/80"
+			disabled={placeholder.length > 0}
 		/>
 	</Launcher.Root>
 	<Chat class="w-full min-h-[265px]">
