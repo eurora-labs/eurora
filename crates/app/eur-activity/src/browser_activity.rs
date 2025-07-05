@@ -507,7 +507,7 @@ impl BrowserStrategy {
             "edge.exe",
             "msedge.exe",
         ];
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "linux")]
         let processes = vec![
             "firefox",
             "firefox-bin",
@@ -523,6 +523,8 @@ impl BrowserStrategy {
             "msedge",
             "safari",
         ];
+        #[cfg(target_os = "macos")]
+        let processes = vec!["Google Chrome"];
         processes
     }
 
