@@ -13,13 +13,14 @@
 		if (!mainRef) return;
 		try {
 			// Use TauRPC resize_launcher_window
-			// taurpc.window.resize_launcher_window(mainRef.scrollHeight, scaleFactor);
+			taurpc.window.resize_launcher_window(500, 1.0);
 		} catch (error) {
 			console.error('Failed to resize window:', error);
 		}
 	}
 
 	onMount(() => {
+		resizeWindow();
 		// const resizeObserver = new ResizeObserver(resizeWindow);
 
 		// Use TauRPC for get_scale_factor
