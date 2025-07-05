@@ -282,26 +282,24 @@ fn main() {
 
                         // We'll use a different approach for Windows focus handling via on_window_event
                         // Keep the window-specific handler for Linux focus loss
-                        #[cfg(target_os = "linux")]
-                        {
-                            let app_handle_focus = app_handle.clone();
-                            let launcher_label_linux = launcher_label.clone();
-                            launcher_window.on_window_event(move |event| {
-                                if let tauri::WindowEvent::Focused(false) = event {
-                                    if let Some(launcher) =
-                                        app_handle_focus.get_window(&launcher_label_linux)
-                                    {
-                                        // launcher.hide().expect("Failed to hide launcher window");
-                                        // Emit an event to clear the conversation when launcher is hidden
-                                        // launcher
-                                        //     .emit("launcher_closed", ())
-                                        //     .expect("Failed to emit launcher_closed event");
-                                        // LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
-                                        // Ensure state is updated
-                                    }
+
+                        let app_handle_focus = app_handle.clone();
+                        let launcher_label_linux = launcher_label.clone();
+                        launcher_window.on_window_event(move |event| {
+                            if let tauri::WindowEvent::Focused(false) = event {
+                                if let Some(launcher) =
+                                    app_handle_focus.get_window(&launcher_label_linux)
+                                {
+                                    launcher.hide().expect("Failed to hide launcher window");
+                                    // Emit an event to clear the conversation when launcher is hidden
+                                    launcher
+                                        .emit("launcher_closed", ())
+                                        .expect("Failed to emit launcher_closed event");
+                                    LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
+                                    // Ensure state is updated
                                 }
-                            });
-                        }
+                            }
+                        });
                     }
 
                     Ok(())
