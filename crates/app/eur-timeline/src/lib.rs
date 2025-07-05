@@ -7,7 +7,7 @@
 use anyhow::Result;
 use eur_activity::select_strategy_for_process;
 use eur_prompt_kit::LLMMessage;
-use ferrous_focus::{FerrousFocusResult, FocusedWindow};
+use ferrous_focus::{FerrousFocusResult, FocusedWindow, IconData};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -201,12 +201,12 @@ impl Timeline {
                         tracker.track_focus(|window: FocusedWindow| -> FerrousFocusResult<()> {
                             let process_name = window.process_name.clone().unwrap();
                             let window_title = window.window_title.clone().unwrap();
-                            info!("▶ {}: {}", process_name, window_title);
                             #[cfg(target_os = "windows")]
                             let eurora_process = "eur-tauri.exe";
                             #[cfg(not(target_os = "windows"))]
                             let eurora_process = "eur-tauri";
                             if process_name != eurora_process {
+                                info!("▶ {}: {}", process_name, window_title);
                                 let _ = tx_clone.send(window);
                             }
                             Ok(())
@@ -245,7 +245,12 @@ impl Timeline {
                 // build a strategy for the newly-focused window
                 let process_name = event.process_name.unwrap();
                 let window_title = event.window_title.unwrap();
-                let icon = event.icon.unwrap();
+                let icon = event.icon.unwrap_or(IconData {
+                    width: 0,
+                    height: 0,
+                    pixels: Vec::new(),
+                });
+
                 if let Ok(strategy) = select_strategy_for_process(
                     &process_name,
                     format!("{}: {}", process_name, window_title),
