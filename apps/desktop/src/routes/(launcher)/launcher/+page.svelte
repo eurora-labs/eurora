@@ -100,6 +100,9 @@
 
 	// Listen for launcher opened event to refresh activities
 	listen<any>('launcher_opened', async (event) => {
+		if (editorRef) {
+			clearQuery(editorRef);
+		}
 		// Reload activities when launcher is opened
 		loadActivities();
 
