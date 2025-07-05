@@ -87,6 +87,7 @@
 		monitor_width: number;
 		monitor_height: number;
 	} | null>(null);
+	let chatRef = $state<Chat | null>(null);
 
 	// Listen for launcher closed event to clear messages and reset conversation
 	listen('launcher_closed', () => {
@@ -250,14 +251,14 @@
 
 	// Load conversations when component is mounted
 	// Note: list_conversations is not yet available in TauRPC, fallback to invoke for now
-	invoke('list_conversations')
-		.then((result) => {
-			conversations.splice(0, conversations.length, ...(result as Conversation[]));
-			console.log('Loaded conversations:', conversations);
-		})
-		.catch((error) => {
-			console.error('Failed to load conversations:', error);
-		});
+	// invoke('list_conversations')
+	// 	.then((result) => {
+	// 		conversations.splice(0, conversations.length, ...(result as Conversation[]));
+	// 		console.log('Loaded conversations:', conversations);
+	// 	})
+	// 	.catch((error) => {
+	// 		console.error('Failed to load conversations:', error);
+	// 	});
 
 	// Use TauRPC for window resize
 	// taurpc.window.resize_launcher_window(100, 1.0).then(() => {
@@ -321,7 +322,8 @@
 				if (agentMessage) {
 					agentMessage.content += response.chunk;
 				}
-				console.log(`got response chunk: ${response.chunk}`);
+
+				chatRef?.scrollToBottom();
 			};
 
 			// Use TauRPC send_query procedure
@@ -350,7 +352,7 @@
 	}
 </script>
 
-<div class="backdrop-custom relative flex h-full flex-col overflow-hidden">
+<div class="backdrop-custom relative h-full overflow-hidden">
 	{#if isCheckingApiKey}
 		<div class="flex h-full items-center justify-center">
 			<p class="text-gray-500">Checking API key...</p>
@@ -404,7 +406,7 @@
 		</Launcher.Root>
 
 		{#if messages.length > 0}
-			<Chat class="w-full ">
+			<Chat bind:this={chatRef} class="w-full max-h-full flex flex-col gap-4">
 				{#each messages as message}
 					<Message.Root
 						variant={message.role === 'user' ? 'default' : 'agent'}
