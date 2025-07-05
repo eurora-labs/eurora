@@ -17,7 +17,7 @@
 	}
 </script>
 
-<ScrollArea ref={scrollAreaRef} class="w-full h-fit {className}">
+<ScrollArea ref={scrollAreaRef} class="w-full {className}">
 	<div class="space-y-4 p-4 pb-0 flex flex-col">
 		{@render children?.()}
 	</div>

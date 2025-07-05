@@ -406,7 +406,7 @@
 		</Launcher.Root>
 
 		{#if messages.length > 0}
-			<Chat bind:this={chatRef} class="w-full max-h-full flex flex-col gap-4">
+			<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
 				{#each messages as message}
 					<Message.Root
 						variant={message.role === 'user' ? 'default' : 'agent'}
