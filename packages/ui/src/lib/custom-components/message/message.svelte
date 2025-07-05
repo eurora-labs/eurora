@@ -6,8 +6,8 @@
 		base: 'message flex flex-col w-fit items-center gap-2 py-2 rounded-2xl [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
 		variants: {
 			variant: {
-				default: 'max-w-[50%] bg-black/20 ml-auto w-fit text-white/80 font-medium',
-				agent: 'backdrop-blur-2xl bg-white/30 max-w-[95%] mr-auto w-fit text-black font-medium',
+				default: 'max-w-[50%] bg-black/20 ml-auto text-white/80 font-medium',
+				agent: 'backdrop-blur-2xl bg-white/30 max-w-[95%] mr-auto text-black font-medium',
 			},
 		},
 		defaultVariants: {
