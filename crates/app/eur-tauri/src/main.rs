@@ -291,12 +291,12 @@ fn main() {
                                     if let Some(launcher) =
                                         app_handle_focus.get_window(&launcher_label_linux)
                                     {
-                                        launcher.hide().expect("Failed to hide launcher window");
+                                        // launcher.hide().expect("Failed to hide launcher window");
                                         // Emit an event to clear the conversation when launcher is hidden
-                                        launcher
-                                            .emit("launcher_closed", ())
-                                            .expect("Failed to emit launcher_closed event");
-                                        LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
+                                        // launcher
+                                        //     .emit("launcher_closed", ())
+                                        //     .expect("Failed to emit launcher_closed event");
+                                        // LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
                                         // Ensure state is updated
                                     }
                                 }
