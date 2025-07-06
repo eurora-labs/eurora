@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
-	import Menubar from '$lib/components/Menubar.svelte';
+	import Menubar from './Menubar.svelte';
 	let { children } = $props();
 	onMount(() => {
 		document.body.classList.add(`${platform()}-app`);
