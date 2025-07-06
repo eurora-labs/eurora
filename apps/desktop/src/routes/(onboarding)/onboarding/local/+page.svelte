@@ -9,7 +9,7 @@
 	async function finished() {
 		status = 'finished';
 		setTimeout(() => {
-			goto('/onboarding/status');
+			goto('/onboarding/hotkey');
 		}, 1000);
 	}
 </script>
