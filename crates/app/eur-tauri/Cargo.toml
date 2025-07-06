@@ -70,7 +70,6 @@ async-mutex = "1.4.1"
 sentry = { workspace = true }
 eur-activity = { path = "../eur-activity" }
 lazy_static = "1.4.0"
-eur-renderer = { path = "../eur-renderer" }
 pollster = "0.4"
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
