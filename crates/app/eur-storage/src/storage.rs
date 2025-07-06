@@ -16,6 +16,7 @@ impl Storage {
     }
 
     pub fn read(&self, relative_path: impl AsRef<Path>) -> std::io::Result<Option<String>> {
+        Self::validate_path(relative_path.as_ref())?;
         let full_path = self.local_data_dir.join(relative_path);
 
         if !full_path.exists() {
@@ -27,6 +28,7 @@ impl Storage {
     }
 
     pub fn write(&self, relative_path: impl AsRef<Path>, content: &str) -> std::io::Result<()> {
+        Self::validate_path(relative_path.as_ref())?;
         let full_path = self.local_data_dir.join(relative_path);
 
         // Create parent directories if they don't exist
@@ -38,12 +40,26 @@ impl Storage {
     }
 
     pub fn delete(&self, relative_path: impl AsRef<Path>) -> std::io::Result<()> {
+        Self::validate_path(relative_path.as_ref())?;
         let full_path = self.local_data_dir.join(relative_path);
 
         if full_path.exists() {
             fs::remove_file(full_path)?;
         }
 
+        Ok(())
+    }
+
+    fn validate_path(relative_path: &Path) -> std::io::Result<()> {
+        if relative_path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Path traversal detected",
+            ));
+        }
         Ok(())
     }
 }

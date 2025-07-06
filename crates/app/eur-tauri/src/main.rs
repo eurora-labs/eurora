@@ -44,12 +44,9 @@ use taurpc::Router;
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 
-// mod focus_tracker;
-
 use tracing::{error, info};
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
-type SharedUserController = Arc<Mutex<Option<eur_user::Controller>>>;
 
 async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> SharedPersonalDb {
     let db_path = get_db_path(app_handle);
@@ -166,7 +163,13 @@ fn main() {
                     let app_handle_user = app_handle.clone();
                     let path = tauri_app.path().app_data_dir().unwrap();
                     tauri::async_runtime::spawn(async move {
-                        let user_controller = eur_user::Controller::from_path(path).await;
+                        let user_controller = eur_user::Controller::from_path(path)
+                            .await
+                            .map_err(|e| {
+                                error!("Failed to create user controller: {}", e);
+                                e
+                            })
+                            .unwrap();
                         app_handle_user.manage(user_controller);
                         info!("User controller initialized");
                     });
