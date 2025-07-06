@@ -82,7 +82,11 @@
 			const newHotkey = recordedKeys.join(' + ');
 			currentHotkey = newHotkey;
 
-			await taurpc.user.set_launcher_hotkey(newHotkey, recordedKeys);
+			try {
+				await taurpc.user.set_launcher_hotkey(newHotkey, recordedKeys);
+			} catch (error) {
+				console.error('Error setting hotkey:', error);
+			}
 		}
 
 		isRecording = false;

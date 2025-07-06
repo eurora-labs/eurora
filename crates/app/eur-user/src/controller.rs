@@ -31,7 +31,7 @@ impl Controller {
         Ok(user)
     }
 
-    /// Note that secrets are never written in plain text, but we assure they are stored.
+    /// Persist the user to storage.
     pub fn set_user(&self, user: &User) -> Result<()> {
         self.storage.set(user).context("failed to set user")
     }
