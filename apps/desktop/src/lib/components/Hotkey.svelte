@@ -56,7 +56,11 @@
 		}
 
 		// Only update if we have at least one modifier + main key, or special keys
-		if (keys.length >= 2 || ['Escape', 'Enter', 'Tab', 'Space'].includes(event.key)) {
+		if (
+			keys.length >= 2 ||
+			['Escape', 'Enter', 'Tab', 'Space'].includes(event.key) ||
+			/^F\d+$/.test(event.key)
+		) {
 			recordedKeys = keys;
 
 			// Clear existing timeout
