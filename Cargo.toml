@@ -9,11 +9,11 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-syn = "2.0" # collapse 2.0.101, 1.0.109, 1.0.109(build)  
-toml_edit = "0.22" # collapse 0.22, 0.20, 0.19  
-regex-syntax = "0.8" # collapse 0.8, 0.6  
-rustix = "0.38" # collapse 0.38, 1.0, 0.38(build)  
-indexmap = "2.9" # collapse 2.10, 1.9  
+syn = "2.0" # collapse 2.0.101, 1.0.109, 1.0.109(build)
+toml_edit = "0.22" # collapse 0.22, 0.20, 0.19
+regex-syntax = "0.8" # collapse 0.8, 0.6
+rustix = "0.38" # collapse 0.38, 1.0, 0.38(build)
+indexmap = "2.9" # collapse 2.10, 1.9
 bstr = "1.11.1"
 insta = "1.41.1"
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
@@ -46,7 +46,10 @@ log = "0.4"
 once_cell = "1.21"
 tokio-stream = "0.1"
 serde_json = "1.0"
-image = { version = "0.25.6", features = ["jpeg", "png"], default-features = false }
+image = { version = "0.25.6", features = [
+    "jpeg",
+    "png",
+], default-features = false }
 base64 = "0.22.1"
 sentry = { version = "0.37.0" }
 
@@ -58,6 +61,7 @@ eur-proto = { path = "crates/proto/eur-proto" }
 eur-proto-client = { path = "crates/common/eur-proto-client" }
 eur-prompt-kit = { path = "crates/common/eur-prompt-kit" }
 eur-util = { path = "crates/common/eur-util" }
+eur-storage = { path = "crates/app/eur-storage" }
 
 eur-prompt-service = { path = "crates/backend/eur-prompt-service" }
 eur-auth-service = { path = "crates/backend/eur-auth-service" }

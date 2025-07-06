@@ -1,3 +1,8 @@
-pub mod auth;
-pub mod controller;
-pub mod user;
+mod auth;
+mod storage;
+
+mod controller;
+pub use controller::Controller;
+
+mod user;
+pub use user::User;
