@@ -25,6 +25,7 @@ use eur_tauri::{
         query_procedures::{QueryApi, QueryApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
+        user_procedures::{UserApi, UserApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
     shared_types::{SharedPromptKitService, create_shared_timeline},
@@ -171,7 +172,6 @@ fn main() {
                             })
                             .unwrap();
                         app_handle_user.manage(user_controller);
-                        info!("User controller initialized");
                     });
 
                     // Initialize OpenAI client if API key exists
@@ -363,7 +363,8 @@ fn main() {
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
                 .merge(WindowApiImpl.into_handler())
-                .merge(QueryApiImpl.into_handler());
+                .merge(QueryApiImpl.into_handler())
+                .merge(UserApiImpl.into_handler());
             builder
                 .invoke_handler(tauri::generate_handler![list_conversations,])
                 .invoke_handler(router.into_handler())

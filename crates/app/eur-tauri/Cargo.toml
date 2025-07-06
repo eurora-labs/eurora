@@ -70,7 +70,6 @@ async-mutex = "1.4.1"
 sentry = { workspace = true }
 eur-activity = { path = "../eur-activity" }
 lazy_static = "1.4.0"
-eur-renderer = { path = "../eur-renderer" }
 pollster = "0.4"
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
@@ -83,6 +82,7 @@ base64 = "0.22.1"
 eur-proto-client = { workspace = true }
 dotenv = "0.15.0"
 eur-user = { workspace = true }
+uuid.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-trafficlights-positioner = { git = "https://github.com/gitbutlerapp/tauri-plugin-trafficlights-positioner", branch = "v2" }
