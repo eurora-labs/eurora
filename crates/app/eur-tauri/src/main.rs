@@ -29,7 +29,6 @@ use eur_tauri::{
     },
     shared_types::{SharedPromptKitService, create_shared_timeline},
 };
-use eur_user::auth::AuthManager;
 use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -44,8 +43,6 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use taurpc::Router;
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
-
-// mod focus_tracker;
 
 use tracing::{error, info};
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
@@ -64,11 +61,6 @@ async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> Shared
     )
 }
 
-// fn create_shared_conversation_storage() -> SharedConversationStorage {
-//     Arc::new(async_mutex::Mutex::new(None))
-// }
-
-// And replace create_shared_client with this function:
 fn create_shared_client() -> SharedQuestionsClient {
     Arc::new(Mutex::new(None))
 }
@@ -76,10 +68,6 @@ fn create_shared_client() -> SharedQuestionsClient {
 fn create_shared_promptkit_client() -> SharedPromptKitService {
     Arc::new(async_mutex::Mutex::new(None))
 }
-
-// fn create_shared_secret_service() -> SharedSecretService {
-//     Arc::new(SecretService::new())
-// }
 
 fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     let base_path = app_handle.path().app_data_dir().unwrap();
@@ -171,16 +159,19 @@ fn main() {
                     app_handle.manage(promptkit_client.clone());
                     let current_conversation_id = Arc::new(None::<String>);
                     app_handle.manage(current_conversation_id.clone());
-                    // let current_conversation = create_shared_current_conversation();
-                    // app_handle.manage(current_conversation);
 
-                    let app_handle_auth = app_handle.clone();
+                    let app_handle_user = app_handle.clone();
+                    let path = tauri_app.path().app_data_dir().unwrap();
                     tauri::async_runtime::spawn(async move {
-                        let auth_manager = AuthManager::new()
+                        let user_controller = eur_user::Controller::from_path(path)
                             .await
-                            .expect("AuthManager initialization failed");
-                        app_handle_auth.manage(auth_manager);
-                        info!("Auth manager initialized");
+                            .map_err(|e| {
+                                error!("Failed to create user controller: {}", e);
+                                e
+                            })
+                            .unwrap();
+                        app_handle_user.manage(user_controller);
+                        info!("User controller initialized");
                     });
 
                     // Initialize OpenAI client if API key exists
@@ -191,7 +182,6 @@ fn main() {
                         if api_key.is_some() {
                             let prompt_kit_service = PromptKitService::default();
 
-                            // let client = eur_openai::OpenAI::with_api_key(&api_key.unwrap().0);
                             let state: tauri::State<SharedPromptKitService> =
                                 app_handle_openai.state();
                             let mut guard = state.lock().await;
