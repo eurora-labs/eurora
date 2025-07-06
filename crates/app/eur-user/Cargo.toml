@@ -19,3 +19,4 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 rand = { workspace = true }
 sha2 = "0.10.9"
+eur-storage.workspace = true
