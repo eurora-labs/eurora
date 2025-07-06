@@ -9,17 +9,19 @@ use sha2::{Digest, Sha256};
 use tracing::error;
 
 // Re-export shared types for convenience
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     sub: String,
     name: String,
     exp: i64,
 }
 
+#[derive(Clone)]
 pub struct JwtConfig {
     refresh_offset: i64,
 }
 
+#[derive(Clone)]
 pub struct AuthManager {
     auth_client: AuthClient,
     jwt_config: JwtConfig,
