@@ -8,7 +8,7 @@
 <Sidebar.Provider>
 	<SettingsSidebar />
 
-	<main>
+	<main class="w-full">
 		{@render children?.()}
 	</main>
 </Sidebar.Provider>
