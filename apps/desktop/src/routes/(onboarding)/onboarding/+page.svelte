@@ -2,9 +2,8 @@
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { open } from '@tauri-apps/plugin-shell';
-
-	// import tauri auth procedures
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+
 	const taurrpc = createTauRPCProxy();
 	async function openLogin() {
 		const loginToken = await taurrpc.auth.get_login_token();
@@ -24,7 +23,6 @@
 			}
 			console.log('Login successful');
 			clearInterval(interval);
-			// window.location.href = '/';
 		}, 5000);
 	}
 </script>
