@@ -2,7 +2,9 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 
+	let taurpc = createTauRPCProxy();
 	let settingHotkey = $state(false);
 	let currentHotkey = $state('Ctrl + Space');
 	let recordedKeys = $state<string[]>([]);
@@ -75,19 +77,12 @@
 		}
 	}
 
-	function finalizeRecording() {
+	async function finalizeRecording() {
 		if (recordedKeys.length > 0) {
 			const newHotkey = recordedKeys.join(' + ');
 			currentHotkey = newHotkey;
-			console.log('Recorded hotkey:', newHotkey);
 
-			// Here you would typically save to backend
-			// For now, we'll just log it as requested
-			console.log('Hotkey recorded and ready for backend integration:', {
-				hotkey: newHotkey,
-				keys: recordedKeys,
-				timestamp: new Date().toISOString(),
-			});
+			await taurpc.user.set_launcher_hotkey(newHotkey, recordedKeys);
 		}
 
 		isRecording = false;
