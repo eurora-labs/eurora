@@ -35,7 +35,7 @@
 	<div class="flex items-center gap-2">
 		<a href="/onboarding" class="flex items-center gap-2">
 			<EuroraLogo class="size-12" />
-			Eurora AI
+			Eurora Labs
 		</a>
 	</div>
 	<div class="flex items-center gap-2">
@@ -53,7 +53,7 @@
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 		{/if}
-		<Button variant="ghost" size="icon">
+		<Button variant="ghost" size="icon" href="/settings">
 			<CircleUserRoundIcon size="24px" class="size-6" />
 		</Button>
 	</div>
