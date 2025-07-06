@@ -28,19 +28,12 @@ impl Controller {
     /// Return the current login, or `None` if there is none yet.
     pub fn get_user(&self) -> Result<Option<User>> {
         let user = self.storage.get().context("failed to get user")?;
-        if let Some(user) = &user {
-            extract_secrets_and_persist_user(&self.storage, user.clone())?;
-        }
         Ok(user)
     }
 
-    /// Note that secrets are never written in plain text, but we assure they are stored.
+    /// Persist the user to storage.
     pub fn set_user(&self, user: &User) -> Result<()> {
-        if !extract_secrets_and_persist_user(&self.storage, user.clone())? {
-            self.storage.set(user).context("failed to set user")
-        } else {
-            Ok(())
-        }
+        self.storage.set(user).context("failed to set user")
     }
 
     pub fn delete_user(&self) -> Result<()> {
@@ -87,22 +80,4 @@ impl Controller {
             .login_by_login_token(login_token.into())
             .await
     }
-}
-
-/// As `user` sports interior mutability right now, let's play it safe and work with fully owned items only.
-fn extract_secrets_and_persist_user(storage: &Storage, user: User) -> Result<bool> {
-    let mut needs_write = false;
-    let namespace = secret::Namespace::BuildKind;
-    if let Some(gb_token) = user.access_token.borrow_mut().take() {
-        needs_write |=
-            secret::persist(AuthManager::ACCESS_TOKEN_HANDLE, &gb_token, namespace).is_ok();
-    }
-    if let Some(refresh_token) = user.refresh_token.borrow_mut().take() {
-        needs_write |=
-            secret::persist(AuthManager::REFRESH_TOKEN_HANDLE, &refresh_token, namespace).is_ok();
-    }
-    if needs_write {
-        storage.set(&user)?;
-    }
-    Ok(needs_write)
 }
