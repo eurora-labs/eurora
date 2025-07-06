@@ -21,15 +21,28 @@ impl UserApi for UserApiImpl {
         key: String,
         modifiers: Vec<String>,
     ) -> Result<(), String> {
-        if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>() {
-            if let Some(mut user) = user_controller.get_user().map_err(|e| e.to_string())? {
-                user.hotkeys.open_launcher = eur_user::Hotkey {
-                    key,
-                    modifiers,
-                    function: eur_user::HotkeyFunction::OpenLauncher,
-                };
-                user_controller.set_user(&user).map_err(|e| e.to_string())?;
+        if key.trim().is_empty() {
+            return Err("Key cannot be empty".to_string());
+        }
+
+        let valid_modifiers = ["ctrl", "alt", "shift", "meta", "cmd"];
+        for modifier in &modifiers {
+            if !valid_modifiers.contains(&modifier.to_lowercase().as_str()) {
+                return Err(format!("Invalid modifier: {}", modifier));
             }
+        }
+
+        if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>() {
+            let mut user = user_controller
+                .get_user()
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| "User not found".to_string())?;
+            user.hotkeys.open_launcher = eur_user::Hotkey {
+                key,
+                modifiers,
+                function: eur_user::HotkeyFunction::OpenLauncher,
+            };
+            user_controller.set_user(&user).map_err(|e| e.to_string())?;
             info!("Launcher hotkey set successfully");
             Ok(())
         } else {
