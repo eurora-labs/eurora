@@ -5,6 +5,19 @@
 		icon: any;
 		isActive?: boolean;
 	}
+</script>
+
+<script lang="ts">
+	import BoltIcon from '@lucide/svelte/icons/bolt';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import ChevronsLeftRightEllipsis from '@lucide/svelte/icons/chevrons-left-right-ellipsis';
+	import KeyboardIcon from '@lucide/svelte/icons/keyboard';
+	import WebhookIcon from '@lucide/svelte/icons/webhook';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
+	import { Button } from '@eurora/ui/components/button/index';
+	import { page } from '$app/state';
+
 	let items: MenuItem[] = [
 		{
 			title: 'General',
@@ -27,18 +40,6 @@
 			icon: ChevronsLeftRightEllipsis,
 		},
 	];
-</script>
-
-<script lang="ts">
-	import BoltIcon from '@lucide/svelte/icons/bolt';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
-	import ChevronsLeftRightEllipsis from '@lucide/svelte/icons/chevrons-left-right-ellipsis';
-	import KeyboardIcon from '@lucide/svelte/icons/keyboard';
-	import WebhookIcon from '@lucide/svelte/icons/webhook';
-	import MailIcon from '@lucide/svelte/icons/mail';
-	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import { Button } from '@eurora/ui/components/button/index';
-	import { page } from '$app/state';
 
 	let navigation = $derived(
 		items.map((item) => ({ ...item, isActive: item.url === page.url.pathname })),
@@ -77,6 +78,6 @@
 		</Sidebar.Group>
 	</Sidebar.Content>
 	<Sidebar.Footer>
-		<Button>Contact us <MailIcon /></Button>
+		<Button href="mailto:contact@eurora-labs.com">Contact us <MailIcon /></Button>
 	</Sidebar.Footer>
 </Sidebar.Root>
