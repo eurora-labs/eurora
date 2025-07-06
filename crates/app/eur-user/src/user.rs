@@ -11,6 +11,10 @@ pub struct User {
     pub email: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+
     #[serde(skip_serializing)]
-    pub(super) _access_token: RefCell<Option<Sensitive<String>>>,
+    pub(super) access_token: RefCell<Option<Sensitive<String>>>,
+
+    #[serde(skip_serializing)]
+    pub(super) refresh_token: RefCell<Option<Sensitive<String>>>,
 }
