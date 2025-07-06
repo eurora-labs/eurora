@@ -2374,16 +2374,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-renderer"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "image",
- "pollster",
- "wgpu",
-]
-
-[[package]]
 name = "eur-secret"
 version = "0.1.0"
 dependencies = [
@@ -2418,7 +2408,6 @@ dependencies = [
  "eur-prompt-kit",
  "eur-proto",
  "eur-proto-client",
- "eur-renderer",
  "eur-secret",
  "eur-timeline",
  "eur-user",
@@ -2462,6 +2451,7 @@ dependencies = [
  "tracing-forest",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]
