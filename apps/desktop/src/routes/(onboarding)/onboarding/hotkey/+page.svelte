@@ -141,7 +141,7 @@
 </script>
 
 <div class="w-full h-full p-6 flex flex-col justify-between">
-	<h1 class="text-2xl font-bold">Set up hotkey</h1>
+	<h1 class="text-2xl font-bold">Set up Eurora hotkey</h1>
 
 	<div class="flex flex-col justify-center items-center gap-6">
 		<div class="text-center">
@@ -188,8 +188,7 @@
 		{/if}
 	</div>
 
-	<div class="flex justify-between">
-		<Button variant="ghost" href="/onboarding">Cancel</Button>
-		<Button variant="default">Continue</Button>
+	<div class="flex justify-end">
+		<Button variant="default" href="/onboarding/final">Continue</Button>
 	</div>
 </div>
