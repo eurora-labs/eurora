@@ -5,6 +5,8 @@
 
 	// import tauri auth procedures
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	const taurrpc = createTauRPCProxy();
 	async function openLogin() {
 		const loginToken = await taurrpc.auth.get_login_token();
@@ -27,6 +29,10 @@
 			// window.location.href = '/';
 		}, 5000);
 	}
+
+	onMount(() => {
+		goto('/onboarding/hotkey');
+	});
 </script>
 
 <div class="relative flex h-screen w-full flex-col">
