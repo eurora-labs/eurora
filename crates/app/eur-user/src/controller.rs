@@ -15,28 +15,28 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub async fn from_path(path: impl Into<PathBuf>) -> Controller {
+    pub async fn from_path(path: impl Into<PathBuf>) -> Result<Controller> {
         let auth_manager = AuthManager::new()
             .await
-            .expect("Failed to create auth manager");
-        Controller {
+            .context("Failed to create auth manager")?;
+        Ok(Controller {
             auth_manager,
             storage: Storage::from_path(path),
-        }
+        })
     }
 
     /// Return the current login, or `None` if there is none yet.
     pub fn get_user(&self) -> Result<Option<User>> {
         let user = self.storage.get().context("failed to get user")?;
         if let Some(user) = &user {
-            write_without_secrets_if_secrets_present(&self.storage, user.clone())?;
+            extract_secrets_and_persist_user(&self.storage, user.clone())?;
         }
         Ok(user)
     }
 
     /// Note that secrets are never written in plain text, but we assure they are stored.
     pub fn set_user(&self, user: &User) -> Result<()> {
-        if !write_without_secrets_if_secrets_present(&self.storage, user.clone())? {
+        if !extract_secrets_and_persist_user(&self.storage, user.clone())? {
             self.storage.set(user).context("failed to set user")
         } else {
             Ok(())
@@ -90,7 +90,7 @@ impl Controller {
 }
 
 /// As `user` sports interior mutability right now, let's play it safe and work with fully owned items only.
-fn write_without_secrets_if_secrets_present(storage: &Storage, user: User) -> Result<bool> {
+fn extract_secrets_and_persist_user(storage: &Storage, user: User) -> Result<bool> {
     let mut needs_write = false;
     let namespace = secret::Namespace::BuildKind;
     if let Some(gb_token) = user.access_token.borrow_mut().take() {
