@@ -6,7 +6,6 @@ use crate::{
 };
 use eur_prompt_kit::EuroraConfig;
 use eur_secret::{Sensitive, secret};
-use eur_user::auth::AuthManager;
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
@@ -36,8 +35,8 @@ impl AuthApi for AuthApiImpl {
         app_handle: AppHandle<R>,
     ) -> Result<LoginToken, String> {
         // Try to get auth manager from app state
-        if let Some(auth_manager) = app_handle.try_state::<AuthManager>() {
-            let (code_verifier, code_challenge) = auth_manager
+        if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>() {
+            let (code_verifier, code_challenge) = user_controller
                 .get_login_tokens()
                 .await
                 .map_err(|e| format!("Failed to get login tokens: {}", e))?;
@@ -68,11 +67,11 @@ impl AuthApi for AuthApiImpl {
     }
 
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        if let Some(auth_manager) = app_handle.try_state::<AuthManager>() {
+        if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>() {
             let login_token = secret::retrieve(LOGIN_CODE_VERIFIER, secret::Namespace::BuildKind)
                 .map_err(|e| format!("Failed to retrieve login token: {}", e))?
                 .ok_or_else(|| "Login token not found".to_string())?;
-            match auth_manager.login_by_login_token(login_token.0).await {
+            match user_controller.login_by_login_token(login_token.0).await {
                 Ok(_) => {
                     secret::delete(LOGIN_CODE_VERIFIER, secret::Namespace::BuildKind)
                         .map_err(|e| format!("Failed to remove login token: {}", e))?;

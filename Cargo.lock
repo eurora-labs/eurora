@@ -2394,6 +2394,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-storage"
+version = "0.0.0"
+
+[[package]]
 name = "eur-tauri"
 version = "0.1.0"
 dependencies = [
@@ -2495,6 +2499,7 @@ dependencies = [
  "eur-proto",
  "eur-proto-client",
  "eur-secret",
+ "eur-storage",
  "image",
  "rand 0.9.1",
  "serde",
