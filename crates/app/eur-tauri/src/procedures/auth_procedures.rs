@@ -57,7 +57,7 @@ impl AuthApi for AuthApiImpl {
             )
             .map_err(|e| format!("Failed to persist code verifier: {}", e))?;
             Ok(LoginToken {
-                code_challenge,
+                code_challenge: code_challenge.to_string(),
                 expires_in,
                 url: url.to_string(),
             })
