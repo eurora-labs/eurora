@@ -1,55 +1,34 @@
-<!-- <script lang="ts">
-	import { AiChat } from '@eurora/ai-chat';
+<script lang="ts">
+	import { Button } from '@eurora/ui/components/button/index';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import { onMount } from 'svelte';
-	import { chatMessages, askQuestion, loadChatMessages } from '$lib/chat-store';
+	import { goto } from '$app/navigation';
 
-	let aiChat = $state<AiChat | null>(null);
-	let hasMessages = $derived($chatMessages.length > 0);
+	let status = $state<'loading' | 'ready'>('loading');
 
-	onMount(async () => {
-		await loadChatMessages();
+	const taurpc = createTauRPCProxy();
+	onMount(() => {
+		taurpc.prompt
+			.get_service_name()
+			.then((name: string) => {
+				if (name) {
+					status = 'ready';
+				}
+			})
+			.catch(() => {
+				// goto('/onboarding');
+			});
 	});
-
-	async function handleMessage(message: string) {
-		try {
-			// This will send the question to the backend and get a response
-			await askQuestion(message);
-		} catch (error) {
-			console.error('Error asking question:', error);
-		}
-	}
 </script>
 
-<div class="flex h-full flex-1 flex-col overflow-hidden">
-	<div class="relative h-full flex-1 overflow-auto">
-		<div
-			class={hasMessages
-				? 'flex h-full flex-col justify-between'
-				: 'absolute inset-0 flex flex-col items-center justify-center'}
-		>
-			{#if !hasMessages}
-				<h2 class="mb-4 text-center text-2xl font-semibold text-foreground">
-					What can I help you with?
-				</h2>
-			{/if}
-			<div class={hasMessages ? 'flex-1 overflow-y-auto' : 'w-full max-w-3xl px-4'}>
-				<AiChat bind:this={aiChat} onSendMessage={handleMessage} />
-			</div>
+<div class="w-full h-full p-6 flex flex-col justify-center items-center gap-4">
+	{#if status === 'ready'}
+		<h1 class="text-2xl font-bold">Eurora is ready!</h1>
+		<p>Press PLACEHOLDER to open Eurora anywhere.</p>
+		<div class="flex justify-start">
+			<Button variant="outline" href="/onboarding">Setup everything again</Button>
 		</div>
-	</div>
+	{:else}
+		Checking...
+	{/if}
 </div>
-
-<style lang="postcss">
-	:host {
-		display: flex;
-		z-index: 9999;
-		position: relative;
-		height: 100%;
-		visibility: hidden;
-	}
-
-	.conversation-text {
-		user-select: text;
-		cursor: text;
-	}
-</style> -->
