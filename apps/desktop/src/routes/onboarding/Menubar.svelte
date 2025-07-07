@@ -12,6 +12,16 @@
 	let service_name: String | undefined = $state(undefined);
 
 	onMount(() => {
+		taurpc.prompt
+			.get_service_name()
+			.then((name) => {
+				if (name) {
+					service_name = name;
+				}
+			})
+			.catch((error) => {
+				console.error('Failed to get service name:', error);
+			});
 		let unlisten: any;
 		taurpc.prompt.prompt_service_change
 			.on((name) => {
