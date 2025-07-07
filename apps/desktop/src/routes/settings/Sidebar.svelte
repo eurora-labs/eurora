@@ -52,7 +52,7 @@
 			<Button
 				variant="ghost"
 				class="rounded-none w-full flex justify-start text-[24px] font-normal"
-				href="/onboarding"
+				href="/"
 			>
 				<ChevronLeftIcon class="size-6" />
 				Profile
