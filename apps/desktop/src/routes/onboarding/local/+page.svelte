@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
-	import Ollama from './ollama.svelte';
-	import ApiProvider from './api-provider.svelte';
+	import Ollama from '$lib/components/Ollama.svelte';
+	import ApiProvider from '$lib/components/ApiProvider.svelte';
 	import { goto } from '$app/navigation';
 
 	let status: 'pending' | 'finished' = $state('pending');
