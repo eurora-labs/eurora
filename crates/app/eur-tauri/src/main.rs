@@ -228,14 +228,14 @@ fn main() {
                     // info!("Setting up global shortcut");
 
                     // Get the launcher shortcut from user settings or use default
-                    let launcher_shortcut = get_launcher_shortcut(app_handle);
+                    // let launcher_shortcut = get_launcher_shortcut(app_handle);
                     let launcher_label = launcher_window.label().to_string();
 
                     // Register the shortcut plugin
                     app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
 
                     // Register the global shortcut
-                    app_handle.global_shortcut().register(launcher_shortcut)?;
+                    // app_handle.global_shortcut().register(launcher_shortcut)?;
 
                     // Linux-specific focus handling
                     #[cfg(target_os = "linux")]
