@@ -33,19 +33,24 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		sender: chrome.runtime.MessageSender,
 		response: (response?: any) => void,
 	) {
+		console.log('Received message from content script:', obj);
 		const { type } = obj;
 
 		switch (type) {
 			case 'NEW':
+				console.log('New video detected');
 				this.handleNew(obj, sender, response);
 				break;
 			case 'PLAY':
+				console.log('Video play detected');
 				this.handlePlay(obj, sender, response);
 				break;
 			case 'GENERATE_ASSETS':
+				console.log('Generate assets detected');
 				this.handleGenerateAssets(obj, sender, response);
 				break;
 			case 'GENERATE_SNAPSHOT':
+				console.log('Generate snapshot detected');
 				this.handleGenerateSnapshot(obj, sender, response);
 				break;
 		}
