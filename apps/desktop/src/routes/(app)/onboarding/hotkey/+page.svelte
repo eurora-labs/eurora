@@ -10,6 +10,6 @@
 	<Hotkey />
 
 	<div class="flex justify-end">
-		<Button variant="default" href="/onboarding/final">Continue</Button>
+		<Button variant="default" href="/">Continue</Button>
 	</div>
 </div>
