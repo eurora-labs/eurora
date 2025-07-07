@@ -32,7 +32,6 @@
 		group: 'inline',
 		inline: true,
 		defining: false,
-		atom: true,
 		selectable: false,
 
 		parseDOM: [
