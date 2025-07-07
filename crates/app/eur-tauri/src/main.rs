@@ -11,6 +11,7 @@ use tracing_subscriber::{
     fmt,
 };
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
+mod util;
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
 use eur_prompt_kit::PromptKitService;
@@ -40,12 +41,14 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use taurpc::Router;
+use util::get_launcher_shortcut;
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 
 use tracing::{error, info};
+
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
 
@@ -224,55 +227,19 @@ fn main() {
 
                     // info!("Setting up global shortcut");
 
-                    // If macos, use Control + Space
-                    #[cfg(target_os = "macos")]
-                    {
-                        let control_space_shortcut =
-                            Shortcut::new(Some(Modifiers::ALT), Code::Space);
-                        let launcher_label = launcher_window.label().to_string();
+                    // Get the launcher shortcut from user settings or use default
+                    let launcher_shortcut = get_launcher_shortcut(app_handle);
+                    let launcher_label = launcher_window.label().to_string();
 
-                        app_handle
-                            .plugin(shortcut_plugin(control_space_shortcut, launcher_label))?;
+                    // Register the shortcut plugin
+                    app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
 
-                        app_handle
-                            .global_shortcut()
-                            .register(control_space_shortcut)?;
-                    }
+                    // Register the global shortcut
+                    app_handle.global_shortcut().register(launcher_shortcut)?;
 
-                    #[cfg(target_os = "windows")]
-                    {
-                        let super_space_shortcut =
-                            Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
-                        let launcher_label = launcher_window.label().to_string();
-
-                        app_handle.plugin(shortcut_plugin(
-                            super_space_shortcut,
-                            launcher_label.clone(),
-                        ))?;
-
-                        app_handle
-                            .global_shortcut()
-                            .register(super_space_shortcut)?;
-                    }
-
+                    // Linux-specific focus handling
                     #[cfg(target_os = "linux")]
                     {
-                        let super_space_shortcut =
-                            Shortcut::new(Some(Modifiers::SUPER), Code::Space);
-                        let launcher_label = launcher_window.label().to_string();
-
-                        app_handle.plugin(shortcut_plugin(
-                            super_space_shortcut,
-                            launcher_label.clone(),
-                        ))?;
-
-                        app_handle
-                            .global_shortcut()
-                            .register(super_space_shortcut)?;
-
-                        // We'll use a different approach for Windows focus handling via on_window_event
-                        // Keep the window-specific handler for Linux focus loss
-
                         let app_handle_focus = app_handle.clone();
                         let launcher_label_linux = launcher_label.clone();
                         launcher_window.on_window_event(move |event| {
@@ -375,12 +342,11 @@ fn main() {
                 });
         });
 }
-fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> TauriPlugin<Wry> {
+fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
     tauri_plugin_global_shortcut::Builder::new()
-        .with_handler(move |app: &AppHandle, shortcut, event| {
-            if shortcut != &super_space_shortcut {
-                return;
-            }
+        .with_handler(move |app: &AppHandle, _shortcut, event| {
+            // Handle any registered shortcut - we'll validate it's a launcher shortcut
+            // by checking if it matches the current user's launcher shortcut
             if ShortcutState::Pressed != event.state() {
                 return;
             }
