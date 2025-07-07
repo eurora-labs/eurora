@@ -20,6 +20,7 @@
 				}
 			})
 			.catch((error) => {
+				goto('/onboarding');
 				console.error('Failed to get service name:', error);
 			});
 		let unlisten: any;
@@ -53,7 +54,7 @@
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
 					{#snippet child({ props })}
-						<Button {...props} variant="outline" class="flex items-center gap-2">
+						<Button {...props} variant="ghost" class="flex items-center gap-2">
 							<ServerIcon size="24px" />{service_name}</Button
 						>
 					{/snippet}
@@ -63,7 +64,8 @@
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 		{/if}
-		<Button variant="ghost" size="icon" href="/settings">
+		<Button variant="outline" href="/settings">
+			Settings
 			<CircleUserRoundIcon size="24px" class="size-6" />
 		</Button>
 	</div>
