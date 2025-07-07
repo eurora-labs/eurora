@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Button } from '@eurora/ui/components/button/index';
 	import Ollama from '$lib/components/Ollama.svelte';
 	import ApiProvider from '$lib/components/ApiProvider.svelte';
 
@@ -16,9 +15,5 @@
 	<div class="grid grid-cols-2 lg:grid-cols-2 gap-6 flex-1">
 		<ApiProvider {finished} />
 		<Ollama {finished} />
-	</div>
-
-	<div class="flex justify-between items-end mt-auto pt-8">
-		<Button variant="outline" href="/onboarding">Back</Button>
 	</div>
 </div>
