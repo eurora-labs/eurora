@@ -29,6 +29,18 @@
 		Delete: 'Del',
 	};
 
+	export async function saveHotkey() {
+		try {
+			const keys = currentHotkey.split(' + ');
+			await taurpc.user.set_launcher_hotkey(
+				keys[keys.length - 1].toLowerCase(),
+				keys.slice(0, keys.length - 1).map((key) => key.toLowerCase()),
+			);
+		} catch (error) {
+			console.error('Error setting hotkey:', error);
+		}
+	}
+
 	function getKeyDisplay(key: string): string {
 		return keyDisplayMap[key] || key.toUpperCase();
 	}
@@ -81,12 +93,6 @@
 		if (recordedKeys.length > 0) {
 			const newHotkey = recordedKeys.join(' + ');
 			currentHotkey = newHotkey;
-
-			try {
-				await taurpc.user.set_launcher_hotkey(newHotkey, recordedKeys);
-			} catch (error) {
-				console.error('Error setting hotkey:', error);
-			}
 		}
 
 		isRecording = false;
