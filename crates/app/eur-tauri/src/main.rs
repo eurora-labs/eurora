@@ -123,10 +123,10 @@ fn main() {
                         .build(tauri_app)
                         .expect("Failed to create tray icon");
 
-                    let _main_window =
-                        create_window(tauri_app.handle(), "main", "onboarding".into())
-                            // create_window(tauri_app.handle(), "main", "index.html".into())
-                            .expect("Failed to create main window");
+                    let _main_window = create_window(tauri_app.handle(), "main", "".into())
+                        // create_window(tauri_app.handle(), "main", "onboarding".into())
+                        // create_window(tauri_app.handle(), "main", "index.html".into())
+                        .expect("Failed to create main window");
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
@@ -487,11 +487,6 @@ fn shortcut_plugin(super_space_shortcut: Shortcut, launcher_label: String) -> Ta
                     Ok(img) => {
                         let t0 = std::time::Instant::now();
                         let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
-                        // let img = pollster::block_on(eur_renderer::blur_image(&img, 0.1, 36.0));
-                        // let img = match cfg!(target_os = "linux") {
-                        //     true => pollster::block_on(eur_renderer::blur_image(&img, 0.1, 36.0)),
-                        //     false => image::DynamicImage::ImageRgba8(img.clone()).to_rgb8(),
-                        // };
 
                         info!("Captured image size: {:?}", img.dimensions());
                         let duration = t0.elapsed();
