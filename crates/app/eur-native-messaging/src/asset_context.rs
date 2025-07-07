@@ -1,5 +1,4 @@
-use anyhow::{Context, Result};
-use base64::prelude::*;
+use anyhow::Result;
 pub use eur_proto::ipc::{
     ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoTweet, ProtoTwitterState,
     ProtoYoutubeState,
@@ -7,7 +6,6 @@ pub use eur_proto::ipc::{
 pub use eur_proto::native_messaging::ProtoNativeArticleAsset;
 pub use eur_proto::native_messaging::ProtoNativeTwitterState;
 pub use eur_proto::native_messaging::ProtoNativeYoutubeState;
-pub use eur_proto::shared::ProtoImage;
 use serde::Deserialize;
 use tracing::info;
 

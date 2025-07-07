@@ -65,7 +65,7 @@ impl Settings {
         &self.openai_api_key
     }
 }
-use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
+use eur_proto::ipc::{ProtoArticleState, ProtoPdfState};
 use eur_proto::questions_service::ProtoChatMessage;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::common::GPT4_O_LATEST;
