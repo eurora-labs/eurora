@@ -25,7 +25,7 @@ export function processQuery(editorRef: Editor): QueryAssets {
 	const processNodeJson = (node: any) => {
 		// If it's a text node, add its text content to the query
 		if (node.type === 'text' && node.text) {
-			query.text += node.text;
+			query.text += ' ' + node.text + ' ';
 		}
 		// If it's any other node with a type that looks like a UUID (not doc or paragraph)
 		// add it to the query as an identifier
