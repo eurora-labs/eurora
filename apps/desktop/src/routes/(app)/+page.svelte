@@ -25,9 +25,7 @@
 	{#if status === 'ready'}
 		<h1 class="text-2xl font-bold">Eurora is ready!</h1>
 		<p>Press PLACEHOLDER to open Eurora anywhere.</p>
-		<div class="flex justify-start">
-			<Button variant="outline" href="/onboarding">Setup everything again</Button>
-		</div>
+		<div class="flex justify-start">You can change all the settings on your account page.</div>
 	{:else}
 		Checking...
 	{/if}
