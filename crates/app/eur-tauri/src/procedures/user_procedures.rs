@@ -81,15 +81,15 @@ impl UserApi for UserApiImpl {
                 }
             }
 
-            // Update the user's hotkey
-            user.hotkeys.open_launcher = new_hotkey;
-            user_controller.set_user(&user).map_err(|e| e.to_string())?;
-
             // Register the new shortcut
             app_handle
                 .global_shortcut()
                 .register(new_shortcut)
                 .map_err(|e| format!("Failed to register new shortcut: {}", e))?;
+
+            // Update the user's hotkey
+            user.hotkeys.open_launcher = new_hotkey;
+            user_controller.set_user(&user).map_err(|e| e.to_string())?;
 
             info!(
                 "Launcher hotkey updated successfully to: {:?}",
