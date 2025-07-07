@@ -372,7 +372,7 @@
 				bind:query={searchQuery}
 				bind:editorRef
 				onkeydown={handleKeydown}
-				class="h-[100px] w-full"
+				class="min-h-[100px] h-fit w-full"
 			/>
 
 			<!-- Recent conversations list -->
