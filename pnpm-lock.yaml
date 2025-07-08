@@ -992,8 +992,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.27
-        version: 2.0.0-next.27(svelte@5.34.9)
+        specifier: 2.0.0-next.29
+        version: 2.0.0-next.29(svelte@5.34.9)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.34.9)
@@ -1464,8 +1464,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.27
-        version: 2.0.0-next.27(svelte@5.34.9)
+        specifier: 2.0.0-next.29
+        version: 2.0.0-next.29(svelte@5.34.9)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.34.9)
@@ -1671,8 +1671,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.27
-        version: 2.0.0-next.27(svelte@5.34.9)
+        specifier: 2.0.0-next.29
+        version: 2.0.0-next.29(svelte@5.34.9)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.34.9)
@@ -5056,8 +5056,8 @@ packages:
   kolorist@1.8.0:
     resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
 
-  layerchart@2.0.0-next.27:
-    resolution: {integrity: sha512-yt28xU8WzXq0AliX7eiC0JKZGQtO8M9FmHvt8sESNitSc/yC+fYeTghaO9lMRwcYCmi6D1NjbFyD9mWFeazNIQ==}
+  layerchart@2.0.0-next.29:
+    resolution: {integrity: sha512-zubub4nkInMW9epKi92vlZ6RrXf0TwL78Ak7unFR38Aukv9BkKfJnC5Ngww35sKRJS4G3HrzKE1/HUpvuDv92g==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -10783,7 +10783,7 @@ snapshots:
 
   kolorist@1.8.0: {}
 
-  layerchart@2.0.0-next.27(svelte@5.34.9):
+  layerchart@2.0.0-next.29(svelte@5.34.9):
     dependencies:
       '@dagrejs/dagre': 1.1.5
       '@layerstack/svelte-actions': 1.0.1-next.12
