@@ -91,6 +91,9 @@ tauri-plugin-trafficlights-positioner = { git = "https://github.com/gitbutlerapp
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-updater = "2"
 
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-autostart = "2.5.0"
+
 [lints.clippy]
 all = "deny"
 perf = "deny"
