@@ -16,24 +16,24 @@
 // contentScriptContext.registerStrategy(new ArticleStrategy(), true);
 
 // Listen for tab updates
+chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
+	if (changeInfo.status === 'complete' && tab.url) {
+		chrome.tabs.sendMessage(
+			tabId,
+			{
+				type: 'NEW',
+				value: tab.url,
+			},
+			(response) => {
+				console.log('Received response from content script:', response);
+			},
+		);
+	}
+});
 
 // Lifecycle handlers
 chrome.runtime.onInstalled.addListener((details) => {
 	console.log('Extension installed or updated:', details.reason);
-	chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
-		if (changeInfo.status === 'complete' && tab.url) {
-			chrome.tabs.sendMessage(
-				tabId,
-				{
-					type: 'NEW',
-					value: tab.url,
-				},
-				(response) => {
-					console.log('Received response from content script:', response);
-				},
-			);
-		}
-	});
 });
 
 console.log('Background script initialized with Strategy Pattern');
