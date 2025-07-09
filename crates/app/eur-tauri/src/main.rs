@@ -43,7 +43,6 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use taurpc::Router;
-use util::get_launcher_shortcut;
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
 
@@ -112,6 +111,22 @@ fn main() {
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
+                    #[cfg(desktop)]
+                    {
+                        use tauri_plugin_autostart::MacosLauncher;
+                        use tauri_plugin_autostart::ManagerExt;
+
+                        let _ = tauri_app.handle().plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--flag1", "--flag2"]) /* arbitrary number of args to pass to your app */));
+
+                        // Get the autostart manager
+                        let autostart_manager = tauri_app.autolaunch();
+                        // Enable autostart
+                        let _ = autostart_manager.enable();
+                        // Check enable state
+                        info!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
+                        
+                    }
+
                     let quit_i = MenuItem::with_id(tauri_app, "quit", "Quit", true, None::<&str>)?;
                     let menu = Menu::with_items(tauri_app, &[&quit_i])?;
                     TrayIconBuilder::new()
@@ -125,6 +140,7 @@ fn main() {
                         })
                         .build(tauri_app)
                         .expect("Failed to create tray icon");
+
 
                     let _main_window = create_window(tauri_app.handle(), "main", "".into())
                         // create_window(tauri_app.handle(), "main", "onboarding".into())
