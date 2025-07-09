@@ -15,14 +15,21 @@
 // // Register the article strategy as the default strategy
 // contentScriptContext.registerStrategy(new ArticleStrategy(), true);
 
-// // Listen for tab updates
-// chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
-// 	// Only process when the page is fully loaded and has a URL
-// 	if (changeInfo.status !== 'complete' || !tab.url) return;
-
-// 	// Process the tab with the appropriate strategy
-// 	contentScriptContext.processTab(tabId, tab.url);
-// });
+// Listen for tab updates
+chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
+	if (changeInfo.status === 'complete' && tab.url) {
+		chrome.tabs.sendMessage(
+			tabId,
+			{
+				type: 'NEW',
+				value: tab.url,
+			},
+			(response) => {
+				console.log('Received response from content script:', response);
+			},
+		);
+	}
+});
 
 // Lifecycle handlers
 chrome.runtime.onInstalled.addListener((details) => {
