@@ -2,6 +2,7 @@
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 import * as path from 'path';
+import copy from 'rollup-plugin-copy';
 
 export default defineConfig({
 	root: __dirname,
@@ -36,6 +37,23 @@ export default defineConfig({
 				chunkFileNames: 'main-[name].js',
 				assetFileNames: 'assets/[name].[ext]',
 			},
+			plugins: [
+				// @ts-expect-error
+				copy({
+					targets: [
+						{
+							src: 'dist/**/*',
+							dest: '../../../../extensions/chromium/content-scripts/twitter-watcher',
+						},
+						{
+							src: 'dist/**/*',
+							dest: '../../../../extensions/firefox/content-scripts/twitter-watcher',
+						},
+					],
+					hook: 'closeBundle',
+					overwrite: true,
+				}),
+			],
 		},
 	},
 	test: {
