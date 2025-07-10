@@ -1,4 +1,3 @@
-// import browser from 'webextension-polyfill';
 console.log('Extension background services started');
 
 let port = browser.runtime.connectNative('com.eurora.app');
@@ -16,92 +15,38 @@ export async function getCurrentTab() {
 		return null;
 	}
 }
-/**
- *
- * Handles the GENERATE_REPORT message by getting the current active tab,
- * checking if it's a YouTube video or article page, and requesting a report
- * from the appropriate watcher
- */
-async function handleGenerateReport() {
-	try {
-		// Get the current active tab
-		const activeTab = await getCurrentTab();
 
-		if (!activeTab || !activeTab.id) {
-			return { success: false, error: 'No active tab found', tab: activeTab };
-		}
+async function handleTabMessage(messageType: string) {
+	// Get the current active tab
+	const activeTab = await getCurrentTab();
 
-		type Response = {
-			error?: string;
-			[key: string]: any;
-		};
-
-		const response: Response = await new Promise((resolve, reject) =>
-			browser.tabs.sendMessage(
-				activeTab.id,
-				{ type: 'GENERATE_ASSETS' },
-				// @ts-expect-error
-				(response: any) => {
-					if (browser.runtime.lastError) {
-						reject({ error: browser.runtime.lastError });
-					} else if (response?.error) {
-						reject({ error: response.error });
-					} else {
-						resolve(response);
-					}
-				},
-			),
-		);
-
-		return { success: true, ...response };
-	} catch (error) {
-		console.error('Error generating report:', error);
-		return {
-			success: false,
-			error: String(error),
-		};
+	if (!activeTab || !activeTab.id) {
+		return { success: false, error: 'No active tab found', tab: activeTab };
 	}
-}
 
-async function handleGenerateSnapshot() {
-	try {
-		// Get the current active tab
-		const activeTab = await getCurrentTab();
+	type Response = {
+		error?: string;
+		[key: string]: any;
+	};
 
-		if (!activeTab || !activeTab.id) {
-			return { success: false, error: 'No active tab found', tab: activeTab };
-		}
+	const response: Response = await new Promise((resolve, reject) =>
+		browser.tabs.sendMessage(
+			activeTab.id,
+			{ type: messageType },
+			// @ts-expect-error
+			(response: any) => {
+				if (browser.runtime.lastError) {
+					reject({ error: browser.runtime.lastError });
+				} else if (response?.error) {
+					reject({ error: response.error });
+				} else {
+					resolve(response);
+				}
+			},
+		),
+	);
 
-		type Response = {
-			error?: string;
-			[key: string]: any;
-		};
-
-		const response: Response = await new Promise((resolve, reject) =>
-			browser.tabs.sendMessage(
-				activeTab.id,
-				{ type: 'GENERATE_SNAPSHOT' },
-				// @ts-expect-error
-				(response: any) => {
-					if (browser.runtime.lastError) {
-						reject({ error: browser.runtime.lastError });
-					} else if (response?.error) {
-						reject({ error: response.error });
-					} else {
-						resolve(response);
-					}
-				},
-			),
-		);
-
-		return { success: true, ...response };
-	} catch (error) {
-		console.error('Error generating snapshot:', error);
-		return {
-			success: false,
-			error: String(error),
-		};
-	}
+	return { success: true, ...response };
 }
 
 // @ts-expect-error
@@ -109,7 +54,7 @@ port.onMessage.addListener(async (message: any, sender: any) => {
 	console.log('Received from native app:', message);
 	switch (message.type) {
 		case 'GENERATE_ASSETS':
-			handleGenerateReport()
+			handleTabMessage('GENERATE_ASSETS')
 				.then((response) => {
 					console.log('Sending GENERATE_REPORT_RESPONSE message', response);
 					sender.postMessage(response);
@@ -120,7 +65,7 @@ port.onMessage.addListener(async (message: any, sender: any) => {
 				});
 			return true; // Indicates we'll call sendResponse asynchronously
 		case 'GENERATE_SNAPSHOT':
-			handleGenerateSnapshot()
+			handleTabMessage('GENERATE_SNAPSHOT')
 				.then((response) => {
 					console.log('Sending GENERATE_SNAPSHOT_RESPONSE message', response);
 					sender.postMessage(response);
