@@ -11,7 +11,9 @@
 	},
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build:firefox": "vite build --outDir ../../../../extensions/firefox/content-scripts/youtube-watcher",
+		"build:chromium": "vite build --outDir ../../../../extensions/chromium/content-scripts/youtube-watcher",
+		"build": "pnpm build:firefox && pnpm build:chromium",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

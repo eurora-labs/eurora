@@ -14,10 +14,6 @@ export default defineConfig({
 	// Configuration for building your library.
 	// See: https://vitejs.dev/guide/build.html#library-mode
 	build: {
-		outDir: path.resolve(
-			__dirname,
-			'../../../../extensions/chromium/content-scripts/article-watcher',
-		),
 		emptyOutDir: true,
 		reportCompressedSize: true,
 		commonjsOptions: {

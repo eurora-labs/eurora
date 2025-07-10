@@ -11,18 +11,9 @@ export default defineConfig({
 			tsconfigPath: path.join(__dirname, 'tsconfig.json'),
 		}),
 	],
-	// Uncomment this if you are using workers.
-	// worker: {
-	//  plugins: [ nxViteTsPaths() ],
-	// },
 	// Configuration for building your library.
 	// See: https://vitejs.dev/guide/build.html#library-mode
 	build: {
-		// outDir: '../../../dist/apps/content-scripts/youtube-watcher',
-		outDir: path.resolve(
-			__dirname,
-			'../../../../extensions/chromium/content-scripts/twitter-watcher',
-		),
 		emptyOutDir: true,
 		reportCompressedSize: true,
 		commonjsOptions: {
