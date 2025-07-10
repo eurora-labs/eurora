@@ -23,7 +23,7 @@ export default defineConfig({
 	// Configuration for building your library.
 	// See: https://vitejs.dev/guide/build.html#library-mode
 	build: {
-		outDir: path.resolve(__dirname, '../../../extensions/chromium/scripts/background'),
+		outDir: path.resolve(__dirname, '../../../../extensions/firefox/scripts/background'),
 		emptyOutDir: true,
 		reportCompressedSize: true,
 
