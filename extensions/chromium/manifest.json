@@ -45,7 +45,7 @@
 			"resources": [
 				"scripts/background/*",
 				"scripts/content/assets/*",
-				"pages/popup/*",
+				"pages/popup/**/*",
 
 				"http:/*",
 				"https:/*",
