@@ -1,16 +1,8 @@
 {
-	"name": "@eurora/extension-background-script",
+	"name": "@firefox/background-script",
 	"private": true,
 	"version": "0.1.0",
 	"type": "module",
-	"module": "index.ts",
-	"main": "index.ts",
-	"exports": {
-		".": {
-			"types": "./index.ts",
-			"svelte": "./index.ts"
-		}
-	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -31,9 +23,11 @@
 		"@eurora/typescript-config": "workspace:*",
 		"@playwright/test": "^1.53.2",
 		"@testing-library/jest-dom": "^6.6.3",
-		"@types/chrome": "^0.0.329",
+		"@types/firefox-webext-browser": "^120.0.4",
 		"eslint": "^9.30.1",
 		"eslint-config-prettier": "^10.1.2",
+		"webextension-polyfill": "^0.12.0",
+		"@types/webextension-polyfill": "^0.12.3",
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
 		"prettier": "^3.6.2",
@@ -44,7 +38,7 @@
 		"vitest": "catalog:"
 	},
 	"dependencies": {
-		"@sentry/vite-plugin": "^3.3.1",
-		"@sentry/browser": "^9.35.0"
+		"@sentry/browser": "^9.35.0",
+		"@sentry/vite-plugin": "^3.3.1"
 	}
 }

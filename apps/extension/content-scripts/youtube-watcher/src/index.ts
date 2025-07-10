@@ -1,14 +1,5 @@
 import './lib/youtube-watcher.ts';
 
-// Send message to service worker
-chrome.runtime.sendMessage({
-	type: 'SEND_TO_NATIVE',
-	payload: {
-		videoId: window.location.search?.split('v=')[1]?.split('&')[0] || '',
-		transcript: '',
-	},
-});
-
 // Listen for responses from service worker
 chrome.runtime.onMessage.addListener((message) => {
 	if (message.type === 'NATIVE_RESPONSE') {

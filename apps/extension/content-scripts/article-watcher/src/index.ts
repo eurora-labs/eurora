@@ -1,14 +1,14 @@
 import './lib/article-watcher.ts';
 
 // Send message to service worker
-chrome.runtime.sendMessage({
-	type: 'SEND_TO_NATIVE',
-	payload: {
-		url: window.location.href,
-		title: document.title,
-		content: '',
-	},
-});
+// chrome.runtime.sendMessage({
+// 	type: 'SEND_TO_NATIVE',
+// 	payload: {
+// 		url: window.location.href,
+// 		title: document.title,
+// 		content: '',
+// 	},
+// });
 
 // Listen for responses from service worker
 chrome.runtime.onMessage.addListener((message) => {

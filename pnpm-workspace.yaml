@@ -2,6 +2,8 @@ packages:
     - 'apps/*'
     - 'apps/extension/*'
     - 'apps/extension/content-scripts/*'
+    - 'apps/extension/chromium/*'
+    - 'apps/extension/firefox/*'
     - 'packages/*'
     - 'packages/website-modules/youtube/*'
     - 'packages/custom-components/*'
