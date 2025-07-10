@@ -13,9 +13,7 @@
 	},
 	"scripts": {
 		"dev": "vite dev",
-		"build:firefox": "vite build --outDir ../../../../extensions/firefox/content-scripts/article-watcher",
-		"build:chromium": "vite build --outDir ../../../../extensions/chromium/content-scripts/article-watcher",
-		"build": "pnpm build:firefox && pnpm build:chromium",
+		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -27,6 +25,7 @@
 		"test:e2e": "playwright test"
 	},
 	"devDependencies": {
+		"rollup-plugin-copy": "^3.5.0",
 		"@eslint/compat": "^1.3.1",
 		"@eslint/js": "^9.30.1",
 		"@eurora/shared": "workspace:*",
