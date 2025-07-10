@@ -32,7 +32,6 @@
 		"@playwright/test": "^1.53.2",
 		"@testing-library/jest-dom": "^6.6.3",
 		"@types/chrome": "^0.0.329",
-		"@types/firefox-webext-browser": "^120.0.4",
 		"eslint": "^9.30.1",
 		"eslint-config-prettier": "^10.1.2",
 		"globals": "^15.15.0",

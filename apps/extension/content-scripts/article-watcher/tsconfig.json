@@ -1,10 +1,9 @@
 {
-	"extends": ["@eurora/typescript-config/svelte"],
 	"compilerOptions": {
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
-		"target": "ESNext",
-		"lib": ["es6", "dom"],
+		"target": "es6",
+		"lib": ["es6", "DOM"],
 		"types": ["chrome", "vite/client"],
 		"strict": false,
 		"noPropertyAccessFromIndexSignature": true,
