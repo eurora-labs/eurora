@@ -415,7 +415,7 @@ importers:
         specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.21)(jiti@2.4.2)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
-  apps/extension/background-script:
+  apps/extension/chromium/background-script:
     dependencies:
       '@sentry/browser':
         specifier: ^9.35.0
@@ -432,10 +432,10 @@ importers:
         version: 9.30.1
       '@eurora/eslint-config':
         specifier: workspace:*
-        version: link:../../../packages/eslint-config
+        version: link:../../../../packages/eslint-config
       '@eurora/typescript-config':
         specifier: workspace:*
-        version: link:../../../packages/typescript-config
+        version: link:../../../../packages/typescript-config
       '@playwright/test':
         specifier: ^1.53.2
         version: 1.53.2
