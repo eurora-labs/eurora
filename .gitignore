@@ -274,31 +274,31 @@ reports/*
 
 .venv
 
-extensions/chromium/pages/*
-!extensions/chromium/pages/.gitkeep
+extensions/**/pages/*
+!extensions/**/pages/.gitkeep
 
-extensions/chromium/scripts/*
-!extensions/chromium/scripts/.gitkeep
+extensions/**/scripts/*
+!extensions/**/scripts/.gitkeep
 
-extensions/chromium/content-scripts/*
-!extensions/chromium/content-scripts/.gitkeep
+extensions/**/content-scripts/*
+!extensions/**/content-scripts/.gitkeep
 
 vitest.config.*.timestamp*
 
-extensions/chromium/katex/*
-!extensions/chromium/katex/.gitkeep
+extensions/**/katex/*
+!extensions/**/katex/.gitkeep
 
 # 
 
-extensions/chromium/pdfjs/viewer/*
+extensions/**/pdfjs/viewer/*
 
 *.pdf
 
-extensions/chromium/pdfjs/viewer/package.json
-extensions/chromium/content/*
-extensions/chromium/options/*
-extensions/chromium/pdfjs/*
-extensions/chromium/contentstyle.css
+extensions/**/pdfjs/viewer/package.json
+extensions/**/content/*
+extensions/**/options/*
+extensions/**/pdfjs/*
+extensions/**/contentstyle.css
 
 *.sqlite
 
