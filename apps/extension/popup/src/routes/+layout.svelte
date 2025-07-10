@@ -1,11 +1,10 @@
 <script lang="ts">
-	import '@eurora/ui/main.css';
 	import '../app.css';
+	import '@eurora/ui/main.css';
 
-	// import Terminal from "@lucide/svelte/icons/terminal";
 	let { children } = $props();
 </script>
 
-<div class="container mx-auto min-h-screen">
+<div class="mx-auto max-h-[300px] max-w-[600px]">
 	{@render children?.()}
 </div>
