@@ -1,5 +1,5 @@
 {
-	"name": "@eurora/extension-popup",
+	"name": "@chrome/popup",
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
@@ -24,6 +24,7 @@
 		"test:unit": "vitest"
 	},
 	"devDependencies": {
+		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
@@ -40,6 +41,15 @@
 		"prettier-plugin-svelte": "^3.3.3",
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
+		"postcss": "catalog:",
+		"@tailwindcss/postcss": "catalog:",
+		"@tailwindcss/container-queries": "^0.1.1",
+		"@tailwindcss/forms": "^0.5.10",
+		"@tailwindcss/typography": "^0.5.16",
+		"@tailwindcss/vite": "^4.1.11",
+		"tailwindcss": "catalog:",
+		"tailwindcss-animate": "^1.0.7",
+		"rollup-plugin-copy": "^3.5.0",
 		"tslib": "^2.8.1",
 		"typescript": "5.8.3",
 		"vite": "catalog:",
