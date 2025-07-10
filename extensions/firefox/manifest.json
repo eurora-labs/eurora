@@ -34,7 +34,7 @@
 			"run_at": "document_start"
 		}
 	],
-	"action": {
+	"browser_action": {
 		"default_icon": "icons/icon-128x128.png",
 		"default_popup": "pages/popup/index.html",
 		"default_title": "Eurora"
