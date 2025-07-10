@@ -1,3 +1,4 @@
+// import browser from 'webextension-polyfill';
 console.log('Extension background services started');
 
 let port = browser.runtime.connectNative('com.eurora.app');
