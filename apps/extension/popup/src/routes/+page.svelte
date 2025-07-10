@@ -3,7 +3,7 @@
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import EuroraIcon from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import { SiGithub } from '@icons-pack/svelte-simple-icons';
-	import { Globe } from '@lucide/svelte';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
 </script>
 
 <div
@@ -40,7 +40,7 @@
 			class="hover:bg-muted rounded-full transition-colors"
 		>
 			<div class="text-muted-foreground hover:text-foreground h-5 w-5">
-				<Globe size={20} />
+				<GlobeIcon size={20} />
 			</div>
 		</Button>
 		<Button
