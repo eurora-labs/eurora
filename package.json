@@ -24,6 +24,7 @@
 		"commit": "cz",
 		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
 		"proto:rust": "cargo build -p eur-proto",
+		"run:firefox": "web-ext run --source-dir ./extensions/firefox/ --devtools",
 		"test:e2e": "cd apps/desktop && pnpm test:e2e"
 	},
 	"devDependencies": {
@@ -36,6 +37,7 @@
 		"@connectrpc/connect": "^2.0.2",
 		"@connectrpc/connect-web": "^2.0.2",
 		"@tauri-apps/cli": "^2.6.2",
+		"web-ext": "^8.8.0",
 		"commitizen": "^4.3.1",
 		"cz-conventional-changelog": "^3.3.0",
 		"eslint-plugin-svelte": "3.9.0",

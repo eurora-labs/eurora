@@ -144,7 +144,7 @@ connectToNativeHost().then((connected) => {
 
 console.log('Native messaging service worker registered');
 
-import { getCurrentTab } from '../utils/tabs.js';
+import { getCurrentTab } from '../utils/tabs.ts';
 
 async function handleGenerateSnapshot() {
 	try {
