@@ -21,7 +21,8 @@ export default defineConfig({
 		// outDir: '../../../dist/apps/content-scripts/youtube-watcher',
 		outDir: path.resolve(
 			__dirname,
-			'../../../../extensions/chromium/content-scripts/youtube-watcher',
+			'../../../../extensions/firefox/content-scripts/youtube-watcher',
+			// '../../../../extensions/chromium/content-scripts/youtube-watcher',
 		),
 		emptyOutDir: true,
 		reportCompressedSize: true,
