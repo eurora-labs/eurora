@@ -47,9 +47,8 @@ impl UserApi for UserApiImpl {
         if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>() {
             // Get the current user to check for existing hotkey
             let mut user = user_controller
-                .get_user()
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| "User not found".to_string())?;
+                .get_or_create_user()
+                .map_err(|e| e.to_string())?;
 
             // Always try to unregister any existing shortcuts to avoid conflicts
             // First, try to unregister the current user's custom shortcut if it exists
