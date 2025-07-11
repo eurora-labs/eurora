@@ -126,36 +126,31 @@ fn main() {
                         info!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
                         
                     }
-                    let main_window = create_window(tauri_app.handle(), "main", "".into())
+
+                    let quit_i = MenuItem::with_id(tauri_app, "quit", "Quit", true, None::<&str>)?;
+                    let menu = Menu::with_items(tauri_app, &[&quit_i])?;
+                    TrayIconBuilder::new()
+                        .icon(tauri_app.default_window_icon().unwrap().clone())
+                        .menu(&menu)
+                        .show_menu_on_left_click(true)
+                        .on_menu_event(move |app, event| {
+                            if event.id == "quit" {
+                                app.exit(0);
+                            }
+                        })
+                        .build(tauri_app)
+                        .expect("Failed to create tray icon");
+
+
+                    let _main_window = create_window(tauri_app.handle(), "main", "".into())
                         // create_window(tauri_app.handle(), "main", "onboarding".into())
+                        // create_window(tauri_app.handle(), "main", "index.html".into())
                         .expect("Failed to create main window");
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
                         create_launcher(tauri_app.handle(), "launcher", "launcher".into())
                             .expect("Failed to create launcher window");
-
-                    let app_handle = tauri_app.handle();
-
-                    let main_window_handle = app_handle.clone();
-                    main_window.on_window_event(move |event| {
-                        info!("Window event: {:?}", event);
-                        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                            let main_window = main_window_handle.get_window("main").expect("Failed to get main window");
-                            main_window.hide().expect("Failed to hide main window");
-                            api.prevent_close();
-                        }
-                        if let tauri::WindowEvent::Focused(focused) = event {
-                            let main_window = main_window_handle.get_window("main").expect("Failed to get main window");
-                            let minimized = main_window.is_minimized().expect("Failed to get window state");
-                            if !*focused && minimized {
-                                main_window.hide().expect("Failed to hide main window");
-                            }
-                            info!("Window focused: {}", focused);
-                        }
-                       
-                    });
-
 
                     #[cfg(debug_assertions)]
                     {
@@ -171,27 +166,7 @@ fn main() {
                             .expect("Failed to hide launcher window on startup");
                     }
 
-                    let open_i = MenuItem::with_id(tauri_app, "open", "Open", true, None::<&str>)?;
-                    let quit_i = MenuItem::with_id(tauri_app, "quit", "Quit", true, None::<&str>)?;
-                    let menu = Menu::with_items(tauri_app, &[&open_i, &quit_i])?;
-                    let tray_icon_handle = app_handle.clone();
-                    TrayIconBuilder::new()
-                        .icon(tauri_app.default_window_icon().unwrap().clone())
-                        .menu(&menu)
-                        .show_menu_on_left_click(true)
-                        .on_menu_event(move |app, event| {
-                            if event.id == "quit" {
-                                app.exit(0);
-                            }
-                            if event.id == "open" {
-                                let main_window = tray_icon_handle.get_window("main").expect("Failed to get main window");
-                                main_window.unminimize().expect("Failed to set window state");
-                                main_window.show().expect("Failed to show main window");
-                            }
-                        })
-                        .build(tauri_app)
-                        .expect("Failed to create tray icon");
-
+                    let app_handle = tauri_app.handle();
 
                     // --- State Initialization ---
                     let transcript_state = Arc::new(Mutex::new(None::<String>));
@@ -379,9 +354,7 @@ fn main() {
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
                 .run(|_app_handle, event| {
-                    if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                        api.prevent_exit();
-                    }
+                    let _ = event;
                 });
         });
 }
