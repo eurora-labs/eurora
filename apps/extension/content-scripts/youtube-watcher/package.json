@@ -3,6 +3,12 @@
 	"private": true,
 	"version": "0.1.0",
 	"type": "module",
+	"exports": {
+		".": {
+			"types": "./index.ts",
+			"svelte": "./index.ts"
+		}
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
