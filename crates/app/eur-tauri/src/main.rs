@@ -378,13 +378,7 @@ fn main() {
                 .invoke_handler(router.into_handler())
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
-                .run(|_app_handle, event| {
-                    if let tauri::RunEvent::ExitRequested { code, api, .. } = event {
-                        if code != Some(0) {
-                            api.prevent_exit();
-                        }
-                    }
-                });
+                .run(|_app_handle, _event| {});
         });
 }
 fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
