@@ -11,7 +11,7 @@
 		"active": false,
 		"category": "DeveloperTool",
 		"copyright": "Copyright © 2024-2025 Eurora Labs. All rights reserved.",
-		"createUpdaterArtifacts": "v1Compatible",
+		"createUpdaterArtifacts": true,
 		"targets": [
 			"app",
 			"dmg",
