@@ -25,6 +25,16 @@ impl Controller {
         })
     }
 
+    pub fn get_or_create_user(&self) -> Result<User> {
+        let user = self.get_user()?;
+        if let Some(user) = user {
+            return Ok(user);
+        }
+        let user = User::default();
+        self.set_user(&user)?;
+        Ok(user)
+    }
+
     /// Return the current login, or `None` if there is none yet.
     pub fn get_user(&self) -> Result<Option<User>> {
         let user = self.storage.get().context("failed to get user")?;
