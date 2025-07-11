@@ -2,8 +2,16 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import copy from 'rollup-plugin-copy';
 
+// import copyBuild from '@eurora/shared/util/copy-plugin';
+
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [
+		sveltekit(),
+		// copyBuild([
+		// 	'../../../extensions/chromium/pages/popup',
+		// 	'../../../extensions/firefox/pages/popup',
+		// ]),
+	],
 	build: {
 		rollupOptions: {
 			plugins: [
