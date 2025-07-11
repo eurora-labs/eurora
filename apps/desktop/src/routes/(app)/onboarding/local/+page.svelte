@@ -4,31 +4,20 @@
 	import ApiProvider from '$lib/components/ApiProvider.svelte';
 	import { goto } from '$app/navigation';
 
-	let status: 'pending' | 'finished' = $state('pending');
-
 	async function finished() {
-		status = 'finished';
-		setTimeout(() => {
-			goto('/onboarding/hotkey');
-		}, 1000);
+		goto('/onboarding/hotkey');
 	}
 </script>
 
 <div class="w-full h-screen mx-auto p-6 flex flex-col">
-	{#if status === 'finished'}
-		<div class="w-full h-screen mx-auto p-6 flex flex-col justify-center items-center">
-			<h1 class="text-4xl font-bold mb-8">Connected, redirecting...</h1>
-		</div>
-	{:else}
-		<h1 class="text-2xl font-bold mb-8">Third Party Configuration</h1>
+	<h1 class="text-2xl font-bold mb-8">Third Party Configuration</h1>
 
-		<div class="grid grid-cols-2 lg:grid-cols-2 gap-6 flex-1">
-			<ApiProvider {finished} />
-			<Ollama {finished} />
-		</div>
+	<div class="grid grid-cols-2 lg:grid-cols-2 gap-6 flex-1">
+		<ApiProvider {finished} />
+		<Ollama {finished} />
+	</div>
 
-		<div class="flex justify-between items-end mt-auto pt-8">
-			<Button variant="outline" href="/onboarding">Back</Button>
-		</div>
-	{/if}
+	<div class="flex justify-between items-end mt-auto pt-8">
+		<Button variant="outline" href="/onboarding">Back</Button>
+	</div>
 </div>
