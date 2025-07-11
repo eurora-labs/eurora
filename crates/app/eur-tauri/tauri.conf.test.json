@@ -1,7 +1,7 @@
 {
-	"productName": "GitButler Test",
-	"identifier": "com.gitbutler.app.test",
+	"productName": "Eurora Test",
+	"identifier": "com.eurora.app.test",
 	"build": {
-		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop -- --mode development && cargo build -p gitbutler-git"
+		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop -- --mode development && cargo build -p eur-tauri"
 	}
 }
