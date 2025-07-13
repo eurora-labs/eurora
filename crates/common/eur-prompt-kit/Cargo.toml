@@ -7,9 +7,14 @@ edition = "2024"
 anyhow = { workspace = true }
 futures = { workspace = true }
 image = { workspace = true }
-llm = { git = "https://github.com/AndreRoelofs/llm.git", branch = "nightly", features = ["openai", "ollama", "anthropic"] }
+ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", features = [
+    "openai",
+    "ollama",
+    "anthropic",
+], branch = "feature/common-trait-derivation" }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
+thiserror = "2.0.12"
 eur-util = { workspace = true }
 regex = "1.9.6"
 tracing = { workspace = true }
