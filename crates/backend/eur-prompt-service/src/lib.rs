@@ -110,10 +110,6 @@ fn to_llm_message(messages: Vec<ProtoChatMessage>) -> Vec<Message> {
                 _ => Role::User,
             },
             content: MessageContent::Text(proto_message.content),
-            name: None,
-            tool_calls: None,
-            tool_call_id: None,
-            created_at: chrono::Utc::now(),
         })
         .collect()
 }
