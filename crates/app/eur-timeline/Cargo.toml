@@ -24,6 +24,7 @@ parking_lot = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 x11rb = "0.13.1"
+ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", features = ["openai"], branch = "main" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.60.2", features = [
