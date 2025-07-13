@@ -2085,11 +2085,12 @@ name = "eur-prompt-service"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "chrono",
  "dotenv",
  "eur-auth",
  "eur-ocr",
- "eur-prompt-kit",
  "eur-proto",
+ "ferrous-llm",
  "futures",
  "image",
  "prost",
