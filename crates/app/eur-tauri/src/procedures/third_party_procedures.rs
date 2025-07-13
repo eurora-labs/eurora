@@ -1,4 +1,3 @@
-use crate::shared_types::SharedPromptKitService;
 use eur_secret::Sensitive;
 use eur_secret::secret;
 use tauri::{Manager, Runtime};
@@ -6,9 +5,6 @@ use tauri::{Manager, Runtime};
 pub trait ThirdPartyApi {
     async fn check_api_key_exists() -> Result<bool, String>;
     async fn save_api_key(api_key: String) -> Result<(), String>;
-    async fn initialize_openai_client<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<bool, String>;
 }
 
 #[derive(Clone)]
@@ -37,20 +33,5 @@ impl ThirdPartyApi for ThirdPartyApiImpl {
         )
         .map_err(|e| format!("Failed to save API key: {}", e))?;
         Ok(())
-    }
-
-    async fn initialize_openai_client<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<bool, String> {
-        // Initialize the OpenAI client with the API key
-        let promptkit_client = eur_prompt_kit::PromptKitService::default();
-
-        // Store the client in the app state
-        let state: tauri::State<SharedPromptKitService> = app_handle.state();
-        let mut guard = state.lock().await;
-        *guard = Some(promptkit_client);
-
-        Ok(true)
     }
 }

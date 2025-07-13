@@ -13,27 +13,41 @@ enum LLMProvider {
     Ollama(OllamaProvider),
 }
 
-pub trait PromptKitServiceTrait {
-    fn get_service_name(&self) -> Result<String>;
-}
-
 #[derive(Debug, Clone)]
-pub struct PromptKitService<T: ProviderConfig> {
-    config: T,
+pub struct PromptKitService {
     provider: LLMProvider,
 }
 
-impl PromptKitService<OpenAIConfig> {
-    pub fn new(config: OpenAIConfig) -> Self {
-        let provider =
-            OpenAIProvider::new(config.clone()).expect("Failed to create OpenAI provider");
+impl Default for PromptKitService {
+    fn default() -> Self {
         Self {
-            config,
-            provider: LLMProvider::OpenAI(provider),
+            provider: LLMProvider::OpenAI(OpenAIProvider::new(OpenAIConfig::default()).unwrap()),
+        }
+    }
+}
+
+impl PromptKitService {
+    pub fn get_service_name(&self) -> Result<String> {
+        match &self.provider {
+            LLMProvider::OpenAI(_) => Ok("OpenAI".to_string()),
+            LLMProvider::Ollama(_) => Ok("Ollama".to_string()),
         }
     }
 
     pub async fn chat_stream(
+        &self,
+        messages: Vec<Message>,
+    ) -> Result<
+        std::pin::Pin<Box<dyn Stream<Item = Result<String, PromptKitError>> + Send>>,
+        PromptKitError,
+    > {
+        match &self.provider {
+            LLMProvider::OpenAI(_) => self._chat_stream_openai(messages).await,
+            LLMProvider::Ollama(_) => self._chat_stream_ollama(messages).await,
+        }
+    }
+
+    async fn _chat_stream_openai(
         &self,
         messages: Vec<Message>,
     ) -> Result<
@@ -50,8 +64,8 @@ impl PromptKitService<OpenAIConfig> {
             let stream = provider
                 .chat_stream(request)
                 .await
-                .map_err(|e| PromptKitError::OpenAIError(e))?
-                .map(|result| result.map_err(|e| PromptKitError::OpenAIError(e)));
+                .map_err(PromptKitError::OpenAIError)?
+                .map(|result| result.map_err(PromptKitError::OpenAIError));
 
             Ok(Box::pin(stream))
         } else {
@@ -60,25 +74,8 @@ impl PromptKitService<OpenAIConfig> {
             })
         }
     }
-}
 
-impl PromptKitServiceTrait for PromptKitService<OpenAIConfig> {
-    fn get_service_name(&self) -> Result<String> {
-        Ok("OpenAI".to_string())
-    }
-}
-
-impl PromptKitService<OllamaConfig> {
-    pub fn new(config: OllamaConfig) -> Self {
-        let provider =
-            OllamaProvider::new(config.clone()).expect("Failed to create Ollama provider");
-        Self {
-            config,
-            provider: LLMProvider::Ollama(provider),
-        }
-    }
-
-    pub async fn chat_stream(
+    async fn _chat_stream_ollama(
         &self,
         messages: Vec<Message>,
     ) -> Result<
@@ -95,8 +92,8 @@ impl PromptKitService<OllamaConfig> {
             let stream = provider
                 .chat_stream(request)
                 .await
-                .map_err(|e| PromptKitError::OllamaError(e))?
-                .map(|result| result.map_err(|e| PromptKitError::OllamaError(e)));
+                .map_err(PromptKitError::OllamaError)?
+                .map(|result| result.map_err(PromptKitError::OllamaError));
 
             Ok(Box::pin(stream))
         } else {
@@ -107,8 +104,22 @@ impl PromptKitService<OllamaConfig> {
     }
 }
 
-impl PromptKitServiceTrait for PromptKitService<OllamaConfig> {
-    fn get_service_name(&self) -> Result<String> {
-        Ok("Ollama".to_string())
+impl From<OpenAIConfig> for PromptKitService {
+    fn from(config: OpenAIConfig) -> Self {
+        let provider =
+            OpenAIProvider::new(config.clone()).expect("Failed to create OpenAI provider");
+        Self {
+            provider: LLMProvider::OpenAI(provider),
+        }
+    }
+}
+
+impl From<OllamaConfig> for PromptKitService {
+    fn from(config: OllamaConfig) -> Self {
+        let provider =
+            OllamaProvider::new(config.clone()).expect("Failed to create Ollama provider");
+        Self {
+            provider: LLMProvider::Ollama(provider),
+        }
     }
 }
