@@ -19,6 +19,9 @@ tokio-stream = { workspace = true }
 image = { workspace = true }
 eur-ocr = { path = "../../common/eur-ocr" }
 futures = "0.3"
-eur-prompt-kit = { workspace = true }
+chrono = { workspace = true }
+ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", features = [
+    "openai",
+], branch = "feature/common-trait-derivation" }
 [build-dependencies]
 tonic-build = { workspace = true }

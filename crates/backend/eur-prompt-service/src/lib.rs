@@ -1,6 +1,9 @@
 use anyhow::{Result, anyhow};
 use eur_auth::{Claims, JwtConfig, validate_access_token};
-use eur_prompt_kit::{EurLLMService, LLMMessage, PromptKitService, RemoteConfig};
+use ferrous_llm::{
+    ChatRequest, Message, MessageContent, Role, StreamingProvider,
+    openai::{OpenAIConfig, OpenAIProvider},
+};
 
 use eur_proto::proto_prompt_service::{
     ProtoChatMessage, SendPromptRequest, SendPromptResponse,
@@ -35,24 +38,20 @@ pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> 
     validate_access_token(token, jwt_config)
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct PromptService {
-    prompt_service: PromptKitService,
+    provider: OpenAIProvider,
     jwt_config: JwtConfig,
 }
 
 impl PromptService {
     pub fn new(jwt_config: Option<JwtConfig>) -> Self {
-        let mut prompt_service = PromptKitService::default();
-        prompt_service
-            .switch_to_remote(RemoteConfig {
-                provider: EurLLMService::OpenAI,
-                api_key: std::env::var("OPENAI_API_KEY").unwrap_or_default(),
-                model: "gpt-4o-2024-11-20".to_string(),
-            })
-            .unwrap();
+        let config = OpenAIConfig::new(
+            std::env::var("OPENAI_API_KEY").unwrap_or_default(),
+            "gpt-4o-2024-11-20",
+        );
         Self {
-            prompt_service,
+            provider: OpenAIProvider::new(config).expect("Failed to create OpenAI provider"),
             jwt_config: jwt_config.unwrap_or_default(),
         }
     }
@@ -78,8 +77,12 @@ impl ProtoPromptService for PromptService {
         let messages = to_llm_message(request_inner.messages);
 
         let stream = self
-            .prompt_service
-            .chat_stream(messages)
+            .provider
+            .chat_stream(ChatRequest {
+                messages,
+                parameters: Default::default(),
+                metadata: Default::default(),
+            })
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
@@ -96,6 +99,21 @@ impl ProtoPromptService for PromptService {
     }
 }
 
-fn to_llm_message(messages: Vec<ProtoChatMessage>) -> Vec<LLMMessage> {
-    messages.into_iter().map(|message| message.into()).collect()
+fn to_llm_message(messages: Vec<ProtoChatMessage>) -> Vec<Message> {
+    messages
+        .into_iter()
+        .map(|proto_message| Message {
+            role: match proto_message.role.as_str() {
+                "user" => Role::User,
+                "assistant" => Role::Assistant,
+                "system" => Role::System,
+                _ => Role::User,
+            },
+            content: MessageContent::Text(proto_message.content),
+            name: None,
+            tool_calls: None,
+            tool_call_id: None,
+            created_at: chrono::Utc::now(),
+        })
+        .collect()
 }
