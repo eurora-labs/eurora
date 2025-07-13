@@ -23,7 +23,6 @@ use eur_tauri::{
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
-        query_procedures::{QueryApi, QueryApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         user_procedures::{UserApi, UserApiImpl},
@@ -371,7 +370,6 @@ fn main() {
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
                 .merge(WindowApiImpl.into_handler())
-                .merge(QueryApiImpl.into_handler())
                 .merge(UserApiImpl.into_handler());
             builder
                 .invoke_handler(tauri::generate_handler![list_conversations,])

@@ -219,12 +219,6 @@ pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
     let mut buffer = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut buffer);
 
-    // let start = std::time::Instant::now();
-    // let rgb = image::DynamicImage::ImageRgba8(image).to_rgb8();
-    // // let rgb = rgba_to_rgb(image);
-    // let duration = start.elapsed();
-    // info!("Conversion to RGB completed in: {:?}", duration);
-
     image
         .write_to(&mut cursor, image::ImageFormat::Jpeg)
         .map_err(|e| anyhow!("Failed to encode image: {}", e))?;

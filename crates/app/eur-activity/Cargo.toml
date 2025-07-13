@@ -8,7 +8,6 @@ description = "Timeline storage for capturing system state over time"
 [dependencies]
 eur-proto = { path = "../../proto/eur-proto" }
 eur-native-messaging = { path = "../eur-native-messaging" }
-
 image.workspace = true
 chrono = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, default-features = false }
@@ -18,10 +17,13 @@ anyhow = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 async-trait = "0.1.77"
-eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 uuid = { workspace = true }
 taurpc = { version = "0.5.1" }
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
 ferrous-focus = { version = "0.2.5" }
 tracing = { workspace = true }
+ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", features = [
+    "openai",
+], branch = "main" }
+base64 = { workspace = true }

@@ -1861,11 +1861,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "eur-native-messaging",
- "eur-prompt-kit",
  "eur-proto",
  "ferrous-focus",
+ "ferrous-llm 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=main)",
  "image",
  "serde",
  "serde_json",
@@ -2070,7 +2071,7 @@ dependencies = [
  "eur-proto",
  "eur-proto-client",
  "eur-util",
- "ferrous-llm",
+ "ferrous-llm 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fcommon-trait-derivation)",
  "futures",
  "image",
  "regex",
@@ -2090,7 +2091,7 @@ dependencies = [
  "eur-auth",
  "eur-ocr",
  "eur-proto",
- "ferrous-llm",
+ "ferrous-llm 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=main)",
  "futures",
  "image",
  "prost",
@@ -2238,6 +2239,7 @@ dependencies = [
  "eur-prompt-kit",
  "eur-proto",
  "ferrous-focus",
+ "ferrous-llm 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=main)",
  "image",
  "parking_lot",
  "serde",
@@ -2392,9 +2394,24 @@ dependencies = [
  "chrono",
  "dotenv",
  "ferrous-llm-anthropic",
- "ferrous-llm-core",
+ "ferrous-llm-core 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fcommon-trait-derivation)",
  "ferrous-llm-ollama",
- "ferrous-llm-openai",
+ "ferrous-llm-openai 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fcommon-trait-derivation)",
+ "futures",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+]
+
+[[package]]
+name = "ferrous-llm"
+version = "0.2.0"
+source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=main#755505ab166b6dd12e34ae7516255a017030c95f"
+dependencies = [
+ "chrono",
+ "dotenv",
+ "ferrous-llm-core 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=main)",
+ "ferrous-llm-openai 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=main)",
  "futures",
  "serde_json",
  "thiserror 2.0.12",
@@ -2408,7 +2425,7 @@ source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fco
 dependencies = [
  "async-trait",
  "chrono",
- "ferrous-llm-core",
+ "ferrous-llm-core 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fcommon-trait-derivation)",
  "futures",
  "reqwest",
  "serde",
@@ -2436,13 +2453,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferrous-llm-core"
+version = "0.2.0"
+source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=main#755505ab166b6dd12e34ae7516255a017030c95f"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "ferrous-llm-ollama"
 version = "0.2.0"
 source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fcommon-trait-derivation#7a851392ec4b6c718d9d8045b7450c519e6313ec"
 dependencies = [
  "async-trait",
  "chrono",
- "ferrous-llm-core",
+ "ferrous-llm-core 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fcommon-trait-derivation)",
  "futures",
  "reqwest",
  "serde",
@@ -2460,7 +2493,25 @@ source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fco
 dependencies = [
  "async-trait",
  "chrono",
- "ferrous-llm-core",
+ "ferrous-llm-core 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fcommon-trait-derivation)",
+ "futures",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-stream",
+ "url",
+]
+
+[[package]]
+name = "ferrous-llm-openai"
+version = "0.2.0"
+source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=main#755505ab166b6dd12e34ae7516255a017030c95f"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "ferrous-llm-core 0.2.0 (git+https://github.com/eurora-labs/ferrous-llm.git?branch=main)",
  "futures",
  "reqwest",
  "serde",
