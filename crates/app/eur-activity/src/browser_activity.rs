@@ -1,6 +1,7 @@
 use crate::{ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, ContextChip};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
+use base64::prelude::*;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{
     self, ProtoArticleSnapshot, ProtoArticleState, ProtoPdfState, ProtoTweet, ProtoTwitterSnapshot,
@@ -13,7 +14,30 @@ use tracing::info;
 use image::DynamicImage;
 use tokio::sync::Mutex;
 
-use eur_prompt_kit::{ImageContent, LLMMessage, MessageContent, Role, TextContent};
+use ferrous_llm::{ContentPart, ImageUrl, Message, MessageContent, Role};
+
+// fn image_to_base64(img: &DynamicImage) -> String {
+//     let mut image_data: Vec<u8> = Vec::new();
+//     img.write_to(
+//         &mut std::io::Cursor::new(&mut image_data),
+//         image::ImageFormat::Png,
+//     )
+//     .unwrap();
+//     let res_base64 = BASE64_STANDARD.encode(image_data);
+//     format!("data:image/png;base64,{}", res_base64)
+// }
+fn image_to_base64(image: &DynamicImage) -> Result<String> {
+    let mut buffer = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut buffer);
+
+    image
+        .write_to(&mut cursor, image::ImageFormat::Jpeg)
+        .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
+
+    let base64 = BASE64_STANDARD.encode(&buffer);
+    // let base64 = base64::encode(&buffer);
+    Ok(format!("data:image/jpeg;base64,{}", base64))
+}
 
 /// Helper function to safely load images from protocol buffer data
 fn load_image_from_proto(
@@ -157,21 +181,19 @@ impl ActivityAsset for YoutubeAsset {
         None
     }
 
-    fn construct_message(&self) -> LLMMessage {
-        LLMMessage {
+    fn construct_message(&self) -> Message {
+        Message {
             role: Role::User,
-            content: MessageContent::Text(TextContent {
-                text: format!(
-                    "I am watching a video with id {} and have a question about it. \
+            content: MessageContent::Text(format!(
+                "I am watching a video with id {} and have a question about it. \
                 Here's the transcript of the video: \n {}",
-                    self.id,
-                    self.transcript
-                        .iter()
-                        .map(|line| format!("{} ({}s)", line.text, line.start))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                ),
-            }),
+                self.id,
+                self.transcript
+                    .iter()
+                    .map(|line| format!("{} ({}s)", line.text, line.start))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            )),
         }
     }
 
@@ -197,16 +219,14 @@ impl ActivityAsset for ArticleAsset {
         None
     }
 
-    fn construct_message(&self) -> LLMMessage {
-        LLMMessage {
+    fn construct_message(&self) -> Message {
+        Message {
             role: Role::User,
-            content: MessageContent::Text(TextContent {
-                text: format!(
-                    "I am reading an article and have a question about it. \
+            content: MessageContent::Text(format!(
+                "I am reading an article and have a question about it. \
                 Here's the text content of the article: \n {}",
-                    self.content
-                ),
-            }),
+                self.content
+            )),
         }
     }
 
@@ -231,7 +251,7 @@ impl ActivityAsset for TwitterAsset {
         None
     }
 
-    fn construct_message(&self) -> LLMMessage {
+    fn construct_message(&self) -> Message {
         let tweet_texts: Vec<String> = self
             .tweets
             .iter()
@@ -244,15 +264,13 @@ impl ActivityAsset for TwitterAsset {
             })
             .collect();
 
-        LLMMessage {
+        Message {
             role: Role::User,
-            content: MessageContent::Text(TextContent {
-                text: format!(
-                    "I am looking at Twitter content and have a question about it. \
+            content: MessageContent::Text(format!(
+                "I am looking at Twitter content and have a question about it. \
                 Here are the tweets I'm seeing: \n\n{}",
-                    tweet_texts.join("\n\n")
-                ),
-            }),
+                tweet_texts.join("\n\n")
+            )),
         }
     }
 
@@ -299,7 +317,7 @@ impl From<ProtoTweet> for TwitterTweet {
 }
 
 impl ActivitySnapshot for TwitterSnapshot {
-    fn construct_message(&self) -> LLMMessage {
+    fn construct_message(&self) -> Message {
         let tweet_texts: Vec<String> = self
             .tweets
             .iter()
@@ -312,15 +330,13 @@ impl ActivitySnapshot for TwitterSnapshot {
             })
             .collect();
 
-        LLMMessage {
+        Message {
             role: Role::User,
-            content: MessageContent::Text(TextContent {
-                text: format!(
-                    "I am looking at Twitter content and have a question about it. \
+            content: MessageContent::Text(format!(
+                "I am looking at Twitter content and have a question about it. \
                 Here are the tweets I'm seeing: \n\n{}",
-                    tweet_texts.join("\n\n")
-                ),
-            }),
+                tweet_texts.join("\n\n")
+            )),
         }
     }
 
@@ -372,15 +388,13 @@ impl ArticleSnapshot {
 }
 
 impl ActivitySnapshot for ArticleSnapshot {
-    fn construct_message(&self) -> LLMMessage {
-        LLMMessage {
+    fn construct_message(&self) -> Message {
+        Message {
             role: Role::User,
-            content: MessageContent::Text(TextContent {
-                text: format!(
-                    "I highlighted the following text: \n {}",
-                    self.highlight.clone().unwrap_or_default()
-                ),
-            }),
+            content: MessageContent::Text(format!(
+                "I highlighted the following text: \n {}",
+                self.highlight.clone().unwrap_or_default()
+            )),
         }
     }
 
@@ -425,13 +439,25 @@ impl From<ProtoYoutubeSnapshot> for YoutubeSnapshot {
 }
 
 impl ActivitySnapshot for YoutubeSnapshot {
-    fn construct_message(&self) -> LLMMessage {
-        LLMMessage {
+    fn construct_message(&self) -> Message {
+        Message {
             role: Role::User,
-            content: MessageContent::Image(ImageContent {
-                text: Some("This is last frame of the video".to_string()),
-                image: self.video_frame.clone(),
-            }),
+            // content: MessageContent::Multimodal(vec![ContentPart {
+            //     text: Text{ Some("This is last frame of the video".to_string())},
+            //     image: self.video_frame.clone(),
+            // }]),
+            content: MessageContent::Multimodal(vec![
+                ContentPart::Text {
+                    text: "This is last frame of the video".to_string(),
+                },
+                ContentPart::Image {
+                    image_url: ImageUrl {
+                        url: image_to_base64(&self.video_frame).unwrap(),
+                        detail: None,
+                    },
+                    detail: None,
+                },
+            ]),
         }
     }
 
@@ -677,8 +703,8 @@ mod tests {
 
         match message.content {
             MessageContent::Text(text_content) => {
-                assert!(text_content.text.contains("Important text"));
-                assert!(text_content.text.contains("highlighted"));
+                assert!(text_content.contains("Important text"));
+                assert!(text_content.contains("highlighted"));
             }
             _ => panic!("Expected text content"),
         }
