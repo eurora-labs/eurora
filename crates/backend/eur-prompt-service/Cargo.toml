@@ -22,6 +22,6 @@ futures = "0.3"
 chrono = { workspace = true }
 ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", features = [
     "openai",
-], branch = "feature/common-trait-derivation" }
+], branch = "main" }
 [build-dependencies]
 tonic-build = { workspace = true }
