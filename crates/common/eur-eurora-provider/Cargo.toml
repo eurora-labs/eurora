@@ -1,0 +1,12 @@
+[package]
+name = "eur-eurora-provider"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+ferrous-llm-core = { version = "0.3.0", features = ["dynamic-image"] }
+ferrous-llm-grpc = { version = "0.1.0" }
+thiserror = "2.0.12"
