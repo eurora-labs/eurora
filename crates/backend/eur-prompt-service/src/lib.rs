@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use eur_auth::{Claims, JwtConfig, validate_access_token};
 use ferrous_llm::{
-    ChatRequest, Message, MessageContent, Role, StreamingProvider,
+    ChatRequest, StreamingProvider,
     openai::{OpenAIConfig, OpenAIProvider},
 };
 use std::pin::Pin;
@@ -10,8 +10,8 @@ use tonic::{Request, Response, Status};
 use tracing::info;
 
 use eur_eurora_provider::proto::chat::{
-    ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse,
-    proto_chat_service_server::ProtoChatService,
+    ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse, ProtoFinishReason,
+    proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
 };
 
 /// Extract and validate JWT token from request metadata
@@ -36,6 +36,10 @@ pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> 
 
     // Validate access token using shared function
     validate_access_token(token, jwt_config)
+}
+
+pub fn get_service(prompt_service: PromptService) -> ProtoChatServiceServer<PromptService> {
+    ProtoChatServiceServer::new(prompt_service)
 }
 
 #[derive(Debug)]
@@ -68,6 +72,15 @@ impl ProtoChatService for PromptService {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
         info!("Received send_prompt request");
+        // Return a single response
+        Ok(Response::new(ProtoChatResponse {
+            content: "Hello, world!".to_string(),
+            usage: None,
+            finish_reason: Some(ProtoFinishReason::FinishReasonStop.into()),
+            metadata: None,
+            tool_calls: vec![],
+        }))
+
         // let request_inner = request.into_inner();
 
         // let messages = request_inner
@@ -87,7 +100,7 @@ impl ProtoChatService for PromptService {
         //     .map_err(|e| Status::internal(e.to_string()))?;
 
         // Ok(Response::new(stream))
-        unimplemented!()
+        // unimplemented!()
     }
 
     async fn chat_stream(
@@ -96,7 +109,7 @@ impl ProtoChatService for PromptService {
     ) -> ChatResult<Self::ChatStreamStream> {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
-        info!("Received send_prompt request");
+        info!("Received chat_stream request");
         let request_inner = request.into_inner();
 
         let messages = request_inner
@@ -105,21 +118,35 @@ impl ProtoChatService for PromptService {
             .map(|msg| msg.clone().into())
             .collect();
 
-        let stream = self
+        let chat_request = ChatRequest {
+            messages,
+            parameters: Default::default(),
+            metadata: Default::default(),
+        };
+
+        let openai_stream = self
             .provider
-            .chat_stream(ChatRequest {
-                messages,
-                parameters: Default::default(),
-                metadata: Default::default(),
-            })
+            .chat_stream(chat_request)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        // Direct stream mapping - much simpler than channel bridging
-        let output_stream = stream.map(|result| {
-            result
-                .map(|message| message.content().into())
-                .map_err(|e| Status::internal(e.to_string()))
+        let output_stream = openai_stream.map(|result| {
+            match result {
+                Ok(content) => {
+                    // Check if this is the final chunk (empty content typically indicates end)
+                    let is_final = content.is_empty();
+
+                    Ok(ProtoChatStreamResponse {
+                        content,
+                        is_final,
+                        usage: None, // Usage info typically only available in final chunk
+                        finish_reason: if is_final { Some(0) } else { None }, // 0 = Stop reason
+                        metadata: None,
+                        tool_calls: vec![],
+                    })
+                }
+                Err(e) => Err(Status::internal(e.to_string())),
+            }
         });
 
         Ok(Response::new(

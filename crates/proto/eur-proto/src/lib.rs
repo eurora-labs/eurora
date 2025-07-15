@@ -5,7 +5,6 @@
 
 // Include the generated code
 pub mod generated {
-
     // Re-export all generated modules
     pub mod questions_service {
         include!("gen/questions_service.rs");
