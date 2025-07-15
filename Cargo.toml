@@ -53,6 +53,7 @@ image = { version = "0.25.6", features = [
 base64 = "0.22.1"
 sentry = { version = "0.37.0" }
 
+eur-eurora-provider = { path = "crates/common/eur-eurora-provider" }
 eur-secret = { path = "crates/app/eur-secret" }
 eur-user = { path = "crates/app/eur-user" }
 eur-auth = { path = "crates/common/eur-auth" }

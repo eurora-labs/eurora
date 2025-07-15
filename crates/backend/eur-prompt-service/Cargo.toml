@@ -23,5 +23,6 @@ chrono = { workspace = true }
 ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", features = [
     "openai",
 ], branch = "main" }
+
 [build-dependencies]
 tonic-build = { workspace = true }
