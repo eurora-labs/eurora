@@ -8,6 +8,7 @@ use crate::proto::chat::{
 };
 use crate::types::*;
 use async_trait::async_trait;
+use ferrous_llm_core::ChatRequest;
 use ferrous_llm_core::traits::{ChatProvider, StreamingProvider};
 use futures::Stream;
 use std::pin::Pin;
@@ -89,7 +90,7 @@ impl GrpcChatProvider {
     }
 
     /// Convert a core ChatRequest to a proto ChatRequest.
-    fn convert_request(&self, request: ProtoChatRequest) -> Result<ProtoChatRequest, GrpcError> {
+    fn convert_request(&self, request: ChatRequest) -> Result<ProtoChatRequest, GrpcError> {
         let messages = request
             .messages
             .into_iter()
@@ -111,10 +112,14 @@ impl GrpcChatProvider {
         &self,
         message: ferrous_llm_core::types::Message,
     ) -> Result<ProtoMessage, GrpcError> {
-        let role = core_role_to_proto(&message.role);
+        let role: ProtoRole = message.role.into();
         let content = Some(self.convert_message_content(message.content)?);
 
-        Ok(ProtoMessage { role, content })
+        Ok(ProtoMessage {
+            // Double into here because prost treats all defined enums as i32 when used asa properties
+            role: role.into(),
+            content,
+        })
     }
 
     /// Convert core MessageContent to proto MessageContent.
@@ -220,128 +225,19 @@ impl GrpcChatProvider {
             created_at: Some(datetime_to_proto_timestamp(&metadata.created_at)),
         }
     }
-
-    /// Convert proto ChatResponse to core GrpcChatResponse.
-    fn convert_response(&self, response: ProtoChatResponse) -> Result<GrpcChatResponse, GrpcError> {
-        let usage = response.usage.map(|u| ferrous_llm_core::types::Usage {
-            prompt_tokens: u.prompt_tokens,
-            completion_tokens: u.completion_tokens,
-            total_tokens: u.total_tokens,
-        });
-
-        let finish_reason = response
-            .finish_reason
-            .map(|r| proto_finish_reason_to_core(r));
-
-        let metadata = response
-            .metadata
-            .map(|m| self.convert_proto_metadata(m))
-            .unwrap_or_default();
-
-        let tool_calls = if response.tool_calls.is_empty() {
-            None
-        } else {
-            Some(
-                response
-                    .tool_calls
-                    .into_iter()
-                    .map(|call| self.convert_proto_tool_call(call))
-                    .collect::<Result<Vec<_>, _>>()?,
-            )
-        };
-
-        Ok(GrpcChatResponse {
-            content: response.content,
-            usage,
-            finish_reason,
-            metadata,
-            tool_calls,
-        })
-    }
-
-    /// Convert proto Metadata to core Metadata.
-    fn convert_proto_metadata(&self, metadata: ProtoMetadata) -> ferrous_llm_core::types::Metadata {
-        ferrous_llm_core::types::Metadata {
-            extensions: proto_struct_to_hashmap(metadata.extensions),
-            request_id: metadata.request_id,
-            user_id: metadata.user_id,
-            created_at: proto_timestamp_to_datetime(metadata.created_at),
-        }
-    }
-
-    /// Convert proto ToolCall to core ToolCall.
-    fn convert_proto_tool_call(
-        &self,
-        call: ProtoToolCall,
-    ) -> Result<ferrous_llm_core::types::ToolCall, GrpcError> {
-        let function = call.function.ok_or_else(|| {
-            GrpcError::InvalidResponse("Missing function in tool call".to_string())
-        })?;
-
-        Ok(ferrous_llm_core::types::ToolCall {
-            id: call.id,
-            call_type: call.call_type,
-            function: ferrous_llm_core::types::FunctionCall {
-                name: function.name,
-                arguments: function.arguments,
-            },
-        })
-    }
-
-    /// Convert proto ChatStreamResponse to core GrpcStreamResponse.
-    fn convert_stream_response(
-        &self,
-        response: ProtoChatStreamResponse,
-    ) -> Result<GrpcStreamResponse, GrpcError> {
-        let usage = response.usage.map(|u| ferrous_llm_core::types::Usage {
-            prompt_tokens: u.prompt_tokens,
-            completion_tokens: u.completion_tokens,
-            total_tokens: u.total_tokens,
-        });
-
-        let finish_reason = response
-            .finish_reason
-            .map(|r| proto_finish_reason_to_core(r));
-
-        let metadata = response
-            .metadata
-            .map(|m| self.convert_proto_metadata(m))
-            .unwrap_or_default();
-
-        let tool_calls = if response.tool_calls.is_empty() {
-            None
-        } else {
-            Some(
-                response
-                    .tool_calls
-                    .into_iter()
-                    .map(|call| self.convert_proto_tool_call(call))
-                    .collect::<Result<Vec<_>, _>>()?,
-            )
-        };
-
-        Ok(GrpcStreamResponse {
-            content: response.content,
-            is_final: response.is_final,
-            usage,
-            finish_reason,
-            metadata,
-            tool_calls,
-        })
-    }
 }
 
 #[async_trait]
 impl ChatProvider for GrpcChatProvider {
     type Config = GrpcConfig;
-    type Response = GrpcChatResponse;
+    type Response = ProtoChatResponse;
     type Error = GrpcError;
 
     async fn chat(
         &self,
         request: ferrous_llm_core::types::ChatRequest,
     ) -> Result<Self::Response, Self::Error> {
-        let proto_request = self.convert_request(request)?;
+        let proto_request = request.into();
         let mut client = self.client.clone();
 
         // Add authentication if configured
@@ -358,7 +254,7 @@ impl ChatProvider for GrpcChatProvider {
         let response = client.chat(grpc_request).await?;
         let proto_response = response.into_inner();
 
-        self.convert_response(proto_response)
+        Ok(proto_response)
     }
 }
 
@@ -379,7 +275,7 @@ impl GrpcStreamingProvider {
 #[async_trait]
 impl ChatProvider for GrpcStreamingProvider {
     type Config = GrpcConfig;
-    type Response = GrpcChatResponse;
+    type Response = ProtoChatResponse;
     type Error = GrpcError;
 
     async fn chat(
@@ -392,7 +288,7 @@ impl ChatProvider for GrpcStreamingProvider {
 
 #[async_trait]
 impl StreamingProvider for GrpcStreamingProvider {
-    type StreamItem = GrpcStreamResponse;
+    type StreamItem = ProtoChatStreamResponse;
     type Stream =
         Pin<Box<dyn Stream<Item = Result<Self::StreamItem, Self::Error>> + Send + 'static>>;
 
@@ -427,16 +323,11 @@ impl GrpcStreamingProvider {
     fn convert_stream(
         mut stream: Streaming<ProtoChatStreamResponse>,
         provider: GrpcChatProvider,
-    ) -> impl Stream<Item = Result<GrpcStreamResponse, GrpcError>> + Send + 'static {
+    ) -> impl Stream<Item = Result<ProtoChatStreamResponse, GrpcError>> + Send + 'static {
         async_stream::stream! {
             while let Some(result) = stream.message().await.transpose() {
                 match result {
-                    Ok(proto_response) => {
-                        match provider.convert_stream_response(proto_response) {
-                            Ok(response) => yield Ok(response),
-                            Err(e) => yield Err(e),
-                        }
-                    }
+                    Ok(proto_response) => yield Ok(proto_response),
                     Err(e) => yield Err(GrpcError::Status(e)),
                 }
             }
