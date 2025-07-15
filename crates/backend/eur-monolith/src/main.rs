@@ -6,7 +6,7 @@ use eur_ocr_service::OcrService;
 use eur_prompt_service::PromptService;
 use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer;
 use eur_proto::proto_ocr_service::proto_ocr_service_server::ProtoOcrServiceServer;
-use eur_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
+// use eur_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
 use eur_remote_db::DatabaseManager;
 use std::sync::Arc;
 use tonic::transport::Server;
@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(health_service)
         .add_service(ProtoOcrServiceServer::new(ocr_service))
         .add_service(ProtoAuthServiceServer::new(auth_service))
-        .add_service(ProtoPromptServiceServer::new(prompt_service))
+        .add_service(eur_prompt_service::get_service(prompt_service))
         .serve_with_shutdown(addr, async {
             tokio::signal::ctrl_c()
                 .await
