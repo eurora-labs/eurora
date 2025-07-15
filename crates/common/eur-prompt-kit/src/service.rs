@@ -1,5 +1,6 @@
 use crate::PromptKitError;
 use anyhow::Result;
+use eur_eurora_provider::{EuroraConfig, EuroraError, EuroraProvider};
 use ferrous_llm::{
     ChatRequest, Message, ProviderConfig, StreamingProvider,
     ollama::{OllamaConfig, OllamaProvider},
@@ -11,6 +12,7 @@ use tokio_stream::{Stream, StreamExt};
 enum LLMProvider {
     OpenAI(OpenAIProvider),
     Ollama(OllamaProvider),
+    Eurora(EuroraProvider),
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +33,7 @@ impl PromptKitService {
         match &self.provider {
             LLMProvider::OpenAI(_) => Ok("OpenAI".to_string()),
             LLMProvider::Ollama(_) => Ok("Ollama".to_string()),
+            LLMProvider::Eurora(_) => Ok("Eurora".to_string()),
         }
     }
 
@@ -44,6 +47,35 @@ impl PromptKitService {
         match &self.provider {
             LLMProvider::OpenAI(_) => self._chat_stream_openai(messages).await,
             LLMProvider::Ollama(_) => self._chat_stream_ollama(messages).await,
+            LLMProvider::Eurora(_) => self._chat_stream_eurora(messages).await,
+        }
+    }
+
+    async fn _chat_stream_eurora(
+        &self,
+        messages: Vec<Message>,
+    ) -> Result<
+        std::pin::Pin<Box<dyn Stream<Item = Result<String, PromptKitError>> + Send>>,
+        PromptKitError,
+    > {
+        if let LLMProvider::Eurora(provider) = &self.provider {
+            let request = ChatRequest {
+                messages,
+                parameters: Default::default(),
+                metadata: Default::default(),
+            };
+
+            let stream = provider
+                .chat_stream(request)
+                .await
+                .map_err(|e| EuroraError::Other(e.to_string()))?
+                .map(|result| result.map_err(EuroraError::from));
+
+            Ok(Box::pin(stream))
+        } else {
+            Err(PromptKitError::ServiceNotInitialized {
+                service: "Eurora".to_string(),
+            })
         }
     }
 
