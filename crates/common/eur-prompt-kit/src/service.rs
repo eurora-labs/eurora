@@ -68,8 +68,8 @@ impl PromptKitService {
             let stream = provider
                 .chat_stream(request)
                 .await
-                .map_err(|e| EuroraError::Other(e.to_string()))?
-                .map(|result| result.map_err(EuroraError::from));
+                .map_err(PromptKitError::EuroraError)?
+                .map(|result| result.map_err(PromptKitError::EuroraError));
 
             Ok(Box::pin(stream))
         } else {
