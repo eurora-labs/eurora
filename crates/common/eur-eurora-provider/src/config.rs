@@ -1,96 +1,228 @@
-use ferrous_llm_core::{ConfigError, HttpConfig, ProviderConfig};
+//! Configuration types for gRPC providers.
+
+use ferrous_llm_core::config::ProviderConfig;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use url::Url;
 
+/// Configuration for gRPC providers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EuroraConfig {
-    pub model: String,
+pub struct GrpcConfig {
+    /// The gRPC server endpoint URL
+    pub endpoint: Url,
 
-    pub base_url: String,
+    /// Optional authentication token
+    pub auth_token: Option<String>,
 
-    pub http: HttpConfig,
+    /// Request timeout duration
+    pub timeout: Option<Duration>,
 
-    pub embedding_model: Option<String>,
+    /// Maximum message size for requests (in bytes)
+    pub max_request_size: Option<usize>,
 
-    pub keep_alive: Option<u64>,
+    /// Maximum message size for responses (in bytes)
+    pub max_response_size: Option<usize>,
 
-    pub options: Option<serde_json::Value>,
+    /// Whether to use TLS
+    pub use_tls: bool,
+
+    /// Optional TLS domain name for verification
+    pub tls_domain: Option<String>,
+
+    /// Connection timeout
+    pub connect_timeout: Option<Duration>,
+
+    /// Keep-alive interval
+    pub keep_alive_interval: Option<Duration>,
+
+    /// Keep-alive timeout
+    pub keep_alive_timeout: Option<Duration>,
+
+    /// Whether to enable keep-alive while idle
+    pub keep_alive_while_idle: bool,
+
+    /// Maximum number of concurrent requests
+    pub max_concurrent_requests: Option<usize>,
+
+    /// User agent string
+    pub user_agent: Option<String>,
 }
 
-impl Default for EuroraConfig {
+impl Default for GrpcConfig {
     fn default() -> Self {
         Self {
-            model: "default".to_string(),
-            base_url: "http://localhost:50051".to_string(),
-            http: HttpConfig::default(),
-            embedding_model: None,
-            keep_alive: None,
-            options: None,
+            endpoint: Url::parse("http://localhost:50051").unwrap(),
+            auth_token: None,
+            timeout: Some(Duration::from_secs(30)),
+            max_request_size: Some(4 * 1024 * 1024),  // 4MB
+            max_response_size: Some(4 * 1024 * 1024), // 4MB
+            use_tls: false,
+            tls_domain: None,
+            connect_timeout: Some(Duration::from_secs(10)),
+            keep_alive_interval: Some(Duration::from_secs(30)),
+            keep_alive_timeout: Some(Duration::from_secs(5)),
+            keep_alive_while_idle: true,
+            max_concurrent_requests: Some(100),
+            user_agent: Some("ferrous-llm-grpc/0.2.0".to_string()),
         }
     }
 }
 
-impl ProviderConfig for EuroraConfig {
-    type Provider = crate::provider::EuroraProvider;
+impl ProviderConfig for GrpcConfig {
+    type Provider = crate::provider::GrpcChatProvider;
 
-    fn build(self) -> Result<Self::Provider, ConfigError> {
+    fn build(self) -> Result<Self::Provider, ferrous_llm_core::error::ConfigError> {
+        use ferrous_llm_core::error::ConfigError;
+
         self.validate()?;
-        crate::provider::EuroraProvider::new(self).map_err(|e| match e {
-            crate::error::EuroraError::Config(source) => source,
-            _ => ConfigError::validation_failed("Failed to create provider"),
-        })
+
+        // Note: This is a synchronous build method, but GrpcChatProvider::new is async
+        // In practice, this would need to be handled differently, perhaps with a builder pattern
+        // For now, we'll return an error indicating async construction is needed
+        Err(ConfigError::validation_failed(
+            "GrpcChatProvider requires async construction. Use GrpcChatProvider::new(config).await instead",
+        ))
     }
 
-    fn validate(&self) -> Result<(), ConfigError> {
-        todo!()
+    fn validate(&self) -> Result<(), ferrous_llm_core::error::ConfigError> {
+        use ferrous_llm_core::error::ConfigError;
+
+        // Validate endpoint
+        if self.endpoint.scheme() != "http" && self.endpoint.scheme() != "https" {
+            return Err(ConfigError::invalid_value(
+                "endpoint",
+                "Endpoint must use http or https scheme",
+            ));
+        }
+
+        // Validate TLS configuration
+        if self.use_tls && self.endpoint.scheme() != "https" {
+            return Err(ConfigError::invalid_value(
+                "endpoint",
+                "TLS is enabled but endpoint scheme is not https",
+            ));
+        }
+
+        // Validate timeouts
+        if let Some(timeout) = self.timeout {
+            if timeout.is_zero() {
+                return Err(ConfigError::invalid_value(
+                    "timeout",
+                    "Timeout must be greater than zero",
+                ));
+            }
+        }
+
+        if let Some(connect_timeout) = self.connect_timeout {
+            if connect_timeout.is_zero() {
+                return Err(ConfigError::invalid_value(
+                    "connect_timeout",
+                    "Connect timeout must be greater than zero",
+                ));
+            }
+        }
+
+        // Validate message sizes
+        if let Some(max_request_size) = self.max_request_size {
+            if max_request_size == 0 {
+                return Err(ConfigError::invalid_value(
+                    "max_request_size",
+                    "Max request size must be greater than zero",
+                ));
+            }
+        }
+
+        if let Some(max_response_size) = self.max_response_size {
+            if max_response_size == 0 {
+                return Err(ConfigError::invalid_value(
+                    "max_response_size",
+                    "Max response size must be greater than zero",
+                ));
+            }
+        }
+
+        // Validate concurrent requests
+        if let Some(max_concurrent) = self.max_concurrent_requests {
+            if max_concurrent == 0 {
+                return Err(ConfigError::invalid_value(
+                    "max_concurrent_requests",
+                    "Max concurrent requests must be greater than zero",
+                ));
+            }
+        }
+
+        Ok(())
     }
 }
 
-impl EuroraConfig {
-    pub fn new(model: impl Into<String>) -> Self {
+impl GrpcConfig {
+    /// Create a new gRPC configuration with the given endpoint.
+    pub fn new(endpoint: Url) -> Self {
         Self {
-            model: model.into(),
+            endpoint,
             ..Default::default()
         }
     }
 
-    pub fn builder() -> EuroraConfigBuilder {
-        EuroraConfigBuilder::new()
-    }
-}
-
-pub struct EuroraConfigBuilder {
-    config: EuroraConfig,
-}
-
-impl EuroraConfigBuilder {
-    pub fn new() -> Self {
-        Self {
-            config: EuroraConfig::default(),
-        }
-    }
-
-    pub fn model(mut self, model: impl Into<String>) -> Self {
-        self.config.model = model.into();
+    /// Set the authentication token.
+    pub fn with_auth_token(mut self, token: String) -> Self {
+        self.auth_token = Some(token);
         self
     }
 
-    pub fn base_url(mut self, base_url: impl Into<String>) -> Self {
-        self.config.base_url = base_url.into();
+    /// Set the request timeout.
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
         self
     }
 
-    pub fn keep_alive(mut self, keep_alive: u64) -> Self {
-        self.config.keep_alive = Some(keep_alive);
+    /// Enable TLS with optional domain name.
+    pub fn with_tls(mut self, domain: Option<String>) -> Self {
+        self.use_tls = true;
+        self.tls_domain = domain;
         self
     }
 
-    pub fn build(self) -> EuroraConfig {
-        self.config
+    /// Set the maximum request size.
+    pub fn with_max_request_size(mut self, size: usize) -> Self {
+        self.max_request_size = Some(size);
+        self
     }
-}
 
-impl Default for EuroraConfigBuilder {
-    fn default() -> Self {
-        Self::new()
+    /// Set the maximum response size.
+    pub fn with_max_response_size(mut self, size: usize) -> Self {
+        self.max_response_size = Some(size);
+        self
+    }
+
+    /// Set the connection timeout.
+    pub fn with_connect_timeout(mut self, timeout: Duration) -> Self {
+        self.connect_timeout = Some(timeout);
+        self
+    }
+
+    /// Set keep-alive configuration.
+    pub fn with_keep_alive(
+        mut self,
+        interval: Duration,
+        timeout: Duration,
+        while_idle: bool,
+    ) -> Self {
+        self.keep_alive_interval = Some(interval);
+        self.keep_alive_timeout = Some(timeout);
+        self.keep_alive_while_idle = while_idle;
+        self
+    }
+
+    /// Set the maximum number of concurrent requests.
+    pub fn with_max_concurrent_requests(mut self, max: usize) -> Self {
+        self.max_concurrent_requests = Some(max);
+        self
+    }
+
+    /// Set the user agent string.
+    pub fn with_user_agent(mut self, user_agent: String) -> Self {
+        self.user_agent = Some(user_agent);
+        self
     }
 }

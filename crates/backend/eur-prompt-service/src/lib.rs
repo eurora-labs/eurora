@@ -4,15 +4,22 @@ use ferrous_llm::{
     ChatRequest, Message, MessageContent, Role, StreamingProvider,
     openai::{OpenAIConfig, OpenAIProvider},
 };
-
-use eur_proto::proto_prompt_service::{
-    ProtoChatMessage, SendPromptRequest, SendPromptResponse,
-    proto_prompt_service_server::ProtoPromptService,
-};
+// use eur_proto::proto_prompt_service::{
+//     ProtoChatMessage, SendPromptRequest, SendPromptResponse,
+//     proto_prompt_service_server::ProtoPromptService,
+// };
 use std::pin::Pin;
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
 use tracing::info;
+
+mod chat {
+    tonic::include_proto!("eurora.chat");
+}
+
+use chat::proto_chat_service_server::ProtoChatService;
+
+use crate::chat::{ProtoChatRequest, ProtoChatResponse};
 
 /// Extract and validate JWT token from request metadata
 pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
@@ -62,13 +69,34 @@ type SendPromptResponseStream =
     Pin<Box<dyn Stream<Item = Result<SendPromptResponse, Status>> + Send>>;
 
 #[tonic::async_trait]
-impl ProtoPromptService for PromptService {
-    type SendPromptStream = SendPromptResponseStream;
+impl ProtoChatService for PromptService {
+    type ChatStreamStream = SendPromptResponseStream;
 
-    async fn send_prompt(
+    async fn chat(&self, request: Request<ProtoChatRequest>) -> Result<ProtoChatResponse> {
+        authenticate_request(&request, &self.jwt_config)
+            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        info!("Received send_prompt request");
+        let request_inner = request.into_inner();
+
+        let messages = to_llm_message(request_inner.messages);
+
+        let stream = self
+            .provider
+            .chat(ChatRequest {
+                messages,
+                parameters: Default::default(),
+                metadata: Default::default(),
+            })
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        Ok(Response::new(Box::pin(stream) as Self::ChatStreamStream))
+    }
+
+    async fn chat_stream(
         &self,
-        request: Request<SendPromptRequest>,
-    ) -> SendPromptResult<Self::SendPromptStream> {
+        request: Request<ProtoChatRequest>,
+    ) -> SendPromptResult<Self::ChatStreamStream> {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
         info!("Received send_prompt request");

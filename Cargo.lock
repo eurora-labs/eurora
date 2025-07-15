@@ -1986,11 +1986,22 @@ dependencies = [
 name = "eur-eurora-provider"
 version = "0.0.0"
 dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
  "ferrous-llm-core 0.3.0",
  "ferrous-llm-grpc",
+ "futures",
+ "prost",
+ "prost-types",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "url",
 ]
 
 [[package]]
@@ -2101,6 +2112,7 @@ name = "eur-prompt-kit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "eur-eurora-provider",
  "eur-proto",
  "eur-proto-client",
  "eur-util",
