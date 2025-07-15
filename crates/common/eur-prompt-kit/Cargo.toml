@@ -12,6 +12,7 @@ ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", features
     "ollama",
     "anthropic",
 ], branch = "feature/common-trait-derivation" }
+eur-eurora-provider = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 thiserror = "2.0.12"
