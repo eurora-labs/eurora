@@ -6,7 +6,7 @@ authors = ["Eurora <eurora@company.com>"]
 publish = false
 
 [dependencies]
-eur-proto = { path = "../../proto/eur-proto" }
+# eur-proto = { path = "../../proto/eur-proto" }
 eur-auth = { path = "../../common/eur-auth" }
 anyhow = { workspace = true }
 tonic = { workspace = true }
@@ -20,9 +20,11 @@ image = { workspace = true }
 eur-ocr = { path = "../../common/eur-ocr" }
 futures = "0.3"
 chrono = { workspace = true }
-ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", features = [
+ferrous-llm = { version = "0.3.1", features = [
     "openai",
-], branch = "main" }
+] }
+async-trait = "0.1.77"
+eur-eurora-provider = { workspace = true }
 
 [build-dependencies]
 tonic-build = { workspace = true }
