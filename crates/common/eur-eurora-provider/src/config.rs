@@ -7,7 +7,7 @@ use url::Url;
 
 /// Configuration for gRPC providers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrpcConfig {
+pub struct EuroraConfig {
     /// The gRPC server endpoint URL
     pub endpoint: Url,
 
@@ -48,7 +48,7 @@ pub struct GrpcConfig {
     pub user_agent: Option<String>,
 }
 
-impl Default for GrpcConfig {
+impl Default for EuroraConfig {
     fn default() -> Self {
         Self {
             endpoint: Url::parse("http://localhost:50051").unwrap(),
@@ -68,8 +68,8 @@ impl Default for GrpcConfig {
     }
 }
 
-impl ProviderConfig for GrpcConfig {
-    type Provider = crate::provider::GrpcChatProvider;
+impl ProviderConfig for EuroraConfig {
+    type Provider = crate::provider::EuroraChatProvider;
 
     fn build(self) -> Result<Self::Provider, ferrous_llm_core::error::ConfigError> {
         use ferrous_llm_core::error::ConfigError;
@@ -80,7 +80,7 @@ impl ProviderConfig for GrpcConfig {
         // In practice, this would need to be handled differently, perhaps with a builder pattern
         // For now, we'll return an error indicating async construction is needed
         Err(ConfigError::validation_failed(
-            "GrpcChatProvider requires async construction. Use GrpcChatProvider::new(config).await instead",
+            "EuroraChatProvider requires async construction. Use EuroraChatProvider::new(config).await instead",
         ))
     }
 
@@ -155,7 +155,7 @@ impl ProviderConfig for GrpcConfig {
     }
 }
 
-impl GrpcConfig {
+impl EuroraConfig {
     /// Create a new gRPC configuration with the given endpoint.
     pub fn new(endpoint: Url) -> Self {
         Self {
