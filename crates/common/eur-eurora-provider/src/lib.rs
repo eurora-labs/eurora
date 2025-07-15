@@ -14,9 +14,10 @@ pub mod provider;
 pub mod types;
 
 // Re-export main types for convenience
-pub use config::GrpcConfig;
-pub use error::GrpcError;
-pub use provider::{GrpcChatProvider, GrpcStreamingProvider};
+pub use config::EuroraConfig;
+pub use error::EuroraError;
+pub use ferrous_llm_core::StreamingProvider;
+pub use provider::{EuroraChatProvider, EuroraStreamingProvider};
 
 #[cfg(test)]
 mod tests {
@@ -25,14 +26,14 @@ mod tests {
 
     #[test]
     fn test_grpc_config_creation() {
-        let config = GrpcConfig::new(Url::parse("http://localhost:50051").unwrap());
+        let config = EuroraConfig::new(Url::parse("http://localhost:50051").unwrap());
         assert_eq!(config.endpoint.to_string(), "http://localhost:50051/");
         assert!(!config.use_tls);
     }
 
     #[test]
     fn test_grpc_config_with_tls() {
-        let config = GrpcConfig::new(Url::parse("https://api.example.com").unwrap())
+        let config = EuroraConfig::new(Url::parse("https://api.example.com").unwrap())
             .with_tls(Some("api.example.com".to_string()))
             .with_auth_token("test-token".to_string());
 
@@ -43,10 +44,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_grpc_chat_provider_creation_fails_with_invalid_endpoint() {
-        let config = GrpcConfig::new(Url::parse("http://invalid-endpoint:8080").unwrap());
+        let config = EuroraConfig::new(Url::parse("http://invalid-endpoint:8080").unwrap());
 
         // This should fail because the endpoint is not reachable
-        let result = GrpcChatProvider::new(config).await;
+        let result = EuroraChatProvider::new(config).await;
         assert!(result.is_err());
     }
 }
