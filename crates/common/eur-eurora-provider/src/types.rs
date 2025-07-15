@@ -121,6 +121,60 @@ impl From<ContentPart> for ProtoContentPart {
     }
 }
 
+impl From<ProtoContentPart> for ContentPart {
+    fn from(part: ProtoContentPart) -> Self {
+        let part_type = match part.proto_part_type {
+            Some(ProtoPartType::Text(text)) => ContentPart::Text { text: text.text },
+            Some(ProtoPartType::Image(image)) => ContentPart::Image {
+                image_source: image.image_source.expect("Image source is required").into(),
+                detail: image.detail,
+            },
+            Some(ProtoPartType::Audio(audio)) => ContentPart::Audio {
+                audio_url: audio.audio_url,
+                format: audio.format,
+            },
+            None => ContentPart::Text {
+                text: String::new(),
+            },
+        };
+
+        part_type
+    }
+}
+
+impl From<ProtoMessageContent> for MessageContent {
+    fn from(content: ProtoMessageContent) -> Self {
+        let content_type = match content.proto_content_type {
+            Some(ProtoContentType::Text(text)) => MessageContent::Text(text),
+            Some(ProtoContentType::Multimodal(parts)) => {
+                let parts = parts
+                    .parts
+                    .into_iter()
+                    .map(|part| part.into())
+                    .collect::<Vec<_>>();
+
+                MessageContent::Multimodal(parts)
+            }
+            Some(ProtoContentType::Tool(tool_content)) => {
+                let tool_calls = tool_content
+                    .tool_calls
+                    .into_iter()
+                    .map(|call| call.into())
+                    .collect::<Vec<_>>();
+
+                MessageContent::Tool(ToolContent {
+                    tool_calls: Some(tool_calls),
+                    tool_call_id: tool_content.tool_call_id,
+                    text: tool_content.text,
+                })
+            }
+            None => MessageContent::Text(String::new()),
+        };
+
+        content_type
+    }
+}
+
 impl From<MessageContent> for ProtoMessageContent {
     fn from(content: MessageContent) -> Self {
         let content_type = match content {
@@ -165,6 +219,16 @@ impl From<Message> for ProtoMessage {
     }
 }
 
+impl From<ProtoMessage> for Message {
+    fn from(message: ProtoMessage) -> Self {
+        let proto_role: ProtoRole = ProtoRole::try_from(message.role).unwrap_or_default();
+        Message {
+            role: proto_role.into(),
+            content: message.content.unwrap().into(),
+        }
+    }
+}
+
 impl From<Role> for ProtoRole {
     fn from(role: Role) -> Self {
         match role {
@@ -172,6 +236,18 @@ impl From<Role> for ProtoRole {
             Role::Assistant => ProtoRole::RoleAssistant,
             Role::System => ProtoRole::RoleSystem,
             Role::Tool => ProtoRole::RoleTool,
+        }
+    }
+}
+
+impl From<ProtoRole> for Role {
+    fn from(role: ProtoRole) -> Self {
+        match role {
+            ProtoRole::RoleUser => Role::User,
+            ProtoRole::RoleAssistant => Role::Assistant,
+            ProtoRole::RoleSystem => Role::System,
+            ProtoRole::RoleTool => Role::Tool,
+            ProtoRole::RoleUnspecified => Role::User,
         }
     }
 }
@@ -336,6 +412,18 @@ impl From<ImageSource> for ProtoImageSource {
             ImageSource::DynamicImage(image) => ProtoImageSource {
                 proto_source_type: Some(ProtoSourceType::Data(image.into_bytes())),
             },
+        }
+    }
+}
+
+impl From<ProtoImageSource> for ImageSource {
+    fn from(source: ProtoImageSource) -> Self {
+        match source.proto_source_type {
+            Some(ProtoSourceType::Url(url)) => ImageSource::Url(url),
+            Some(ProtoSourceType::Data(data)) => ImageSource::DynamicImage(
+                image::load_from_memory(&data).expect("Failed to load image"),
+            ),
+            None => ImageSource::Url(String::new()),
         }
     }
 }
