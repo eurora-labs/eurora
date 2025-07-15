@@ -73,7 +73,13 @@ impl From<ProtoToolCall> for ToolCall {
         ToolCall {
             id: call.id,
             call_type: call.call_type,
-            function: call.function.unwrap().into(),
+            function: call
+                .function
+                .map(Into::into)
+                .unwrap_or_else(|| FunctionCall {
+                    name: String::new(),
+                    arguments: String::new(),
+                }),
         }
     }
 }
@@ -199,9 +205,8 @@ impl From<ProtoFinishReason> for FinishReason {
             ProtoFinishReason::FinishReasonStopSequence => FinishReason::StopSequence,
             ProtoFinishReason::FinishReasonToolCalls => FinishReason::ToolCalls,
             ProtoFinishReason::FinishReasonError => FinishReason::Error,
-            ProtoFinishReason::FinishReasonUnspecified => {
-                panic!("Unspecified finish reason")
-            }
+
+            ProtoFinishReason::FinishReasonUnspecified => FinishReason::Stop,
         }
     }
 }
@@ -212,17 +217,15 @@ impl ChatResponse for ProtoChatResponse {
     }
 
     fn usage(&self) -> Option<Usage> {
-        self.usage.clone().map(Into::into)
+        self.usage.map(Into::into)
     }
 
     fn finish_reason(&self) -> Option<FinishReason> {
-        Some(FinishReason::from(ProtoFinishReason::from(
-            self.finish_reason(),
-        )))
+        Some(FinishReason::from(self.finish_reason()))
     }
 
     fn metadata(&self) -> Metadata {
-        self.metadata.clone().unwrap().into()
+        self.metadata.clone().map(Into::into).unwrap_or_default()
     }
 
     fn tool_calls(&self) -> Option<Vec<ToolCall>> {
