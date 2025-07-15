@@ -5,9 +5,236 @@ use ferrous_llm_core::types::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::proto::chat::{ProtoImageSource, proto_image_source::ProtoSourceType};
+use crate::proto::chat::{
+    ProtoAudioPart, ProtoChatRequest, ProtoChatResponse, ProtoContentPart, ProtoFinishReason,
+    ProtoFunctionCall, ProtoImagePart, ProtoImageSource, ProtoMessage, ProtoMessageContent,
+    ProtoMetadata, ProtoMultimodalContent, ProtoParameters, ProtoRole, ProtoTextPart,
+    ProtoToolCall, ProtoToolContent, ProtoUsage, proto_content_part::ProtoPartType,
+    proto_image_source::ProtoSourceType, proto_message_content::ProtoContentType,
+};
 
-use crate::proto::chat::{ProtoChatResponse, ProtoChatStreamResponse};
+impl From<Metadata> for ProtoMetadata {
+    fn from(metadata: Metadata) -> Self {
+        ProtoMetadata {
+            extensions: Some(hashmap_to_proto_struct(&metadata.extensions)),
+            request_id: metadata.request_id,
+            user_id: metadata.user_id,
+            created_at: Some(datetime_to_proto_timestamp(&metadata.created_at)),
+        }
+    }
+}
+
+impl From<ProtoMetadata> for Metadata {
+    fn from(metadata: ProtoMetadata) -> Self {
+        Metadata {
+            extensions: proto_struct_to_hashmap(metadata.extensions),
+            request_id: metadata.request_id,
+            user_id: metadata.user_id,
+            created_at: proto_timestamp_to_datetime(metadata.created_at),
+        }
+    }
+}
+
+impl From<Parameters> for ProtoParameters {
+    fn from(params: Parameters) -> Self {
+        ProtoParameters {
+            temperature: params.temperature,
+            max_tokens: params.max_tokens,
+            top_p: params.top_p,
+            top_k: params.top_k,
+            stop_sequences: params.stop_sequences,
+            presence_penalty: params.presence_penalty,
+            frequency_penalty: params.frequency_penalty,
+        }
+    }
+}
+
+impl From<FunctionCall> for ProtoFunctionCall {
+    fn from(call: FunctionCall) -> Self {
+        ProtoFunctionCall {
+            name: call.name,
+            arguments: call.arguments,
+        }
+    }
+}
+
+impl From<ToolCall> for ProtoToolCall {
+    fn from(call: ToolCall) -> Self {
+        ProtoToolCall {
+            id: call.id,
+            call_type: call.call_type,
+            function: Some(call.function.into()),
+        }
+    }
+}
+
+impl From<ProtoToolCall> for ToolCall {
+    fn from(call: ProtoToolCall) -> Self {
+        ToolCall {
+            id: call.id,
+            call_type: call.call_type,
+            function: call.function.unwrap().into(),
+        }
+    }
+}
+
+impl From<ProtoFunctionCall> for FunctionCall {
+    fn from(call: ProtoFunctionCall) -> Self {
+        FunctionCall {
+            name: call.name,
+            arguments: call.arguments,
+        }
+    }
+}
+
+impl From<ContentPart> for ProtoContentPart {
+    fn from(part: ContentPart) -> Self {
+        let part_type = match part {
+            ferrous_llm_core::types::ContentPart::Text { text } => {
+                ProtoPartType::Text(ProtoTextPart { text })
+            }
+            ferrous_llm_core::types::ContentPart::Image {
+                image_source,
+                detail,
+            } => {
+                let source = image_source.into();
+
+                ProtoPartType::Image(ProtoImagePart {
+                    image_source: Some(source),
+                    detail,
+                })
+            }
+            ferrous_llm_core::types::ContentPart::Audio { audio_url, format } => {
+                ProtoPartType::Audio(ProtoAudioPart { audio_url, format })
+            }
+        };
+
+        ProtoContentPart {
+            proto_part_type: Some(part_type),
+        }
+    }
+}
+
+impl From<MessageContent> for ProtoMessageContent {
+    fn from(content: MessageContent) -> Self {
+        let content_type = match content {
+            ferrous_llm_core::types::MessageContent::Text(text) => ProtoContentType::Text(text),
+            ferrous_llm_core::types::MessageContent::Multimodal(parts) => {
+                let proto_parts = parts
+                    .into_iter()
+                    .map(|part| part.into())
+                    .collect::<Vec<_>>();
+
+                ProtoContentType::Multimodal(ProtoMultimodalContent { parts: proto_parts })
+            }
+            ferrous_llm_core::types::MessageContent::Tool(tool_content) => {
+                let tool_calls = tool_content
+                    .tool_calls
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|call| call.into())
+                    .collect::<Vec<_>>();
+
+                ProtoContentType::Tool(ProtoToolContent {
+                    tool_calls,
+                    tool_call_id: tool_content.tool_call_id,
+                    text: tool_content.text,
+                })
+            }
+        };
+
+        ProtoMessageContent {
+            proto_content_type: Some(content_type),
+        }
+    }
+}
+
+impl From<Message> for ProtoMessage {
+    fn from(message: Message) -> Self {
+        ProtoMessage {
+            // Double into here because prost treats all defined enums as i32 when used as properties
+            role: ProtoRole::from(message.role).into(),
+            content: Some(message.content.into()),
+        }
+    }
+}
+
+impl From<Role> for ProtoRole {
+    fn from(role: Role) -> Self {
+        match role {
+            Role::User => ProtoRole::RoleUser,
+            Role::Assistant => ProtoRole::RoleAssistant,
+            Role::System => ProtoRole::RoleSystem,
+            Role::Tool => ProtoRole::RoleTool,
+        }
+    }
+}
+
+impl From<ChatRequest> for ProtoChatRequest {
+    fn from(request: ChatRequest) -> Self {
+        ProtoChatRequest {
+            messages: request.messages.into_iter().map(Into::into).collect(),
+            parameters: Some(request.parameters.into()),
+            metadata: Some(request.metadata.into()),
+        }
+    }
+}
+
+impl From<ProtoUsage> for Usage {
+    fn from(usage: ProtoUsage) -> Self {
+        Usage {
+            prompt_tokens: usage.prompt_tokens,
+            completion_tokens: usage.completion_tokens,
+            total_tokens: usage.total_tokens,
+        }
+    }
+}
+
+impl From<ProtoFinishReason> for FinishReason {
+    fn from(reason: ProtoFinishReason) -> Self {
+        match reason {
+            ProtoFinishReason::FinishReasonStop => FinishReason::Stop,
+            ProtoFinishReason::FinishReasonLength => FinishReason::Length,
+            ProtoFinishReason::FinishReasonContentFilter => FinishReason::ContentFilter,
+            ProtoFinishReason::FinishReasonStopSequence => FinishReason::StopSequence,
+            ProtoFinishReason::FinishReasonToolCalls => FinishReason::ToolCalls,
+            ProtoFinishReason::FinishReasonError => FinishReason::Error,
+            ProtoFinishReason::FinishReasonUnspecified => {
+                panic!("Unspecified finish reason")
+            }
+        }
+    }
+}
+
+impl ChatResponse for ProtoChatResponse {
+    fn content(&self) -> String {
+        self.content.clone()
+    }
+
+    fn usage(&self) -> Option<Usage> {
+        self.usage.clone().map(Into::into)
+    }
+
+    fn finish_reason(&self) -> Option<FinishReason> {
+        Some(FinishReason::from(ProtoFinishReason::from(
+            self.finish_reason(),
+        )))
+    }
+
+    fn metadata(&self) -> Metadata {
+        self.metadata.clone().unwrap().into()
+    }
+
+    fn tool_calls(&self) -> Option<Vec<ToolCall>> {
+        Some(
+            self.tool_calls
+                .clone()
+                .into_iter()
+                .map(|tool_calls| tool_calls.into())
+                .collect::<Vec<_>>(),
+        )
+    }
+}
 
 /// Convert proto Timestamp to DateTime<Utc>
 pub fn proto_timestamp_to_datetime(timestamp: Option<prost_types::Timestamp>) -> DateTime<Utc> {

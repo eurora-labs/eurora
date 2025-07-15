@@ -1990,7 +1990,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "ferrous-llm-core 0.3.0",
- "ferrous-llm-grpc",
  "futures",
  "prost",
  "prost-types",
@@ -2528,28 +2527,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.12",
  "tokio",
- "url",
-]
-
-[[package]]
-name = "ferrous-llm-grpc"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbe43a7734ee619eb3ce1c7772d1fa968bce73f3cd737befb8e32f40d58b0aa9"
-dependencies = [
- "async-stream",
- "async-trait",
- "chrono",
- "ferrous-llm-core 0.3.0",
- "futures",
- "prost",
- "prost-types",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
- "tokio",
- "tonic",
- "tonic-build",
  "url",
 ]
 
