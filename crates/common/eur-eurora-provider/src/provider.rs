@@ -1,7 +1,7 @@
 //! gRPC provider implementations.
 
-use crate::config::GrpcConfig;
-use crate::error::GrpcError;
+use crate::config::EuroraConfig;
+use crate::error::EuroraError;
 use crate::proto::chat::{
     proto_chat_service_client::ProtoChatServiceClient, proto_content_part::ProtoPartType,
     proto_message_content::ProtoContentType, *,
@@ -15,20 +15,20 @@ use std::pin::Pin;
 use tonic::transport::{Channel, Endpoint};
 use tonic::{Request, Streaming};
 
-/// gRPC-based chat provider.
+/// Eurora-based chat provider.
 #[derive(Debug, Clone)]
-pub struct GrpcChatProvider {
+pub struct EuroraChatProvider {
     client: ProtoChatServiceClient<Channel>,
-    config: GrpcConfig,
+    config: EuroraConfig,
 }
 
-impl GrpcChatProvider {
+impl EuroraChatProvider {
     /// Create a new gRPC chat provider with the given configuration.
-    pub async fn new(config: GrpcConfig) -> Result<Self, GrpcError> {
+    pub async fn new(config: EuroraConfig) -> Result<Self, EuroraError> {
         use ferrous_llm_core::config::ProviderConfig;
         config
             .validate()
-            .map_err(|e| GrpcError::InvalidConfig(e.to_string()))?;
+            .map_err(|e| EuroraError::InvalidConfig(e.to_string()))?;
 
         let client = Self::create_client(&config).await?;
 
@@ -37,17 +37,17 @@ impl GrpcChatProvider {
 
     /// Create a gRPC client from the configuration.
     async fn create_client(
-        config: &GrpcConfig,
-    ) -> Result<ProtoChatServiceClient<Channel>, GrpcError> {
+        config: &EuroraConfig,
+    ) -> Result<ProtoChatServiceClient<Channel>, EuroraError> {
         // Convert URL to URI
         let uri = config
             .endpoint
             .to_string()
             .parse::<tonic::transport::Uri>()
-            .map_err(|e| GrpcError::InvalidConfig(format!("Invalid endpoint URI: {}", e)))?;
+            .map_err(|e| EuroraError::InvalidConfig(format!("Invalid endpoint URI: {}", e)))?;
 
         let mut endpoint = Endpoint::from(uri)
-            .user_agent(config.user_agent.as_deref().unwrap_or("ferrous-llm-grpc"))?;
+            .user_agent(config.user_agent.as_deref().unwrap_or("eurora-grpc"))?;
 
         // Configure timeouts
         if let Some(timeout) = config.timeout {
@@ -90,7 +90,7 @@ impl GrpcChatProvider {
     }
 
     /// Convert a core ChatRequest to a proto ChatRequest.
-    fn convert_request(&self, request: ChatRequest) -> Result<ProtoChatRequest, GrpcError> {
+    fn convert_request(&self, request: ChatRequest) -> Result<ProtoChatRequest, EuroraError> {
         let messages = request
             .messages
             .into_iter()
@@ -111,7 +111,7 @@ impl GrpcChatProvider {
     fn convert_message(
         &self,
         message: ferrous_llm_core::types::Message,
-    ) -> Result<ProtoMessage, GrpcError> {
+    ) -> Result<ProtoMessage, EuroraError> {
         let role: ProtoRole = message.role.into();
         let content = Some(self.convert_message_content(message.content)?);
 
@@ -126,7 +126,7 @@ impl GrpcChatProvider {
     fn convert_message_content(
         &self,
         content: ferrous_llm_core::types::MessageContent,
-    ) -> Result<ProtoMessageContent, GrpcError> {
+    ) -> Result<ProtoMessageContent, EuroraError> {
         let content_type = match content {
             ferrous_llm_core::types::MessageContent::Text(text) => ProtoContentType::Text(text),
             ferrous_llm_core::types::MessageContent::Multimodal(parts) => {
@@ -162,7 +162,7 @@ impl GrpcChatProvider {
     fn convert_content_part(
         &self,
         part: ferrous_llm_core::types::ContentPart,
-    ) -> Result<ProtoContentPart, GrpcError> {
+    ) -> Result<ProtoContentPart, EuroraError> {
         let part_type = match part {
             ferrous_llm_core::types::ContentPart::Text { text } => {
                 ProtoPartType::Text(ProtoTextPart { text })
@@ -192,7 +192,7 @@ impl GrpcChatProvider {
     fn convert_tool_call(
         &self,
         call: ferrous_llm_core::types::ToolCall,
-    ) -> Result<ProtoToolCall, GrpcError> {
+    ) -> Result<ProtoToolCall, EuroraError> {
         Ok(ProtoToolCall {
             id: call.id,
             call_type: call.call_type,
@@ -228,10 +228,10 @@ impl GrpcChatProvider {
 }
 
 #[async_trait]
-impl ChatProvider for GrpcChatProvider {
-    type Config = GrpcConfig;
+impl ChatProvider for EuroraChatProvider {
+    type Config = EuroraConfig;
     type Response = ProtoChatResponse;
-    type Error = GrpcError;
+    type Error = EuroraError;
 
     async fn chat(
         &self,
@@ -246,7 +246,7 @@ impl ChatProvider for GrpcChatProvider {
             grpc_request.metadata_mut().insert(
                 "authorization",
                 format!("Bearer {}", token).parse().map_err(|_| {
-                    GrpcError::Authentication("Invalid auth token format".to_string())
+                    EuroraError::Authentication("Invalid auth token format".to_string())
                 })?,
             );
         }
@@ -258,25 +258,25 @@ impl ChatProvider for GrpcChatProvider {
     }
 }
 
-/// gRPC-based streaming provider.
+/// Eurora-based streaming provider.
 #[derive(Debug, Clone)]
-pub struct GrpcStreamingProvider {
-    inner: GrpcChatProvider,
+pub struct EuroraStreamingProvider {
+    inner: EuroraChatProvider,
 }
 
-impl GrpcStreamingProvider {
-    /// Create a new gRPC streaming provider with the given configuration.
-    pub async fn new(config: GrpcConfig) -> Result<Self, GrpcError> {
-        let inner = GrpcChatProvider::new(config).await?;
+impl EuroraStreamingProvider {
+    /// Create a new Eurora streaming provider with the given configuration.
+    pub async fn new(config: EuroraConfig) -> Result<Self, EuroraError> {
+        let inner = EuroraChatProvider::new(config).await?;
         Ok(Self { inner })
     }
 }
 
 #[async_trait]
-impl ChatProvider for GrpcStreamingProvider {
-    type Config = GrpcConfig;
+impl ChatProvider for EuroraStreamingProvider {
+    type Config = EuroraConfig;
     type Response = ProtoChatResponse;
-    type Error = GrpcError;
+    type Error = EuroraError;
 
     async fn chat(
         &self,
@@ -287,7 +287,7 @@ impl ChatProvider for GrpcStreamingProvider {
 }
 
 #[async_trait]
-impl StreamingProvider for GrpcStreamingProvider {
+impl StreamingProvider for EuroraStreamingProvider {
     type StreamItem = ProtoChatStreamResponse;
     type Stream =
         Pin<Box<dyn Stream<Item = Result<Self::StreamItem, Self::Error>> + Send + 'static>>;
@@ -305,7 +305,7 @@ impl StreamingProvider for GrpcStreamingProvider {
             grpc_request.metadata_mut().insert(
                 "authorization",
                 format!("Bearer {}", token).parse().map_err(|_| {
-                    GrpcError::Authentication("Invalid auth token format".to_string())
+                    EuroraError::Authentication("Invalid auth token format".to_string())
                 })?,
             );
         }
@@ -318,17 +318,17 @@ impl StreamingProvider for GrpcStreamingProvider {
     }
 }
 
-impl GrpcStreamingProvider {
+impl EuroraStreamingProvider {
     /// Convert the gRPC stream to our stream type.
     fn convert_stream(
         mut stream: Streaming<ProtoChatStreamResponse>,
-        provider: GrpcChatProvider,
-    ) -> impl Stream<Item = Result<ProtoChatStreamResponse, GrpcError>> + Send + 'static {
+        provider: EuroraChatProvider,
+    ) -> impl Stream<Item = Result<ProtoChatStreamResponse, EuroraError>> + Send + 'static {
         async_stream::stream! {
             while let Some(result) = stream.message().await.transpose() {
                 match result {
                     Ok(proto_response) => yield Ok(proto_response),
-                    Err(e) => yield Err(GrpcError::Status(e)),
+                    Err(e) => yield Err(EuroraError::Status(e)),
                 }
             }
         }

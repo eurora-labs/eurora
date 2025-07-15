@@ -4,22 +4,15 @@ use ferrous_llm::{
     ChatRequest, Message, MessageContent, Role, StreamingProvider,
     openai::{OpenAIConfig, OpenAIProvider},
 };
-// use eur_proto::proto_prompt_service::{
-//     ProtoChatMessage, SendPromptRequest, SendPromptResponse,
-//     proto_prompt_service_server::ProtoPromptService,
-// };
 use std::pin::Pin;
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
 use tracing::info;
 
-mod chat {
-    tonic::include_proto!("eurora.chat");
-}
-
-use chat::proto_chat_service_server::ProtoChatService;
-
-use crate::chat::{ProtoChatRequest, ProtoChatResponse};
+use eur_eurora_provider::proto::chat::{
+    ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse,
+    proto_chat_service_server::ProtoChatService,
+};
 
 /// Extract and validate JWT token from request metadata
 pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
@@ -64,45 +57,53 @@ impl PromptService {
     }
 }
 
-type SendPromptResult<T> = Result<Response<T>, Status>;
-type SendPromptResponseStream =
-    Pin<Box<dyn Stream<Item = Result<SendPromptResponse, Status>> + Send>>;
+type ChatResult<T> = Result<Response<T>, Status>;
+type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ProtoChatStreamResponse, Status>> + Send>>;
 
 #[tonic::async_trait]
 impl ProtoChatService for PromptService {
-    type ChatStreamStream = SendPromptResponseStream;
+    type ChatStreamStream = ChatStreamResult;
 
-    async fn chat(&self, request: Request<ProtoChatRequest>) -> Result<ProtoChatResponse> {
+    async fn chat(&self, request: Request<ProtoChatRequest>) -> ChatResult<ProtoChatResponse> {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
         info!("Received send_prompt request");
-        let request_inner = request.into_inner();
+        // let request_inner = request.into_inner();
 
-        let messages = to_llm_message(request_inner.messages);
+        // let messages = request_inner
+        //     .messages
+        //     .iter()
+        //     .map(|msg| msg.clone().into())
+        //     .collect();
 
-        let stream = self
-            .provider
-            .chat(ChatRequest {
-                messages,
-                parameters: Default::default(),
-                metadata: Default::default(),
-            })
-            .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+        // let stream = self
+        //     .provider
+        //     .chat_stream(ChatRequest {
+        //         messages,
+        //         parameters: Default::default(),
+        //         metadata: Default::default(),
+        //     })
+        //     .await
+        //     .map_err(|e| Status::internal(e.to_string()))?;
 
-        Ok(Response::new(Box::pin(stream) as Self::ChatStreamStream))
+        // Ok(Response::new(stream))
+        unimplemented!()
     }
 
     async fn chat_stream(
         &self,
         request: Request<ProtoChatRequest>,
-    ) -> SendPromptResult<Self::ChatStreamStream> {
+    ) -> ChatResult<Self::ChatStreamStream> {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
         info!("Received send_prompt request");
         let request_inner = request.into_inner();
 
-        let messages = to_llm_message(request_inner.messages);
+        let messages = request_inner
+            .messages
+            .iter()
+            .map(|msg| msg.clone().into())
+            .collect();
 
         let stream = self
             .provider
@@ -117,27 +118,12 @@ impl ProtoChatService for PromptService {
         // Direct stream mapping - much simpler than channel bridging
         let output_stream = stream.map(|result| {
             result
-                .map(|message| SendPromptResponse { response: message })
+                .map(|message| message.content().into())
                 .map_err(|e| Status::internal(e.to_string()))
         });
 
         Ok(Response::new(
-            Box::pin(output_stream) as Self::SendPromptStream
+            Box::pin(output_stream) as Self::ChatStreamStream
         ))
     }
-}
-
-fn to_llm_message(messages: Vec<ProtoChatMessage>) -> Vec<Message> {
-    messages
-        .into_iter()
-        .map(|proto_message| Message {
-            role: match proto_message.role.as_str() {
-                "user" => Role::User,
-                "assistant" => Role::Assistant,
-                "system" => Role::System,
-                _ => Role::User,
-            },
-            content: MessageContent::Text(proto_message.content),
-        })
-        .collect()
 }

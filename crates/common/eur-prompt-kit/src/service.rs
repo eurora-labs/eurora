@@ -1,8 +1,10 @@
 use crate::PromptKitError;
 use anyhow::Result;
-use eur_eurora_provider::{EuroraConfig, EuroraError, EuroraProvider};
+use eur_eurora_provider::{
+    EuroraChatProvider, EuroraConfig, EuroraError, EuroraStreamingProvider, StreamingProvider,
+};
 use ferrous_llm::{
-    ChatRequest, Message, ProviderConfig, StreamingProvider,
+    ChatRequest, Message, ProviderConfig,
     ollama::{OllamaConfig, OllamaProvider},
     openai::{OpenAIConfig, OpenAIProvider},
 };
@@ -12,7 +14,7 @@ use tokio_stream::{Stream, StreamExt};
 enum LLMProvider {
     OpenAI(OpenAIProvider),
     Ollama(OllamaProvider),
-    Eurora(EuroraProvider),
+    Eurora(EuroraStreamingProvider),
 }
 
 #[derive(Debug, Clone)]
@@ -69,7 +71,8 @@ impl PromptKitService {
                 .chat_stream(request)
                 .await
                 .map_err(PromptKitError::EuroraError)?
-                .map(|result| result.map_err(PromptKitError::EuroraError));
+                .map(|result| result.map_err(PromptKitError::EuroraError))
+                .map(|result| result.map(|message| message.content));
 
             Ok(Box::pin(stream))
         } else {

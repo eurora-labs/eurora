@@ -7,11 +7,11 @@ edition = "2024"
 anyhow = { workspace = true }
 futures = { workspace = true }
 image = { workspace = true }
-ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", features = [
+ferrous-llm = { version = "0.3.1", features = [
     "openai",
     "ollama",
     "anthropic",
-], branch = "feature/common-trait-derivation" }
+] }
 eur-eurora-provider = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
@@ -20,4 +20,4 @@ eur-util = { workspace = true }
 regex = "1.9.6"
 tracing = { workspace = true }
 eur-proto = { workspace = true }
-eur-proto-client = { workspace = true }
+# eur-proto-client = { workspace = true }
