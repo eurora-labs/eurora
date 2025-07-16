@@ -17,8 +17,6 @@ fn main() -> Result<()> {
             .build_client(true)
             // .compile_well_known_types(true)
             .protoc_arg("--experimental_allow_proto3_optional")
-            // .out_dir("src/gen") // Output the generated files in a specific directory
-            .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
             .compile_protos(&proto_files, &[proto_dir, common_dir])?;
     }
 
@@ -28,8 +26,6 @@ fn main() -> Result<()> {
             .build_server(true)
             .build_client(true)
             .protoc_arg("--experimental_allow_proto3_optional")
-            // .out_dir("src/gen") // Output the generated files in a specific directory
-            .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
             .compile_protos(&proto_files, &[proto_dir])?;
     }
     Ok(())
