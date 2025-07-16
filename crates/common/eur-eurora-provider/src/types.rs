@@ -122,7 +122,7 @@ impl From<ContentPart> for ProtoContentPart {
 
 impl From<ProtoContentPart> for ContentPart {
     fn from(part: ProtoContentPart) -> Self {
-        let part_type = match part.proto_part_type {
+        match part.proto_part_type {
             Some(ProtoPartType::Text(text)) => ContentPart::Text { text: text.text },
             Some(ProtoPartType::Image(image)) => ContentPart::Image {
                 image_source: image.image_source.expect("Image source is required").into(),
@@ -135,15 +135,13 @@ impl From<ProtoContentPart> for ContentPart {
             None => ContentPart::Text {
                 text: String::new(),
             },
-        };
-
-        part_type
+        }
     }
 }
 
 impl From<ProtoMessageContent> for MessageContent {
     fn from(content: ProtoMessageContent) -> Self {
-        let content_type = match content.proto_content_type {
+        match content.proto_content_type {
             Some(ProtoContentType::Text(text)) => MessageContent::Text(text),
             Some(ProtoContentType::Multimodal(parts)) => {
                 let parts = parts
@@ -168,9 +166,7 @@ impl From<ProtoMessageContent> for MessageContent {
                 })
             }
             None => MessageContent::Text(String::new()),
-        };
-
-        content_type
+        }
     }
 }
 
