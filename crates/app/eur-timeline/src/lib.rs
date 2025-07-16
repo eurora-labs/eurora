@@ -6,7 +6,8 @@
 
 use anyhow::Result;
 use eur_activity::select_strategy_for_process;
-use eur_prompt_kit::LLMMessage;
+use ferrous_llm_core::Message;
+
 use ferrous_focus::{FerrousFocusResult, FocusedWindow, IconData};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -90,7 +91,7 @@ impl Timeline {
         activities.last().unwrap().get_display_assets()
     }
 
-    pub fn construct_asset_messages(&self) -> Vec<LLMMessage> {
+    pub fn construct_asset_messages(&self) -> Vec<Message> {
         let activities = self.activities.read();
         let last_activity = activities.last().unwrap();
 
@@ -101,7 +102,7 @@ impl Timeline {
             .collect()
     }
 
-    pub fn construct_snapshot_messages(&self) -> Vec<LLMMessage> {
+    pub fn construct_snapshot_messages(&self) -> Vec<Message> {
         let activities = self.activities.read();
         let last_activity = activities.last();
 
