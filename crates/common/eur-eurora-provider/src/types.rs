@@ -2,7 +2,6 @@
 
 use chrono::{DateTime, Utc};
 use ferrous_llm_core::types::*;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::proto::chat::{
