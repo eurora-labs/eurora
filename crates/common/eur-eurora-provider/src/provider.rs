@@ -2,9 +2,7 @@
 
 use crate::config::EuroraConfig;
 use crate::error::EuroraError;
-use crate::proto::chat::{
-    proto_chat_service_client::ProtoChatServiceClient, *,
-};
+use crate::proto::chat::{proto_chat_service_client::ProtoChatServiceClient, *};
 use async_trait::async_trait;
 use eur_secret::secret;
 use ferrous_llm_core::traits::{ChatProvider, StreamingProvider};
@@ -37,7 +35,6 @@ type EuroraGrpcClient = ProtoChatServiceClient<InterceptedService<Channel, AuthI
 #[derive(Debug, Clone)]
 pub struct EuroraChatProvider {
     client: EuroraGrpcClient,
-    config: EuroraConfig,
 }
 
 impl EuroraChatProvider {
@@ -50,7 +47,7 @@ impl EuroraChatProvider {
 
         let client = Self::create_client(&config).await?;
 
-        Ok(Self { client, config })
+        Ok(Self { client })
     }
 
     /// Create a gRPC client from the configuration.
