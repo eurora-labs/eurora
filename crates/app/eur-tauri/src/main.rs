@@ -20,10 +20,10 @@ use eur_tauri::{
     WindowState, create_launcher, create_window,
     procedures::{
         auth_procedures::{AuthApi, AuthApiImpl},
+        chat_procedures::{ChatApi, ChatApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
-        query_procedures::{QueryApi, QueryApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         user_procedures::{UserApi, UserApiImpl},
@@ -41,7 +41,7 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 use taurpc::Router;
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
@@ -124,7 +124,6 @@ fn main() {
                         let _ = autostart_manager.enable();
                         // Check enable state
                         info!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
-                        
                     }
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
                         // create_window(tauri_app.handle(), "main", "onboarding".into())
@@ -153,7 +152,6 @@ fn main() {
                             }
                             info!("Window focused: {}", focused);
                         }
-                       
                     });
 
 
@@ -371,7 +369,7 @@ fn main() {
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
                 .merge(WindowApiImpl.into_handler())
-                .merge(QueryApiImpl.into_handler())
+                .merge(ChatApiImpl.into_handler())
                 .merge(UserApiImpl.into_handler());
             builder
                 .invoke_handler(tauri::generate_handler![list_conversations,])
