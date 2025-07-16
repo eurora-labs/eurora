@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use eur_activity::select_strategy_for_process;
-use ferrous_llm::Message;
+use ferrous_llm_core::Message;
 
 use ferrous_focus::{FerrousFocusResult, FocusedWindow, IconData};
 use parking_lot::RwLock;

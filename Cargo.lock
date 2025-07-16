@@ -346,6 +346,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "async_from"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b397bca84f93309aa3c1f6a8153678bfb260a6749a4be58dc5458d18e1bb517"
+dependencies = [
+ "async-trait",
+]
+
+[[package]]
 name = "atk"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1888,7 +1897,7 @@ dependencies = [
  "eur-native-messaging",
  "eur-proto",
  "ferrous-focus",
- "ferrous-llm 0.2.0",
+ "ferrous-llm-core 0.3.0",
  "image",
  "serde",
  "serde_json",
@@ -2112,6 +2121,7 @@ name = "eur-prompt-kit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async_from",
  "eur-eurora-provider",
  "eur-proto",
  "eur-util",
@@ -2211,6 +2221,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-mutex",
+ "async_from",
  "backtrace",
  "base64 0.22.1",
  "chrono",
@@ -2220,6 +2231,7 @@ dependencies = [
  "eur-activity",
  "eur-client-grpc",
  "eur-client-questions",
+ "eur-eurora-provider",
  "eur-native-messaging",
  "eur-personal-db",
  "eur-prompt-kit",
@@ -2229,6 +2241,7 @@ dependencies = [
  "eur-timeline",
  "eur-user",
  "eur-vision",
+ "ferrous-llm-core 0.3.0",
  "futures",
  "image",
  "lazy_static",
@@ -2281,10 +2294,10 @@ dependencies = [
  "chrono",
  "eur-activity",
  "eur-native-messaging",
- "eur-prompt-kit",
  "eur-proto",
  "ferrous-focus",
  "ferrous-llm 0.2.0",
+ "ferrous-llm-core 0.3.0",
  "image",
  "parking_lot",
  "serde",
