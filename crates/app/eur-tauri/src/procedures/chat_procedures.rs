@@ -1,4 +1,5 @@
 use crate::shared_types::{SharedPromptKitService, SharedTimeline};
+use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::ipc::Channel;
 use tauri::{Manager, Runtime};
@@ -19,8 +20,8 @@ pub struct Query {
     assets: Vec<String>,
 }
 
-#[taurpc::procedures]
-pub trait QueryApi {
+#[taurpc::procedures(path = "chat")]
+pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         channel: Channel<ResponseChunk>,
@@ -29,10 +30,10 @@ pub trait QueryApi {
 }
 
 #[derive(Clone)]
-pub struct QueryApiImpl;
+pub struct ChatApiImpl;
 
 #[taurpc::resolvers]
-impl QueryApi for QueryApiImpl {
+impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
@@ -46,11 +47,9 @@ impl QueryApi for QueryApiImpl {
         let mut messages = timeline.construct_asset_messages();
         messages.extend(timeline.construct_snapshot_messages());
 
-        messages.push(eur_prompt_kit::LLMMessage {
-            role: eur_prompt_kit::Role::User,
-            content: eur_prompt_kit::MessageContent::Text(eur_prompt_kit::TextContent {
-                text: query.text.clone(),
-            }),
+        messages.push(Message {
+            role: Role::User,
+            content: MessageContent::Text(query.text.clone()),
         });
 
         let state: tauri::State<SharedPromptKitService> = app_handle.state();

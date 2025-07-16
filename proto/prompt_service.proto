@@ -2,7 +2,6 @@ syntax = "proto3";
 package prompt_service;
 
 service ProtoPromptService {
-    rpc SendPrompt (SendPromptRequest) returns (stream SendPromptResponse);
 }
 
 message ProtoChatMessage {

@@ -1,15 +1,18 @@
 use anyhow::{Result, anyhow};
 use eur_auth::{Claims, JwtConfig, validate_access_token};
-use eur_prompt_kit::{EurLLMService, LLMMessage, PromptKitService, RemoteConfig};
-
-use eur_proto::proto_prompt_service::{
-    ProtoChatMessage, SendPromptRequest, SendPromptResponse,
-    proto_prompt_service_server::ProtoPromptService,
+use ferrous_llm::{
+    ChatRequest, StreamingProvider,
+    openai::{OpenAIConfig, OpenAIProvider},
 };
 use std::pin::Pin;
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
 use tracing::info;
+
+use eur_eurora_provider::proto::chat::{
+    ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse, ProtoFinishReason,
+    proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
+};
 
 /// Extract and validate JWT token from request metadata
 pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
@@ -35,67 +38,123 @@ pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> 
     validate_access_token(token, jwt_config)
 }
 
-#[derive(Debug, Default)]
+pub fn get_service(prompt_service: PromptService) -> ProtoChatServiceServer<PromptService> {
+    ProtoChatServiceServer::new(prompt_service)
+}
+
+#[derive(Debug)]
 pub struct PromptService {
-    prompt_service: PromptKitService,
+    provider: OpenAIProvider,
     jwt_config: JwtConfig,
 }
 
 impl PromptService {
     pub fn new(jwt_config: Option<JwtConfig>) -> Self {
-        let mut prompt_service = PromptKitService::default();
-        prompt_service
-            .switch_to_remote(RemoteConfig {
-                provider: EurLLMService::OpenAI,
-                api_key: std::env::var("OPENAI_API_KEY").unwrap_or_default(),
-                model: "gpt-4o-2024-11-20".to_string(),
-            })
-            .unwrap();
+        let config = OpenAIConfig::new(
+            std::env::var("OPENAI_API_KEY").unwrap_or_default(),
+            "gpt-4o-2024-11-20",
+        );
         Self {
-            prompt_service,
+            provider: OpenAIProvider::new(config).expect("Failed to create OpenAI provider"),
             jwt_config: jwt_config.unwrap_or_default(),
         }
     }
 }
 
-type SendPromptResult<T> = Result<Response<T>, Status>;
-type SendPromptResponseStream =
-    Pin<Box<dyn Stream<Item = Result<SendPromptResponse, Status>> + Send>>;
+type ChatResult<T> = Result<Response<T>, Status>;
+type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ProtoChatStreamResponse, Status>> + Send>>;
 
 #[tonic::async_trait]
-impl ProtoPromptService for PromptService {
-    type SendPromptStream = SendPromptResponseStream;
+impl ProtoChatService for PromptService {
+    type ChatStreamStream = ChatStreamResult;
 
-    async fn send_prompt(
-        &self,
-        request: Request<SendPromptRequest>,
-    ) -> SendPromptResult<Self::SendPromptStream> {
+    async fn chat(&self, request: Request<ProtoChatRequest>) -> ChatResult<ProtoChatResponse> {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
         info!("Received send_prompt request");
+        // Return a single response
+        Ok(Response::new(ProtoChatResponse {
+            content: "Hello, world!".to_string(),
+            usage: None,
+            finish_reason: Some(ProtoFinishReason::FinishReasonStop.into()),
+            metadata: None,
+            tool_calls: vec![],
+        }))
+
+        // let request_inner = request.into_inner();
+
+        // let messages = request_inner
+        //     .messages
+        //     .iter()
+        //     .map(|msg| msg.clone().into())
+        //     .collect();
+
+        // let stream = self
+        //     .provider
+        //     .chat_stream(ChatRequest {
+        //         messages,
+        //         parameters: Default::default(),
+        //         metadata: Default::default(),
+        //     })
+        //     .await
+        //     .map_err(|e| Status::internal(e.to_string()))?;
+
+        // Ok(Response::new(stream))
+        // unimplemented!()
+    }
+
+    async fn chat_stream(
+        &self,
+        request: Request<ProtoChatRequest>,
+    ) -> ChatResult<Self::ChatStreamStream> {
+        authenticate_request(&request, &self.jwt_config)
+            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        info!("Received chat_stream request");
         let request_inner = request.into_inner();
 
-        let messages = to_llm_message(request_inner.messages);
+        let messages = request_inner
+            .messages
+            .iter()
+            .map(|msg| msg.clone().into())
+            .collect();
 
-        let stream = self
-            .prompt_service
-            .chat_stream(messages)
+        let chat_request = ChatRequest {
+            messages,
+            parameters: Default::default(),
+            metadata: Default::default(),
+        };
+
+        let openai_stream = self
+            .provider
+            .chat_stream(chat_request)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        // Direct stream mapping - much simpler than channel bridging
-        let output_stream = stream.map(|result| {
-            result
-                .map(|message| SendPromptResponse { response: message })
-                .map_err(|e| Status::internal(e.to_string()))
+        let output_stream = openai_stream.map(|result| {
+            match result {
+                Ok(content) => {
+                    // Check if this is the final chunk (empty content typically indicates end)
+                    let is_final = content.is_empty();
+
+                    Ok(ProtoChatStreamResponse {
+                        content,
+                        is_final,
+                        usage: None, // Usage info typically only available in final chunk
+                        finish_reason: if is_final {
+                            Some(ProtoFinishReason::FinishReasonStop.into())
+                        } else {
+                            None
+                        },
+                        metadata: None,
+                        tool_calls: vec![],
+                    })
+                }
+                Err(e) => Err(Status::internal(e.to_string())),
+            }
         });
 
         Ok(Response::new(
-            Box::pin(output_stream) as Self::SendPromptStream
+            Box::pin(output_stream) as Self::ChatStreamStream
         ))
     }
-}
-
-fn to_llm_message(messages: Vec<ProtoChatMessage>) -> Vec<LLMMessage> {
-    messages.into_iter().map(|message| message.into()).collect()
 }
