@@ -17,9 +17,19 @@ use eur_personal_db::{Conversation, DatabaseManager};
 use eur_prompt_kit::PromptKitService;
 use eur_secret::secret;
 use eur_tauri::{
-    create_launcher, create_window, procedures::{
-        auth_procedures::{AuthApi, AuthApiImpl}, chat_procedures::{ChatApi, ChatApiImpl}, context_chip_procedures::{ContextChipApi, ContextChipApiImpl}, monitor_procedures::{MonitorApi, MonitorApiImpl}, prompt_procedures::{PromptApi, PromptApiImpl}, system_procedures::{SystemApi, SystemApiImpl}, third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl}, user_procedures::{UserApi, UserApiImpl}, window_procedures::{WindowApi, WindowApiImpl}
-    }, shared_types::{create_shared_timeline, SharedPromptKitService}, WindowState
+    WindowState, create_launcher, create_window,
+    procedures::{
+        auth_procedures::{AuthApi, AuthApiImpl},
+        chat_procedures::{ChatApi, ChatApiImpl},
+        context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
+        monitor_procedures::{MonitorApi, MonitorApiImpl},
+        prompt_procedures::{PromptApi, PromptApiImpl},
+        system_procedures::{SystemApi, SystemApiImpl},
+        third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
+        user_procedures::{UserApi, UserApiImpl},
+        window_procedures::{WindowApi, WindowApiImpl},
+    },
+    shared_types::{SharedPromptKitService, create_shared_timeline},
 };
 use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -31,7 +41,7 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 use taurpc::Router;
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
@@ -114,7 +124,6 @@ fn main() {
                         let _ = autostart_manager.enable();
                         // Check enable state
                         info!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
-                        
                     }
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
                         // create_window(tauri_app.handle(), "main", "onboarding".into())
@@ -143,7 +152,6 @@ fn main() {
                             }
                             info!("Window focused: {}", focused);
                         }
-                       
                     });
 
 

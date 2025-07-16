@@ -3,13 +3,10 @@
 use crate::config::EuroraConfig;
 use crate::error::EuroraError;
 use crate::proto::chat::{
-    proto_chat_service_client::ProtoChatServiceClient, proto_content_part::ProtoPartType,
-    proto_message_content::ProtoContentType, *,
+    proto_chat_service_client::ProtoChatServiceClient, *,
 };
-use crate::types::*;
 use async_trait::async_trait;
 use eur_secret::secret;
-use ferrous_llm_core::ChatRequest;
 use ferrous_llm_core::traits::{ChatProvider, StreamingProvider};
 use futures::Stream;
 use std::pin::Pin;
