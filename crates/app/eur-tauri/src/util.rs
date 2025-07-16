@@ -3,6 +3,7 @@ use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
 use tracing::info;
 
 /// Convert string modifiers to Tauri Modifiers
+#[allow(unused)]
 pub fn string_modifiers_to_tauri(modifiers: &[String]) -> Option<Modifiers> {
     let mut tauri_modifiers = Modifiers::empty();
 
@@ -24,6 +25,7 @@ pub fn string_modifiers_to_tauri(modifiers: &[String]) -> Option<Modifiers> {
 }
 
 /// Convert string key to Tauri Code
+#[allow(unused)]
 pub fn string_key_to_tauri_code(key: &str) -> Option<Code> {
     match key.to_lowercase().as_str() {
         "space" => Some(Code::Space),
@@ -100,6 +102,7 @@ pub fn string_key_to_tauri_code(key: &str) -> Option<Code> {
 }
 
 /// Convert user hotkey to Tauri shortcut
+#[allow(unused)]
 pub fn user_hotkey_to_shortcut(hotkey: &eur_user::Hotkey) -> Option<Shortcut> {
     let key_code = string_key_to_tauri_code(&hotkey.key)?;
     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
@@ -107,6 +110,7 @@ pub fn user_hotkey_to_shortcut(hotkey: &eur_user::Hotkey) -> Option<Shortcut> {
 }
 
 /// Get default shortcut for the current OS
+#[allow(unused)]
 pub fn get_default_shortcut() -> Shortcut {
     #[cfg(target_os = "macos")]
     return Shortcut::new(Some(Modifiers::ALT), Code::Space);
@@ -122,6 +126,7 @@ pub fn get_default_shortcut() -> Shortcut {
 }
 
 /// Get the launcher shortcut from user settings or default
+#[allow(unused)]
 pub fn get_launcher_shortcut(app_handle: &tauri::AppHandle) -> Shortcut {
     if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>() {
         if let Ok(Some(user)) = user_controller.get_user() {
