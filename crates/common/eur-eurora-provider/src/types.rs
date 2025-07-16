@@ -317,10 +317,8 @@ impl ChatResponse for ProtoChatResponse {
 /// Convert proto Timestamp to DateTime<Utc>
 pub fn proto_timestamp_to_datetime(timestamp: Option<prost_types::Timestamp>) -> DateTime<Utc> {
     timestamp
-        .map(|ts| {
-            DateTime::from_timestamp(ts.seconds, ts.nanos as u32).unwrap_or_else(|| Utc::now())
-        })
-        .unwrap_or_else(|| Utc::now())
+        .map(|ts| DateTime::from_timestamp(ts.seconds, ts.nanos as u32).unwrap_or(Utc::now()))
+        .unwrap_or(Utc::now())
 }
 
 /// Convert DateTime<Utc> to proto Timestamp

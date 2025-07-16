@@ -7,37 +7,37 @@
 pub mod generated {
     // Re-export all generated modules
     pub mod questions_service {
-        include!("gen/questions_service.rs");
+        tonic::include_proto!("questions_service");
         pub use super::*;
     }
 
     pub mod shared {
-        include!("gen/shared.rs");
+        tonic::include_proto!("shared");
         pub use super::*;
     }
 
     pub mod ipc {
-        include!("gen/ipc.rs");
+        tonic::include_proto!("ipc");
         pub use super::*;
     }
 
     pub mod native_messaging {
-        include!("gen/native_messaging.rs");
+        tonic::include_proto!("native_messaging");
         pub use super::*;
     }
 
     pub mod proto_ocr_service {
-        include!("gen/ocr_service.rs");
+        tonic::include_proto!("ocr_service");
         pub use super::*;
     }
 
     pub mod proto_auth_service {
-        include!("gen/auth_service.rs");
+        tonic::include_proto!("auth_service");
         pub use super::*;
     }
 
     pub mod proto_prompt_service {
-        include!("gen/prompt_service.rs");
+        tonic::include_proto!("prompt_service");
         pub use super::*;
     }
 }
