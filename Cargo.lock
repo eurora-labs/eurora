@@ -1998,6 +1998,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
+ "eur-secret",
  "ferrous-llm-core 0.3.0",
  "futures",
  "image",
