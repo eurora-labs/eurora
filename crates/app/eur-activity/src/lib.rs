@@ -10,7 +10,7 @@ use tracing::info;
 // use eur_timeline::TimelineRef;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use ferrous_llm::Message;
+use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
 pub mod browser_activity;
 pub mod default_activity;
