@@ -20,10 +20,10 @@ catalog:
     'postcss': '^8.5.6'
 catalogs:
     svelte:
-        'svelte': '5.35.4'
-        '@sveltejs/kit': '2.22.2'
+        'svelte': '5.36.0'
+        '@sveltejs/kit': '2.23.0'
         'svelte-check': '4.2.2'
-        '@sveltejs/vite-plugin-svelte': '5.1.0'
+        '@sveltejs/vite-plugin-svelte': '5.1.1'
         '@sveltejs/adapter-static': '3.0.8'
         '@sentry/sveltekit': '8.55.0'
     redux:
