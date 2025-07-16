@@ -2,6 +2,7 @@
 //!
 //! This crate contains auto-generated code from proto files
 //! and makes them available to other Rust crates in the workspace.
+#![allow(clippy::all)]
 
 // Include the generated code
 pub mod generated {
