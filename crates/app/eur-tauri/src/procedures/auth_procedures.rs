@@ -4,6 +4,8 @@ use crate::{
     procedures::prompt_procedures::TauRpcPromptApiEventTrigger,
     shared_types::SharedPromptKitService,
 };
+use async_from::AsyncFrom;
+use eur_eurora_provider::EuroraConfig;
 use eur_secret::{Sensitive, secret};
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
@@ -75,25 +77,26 @@ impl AuthApi for AuthApiImpl {
                     secret::delete(LOGIN_CODE_VERIFIER, secret::Namespace::BuildKind)
                         .map_err(|e| format!("Failed to remove login token: {}", e))?;
 
+                    let config = EuroraConfig::new(
+                        Url::parse(std::env::var("API_BASE_URL").unwrap().as_str())
+                            .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
+                    );
+
                     // TODO: re-enable remote eurora provider
-                    // let mut promptkit_client = eur_prompt_kit::PromptKitService::default();
-                    // promptkit_client
-                    //     .switch_to_eurora(EuroraConfig {
-                    //         model: "default".to_string(),
-                    //     })
-                    //     .await?;
+                    let promptkit_client =
+                        eur_prompt_kit::PromptKitService::async_from(config).await;
 
-                    // TauRpcPromptApiEventTrigger::new(app_handle.clone())
-                    //     .prompt_service_change(Some(
-                    //         promptkit_client
-                    //             .get_service_name()
-                    //             .map_err(|e| e.to_string())?,
-                    //     ))
-                    //     .map_err(|e| e.to_string())?;
+                    TauRpcPromptApiEventTrigger::new(app_handle.clone())
+                        .prompt_service_change(Some(
+                            promptkit_client
+                                .get_service_name()
+                                .map_err(|e| e.to_string())?,
+                        ))
+                        .map_err(|e| e.to_string())?;
 
-                    // let state: tauri::State<SharedPromptKitService> = app_handle.state();
-                    // let mut guard = state.lock().await;
-                    // *guard = Some(promptkit_client);
+                    let state: tauri::State<SharedPromptKitService> = app_handle.state();
+                    let mut guard = state.lock().await;
+                    *guard = Some(promptkit_client);
 
                     Ok(true)
                 }

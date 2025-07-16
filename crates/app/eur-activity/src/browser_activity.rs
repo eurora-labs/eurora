@@ -14,7 +14,7 @@ use tracing::info;
 use image::DynamicImage;
 use tokio::sync::Mutex;
 
-use ferrous_llm::{ContentPart, ImageUrl, Message, MessageContent, Role};
+use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
 
 // fn image_to_base64(img: &DynamicImage) -> String {
 //     let mut image_data: Vec<u8> = Vec::new();
@@ -451,10 +451,7 @@ impl ActivitySnapshot for YoutubeSnapshot {
                     text: "This is last frame of the video".to_string(),
                 },
                 ContentPart::Image {
-                    image_url: ImageUrl {
-                        url: image_to_base64(&self.video_frame).unwrap(),
-                        detail: None,
-                    },
+                    image_source: ImageSource::DynamicImage(self.video_frame.clone()),
                     detail: None,
                 },
             ]),

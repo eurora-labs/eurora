@@ -69,8 +69,8 @@ impl ProtoChatService for PromptService {
     type ChatStreamStream = ChatStreamResult;
 
     async fn chat(&self, request: Request<ProtoChatRequest>) -> ChatResult<ProtoChatResponse> {
-        authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        // authenticate_request(&request, &self.jwt_config)
+        //     .map_err(|e| Status::unauthenticated(e.to_string()))?;
         info!("Received send_prompt request");
         // Return a single response
         Ok(Response::new(ProtoChatResponse {
@@ -107,8 +107,8 @@ impl ProtoChatService for PromptService {
         &self,
         request: Request<ProtoChatRequest>,
     ) -> ChatResult<Self::ChatStreamStream> {
-        authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        // authenticate_request(&request, &self.jwt_config)
+        //     .map_err(|e| Status::unauthenticated(e.to_string()))?;
         info!("Received chat_stream request");
         let request_inner = request.into_inner();
 
