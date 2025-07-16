@@ -8,17 +8,38 @@ use crate::proto::chat::{
 };
 use crate::types::*;
 use async_trait::async_trait;
+use eur_secret::secret;
 use ferrous_llm_core::ChatRequest;
 use ferrous_llm_core::traits::{ChatProvider, StreamingProvider};
 use futures::Stream;
 use std::pin::Pin;
-use tonic::transport::{Channel, Endpoint};
-use tonic::{Request, Streaming};
+use tonic::service::Interceptor;
+use tonic::service::interceptor::InterceptedService;
+use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
+use tonic::{Request, Status, Streaming};
+
+#[derive(Clone)]
+struct AuthInterceptor;
+
+impl Interceptor for AuthInterceptor {
+    fn call(&mut self, mut request: Request<()>) -> Result<Request<()>, Status> {
+        let access_token = secret::retrieve("AUTH_ACCESS_TOKEN", secret::Namespace::Global)
+            .expect("Failed to retrieve access token")
+            .expect("AUTH_ACCESS_TOKEN not found");
+        request.metadata_mut().insert(
+            "authorization",
+            format!("Bearer {}", access_token.0).parse().unwrap(),
+        );
+        Ok(request)
+    }
+}
+
+type EuroraGrpcClient = ProtoChatServiceClient<InterceptedService<Channel, AuthInterceptor>>;
 
 /// Eurora-based chat provider.
 #[derive(Debug, Clone)]
 pub struct EuroraChatProvider {
-    client: ProtoChatServiceClient<Channel>,
+    client: EuroraGrpcClient,
     config: EuroraConfig,
 }
 
@@ -36,9 +57,7 @@ impl EuroraChatProvider {
     }
 
     /// Create a gRPC client from the configuration.
-    async fn create_client(
-        config: &EuroraConfig,
-    ) -> Result<ProtoChatServiceClient<Channel>, EuroraError> {
+    async fn create_client(config: &EuroraConfig) -> Result<EuroraGrpcClient, EuroraError> {
         // Convert URL to URI
         let uri = config
             .endpoint
@@ -66,16 +85,12 @@ impl EuroraChatProvider {
 
         // Configure TLS if needed
         if config.use_tls {
-            let tls_config = if let Some(domain) = &config.tls_domain {
-                tonic::transport::ClientTlsConfig::new().domain_name(domain)
-            } else {
-                tonic::transport::ClientTlsConfig::new()
-            };
+            let tls_config = ClientTlsConfig::new().with_native_roots();
             endpoint = endpoint.tls_config(tls_config)?;
         }
 
         let channel = endpoint.connect().await?;
-        let mut client = ProtoChatServiceClient::new(channel);
+        let mut client = ProtoChatServiceClient::with_interceptor(channel, AuthInterceptor);
 
         // Configure message size limits
         if let Some(max_request_size) = config.max_request_size {
