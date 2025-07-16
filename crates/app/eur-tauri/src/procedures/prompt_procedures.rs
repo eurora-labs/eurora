@@ -60,7 +60,7 @@ impl PromptApi for PromptApiImpl {
     async fn switch_to_remote<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        provider: String,
+        _provider: String,
         api_key: String,
         model: String,
     ) -> Result<(), String> {
