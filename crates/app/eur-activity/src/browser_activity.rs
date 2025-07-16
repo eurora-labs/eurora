@@ -1,7 +1,6 @@
 use crate::{ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, ContextChip};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use async_trait::async_trait;
-use base64::prelude::*;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::{
     self, ProtoArticleSnapshot, ProtoArticleState, ProtoPdfState, ProtoTweet, ProtoTwitterSnapshot,
@@ -15,29 +14,6 @@ use image::DynamicImage;
 use tokio::sync::Mutex;
 
 use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
-
-// fn image_to_base64(img: &DynamicImage) -> String {
-//     let mut image_data: Vec<u8> = Vec::new();
-//     img.write_to(
-//         &mut std::io::Cursor::new(&mut image_data),
-//         image::ImageFormat::Png,
-//     )
-//     .unwrap();
-//     let res_base64 = BASE64_STANDARD.encode(image_data);
-//     format!("data:image/png;base64,{}", res_base64)
-// }
-fn image_to_base64(image: &DynamicImage) -> Result<String> {
-    let mut buffer = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut buffer);
-
-    image
-        .write_to(&mut cursor, image::ImageFormat::Jpeg)
-        .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
-
-    let base64 = BASE64_STANDARD.encode(&buffer);
-    // let base64 = base64::encode(&buffer);
-    Ok(format!("data:image/jpeg;base64,{}", base64))
-}
 
 /// Helper function to safely load images from protocol buffer data
 fn load_image_from_proto(
