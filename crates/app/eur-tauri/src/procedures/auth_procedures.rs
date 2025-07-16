@@ -4,7 +4,7 @@ use crate::{
     procedures::prompt_procedures::TauRpcPromptApiEventTrigger,
     shared_types::SharedPromptKitService,
 };
-use async_from::AsyncFrom;
+use async_from::AsyncTryFrom;
 use eur_eurora_provider::EuroraConfig;
 use eur_secret::{Sensitive, secret};
 use tauri::{AppHandle, Manager, Runtime};
@@ -83,8 +83,9 @@ impl AuthApi for AuthApiImpl {
                     );
 
                     // TODO: re-enable remote eurora provider
-                    let promptkit_client =
-                        eur_prompt_kit::PromptKitService::async_from(config).await;
+                    let promptkit_client = eur_prompt_kit::PromptKitService::async_try_from(config)
+                        .await
+                        .map_err(|e| e.to_string())?;
 
                     TauRpcPromptApiEventTrigger::new(app_handle.clone())
                         .prompt_service_change(Some(
