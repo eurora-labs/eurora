@@ -1,4 +1,3 @@
-use eur_prompt_kit::PromptKitService;
 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
