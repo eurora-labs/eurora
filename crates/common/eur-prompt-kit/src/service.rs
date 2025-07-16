@@ -1,10 +1,11 @@
 use crate::PromptKitError;
 use anyhow::Result;
+use async_from::{AsyncFrom, async_trait};
 use eur_eurora_provider::{
     EuroraChatProvider, EuroraConfig, EuroraError, EuroraStreamingProvider, StreamingProvider,
 };
 use ferrous_llm::{
-    ChatRequest, Message, ProviderConfig,
+    ChatRequest, Message,
     ollama::{OllamaConfig, OllamaProvider},
     openai::{OpenAIConfig, OpenAIProvider},
 };
@@ -155,6 +156,18 @@ impl From<OllamaConfig> for PromptKitService {
             OllamaProvider::new(config.clone()).expect("Failed to create Ollama provider");
         Self {
             provider: LLMProvider::Ollama(provider),
+        }
+    }
+}
+
+#[async_trait]
+impl AsyncFrom<EuroraConfig> for PromptKitService {
+    async fn async_from(config: EuroraConfig) -> Self {
+        let provider = EuroraStreamingProvider::new(config.clone())
+            .await
+            .expect("Failed to create Eurora provider");
+        Self {
+            provider: LLMProvider::Eurora(provider),
         }
     }
 }

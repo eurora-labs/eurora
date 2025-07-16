@@ -21,3 +21,4 @@ regex = "1.9.6"
 tracing = { workspace = true }
 eur-proto = { workspace = true }
 # eur-proto-client = { workspace = true }
+async_from = { workspace = true }

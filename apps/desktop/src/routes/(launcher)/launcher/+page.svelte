@@ -235,23 +235,6 @@
 		}
 	}
 
-	// Function to check if API key exists
-	async function checkApiKey() {
-		try {
-			const result: boolean = await taurpc.third_party.check_api_key_exists();
-			hasApiKey = result;
-
-			// If API key exists, initialize the OpenAI client
-			if (hasApiKey) {
-				await taurpc.third_party.initialize_openai_client();
-			}
-		} catch (error) {
-			console.error('Failed to check API key:', error);
-		} finally {
-			isCheckingApiKey = false;
-		}
-	}
-
 	// Load conversations when component is mounted
 	// Note: list_conversations is not yet available in TauRPC, fallback to invoke for now
 	// invoke('list_conversations')
@@ -330,7 +313,7 @@
 			};
 
 			// Use TauRPC send_query procedure
-			await taurpc.send_query(onEvent, tauRpcQuery);
+			await taurpc.chat.send_query(onEvent, tauRpcQuery);
 
 			// Note: Conversation management is not yet available in TauRPC,
 			// so we skip the conversation refresh for now
