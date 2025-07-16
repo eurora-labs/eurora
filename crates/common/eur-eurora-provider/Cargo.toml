@@ -1,0 +1,26 @@
+[package]
+name = "eur-eurora-provider"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+ferrous-llm-core = { version = "0.3.0", features = ["dynamic-image"] }
+thiserror = "2.0.12"
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+async-trait = "0.1.77"
+url = "2.5.1"
+tonic = { workspace = true, features = ["tls-native-roots", "channel"] }
+futures = { workspace = true }
+prost = { workspace = true }
+chrono = { workspace = true }
+prost-types = { workspace = true }
+async-stream = "0.3.1"
+image = { workspace = true }
+eur-secret = { workspace = true }
+
+[build-dependencies]
+tonic-build = "0.13.1"

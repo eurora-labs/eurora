@@ -26,25 +26,25 @@
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.3.1",
-		"@eslint/js": "^9.30.1",
+		"@eslint/js": "^9.31.0",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
-		"@playwright/test": "^1.53.2",
+		"@playwright/test": "^1.54.1",
 		"@testing-library/jest-dom": "^6.6.3",
-		"@types/chrome": "^0.0.329",
-		"eslint": "^9.30.1",
+		"@types/chrome": "^0.1.0",
+		"eslint": "^9.31.0",
 		"eslint-config-prettier": "^10.1.2",
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
 		"prettier": "^3.6.2",
 		"typescript": "^5.8.3",
-		"typescript-eslint": "^8.36.0",
+		"typescript-eslint": "^8.37.0",
 		"vite": "catalog:",
 		"vite-plugin-dts": "^4.5.3",
 		"vitest": "catalog:"
 	},
 	"dependencies": {
-		"@sentry/browser": "^9.35.0",
+		"@sentry/browser": "^9.38.0",
 		"@sentry/vite-plugin": "^3.3.1"
 	}
 }

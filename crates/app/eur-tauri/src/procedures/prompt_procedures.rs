@@ -1,4 +1,5 @@
 use crate::shared_types::SharedPromptKitService;
+use eur_prompt_kit::{OllamaConfig, OpenAIConfig};
 use tauri::{Manager, Runtime};
 
 #[taurpc::procedures(path = "prompt")]
@@ -35,22 +36,23 @@ impl PromptApi for PromptApiImpl {
         base_url: String,
         model: String,
     ) -> Result<(), String> {
-        let mut promptkit_client = eur_prompt_kit::PromptKitService::default();
-        promptkit_client
-            .switch_to_ollama(eur_prompt_kit::OllamaConfig { base_url, model })
-            .await?;
+        let config = OllamaConfig::builder()
+            .model(model)
+            .base_url(base_url)
+            .expect("Failed to connect to Ollama")
+            .keep_alive(300)
+            .build();
+        let llm_provider = eur_prompt_kit::PromptKitService::from(config);
 
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
             .prompt_service_change(Some(
-                promptkit_client
-                    .get_service_name()
-                    .map_err(|e| e.to_string())?,
+                llm_provider.get_service_name().map_err(|e| e.to_string())?,
             ))
             .map_err(|e| e.to_string())?;
 
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;
-        *guard = Some(promptkit_client);
+        *guard = Some(llm_provider);
 
         Ok(())
     }
@@ -58,28 +60,25 @@ impl PromptApi for PromptApiImpl {
     async fn switch_to_remote<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        provider: String,
+        _provider: String,
         api_key: String,
         model: String,
     ) -> Result<(), String> {
-        let mut promptkit_client = eur_prompt_kit::PromptKitService::default();
-        promptkit_client.switch_to_remote(eur_prompt_kit::RemoteConfig {
-            provider: provider.into(),
-            api_key,
-            model,
-        })?;
+        let config = OpenAIConfig::builder()
+            .api_key(api_key)
+            .model(model)
+            .build();
+        let llm_provider = eur_prompt_kit::PromptKitService::from(config);
 
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
             .prompt_service_change(Some(
-                promptkit_client
-                    .get_service_name()
-                    .map_err(|e| e.to_string())?,
+                llm_provider.get_service_name().map_err(|e| e.to_string())?,
             ))
             .map_err(|e| e.to_string())?;
 
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;
-        *guard = Some(promptkit_client);
+        *guard = Some(llm_provider);
 
         Ok(())
     }
