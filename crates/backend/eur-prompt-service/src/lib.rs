@@ -140,7 +140,11 @@ impl ProtoChatService for PromptService {
                         content,
                         is_final,
                         usage: None, // Usage info typically only available in final chunk
-                        finish_reason: if is_final { Some(0) } else { None }, // 0 = Stop reason
+                        finish_reason: if is_final {
+                            Some(ProtoFinishReason::FinishReasonStop.into())
+                        } else {
+                            None
+                        },
                         metadata: None,
                         tool_calls: vec![],
                     })
