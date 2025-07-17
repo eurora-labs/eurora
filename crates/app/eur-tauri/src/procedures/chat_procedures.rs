@@ -1,9 +1,9 @@
-use crate::shared_types::{SharedPromptKitService, SharedTimeline};
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
-use tauri::ipc::Channel;
-use tauri::{Manager, Runtime};
+use tauri::{Manager, Runtime, ipc::Channel};
 use tracing::info;
+
+use crate::shared_types::{SharedPromptKitService, SharedTimeline};
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
     chunk: String,
