@@ -97,12 +97,4 @@
 		background: rgba(255, 255, 255, 0.2);
 		box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 	}
-
-	.transcript-badge {
-		border-radius: 16px;
-		/* @apply flex w-fit items-center gap-2 text-[40px] leading-[40px] text-white; */
-		/* @apply p-2; */
-		background: rgba(128, 128, 128, 0.4);
-		color: rgba(0, 0, 0, 0.8);
-	}
 </style>
