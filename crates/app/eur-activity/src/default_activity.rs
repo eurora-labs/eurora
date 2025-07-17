@@ -1,6 +1,7 @@
-use crate::{ActivityAsset, ActivitySnapshot, ActivityStrategy};
 use anyhow::Result;
 use async_trait::async_trait;
+
+use crate::{ActivityAsset, ActivitySnapshot, ActivityStrategy};
 
 pub struct DefaultStrategy {
     pub name: String,

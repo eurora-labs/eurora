@@ -1,8 +1,9 @@
 //! Response types for gRPC providers.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use ferrous_llm_core::types::*;
-use std::collections::HashMap;
 
 use crate::proto::chat::{
     ProtoAudioPart, ProtoChatRequest, ProtoChatResponse, ProtoContentPart, ProtoFinishReason,
