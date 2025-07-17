@@ -1,10 +1,11 @@
+use std::env;
+
 use anyhow::{Result, anyhow};
 use oauth2::{
     AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, RevocationUrl, Scope, TokenUrl,
     basic::BasicClient,
 };
 use serde::{Deserialize, Serialize};
-use std::env;
 use tracing::info;
 
 /// Google OAuth configuration

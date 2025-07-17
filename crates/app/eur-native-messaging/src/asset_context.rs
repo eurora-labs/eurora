@@ -1,11 +1,11 @@
 use anyhow::Result;
-pub use eur_proto::ipc::{
-    ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoTweet, ProtoTwitterState,
-    ProtoYoutubeState,
+pub use eur_proto::{
+    ipc::{
+        ProtoArticleState, ProtoPdfState, ProtoTranscriptLine, ProtoTweet, ProtoTwitterState,
+        ProtoYoutubeState,
+    },
+    native_messaging::{ProtoNativeArticleAsset, ProtoNativeTwitterState, ProtoNativeYoutubeState},
 };
-pub use eur_proto::native_messaging::ProtoNativeArticleAsset;
-pub use eur_proto::native_messaging::ProtoNativeTwitterState;
-pub use eur_proto::native_messaging::ProtoNativeYoutubeState;
 use serde::Deserialize;
 use tracing::info;
 
