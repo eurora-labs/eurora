@@ -1,14 +1,16 @@
 //! Core authentication manager that handles all token operations autonomously.
 
-use crate::{
-    JwtConfig, token_storage::TokenStorage, validate_access_token, validate_refresh_token,
-};
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Duration, Utc};
 use eur_proto_client::auth::AuthClient;
-use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
+
+use crate::{
+    JwtConfig, token_storage::TokenStorage, validate_access_token, validate_refresh_token,
+};
 
 /// User information returned after successful authentication
 #[derive(Debug)]
