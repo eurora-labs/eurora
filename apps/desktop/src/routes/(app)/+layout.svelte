@@ -4,7 +4,9 @@
 	import Menubar from '$lib/components/Menubar.svelte';
 	let { children } = $props();
 	onMount(() => {
-		document.body.classList.add(`${platform()}-app`);
+		if (document) {
+			document.body.classList.add(`${platform()}-app`);
+		}
 	});
 </script>
 
