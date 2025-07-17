@@ -1,7 +1,8 @@
+use std::sync::Arc;
+
 use async_mutex::Mutex;
 use eur_prompt_kit::PromptKitService;
 use eur_timeline::Timeline;
-use std::sync::Arc;
 pub type SharedPromptKitService = Arc<Mutex<Option<PromptKitService>>>;
 pub type SharedTimeline = Arc<Timeline>;
 pub fn create_shared_timeline() -> SharedTimeline {

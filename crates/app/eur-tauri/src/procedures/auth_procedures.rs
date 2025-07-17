@@ -1,14 +1,15 @@
 //! Authentication procedures for the Tauri application.
 
-use crate::{
-    procedures::prompt_procedures::TauRpcPromptApiEventTrigger,
-    shared_types::SharedPromptKitService,
-};
 use async_from::AsyncTryFrom;
 use eur_eurora_provider::EuroraConfig;
 use eur_secret::{Sensitive, secret};
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
+
+use crate::{
+    procedures::prompt_procedures::TauRpcPromptApiEventTrigger,
+    shared_types::SharedPromptKitService,
+};
 
 #[taurpc::ipc_type]
 pub struct LoginToken {

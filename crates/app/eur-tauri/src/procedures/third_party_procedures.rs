@@ -1,5 +1,4 @@
-use eur_secret::Sensitive;
-use eur_secret::secret;
+use eur_secret::{Sensitive, secret};
 #[taurpc::procedures(path = "third_party")]
 pub trait ThirdPartyApi {
     async fn check_api_key_exists() -> Result<bool, String>;

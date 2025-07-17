@@ -5,13 +5,12 @@
 //! can be used to collect data from activities and store it in a timeline.
 use std::collections::HashMap;
 
-use tracing::info;
-
 // use eur_timeline::TimelineRef;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 pub mod browser_activity;
 pub mod default_activity;
 pub mod error;

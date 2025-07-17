@@ -1,8 +1,10 @@
 use anyhow::{Context, Result};
-use eur_proto::ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState};
-use eur_proto::questions_service::{
-    ArticleQuestionRequest, PdfQuestionRequest, ProtoChatMessage, VideoQuestionRequest,
-    questions_service_client::QuestionsServiceClient,
+use eur_proto::{
+    ipc::{ProtoArticleState, ProtoPdfState, ProtoYoutubeState},
+    questions_service::{
+        ArticleQuestionRequest, PdfQuestionRequest, ProtoChatMessage, VideoQuestionRequest,
+        questions_service_client::QuestionsServiceClient,
+    },
 };
 use tonic::transport::Channel;
 

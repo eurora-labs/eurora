@@ -1,7 +1,10 @@
-use chrono::{DateTime, Utc};
-use sqlx::migrate::MigrateDatabase;
-use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::time::Duration;
+
+use chrono::{DateTime, Utc};
+use sqlx::{
+    migrate::MigrateDatabase,
+    postgres::{PgPool, PgPoolOptions},
+};
 use tracing::debug;
 use uuid::Uuid;
 

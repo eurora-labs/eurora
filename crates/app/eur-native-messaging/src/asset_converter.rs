@@ -1,10 +1,11 @@
+use anyhow::Error;
+use eur_proto::ipc::StateResponse;
+use tracing::info;
+
 pub use crate::asset_context::{
     ArticleState, NativeArticleAsset, NativeTwitterState, NativeYoutubeState, PdfState,
     TwitterState, YoutubeState,
 };
-use anyhow::Error;
-use eur_proto::ipc::StateResponse;
-use tracing::info;
 
 pub struct JSONToProtoAssetConverter;
 

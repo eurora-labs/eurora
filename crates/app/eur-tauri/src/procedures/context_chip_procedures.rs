@@ -1,6 +1,7 @@
-use crate::shared_types::SharedTimeline;
 use eur_activity::ContextChip;
 use tauri::{Manager, Runtime};
+
+use crate::shared_types::SharedTimeline;
 #[taurpc::procedures(path = "context_chip")]
 pub trait ContextChipApi {
     async fn get<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Vec<ContextChip>, String>;
