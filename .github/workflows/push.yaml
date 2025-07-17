@@ -80,6 +80,12 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - uses: ./.github/actions/init-env-node
+            - name: Install Protoc
+              uses: arduino/setup-protoc@v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
             - run: pnpm check
 
     unittest-node:
