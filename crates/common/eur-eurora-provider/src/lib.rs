@@ -21,8 +21,9 @@ pub use provider::{EuroraChatProvider, EuroraStreamingProvider};
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use url::Url;
+
+    use super::*;
 
     #[test]
     fn test_grpc_config_creation() {

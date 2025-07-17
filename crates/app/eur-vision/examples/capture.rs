@@ -1,6 +1,7 @@
+use std::{fs, path::Path, time::Instant};
+
 use anyhow::Result;
 use eur_vision::{capture_all_monitors, capture_monitor};
-use std::{fs, path::Path, time::Instant};
 use tracing::info;
 // Different capture methods to demonstrate and benchmark
 enum CaptureMethod {

@@ -1,7 +1,6 @@
 mod clients;
-pub use clients::*;
-
 use anyhow::{Ok, Result, anyhow};
+pub use clients::*;
 use tonic::transport::{Channel, ClientTlsConfig};
 
 async fn get_secure_channel(base_url: String) -> Result<Option<Channel>> {
