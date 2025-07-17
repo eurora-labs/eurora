@@ -17,8 +17,7 @@
 		"storybook": "storybook dev --no-open -p 6006",
 		"storybook:build": "storybook build",
 		"test": "vitest run --mode development",
-		"test:watch": "vitest --watch --mode development",
-		"playwright:install": "playwright install --with-deps chromium"
+		"test:watch": "vitest --watch --mode development"
 	},
 	"peerDependencies": {
 		"@icons-pack/svelte-simple-icons": "^5.0.0",

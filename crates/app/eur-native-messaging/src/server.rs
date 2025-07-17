@@ -1,17 +1,22 @@
+use std::{
+    error::Error,
+    io::{self, ErrorKind, Read, Write},
+    pin::Pin,
+    sync::Arc,
+};
+
 use anyhow::{anyhow, Result};
 use eur_proto::ipc::{SnapshotResponse, StateRequest, StateResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::io::{self, Read, Write};
-use std::sync::Arc;
-use std::{error::Error, io::ErrorKind, pin::Pin};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::info;
 
-use crate::asset_converter::JSONToProtoAssetConverter;
-use crate::snapshot_converter::JSONToProtoSnapshotConverter;
+use crate::{
+    asset_converter::JSONToProtoAssetConverter, snapshot_converter::JSONToProtoSnapshotConverter,
+};
 
 type IpcResult<T> = Result<Response<T>, Status>;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<StateResponse, Status>> + Send>>;
