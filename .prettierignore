@@ -1,6 +1,5 @@
 .DS_Store
 node_modules
-butler/target
 build
 dist
 .svelte-kit
