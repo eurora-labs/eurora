@@ -1,18 +1,18 @@
+use std::pin::Pin;
+
 use anyhow::{Result, anyhow};
 use eur_auth::{Claims, JwtConfig, validate_access_token};
-use ferrous_llm::{
-    ChatRequest, StreamingProvider,
-    openai::{OpenAIConfig, OpenAIProvider},
-};
-use std::pin::Pin;
-use tokio_stream::{Stream, StreamExt};
-use tonic::{Request, Response, Status};
-use tracing::info;
-
 use eur_eurora_provider::proto::chat::{
     ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse, ProtoFinishReason,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
 };
+use ferrous_llm::{
+    ChatRequest, StreamingProvider,
+    openai::{OpenAIConfig, OpenAIProvider},
+};
+use tokio_stream::{Stream, StreamExt};
+use tonic::{Request, Response, Status};
+use tracing::info;
 
 /// Extract and validate JWT token from request metadata
 pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {

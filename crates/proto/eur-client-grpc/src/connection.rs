@@ -1,5 +1,6 @@
-use anyhow::{Context, Result};
 use std::time::Duration;
+
+use anyhow::{Context, Result};
 use tonic::transport::Channel;
 
 /// Builder for creating service clients

@@ -21,10 +21,10 @@ pub mod procedures;
 pub mod shared_types;
 mod util;
 pub mod window;
-pub use window::create as create_window;
-pub use window::create_launcher;
-pub use window::state::WindowState;
-pub use window::state::event::ChangeForFrontend;
+pub use window::{
+    create as create_window, create_launcher,
+    state::{WindowState, event::ChangeForFrontend},
+};
 
 // pub mod conversations;
 
