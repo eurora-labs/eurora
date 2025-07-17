@@ -1,4 +1,3 @@
-use crate::get_secure_channel;
 use anyhow::{Ok, Result, anyhow};
 use eur_proto::proto_auth_service::GetLoginTokenResponse;
 pub use eur_proto::proto_auth_service::{
@@ -8,6 +7,8 @@ pub use eur_proto::proto_auth_service::{
 };
 use tonic::transport::Channel;
 use tracing::{error, info};
+
+use crate::get_secure_channel;
 
 /// gRPC client for authentication service
 #[derive(Clone)]

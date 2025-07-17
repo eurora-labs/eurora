@@ -7,10 +7,11 @@
 //! 4. Refresh tokens
 //! 5. Validate tokens
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use eur_auth_service::{AuthService, JwtConfig};
 use eur_remote_db::DatabaseManager;
-use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
