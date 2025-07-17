@@ -1,16 +1,16 @@
+use std::{str::FromStr, time::Duration};
+
 use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use eur_secret::{Sensitive, secret};
 use libsqlite3_sys::sqlite3_auto_extension;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::{TryRngCore, rngs::OsRng};
 use sqlite_vec::sqlite3_vec_init;
-use sqlx::sqlite::SqliteConnectOptions;
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
-use sqlx::types::Uuid;
-use std::str::FromStr;
-use std::time::Duration;
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions},
+    types::Uuid,
+};
 use tracing::{debug, info};
 
 use crate::types::{Activity, ActivityAsset, ChatMessage, Conversation};

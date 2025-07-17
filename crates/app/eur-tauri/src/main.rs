@@ -12,6 +12,11 @@ use tracing_subscriber::{
 };
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 mod util;
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
+
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
 use eur_prompt_kit::PromptKitService;
@@ -32,13 +37,10 @@ use eur_tauri::{
     shared_types::{SharedPromptKitService, create_shared_timeline},
 };
 use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use tauri::plugin::TauriPlugin;
-use tauri::{AppHandle, Emitter, Wry};
-use tauri::{Manager, generate_context};
 use tauri::{
+    AppHandle, Emitter, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
+    plugin::TauriPlugin,
     tray::TrayIconBuilder,
 };
 use tauri_plugin_global_shortcut::ShortcutState;

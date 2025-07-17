@@ -1,17 +1,22 @@
 //! gRPC provider implementations.
 
-use crate::config::EuroraConfig;
-use crate::error::EuroraError;
-use crate::proto::chat::{proto_chat_service_client::ProtoChatServiceClient, *};
+use std::pin::Pin;
+
 use async_trait::async_trait;
 use eur_secret::secret;
 use ferrous_llm_core::traits::{ChatProvider, StreamingProvider};
 use futures::Stream;
-use std::pin::Pin;
-use tonic::service::Interceptor;
-use tonic::service::interceptor::InterceptedService;
-use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
-use tonic::{Request, Status, Streaming};
+use tonic::{
+    Request, Status, Streaming,
+    service::{Interceptor, interceptor::InterceptedService},
+    transport::{Channel, ClientTlsConfig, Endpoint},
+};
+
+use crate::{
+    config::EuroraConfig,
+    error::EuroraError,
+    proto::chat::{proto_chat_service_client::ProtoChatServiceClient, *},
+};
 
 #[derive(Clone)]
 struct AuthInterceptor;
