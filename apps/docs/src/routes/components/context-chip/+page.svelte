@@ -34,11 +34,13 @@
 
 	<div class="mt-4">
 		<h2 class="mb-2 text-lg font-semibold">With Click Handler</h2>
-		<ContextChip onClick={(e) => alert('Context chip clicked!')}>Clickable Context</ContextChip>
+		<ContextChip onClick={(e: any) => alert('Context chip clicked!')}
+			>Clickable Context</ContextChip
+		>
 	</div>
 
 	<div class="mt-4">
 		<h2 class="mb-2 text-lg font-semibold">With Link</h2>
-		<ContextChip href="#" onClick={(e) => e.preventDefault()}>Link Context</ContextChip>
+		<ContextChip href="#" onClick={(e: any) => e.preventDefault()}>Link Context</ContextChip>
 	</div>
 </div>
