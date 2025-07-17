@@ -47,7 +47,15 @@
 </script>
 
 <!-- Interactive Context Chip -->
-{#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
+{#snippet template(
+	args: {
+		variant: 'default' | 'primary' | 'secondary' | 'destructive' | 'outline' | undefined;
+		href: string | undefined;
+		onclick: boolean;
+		class: string | undefined;
+	},
+	_context: StoryContext<typeof Story>,
+)}
 	<StorybookContainer>
 		<ContextChip
 			variant={args.variant}
@@ -68,5 +76,3 @@
 		</ContextChip>
 	</StorybookContainer>
 {/snippet}
-
-<Story name="Interactive" children={template} />
