@@ -21,6 +21,9 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
+            - name: Init Node Environment
+              uses: ./.github/actions/init-env-node
+
             - name: Install Protoc
               uses: arduino/setup-protoc@v3
               with:
