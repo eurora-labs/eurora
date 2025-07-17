@@ -28,7 +28,10 @@
 		"prettier": "prettier --check",
 		"format": "prettier --write .",
 		"rustfmt": "cargo +nightly fmt -- --config-path rustfmt-nightly.toml",
-		"test:e2e": "cd apps/desktop && pnpm test:e2e"
+		"test": "turbo run test --no-daemon",
+		"test:watch": "pnpm --filter @eurora/desktop run test:watch",
+		"test:e2e:web": "turbo run test:e2e:web",
+		"test:e2e": "pnpm --filter @eurora/desktop run test:e2e"
 	},
 	"devDependencies": {
 		"@bufbuild/buf": "^1.55.1",
