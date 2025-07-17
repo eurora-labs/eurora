@@ -6,12 +6,11 @@
 mod auth_manager;
 mod token_storage;
 
-pub use auth_manager::{AuthManager, LoginCredentials, RegisterData, UserInfo};
-pub use token_storage::{SecureTokenStorage, TokenStorage};
-
 use anyhow::{Result, anyhow};
+pub use auth_manager::{AuthManager, LoginCredentials, RegisterData, UserInfo};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
+pub use token_storage::{SecureTokenStorage, TokenStorage};
 
 /// JWT Claims structure used across all services
 #[derive(Debug, Serialize, Deserialize, Clone)]
