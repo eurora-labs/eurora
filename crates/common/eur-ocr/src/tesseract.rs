@@ -1,6 +1,8 @@
-use crate::OcrStrategy;
-use rusty_tesseract::Args;
 use std::collections::HashMap;
+
+use rusty_tesseract::Args;
+
+use crate::OcrStrategy;
 
 #[derive(Default)]
 pub struct TesseractOcr {}
