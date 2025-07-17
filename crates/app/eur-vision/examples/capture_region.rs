@@ -1,7 +1,7 @@
+use std::{fs, path::Path, time::Instant};
+
 use anyhow::{Result, anyhow};
 use eur_vision::capture_monitor_region;
-use std::time::Instant;
-use std::{fs, path::Path};
 use tracing::info;
 use xcap::Monitor;
 fn main() -> Result<()> {
