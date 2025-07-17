@@ -258,7 +258,7 @@
 </Story>
 
 <!-- Interactive Example -->
-{#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
+{#snippet template(args: { value: string }, _context: StoryContext<typeof Story>)}
 	<StorybookContainer>
 		<Command.Root
 			bind:value={args.value}
