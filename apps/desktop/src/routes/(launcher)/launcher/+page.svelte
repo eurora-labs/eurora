@@ -11,8 +11,6 @@
 	} from '@eurora/shared/proto/questions_service_pb.js';
 	import { onMount } from 'svelte';
 	import { Chat } from '@eurora/ui/custom-components/chat/index';
-	// import MessageArea from './message-area.svelte';
-	import ApiKeyForm from './api-key-form.svelte';
 	import { executeCommand } from '$lib/commands.js';
 	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
@@ -339,74 +337,64 @@
 </script>
 
 <div class="backdrop-custom relative h-full overflow-hidden">
-	{#if isCheckingApiKey}
-		<div class="flex h-full items-center justify-center">
-			<p class="text-gray-500">Checking API key...</p>
-		</div>
-	{:else if !hasApiKey}
-		<div class="flex h-full items-center justify-center">
-			<ApiKeyForm saved={() => onApiKeySaved()} />
-		</div>
-	{:else}
-		<!-- Launcher component -->
-		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 ">
-			<Launcher.Input
-				placeholder="What can I help you with?"
-				bind:query={searchQuery}
-				bind:editorRef
-				onkeydown={handleKeydown}
-				class="min-h-[100px] h-fit w-full"
-			/>
+	<!-- Launcher component -->
+	<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 ">
+		<Launcher.Input
+			placeholder="What can I help you with?"
+			bind:query={searchQuery}
+			bind:editorRef
+			onkeydown={handleKeydown}
+			class="min-h-[100px] h-fit w-full"
+		/>
 
-			<!-- Recent conversations list -->
-			{#if messages.length === 0}
-				<Launcher.List class="h-full overflow-y-scroll p-0 m-0 max-h-full">
-					<!-- <Launcher.List hidden> -->
-					<Launcher.Group heading="Local Files">
-						<Launcher.Item onclick={addVideoExtension}>
-							<HardDrive />
-							<span>Video</span>
-						</Launcher.Item>
-						<Launcher.Item>
-							<FileTextIcon />
-							<span>Notes</span>
-						</Launcher.Item>
-					</Launcher.Group>
-					<Launcher.Separator />
-					<Launcher.Group heading="Google Drive">
-						<Launcher.Item>
-							<SiGoogledrive />
-							<span>Presentation 1</span>
-						</Launcher.Item>
-						<Launcher.Item>
-							<SiGoogledrive />
-							<span>Report card</span>
-						</Launcher.Item>
-						<Launcher.Item>
-							<SiGoogledrive />
-							<span>Exercise sheet 3</span>
-						</Launcher.Item>
-					</Launcher.Group>
-				</Launcher.List>
-			{/if}
-		</Launcher.Root>
-
-		{#if messages.length > 0}
-			<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
-				{#each messages as message}
-					{#if message.content.length > 0}
-						<Message.Root
-							variant={message.role === 'user' ? 'default' : 'agent'}
-							finishRendering={() => {}}
-						>
-							<Message.Content>
-								<Katex math={message.content} finishRendering={() => {}} />
-							</Message.Content>
-						</Message.Root>
-					{/if}
-				{/each}
-			</Chat>
+		<!-- Recent conversations list -->
+		{#if messages.length === 0}
+			<Launcher.List class="h-full overflow-y-scroll p-0 m-0 max-h-full">
+				<!-- <Launcher.List hidden> -->
+				<Launcher.Group heading="Local Files">
+					<Launcher.Item onclick={addVideoExtension}>
+						<HardDrive />
+						<span>Video</span>
+					</Launcher.Item>
+					<Launcher.Item>
+						<FileTextIcon />
+						<span>Notes</span>
+					</Launcher.Item>
+				</Launcher.Group>
+				<Launcher.Separator />
+				<Launcher.Group heading="Google Drive">
+					<Launcher.Item>
+						<SiGoogledrive />
+						<span>Presentation 1</span>
+					</Launcher.Item>
+					<Launcher.Item>
+						<SiGoogledrive />
+						<span>Report card</span>
+					</Launcher.Item>
+					<Launcher.Item>
+						<SiGoogledrive />
+						<span>Exercise sheet 3</span>
+					</Launcher.Item>
+				</Launcher.Group>
+			</Launcher.List>
 		{/if}
+	</Launcher.Root>
+
+	{#if messages.length > 0}
+		<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
+			{#each messages as message}
+				{#if message.content.length > 0}
+					<Message.Root
+						variant={message.role === 'user' ? 'default' : 'agent'}
+						finishRendering={() => {}}
+					>
+						<Message.Content>
+							<Katex math={message.content} finishRendering={() => {}} />
+						</Message.Content>
+					</Message.Root>
+				{/if}
+			{/each}
+		</Chat>
 	{/if}
 </div>
 

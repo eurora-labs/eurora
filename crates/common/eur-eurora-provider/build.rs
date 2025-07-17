@@ -1,5 +1,4 @@
-use std::io::Result;
-use std::path::PathBuf;
+use std::{io::Result, path::PathBuf};
 
 fn main() -> Result<()> {
     let proto_dir = PathBuf::from("../../../proto");

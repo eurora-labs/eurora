@@ -24,7 +24,7 @@ runs:
         - run: |
               cargo test --workspace $(cat /tmp/features)
           env:
-              GITBUTLER_TESTS_NO_CLEANUP: '1'
+              EURORA_TESTS_NO_CLEANUP: '1'
               CARGO_TERM_COLOR: always
           shell: bash
 

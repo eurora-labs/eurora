@@ -1,19 +1,22 @@
-use crate::{ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, ContextChip};
+use std::collections::HashMap;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
-use eur_proto::ipc::{
-    self, ProtoArticleSnapshot, ProtoArticleState, ProtoPdfState, ProtoTweet, ProtoTwitterSnapshot,
-    ProtoTwitterState, ProtoYoutubeSnapshot, ProtoYoutubeState, StateRequest,
+use eur_proto::{
+    ipc::{
+        self, ProtoArticleSnapshot, ProtoArticleState, ProtoPdfState, ProtoTweet,
+        ProtoTwitterSnapshot, ProtoTwitterState, ProtoYoutubeSnapshot, ProtoYoutubeState,
+        StateRequest,
+    },
+    shared::ProtoImageFormat,
 };
-use eur_proto::shared::ProtoImageFormat;
-use std::collections::HashMap;
-use tracing::info;
-
+use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
 use image::DynamicImage;
 use tokio::sync::Mutex;
+use tracing::info;
 
-use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
+use crate::{ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, ContextChip};
 
 /// Helper function to safely load images from protocol buffer data
 fn load_image_from_proto(

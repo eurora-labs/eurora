@@ -120,7 +120,6 @@ export default ts.config(
 			'.*', // dotfiles aren't ignored by default in FlatConfig
 			'**/.DS_Store',
 			'**/node_modules',
-			'**/butler/target',
 			'**/build',
 			'**/dist',
 			'.svelte-kit',

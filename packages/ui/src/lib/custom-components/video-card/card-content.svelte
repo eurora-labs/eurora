@@ -44,6 +44,7 @@
 			{#if mp4Src}
 				<source src={mp4Src} type="video/mp4" />
 			{/if}
+			<track kind="captions" src="" srclang="en" label="English" />
 			Your browser does not support the video tag.
 		</video>
 	</div>

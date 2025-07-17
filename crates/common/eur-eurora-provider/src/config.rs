@@ -1,8 +1,9 @@
 //! Configuration types for gRPC providers.
 
+use std::time::Duration;
+
 use ferrous_llm_core::config::ProviderConfig;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use url::Url;
 
 /// Configuration for gRPC providers.

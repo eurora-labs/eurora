@@ -1,14 +1,16 @@
-use dotenv::dotenv;
+use std::sync::Arc;
 
+use dotenv::dotenv;
 use eur_auth::JwtConfig;
 use eur_auth_service::AuthService;
 use eur_ocr_service::OcrService;
 use eur_prompt_service::PromptService;
-use eur_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer;
-use eur_proto::proto_ocr_service::proto_ocr_service_server::ProtoOcrServiceServer;
+use eur_proto::{
+    proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer,
+    proto_ocr_service::proto_ocr_service_server::ProtoOcrServiceServer,
+};
 // use eur_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
 use eur_remote_db::DatabaseManager;
-use std::sync::Arc;
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;

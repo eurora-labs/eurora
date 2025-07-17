@@ -1,9 +1,13 @@
 //! The Eurora authentication service that provides gRPC endpoints for user authentication.
 
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
+// Re-export shared types for convenience
+pub use eur_auth::{Claims, JwtConfig, validate_access_token, validate_refresh_token};
 use eur_proto::proto_auth_service::{
     EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
     Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
@@ -16,16 +20,11 @@ use eur_remote_db::{
 };
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use oauth2::TokenResponse as OAuth2TokenResponse;
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
-use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
 use uuid::Uuid;
-
-// Re-export shared types for convenience
-pub use eur_auth::{Claims, JwtConfig, validate_access_token, validate_refresh_token};
 pub mod oauth;
 
 use oauth::google::create_google_oauth_client;

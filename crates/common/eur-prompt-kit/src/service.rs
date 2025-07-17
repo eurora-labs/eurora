@@ -1,4 +1,3 @@
-use crate::PromptKitError;
 use anyhow::Result;
 use async_from::{AsyncTryFrom, async_trait};
 use eur_eurora_provider::{EuroraConfig, EuroraStreamingProvider, StreamingProvider};
@@ -8,6 +7,8 @@ use ferrous_llm::{
     openai::{OpenAIConfig, OpenAIProvider},
 };
 use tokio_stream::{Stream, StreamExt};
+
+use crate::PromptKitError;
 
 #[derive(Debug, Clone)]
 enum LLMProvider {

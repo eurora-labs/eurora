@@ -1,6 +1,5 @@
 use eur_activity::ContextChip;
-use tauri::Emitter;
-use tauri::{Manager, Runtime};
+use tauri::{Emitter, Manager, Runtime};
 use tracing::info;
 
 #[taurpc::procedures(path = "system")]

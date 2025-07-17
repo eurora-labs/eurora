@@ -1,17 +1,20 @@
+use std::{
+    fs::{self, File, OpenOptions},
+    io::{Read, Write},
+    net::ToSocketAddrs,
+    path::PathBuf,
+    process,
+};
+
 use anyhow::{anyhow, Result};
-use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
-use std::net::ToSocketAddrs;
-use std::path::PathBuf;
-use std::process;
+// Import the PORT constant from lib.rs
+use eur_native_messaging::PORT;
 use tonic::transport::Server;
 use tracing::info;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
 };
-// Import the PORT constant from lib.rs
-use eur_native_messaging::PORT;
 
 mod asset_context;
 mod asset_converter;
