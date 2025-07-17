@@ -27,7 +27,7 @@
 </script>
 
 <!-- Interactive Login Form -->
-{#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
+{#snippet template(args: { submitError: string | undefined }, _context: StoryContext<typeof Story>)}
 	<div class="w-full max-w-md">
 		<Login
 			submitError={args.submitError}
@@ -41,5 +41,3 @@
 		/>
 	</div>
 {/snippet}
-
-<Story name="Interactive" children={template} />
