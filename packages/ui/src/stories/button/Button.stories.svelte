@@ -48,7 +48,16 @@
 </script>
 
 <!-- Interactive Button -->
-{#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
+{#snippet template(
+	args: {
+		variant: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | undefined;
+		size: 'default' | 'sm' | 'lg' | 'icon' | undefined;
+		disabled: boolean;
+		href: string | undefined;
+		type: 'button' | 'submit' | 'reset' | undefined;
+	},
+	_context: StoryContext<typeof Story>,
+)}
 	<Button
 		variant={args.variant}
 		size={args.size}
@@ -59,5 +68,3 @@
 		{args.disabled ? 'Disabled' : 'Click me'}
 	</Button>
 {/snippet}
-
-<Story name="Interactive" children={template} />
