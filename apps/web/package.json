@@ -24,6 +24,7 @@
 		"test:unit": "vitest"
 	},
 	"devDependencies": {
+		"mode-watcher": "^1.1.0",
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/shared": "workspace:*",
