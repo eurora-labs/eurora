@@ -3,9 +3,12 @@
 use anyhow::{Result, anyhow};
 use eur_auth::{Claims, JwtConfig, validate_access_token};
 use eur_ocr::{self, OcrStrategy};
-use eur_proto::proto_ocr_service::proto_ocr_service_server::ProtoOcrService;
-use eur_proto::proto_ocr_service::{TranscribeImageRequest, TranscribeImageResponse};
-use eur_proto::shared::ProtoImage;
+use eur_proto::{
+    proto_ocr_service::{
+        TranscribeImageRequest, TranscribeImageResponse, proto_ocr_service_server::ProtoOcrService,
+    },
+    shared::ProtoImage,
+};
 use futures::future;
 use tonic::{Request, Response, Status};
 use tracing::{info, warn};

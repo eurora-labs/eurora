@@ -1,7 +1,8 @@
-use crate::util::*;
 use tauri::{Manager, Runtime};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tracing::{error, info};
+
+use crate::util::*;
 
 #[taurpc::procedures(path = "user")]
 pub trait UserApi {

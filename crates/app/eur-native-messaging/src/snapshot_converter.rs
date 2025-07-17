@@ -1,10 +1,11 @@
+use anyhow::{anyhow, Error}; // Import anyhow macro and Error
+use eur_proto::ipc::SnapshotResponse; // Import necessary proto types
+use tracing::info;
+
 use crate::snapshot_context::{
     ArticleSnapshot, NativeArticleSnapshot, NativeTwitterSnapshot, NativeYoutubeSnapshot,
     TwitterSnapshot, YoutubeSnapshot,
 }; // Use snapshot context types
-use anyhow::{anyhow, Error}; // Import anyhow macro and Error
-use eur_proto::ipc::SnapshotResponse; // Import necessary proto types
-use tracing::info;
 pub struct JSONToProtoSnapshotConverter;
 
 impl JSONToProtoSnapshotConverter {
