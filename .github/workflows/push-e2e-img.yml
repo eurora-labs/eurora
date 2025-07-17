@@ -2,7 +2,7 @@ name: build e2e-runner container
 on:
     push:
         branches:
-            - master
+            - main
         paths:
             - 'apps/desktop/e2e/Dockerfile'
 
