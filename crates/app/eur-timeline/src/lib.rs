@@ -4,20 +4,16 @@
 //! and store it in memory for later retrieval. It works by sampling data every
 //! 3 seconds and maintaining a rolling history.
 
-use anyhow::Result;
-use eur_activity::select_strategy_for_process;
-use ferrous_llm_core::Message;
+use std::{sync::Arc, time::Duration};
 
+use anyhow::Result;
+use eur_activity::{ActivityStrategy, DisplayAsset, select_strategy_for_process};
 use ferrous_focus::{FerrousFocusResult, FocusedWindow, IconData};
+use ferrous_llm_core::Message;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::time;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{sync::mpsc, task::JoinHandle, time};
 use tracing::{error, info, warn};
-
-use eur_activity::{ActivityStrategy, DisplayAsset};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SystemState {}

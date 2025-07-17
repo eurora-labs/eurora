@@ -1,6 +1,7 @@
-use crate::shared_types::SharedPromptKitService;
 use eur_prompt_kit::{OllamaConfig, OpenAIConfig};
 use tauri::{Manager, Runtime};
+
+use crate::shared_types::SharedPromptKitService;
 
 #[taurpc::procedures(path = "prompt")]
 pub trait PromptApi {
