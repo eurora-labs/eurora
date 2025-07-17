@@ -13,7 +13,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  repository: 'gitbutlerapp/gitbutler'
+                  repository: 'eurora-labs/eurora'
             - uses: actions/labeler@v5
               with:
                   configuration-path: '.github/pr-labeler.yml'

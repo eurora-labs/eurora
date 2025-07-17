@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 use base64::prelude::*;
-pub use eur_proto::ipc::{ProtoArticleSnapshot, ProtoTwitterSnapshot, ProtoYoutubeSnapshot};
-pub use eur_proto::native_messaging::ProtoNativeTwitterSnapshot;
-pub use eur_proto::native_messaging::ProtoNativeYoutubeSnapshot;
-pub use eur_proto::shared::ProtoImage;
+pub use eur_proto::{
+    ipc::{ProtoArticleSnapshot, ProtoTwitterSnapshot, ProtoYoutubeSnapshot},
+    native_messaging::{ProtoNativeTwitterSnapshot, ProtoNativeYoutubeSnapshot},
+    shared::ProtoImage,
+};
 use tracing::info;
 
 pub struct ArticleSnapshot(pub ProtoArticleSnapshot);

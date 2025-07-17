@@ -179,7 +179,7 @@
 	</StorybookContainer>
 </Story>
 
-{#snippet template({ ...args }: Args<typeof Story>, _context: StoryContext<typeof Story>)}
+{#snippet template(args: { disabled: boolean }, _context: StoryContext<typeof Story>)}
 	<StorybookContainer>
 		<Command.Root class="rounded-lg border bg-white/20 shadow-md backdrop-blur-[36px]">
 			<Command.List>
