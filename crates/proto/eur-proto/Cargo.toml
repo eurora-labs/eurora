@@ -7,7 +7,7 @@ edition = "2024"
 tonic = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
-tokio = { workspace = true, default-features = false }
+tokio = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 [build-dependencies]

@@ -508,6 +508,7 @@ impl BrowserStrategy {
             "vivaldi.exe",
             "edge.exe",
             "msedge.exe",
+            "librewolf.exe",
         ];
         #[cfg(target_os = "linux")]
         let processes = vec![
@@ -524,6 +525,7 @@ impl BrowserStrategy {
             "edge",
             "msedge",
             "safari",
+            "librewolf",
         ];
         #[cfg(target_os = "macos")]
         let processes = vec!["Google Chrome"];
