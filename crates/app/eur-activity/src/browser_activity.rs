@@ -508,6 +508,7 @@ impl BrowserStrategy {
             "vivaldi.exe",
             "edge.exe",
             "msedge.exe",
+            "librewolf.exe",
         ];
         #[cfg(target_os = "linux")]
         let processes = vec![
