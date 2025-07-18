@@ -41,7 +41,7 @@
             <!-- </Directory> -->
 
             <!-- Registry component -->
-            <Component Id="MyFragmentRegistryEntries" Guid="*">
+            <Component Id="ChromeRegistryEntries" Guid="*">
                 <RegistryKey
                 Root="HKCU"
                 Key="Software\Google\Chrome\NativeMessagingHosts\com.eurora.app"
@@ -54,6 +54,8 @@
                         KeyPath="yes"
                     />
                 </RegistryKey>
+            </Component>
+            <Component Id="FirefoxRegistryEntries" Guid="*">
                 <RegistryKey
                 Root="HKCU"
                 Key="Software\Mozilla\NativeMessagingHosts\com.eurora.app"
