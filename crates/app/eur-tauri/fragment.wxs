@@ -8,8 +8,8 @@
                     <Directory Id="EuroraFolder" Name="Eurora">
                         <Directory Id="ChromeFolder" Name="Chrome">
                             <!-- Component to copy the native-messaging-host.json file to the target location -->
-                            <Component Id="NativeMessagingHostJson" Guid="8c7ca6a7-77b0-4738-aaa5-9ba9b4a509fe">
-                                <File Id="NativeMessagingHostJsonFile"
+                            <Component Id="ChromeNativeMessagingHostJson" Guid="8c7ca6a7-77b0-4738-aaa5-9ba9b4a509fe">
+                                <File Id="ChromeNativeMessagingHostJsonFile"
                                     Name="com.eurora.app.json"
                                     Source="D:\a\eurora\eurora\crates\app\eur-tauri\hosts\windows.native-messaging.json"
                                 KeyPath="yes" />
@@ -23,8 +23,8 @@
                         </Directory>
 
                         <Directory Id="FirefoxFolder" Name="Firefox">
-                            <Component Id="NativeMessagingHostJson" Guid="b4e02a43-35e2-4635-b980-9b87224a33b1">
-                                <File Id="NativeMessagingHostJsonFile"
+                            <Component Id="FirefoxNativeMessagingHostJson" Guid="b4e02a43-35e2-4635-b980-9b87224a33b1">
+                                <File Id="FirefoxNativeMessagingHostJsonFile"
                                     Name="com.eurora.app.json"
                                     Source="D:\a\eurora\eurora\crates\app\eur-tauri\hosts\windows.firefox.native-messaging.json"
                                     KeyPath="yes" />
