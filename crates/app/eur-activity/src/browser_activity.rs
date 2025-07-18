@@ -524,6 +524,7 @@ impl BrowserStrategy {
             "edge",
             "msedge",
             "safari",
+            "librewolf",
         ];
         #[cfg(target_os = "macos")]
         let processes = vec!["Google Chrome"];
