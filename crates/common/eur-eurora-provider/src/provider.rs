@@ -23,7 +23,7 @@ struct AuthInterceptor;
 
 impl Interceptor for AuthInterceptor {
     fn call(&mut self, mut request: Request<()>) -> Result<Request<()>, Status> {
-        let access_token = secret::retrieve("AUTH_ACCESS_TOKEN", secret::Namespace::Global)
+        let access_token = secret::retrieve("AUTH_ACCESS_TOKEN", secret::Namespace::BuildKind)
             .map_err(|e| Status::internal(format!("Failed to retrieve access token: {}", e)))?
             .ok_or_else(|| Status::unauthenticated("AUTH_ACCESS_TOKEN not found"))?;
         request.metadata_mut().insert(
