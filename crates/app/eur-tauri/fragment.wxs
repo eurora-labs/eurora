@@ -14,8 +14,8 @@
                                     Source="D:\a\eurora\eurora\crates\app\eur-tauri\hosts\windows.native-messaging.json"
                                 KeyPath="yes" />
                             </Component>
-                            <Component Id="EurNativeMessaging" Guid="6adc0a23-d076-44c8-8a93-e22934856bac">
-                                <File Id="EurNativeMessagingFile"
+                            <Component Id="ChromeNativeMessaging" Guid="6adc0a23-d076-44c8-8a93-e22934856bac">
+                                <File Id="ChromeNativeMessagingFile"
                                     Name="eur-native-messaging.exe"
                                     Source="D:\a\eurora\eurora\target\release\eur-native-messaging.exe"
                                     KeyPath="yes" />
@@ -29,8 +29,8 @@
                                     Source="D:\a\eurora\eurora\crates\app\eur-tauri\hosts\windows.firefox.native-messaging.json"
                                     KeyPath="yes" />
                             </Component>
-                            <Component Id="EurNativeMessaging" Guid="6adc0a23-d076-44c8-8a93-e22934856bac">
-                                <File Id="EurNativeMessagingFile"
+                            <Component Id="FirefoxNativeMessaging" Guid="93829cc0-4c70-4684-9cab-79f0cad6ed9d">
+                                <File Id="FirefoxNativeMessagingFile"
                                     Name="eur-native-messaging.exe"
                                     Source="D:\a\eurora\eurora\target\release\eur-native-messaging.exe"
                                     KeyPath="yes" />
