@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Fragment>
+        <!-- Define the directory structure for C:\Program Files\Eurora Labs\Eurora\ -->
+        <DirectoryRef Id="TARGETDIR">
+            <!-- <Directory Id="ProgramFiles64Folder"> -->
+                <Directory Id="EuroraLabsFolder" Name="Eurora Labs">
+                    <Directory Id="EuroraFolder" Name="Eurora">
+                        <Directory Id="ChromeFolder" Name="Chrome">
+                            <!-- Component to copy the native-messaging-host.json file to the target location -->
+                            <Component Id="NativeMessagingHostJson" Guid="8c7ca6a7-77b0-4738-aaa5-9ba9b4a509fe">
+                                <File Id="NativeMessagingHostJsonFile"
+                                    Name="com.eurora.app.json"
+                                    Source="D:\a\eurora\eurora\crates\app\eur-tauri\hosts\windows.native-messaging.json"
+                                KeyPath="yes" />
+                            </Component>
+                            <Component Id="EurNativeMessaging" Guid="6adc0a23-d076-44c8-8a93-e22934856bac">
+                                <File Id="EurNativeMessagingFile"
+                                    Name="eur-native-messaging.exe"
+                                    Source="D:\a\eurora\eurora\target\release\eur-native-messaging.exe"
+                                    KeyPath="yes" />
+                            </Component>
+                        </Directory>
+
+                        <Directory Id="FirefoxFolder" Name="Firefox">
+                            <Component Id="NativeMessagingHostJson" Guid="b4e02a43-35e2-4635-b980-9b87224a33b1">
+                                <File Id="NativeMessagingHostJsonFile"
+                                    Name="com.eurora.app.json"
+                                    Source="D:\a\eurora\eurora\crates\app\eur-tauri\hosts\windows.firefox.native-messaging.json"
+                                    KeyPath="yes" />
+                            </Component>
+                            <Component Id="EurNativeMessaging" Guid="6adc0a23-d076-44c8-8a93-e22934856bac">
+                                <File Id="EurNativeMessagingFile"
+                                    Name="eur-native-messaging.exe"
+                                    Source="D:\a\eurora\eurora\target\release\eur-native-messaging.exe"
+                                    KeyPath="yes" />
+                            </Component>
+                        </Directory>
+                    </Directory>
+                </Directory>
+            <!-- </Directory> -->
+
+            <!-- Registry component -->
+            <Component Id="MyFragmentRegistryEntries" Guid="*">
+                <RegistryKey
+                Root="HKCU"
+                Key="Software\Google\Chrome\NativeMessagingHosts\com.eurora.app"
+                Action="createAndRemoveOnUninstall"
+                >
+                    <!-- values to persist on the registry -->
+                    <RegistryValue
+                        Type="string"
+                        Value="C:\\Eurora Labs\\Eurora\\chrome\\com.eurora.app.json"
+                        KeyPath="yes"
+                    />
+                </RegistryKey>
+                <RegistryKey
+                Root="HKCU"
+                Key="Software\Mozilla\NativeMessagingHosts\com.eurora.app"
+                Action="createAndRemoveOnUninstall"
+                >
+                    <!-- values to persist on the registry -->
+                    <RegistryValue
+                        Type="string"
+                        Value="C:\\Eurora Labs\\Eurora\\firefox\\com.eurora.app.json"
+                        KeyPath="yes"
+                    />
+                </RegistryKey>
+            </Component>
+        </DirectoryRef>
+
+
+    </Fragment>
+</Wix>
