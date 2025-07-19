@@ -44,8 +44,8 @@ impl AuthApi for AuthApiImpl {
                 .map_err(|e| format!("Failed to get login tokens: {}", e))?;
             let expires_in: i64 = 60 * 20;
 
-            let base_url = std::env::var("AUTH_SERVICE_URL")
-                .unwrap_or_else(|_| "http://localhost:5173".to_string());
+            let base_url =
+                std::env::var("AUTH_SERVICE_URL").unwrap_or("https://eurora-labs.com".to_string());
             let mut url = Url::parse(&format!("{}/login", base_url))
                 .map_err(|e| format!("Invalid AUTH_SERVICE_URL: {}", e))?;
             // Add code challenge as parameter
@@ -79,8 +79,12 @@ impl AuthApi for AuthApiImpl {
                         .map_err(|e| format!("Failed to remove login token: {}", e))?;
 
                     let config = EuroraConfig::new(
-                        Url::parse(std::env::var("API_BASE_URL").unwrap().as_str())
-                            .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
+                        Url::parse(
+                            std::env::var("API_BASE_URL")
+                                .unwrap_or("https://api.eurora-labs.com".to_string())
+                                .as_str(),
+                        )
+                        .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
                     );
 
                     // TODO: re-enable remote eurora provider
