@@ -17,7 +17,7 @@ use eur_remote_db::DatabaseManager;
 async fn main() -> Result<()> {
     // Note: This example requires a PostgreSQL database to be running
     // You would typically get this from environment variables
-    let database_url = std::env::var("DATABASE_URL")
+    let database_url = std::env::var("REMOTE_DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/eurora".to_string());
 
     eprintln!("Connecting to database...");
@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
         Ok(db) => Arc::new(db),
         Err(e) => {
             eprintln!("Failed to connect to database: {}", e);
-            eprintln!("Make sure PostgreSQL is running and DATABASE_URL is set correctly");
+            eprintln!("Make sure PostgreSQL is running and REMOTE_DATABASE_URL is set correctly");
             return Ok(());
         }
     };

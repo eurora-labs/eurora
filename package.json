@@ -9,6 +9,8 @@
 		"dev": "turbo run dev",
 		"lint": "turbo run //#globallint --no-daemon",
 		"check-types": "turbo run check-types",
+		"dev:stripe": "cargo run -p eur-stripe-service -- --mode development",
+		"prod:stripe": "cargo run -p eur-stripe-service -- --mode production",
 		"dev:monolith": "cargo run -p eur-monolith -- --mode development",
 		"prod:monolith": "cargo run -p eur-monolith -- --mode production",
 		"dev:desktop": "pnpm tauri dev",

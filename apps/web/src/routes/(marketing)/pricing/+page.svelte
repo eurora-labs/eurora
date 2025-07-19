@@ -2,6 +2,42 @@
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Check, X, Sparkles } from '@lucide/svelte';
+	import { getStripeService, PRICING_PLANS } from '$lib/stripe/service.js';
+	import { browser } from '$app/environment';
+
+	const stripeService = getStripeService({
+		publishableKey:
+			'pk_test_51RmZGBFbfKULj0cN4XGX2nuvoWaItaO1c7iXxK91UjnMqhTiCAbLQf3UDt6srATfvM5NmAdq0czNL7LYidMDKei200nypFLBOX', // This should be replaced with actual publishable key
+		apiUrl: 'http://localhost:3003', // This should point to your Rust backend
+	});
+
+	let loading = '';
+
+	async function handleSubscribe(planId: string, priceId: string) {
+		if (!browser || !priceId) return;
+
+		loading = planId;
+		try {
+			await stripeService.redirectToCheckout(priceId, 'subscription', {
+				metadata: { plan_id: planId },
+			});
+		} catch (error) {
+			console.error('Error redirecting to checkout:', error);
+			alert('There was an error processing your request. Please try again.');
+		} finally {
+			loading = '';
+		}
+	}
+
+	function handleContactSales() {
+		// For enterprise plan, redirect to contact form or open email
+		window.location.href = 'mailto:sales@eurora-labs.com?subject=Enterprise Plan Inquiry';
+	}
+
+	function handleGetStarted() {
+		// For free plan, redirect to registration
+		window.location.href = '/register';
+	}
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">
@@ -55,7 +91,9 @@
 						<span class="text-gray-500">Custom integrations</span>
 					</li>
 				</ul>
-				<Button variant="outline" class="w-full">Get Started</Button>
+				<Button variant="outline" class="w-full" onclick={handleGetStarted}
+					>Get Started</Button
+				>
 			</Card.Content>
 		</Card.Root>
 
@@ -105,7 +143,13 @@
 						<span class="text-gray-500">Custom integrations</span>
 					</li>
 				</ul>
-				<Button class="w-full">Subscribe Now</Button>
+				<Button
+					class="w-full"
+					onclick={() => handleSubscribe('pro', 'price_pro_monthly')}
+					disabled={loading === 'pro'}
+				>
+					{loading === 'pro' ? 'Loading...' : 'Subscribe Now'}
+				</Button>
 			</Card.Content>
 		</Card.Root>
 
@@ -150,7 +194,9 @@
 						<span>Custom integrations & API access</span>
 					</li>
 				</ul>
-				<Button variant="outline" class="w-full">Contact Sales</Button>
+				<Button variant="outline" class="w-full" onclick={handleContactSales}
+					>Contact Sales</Button
+				>
 			</Card.Content>
 		</Card.Root>
 	</div>
@@ -285,8 +331,12 @@
 					and recommend the best option for your use case.
 				</p>
 				<div class="space-y-4">
-					<Button variant="outline" class="w-full">Schedule a Demo</Button>
-					<Button variant="outline" class="w-full">Contact Sales</Button>
+					<Button variant="outline" class="w-full" onclick={handleContactSales}
+						>Schedule a Demo</Button
+					>
+					<Button variant="outline" class="w-full" onclick={handleContactSales}
+						>Contact Sales</Button
+					>
 					<p class="mt-2 text-center text-sm text-gray-500">
 						Or email us at <span class="text-purple-600">sales@eurora-labs.com</span>
 					</p>
