@@ -307,3 +307,7 @@ extensions/**/contentstyle.css
 *.mp4
 *.webm
 *.mkv
+
+/context_portal/
+*.sqlite
+*.sqlite-journal
