@@ -1,6 +1,6 @@
 <script lang="ts">
-	import '../app.pcss';
 	import '@eurora/ui/main.css';
+	import '../app.pcss';
 	import { onMount } from 'svelte';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 
