@@ -20,7 +20,7 @@ impl AuthClient {
     /// Create a new gRPC client connected to the auth service
     pub async fn new(base_url: Option<String>) -> Result<Self> {
         let base_url = base_url.unwrap_or(
-            std::env::var("API_BASE_URL").unwrap_or("http://localhost:50051".to_string()),
+            std::env::var("API_BASE_URL").unwrap_or("https://api.eurora-labs.com".to_string()),
         );
         Ok(Self { base_url })
     }
