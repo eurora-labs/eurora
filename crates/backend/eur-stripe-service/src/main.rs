@@ -63,10 +63,10 @@ fn create_app(stripe_service: StripeService) -> Router {
         .route("/health", get(handlers::health))
         // Customer routes
         .route("/customers", post(handlers::create_customer))
-        .route("/customers/:id", get(handlers::get_customer))
+        .route("/customers/{id}", get(handlers::get_customer))
         // Product routes
         .route("/products", post(handlers::create_product))
-        .route("/products/:id", get(handlers::get_product))
+        .route("/products/{id}", get(handlers::get_product))
         // Price routes
         .route("/prices", post(handlers::create_price))
         // Subscription routes

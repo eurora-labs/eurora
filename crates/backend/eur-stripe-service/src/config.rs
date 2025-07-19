@@ -46,7 +46,7 @@ impl Config {
                 webhook_secret: env::var("STRIPE_WEBHOOK_SECRET")?,
             },
             database: DatabaseConfig {
-                url: env::var("DATABASE_URL")?,
+                url: env::var("REMOTE_DATABASE_URL")?,
             },
         })
     }
