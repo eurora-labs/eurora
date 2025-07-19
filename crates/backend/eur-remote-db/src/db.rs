@@ -50,7 +50,7 @@ use crate::types::{
     User,
     WebhookEvent,
 };
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DatabaseManager {
     pub pool: PgPool,
 }
@@ -873,5 +873,294 @@ impl DatabaseManager {
             .await?;
 
         Ok(webhook_events)
+    }
+
+    // Stripe Product management methods
+    pub async fn create_product(
+        &self,
+        request: CreateProductRequest,
+    ) -> Result<Product, sqlx::Error> {
+        let id = Uuid::new_v4();
+        let now = Utc::now();
+
+        let product = sqlx::query_as::<_, Product>(
+            r#"
+            INSERT INTO products (id, stripe_product_id, name, description, active, metadata, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, stripe_product_id, name, description, active, metadata, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(&request.stripe_product_id)
+        .bind(&request.name)
+        .bind(&request.description)
+        .bind(request.active.unwrap_or(true))
+        .bind(request.metadata.unwrap_or_else(|| serde_json::json!({})))
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(product)
+    }
+
+    pub async fn get_product_by_stripe_id(
+        &self,
+        stripe_product_id: &str,
+    ) -> Result<Product, sqlx::Error> {
+        let product = sqlx::query_as::<_, Product>(
+            r#"
+            SELECT id, stripe_product_id, name, description, active, metadata, created_at, updated_at
+            FROM products
+            WHERE stripe_product_id = $1
+            "#,
+        )
+        .bind(stripe_product_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(product)
+    }
+
+    pub async fn update_product(
+        &self,
+        product_id: Uuid,
+        request: UpdateProductRequest,
+    ) -> Result<Product, sqlx::Error> {
+        let now = Utc::now();
+
+        let product = sqlx::query_as::<_, Product>(
+            r#"
+            UPDATE products
+            SET name = COALESCE($2, name),
+                description = COALESCE($3, description),
+                active = COALESCE($4, active),
+                metadata = COALESCE($5, metadata),
+                updated_at = $6
+            WHERE id = $1
+            RETURNING id, stripe_product_id, name, description, active, metadata, created_at, updated_at
+            "#,
+        )
+        .bind(product_id)
+        .bind(&request.name)
+        .bind(&request.description)
+        .bind(request.active)
+        .bind(request.metadata)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(product)
+    }
+
+    // Stripe Price management methods
+    pub async fn create_price(&self, request: CreatePriceRequest) -> Result<Price, sqlx::Error> {
+        let id = Uuid::new_v4();
+        let now = Utc::now();
+
+        let price = sqlx::query_as::<_, Price>(
+            r#"
+            INSERT INTO prices (id, stripe_price_id, product_id, active, currency, unit_amount,
+                               recurring_interval, recurring_interval_count, billing_scheme, tiers,
+                               metadata, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            RETURNING id, stripe_price_id, product_id, active, currency, unit_amount,
+                      recurring_interval, recurring_interval_count, billing_scheme, tiers,
+                      metadata, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(&request.stripe_price_id)
+        .bind(request.product_id)
+        .bind(request.active.unwrap_or(true))
+        .bind(&request.currency)
+        .bind(request.unit_amount)
+        .bind(&request.recurring_interval)
+        .bind(request.recurring_interval_count)
+        .bind(
+            request
+                .billing_scheme
+                .unwrap_or_else(|| "per_unit".to_string()),
+        )
+        .bind(request.tiers)
+        .bind(request.metadata.unwrap_or_else(|| serde_json::json!({})))
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(price)
+    }
+
+    pub async fn get_price_by_stripe_id(
+        &self,
+        stripe_price_id: &str,
+    ) -> Result<Price, sqlx::Error> {
+        let price = sqlx::query_as::<_, Price>(
+            r#"
+            SELECT id, stripe_price_id, product_id, active, currency, unit_amount,
+                   recurring_interval, recurring_interval_count, billing_scheme, tiers,
+                   metadata, created_at, updated_at
+            FROM prices
+            WHERE stripe_price_id = $1
+            "#,
+        )
+        .bind(stripe_price_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(price)
+    }
+
+    pub async fn update_price(
+        &self,
+        price_id: Uuid,
+        request: UpdatePriceRequest,
+    ) -> Result<Price, sqlx::Error> {
+        let now = Utc::now();
+
+        let price = sqlx::query_as::<_, Price>(
+            r#"
+            UPDATE prices
+            SET active = COALESCE($2, active),
+                metadata = COALESCE($3, metadata),
+                updated_at = $4
+            WHERE id = $1
+            RETURNING id, stripe_price_id, product_id, active, currency, unit_amount,
+                      recurring_interval, recurring_interval_count, billing_scheme, tiers,
+                      metadata, created_at, updated_at
+            "#,
+        )
+        .bind(price_id)
+        .bind(request.active)
+        .bind(request.metadata)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(price)
+    }
+
+    // Stripe Subscription management methods
+    pub async fn create_subscription(
+        &self,
+        request: CreateSubscriptionRequest,
+    ) -> Result<Subscription, sqlx::Error> {
+        let id = Uuid::new_v4();
+        let now = Utc::now();
+
+        let subscription = sqlx::query_as::<_, Subscription>(
+            r#"
+            INSERT INTO subscriptions (id, stripe_subscription_id, user_id, status, current_period_start,
+                                     current_period_end, cancel_at_period_end, canceled_at, ended_at,
+                                     trial_start, trial_end, metadata, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            RETURNING id, stripe_subscription_id, user_id, status, current_period_start,
+                      current_period_end, cancel_at_period_end, canceled_at, ended_at,
+                      trial_start, trial_end, metadata, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(&request.stripe_subscription_id)
+        .bind(request.user_id)
+        .bind(&request.status)
+        .bind(request.current_period_start)
+        .bind(request.current_period_end)
+        .bind(request.cancel_at_period_end.unwrap_or(false))
+        .bind(request.canceled_at)
+        .bind(request.ended_at)
+        .bind(request.trial_start)
+        .bind(request.trial_end)
+        .bind(request.metadata.unwrap_or_else(|| serde_json::json!({})))
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(subscription)
+    }
+
+    pub async fn get_subscription_by_stripe_id(
+        &self,
+        stripe_subscription_id: &str,
+    ) -> Result<Subscription, sqlx::Error> {
+        let subscription = sqlx::query_as::<_, Subscription>(
+            r#"
+            SELECT id, stripe_subscription_id, user_id, status, current_period_start,
+                   current_period_end, cancel_at_period_end, canceled_at, ended_at,
+                   trial_start, trial_end, metadata, created_at, updated_at
+            FROM subscriptions
+            WHERE stripe_subscription_id = $1
+            "#,
+        )
+        .bind(stripe_subscription_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(subscription)
+    }
+
+    pub async fn update_subscription(
+        &self,
+        subscription_id: Uuid,
+        request: UpdateSubscriptionRequest,
+    ) -> Result<Subscription, sqlx::Error> {
+        let now = Utc::now();
+
+        let subscription = sqlx::query_as::<_, Subscription>(
+            r#"
+            UPDATE subscriptions
+            SET status = COALESCE($2, status),
+                current_period_start = COALESCE($3, current_period_start),
+                current_period_end = COALESCE($4, current_period_end),
+                cancel_at_period_end = COALESCE($5, cancel_at_period_end),
+                canceled_at = COALESCE($6, canceled_at),
+                ended_at = COALESCE($7, ended_at),
+                trial_start = COALESCE($8, trial_start),
+                trial_end = COALESCE($9, trial_end),
+                metadata = COALESCE($10, metadata),
+                updated_at = $11
+            WHERE id = $1
+            RETURNING id, stripe_subscription_id, user_id, status, current_period_start,
+                      current_period_end, cancel_at_period_end, canceled_at, ended_at,
+                      trial_start, trial_end, metadata, created_at, updated_at
+            "#,
+        )
+        .bind(subscription_id)
+        .bind(&request.status)
+        .bind(request.current_period_start)
+        .bind(request.current_period_end)
+        .bind(request.cancel_at_period_end)
+        .bind(request.canceled_at)
+        .bind(request.ended_at)
+        .bind(request.trial_start)
+        .bind(request.trial_end)
+        .bind(request.metadata)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(subscription)
+    }
+
+    pub async fn get_subscriptions_by_user_id(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<Subscription>, sqlx::Error> {
+        let subscriptions = sqlx::query_as::<_, Subscription>(
+            r#"
+            SELECT id, stripe_subscription_id, user_id, status, current_period_start,
+                   current_period_end, cancel_at_period_end, canceled_at, ended_at,
+                   trial_start, trial_end, metadata, created_at, updated_at
+            FROM subscriptions
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(subscriptions)
     }
 }
