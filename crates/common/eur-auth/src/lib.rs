@@ -29,6 +29,7 @@ pub struct JwtConfig {
     pub secret: String,
     pub access_token_expiry_hours: i64,
     pub refresh_token_expiry_days: i64,
+    pub approved_emails: Vec<String>,
 }
 
 impl Default for JwtConfig {
@@ -38,6 +39,11 @@ impl Default for JwtConfig {
                 .expect("JWT_SECRET must be set at runtime for secure token validation"),
             access_token_expiry_hours: 1,  // 1 hour
             refresh_token_expiry_days: 30, // 30 days
+            approved_emails: std::env::var("APPROVED_EMAILS")
+                .unwrap_or_default()
+                .split(',')
+                .map(|s| s.trim().to_lowercase().to_string())
+                .collect::<Vec<_>>(),
         }
     }
 }
@@ -62,11 +68,10 @@ pub fn validate_access_token(token: &str, jwt_config: &JwtConfig) -> Result<Clai
         return Err(anyhow!("Invalid token type: expected access token"));
     }
 
-    // TODO: Remove when Stripe integration is complete
-    let approved_emails = std::env::var("APPROVED_EMAILS").unwrap_or_default();
-    let approved_emails = approved_emails.split(',').collect::<Vec<_>>();
-
-    if !approved_emails.contains(&claims.email.as_str()) {
+    if !jwt_config
+        .approved_emails
+        .contains(&claims.email.to_lowercase())
+    {
         return Err(anyhow!("Email not approved"));
     }
 
