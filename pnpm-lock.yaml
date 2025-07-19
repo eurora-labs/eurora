@@ -938,6 +938,9 @@ importers:
       '@playwright/test':
         specifier: ^1.54.1
         version: 1.54.1
+      '@stripe/stripe-js':
+        specifier: ^7.5.0
+        version: 7.5.0
       '@sveltejs/adapter-auto':
         specifier: ^4.0.0
         version: 4.0.0(@sveltejs/kit@2.23.0(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.36.0)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))(svelte@5.36.0)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.8.0)))
@@ -992,6 +995,9 @@ importers:
       svelte-check:
         specifier: catalog:svelte
         version: 4.2.2(picomatch@4.0.2)(svelte@5.36.0)(typescript@5.8.3)
+      svelte-stripe:
+        specifier: ^1.4.0
+        version: 1.4.0(@stripe/stripe-js@7.5.0)(svelte@5.36.0)
       svelte-system-info:
         specifier: ^1.0.3
         version: 1.0.3
@@ -3047,6 +3053,10 @@ packages:
     resolution: {integrity: sha512-r4y+LsiB37V5hzpQo+BM10PaCsp7YlZ0YcZzQP1OCkPlYXmUAFy2VvDKaFRpD8IeNPKug2u4iFm/laDEbs03dg==}
     peerDependencies:
       storybook: ^8.2.0 || ^8.3.0-0 || ^8.4.0-0 || ^8.5.0-0 || ^8.6.0-0
+
+  '@stripe/stripe-js@7.5.0':
+    resolution: {integrity: sha512-Cq3KKe+G1o7PSBMbmrgpT2JgBeyH2THHr3RdIX2MqF7AnBuspIMgtZ3ktcCgP7kZsTMvnmWymr7zZCT1zeWbMw==}
+    engines: {node: '>=12.16'}
 
   '@sveltejs/acorn-typescript@1.0.5':
     resolution: {integrity: sha512-IwQk4yfwLdibDlrXVE04jTZYlLnwsTT2PIOQQGNLWfjavGifnk1JD1LcZjZaBTRcxZu2FfPfNLOE04DSu9lqtQ==}
@@ -7226,6 +7236,12 @@ packages:
     peerDependencies:
       svelte: ^5.0.0
 
+  svelte-stripe@1.4.0:
+    resolution: {integrity: sha512-RUSui4IszIBXhGt3mT3pLJX17OJ34A0O+LAcZLooWVYQCAv95umVXoRB6WmjMabj3jOoJ8c3KHGufaJLRlIzRg==}
+    peerDependencies:
+      '@stripe/stripe-js': ^3 || ^4
+      svelte: ^3 || ^4 || ^5
+
   svelte-system-info@1.0.3:
     resolution: {integrity: sha512-Hasj4Es72KU7C3iIW6Yzjaek8d5iVAMk+ybRq7pIu4gqv3MMYqrvW0ViknUrI1eDXBCkLlGxfi0i2MAxQAzN2g==}
 
@@ -9261,6 +9277,8 @@ snapshots:
   '@storybook/theming@8.6.14(storybook@8.6.14(prettier@3.6.2))':
     dependencies:
       storybook: 8.6.14(prettier@3.6.2)
+
+  '@stripe/stripe-js@7.5.0': {}
 
   '@sveltejs/acorn-typescript@1.0.5(acorn@8.15.0)':
     dependencies:
@@ -13847,6 +13865,11 @@ snapshots:
   svelte-sonner@1.0.5(svelte@5.36.0):
     dependencies:
       runed: 0.28.0(svelte@5.36.0)
+      svelte: 5.36.0
+
+  svelte-stripe@1.4.0(@stripe/stripe-js@7.5.0)(svelte@5.36.0):
+    dependencies:
+      '@stripe/stripe-js': 7.5.0
       svelte: 5.36.0
 
   svelte-system-info@1.0.3:
