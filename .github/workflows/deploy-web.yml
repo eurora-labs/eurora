@@ -63,7 +63,7 @@ jobs:
               run: pnpm proto:typescript
 
             - name: Build everything
-              run: pnpm build
+              run: pnpm build:web
 
             - name: Build Project Artifacts
               run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
