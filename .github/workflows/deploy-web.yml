@@ -62,18 +62,18 @@ jobs:
             - name: Generate proto types
               run: pnpm proto:typescript
 
-            - name: Build Project Artifacts
-              run: vercel build --token=${{ secrets.VERCEL_TOKEN }} --filter @eurora/web...
+            # - name: Build Project Artifacts
+            #   run: vercel build --token=${{ secrets.VERCEL_TOKEN }} --filter @eurora/web...
+            #   env:
+            #       VITE_API_BASE_URL: 'https://api.eurora-labs.com'
+
+            - name: Build web app
+              run: pnpm turbo run build --filter @eurora/web...
               env:
                   VITE_API_BASE_URL: 'https://api.eurora-labs.com'
 
             - name: Deploy Project Artifacts to Vercel
               run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
-
-            # - name: Build web app
-            #   run: pnpm turbo run build --filter @eurora/web...
-            #   env:
-            #       VITE_API_BASE_URL: 'https://api.eurora-labs.com'
 
             # - name: Create CNAME file
             #   run: echo "eurora-labs.com" > apps/web/dist/CNAME
