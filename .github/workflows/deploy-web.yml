@@ -1,5 +1,7 @@
-name: Deploy Web to GitHub Pages
-
+name: Deploy Web to Vercel
+env:
+    VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+    VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 on:
     # Runs on pushes targeting the main branch
     push:
@@ -19,7 +21,7 @@ permissions:
 
 # Allow only one concurrent deployment
 concurrency:
-    group: 'pages'
+    group: 'vercel'
     cancel-in-progress: true
 
 env:
@@ -29,9 +31,17 @@ jobs:
     # Build job
     build:
         runs-on: ubuntu-latest
+        environment:
+            name: vercel
         steps:
             - name: Checkout
               uses: actions/checkout@v4
+
+            - name: Install Vercel CLI
+              run: npm install --global vercel@latest
+
+            - name: Pull Vercel Environment Information
+              run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
 
             - name: Pull Git LFS files
               run: git lfs pull
@@ -53,29 +63,39 @@ jobs:
             - name: Generate proto types
               run: pnpm proto:typescript
 
-            - name: Build web app
-              run: pnpm turbo run build --filter @eurora/web...
+            - name: Build Project Artifacts
+              run: vercel build --token=${{ secrets.VERCEL_TOKEN }} --filter @eurora/web...
               env:
                   VITE_API_BASE_URL: 'https://api.eurora-labs.com'
 
-            - name: Create CNAME file
-              run: echo "eurora-labs.com" > apps/web/dist/CNAME
+            - name: Deploy Project Artifacts to Vercel
+              run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
 
-            - name: Setup Pages
-              uses: actions/configure-pages@v5
-              with:
-                  static_site_generator: sveltekit
+            # - name: Build web app
+            #   run: pnpm turbo run build --filter @eurora/web...
+            #   env:
+            #       VITE_API_BASE_URL: 'https://api.eurora-labs.com'
 
-            - name: Upload artifact
-              uses: actions/upload-pages-artifact@v3
-              with:
-                  path: 'apps/web/dist'
+            # - name: Create CNAME file
+            #   run: echo "eurora-labs.com" > apps/web/dist/CNAME
 
-    # Deployment job
-    deploy:
-        runs-on: ubuntu-latest
-        needs: build
-        steps:
-            - name: Deploy to GitHub Pages
-              id: deployment
-              uses: actions/deploy-pages@v4
+            # - name: Setup Pages
+            #   uses: actions/configure-pages@v5
+            #   with:
+            #       static_site_generator: sveltekit
+
+    #         - name: Upload artifact
+    #           uses: actions/upload-pages-artifact@v3
+    #           with:
+    #               path: 'apps/web/dist'
+
+    # # Deployment job
+    # deploy:
+    #     runs-on: ubuntu-latest
+    #     needs: build
+    #     steps:
+    #         - name: Deploy Project Artifacts to Vercel
+    #           run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+    #         # - name: Deploy to GitHub Pages
+    #         #   id: deployment
+    #         #   uses: actions/deploy-pages@v4
