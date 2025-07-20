@@ -159,8 +159,10 @@ impl ProviderConfig for EuroraConfig {
 impl EuroraConfig {
     /// Create a new gRPC configuration with the given endpoint.
     pub fn new(endpoint: Url) -> Self {
+        let use_tls = endpoint.scheme() == "https";
         Self {
             endpoint,
+            use_tls,
             ..Default::default()
         }
     }
