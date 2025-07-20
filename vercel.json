@@ -1,5 +1,4 @@
 {
-	"projects": [],
 	"buildCommand": "pnpm build:web",
 	"installCommand": "pnpm install --frozen-lockfile",
 	"outputDirectory": "apps/web/build",
