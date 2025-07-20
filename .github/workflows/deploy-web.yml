@@ -78,7 +78,7 @@ jobs:
 
             - name: Deploy to AWS Amplify
               id: deployment
-              run: chmod +x ./scripts/amplify-deploy.sh && ./scripts/amplify-deploy.sh ${{ secrets.AMPLIFY_APP_ID }} ci/web-amplify
+              run: chmod +x ./scripts/amplify-deploy.sh && ./scripts/amplify-deploy.sh ${{ secrets.AMPLIFY_APP_ID }} main
 
     #GitHub Pages Deployment job
     # deploy:
