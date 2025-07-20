@@ -62,6 +62,9 @@ jobs:
             - name: Generate proto types
               run: pnpm proto:typescript
 
+            - name: Build everything
+              run: pnpm build
+
             - name: Build Project Artifacts
               run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
               env:
