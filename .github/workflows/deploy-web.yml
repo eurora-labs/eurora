@@ -63,7 +63,7 @@ jobs:
               run: pnpm proto:typescript
 
             - name: Build Project Artifacts
-              run: vercel build --token=${{ secrets.VERCEL_TOKEN }} --filter @eurora/web...
+              run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
               env:
                   VITE_API_BASE_URL: 'https://api.eurora-labs.com'
 
