@@ -1,7 +1,4 @@
 name: Deploy Web to Vercel
-env:
-    VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-    VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 on:
     # Runs on pushes targeting the main branch
     push:
@@ -25,6 +22,8 @@ concurrency:
     cancel-in-progress: true
 
 env:
+    VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+    VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     NODE_VERSION: 'lts/jod' # Set this to the node version to use
 
 jobs:
