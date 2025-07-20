@@ -52,29 +52,29 @@ jobs:
                   node-version: ${{ env.NODE_VERSION }}
                   cache: 'pnpm'
 
-            - name: Install dependencies
-              run: pnpm install --frozen-lockfile
+            # - name: Install dependencies
+            #   run: pnpm install --frozen-lockfile
 
-            - name: Generate proto types
-              run: pnpm proto:typescript
+            # - name: Generate proto types
+            #   run: pnpm proto:typescript
 
-            - name: Build web app
-              run: pnpm turbo run build --filter @eurora/web...
-              env:
-                  VITE_API_BASE_URL: 'https://api.eurora-labs.com'
+            # - name: Build web app
+            #   run: pnpm turbo run build --filter @eurora/web...
+            #   env:
+            #       VITE_API_BASE_URL: 'https://api.eurora-labs.com'
 
-            - name: Create CNAME file
-              run: echo "eurora-labs.com" > apps/web/dist/CNAME
+            # - name: Create CNAME file
+            #   run: echo "eurora-labs.com" > apps/web/dist/CNAME
 
-            - name: Setup Pages
-              uses: actions/configure-pages@v5
-              with:
-                  static_site_generator: sveltekit
+            # - name: Setup Pages
+            #   uses: actions/configure-pages@v5
+            #   with:
+            #       static_site_generator: sveltekit
 
-            - name: Upload artifact
-              uses: actions/upload-pages-artifact@v3
-              with:
-                  path: 'apps/web/dist'
+            # - name: Upload artifact
+            #   uses: actions/upload-pages-artifact@v3
+            #   with:
+            #       path: 'apps/web/dist'
 
             - name: Deploy to AWS Amplify
               id: deployment
