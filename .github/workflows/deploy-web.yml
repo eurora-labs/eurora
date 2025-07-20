@@ -77,7 +77,7 @@ jobs:
 
             - name: Deploy to AWS Amplify
               id: deployment
-              run: ./scripts/amplify-deploy.sh eurora main
+              run: chmod +x ./scripts/amplify-deploy.sh && ./scripts/amplify-deploy.sh eurora main
 
     #GitHub Pages Deployment job
     # deploy:
