@@ -1,7 +1,10 @@
 <script lang="ts">
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import { Shield, Lock, Eye, FileText } from '@lucide/svelte';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import LockIcon from '@lucide/svelte/icons/lock';
+	import EyeIcon from '@lucide/svelte/icons/eye';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">
@@ -17,7 +20,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Shield class="h-6 w-6 text-purple-600" />
+					<ShieldIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Data Protection</Card.Title>
 				</div>
 			</Card.Header>
@@ -33,7 +36,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Lock class="h-6 w-6 text-purple-600" />
+					<LockIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Privacy Controls</Card.Title>
 				</div>
 			</Card.Header>
@@ -48,7 +51,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Eye class="h-6 w-6 text-purple-600" />
+					<EyeIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Transparency</Card.Title>
 				</div>
 			</Card.Header>
@@ -65,7 +68,7 @@
 	<Card.Root class="mb-16 p-6">
 		<Card.Header>
 			<div class="flex items-center gap-2">
-				<FileText class="h-6 w-6 text-purple-600" />
+				<FileTextIcon class="h-6 w-6 text-purple-600" />
 				<Card.Title>Privacy Policy</Card.Title>
 			</div>
 			<Card.Description>Last updated: March 15, 2025</Card.Description>

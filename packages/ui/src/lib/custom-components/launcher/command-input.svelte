@@ -3,7 +3,7 @@
 	import { cn } from '$lib/utils.js';
 	import InputArea from './input-area.svelte';
 	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core/index';
-	import { Search } from '@lucide/svelte';
+	import SearchIcon from '@lucide/svelte/icons/search';
 
 	interface Props extends CommandPrimitive.InputProps {
 		query?: Query;
@@ -26,7 +26,7 @@
 	data-command-input-wrapper=""
 >
 	<div class="flex">
-		<Search class="opacity-30 shrink-0 text-black/80 mt-7" size="40" />
+		<SearchIcon class="opacity-30 shrink-0 text-black/80 mt-7" size="40" />
 	</div>
 	<div class="mr-2 h-[100px] w-2 shrink-0"></div>
 	<CommandPrimitive.Input
