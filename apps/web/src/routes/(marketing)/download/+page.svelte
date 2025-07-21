@@ -1,7 +1,10 @@
 <script lang="ts">
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import { Download, Monitor, Laptop, Globe } from '@lucide/svelte';
+	import MonitorIcon from '@lucide/svelte/icons/monitor';
+	import LaptopIcon from '@lucide/svelte/icons/laptop';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import DownloadIcon from '@lucide/svelte/icons/download';
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">
@@ -26,14 +29,14 @@
 						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
 					>
 						<div class="flex items-center gap-3">
-							<Monitor class="h-8 w-8 text-blue-600" />
+							<MonitorIcon class="h-8 w-8 text-blue-600" />
 							<div>
 								<h3 class="font-medium">Windows</h3>
 								<p class="text-sm text-gray-600">Windows 10 or later</p>
 							</div>
 						</div>
 						<Button>
-							<Download class="mr-2 h-4 w-4" />
+							<DownloadIcon class="mr-2 h-4 w-4" />
 							Download
 						</Button>
 					</div>
@@ -42,14 +45,14 @@
 						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
 					>
 						<div class="flex items-center gap-3">
-							<Laptop class="h-8 w-8 text-gray-800" />
+							<LaptopIcon class="h-8 w-8 text-gray-800" />
 							<div>
 								<h3 class="font-medium">macOS</h3>
 								<p class="text-sm text-gray-600">macOS 11 or later</p>
 							</div>
 						</div>
 						<Button>
-							<Download class="mr-2 h-4 w-4" />
+							<DownloadIcon class="mr-2 h-4 w-4" />
 							Download
 						</Button>
 					</div>
@@ -58,14 +61,14 @@
 						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
 					>
 						<div class="flex items-center gap-3">
-							<Monitor class="h-8 w-8 text-orange-600" />
+							<MonitorIcon class="h-8 w-8 text-orange-600" />
 							<div>
 								<h3 class="font-medium">Linux</h3>
 								<p class="text-sm text-gray-600">Ubuntu, Debian, Fedora</p>
 							</div>
 						</div>
 						<Button>
-							<Download class="mr-2 h-4 w-4" />
+							<DownloadIcon class="mr-2 h-4 w-4" />
 							Download
 						</Button>
 					</div>
@@ -84,14 +87,14 @@
 						class="flex items-center justify-between rounded-md border p-4 hover:bg-gray-50"
 					>
 						<div class="flex items-center gap-3">
-							<Globe class="h-8 w-8 text-blue-500" />
+							<GlobeIcon class="h-8 w-8 text-blue-500" />
 							<div>
 								<h3 class="font-medium">Chrome</h3>
 								<p class="text-sm text-gray-600">Chrome Web Store</p>
 							</div>
 						</div>
 						<Button>
-							<Download class="mr-2 h-4 w-4" />
+							<DownloadIcon class="mr-2 h-4 w-4" />
 							Add to Chrome
 						</Button>
 					</div>
@@ -115,7 +118,7 @@
 							</div>
 						</div>
 						<Button>
-							<Download class="mr-2 h-4 w-4" />
+							<DownloadIcon class="mr-2 h-4 w-4" />
 							Add to Firefox
 						</Button>
 					</div>
@@ -139,7 +142,7 @@
 							</div>
 						</div>
 						<Button>
-							<Download class="mr-2 h-4 w-4" />
+							<DownloadIcon class="mr-2 h-4 w-4" />
 							Add to Edge
 						</Button>
 					</div>
