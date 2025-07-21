@@ -126,16 +126,9 @@
 						</Sidebar.MenuItem>
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton>
-								<!-- {#snippet child({ props })} -->
-								<!-- <a href="mailto:contact@eurora-labs.com" {...props}> -->
-								<!-- <MailIcon /> -->
-								<!-- <span>Contact us</span> -->
-								<!-- </a> -->
-								<!-- {/snippet} -->
-
 								<Dialog.Root>
 									<Dialog.Trigger
-										class="flex flex-row gap-2 text-sm items-center"
+										class="flex flex-row gap-2 text-sm items-center w-full h-full"
 									>
 										<MailIcon size={16} />
 										Contact Us</Dialog.Trigger
