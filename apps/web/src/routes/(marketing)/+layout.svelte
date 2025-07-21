@@ -12,8 +12,8 @@
 <div class="bg-transparent z-0 flex items-center justify-between px-6 py-4 mt-2">
 	<div class="flex items-center gap-2">
 		<Button variant="link" href="/" class="decoration-transparent">
-			<EuroraLogo style="width: 4rem; height: 4rem;" />
-			<span class="text-lg">Eurora Labs</span>
+			<EuroraLogo style="width: 2rem; height: 2rem;" />
+			<span class="text-lg font-bold">Eurora Labs</span>
 		</Button>
 	</div>
 
