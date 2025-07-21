@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
-	import { create } from '@eurora/shared/util/grpc';
+	import { create } from '@bufbuild/protobuf';
 	import { onMount } from 'svelte';
 	import { authService } from '@eurora/shared/services/auth-service';
+	import { auth } from '$lib/stores/auth.js';
+	import { goto } from '$app/navigation';
 	onMount(async () => {
 		const query = new URLSearchParams(window.location.search);
 		const error = query.get('error');
@@ -47,6 +49,12 @@
 			const tokens = await authService.login(loginData);
 
 			console.log('Tokens:', tokens);
+
+			// Store tokens in auth store
+			auth.login(tokens);
+
+			// Redirect to home page
+			goto('/');
 		} catch (error) {
 			console.error('Token exchange failed:', error);
 			window.location.href = '/login?error=token_exchange_failed';

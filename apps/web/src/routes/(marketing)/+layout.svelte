@@ -3,6 +3,8 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import LogInIcon from '@lucide/svelte/icons/log-in';
+	import { isAuthenticated } from '$lib/stores/auth.js';
+	import UserButton from '$lib/components/UserButton.svelte';
 
 	const { children } = $props();
 </script>
@@ -28,10 +30,14 @@
 			<SiGithub />
 		</Button>
 		<!-- <Button variant="default" href="/download">Get Eurora</Button> -->
-		<Button variant="outline" href="/login" class="backdrop-blur-2xl">
-			Login
-			<LogInIcon />
-		</Button>
+		{#if $isAuthenticated}
+			<UserButton />
+		{:else}
+			<Button variant="outline" href="/login" class="backdrop-blur-2xl">
+				Login
+				<LogInIcon />
+			</Button>
+		{/if}
 	</div>
 </div>
 

@@ -11,7 +11,7 @@
 	import { Label } from '@eurora/ui/components/label/index';
 	import Button from '@eurora/ui/components/button/button.svelte';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
-	import { CheckIcon } from '@lucide/svelte';
+	import CheckIcon from '@lucide/svelte/icons/check';
 
 	let { finished }: ApiProviderProps = $props();
 

@@ -1,19 +1,7 @@
 <script lang="ts">
-	import {
-		Calendar,
-		Smile,
-		Calculator,
-		User,
-		CreditCard,
-		Settings,
-		Captions,
-		Film,
-		YoutubeIcon,
-		HardDrive,
-		FileTextIcon,
-	} from '@lucide/svelte';
-
-	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
+	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import SiGoogledrive from '@icons-pack/svelte-simple-icons/icons/SiGoogledrive';
 
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
@@ -57,7 +45,7 @@
 				<!-- <Launcher.Empty>No results found.</Launcher.Empty> -->
 				<Launcher.Group heading="Local Files">
 					<Launcher.Item onclick={addExerciseSheet}>
-						<HardDrive />
+						<HardDriveIcon />
 						<span>Exercise Sheet 2</span>
 					</Launcher.Item>
 					<Launcher.Item>

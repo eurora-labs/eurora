@@ -1,7 +1,12 @@
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
-	import { Users, Briefcase, GraduationCap, Mail, Github, Linkedin } from '@lucide/svelte';
+	import UsersIcon from '@lucide/svelte/icons/users';
+	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
+	import GraduationCapIcon from '@lucide/svelte/icons/graduation-cap';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import GithubIcon from '@lucide/svelte/icons/github';
+	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
 	// Use static images instead of importing from lib
 	const laura_thommen_img = '/images/avatars/laura_thommen.jpg';
 	const andre_roelofs_img = '/images/avatars/andre_roelofs.jpg';
@@ -21,7 +26,7 @@
 	<Card.Root class="mb-12 p-6">
 		<Card.Header>
 			<div class="flex items-center gap-2">
-				<Users class="h-6 w-6 text-purple-600" />
+				<UsersIcon class="h-6 w-6 text-purple-600" />
 				<Card.Title>Our Mission</Card.Title>
 			</div>
 		</Card.Header>
@@ -63,7 +68,7 @@
 				<div class="space-y-4">
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<Briefcase class="h-4 w-4 text-purple-600" /> Experience
+							<BriefcaseIcon class="h-4 w-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
 							Demonstrated breadth of experience from sales to management, driving new
@@ -74,7 +79,7 @@
 					</div>
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<GraduationCap class="h-4 w-4 text-purple-600" /> Education
+							<GraduationCapIcon class="h-4 w-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
 							MBA from Pepperdine University, BS in Business Administration with a
@@ -83,13 +88,13 @@
 					</div>
 					<div class="mt-4 flex justify-center gap-3">
 						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<Mail class="h-4 w-4" />
+							<MailIcon class="h-4 w-4" />
 						</Button>
 						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<Linkedin class="h-4 w-4" />
+							<LinkedinIcon class="h-4 w-4" />
 						</Button>
 						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<Github class="h-4 w-4" />
+							<GithubIcon class="h-4 w-4" />
 						</Button>
 					</div>
 				</div>
@@ -113,7 +118,7 @@
 				<div class="space-y-4">
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<Briefcase class="h-4 w-4 text-purple-600" /> Experience
+							<BriefcaseIcon class="h-4 w-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
 							Founder and CTO of Eurora Labs, previously Head of Engineering and
@@ -124,7 +129,7 @@
 					</div>
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<GraduationCap class="h-4 w-4 text-purple-600" /> Education
+							<GraduationCapIcon class="h-4 w-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">
 							BS in Computer Science from Avans University of Applied Sciences;
@@ -133,13 +138,13 @@
 					</div>
 					<div class="mt-4 flex justify-center gap-3">
 						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<Mail class="h-4 w-4" />
+							<MailIcon class="h-4 w-4" />
 						</Button>
 						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<Linkedin class="h-4 w-4" />
+							<LinkedinIcon class="h-4 w-4" />
 						</Button>
 						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<Github class="h-4 w-4" />
+							<GithubIcon class="h-4 w-4" />
 						</Button>
 					</div>
 				</div>
@@ -164,7 +169,7 @@
 				<div class="space-y-4">
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<Briefcase class="h-4 w-4 text-purple-600" /> Experience
+							<BriefcaseIcon class="h-4 w-4 text-purple-600" /> Experience
 						</h3>
 						<p class="text-gray-600">
 							Co-founder of ArtisansPR, with deep expertise in media, entertainment,
@@ -175,19 +180,19 @@
 					</div>
 					<div>
 						<h3 class="flex items-center gap-2 font-medium">
-							<GraduationCap class="h-4 w-4 text-purple-600" /> Education
+							<GraduationCapIcon class="h-4 w-4 text-purple-600" /> Education
 						</h3>
 						<p class="text-gray-600">BA in Theater from UCLA.</p>
 					</div>
 					<div class="mt-4 flex justify-center gap-3">
 						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<Mail class="h-4 w-4" />
+							<MailIcon class="h-4 w-4" />
 						</Button>
 						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<Linkedin class="h-4 w-4" />
+							<LinkedinIcon class="h-4 w-4" />
 						</Button>
 						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<Github class="h-4 w-4" />
+							<GithubIcon class="h-4 w-4" />
 						</Button>
 					</div>
 				</div>
