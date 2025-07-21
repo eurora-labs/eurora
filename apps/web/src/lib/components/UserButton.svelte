@@ -39,10 +39,10 @@
 		<DropdownMenu.Trigger>
 			<Button variant="ghost" class="relative h-8 w-8 rounded-full p-0">
 				<Avatar.Root class="h-8 w-8">
-					<!-- <Avatar.Image
-						src={$currentUser.avatar}
-						alt={$currentUser.name || $currentUser.email}
-					/> -->
+					<Avatar.Image
+						src={page.data.session.user?.image}
+						alt={page.data.session.user?.name || page.data.session.user?.email}
+					/>
 					<Avatar.Fallback
 						>{page.data.session.user?.email ?? page.data.session.user?.name}
 					</Avatar.Fallback>
@@ -52,13 +52,13 @@
 		<DropdownMenu.Content class="w-56" align="end">
 			<DropdownMenu.Label class="font-normal">
 				<div class="flex flex-col space-y-1">
-					<!-- <p class="text-sm font-medium leading-none">
-						{$currentUser.name || 'User'}
+					<p class="text-sm font-medium leading-none">
+						{page.data.session.user?.name || 'User'}
 					</p>
 					<p class="text-xs leading-none text-muted-foreground">
-						{$currentUser.email}
-					</p> -->
-					test name and email
+						{page.data.session.user?.email}
+					</p>
+					<!-- test name and email -->
 				</div>
 			</DropdownMenu.Label>
 			<DropdownMenu.Separator />
