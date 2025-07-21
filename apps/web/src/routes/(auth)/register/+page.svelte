@@ -5,7 +5,9 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Separator from '@eurora/ui/components/separator/index';
-	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
+	import EyeIcon from '@lucide/svelte/icons/eye';
+	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { authService } from '@eurora/shared/services/auth-service';
 	import { RegisterRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
 	import { superForm } from 'sveltekit-superforms';
@@ -257,9 +259,9 @@
 											: 'Show password'}
 									>
 										{#if showPassword}
-											<EyeOff class="h-4 w-4" />
+											<EyeOffIcon class="h-4 w-4" />
 										{:else}
-											<Eye class="h-4 w-4" />
+											<EyeIcon class="h-4 w-4" />
 										{/if}
 									</button>
 								</div>
@@ -293,9 +295,9 @@
 											: 'Show password'}
 									>
 										{#if showConfirmPassword}
-											<EyeOff class="h-4 w-4" />
+											<EyeOffIcon class="h-4 w-4" />
 										{:else}
-											<Eye class="h-4 w-4" />
+											<EyeIcon class="h-4 w-4" />
 										{/if}
 									</button>
 								</div>
@@ -306,7 +308,7 @@
 
 					<Button type="submit" class="w-full" disabled={$submitting}>
 						{#if $submitting}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
 							Creating account...
 						{:else}
 							Create Account
