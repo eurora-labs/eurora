@@ -72,7 +72,7 @@
 				<Card.Title>Pro</Card.Title>
 				<Card.Description>For power users and professionals</Card.Description>
 				<div class="mt-4">
-					<span class="text-4xl font-bold">$12</span>
+					<span class="text-4xl font-bold">$20</span>
 					<span class="text-gray-600">/month</span>
 				</div>
 			</Card.Header>
@@ -107,7 +107,9 @@
 						<span class="text-gray-500">Custom integrations</span>
 					</li>
 				</ul>
-				<Button class="w-full">Subscribe Now</Button>
+				<Button class="w-full" href="https://buy.stripe.com/test_6oU00j5JH71f8571Tq7wA00"
+					>Subscribe Now</Button
+				>
 			</Card.Content>
 		</Card.Root>
 
