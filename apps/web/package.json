@@ -23,6 +23,7 @@
 		"test:unit": "vitest"
 	},
 	"devDependencies": {
+		"@auth/sveltekit": "^1.10.0",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/shared": "workspace:*",
@@ -32,7 +33,6 @@
 		"@lucide/svelte": "^0.525.0",
 		"@playwright/test": "^1.54.1",
 		"@stripe/stripe-js": "^7.5.0",
-		"bits-ui": "^2.8.11",
 		"@sveltejs/adapter-auto": "^4.0.0",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "catalog:svelte",
@@ -43,6 +43,7 @@
 		"@tailwindcss/typography": "^0.5.16",
 		"@tailwindcss/vite": "^4.1.11",
 		"amplify-adapter": "^1.1.0",
+		"bits-ui": "^2.8.11",
 		"eslint": "^9.31.0",
 		"esm-env": "^1.2.2",
 		"grpc-web": "^1.5.0",
