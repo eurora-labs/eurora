@@ -1,32 +1,36 @@
 <script lang="ts">
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import { House, Inbox, Calendar, Search, Settings } from '@lucide/svelte';
+	import HouseIcon from '@lucide/svelte/icons/house';
+	import InboxIcon from '@lucide/svelte/icons/inbox';
+	import CalendarIcon from '@lucide/svelte/icons/calendar';
+	import SearchIcon from '@lucide/svelte/icons/search';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	const items = [
 		{
 			title: 'Chat 1',
 			url: '#',
-			icon: House,
+			icon: HouseIcon,
 		},
 		{
 			title: 'Chat 2',
 			url: '#',
-			icon: Inbox,
+			icon: InboxIcon,
 		},
 		{
 			title: 'Chat 3',
 			url: '#',
-			icon: Calendar,
+			icon: CalendarIcon,
 		},
 		{
 			title: 'Chat 4',
 			url: '#',
-			icon: Search,
+			icon: SearchIcon,
 		},
 		{
 			title: 'Chat 5',
 			url: '#',
-			icon: Settings,
+			icon: SettingsIcon,
 		},
 	];
 </script>
