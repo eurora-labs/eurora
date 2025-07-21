@@ -7,7 +7,9 @@
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Separator from '@eurora/ui/components/separator/index';
-	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
+	import EyeIcon from '@lucide/svelte/icons/eye';
+	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { authService } from '@eurora/shared/services/auth-service';
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
 	import { superForm } from 'sveltekit-superforms';
@@ -15,6 +17,7 @@
 	import { z } from 'zod';
 	import { page } from '$app/state';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
+	import { auth } from '$lib/stores/auth.js';
 
 	onMount(() => {
 		try {
@@ -79,12 +82,15 @@
 			const tokens = await authService.login(loginData);
 
 			console.log('Login successful, tokens:', tokens);
+
+			// Store tokens in auth store
+			auth.login(tokens);
 			success = true;
 
-			// // Redirect to dashboard or home page after a short delay
-			// setTimeout(() => {
-			// 	window.location.href = '/app';
-			// }, 1500);
+			// Redirect to home page after a short delay
+			setTimeout(() => {
+				goto('/');
+			}, 1500);
 		} catch (err) {
 			console.error('Login error:', err);
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
@@ -227,9 +233,9 @@
 											: 'Show password'}
 									>
 										{#if showPassword}
-											<EyeOff class="h-4 w-4" />
+											<EyeOffIcon class="h-4 w-4" />
 										{:else}
-											<Eye class="h-4 w-4" />
+											<EyeIcon class="h-4 w-4" />
 										{/if}
 									</button>
 								</div>
@@ -240,7 +246,7 @@
 
 					<Button type="submit" class="w-full" disabled={$submitting}>
 						{#if $submitting}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
 							Signing in...
 						{:else}
 							Sign In

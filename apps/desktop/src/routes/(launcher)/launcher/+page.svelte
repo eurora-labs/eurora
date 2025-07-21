@@ -12,7 +12,8 @@
 	import { onMount } from 'svelte';
 	import { Chat } from '@eurora/ui/custom-components/chat/index';
 	import { executeCommand } from '$lib/commands.js';
-	import { X, HardDrive, FileTextIcon } from '@lucide/svelte';
+	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
 	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
 	import {
@@ -353,7 +354,7 @@
 				<!-- <Launcher.List hidden> -->
 				<Launcher.Group heading="Local Files">
 					<Launcher.Item onclick={addVideoExtension}>
-						<HardDrive />
+						<HardDriveIcon />
 						<span>Video</span>
 					</Launcher.Item>
 					<Launcher.Item>
