@@ -2,4 +2,5 @@
 	let { children } = $props();
 </script>
 
+test
 {@render children?.()}
