@@ -4,42 +4,23 @@
 	import System from 'svelte-system-info';
 	import * as Card from '@eurora/ui/components/card/index';
 	import * as VideoCard from '@eurora/ui/custom-components/video-card/index';
-	import * as Sheet from '@eurora/ui/components/sheet/index';
-	import { Skeleton } from '@eurora/ui/components/skeleton/index';
-	import { Input } from '@eurora/ui/components/input/index';
-	import { Label } from '@eurora/ui/components/label/index';
-	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
 	// import gradient.svg from static folder
-	import {
-		ArrowRight,
-		ServerIcon,
-		Brain,
-		Shield,
-		Zap,
-		Globe,
-		MessageSquare,
-		KeyRound,
-		Mic,
-		Briefcase,
-		GraduationCap,
-		Mail,
-		Linkedin,
-		ShieldCheckIcon,
-		GaugeIcon,
-		Github,
-		Layers,
-		Code,
-		Sparkles,
-		type Icon as IconType,
-		EyeIcon,
-	} from '@lucide/svelte';
-	import IntroModule from './intro_module.svelte';
+	import { type Icon as IconType } from '@lucide/svelte';
 
+	import EyeIcon from '@lucide/svelte/icons/eye';
+	import BrainIcon from '@lucide/svelte/icons/brain';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import ZapIcon from '@lucide/svelte/icons/zap';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
+	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import GaugeIcon from '@lucide/svelte/icons/gauge';
+	import GithubIcon from '@lucide/svelte/icons/github';
+	import LayersIcon from '@lucide/svelte/icons/layers';
+	import CodeIcon from '@lucide/svelte/icons/code';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import { SiLinux, SiApple } from '@icons-pack/svelte-simple-icons';
-
-	import WaitlistForm from './waitlist_form.svelte';
-	import JoinWaitlist from './join_waitlist.svelte';
-	import type { SvelteComponent } from 'svelte';
 	import StaticLauncher from './static-launcher.svelte';
 
 	let inputValue = $state('');
@@ -134,7 +115,7 @@
 </script>
 
 <div class="mx-auto w-full h-full px-4 pb-16">
-	<div class="flex justify-center px-4 mt-32 h-[5%] items-center">
+	<div class="flex justify-center px-4 h-[5%] items-center">
 		<h1
 			class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-shadow-xl text-center"
 		>
@@ -333,7 +314,7 @@
 		<Card.Root class="p-3 md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Brain class="h-6 w-6 text-purple-600" />
+					<BrainIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Intelligent Understanding</Card.Title>
 				</div>
 			</Card.Header>
@@ -351,7 +332,7 @@
 		<Card.Root class="p-3 md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<KeyRound class="h-6 w-6 text-purple-600" />
+					<KeyRoundIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Fully Open Source</Card.Title>
 				</div>
 			</Card.Header>
@@ -371,7 +352,7 @@
 		<Card.Root class="p-3 md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Shield class="h-6 w-6 text-purple-600" />
+					<ShieldIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Privacy-First Design</Card.Title>
 				</div>
 			</Card.Header>
@@ -561,7 +542,7 @@
 		<Card.Root class=" md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Brain class="h-6 w-6 text-purple-600" />
+					<BrainIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Advanced AI Understanding</Card.Title>
 				</div>
 				<Card.Description
@@ -590,7 +571,7 @@
 		<Card.Root class=" md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Github class="h-6 w-6 text-purple-600" />
+					<GithubIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Fully Open Source Hosting</Card.Title>
 				</div>
 				<Card.Description>Host Eurora on your own infrastructure</Card.Description>
@@ -616,7 +597,7 @@
 		<Card.Root class=" md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Code class="h-6 w-6 text-purple-600" />
+					<CodeIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Built with Rust</Card.Title>
 				</div>
 				<Card.Description>Maximum security and safety by design</Card.Description>
@@ -642,7 +623,7 @@
 		<Card.Root class="p-3 md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Shield class="h-6 w-6 text-purple-600" />
+					<ShieldIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Privacy-First Design</Card.Title>
 				</div>
 				<Card.Description>Your data stays private and secure</Card.Description>
@@ -667,7 +648,7 @@
 		<Card.Root class="md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Zap class="h-6 w-6 text-purple-600" />
+					<ZapIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Lightning-Fast Performance</Card.Title>
 				</div>
 				<Card.Description>Get answers instantly, even offline</Card.Description>
@@ -693,7 +674,7 @@
 		<Card.Root class="md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Globe class="h-6 w-6 text-purple-600" />
+					<GlobeIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Cross-Platform Integration</Card.Title>
 				</div>
 				<Card.Description>Seamless experience across all your devices</Card.Description>
@@ -721,7 +702,7 @@
 		<Card.Root class=" md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Layers class="h-6 w-6 text-purple-600" />
+					<LayersIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Powerful Integrations</Card.Title>
 				</div>
 				<Card.Description
@@ -778,7 +759,7 @@
 		<Card.Root class="md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<MessageSquare class="h-6 w-6 text-purple-600" />
+					<MessageSquareIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Natural Conversations</Card.Title>
 				</div>
 				<Card.Description>Talk to Eurora like you would to a human</Card.Description>
@@ -829,7 +810,7 @@
 		<Card.Root class="md:p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Code class="h-6 w-6 text-purple-600" />
+					<CodeIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Developer-Friendly</Card.Title>
 				</div>
 				<Card.Description>Extend Eurora with custom plugins and APIs</Card.Description>
@@ -851,7 +832,7 @@
 				</div>
 				<div class="mt-4">
 					<Button variant="outline" class="w-full">
-						<Code class="mr-2 h-4 w-4" />
+						<CodeIcon class="mr-2 h-4 w-4" />
 						Explore Developer Docs
 					</Button>
 				</div>
@@ -862,7 +843,7 @@
 	<Card.Root class="p-3 md:p-6">
 		<Card.Header>
 			<div class="flex items-center gap-2">
-				<Sparkles class="h-6 w-6 text-purple-600" />
+				<SparklesIcon class="h-6 w-6 text-purple-600" />
 				<Card.Title>Coming Soon</Card.Title>
 			</div>
 			<Card.Description>Exciting new features on our roadmap</Card.Description>

@@ -1,17 +1,10 @@
 <script lang="ts">
 	// Removed Input import as we're using a custom div
 	import { onMount } from 'svelte';
-	import {
-		Mic,
-		Globe,
-		UnlockIcon,
-		ShieldCheckIcon,
-		GaugeIcon,
-		RabbitIcon,
-		LaptopMinimalCheckIcon,
-		DownloadIcon,
-		ServerIcon,
-	} from '@lucide/svelte';
+	import MicIcon from '@lucide/svelte/icons/mic';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import GaugeIcon from '@lucide/svelte/icons/gauge';
+	import ServerIcon from '@lucide/svelte/icons/server';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import JoinWaitlist from './join_waitlist.svelte';
@@ -129,7 +122,7 @@
 							<span class="cursor-blink">|</span>
 						{/if}
 					</div>
-					<Mic class="text-black/80" size={32} />
+					<MicIcon class="text-black/80" size={32} />
 				</div>
 			</div>
 		</div>
