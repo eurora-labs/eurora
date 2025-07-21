@@ -17,7 +17,9 @@
 	import * as Form from '$lib/components/form/index.js';
 	import { Button } from '$lib/components/button/index.js';
 	import { Input } from '$lib/components/input/index.js';
-	import { Eye, EyeOff, Loader2 } from '@lucide/svelte';
+	import EyeIcon from '@lucide/svelte/icons/eye';
+	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
@@ -109,9 +111,9 @@
 							aria-label={showPassword ? 'Hide password' : 'Show password'}
 						>
 							{#if showPassword}
-								<EyeOff class="h-4 w-4" />
+								<EyeOffIcon class="h-4 w-4" />
 							{:else}
-								<Eye class="h-4 w-4" />
+								<EyeIcon class="h-4 w-4" />
 							{/if}
 						</button>
 					</div>
@@ -122,7 +124,7 @@
 
 		<Button type="submit" class="w-full" disabled={$submitting}>
 			{#if $submitting}
-				<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+				<Loader2Icon class="mr-2 h-4 w-4 animate-spin" />
 				Signing in...
 			{:else}
 				Sign In

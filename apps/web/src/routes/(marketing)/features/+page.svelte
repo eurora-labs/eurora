@@ -1,16 +1,14 @@
 <script lang="ts">
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import {
-		Sparkles,
-		Brain,
-		Shield,
-		Zap,
-		Globe,
-		Layers,
-		MessageSquare,
-		Code,
-	} from '@lucide/svelte';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import BrainIcon from '@lucide/svelte/icons/brain';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import ZapIcon from '@lucide/svelte/icons/zap';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import LayersIcon from '@lucide/svelte/icons/layers';
+	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
+	import CodeIcon from '@lucide/svelte/icons/code';
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">
@@ -25,7 +23,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Brain class="h-6 w-6 text-purple-600" />
+					<BrainIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Advanced AI Understanding</Card.Title>
 				</div>
 				<Card.Description>Eurora understands context like never before</Card.Description>
@@ -51,7 +49,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Shield class="h-6 w-6 text-purple-600" />
+					<ShieldIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Privacy-First Design</Card.Title>
 				</div>
 				<Card.Description>Your data stays private and secure</Card.Description>
@@ -77,7 +75,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Zap class="h-6 w-6 text-purple-600" />
+					<ZapIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Lightning-Fast Performance</Card.Title>
 				</div>
 				<Card.Description>Get answers instantly, even offline</Card.Description>
@@ -103,7 +101,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Globe class="h-6 w-6 text-purple-600" />
+					<GlobeIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Cross-Platform Integration</Card.Title>
 				</div>
 				<Card.Description>Seamless experience across all your devices</Card.Description>
@@ -131,7 +129,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Layers class="h-6 w-6 text-purple-600" />
+					<LayersIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Powerful Integrations</Card.Title>
 				</div>
 				<Card.Description>Connect with your favorite tools and services</Card.Description>
@@ -185,7 +183,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<MessageSquare class="h-6 w-6 text-purple-600" />
+					<MessageSquareIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Natural Conversations</Card.Title>
 				</div>
 				<Card.Description>Talk to Eurora like you would to a human</Card.Description>
@@ -236,7 +234,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Code class="h-6 w-6 text-purple-600" />
+					<CodeIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Developer-Friendly</Card.Title>
 				</div>
 				<Card.Description>Extend Eurora with custom plugins and APIs</Card.Description>
@@ -258,7 +256,7 @@
 				</div>
 				<div class="mt-4">
 					<Button variant="outline" class="w-full">
-						<Code class="mr-2 h-4 w-4" />
+						<CodeIcon class="mr-2 h-4 w-4" />
 						Explore Developer Docs
 					</Button>
 				</div>
@@ -269,7 +267,7 @@
 	<Card.Root class="p-6">
 		<Card.Header>
 			<div class="flex items-center gap-2">
-				<Sparkles class="h-6 w-6 text-purple-600" />
+				<SparklesIcon class="h-6 w-6 text-purple-600" />
 				<Card.Title>Coming Soon</Card.Title>
 			</div>
 			<Card.Description>Exciting new features on our roadmap</Card.Description>
