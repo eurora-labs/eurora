@@ -5,7 +5,7 @@ import Google from '@auth/sveltekit/providers/google';
 import Credentials from '@auth/sveltekit/providers/credentials';
 
 export const { handle, signIn, signOut } = SvelteKitAuth({
-	// trustHost: true,
+	trustHost: true,
 	providers: [
 		Apple,
 		GitHub,
