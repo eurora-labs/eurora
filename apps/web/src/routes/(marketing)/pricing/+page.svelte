@@ -1,7 +1,9 @@
 <script lang="ts">
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import { Check, X, Sparkles } from '@lucide/svelte';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import XIcon from '@lucide/svelte/icons/x';
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">
@@ -27,31 +29,31 @@
 			<Card.Content>
 				<ul class="mb-6 space-y-3">
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Basic AI assistance</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Up to 20 queries per day</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Standard response time</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Desktop and mobile apps</span>
 					</li>
 					<li class="flex items-start">
-						<X class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
+						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
 						<span class="text-gray-500">Advanced AI models</span>
 					</li>
 					<li class="flex items-start">
-						<X class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
+						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
 						<span class="text-gray-500">Priority support</span>
 					</li>
 					<li class="flex items-start">
-						<X class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
+						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
 						<span class="text-gray-500">Custom integrations</span>
 					</li>
 				</ul>
@@ -70,42 +72,44 @@
 				<Card.Title>Pro</Card.Title>
 				<Card.Description>For power users and professionals</Card.Description>
 				<div class="mt-4">
-					<span class="text-4xl font-bold">$12</span>
+					<span class="text-4xl font-bold">$20</span>
 					<span class="text-gray-600">/month</span>
 				</div>
 			</Card.Header>
 			<Card.Content>
 				<ul class="mb-6 space-y-3">
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Advanced AI assistance</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Unlimited queries</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Faster response time</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Desktop and mobile apps</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Access to premium AI models</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Priority email support</span>
 					</li>
 					<li class="flex items-start">
-						<X class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
+						<XIcon class="mr-2 mt-0.5 h-5 w-5 text-gray-400" />
 						<span class="text-gray-500">Custom integrations</span>
 					</li>
 				</ul>
-				<Button class="w-full">Subscribe Now</Button>
+				<Button class="w-full" href="https://buy.stripe.com/test_6oU00j5JH71f8571Tq7wA00"
+					>Subscribe Now</Button
+				>
 			</Card.Content>
 		</Card.Root>
 
@@ -122,31 +126,31 @@
 			<Card.Content>
 				<ul class="mb-6 space-y-3">
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Enterprise-grade AI assistance</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Unlimited queries with higher rate limits</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Fastest response time</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>All apps and platforms</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Access to all AI models</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>24/7 dedicated support</span>
 					</li>
 					<li class="flex items-start">
-						<Check class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
+						<CheckIcon class="mr-2 mt-0.5 h-5 w-5 text-green-500" />
 						<span>Custom integrations & API access</span>
 					</li>
 				</ul>
@@ -205,19 +209,19 @@
 						<tr class="border-b">
 							<td class="px-4 py-3 font-medium">Team Collaboration</td>
 							<td class="px-4 py-3 text-center">
-								<X class="mx-auto h-5 w-5 text-gray-400" />
+								<XIcon class="mx-auto h-5 w-5 text-gray-400" />
 							</td>
 							<td class="px-4 py-3 text-center">
-								<X class="mx-auto h-5 w-5 text-gray-400" />
+								<XIcon class="mx-auto h-5 w-5 text-gray-400" />
 							</td>
 							<td class="px-4 py-3 text-center">
-								<Check class="mx-auto h-5 w-5 text-green-500" />
+								<CheckIcon class="mx-auto h-5 w-5 text-green-500" />
 							</td>
 						</tr>
 						<tr class="border-b">
 							<td class="px-4 py-3 font-medium">API Access</td>
 							<td class="px-4 py-3 text-center">
-								<X class="mx-auto h-5 w-5 text-gray-400" />
+								<XIcon class="mx-auto h-5 w-5 text-gray-400" />
 							</td>
 							<td class="px-4 py-3 text-center">Limited</td>
 							<td class="px-4 py-3 text-center">Full Access</td>
@@ -238,7 +242,7 @@
 		<Card.Root class="p-6">
 			<Card.Header>
 				<div class="flex items-center gap-2">
-					<Sparkles class="h-6 w-6 text-purple-600" />
+					<SparklesIcon class="h-6 w-6 text-purple-600" />
 					<Card.Title>Frequently Asked Questions</Card.Title>
 				</div>
 			</Card.Header>
