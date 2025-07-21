@@ -3,9 +3,8 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Alert from '@eurora/ui/components/alert/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import { ShieldAlert, LogInIcon } from '@lucide/svelte';
-
-	import JoinWaitlist from './join_waitlist.svelte';
+	import ShieldAlertIcon from '@lucide/svelte/icons/shield-alert';
+	import LogInIcon from '@lucide/svelte/icons/log-in';
 
 	const { children } = $props();
 
@@ -21,7 +20,7 @@
 		class="bg-background fixed top-0 right-0 left-0 z-50 flex items-center justify-between border-b px-6 py-2"
 	>
 		<Alert.Root class="flex flex-1 items-center">
-			<ShieldAlert class="size-4" />
+			<ShieldAlertIcon class="size-4" />
 			<Alert.Title>Heads up!</Alert.Title>
 			<Alert.Description
 				>All existing text on this website is placeholder and doesn't represent anything
@@ -46,8 +45,8 @@
 
 	<div class="flex items-center gap-4">
 		<!-- <Button variant="ghost" href="/features">Features</Button> -->
-		<!-- <Button variant="ghost" href="/pricing">Pricing</Button> -->
 		<Button variant="ghost" href="/about">About Us</Button>
+		<Button variant="ghost" href="/pricing">Pricing</Button>
 		<!-- <Button variant="ghost" href="/privacy">Privacy</Button> -->
 		<!-- <Button variant="ghost" href="/contact">Contact</Button> -->
 		<!-- <JoinWaitlist /> -->
