@@ -7,6 +7,7 @@
 	import { page } from '$app/state';
 	// import { currentUser, auth } from '$lib/stores/auth.js';
 	import { goto } from '$app/navigation';
+	import { SignOut } from '@auth/sveltekit/components';
 
 	// function handleLogout() {
 	// 	auth.logout();
@@ -69,10 +70,31 @@
 			</DropdownMenu.Group>
 			<DropdownMenu.Separator />
 			<!-- <DropdownMenu.Item onclick={handleLogout}> -->
-			<DropdownMenu.Item>
-				<LogOutIcon class="mr-2 h-4 w-4" />
-				<span>Log out</span>
+
+			<DropdownMenu.Item class="w-full signout-container">
+				<SignOut className="w-full flex">
+					<div
+						slot="submitButton"
+						class="flex flex-row justify-start items-center gap-2 min-w-full"
+					>
+						<LogOutIcon class="mr-2 h-4 w-4" />
+						Log out
+					</div>
+				</SignOut>
 			</DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
 {/if}
+
+<style lang="postcss">
+	:global(.signOutButton) {
+		:global(form) {
+			width: 100%;
+		}
+
+		:global(button) {
+			width: 100%;
+			cursor: default;
+		}
+	}
+</style>
