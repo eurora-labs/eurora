@@ -1,7 +1,9 @@
 <script lang="ts">
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import { Mail, Phone, MapPin } from '@lucide/svelte';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import PhoneIcon from '@lucide/svelte/icons/phone';
+	import MapPinIcon from '@lucide/svelte/icons/map-pin';
 	import { Input } from '@eurora/ui/components/input/index';
 </script>
 
@@ -63,21 +65,21 @@
 				<Card.Content>
 					<div class="space-y-4">
 						<div class="flex items-start space-x-3">
-							<Mail class="mt-1 h-5 w-5 text-purple-600" />
+							<MailIcon class="mt-1 h-5 w-5 text-purple-600" />
 							<div>
 								<h3 class="font-medium">Email</h3>
 								<p class="text-gray-600">contact@eurora-labs.com</p>
 							</div>
 						</div>
 						<div class="flex items-start space-x-3">
-							<Phone class="mt-1 h-5 w-5 text-purple-600" />
+							<PhoneIcon class="mt-1 h-5 w-5 text-purple-600" />
 							<div>
 								<h3 class="font-medium">Phone</h3>
 								<p class="text-gray-600">+1 (555) 123-4567</p>
 							</div>
 						</div>
 						<div class="flex items-start space-x-3">
-							<MapPin class="mt-1 h-5 w-5 text-purple-600" />
+							<MapPinIcon class="mt-1 h-5 w-5 text-purple-600" />
 							<div>
 								<h3 class="font-medium">Office</h3>
 								<p class="text-gray-600">
