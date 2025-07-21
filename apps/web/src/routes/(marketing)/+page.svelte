@@ -134,7 +134,7 @@
 </script>
 
 <div class="mx-auto w-full h-full px-4 pb-16">
-	<div class="flex justify-center px-4 mt-32 h-[5%] items-center">
+	<div class="flex justify-center px-4 h-[5%] items-center">
 		<h1
 			class="w-full mx-auto text-3xl sm:text-4xl md:text-5xl font-bold text-shadow-xl text-center"
 		>
