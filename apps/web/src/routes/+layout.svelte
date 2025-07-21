@@ -20,7 +20,7 @@
 <Alert.Root
 	hidden={!showAlert}
 	variant="destructive"
-	class="fixed bottom-0 left-1/2 w-1/2 -translate-x-1/2"
+	class="fixed bottom-0 left-1/2 w-1/2 -translate-x-1/2 z-1"
 >
 	<Button
 		variant="destructive"
