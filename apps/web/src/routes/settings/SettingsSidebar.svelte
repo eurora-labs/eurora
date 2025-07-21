@@ -10,16 +10,12 @@
 <script lang="ts">
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import BoltIcon from '@lucide/svelte/icons/bolt';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
-	import ChevronsLeftRightEllipsis from '@lucide/svelte/icons/chevrons-left-right-ellipsis';
-	import KeyboardIcon from '@lucide/svelte/icons/keyboard';
-	import WebhookIcon from '@lucide/svelte/icons/webhook';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { page } from '$app/state';
-	import { CreditCardIcon } from '@lucide/svelte';
+	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
 
 	let generalItems: MenuItem[] = [
 		{
