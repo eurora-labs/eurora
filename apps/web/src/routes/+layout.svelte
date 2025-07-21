@@ -5,7 +5,7 @@
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import * as Alert from '@eurora/ui/components/alert/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import TrashIcon from '@lucide/svelte/icons/trash';
+	import XIcon from '@lucide/svelte/icons/x';
 
 	onMount(() => {
 		setMode('dark');
@@ -23,13 +23,14 @@
 	class="fixed bottom-0 left-1/2 w-1/2 -translate-x-1/2 z-1"
 >
 	<Button
-		variant="destructive"
+		variant="ghost"
+		size="icon"
 		class="absolute right-0 top-0"
 		onclick={() => {
 			showAlert = false;
 		}}
 	>
-		<TrashIcon />
+		<XIcon class="h-4 w-4" />
 	</Button>
 	<Alert.Title>Development Notice</Alert.Title>
 	<Alert.Description>
