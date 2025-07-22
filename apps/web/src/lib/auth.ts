@@ -1,17 +1,22 @@
 import { SvelteKitAuth } from '@auth/sveltekit';
-import Apple from '@auth/sveltekit/providers/apple';
-import GitHub from '@auth/sveltekit/providers/github';
+// import Apple from '@auth/sveltekit/providers/apple';
+// import GitHub from '@auth/sveltekit/providers/github';
 import Google from '@auth/sveltekit/providers/google';
 import Credentials from '@auth/sveltekit/providers/credentials';
+import { env } from '$env/dynamic/private';
+import { building } from '$app/environment';
 // import { TRUST_HOST } from '$env/static/private';
 
 export const { handle, signIn, signOut } = SvelteKitAuth({
 	// trustHost: TRUST_HOST == 'true',
 	trustHost: true,
 	providers: [
-		Apple,
-		GitHub,
-		Google,
+		// Apple,
+		// GitHub,
+		Google({
+			clientId: building ? '' : env.AUTH_GOOGLE_ID,
+			clientSecret: building ? '' : env.AUTH_GOOGLE_SECRET,
+		}),
 		Credentials({
 			credentials: {
 				username: { label: 'Username' },
