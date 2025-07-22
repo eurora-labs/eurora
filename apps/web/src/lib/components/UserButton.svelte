@@ -4,47 +4,46 @@
 	import * as Avatar from '@eurora/ui/components/avatar/index';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import UserIcon from '@lucide/svelte/icons/user';
-	import { page } from '$app/state';
+	import { currentUser, auth } from '$lib/stores/auth.js';
 	import { goto } from '$app/navigation';
-	import { SignOut } from '@auth/sveltekit/components';
 
-	// function handleLogout() {
-	// 	auth.logout();
-	// 	goto('/');
-	// }
+	function handleLogout() {
+		auth.logout();
+		goto('/');
+	}
 
 	function handleSettings() {
 		goto('/settings/profile');
 	}
 
-	// function getInitials(name?: string, email?: string): string {
-	// 	if (name) {
-	// 		return name
-	// 			.split(' ')
-	// 			.map((n) => n[0])
-	// 			.join('')
-	// 			.toUpperCase()
-	// 			.slice(0, 2);
-	// 	}
-	// 	if (email) {
-	// 		return email[0].toUpperCase();
-	// 	}
-	// 	return 'U';
-	// }
+	function getInitials(name?: string, email?: string): string {
+		if (name) {
+			return name
+				.split(' ')
+				.map((n) => n[0])
+				.join('')
+				.toUpperCase()
+				.slice(0, 2);
+		}
+		if (email) {
+			return email[0].toUpperCase();
+		}
+		return 'U';
+	}
 </script>
 
-{#if page.data.session}
+{#if $currentUser}
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger>
 			<Button variant="ghost" class="relative h-8 w-8 rounded-full p-0">
 				<Avatar.Root class="h-8 w-8">
 					<Avatar.Image
-						src={page.data.session.user?.image}
-						alt={page.data.session.user?.name || page.data.session.user?.email}
+						src={$currentUser.avatar}
+						alt={$currentUser.name || $currentUser.email}
 					/>
 					<Avatar.Fallback
-						>{page.data.session.user?.email ?? page.data.session.user?.name}
-					</Avatar.Fallback>
+						>{getInitials($currentUser.name, $currentUser.email)}</Avatar.Fallback
+					>
 				</Avatar.Root>
 			</Button>
 		</DropdownMenu.Trigger>
@@ -52,12 +51,11 @@
 			<DropdownMenu.Label class="font-normal">
 				<div class="flex flex-col space-y-1">
 					<p class="text-sm font-medium leading-none">
-						{page.data.session.user?.name || 'User'}
+						{$currentUser.name || 'User'}
 					</p>
 					<p class="text-xs leading-none text-muted-foreground">
-						{page.data.session.user?.email}
+						{$currentUser.email}
 					</p>
-					<!-- test name and email -->
 				</div>
 			</DropdownMenu.Label>
 			<DropdownMenu.Separator />
@@ -68,32 +66,10 @@
 				</DropdownMenu.Item>
 			</DropdownMenu.Group>
 			<DropdownMenu.Separator />
-			<!-- <DropdownMenu.Item onclick={handleLogout}> -->
-
-			<DropdownMenu.Item class="w-full signout-container">
-				<SignOut className="w-full flex">
-					<div
-						slot="submitButton"
-						class="flex flex-row justify-start items-center gap-2 min-w-full"
-					>
-						<LogOutIcon class="mr-2 h-4 w-4" />
-						Log out
-					</div>
-				</SignOut>
+			<DropdownMenu.Item onclick={handleLogout}>
+				<LogOutIcon class="mr-2 h-4 w-4" />
+				<span>Log out</span>
 			</DropdownMenu.Item>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
 {/if}
-
-<style lang="postcss">
-	:global(.signOutButton) {
-		:global(form) {
-			width: 100%;
-		}
-
-		:global(button) {
-			width: 100%;
-			cursor: default;
-		}
-	}
-</style>
