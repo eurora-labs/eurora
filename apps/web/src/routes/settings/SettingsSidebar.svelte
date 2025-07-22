@@ -13,9 +13,11 @@
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import { Button } from '@eurora/ui/components/button/index';
+	import * as Dialog from '@eurora/ui/components/dialog/index';
+	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import { page } from '$app/state';
 	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
+	import { cn } from '@eurora/ui/utils';
 
 	let generalItems: MenuItem[] = [
 		{
@@ -124,12 +126,28 @@
 						</Sidebar.MenuItem>
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton>
-								{#snippet child({ props })}
-									<a href="mailto:contact@eurora-labs.com" {...props}>
-										<MailIcon />
-										<span>Contact us</span>
-									</a>
-								{/snippet}
+								<Dialog.Root>
+									<Dialog.Trigger
+										class="flex flex-row gap-2 text-sm items-center w-full h-full"
+									>
+										<MailIcon size={16} />
+										Contact Us</Dialog.Trigger
+									>
+									<Dialog.Content class="sm:max-w-1/2">
+										<Dialog.Header class="items-start">
+											<Dialog.Title>Contact Us</Dialog.Title>
+										</Dialog.Header>
+										<p>
+											Feel free to reach out to us at
+											<a
+												href="mailto:contact@eurora-labs.com"
+												class="inline w-fit underline"
+												>contact@eurora-labs.com</a
+											>
+											for any inquiries or feedback.
+										</p>
+									</Dialog.Content>
+								</Dialog.Root>
 							</Sidebar.MenuButton>
 						</Sidebar.MenuItem>
 					{/each}

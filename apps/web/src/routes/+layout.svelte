@@ -23,9 +23,9 @@
 	class="fixed bottom-0 left-1/2 w-1/2 -translate-x-1/2 z-1"
 >
 	<Button
-		variant="ghost"
+		variant="link"
 		size="icon"
-		class="absolute right-0 top-0"
+		class="absolute right-1 top-1"
 		onclick={() => {
 			showAlert = false;
 		}}

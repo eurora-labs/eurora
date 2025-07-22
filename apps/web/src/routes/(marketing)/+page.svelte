@@ -1,7 +1,7 @@
 <script lang="ts">
 	import VideoSection from './video-section.svelte';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
-	import System from 'svelte-system-info';
+	// import System from 'svelte-system-info';
 	import * as Card from '@eurora/ui/components/card/index';
 	import * as VideoCard from '@eurora/ui/custom-components/video-card/index';
 	// import gradient.svg from static folder
@@ -129,7 +129,7 @@
 			style="background-image: url('/images/promo.webp'); background-size: cover; background-position: center; background-repeat: no-repeat;"
 		>
 			<div class="flex justify-center align-start px-4 gap-4 my-8 download-button-container">
-				{#snippet downloadButtonSnippet()}
+				<!-- {#snippet downloadButtonSnippet()}
 					{@const downloadButton = downloads[System.OSName.toLowerCase()]}
 
 					<Button size="lg" class="w-full md:w-auto p-8 shadow-lg gap-4">
@@ -139,8 +139,8 @@
 						{/if}
 						Download for {downloadButton.name}
 					</Button>
-				{/snippet}
-				{@render downloadButtonSnippet()}
+				{/snippet} -->
+				<!-- {@render downloadButtonSnippet()} -->
 				<Button size="lg" class="w-full md:w-auto p-8 shadow-lg" variant="secondary"
 					>Learn More</Button
 				>

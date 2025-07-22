@@ -105,7 +105,7 @@
 	async function handleGoogleLogin() {
 		try {
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
-			window.location.href = url;
+			goto(url);
 			console.log('Google login clicked');
 		} catch (err) {
 			console.error('Google login error:', err);
@@ -116,7 +116,7 @@
 	async function handleGitHubLogin() {
 		try {
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
-			window.location.href = url;
+			goto(url);
 			console.log('GitHub login clicked');
 		} catch (err) {
 			console.error('GitHub login error:', err);
