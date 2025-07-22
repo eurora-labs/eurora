@@ -3,7 +3,7 @@
 	import { create } from '@bufbuild/protobuf';
 	import { onMount } from 'svelte';
 	import { authService } from '@eurora/shared/services/auth-service';
-	import { auth } from '$lib/stores/auth.js';
+	// import { auth } from '$lib/stores/auth.js';
 	import { goto } from '$app/navigation';
 
 	onMount(async () => {
@@ -52,7 +52,7 @@
 			console.log('Tokens:', tokens);
 
 			// Store tokens in auth store
-			auth.login(tokens);
+			// auth.login(tokens);
 
 			// Redirect to home page
 			goto('/');

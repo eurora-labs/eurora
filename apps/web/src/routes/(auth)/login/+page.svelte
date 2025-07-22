@@ -17,7 +17,7 @@
 	import { z } from 'zod';
 	import { page } from '$app/state';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
-	import { auth } from '$lib/stores/auth.js';
+	// import { auth } from '$lib/stores/auth.js';
 
 	onMount(() => {
 		try {
@@ -84,7 +84,7 @@
 			console.log('Login successful, tokens:', tokens);
 
 			// Store tokens in auth store
-			auth.login(tokens);
+			// auth.login(tokens);
 			success = true;
 
 			// Redirect to home page after a short delay
