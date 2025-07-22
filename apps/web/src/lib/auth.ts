@@ -7,7 +7,7 @@ import Credentials from '@auth/sveltekit/providers/credentials';
 
 export const { handle, signIn, signOut } = SvelteKitAuth({
 	// trustHost: TRUST_HOST == 'true',
-	trustHost: false,
+	trustHost: true,
 	providers: [
 		Apple,
 		GitHub,
