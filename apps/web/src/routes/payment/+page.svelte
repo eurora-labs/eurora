@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { loadStripe } from '@stripe/stripe-js';
-	import { env } from '$env/dynamic/public';
+	import { PUBLIC_STRIPE_KEY } from '$env/static/public';
 	import { Elements, PaymentElement, LinkAuthenticationElement, Address } from 'svelte-stripe';
 
 	let stripe = null;
@@ -12,7 +12,7 @@
 	let processing = false;
 
 	onMount(async () => {
-		stripe = await loadStripe(env.PUBLIC_STRIPE_KEY);
+		stripe = await loadStripe(PUBLIC_STRIPE_KEY);
 
 		// create payment intent server side
 		clientSecret = await createPaymentIntent();
