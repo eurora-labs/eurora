@@ -9,6 +9,7 @@ import { building } from '$app/environment';
 
 export const { handle, signIn, signOut } = SvelteKitAuth({
 	// trustHost: TRUST_HOST == 'true',
+	secret: building ? '' : env.AUTH_SECRET,
 	trustHost: true,
 	providers: [
 		// Apple,
