@@ -3,8 +3,8 @@
 	import { create } from '@bufbuild/protobuf';
 	import { onMount } from 'svelte';
 	import { authService } from '@eurora/shared/services/auth-service';
-	// import { auth } from '$lib/stores/auth.js';
 	import { goto } from '$app/navigation';
+
 	onMount(async () => {
 		const query = new URLSearchParams(window.location.search);
 		const error = query.get('error');
