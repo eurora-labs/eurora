@@ -4,6 +4,7 @@ import { SvelteKitAuth } from '@auth/sveltekit';
 import Google from '@auth/sveltekit/providers/google';
 import Credentials from '@auth/sveltekit/providers/credentials';
 import { env } from '$env/dynamic/private';
+import { building } from '$app/environment';
 // import { TRUST_HOST } from '$env/static/private';
 
 export const { handle, signIn, signOut } = SvelteKitAuth({
@@ -13,8 +14,8 @@ export const { handle, signIn, signOut } = SvelteKitAuth({
 		// Apple,
 		// GitHub,
 		Google({
-			clientId: env.AUTH_GOOGLE_ID,
-			clientSecret: env.AUTH_GOOGLE_SECRET,
+			clientId: building ? '' : env.AUTH_GOOGLE_ID,
+			clientSecret: building ? '' : env.AUTH_GOOGLE_SECRET,
 		}),
 		Credentials({
 			credentials: {
