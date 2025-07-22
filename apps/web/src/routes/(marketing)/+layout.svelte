@@ -4,7 +4,6 @@
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import LogInIcon from '@lucide/svelte/icons/log-in';
 	import { SignIn, SignOut } from '@auth/sveltekit/components';
-	// import { isAuthenticated } from '$lib/stores/auth.js';
 	import UserButton from '$lib/components/UserButton.svelte';
 
 	import { page } from '$app/state';
