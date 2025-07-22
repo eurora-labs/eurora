@@ -1,1 +1,1 @@
-export { handle } from './auth.js';
+export { handle } from '$lib/auth.js';
