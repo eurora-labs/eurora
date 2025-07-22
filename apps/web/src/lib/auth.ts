@@ -3,10 +3,11 @@ import Apple from '@auth/sveltekit/providers/apple';
 import GitHub from '@auth/sveltekit/providers/github';
 import Google from '@auth/sveltekit/providers/google';
 import Credentials from '@auth/sveltekit/providers/credentials';
-import { TRUST_HOST } from '$env/static/private';
+// import { TRUST_HOST } from '$env/static/private';
 
 export const { handle, signIn, signOut } = SvelteKitAuth({
-	trustHost: TRUST_HOST == 'true',
+	// trustHost: TRUST_HOST == 'true',
+	trustHost: false,
 	providers: [
 		Apple,
 		GitHub,
