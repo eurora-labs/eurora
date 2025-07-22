@@ -1,8 +1,12 @@
 import { json } from '@sveltejs/kit';
 import Stripe from 'stripe';
-import { SECRET_STRIPE_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+import { building } from '$app/environment';
 
-const stripe = new Stripe(SECRET_STRIPE_KEY);
+let stripe: Stripe;
+if (!building) {
+	stripe = new Stripe(env.SECRET_STRIPE_KEY);
+}
 
 export async function POST() {
 	const paymentIntent = await stripe.paymentIntents.create({
