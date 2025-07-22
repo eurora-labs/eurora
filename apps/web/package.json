@@ -23,7 +23,6 @@
 		"test:unit": "vitest"
 	},
 	"dependencies": {
-		"@auth/sveltekit": "^1.10.0",
 		"stripe": "^18.3.0",
 		"@stripe/stripe-js": "^7.5.0",
 		"svelte-stripe": "^1.4.0"
