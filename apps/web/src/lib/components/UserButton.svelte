@@ -5,7 +5,6 @@
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import UserIcon from '@lucide/svelte/icons/user';
 	import { page } from '$app/state';
-	// import { currentUser, auth } from '$lib/stores/auth.js';
 	import { goto } from '$app/navigation';
 	import { SignOut } from '@auth/sveltekit/components';
 
