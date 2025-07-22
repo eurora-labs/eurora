@@ -11,7 +11,7 @@
 
 		if (error) {
 			console.error('OAuth error:', error, query.get('error_description'));
-			window.location.href = '/login?error=oauth_failed';
+			goto('/login?error=oauth_failed');
 			return;
 		}
 
@@ -20,7 +20,7 @@
 
 		if (!code || !state) {
 			console.error('Missing required OAuth parameters');
-			window.location.href = '/login?error=invalid_callback';
+			goto('/login?error=invalid_callback');
 			return;
 		}
 
@@ -57,7 +57,7 @@
 			goto('/');
 		} catch (error) {
 			console.error('Token exchange failed:', error);
-			window.location.href = '/login?error=token_exchange_failed';
+			goto('/login?error=token_exchange_failed');
 		}
 	});
 </script>
