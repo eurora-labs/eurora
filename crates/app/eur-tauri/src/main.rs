@@ -22,7 +22,7 @@ use eur_personal_db::{Conversation, DatabaseManager};
 use eur_prompt_kit::PromptKitService;
 use eur_secret::secret;
 use eur_tauri::{
-    WindowState, create_launcher, create_window,
+    WindowState, create_hover, create_launcher, create_window,
     procedures::{
         auth_procedures::{AuthApi, AuthApiImpl},
         chat_procedures::{ChatApi, ChatApiImpl},
@@ -135,6 +135,11 @@ fn main() {
                     let launcher_window =
                         create_launcher(tauri_app.handle(), "launcher", "launcher".into())
                             .expect("Failed to create launcher window");
+
+                    let hover_window = create_hover(tauri_app.handle(), "hover", "hover".into())
+                        .expect("Failed to create hover window");
+
+                    // hover_window.set_resizable(false);
 
                     let app_handle = tauri_app.handle();
 
