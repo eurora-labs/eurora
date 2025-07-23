@@ -22,7 +22,7 @@ pub mod shared_types;
 mod util;
 pub mod window;
 pub use window::{
-    create as create_window, create_launcher,
+    create as create_window, create_hover, create_launcher,
     state::{WindowState, event::ChangeForFrontend},
 };
 

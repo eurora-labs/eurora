@@ -110,6 +110,31 @@ pub fn create_launcher(
     Ok(window)
 }
 
+#[cfg(not(target_os = "macos"))]
+pub fn create_hover(
+    handle: &AppHandle,
+    label: &str,
+    window_relative_url: String,
+) -> tauri::Result<tauri::WebviewWindow> {
+    info!("creating window '{label}' created at '{window_relative_url}'");
+    let window = tauri::WebviewWindowBuilder::new(
+        handle,
+        label,
+        tauri::WebviewUrl::App(window_relative_url.into()),
+    )
+    .inner_size(50.0, 50.0)
+    .max_inner_size(50.0, 50.0)
+    // .disable_drag_drop_handler()
+    .decorations(false)
+    .always_on_top(true)
+    // .position(0.0, 0.0)
+    // .center()
+    .visible(true)
+    .build()?;
+
+    Ok(window)
+}
+
 #[cfg(target_os = "macos")]
 pub fn create(
     handle: &AppHandle,
