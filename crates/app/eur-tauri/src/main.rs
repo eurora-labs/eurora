@@ -606,65 +606,92 @@ fn position_hover_window(hover_window: &tauri::WebviewWindow) {
 /// Monitor cursor position and reposition hover window when cursor moves to different screen
 async fn monitor_cursor_for_hover(hover_window: tauri::WebviewWindow) {
     let mut last_monitor_id = String::new();
+    let mut last_cursor_x = 0.0;
+    let mut last_cursor_y = 0.0;
+
+    // Cache monitors to avoid repeated system calls
+    let mut cached_monitors = Vec::new();
+    let mut last_monitor_refresh = std::time::Instant::now();
 
     loop {
-        // Check cursor position every 500ms
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        // Very fast polling for maximum responsiveness - check every 16ms (~60fps)
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         if let Ok(cursor_position) = hover_window.cursor_position() {
-            if let Ok(monitors) = get_all_monitors() {
-                for monitor in monitors {
-                    let monitor_id = monitor.id().unwrap_or_default().to_string();
-                    let scale_factor = monitor.scale_factor().unwrap_or(1.0) as f64;
-                    let monitor_width =
-                        (monitor.width().unwrap_or(1920) as f64 * scale_factor) as u32;
-                    let monitor_height =
-                        (monitor.height().unwrap_or(1080) as f64 * scale_factor) as u32;
-                    let monitor_x = (monitor.x().unwrap_or(0) as f64 * scale_factor) as i32;
-                    let monitor_y = (monitor.y().unwrap_or(0) as f64 * scale_factor) as i32;
+            // Only proceed if cursor actually moved (avoid unnecessary work)
+            if (cursor_position.x - last_cursor_x).abs() < 1.0
+                && (cursor_position.y - last_cursor_y).abs() < 1.0
+            {
+                continue;
+            }
 
-                    // Check if cursor is on this monitor
-                    if cursor_position.x >= monitor_x as f64
-                        && cursor_position.x <= (monitor_x + monitor_width as i32) as f64
-                        && cursor_position.y >= monitor_y as f64
-                        && cursor_position.y <= (monitor_y + monitor_height as i32) as f64
-                    {
-                        // If cursor moved to a different monitor, reposition hover window
-                        if monitor_id != last_monitor_id {
-                            info!("Cursor moved to monitor: {}", monitor_id);
-                            last_monitor_id = monitor_id;
+            last_cursor_x = cursor_position.x;
+            last_cursor_y = cursor_position.y;
 
-                            // Position hover window on the new monitor
-                            let window_size =
-                                hover_window.inner_size().unwrap_or(tauri::PhysicalSize {
-                                    width: 50,
-                                    height: 50,
-                                });
+            // Refresh monitor cache every 5 seconds or if empty
+            let now = std::time::Instant::now();
+            if cached_monitors.is_empty() || now.duration_since(last_monitor_refresh).as_secs() > 5
+            {
+                if let Ok(monitors) = get_all_monitors() {
+                    cached_monitors = monitors;
+                    last_monitor_refresh = now;
+                }
+            }
 
-                            // Right side positioning (close to right edge)
-                            let hover_x =
-                                monitor_x + monitor_width as i32 - window_size.width as i32 - 10; // 10px margin from edge
+            // Check which monitor the cursor is on
+            for monitor in &cached_monitors {
+                let monitor_id = monitor.id().unwrap_or_default().to_string();
+                let scale_factor = monitor.scale_factor().unwrap_or(1.0) as f64;
+                let monitor_width = (monitor.width().unwrap_or(1920) as f64 * scale_factor) as u32;
+                let monitor_height =
+                    (monitor.height().unwrap_or(1080) as f64 * scale_factor) as u32;
+                let monitor_x = (monitor.x().unwrap_or(0) as f64 * scale_factor) as i32;
+                let monitor_y = (monitor.y().unwrap_or(0) as f64 * scale_factor) as i32;
 
-                            // 3/4 down the screen positioning
-                            let hover_y = monitor_y + (monitor_height as f64 * 0.75) as i32
-                                - (window_size.height as i32 / 2);
+                // Check if cursor is on this monitor
+                if cursor_position.x >= monitor_x as f64
+                    && cursor_position.x <= (monitor_x + monitor_width as i32) as f64
+                    && cursor_position.y >= monitor_y as f64
+                    && cursor_position.y <= (monitor_y + monitor_height as i32) as f64
+                {
+                    // If cursor moved to a different monitor, reposition hover window immediately
+                    if monitor_id != last_monitor_id {
+                        info!(
+                            "Cursor moved to monitor: {} (immediate repositioning)",
+                            monitor_id
+                        );
+                        last_monitor_id = monitor_id;
 
-                            info!(
-                                "Repositioning hover window to: ({}, {}) on monitor {}x{}",
-                                hover_x, hover_y, monitor_width, monitor_height
-                            );
+                        // Position hover window on the new monitor
+                        let window_size =
+                            hover_window.inner_size().unwrap_or(tauri::PhysicalSize {
+                                width: 50,
+                                height: 50,
+                            });
 
-                            if let Err(e) = hover_window.set_position(tauri::Position::Physical(
-                                tauri::PhysicalPosition {
-                                    x: hover_x,
-                                    y: hover_y,
-                                },
-                            )) {
-                                error!("Failed to reposition hover window: {}", e);
-                            }
+                        // Right side positioning (close to right edge)
+                        let hover_x =
+                            monitor_x + monitor_width as i32 - window_size.width as i32 - 10; // 10px margin from edge
+
+                        // 3/4 down the screen positioning
+                        let hover_y = monitor_y + (monitor_height as f64 * 0.75) as i32
+                            - (window_size.height as i32 / 2);
+
+                        info!(
+                            "Repositioning hover window to: ({}, {}) on monitor {}x{}",
+                            hover_x, hover_y, monitor_width, monitor_height
+                        );
+
+                        if let Err(e) = hover_window.set_position(tauri::Position::Physical(
+                            tauri::PhysicalPosition {
+                                x: hover_x,
+                                y: hover_y,
+                            },
+                        )) {
+                            error!("Failed to reposition hover window: {}", e);
                         }
-                        break;
                     }
+                    break;
                 }
             }
         }
