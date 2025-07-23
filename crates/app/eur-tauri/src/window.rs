@@ -127,6 +127,7 @@ pub fn create_hover(
     // .disable_drag_drop_handler()
     .decorations(false)
     .always_on_top(true)
+    .transparent(true)
     // .position(0.0, 0.0)
     // .center()
     .visible(true)
