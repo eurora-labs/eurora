@@ -1,7 +1,36 @@
 <script lang="ts">
+	import { Button } from '@eurora/ui/components/button/index';
 	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub';
+	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
+	import { Window } from '@tauri-apps/api/window';
+	import { onMount } from 'svelte';
+	import { ModeWatcher, setMode } from 'mode-watcher';
+
+	let window: Window | null = $state(null);
+
+	onMount(() => {
+		window = new Window('launcher');
+		// setMode('dark');
+	});
+
+	function handleClick() {
+		window?.show();
+		window?.setFocus();
+	}
 </script>
 
-<main class="container w-full h-full m-auto flex items-center justify-center">
-	<SiGithub size={24} />
-</main>
+<Button
+	class="container w-full h-full m-auto flex items-center justify-center cursor-pointer "
+	onclick={handleClick}
+	size="icon"
+	variant="link"
+>
+	<EuroraLogo class="size-8" />
+</Button>
+
+<style lang="postcss">
+	@reference 'tailwindcss';
+	:global(body) {
+		@apply bg-transparent;
+	}
+</style>
