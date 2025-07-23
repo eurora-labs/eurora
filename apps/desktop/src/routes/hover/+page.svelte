@@ -1,16 +1,13 @@
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
-	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import { Window } from '@tauri-apps/api/window';
 	import { onMount } from 'svelte';
-	import { ModeWatcher, setMode } from 'mode-watcher';
 
 	let window: Window | null = $state(null);
 
 	onMount(() => {
 		window = new Window('launcher');
-		// setMode('dark');
 	});
 
 	function handleClick() {
