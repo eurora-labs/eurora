@@ -11,6 +11,6 @@
 
 <ModeWatcher defaultMode="light" track={false} />
 
-<main class="h-screen p-0 m-0">
+<main class="h-screen p-0 m-0 bg-inherit">
 	{@render children?.()}
 </main>
