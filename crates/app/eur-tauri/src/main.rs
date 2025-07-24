@@ -11,10 +11,12 @@ use tracing_subscriber::{
     fmt,
 };
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
+mod launcher;
 mod util;
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+use std::sync::{Arc, Mutex};
+
+use launcher::{
+    monitor_cursor_for_hover, open_launcher_window, position_hover_window, set_launcher_visible,
 };
 
 use eur_native_messaging::create_grpc_ipc_client;
@@ -23,9 +25,6 @@ use eur_prompt_kit::PromptKitService;
 use eur_secret::secret;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
-    launcher::{
-        monitor_cursor_for_hover, open_launcher_window, position_hover_window, set_launcher_visible,
-    },
     procedures::{
         auth_procedures::{AuthApi, AuthApiImpl},
         chat_procedures::{ChatApi, ChatApiImpl},
@@ -105,7 +104,7 @@ fn main() {
         .build()
         .unwrap()
         .block_on(async {
-            // info!("Setting tokio runtime");
+            info!("Setting tokio runtime");
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let builder = tauri::Builder::default()
