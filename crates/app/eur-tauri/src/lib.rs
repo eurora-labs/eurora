@@ -17,6 +17,7 @@
 // pub mod commands;
 
 // pub mod logs;
+pub mod launcher;
 pub mod procedures;
 pub mod shared_types;
 mod util;
