@@ -39,7 +39,6 @@ use eur_tauri::{
     },
     shared_types::{SharedPromptKitService, create_shared_timeline},
 };
-use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
 use tauri::{
     AppHandle, Emitter, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -99,7 +98,7 @@ fn main() {
     // Regular application startup
     let tauri_context = generate_context!();
 
-    // info!("Starting Tauri application...");
+    info!("Starting Tauri application...");
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -128,7 +127,6 @@ fn main() {
                         info!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
                     }
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
-                        // create_window(tauri_app.handle(), "main", "onboarding".into())
                         .expect("Failed to create main window");
 
                     // Create launcher window without Arc<Mutex>
@@ -138,8 +136,6 @@ fn main() {
 
                     let hover_window = create_hover(tauri_app.handle(), "hover", "hover".into())
                         .expect("Failed to create hover window");
-
-                    // hover_window.set_resizable(false);
 
                     // Position hover window initially
                     position_hover_window(&hover_window);
@@ -395,6 +391,7 @@ fn main() {
                 .run(|_app_handle, _event| {});
         });
 }
+
 fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
     tauri_plugin_global_shortcut::Builder::new()
         .with_handler(move |app: &AppHandle, _shortcut, event| {
