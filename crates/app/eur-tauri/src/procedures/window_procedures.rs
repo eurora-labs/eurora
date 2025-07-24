@@ -1,9 +1,6 @@
 use tauri::{Manager, Runtime};
 use tracing::info;
-#[taurpc::procedures(
-    path = "window",
-    export_to = "../../../apps/desktop/src/lib/bindings/bindings.ts"
-)]
+#[taurpc::procedures(path = "window")]
 pub trait WindowApi {
     async fn get_scale_factor<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -14,6 +11,10 @@ pub trait WindowApi {
         app_handle: tauri::AppHandle<R>,
         height: u32,
         scale_factor: f64,
+    ) -> Result<(), String>;
+
+    async fn open_launcher_window<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
     ) -> Result<(), String>;
 }
 
@@ -50,5 +51,14 @@ impl WindowApi for WindowApiImpl {
             height: new_height as u32,
         }));
         Ok(())
+    }
+
+    async fn open_launcher_window<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<(), String> {
+        let window = app_handle.get_window("launcher").unwrap();
+        // Use the launcher module function
+        crate::launcher::open_launcher_window(&window)
     }
 }

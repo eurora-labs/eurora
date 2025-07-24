@@ -22,7 +22,10 @@ use eur_personal_db::{Conversation, DatabaseManager};
 use eur_prompt_kit::PromptKitService;
 use eur_secret::secret;
 use eur_tauri::{
-    WindowState, create_launcher, create_window,
+    WindowState, create_hover, create_launcher, create_window,
+    launcher::{
+        monitor_cursor_for_hover, open_launcher_window, position_hover_window, set_launcher_visible,
+    },
     procedures::{
         auth_procedures::{AuthApi, AuthApiImpl},
         chat_procedures::{ChatApi, ChatApiImpl},
@@ -45,9 +48,6 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::ShortcutState;
 use taurpc::Router;
-// Shared state to track if launcher is visible
-static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
-
 use tracing::{error, info};
 
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
@@ -135,6 +135,20 @@ fn main() {
                     let launcher_window =
                         create_launcher(tauri_app.handle(), "launcher", "launcher".into())
                             .expect("Failed to create launcher window");
+
+                    let hover_window = create_hover(tauri_app.handle(), "hover", "hover".into())
+                        .expect("Failed to create hover window");
+
+                    // hover_window.set_resizable(false);
+
+                    // Position hover window initially
+                    position_hover_window(&hover_window);
+
+                    // Start cursor monitoring for hover window
+                    let hover_window_clone = hover_window.clone();
+                    tauri::async_runtime::spawn(async move {
+                        monitor_cursor_for_hover(hover_window_clone).await;
+                    });
 
                     let app_handle = tauri_app.handle();
 
@@ -293,7 +307,7 @@ fn main() {
                                     launcher
                                         .emit("launcher_closed", ())
                                         .expect("Failed to emit launcher_closed event");
-                                    LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
+                                    set_launcher_visible(false);
                                     // Ensure state is updated
                                 }
                             }
@@ -343,7 +357,7 @@ fn main() {
                                 window
                                     .emit("launcher_closed", ())
                                     .expect("Failed to emit launcher_closed event");
-                                LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
+                                set_launcher_visible(false);
                                 // Ensure state is updated
                             }
                         }
@@ -404,139 +418,17 @@ fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
                     .expect("Failed to emit launcher_closed event");
 
                 // Update the shared state to indicate launcher is hidden
-                LAUNCHER_VISIBLE.store(false, Ordering::SeqCst);
+                set_launcher_visible(false);
             } else {
-                // Update the shared state to indicate launcher is visible
-                LAUNCHER_VISIBLE.store(true, Ordering::SeqCst);
-
-                // Variables to store launcher position and size
-                let mut launcher_x = 0;
-                let mut launcher_y = 0;
-                let mut launcher_width = 512; // Default width
-                let mut launcher_height = 500; // Default height
-                let mut monitor_id = "".to_string();
-                let mut monitor_width = 1920u32; // Default monitor width
-                let mut monitor_height = 1080u32; // Default monitor height
-
-                // Get cursor position and center launcher on that screen
-                if let Ok(cursor_position) = launcher.cursor_position() {
-                    if let Ok(monitors) = get_all_monitors() {
-                        for monitor in monitors {
-                            monitor_id = monitor.id().unwrap().to_string();
-                            let scale_factor = monitor.scale_factor().unwrap() as f64;
-                            monitor_width = (monitor.width().unwrap() as f64 * scale_factor) as u32;
-                            monitor_height =
-                                (monitor.height().unwrap() as f64 * scale_factor) as u32;
-                            let monitor_x = (monitor.x().unwrap() as f64 * scale_factor) as i32;
-                            let monitor_y = (monitor.y().unwrap() as f64 * scale_factor) as i32;
-
-                            info!("Monitor width: {:?}", monitor_width);
-                            info!("Monitor height: {:?}", monitor_height);
-                            info!("Monitor x: {:?}", monitor_x);
-                            info!("Monitor y: {:?}", monitor_y);
-                            info!("Monitor scale factor: {:?}", scale_factor);
-
-                            // Check if cursor is on this monitor
-                            if cursor_position.x >= monitor_x as f64
-                                && cursor_position.x <= (monitor_x + monitor_width as i32) as f64
-                                && cursor_position.y >= monitor_y as f64
-                                && cursor_position.y <= (monitor_y + monitor_height as i32) as f64
-                            {
-                                // Center the launcher on this monitor
-                                let window_size = launcher.inner_size().unwrap();
-
-                                info!("Window size: {:?}", window_size);
-
-                                launcher_x = monitor_x
-                                    + (monitor_width as i32 - window_size.width as i32) / 2;
-                                // launcher_x = (monitor_x as f64 * scale_factor) as i32
-                                //     + ((monitor_width as f64 * scale_factor
-                                //         - window_size.width as f64)
-                                //         / 2.0) as i32;
-                                launcher_y = monitor_y
-                                    + (monitor_height as i32 - window_size.height as i32) / 4;
-
-                                info!("Launcher position: ({}, {})", launcher_x, launcher_y);
-
-                                launcher
-                                    .set_position(tauri::Position::Physical(
-                                        tauri::PhysicalPosition {
-                                            x: launcher_x,
-                                            y: launcher_y,
-                                            // x: 0,
-                                            // y: 0,
-                                        },
-                                    ))
-                                    .expect("Failed to set launcher position");
-
-                                launcher_x = ((monitor_width as i32 as f64) / 2.0) as i32
-                                    - (window_size.width as f64 / 2.0) as i32;
-                                launcher_y = ((monitor_height as i32 as f64) / 4.0) as i32
-                                    - (window_size.height as f64 / 4.0) as i32;
-                                launcher_width = window_size.width;
-                                launcher_height = window_size.height;
-                                break;
-                            }
-                        }
-                    }
+                // Use the extracted launcher opening function
+                if let Err(e) = open_launcher_window(&launcher) {
+                    error!("Failed to open launcher window: {}", e);
                 }
-                let start_record = std::time::Instant::now();
-                // Capture the screen region behind the launcher
-                match capture_focused_region_rgba(
-                    monitor_id.clone(),
-                    launcher_x as u32,
-                    launcher_y as u32,
-                    launcher_width,
-                    launcher_height,
-                ) {
-                    Ok(img) => {
-                        let t0 = std::time::Instant::now();
-                        let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
-
-                        info!("Captured image size: {:?}", img.dimensions());
-                        let duration = t0.elapsed();
-                        info!("Capture of background area completed in: {:?}", duration);
-
-                        // Convert the image to base64
-                        if let Ok(base64_image) = image_to_base64(img) {
-                            // Send the base64 image to the frontend
-                            launcher
-                                .emit("background_image", base64_image)
-                                .expect("Failed to emit background_image event");
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to capture screen region: {}", e);
-                    }
-                }
-                let duration = start_record.elapsed();
-                info!("Capture of background area completed in: {:?}", duration);
-
-                // Only show the launcher if it was previously hidden
-                launcher.show().expect("Failed to show launcher window");
-
-                // Emit an event to notify that the launcher has been opened
-                // Include positioning information for proper background alignment
-                let launcher_info = serde_json::json!({
-                    "monitor_id": monitor_id.clone(),
-                    "launcher_x": launcher_x,
-                    "launcher_y": launcher_y,
-                    "launcher_width": launcher_width,
-                    "launcher_height": launcher_height,
-                    "monitor_width": monitor_width,
-                    "monitor_height": monitor_height
-                });
-                launcher
-                    .emit("launcher_opened", launcher_info)
-                    .expect("Failed to emit launcher_opened event");
-
-                launcher
-                    .set_focus()
-                    .expect("Failed to focus launcher window");
             }
         })
         .build()
 }
+
 #[tauri::command]
 async fn list_conversations(app_handle: tauri::AppHandle) -> Result<Vec<Conversation>, String> {
     let db = app_handle.state::<SharedPersonalDb>().clone();
