@@ -23,8 +23,8 @@
 		"test:unit": "vitest"
 	},
 	"dependencies": {
-		"stripe": "^18.3.0",
 		"@stripe/stripe-js": "^7.5.0",
+		"stripe": "^18.3.0",
 		"svelte-stripe": "^1.4.0"
 	},
 	"devDependencies": {
@@ -45,6 +45,7 @@
 		"@tailwindcss/postcss": "catalog:",
 		"@tailwindcss/typography": "^0.5.16",
 		"@tailwindcss/vite": "^4.1.11",
+		"@tauri-apps/plugin-updater": "^2.9.0",
 		"amplify-adapter": "^1.1.0",
 		"bits-ui": "^2.8.11",
 		"eslint": "^9.31.0",
