@@ -1,6 +1,6 @@
 use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tracing::{error, info};
 
 // Shared state to track if launcher is visible
