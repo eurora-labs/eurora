@@ -1,18 +1,12 @@
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import { Window } from '@tauri-apps/api/window';
-	import { onMount } from 'svelte';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 
-	let window: Window | null = $state(null);
-
-	onMount(() => {
-		window = new Window('launcher');
-	});
+	const taurpc = createTauRPCProxy();
 
 	function handleClick() {
-		window?.show();
-		window?.setFocus();
+		taurpc.window.open_launcher_window();
 	}
 </script>
 
