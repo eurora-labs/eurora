@@ -57,7 +57,9 @@ impl WindowApi for WindowApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<(), String> {
-        let window = app_handle.get_window("launcher").unwrap();
+        let window = app_handle
+            .get_window("launcher")
+            .ok_or_else(|| "Launcher window not found".to_string())?;
         // Use the launcher module function
         crate::launcher::open_launcher_window(&window)
     }
