@@ -37,6 +37,7 @@ async fn main() -> Result<()> {
         secret: "your-super-secret-jwt-key".to_string(),
         access_token_expiry_hours: 1,
         refresh_token_expiry_days: 30,
+        approved_emails: vec![],
     };
 
     // Create auth service
