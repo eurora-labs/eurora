@@ -53,6 +53,95 @@ use tracing::{error, info};
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
 
+/// Monitor information for window positioning
+#[derive(Debug, Clone)]
+struct MonitorInfo {
+    id: String,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+}
+
+/// Result of finding the monitor containing the cursor
+#[derive(Debug)]
+struct CursorMonitorResult {
+    monitor: MonitorInfo,
+    cursor_x: f64,
+    cursor_y: f64,
+}
+
+/// Find the monitor that contains the cursor position for WebviewWindow
+fn find_cursor_monitor(window: &tauri::WebviewWindow) -> Option<CursorMonitorResult> {
+    let cursor_position = window.cursor_position().ok()?;
+    find_cursor_monitor_impl(cursor_position)
+}
+
+/// Find the monitor that contains the cursor position for Window
+fn find_cursor_monitor_window(window: &tauri::Window) -> Option<CursorMonitorResult> {
+    let cursor_position = window.cursor_position().ok()?;
+    find_cursor_monitor_impl(cursor_position)
+}
+
+/// Internal implementation for finding cursor monitor
+fn find_cursor_monitor_impl(
+    cursor_position: tauri::PhysicalPosition<f64>,
+) -> Option<CursorMonitorResult> {
+    let monitors = get_all_monitors().ok()?;
+
+    for monitor in monitors {
+        let monitor_id = monitor.id().unwrap_or_default().to_string();
+        let scale_factor = monitor.scale_factor().unwrap_or(1.0) as f64;
+        let monitor_width = (monitor.width().unwrap_or(1920) as f64 * scale_factor) as u32;
+        let monitor_height = (monitor.height().unwrap_or(1080) as f64 * scale_factor) as u32;
+        let monitor_x = (monitor.x().unwrap_or(0) as f64 * scale_factor) as i32;
+        let monitor_y = (monitor.y().unwrap_or(0) as f64 * scale_factor) as i32;
+
+        // Check if cursor is on this monitor
+        if cursor_position.x >= monitor_x as f64
+            && cursor_position.x <= (monitor_x + monitor_width as i32) as f64
+            && cursor_position.y >= monitor_y as f64
+            && cursor_position.y <= (monitor_y + monitor_height as i32) as f64
+        {
+            return Some(CursorMonitorResult {
+                monitor: MonitorInfo {
+                    id: monitor_id,
+                    x: monitor_x,
+                    y: monitor_y,
+                    width: monitor_width,
+                    height: monitor_height,
+                    scale_factor,
+                },
+                cursor_x: cursor_position.x,
+                cursor_y: cursor_position.y,
+            });
+        }
+    }
+    None
+}
+
+/// Calculate launcher position (centered horizontally, 1/4 from top)
+fn calculate_launcher_position(
+    monitor: &MonitorInfo,
+    window_size: tauri::PhysicalSize<u32>,
+) -> (i32, i32) {
+    let launcher_x = monitor.x + (monitor.width as i32 - window_size.width as i32) / 2;
+    let launcher_y = monitor.y + (monitor.height as i32 - window_size.height as i32) / 4;
+    (launcher_x, launcher_y)
+}
+
+/// Calculate hover window position (right side, 3/4 down)
+fn calculate_hover_position(
+    monitor: &MonitorInfo,
+    window_size: tauri::PhysicalSize<u32>,
+) -> (i32, i32) {
+    let hover_x = monitor.x + monitor.width as i32 - window_size.width as i32 - 10; // 10px margin from edge
+    let hover_y =
+        monitor.y + (monitor.height as f64 * 0.75) as i32 - (window_size.height as i32 / 2);
+    (hover_x, hover_y)
+}
+
 async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> SharedPersonalDb {
     let db_path = get_db_path(app_handle);
     Arc::new(
@@ -423,130 +512,90 @@ fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
                 // Update the shared state to indicate launcher is visible
                 LAUNCHER_VISIBLE.store(true, Ordering::SeqCst);
 
-                // Variables to store launcher position and size
-                let mut launcher_x = 0;
-                let mut launcher_y = 0;
-                let mut launcher_width = 512; // Default width
-                let mut launcher_height = 500; // Default height
-                let mut monitor_id = "".to_string();
-                let mut monitor_width = 1920u32; // Default monitor width
-                let mut monitor_height = 1080u32; // Default monitor height
+                // Use consolidated monitor detection function
+                if let Some(cursor_monitor) = find_cursor_monitor_window(&launcher) {
+                    let monitor = &cursor_monitor.monitor;
+                    let window_size = launcher.inner_size().unwrap();
 
-                // Get cursor position and center launcher on that screen
-                if let Ok(cursor_position) = launcher.cursor_position() {
-                    if let Ok(monitors) = get_all_monitors() {
-                        for monitor in monitors {
-                            monitor_id = monitor.id().unwrap().to_string();
-                            let scale_factor = monitor.scale_factor().unwrap() as f64;
-                            monitor_width = (monitor.width().unwrap() as f64 * scale_factor) as u32;
-                            monitor_height =
-                                (monitor.height().unwrap() as f64 * scale_factor) as u32;
-                            let monitor_x = (monitor.x().unwrap() as f64 * scale_factor) as i32;
-                            let monitor_y = (monitor.y().unwrap() as f64 * scale_factor) as i32;
+                    info!("Monitor width: {:?}", monitor.width);
+                    info!("Monitor height: {:?}", monitor.height);
+                    info!("Monitor x: {:?}", monitor.x);
+                    info!("Monitor y: {:?}", monitor.y);
+                    info!("Monitor scale factor: {:?}", monitor.scale_factor);
+                    info!("Window size: {:?}", window_size);
 
-                            info!("Monitor width: {:?}", monitor_width);
-                            info!("Monitor height: {:?}", monitor_height);
-                            info!("Monitor x: {:?}", monitor_x);
-                            info!("Monitor y: {:?}", monitor_y);
-                            info!("Monitor scale factor: {:?}", scale_factor);
+                    // Calculate launcher position using consolidated function
+                    let (launcher_x, launcher_y) =
+                        calculate_launcher_position(monitor, window_size);
 
-                            // Check if cursor is on this monitor
-                            if cursor_position.x >= monitor_x as f64
-                                && cursor_position.x <= (monitor_x + monitor_width as i32) as f64
-                                && cursor_position.y >= monitor_y as f64
-                                && cursor_position.y <= (monitor_y + monitor_height as i32) as f64
-                            {
-                                // Center the launcher on this monitor
-                                let window_size = launcher.inner_size().unwrap();
+                    info!("Launcher position: ({}, {})", launcher_x, launcher_y);
 
-                                info!("Window size: {:?}", window_size);
+                    launcher
+                        .set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+                            x: launcher_x,
+                            y: launcher_y,
+                        }))
+                        .expect("Failed to set launcher position");
 
-                                launcher_x = monitor_x
-                                    + (monitor_width as i32 - window_size.width as i32) / 2;
-                                // launcher_x = (monitor_x as f64 * scale_factor) as i32
-                                //     + ((monitor_width as f64 * scale_factor
-                                //         - window_size.width as f64)
-                                //         / 2.0) as i32;
-                                launcher_y = monitor_y
-                                    + (monitor_height as i32 - window_size.height as i32) / 4;
+                    // Calculate relative position for screen capture
+                    let capture_x = ((monitor.width as i32 as f64) / 2.0) as i32
+                        - (window_size.width as f64 / 2.0) as i32;
+                    let capture_y = ((monitor.height as i32 as f64) / 4.0) as i32
+                        - (window_size.height as f64 / 4.0) as i32;
+                    let start_record = std::time::Instant::now();
+                    // Capture the screen region behind the launcher
+                    match capture_focused_region_rgba(
+                        monitor.id.clone(),
+                        capture_x as u32,
+                        capture_y as u32,
+                        window_size.width,
+                        window_size.height,
+                    ) {
+                        Ok(img) => {
+                            let t0 = std::time::Instant::now();
+                            let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
 
-                                info!("Launcher position: ({}, {})", launcher_x, launcher_y);
+                            info!("Captured image size: {:?}", img.dimensions());
+                            let duration = t0.elapsed();
+                            info!("Capture of background area completed in: {:?}", duration);
 
+                            // Convert the image to base64
+                            if let Ok(base64_image) = image_to_base64(img) {
+                                // Send the base64 image to the frontend
                                 launcher
-                                    .set_position(tauri::Position::Physical(
-                                        tauri::PhysicalPosition {
-                                            x: launcher_x,
-                                            y: launcher_y,
-                                            // x: 0,
-                                            // y: 0,
-                                        },
-                                    ))
-                                    .expect("Failed to set launcher position");
-
-                                launcher_x = ((monitor_width as i32 as f64) / 2.0) as i32
-                                    - (window_size.width as f64 / 2.0) as i32;
-                                launcher_y = ((monitor_height as i32 as f64) / 4.0) as i32
-                                    - (window_size.height as f64 / 4.0) as i32;
-                                launcher_width = window_size.width;
-                                launcher_height = window_size.height;
-                                break;
+                                    .emit("background_image", base64_image)
+                                    .expect("Failed to emit background_image event");
                             }
                         }
-                    }
-                }
-                let start_record = std::time::Instant::now();
-                // Capture the screen region behind the launcher
-                match capture_focused_region_rgba(
-                    monitor_id.clone(),
-                    launcher_x as u32,
-                    launcher_y as u32,
-                    launcher_width,
-                    launcher_height,
-                ) {
-                    Ok(img) => {
-                        let t0 = std::time::Instant::now();
-                        let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
-
-                        info!("Captured image size: {:?}", img.dimensions());
-                        let duration = t0.elapsed();
-                        info!("Capture of background area completed in: {:?}", duration);
-
-                        // Convert the image to base64
-                        if let Ok(base64_image) = image_to_base64(img) {
-                            // Send the base64 image to the frontend
-                            launcher
-                                .emit("background_image", base64_image)
-                                .expect("Failed to emit background_image event");
+                        Err(e) => {
+                            error!("Failed to capture screen region: {}", e);
                         }
                     }
-                    Err(e) => {
-                        error!("Failed to capture screen region: {}", e);
-                    }
+                    let duration = start_record.elapsed();
+                    info!("Capture of background area completed in: {:?}", duration);
+
+                    // Only show the launcher if it was previously hidden
+                    launcher.show().expect("Failed to show launcher window");
+
+                    // Emit an event to notify that the launcher has been opened
+                    // Include positioning information for proper background alignment
+                    let launcher_info = serde_json::json!({
+                        "monitor_id": monitor.id.clone(),
+                        "launcher_x": launcher_x,
+                        "launcher_y": launcher_y,
+                        "launcher_width": window_size.width,
+                        "launcher_height": window_size.height,
+                        "monitor_width": monitor.width,
+                        "monitor_height": monitor.height
+                    });
+                    launcher
+                        .emit("launcher_opened", launcher_info)
+                        .expect("Failed to emit launcher_opened event");
+
+                    launcher
+                        .set_focus()
+                        .expect("Failed to focus launcher window");
                 }
-                let duration = start_record.elapsed();
-                info!("Capture of background area completed in: {:?}", duration);
-
-                // Only show the launcher if it was previously hidden
-                launcher.show().expect("Failed to show launcher window");
-
-                // Emit an event to notify that the launcher has been opened
-                // Include positioning information for proper background alignment
-                let launcher_info = serde_json::json!({
-                    "monitor_id": monitor_id.clone(),
-                    "launcher_x": launcher_x,
-                    "launcher_y": launcher_y,
-                    "launcher_width": launcher_width,
-                    "launcher_height": launcher_height,
-                    "monitor_width": monitor_width,
-                    "monitor_height": monitor_height
-                });
-                launcher
-                    .emit("launcher_opened", launcher_info)
-                    .expect("Failed to emit launcher_opened event");
-
-                launcher
-                    .set_focus()
-                    .expect("Failed to focus launcher window");
             }
         })
         .build()
@@ -554,51 +603,28 @@ fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
 
 /// Position the hover window to the right side, around 3/4 to the bottom of the screen
 fn position_hover_window(hover_window: &tauri::WebviewWindow) {
-    if let Ok(cursor_position) = hover_window.cursor_position() {
-        if let Ok(monitors) = get_all_monitors() {
-            for monitor in monitors {
-                let scale_factor = monitor.scale_factor().unwrap_or(1.0) as f64;
-                let monitor_width = (monitor.width().unwrap_or(1920) as f64 * scale_factor) as u32;
-                let monitor_height =
-                    (monitor.height().unwrap_or(1080) as f64 * scale_factor) as u32;
-                let monitor_x = (monitor.x().unwrap_or(0) as f64 * scale_factor) as i32;
-                let monitor_y = (monitor.y().unwrap_or(0) as f64 * scale_factor) as i32;
+    if let Some(cursor_monitor) = find_cursor_monitor(hover_window) {
+        let monitor = &cursor_monitor.monitor;
+        let window_size = hover_window.inner_size().unwrap_or(tauri::PhysicalSize {
+            width: 50,
+            height: 50,
+        });
 
-                // Check if cursor is on this monitor
-                if cursor_position.x >= monitor_x as f64
-                    && cursor_position.x <= (monitor_x + monitor_width as i32) as f64
-                    && cursor_position.y >= monitor_y as f64
-                    && cursor_position.y <= (monitor_y + monitor_height as i32) as f64
-                {
-                    // Position hover window to the right side, 3/4 down the screen
-                    let window_size = hover_window.inner_size().unwrap_or(tauri::PhysicalSize {
-                        width: 50,
-                        height: 50,
-                    });
+        // Calculate hover position using consolidated function
+        let (hover_x, hover_y) = calculate_hover_position(monitor, window_size);
 
-                    // Right side positioning (close to right edge)
-                    let hover_x = monitor_x + monitor_width as i32 - window_size.width as i32 - 10; // 10px margin from edge
+        info!(
+            "Positioning hover window at: ({}, {}) on monitor {}x{}",
+            hover_x, hover_y, monitor.width, monitor.height
+        );
 
-                    // 3/4 down the screen positioning
-                    let hover_y = monitor_y + (monitor_height as f64 * 0.75) as i32
-                        - (window_size.height as i32 / 2);
-
-                    info!(
-                        "Positioning hover window at: ({}, {}) on monitor {}x{}",
-                        hover_x, hover_y, monitor_width, monitor_height
-                    );
-
-                    if let Err(e) = hover_window.set_position(tauri::Position::Physical(
-                        tauri::PhysicalPosition {
-                            x: hover_x,
-                            y: hover_y,
-                        },
-                    )) {
-                        error!("Failed to set hover window position: {}", e);
-                    }
-                    break;
-                }
-            }
+        if let Err(e) =
+            hover_window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+                x: hover_x,
+                y: hover_y,
+            }))
+        {
+            error!("Failed to set hover window position: {}", e);
         }
     }
 }
@@ -608,10 +634,6 @@ async fn monitor_cursor_for_hover(hover_window: tauri::WebviewWindow) {
     let mut last_monitor_id = String::new();
     let mut last_cursor_x = 0.0;
     let mut last_cursor_y = 0.0;
-
-    // Cache monitors to avoid repeated system calls
-    let mut cached_monitors = Vec::new();
-    let mut last_monitor_refresh = std::time::Instant::now();
 
     loop {
         // Very fast polling for maximum responsiveness - check every 16ms (~60fps)
@@ -628,70 +650,40 @@ async fn monitor_cursor_for_hover(hover_window: tauri::WebviewWindow) {
             last_cursor_x = cursor_position.x;
             last_cursor_y = cursor_position.y;
 
-            // Refresh monitor cache every 5 seconds or if empty
-            let now = std::time::Instant::now();
-            if cached_monitors.is_empty() || now.duration_since(last_monitor_refresh).as_secs() > 5
-            {
-                if let Ok(monitors) = get_all_monitors() {
-                    cached_monitors = monitors;
-                    last_monitor_refresh = now;
-                }
-            }
+            // Use consolidated monitor detection function
+            if let Some(cursor_monitor) = find_cursor_monitor(&hover_window) {
+                let monitor = &cursor_monitor.monitor;
 
-            // Check which monitor the cursor is on
-            for monitor in &cached_monitors {
-                let monitor_id = monitor.id().unwrap_or_default().to_string();
-                let scale_factor = monitor.scale_factor().unwrap_or(1.0) as f64;
-                let monitor_width = (monitor.width().unwrap_or(1920) as f64 * scale_factor) as u32;
-                let monitor_height =
-                    (monitor.height().unwrap_or(1080) as f64 * scale_factor) as u32;
-                let monitor_x = (monitor.x().unwrap_or(0) as f64 * scale_factor) as i32;
-                let monitor_y = (monitor.y().unwrap_or(0) as f64 * scale_factor) as i32;
+                // If cursor moved to a different monitor, reposition hover window immediately
+                if monitor.id != last_monitor_id {
+                    info!(
+                        "Cursor moved to monitor: {} (immediate repositioning)",
+                        monitor.id
+                    );
+                    last_monitor_id = monitor.id.clone();
 
-                // Check if cursor is on this monitor
-                if cursor_position.x >= monitor_x as f64
-                    && cursor_position.x <= (monitor_x + monitor_width as i32) as f64
-                    && cursor_position.y >= monitor_y as f64
-                    && cursor_position.y <= (monitor_y + monitor_height as i32) as f64
-                {
-                    // If cursor moved to a different monitor, reposition hover window immediately
-                    if monitor_id != last_monitor_id {
-                        info!(
-                            "Cursor moved to monitor: {} (immediate repositioning)",
-                            monitor_id
-                        );
-                        last_monitor_id = monitor_id;
+                    // Position hover window on the new monitor
+                    let window_size = hover_window.inner_size().unwrap_or(tauri::PhysicalSize {
+                        width: 50,
+                        height: 50,
+                    });
 
-                        // Position hover window on the new monitor
-                        let window_size =
-                            hover_window.inner_size().unwrap_or(tauri::PhysicalSize {
-                                width: 50,
-                                height: 50,
-                            });
+                    // Calculate hover position using consolidated function
+                    let (hover_x, hover_y) = calculate_hover_position(monitor, window_size);
 
-                        // Right side positioning (close to right edge)
-                        let hover_x =
-                            monitor_x + monitor_width as i32 - window_size.width as i32 - 10; // 10px margin from edge
+                    info!(
+                        "Repositioning hover window to: ({}, {}) on monitor {}x{}",
+                        hover_x, hover_y, monitor.width, monitor.height
+                    );
 
-                        // 3/4 down the screen positioning
-                        let hover_y = monitor_y + (monitor_height as f64 * 0.75) as i32
-                            - (window_size.height as i32 / 2);
-
-                        info!(
-                            "Repositioning hover window to: ({}, {}) on monitor {}x{}",
-                            hover_x, hover_y, monitor_width, monitor_height
-                        );
-
-                        if let Err(e) = hover_window.set_position(tauri::Position::Physical(
-                            tauri::PhysicalPosition {
-                                x: hover_x,
-                                y: hover_y,
-                            },
-                        )) {
-                            error!("Failed to reposition hover window: {}", e);
-                        }
+                    if let Err(e) = hover_window.set_position(tauri::Position::Physical(
+                        tauri::PhysicalPosition {
+                            x: hover_x,
+                            y: hover_y,
+                        },
+                    )) {
+                        error!("Failed to reposition hover window: {}", e);
                     }
-                    break;
                 }
             }
         }
