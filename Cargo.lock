@@ -2282,6 +2282,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-update-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "futures",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+ "zerocopy",
+]
+
+[[package]]
 name = "eur-user"
 version = "0.1.0"
 dependencies = [
