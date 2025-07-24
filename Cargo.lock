@@ -2533,7 +2533,6 @@ dependencies = [
  "eur-remote-db",
  "eur-update-service",
  "futures",
- "hyper 1.6.0",
  "image",
  "prost",
  "sentry",
@@ -2837,7 +2836,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "zerocopy",
 ]
 
 [[package]]
