@@ -1,14 +1,16 @@
-<script lang="ts">
-	import { Command as CommandPrimitive } from 'bits-ui';
-	import { cn } from '$lib/utils.js';
-	import InputArea from './input-area.svelte';
+<script lang="ts" module>
 	import { Editor as ProsemirrorEditor, type Query } from '@eurora/prosemirror-core/index';
-	import SearchIcon from '@lucide/svelte/icons/search';
-
+	import { Command as CommandPrimitive } from 'bits-ui';
 	interface Props extends CommandPrimitive.InputProps {
 		query?: Query;
 		editorRef?: ProsemirrorEditor;
 	}
+</script>
+
+<script lang="ts">
+	import { cn } from '$lib/utils.js';
+	import InputArea from './input-area.svelte';
+	import SearchIcon from '@lucide/svelte/icons/search';
 
 	let {
 		ref = $bindable(null),
