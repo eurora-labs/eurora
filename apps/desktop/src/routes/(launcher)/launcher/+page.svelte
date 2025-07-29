@@ -1,7 +1,6 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
 	import Katex from '$lib/components/katex.svelte';
-	import { invoke, Channel } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 
 	import * as Message from '@eurora/ui/custom-components/message/index';
@@ -12,10 +11,7 @@
 	import { onMount } from 'svelte';
 	import { Chat } from '@eurora/ui/custom-components/chat/index';
 	import { executeCommand } from '$lib/commands.js';
-	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
-	import { SiGoogledrive } from '@icons-pack/svelte-simple-icons';
 	import {
 		createTauRPCProxy,
 		type ResponseChunk,
@@ -37,22 +33,6 @@
 	const taurpc = createTauRPCProxy();
 	// Define a type for Conversation based on what we know from main.rs
 
-	type Conversation = {
-		id: string;
-		title: string;
-		created_at: number;
-		updated_at: number;
-	};
-
-	type DisplayAsset = {
-		name: string;
-		icon: string;
-		// process_name: string;
-		// start: string; // ISO date string
-		// end: string | null; // ISO date string or null
-	};
-
-	let inputRef = $state<HTMLTextAreaElement | null>(null);
 	let editorRef: ProsemirrorEditor | undefined = $state();
 	registerCoreExtensions();
 	// Query object for the Launcher.Input component
@@ -66,15 +46,8 @@
 		] as SveltePMExtension[],
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
-	let transcript = $state<string | null>(null);
 	const messages = $state<ProtoChatMessage[]>([]);
-	let statusCode = $state<string | null>(null);
-	let messagesContainer: HTMLElement;
-	const conversations = $state<Conversation[]>([]);
-	let hasApiKey = $state(true);
-	let isCheckingApiKey = $state(false);
 	let currentConversationId = $state<string | null>(null);
-	const displayAssets = $state<DisplayAsset[]>([]);
 	let backgroundImage = $state<string | null>(null);
 	let currentMonitorId = $state<string>('');
 	let launcherInfo = $state<{
@@ -109,44 +82,6 @@
 		launcherInfo = event.payload;
 		currentMonitorId = launcherInfo?.monitor_id || '';
 		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
-
-		// Capture full monitor after launcher is opened to replace the small background
-		// try {
-		// 	if (currentMonitorId && launcherInfo) {
-		// 		// Capture the full monitor using the monitor name from the event
-		// 		const fullMonitorImage = await taurpc.monitor.capture_monitor(currentMonitorId);
-
-		// 		// Replace the background image with the full monitor capture
-		// 		// Position it so it appears as if looking through transparent glass
-		// 		if (backdropCustom2Ref && fullMonitorImage) {
-		// 			// Calculate the position offset to align the background properly
-		// 			// The background should be positioned so that the launcher area shows
-		// 			// the same content as if it were transparent
-		// 			const offsetX = -launcherInfo.launcher_x;
-		// 			const offsetY = -launcherInfo.launcher_y;
-
-		// 			backdropCustom2Ref.style.backgroundImage = `url('${fullMonitorImage}')`;
-		// 			// backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
-		// 			backdropCustom2Ref.style.backgroundSize = `${launcherInfo.monitor_width}px ${launcherInfo.monitor_height}px`;
-		// 			backdropCustom2Ref.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
-		// 			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-		// 			// backdropCustom2Ref.style.backgroundClip = 'content-box';
-
-		// 			// Update the backgroundImage state
-		// 			backgroundImage = fullMonitorImage;
-
-		// 			console.log(
-		// 				'Full monitor background captured and positioned for monitor:',
-		// 				currentMonitorId,
-		// 				'offset:',
-		// 				offsetX,
-		// 				offsetY,
-		// 			);
-		// 		}
-		// 	}
-		// } catch (error) {
-		// 	console.error('Failed to capture full monitor background:', error);
-		// }
 	});
 
 	function addExampleMessages() {
@@ -175,11 +110,6 @@
 
 	// Listen for background image event
 	listen<string>('background_image', (event) => {
-		// const scrollY = window.scrollY;
-		// window.scrollTo(0, 0);
-		// taurpc.window.resize_launcher_window(window.outerHeight + scrollY, 1.0).then(() => {
-		// 	window.scrollTo(0, 0);
-		// });
 		backgroundImage = event.payload;
 
 		if (backdropCustom2Ref) {
@@ -207,9 +137,6 @@
 	onMount(() => {
 		document.addEventListener('keydown', handleEscapeKey);
 
-		// Check if API key exists
-		// checkApiKey();
-
 		// Clean up event listener when component is unmounted
 		return () => {
 			document.removeEventListener('keydown', handleEscapeKey);
@@ -234,29 +161,7 @@
 		}
 	}
 
-	// Load conversations when component is mounted
-	// Note: list_conversations is not yet available in TauRPC, fallback to invoke for now
-	// invoke('list_conversations')
-	// 	.then((result) => {
-	// 		conversations.splice(0, conversations.length, ...(result as Conversation[]));
-	// 		console.log('Loaded conversations:', conversations);
-	// 	})
-	// 	.catch((error) => {
-	// 		console.error('Failed to load conversations:', error);
-	// 	});
-
-	// Use TauRPC for window resize
-	// taurpc.window.resize_launcher_window(100, 1.0).then(() => {
-	// 	console.log('Window resized to 100px');
-	// });
-
-	// Auto-scroll to bottom when new messages arrive
-	$effect(() => {});
-
 	async function handleKeydown(event: KeyboardEvent) {
-		// We still keep the original keyboard handler for direct keyboard input
-		// when typing in the input field
-		// event.preventDefault();
 		if (event.key === 'Enter' && !event.shiftKey) {
 			// await taurpc.window.resize_launcher_window(100, 1.0);
 
@@ -276,21 +181,6 @@
 		}
 	}
 
-	async function addVideoExtension() {
-		editorRef?.cmd((state, dispatch) => {
-			const tr = state.tr;
-			const { schema } = state;
-			const nodes = schema.nodes;
-			tr.insert(
-				0,
-				nodes['9370B14D-B61C-4CE2-BDE7-B18684E8731A'].createChecked(
-					{ id: 'video-1', name: 'Some video with attrs' },
-					schema.text(' '),
-				),
-			);
-			dispatch?.(tr);
-		});
-	}
 	async function askQuestion(query: QueryAssets): Promise<void> {
 		console.log('askQuestion', query);
 		try {
@@ -326,15 +216,6 @@
 			);
 		}
 	}
-
-	// Handle API key saved event
-	function onApiKeySaved() {
-		hasApiKey = true;
-		// Resize the window after API key is saved using TauRPC
-		// taurpc.window.resize_launcher_window(100, 1.0).catch((error) => {
-		// 	console.error('Failed to resize window:', error);
-		// });
-	}
 </script>
 
 <div class="backdrop-custom relative h-full overflow-hidden">
@@ -347,38 +228,6 @@
 			onkeydown={handleKeydown}
 			class="min-h-[100px] h-fit w-full"
 		/>
-
-		<!-- Recent conversations list -->
-		{#if messages.length === 0}
-			<Launcher.List class="h-full overflow-y-scroll p-0 m-0 max-h-full">
-				<!-- <Launcher.List hidden> -->
-				<Launcher.Group heading="Local Files">
-					<Launcher.Item onclick={addVideoExtension}>
-						<HardDriveIcon />
-						<span>Video</span>
-					</Launcher.Item>
-					<Launcher.Item>
-						<FileTextIcon />
-						<span>Notes</span>
-					</Launcher.Item>
-				</Launcher.Group>
-				<Launcher.Separator />
-				<Launcher.Group heading="Google Drive">
-					<Launcher.Item>
-						<SiGoogledrive />
-						<span>Presentation 1</span>
-					</Launcher.Item>
-					<Launcher.Item>
-						<SiGoogledrive />
-						<span>Report card</span>
-					</Launcher.Item>
-					<Launcher.Item>
-						<SiGoogledrive />
-						<span>Exercise sheet 3</span>
-					</Launcher.Item>
-				</Launcher.Group>
-			</Launcher.List>
-		{/if}
 	</Launcher.Root>
 
 	{#if messages.length > 0}

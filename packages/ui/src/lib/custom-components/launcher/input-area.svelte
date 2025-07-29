@@ -17,7 +17,7 @@
 
 	let {
 		ref = $bindable(),
-		query = $bindable(undefined),
+		query = $bindable(),
 		value = $bindable(''),
 		class: className,
 		...restProps
@@ -37,9 +37,6 @@
 <Editor
 	bind:this={ref}
 	bind:value
-	class={cn(
-		className,
-		'ProsemirrorEditor h-fit min-h-[100px] text-[40px] text-black/50 shadow-none',
-	)}
+	class={cn(className, 'ProsemirrorEditor h-fit min-h-[100px] text-[40px]  shadow-none')}
 	{...restProps}
 />
