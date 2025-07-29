@@ -103,13 +103,17 @@
 			// await taurpc.window.resize_launcher_window(100, 1.0);
 
 			try {
-				const query = processQuery(editorRef!);
+				if (!editorRef) {
+					console.error('No editor ref found');
+					return;
+				}
+				const query = processQuery(editorRef);
 				messages.push(
 					create(ProtoChatMessageSchema, { role: 'user', content: query.text }),
 				);
 				console.log('query', query);
 				searchQuery.text = '';
-				clearQuery(editorRef!);
+				clearQuery(editorRef);
 				await askQuestion(query);
 				// Responses will come through the event listener
 			} catch (error) {
