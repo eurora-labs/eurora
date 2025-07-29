@@ -11,17 +11,10 @@
 </script>
 
 <Button
-	class="container w-full h-full m-auto flex items-center justify-center cursor-pointer "
+	class="container w-full h-full m-auto flex items-center justify-center cursor-pointer bg-transparent"
 	onclick={handleClick}
 	size="icon"
 	variant="link"
 >
 	<EuroraLogo class="size-8" />
 </Button>
-
-<style lang="postcss">
-	@reference 'tailwindcss';
-	:global(body) {
-		@apply bg-transparent;
-	}
-</style>
