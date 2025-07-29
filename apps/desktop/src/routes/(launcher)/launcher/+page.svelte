@@ -162,9 +162,6 @@
 	}
 
 	async function handleKeydown(event: KeyboardEvent) {
-		// We still keep the original keyboard handler for direct keyboard input
-		// when typing in the input field
-		// event.preventDefault();
 		if (event.key === 'Enter' && !event.shiftKey) {
 			// await taurpc.window.resize_launcher_window(100, 1.0);
 
