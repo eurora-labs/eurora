@@ -8,12 +8,13 @@ use axum::{
     response::Json,
     routing::get,
 };
+use chrono::Utc;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 /// Application state containing the S3 client and configuration
 #[derive(Clone)]
@@ -22,31 +23,14 @@ pub struct AppState {
     bucket_name: String,
 }
 
-/// Tauri updater response format
+/// Tauri updater response format (dynamic server)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateResponse {
     pub version: String,
-    pub notes: String,
     pub pub_date: String,
-    pub platforms: Platforms,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Platforms {
-    #[serde(rename = "linux-x86_64")]
-    pub linux_x86_64: Option<PlatformInfo>,
-    #[serde(rename = "darwin-x86_64")]
-    pub darwin_x86_64: Option<PlatformInfo>,
-    #[serde(rename = "darwin-aarch64")]
-    pub darwin_aarch64: Option<PlatformInfo>,
-    #[serde(rename = "windows-x86_64")]
-    pub windows_x86_64: Option<PlatformInfo>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PlatformInfo {
-    pub signature: String,
     pub url: String,
+    pub signature: String,
+    pub notes: String,
 }
 
 /// Error response for when no update is available
@@ -66,7 +50,10 @@ pub struct UpdateParams {
 impl AppState {
     /// Create a new AppState with S3 client
     pub async fn new(bucket_name: String) -> Result<Self> {
-        let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
+        let config = aws_config::defaults(BehaviorVersion::latest())
+            .region("us-west-2")
+            .load()
+            .await;
         let s3_client = S3Client::new(&config);
 
         Ok(Self {
@@ -86,8 +73,9 @@ impl AppState {
         let current_ver =
             Version::parse(current_version).context("Failed to parse current version")?;
 
-        // List objects in the S3 bucket for this channel and platform
-        let prefix = format!("{}/{}/", channel, target_arch);
+        // List objects in the S3 bucket for this channel
+        // New structure: releases/{channel}/{version}/{target}/{arch}/
+        let prefix = format!("releases/{}/", channel);
 
         let resp = self
             .s3_client
@@ -99,30 +87,33 @@ impl AppState {
             .context("Failed to list S3 objects")?;
 
         let mut latest_version: Option<Version> = None;
-        let mut latest_key: Option<String> = None;
+        let mut latest_version_str: Option<String> = None;
 
-        // Find the latest version
+        // Parse target_arch to extract target and arch components
+        let (target, arch) = parse_target_arch(target_arch)?;
+
+        // Find the latest version that has files for our target platform
         for object in resp.contents() {
             if let Some(key) = object.key() {
-                // Extract version from key (assuming format: channel/target-arch/version/...)
-                if let Some(version_str) = extract_version_from_key(key, &prefix) {
+                // Extract version from key (format: releases/channel/version/target/arch/...)
+                if let Some(version_str) = extract_version_from_key(key, &prefix, &target, &arch) {
                     if let Ok(version) = Version::parse(&version_str) {
                         if version > current_ver
                             && (latest_version.is_none()
                                 || version > *latest_version.as_ref().unwrap())
                         {
                             latest_version = Some(version);
-                            latest_key = Some(key.to_string());
+                            latest_version_str = Some(version_str);
                         }
                     }
                 }
             }
         }
 
-        if let (Some(latest_ver), Some(_key)) = (latest_version, latest_key) {
+        if let (Some(_latest_ver), Some(latest_ver_str)) = (latest_version, latest_version_str) {
             // Construct the update response
             let update_response = self
-                .build_update_response(channel, target_arch, &latest_ver.to_string())
+                .build_update_response(channel, target_arch, &target, &arch, &latest_ver_str)
                 .await?;
             Ok(Some(update_response))
         } else {
@@ -135,63 +126,40 @@ impl AppState {
         &self,
         channel: &str,
         target_arch: &str,
+        target: &str,
+        arch: &str,
         version: &str,
     ) -> Result<UpdateResponse> {
         // Construct the base URL for the release files
+        // New structure: releases/{channel}/{version}/{target}/{arch}/
         let base_url = format!(
-            "https://{}.s3.amazonaws.com/{}/{}/{}",
-            self.bucket_name, channel, target_arch, version
+            "https://{}.s3.amazonaws.com/releases/{}/{}/{}/{}",
+            self.bucket_name, channel, version, target, arch
         );
 
         // Get signature file content
-        let signature_key = format!("{}/{}/{}/signature", channel, target_arch, version);
+        let signature_key = format!(
+            "releases/{}/{}/{}/{}/signature",
+            channel, version, target, arch
+        );
         let signature = self
             .get_file_content(&signature_key)
             .await
             .unwrap_or_else(|_| "".to_string());
 
-        // Determine the appropriate file extension and URL based on platform
-        let (_file_extension, download_url) = match target_arch {
-            arch if arch.starts_with("linux") => (
-                "AppImage.tar.gz",
-                format!("{}/bundle.AppImage.tar.gz", base_url),
-            ),
-            arch if arch.starts_with("darwin") => {
-                ("app.tar.gz", format!("{}/bundle.app.tar.gz", base_url))
-            }
-            arch if arch.starts_with("windows") => {
-                ("msi.zip", format!("{}/bundle.msi.zip", base_url))
-            }
-            _ => ("tar.gz", format!("{}/bundle.tar.gz", base_url)),
+        // Determine the appropriate download URL based on platform
+        let download_url = match target {
+            "linux" => format!("{}/bundle.AppImage.tar.gz", base_url),
+            "darwin" => format!("{}/bundle.app.tar.gz", base_url),
+            "windows" => format!("{}/bundle.msi.zip", base_url),
+            _ => format!("{}/bundle.tar.gz", base_url),
         };
-
-        // Create platform info
-        let platform_info = PlatformInfo {
-            signature,
-            url: download_url,
-        };
-
-        // Build platforms object with the appropriate platform set
-        let mut platforms = Platforms {
-            linux_x86_64: None,
-            darwin_x86_64: None,
-            darwin_aarch64: None,
-            windows_x86_64: None,
-        };
-
-        match target_arch {
-            "linux-x86_64" => platforms.linux_x86_64 = Some(platform_info),
-            "darwin-x86_64" => platforms.darwin_x86_64 = Some(platform_info),
-            "darwin-aarch64" => platforms.darwin_aarch64 = Some(platform_info),
-            "windows-x86_64" => platforms.windows_x86_64 = Some(platform_info),
-            _ => {
-                warn!("Unknown target architecture: {}", target_arch);
-                platforms.linux_x86_64 = Some(platform_info); // Default fallback
-            }
-        }
 
         // Try to get release notes
-        let notes_key = format!("{}/{}/{}/notes.txt", channel, target_arch, version);
+        let notes_key = format!(
+            "releases/{}/{}/{}/{}/notes.txt",
+            channel, version, target, arch
+        );
         let notes = self
             .get_file_content(&notes_key)
             .await
@@ -199,9 +167,10 @@ impl AppState {
 
         Ok(UpdateResponse {
             version: version.to_string(),
+            pub_date: Utc::now().to_rfc3339(),
+            url: download_url,
+            signature,
             notes,
-            pub_date: chrono::Utc::now().to_rfc3339(),
-            platforms,
         })
     }
 
@@ -226,15 +195,41 @@ impl AppState {
     }
 }
 
-/// Extract version from S3 object key
-fn extract_version_from_key(key: &str, prefix: &str) -> Option<String> {
+/// Parse target_arch into target and arch components
+/// e.g., "linux-x86_64" -> ("linux", "x86_64")
+fn parse_target_arch(target_arch: &str) -> Result<(String, String)> {
+    let parts: Vec<&str> = target_arch.split('-').collect();
+    if parts.len() < 2 {
+        return Err(anyhow::anyhow!(
+            "Invalid target_arch format: {}",
+            target_arch
+        ));
+    }
+
+    let target = parts[0].to_string();
+    let arch = parts[1..].join("-"); // Handle cases like "aarch64" or multi-part arch
+
+    Ok((target, arch))
+}
+
+/// Extract version from S3 object key for the new structure
+/// Expected format: releases/{channel}/{version}/{target}/{arch}/filename
+fn extract_version_from_key(key: &str, prefix: &str, target: &str, arch: &str) -> Option<String> {
     if let Some(remainder) = key.strip_prefix(prefix) {
-        // Assuming format: version/filename
-        if let Some(slash_pos) = remainder.find('/') {
-            let version_str = &remainder[..slash_pos];
-            // Validate that this looks like a version
-            if Version::parse(version_str).is_ok() {
-                return Some(version_str.to_string());
+        // Split by '/' to get path components
+        let parts: Vec<&str> = remainder.split('/').collect();
+
+        if parts.len() >= 3 {
+            let version_str = parts[0];
+            let key_target = parts[1];
+            let key_arch = parts[2];
+
+            // Check if this key is for our target platform
+            if key_target == target && key_arch == arch {
+                // Validate that this looks like a version
+                if Version::parse(version_str).is_ok() {
+                    return Some(version_str.to_string());
+                }
             }
         }
     }
@@ -319,21 +314,70 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_extract_version_from_key() {
-        let prefix = "nightly/linux-x86_64/";
+    fn test_parse_target_arch() {
+        assert_eq!(
+            parse_target_arch("linux-x86_64").unwrap(),
+            ("linux".to_string(), "x86_64".to_string())
+        );
 
         assert_eq!(
-            extract_version_from_key("nightly/linux-x86_64/1.0.0/bundle.AppImage.tar.gz", prefix),
+            parse_target_arch("darwin-aarch64").unwrap(),
+            ("darwin".to_string(), "aarch64".to_string())
+        );
+
+        assert_eq!(
+            parse_target_arch("windows-x86_64").unwrap(),
+            ("windows".to_string(), "x86_64".to_string())
+        );
+
+        assert!(parse_target_arch("invalid").is_err());
+    }
+
+    #[test]
+    fn test_extract_version_from_key() {
+        let prefix = "releases/nightly/";
+        let target = "linux";
+        let arch = "x86_64";
+
+        assert_eq!(
+            extract_version_from_key(
+                "releases/nightly/1.0.0/linux/x86_64/bundle.AppImage.tar.gz",
+                prefix,
+                target,
+                arch
+            ),
             Some("1.0.0".to_string())
         );
 
         assert_eq!(
-            extract_version_from_key("nightly/linux-x86_64/1.2.3-beta.1/signature", prefix),
+            extract_version_from_key(
+                "releases/nightly/1.2.3-beta.1/linux/x86_64/signature",
+                prefix,
+                target,
+                arch
+            ),
             Some("1.2.3-beta.1".to_string())
         );
 
+        // Different target should return None
         assert_eq!(
-            extract_version_from_key("nightly/linux-x86_64/invalid-version/file", prefix),
+            extract_version_from_key(
+                "releases/nightly/1.0.0/darwin/x86_64/bundle.app.tar.gz",
+                prefix,
+                target,
+                arch
+            ),
+            None
+        );
+
+        // Invalid version should return None
+        assert_eq!(
+            extract_version_from_key(
+                "releases/nightly/invalid-version/linux/x86_64/file",
+                prefix,
+                target,
+                arch
+            ),
             None
         );
     }
