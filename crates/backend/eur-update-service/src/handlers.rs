@@ -15,7 +15,7 @@ use crate::types::UpdateParams;
 /// Handler for the update endpoint
 #[instrument(skip(state), fields(
     channel = %params.channel,
-    target_arch = %params.target_arch, 
+    target_arch = %params.target_arch,
     current_version = %params.current_version
 ))]
 pub async fn check_update_handler(
@@ -26,7 +26,7 @@ pub async fn check_update_handler(
         "Processing update request: channel={}, target_arch={}, current_version={}",
         params.channel, params.target_arch, params.current_version
     );
-    
+
     let start_time = std::time::Instant::now();
 
     match state
@@ -40,11 +40,15 @@ pub async fn check_update_handler(
         Ok(Some(update)) => {
             let duration = start_time.elapsed();
             info!(
-                "Update available: version {} (processed in {:?})", 
+                "Update available: version {} (processed in {:?})",
                 update.version, duration
             );
-            debug!("Update response: signature_length={}, notes_length={}, url_length={}", 
-                   update.signature.len(), update.notes.len(), update.url.len());
+            debug!(
+                "Update response: signature_length={}, notes_length={}, url_length={}",
+                update.signature.len(),
+                update.notes.len(),
+                update.url.len()
+            );
             (StatusCode::OK, Json(update)).into_response()
         }
         Ok(None) => {
