@@ -179,11 +179,10 @@ impl AppState {
                 debug!("Successfully retrieved signature from {}", signature_key);
                 sig
             }
-            Err(e) => {
-                warn!("Signature file not found at {}: {}", signature_key, e);
-                // For security, we might want to fail here if signatures are mandatory
-                // For now, we'll continue with empty signature but log the warning
-                String::new()
+            Err(_) => {
+                return Err(anyhow::Error::from(UpdateServiceError::SignatureNotFound(
+                    signature_key,
+                )));
             }
         };
 
