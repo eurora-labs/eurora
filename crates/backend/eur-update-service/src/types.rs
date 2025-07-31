@@ -13,7 +13,7 @@ pub struct UpdateResponse {
 }
 
 /// Path parameters for the update endpoint
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct UpdateParams {
     pub channel: String,     // "nightly" or "release"
     pub target_arch: String, // e.g., "linux-x86_64", "darwin-aarch64"
