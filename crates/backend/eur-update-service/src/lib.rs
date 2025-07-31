@@ -115,7 +115,7 @@ impl AppState {
         if let (Some(_latest_ver), Some(latest_ver_str)) = (latest_version, latest_version_str) {
             // Construct the update response
             let update_response = self
-                .build_update_response(channel, target_arch, &target, &arch, &latest_ver_str)
+                .build_update_response(channel, &target, &arch, &latest_ver_str)
                 .await?;
             Ok(Some(update_response))
         } else {
@@ -127,7 +127,6 @@ impl AppState {
     async fn build_update_response(
         &self,
         channel: &str,
-        target_arch: &str,
         target: &str,
         arch: &str,
         version: &str,
