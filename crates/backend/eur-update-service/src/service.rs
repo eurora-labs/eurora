@@ -78,6 +78,7 @@ impl AppState {
             .prefix(&prefix)
             .send()
             .await
+            .map_err(|e| anyhow::Error::from(UpdateServiceError::ListObjectsError(e.to_string())))
             .context("Failed to list S3 objects")?;
 
         let object_count = resp.contents().len();
