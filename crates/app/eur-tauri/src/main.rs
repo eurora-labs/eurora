@@ -15,10 +15,6 @@ mod launcher;
 mod util;
 use std::sync::{Arc, Mutex};
 
-use launcher::{
-    monitor_cursor_for_hover, open_launcher_window, position_hover_window, set_launcher_visible,
-};
-
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
 use eur_prompt_kit::PromptKitService;
@@ -38,6 +34,9 @@ use eur_tauri::{
     },
     shared_types::{SharedPromptKitService, create_shared_timeline},
 };
+use launcher::{
+    monitor_cursor_for_hover, open_launcher_window, position_hover_window, set_launcher_visible,
+};
 use tauri::{
     AppHandle, Emitter, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -45,6 +44,7 @@ use tauri::{
     tray::TrayIconBuilder,
 };
 use tauri_plugin_global_shortcut::ShortcutState;
+use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{error, info};
 
@@ -79,6 +79,30 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     db_path.to_string_lossy().to_string()
 }
 
+async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
+    if let Some(update) = app.updater()?.check().await? {
+        let mut downloaded = 0;
+
+        // alternatively we could also call update.download() and update.install() separately
+        update
+            .download_and_install(
+                |chunk_length, content_length| {
+                    downloaded += chunk_length;
+                    info!("downloaded {downloaded} from {content_length:?}");
+                },
+                || {
+                    info!("download finished");
+                },
+            )
+            .await?;
+
+        info!("update installed");
+        app.restart();
+    }
+
+    Ok(())
+}
+
 fn main() {
     dotenv().ok();
     let filter = EnvFilter::builder()
@@ -111,6 +135,11 @@ fn main() {
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
+                    let handle = tauri_app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        update(handle).await.unwrap();
+                    });
+
                     #[cfg(desktop)]
                     {
                         use tauri_plugin_autostart::MacosLauncher;
