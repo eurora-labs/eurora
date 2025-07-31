@@ -147,7 +147,7 @@ impl AppState {
         let file_key = self.find_download_file(&directory_prefix, target).await?;
 
         // Generate presigned URL valid for 1 hour
-        let presigning_config = PresigningConfig::expires_in(Duration::from_secs(3600))?;
+        let presigning_config = PresigningConfig::expires_in(Duration::from_secs(60))?;
         let presigned_request = self
             .s3_client
             .get_object()
