@@ -1,7 +1,7 @@
 //! Core update service logic and S3 operations
 
 use anyhow::{Context, Result};
-// use aws_config::BehaviorVersion;
+use aws_config::BehaviorVersion;
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_s3::presigning::PresigningConfig;
 use chrono::Utc;
@@ -25,12 +25,11 @@ impl AppState {
     #[instrument(skip_all, fields(bucket = %bucket_name))]
     pub async fn new(bucket_name: String) -> Result<Self> {
         info!("Initializing S3 client for bucket: {}", bucket_name);
-        let config = aws_config::load_from_env().await;
 
-        // let config = aws_config::defaults(BehaviorVersion::latest())
-        //     .region("us-west-2")
-        //     .load()
-        //     .await;
+        let config = aws_config::defaults(BehaviorVersion::latest())
+            .region("us-west-2")
+            .load()
+            .await;
         let s3_client = S3Client::new(&config);
 
         info!("S3 client initialized successfully");
@@ -79,10 +78,6 @@ impl AppState {
             .prefix(&prefix)
             .send()
             .await
-            .map_err(|e| {
-                error!("Failed to list S3 objects: {}", e);
-                e
-            })
             .context("Failed to list S3 objects")?;
 
         let object_count = resp.contents().len();
