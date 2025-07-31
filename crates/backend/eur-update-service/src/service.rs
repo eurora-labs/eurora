@@ -74,6 +74,7 @@ impl AppState {
             .s3_client
             .list_objects_v2()
             .bucket(&self.bucket_name)
+            .max_keys(100)
             .prefix(&prefix)
             .send()
             .await
