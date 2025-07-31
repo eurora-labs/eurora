@@ -2,12 +2,15 @@
 
 use anyhow::Result;
 use semver::Version;
+use tracing::{debug, instrument};
 
 use crate::error::UpdateServiceError;
 
 /// Parse target_arch into target and arch components
 /// e.g., "linux-x86_64" -> ("linux", "x86_64")
+#[instrument(fields(target_arch))]
 pub fn parse_target_arch(target_arch: &str) -> Result<(String, String)> {
+    debug!("Parsing target architecture: {}", target_arch);
     let parts: Vec<&str> = target_arch.split('-').collect();
     if parts.len() < 2 {
         return Err(anyhow::Error::from(UpdateServiceError::InvalidTargetArch(
@@ -32,20 +35,42 @@ pub fn extract_version_from_key(
     if let Some(remainder) = key.strip_prefix(prefix) {
         // Split by '/' to get path components
         let parts: Vec<&str> = remainder.split('/').collect();
+        debug!("Key path components: {:?}", parts);
 
         if parts.len() >= 3 {
             let version_str = parts[0];
             let key_target = parts[1];
             let key_arch = parts[2];
 
+            debug!(
+                "Extracted components: version={}, target={}, arch={}",
+                version_str, key_target, key_arch
+            );
+
             // Check if this key is for our target platform
             if key_target == target && key_arch == arch {
+                debug!("Target platform matches: {}/{}", target, arch);
                 // Validate that this looks like a version
                 if Version::parse(version_str).is_ok() {
+                    debug!("Valid version extracted: {}", version_str);
                     return Some(version_str.to_string());
+                } else {
+                    debug!("Invalid version format: {}", version_str);
                 }
+            } else {
+                debug!(
+                    "Target platform mismatch: expected {}/{}, got {}/{}",
+                    target, arch, key_target, key_arch
+                );
             }
+        } else {
+            debug!(
+                "Insufficient path components: {} (need at least 3)",
+                parts.len()
+            );
         }
+    } else {
+        debug!("Key doesn't match prefix: {} (prefix: {})", key, prefix);
     }
     None
 }
