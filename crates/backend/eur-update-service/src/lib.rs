@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::presigning::PresigningConfig;
 use axum::{
     Router,
     extract::{Path, State},
@@ -12,6 +13,7 @@ use chrono::Utc;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{error, info};
@@ -130,13 +132,6 @@ impl AppState {
         arch: &str,
         version: &str,
     ) -> Result<UpdateResponse> {
-        // Construct the base URL for the release files
-        // New structure: releases/{channel}/{version}/{target}/{arch}/
-        let base_url = format!(
-            "https://{}.s3.amazonaws.com/releases/{}/{}/{}/{}",
-            self.bucket_name, channel, version, target, arch
-        );
-
         // Get signature file content
         let signature_key = format!(
             "releases/{}/{}/{}/{}/signature",
@@ -147,13 +142,22 @@ impl AppState {
             .await
             .unwrap_or_else(|_| "".to_string());
 
-        // Determine the appropriate download URL based on platform
-        let download_url = match target {
-            "linux" => format!("{}/bundle.AppImage.tar.gz", base_url),
-            "darwin" => format!("{}/bundle.app.tar.gz", base_url),
-            "windows" => format!("{}/bundle.msi.zip", base_url),
-            _ => format!("{}/bundle.tar.gz", base_url),
-        };
+        // Find the actual download file in the directory
+        let directory_prefix = format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
+        let file_key = self.find_download_file(&directory_prefix, target).await?;
+
+        // Generate presigned URL valid for 1 hour
+        let presigning_config = PresigningConfig::expires_in(Duration::from_secs(3600))?;
+        let presigned_request = self
+            .s3_client
+            .get_object()
+            .bucket(&self.bucket_name)
+            .key(&file_key)
+            .presigned(presigning_config)
+            .await
+            .context("Failed to generate presigned URL")?;
+
+        let download_url = presigned_request.uri().to_string();
 
         // Try to get release notes
         let notes_key = format!(
@@ -192,6 +196,60 @@ impl AppState {
             .context("Failed to read object body")?;
 
         String::from_utf8(body.to_vec()).context("Failed to convert body to string")
+    }
+
+    /// Find the actual download file in the S3 directory
+    async fn find_download_file(&self, directory_prefix: &str, target: &str) -> Result<String> {
+        let resp = self
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(directory_prefix)
+            .send()
+            .await
+            .context("Failed to list files in release directory")?;
+
+        // Define expected file extensions based on target platform
+        let expected_extensions = match target {
+            "linux" => vec![".AppImage.tar.gz", ".AppImage", ".tar.gz"],
+            "darwin" => vec![".app.tar.gz", ".dmg", ".tar.gz"],
+            "windows" => vec![".msi.zip", ".msi", ".exe", ".zip"],
+            _ => vec![".tar.gz", ".zip"],
+        };
+
+        // Find the first file that matches expected extensions and is not "signature" or "notes.txt"
+        for object in resp.contents() {
+            if let Some(key) = object.key() {
+                let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
+
+                // Skip signature and notes files
+                if filename == "signature" || filename == "notes.txt" {
+                    continue;
+                }
+
+                // Check if file matches expected extensions
+                for ext in &expected_extensions {
+                    if filename.ends_with(ext) {
+                        return Ok(key.to_string());
+                    }
+                }
+            }
+        }
+
+        // If no specific file found, return the first non-signature/notes file
+        for object in resp.contents() {
+            if let Some(key) = object.key() {
+                let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
+                if filename != "signature" && filename != "notes.txt" && !filename.is_empty() {
+                    return Ok(key.to_string());
+                }
+            }
+        }
+
+        Err(anyhow::anyhow!(
+            "No download file found in directory: {}",
+            directory_prefix
+        ))
     }
 }
 
