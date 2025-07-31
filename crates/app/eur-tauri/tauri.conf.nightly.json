@@ -1,0 +1,25 @@
+{
+	"productName": "Eurora Nightly",
+	"identifier": "com.eurora.app.nightly",
+	"build": {
+		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop -- --mode nightly"
+	},
+	"bundle": {
+		"active": true,
+		"icon": [
+			"icons/nightly/32x32.png",
+			"icons/nightly/128x128.png",
+			"icons/nightly/128x128@2x.png",
+			"icons/nightly/icon.icns",
+			"icons/nightly/icon.ico"
+		]
+	},
+	"plugins": {
+		"updater": {
+			"endpoints": [
+				"https://api.eurora-labs.com/releases/nightly/{{target}}-{{arch}}/{{current_version}}"
+			],
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU3NzQzMEU5RDE5MDk4OTMKUldTVG1KRFI2VEIwNTFCdlhJbkI5NExkOFpNVVpoQy9hZE1jQnlWR2FPZXYwR09rS1RLZ2dnc00K"
+		}
+	}
+}
