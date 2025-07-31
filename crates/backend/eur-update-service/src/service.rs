@@ -106,7 +106,7 @@ impl AppState {
                     if let Ok(version) = Version::parse(&version_str) {
                         processed_versions += 1;
                         if version > current_ver
-                            && latest_version.as_ref().map_or(true, |v| version > *v)
+                            && latest_version.as_ref().is_none_or(|v| version > *v)
                         {
                             info!(
                                 "Found newer version: {} (previous latest: {:?})",
@@ -162,11 +162,18 @@ impl AppState {
             "Building update response for {}/{}/{}/{}",
             channel, version, target, arch
         );
-        // Get signature file content
-        let signature_key = format!(
-            "releases/{}/{}/{}/{}/signature",
-            channel, version, target, arch
+
+        // Find the actual download file in the directory first
+        let directory_prefix = format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
+        debug!(
+            "Looking for download file in directory: {}",
+            directory_prefix
         );
+        let file_key = self.find_download_file(&directory_prefix, target).await?;
+        info!("Found download file: {}", file_key);
+
+        // Get signature file content based on the actual release file name
+        let signature_key = format!("{}.sig", file_key);
         let signature = match self.get_file_content(&signature_key).await {
             Ok(sig) => {
                 debug!("Successfully retrieved signature from {}", signature_key);
@@ -179,15 +186,6 @@ impl AppState {
                 String::new()
             }
         };
-
-        // Find the actual download file in the directory
-        let directory_prefix = format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
-        debug!(
-            "Looking for download file in directory: {}",
-            directory_prefix
-        );
-        let file_key = self.find_download_file(&directory_prefix, target).await?;
-        info!("Found download file: {}", file_key);
 
         // Generate presigned URL valid for 1 hour
         debug!("Generating presigned URL for file: {}", file_key);
@@ -300,9 +298,9 @@ impl AppState {
 
         // Define expected file extensions based on target platform
         let expected_extensions = match target {
-            "linux" => vec![".AppImage.tar.gz", ".AppImage", ".tar.gz"],
+            "linux" => vec![".AppImage.tar.gz", ".tar.gz"],
             "darwin" => vec![".app.tar.gz", ".dmg", ".tar.gz"],
-            "windows" => vec![".msi.zip", ".msi", ".exe", ".zip"],
+            "windows" => vec![".msi.zip"],
             _ => vec![".tar.gz", ".zip"],
         };
         debug!(
