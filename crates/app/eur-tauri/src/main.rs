@@ -14,6 +14,7 @@ use tracing_subscriber::{
 mod launcher;
 mod util;
 use std::sync::{Arc, Mutex};
+use eur_screen_position::ActiveMonitor;
 
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
@@ -135,6 +136,7 @@ fn main() {
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
+
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
                         update(handle).await.unwrap();
@@ -166,7 +168,10 @@ fn main() {
                         .expect("Failed to create hover window");
 
                     // Position hover window initially
-                    position_hover_window(&hover_window);
+                    let active_monitor = ActiveMonitor::default(); 
+                    let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(tauri::LogicalSize::new(50, 50),1.0, 0.75);
+                    let _ = hover_window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: hover_x as f64, y: hover_y as f64 }));
+
 
                     // Start cursor monitoring for hover window
                     let hover_window_clone = hover_window.clone();
