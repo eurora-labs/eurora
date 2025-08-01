@@ -1,6 +1,6 @@
 use crate::platform::ImplActiveMonitor;
 use crate::{CursorMonitorResult, MonitorInfo};
-use tauri::LogicalSize;
+use tauri::{LogicalSize, PhysicalSize};
 
 /// ActiveMonitor represents the currently active monitor (based on cursor position)
 /// and provides generalized positioning methods for that monitor
@@ -18,7 +18,7 @@ impl ActiveMonitor {
 
     pub fn calculate_position_for_percentage(
         &self,
-        size: LogicalSize<u32>,
+        size: PhysicalSize<u32>,
         x_percentage: f64,
         y_percentage: f64,
     ) -> (i32, i32) {
