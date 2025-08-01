@@ -8,9 +8,9 @@ use axum::{
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
-use crate::error::error_to_http_response;
 use crate::service::AppState;
 use crate::types::UpdateParams;
+use crate::{UpdateResponse, error::error_to_http_response};
 
 /// Handler for the update endpoint
 #[instrument(skip(state), fields(
@@ -26,6 +26,10 @@ pub async fn check_update_handler(
         "Processing update request: channel={}, target_arch={}, current_version={}",
         params.channel, params.target_arch, params.current_version
     );
+
+    if &params.current_version == "0.0.0" {
+        return StatusCode::NO_CONTENT.into_response();
+    }
 
     match state
         .check_for_update(
