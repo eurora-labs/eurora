@@ -1,6 +1,6 @@
 use super::util::find_cursor_monitor;
-use crate::{CursorMonitorResult, MonitorInfo};
-use tauri::LogicalSize;
+use crate::MonitorInfo;
+use tauri::PhysicalSize;
 use xcap::Monitor;
 
 #[derive(Debug, Clone)]
@@ -15,7 +15,7 @@ impl ImplActiveMonitor {
 
     pub fn calculate_position_for_percentage(
         &self,
-        size: LogicalSize<u32>,
+        size: PhysicalSize<u32>,
         x_percentage: f64,
         y_percentage: f64,
     ) -> (i32, i32) {
