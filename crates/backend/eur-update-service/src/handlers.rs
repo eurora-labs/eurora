@@ -27,6 +27,10 @@ pub async fn check_update_handler(
         params.channel, params.target_arch, params.current_version
     );
 
+    if &params.current_version == "0.0.0" {
+        return StatusCode::NO_CONTENT.into_response();
+    }
+
     match state
         .check_for_update(
             &params.channel,
