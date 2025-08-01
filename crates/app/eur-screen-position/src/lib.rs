@@ -1,5 +1,7 @@
+mod active_monitor;
 mod types;
 
+pub use active_monitor::ActiveMonitor;
 pub use types::*;
 
 #[cfg(target_os = "macos")]
@@ -10,5 +12,6 @@ mod platform;
 #[path = "linux/mod.rs"]
 mod platform;
 
-mod active_monitor;
-pub use active_monitor::ActiveMonitor;
+#[cfg(target_os = "windows")]
+#[path = "windows/mod.rs"]
+mod platform;

@@ -2732,7 +2732,7 @@ version = "0.0.0"
 
 [[package]]
 name = "eur-tauri"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-mutex",
@@ -2752,6 +2752,7 @@ dependencies = [
  "eur-prompt-kit",
  "eur-proto",
  "eur-proto-client",
+ "eur-screen-position",
  "eur-secret",
  "eur-timeline",
  "eur-user",
