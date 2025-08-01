@@ -1,0 +1,8 @@
+[package]
+name = "eur-screen-position"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+tauri = { version = "^2.5.1", features = ["unstable", "tray-icon"] }
+xcap = { version = "0.6.2" }
