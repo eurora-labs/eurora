@@ -28,6 +28,7 @@ pub enum UpdateServiceError {
     SignatureNotFound(String),
     DownloadFileNotFound(String),
     PresignedUrlError(String),
+    ListObjectsError(String),
 }
 
 impl std::fmt::Display for UpdateServiceError {
@@ -47,6 +48,9 @@ impl std::fmt::Display for UpdateServiceError {
             }
             UpdateServiceError::PresignedUrlError(e) => {
                 write!(f, "Failed to generate presigned URL: {}", e)
+            }
+            UpdateServiceError::ListObjectsError(e) => {
+                write!(f, "Failed to list S3 objects: {}", e)
             }
         }
     }
