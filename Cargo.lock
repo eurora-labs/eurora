@@ -2749,7 +2749,7 @@ dependencies = [
  "enigo",
  "tauri",
  "tracing",
- "xcap 0.6.2",
+ "xcap",
 ]
 
 [[package]]
@@ -2928,7 +2928,7 @@ dependencies = [
  "tokio",
  "tracing",
  "wgpu",
- "xcap 0.6.1",
+ "xcap",
 ]
 
 [[package]]
@@ -11304,37 +11304,6 @@ checksum = "0d65cbf2f12c15564212d48f4e3dfb87923d25d611f2aed18f4cb23f0413d89e"
 dependencies = [
  "libc",
  "rustix 1.0.5",
-]
-
-[[package]]
-name = "xcap"
-version = "0.6.1"
-source = "git+https://github.com/AndreRoelofs/xcap.git?branch=master#67d808042ce991ea6b7031d76619dcb42a2f0bb8"
-dependencies = [
- "dispatch2 0.3.0",
- "image",
- "lazy_static",
- "libwayshot-xcap",
- "log",
- "objc2 0.6.1",
- "objc2-app-kit",
- "objc2-av-foundation",
- "objc2-core-foundation",
- "objc2-core-graphics",
- "objc2-core-media",
- "objc2-core-video",
- "objc2-foundation 0.3.1",
- "percent-encoding",
- "pipewire",
- "rand 0.9.1",
- "scopeguard",
- "serde",
- "thiserror 2.0.12",
- "url",
- "widestring",
- "windows 0.61.1",
- "xcb",
- "zbus 5.7.1",
 ]
 
 [[package]]
