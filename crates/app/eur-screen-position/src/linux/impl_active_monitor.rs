@@ -42,73 +42,23 @@ impl ImplActiveMonitor {
 
         let monitor_infos = monitors
             .into_iter()
-            .map(|monitor| {
-                let monitor_id = monitor.id().unwrap_or_default().to_string();
-                let scale_factor = monitor.scale_factor().unwrap_or(1.0) as f64;
-                let monitor_width = (monitor.width().unwrap_or(1920) as f64 * scale_factor) as u32;
-                let monitor_height =
-                    (monitor.height().unwrap_or(1080) as f64 * scale_factor) as u32;
-                let monitor_x = (monitor.x().unwrap_or(0) as f64 * scale_factor) as i32;
-                let monitor_y = (monitor.y().unwrap_or(0) as f64 * scale_factor) as i32;
-
-                MonitorInfo {
-                    id: monitor_id,
-                    x: monitor_x,
-                    y: monitor_y,
-                    width: monitor_width,
-                    height: monitor_height,
-                    scale_factor,
-                }
-            })
+            .map(|monitor| MonitorInfo::from(&monitor))
             .collect();
 
         Ok(monitor_infos)
     }
 
-    /// Find the primary monitor
     pub fn get_primary_monitor() -> Option<MonitorInfo> {
         let monitors = Monitor::all().ok()?;
 
         // Try to find the primary monitor (usually the one at 0,0)
         for monitor in &monitors {
             if monitor.x().unwrap_or(0) == 0 && monitor.y().unwrap_or(0) == 0 {
-                let monitor_id = monitor.id().unwrap_or_default().to_string();
-                let scale_factor = monitor.scale_factor().unwrap_or(1.0) as f64;
-                let monitor_width = (monitor.width().unwrap_or(1920) as f64 * scale_factor) as u32;
-                let monitor_height =
-                    (monitor.height().unwrap_or(1080) as f64 * scale_factor) as u32;
-                let monitor_x = (monitor.x().unwrap_or(0) as f64 * scale_factor) as i32;
-                let monitor_y = (monitor.y().unwrap_or(0) as f64 * scale_factor) as i32;
-
-                return Some(MonitorInfo {
-                    id: monitor_id,
-                    x: monitor_x,
-                    y: monitor_y,
-                    width: monitor_width,
-                    height: monitor_height,
-                    scale_factor,
-                });
+                return Some(MonitorInfo::from(monitor));
             }
         }
 
-        // If no monitor at 0,0, return the first one
-        monitors.first().map(|monitor| {
-            let monitor_id = monitor.id().unwrap_or_default().to_string();
-            let scale_factor = monitor.scale_factor().unwrap_or(1.0) as f64;
-            let monitor_width = (monitor.width().unwrap_or(1920) as f64 * scale_factor) as u32;
-            let monitor_height = (monitor.height().unwrap_or(1080) as f64 * scale_factor) as u32;
-            let monitor_x = (monitor.x().unwrap_or(0) as f64 * scale_factor) as i32;
-            let monitor_y = (monitor.y().unwrap_or(0) as f64 * scale_factor) as i32;
-
-            MonitorInfo {
-                id: monitor_id,
-                x: monitor_x,
-                y: monitor_y,
-                width: monitor_width,
-                height: monitor_height,
-                scale_factor,
-            }
-        })
+        None
     }
 }
 
@@ -138,6 +88,26 @@ impl Default for ImplActiveMonitor {
                 height: 1080,
                 scale_factor: 1.0,
             })
+        }
+    }
+}
+
+impl From<&Monitor> for MonitorInfo {
+    fn from(monitor: &Monitor) -> Self {
+        let monitor_id = monitor.id().unwrap_or_default().to_string();
+        let scale_factor = monitor.scale_factor().unwrap_or(1.0) as f64;
+        let monitor_width = (monitor.width().unwrap_or(1920) as f64 * scale_factor) as u32;
+        let monitor_height = (monitor.height().unwrap_or(1080) as f64 * scale_factor) as u32;
+        let monitor_x = (monitor.x().unwrap_or(0) as f64 * scale_factor) as i32;
+        let monitor_y = (monitor.y().unwrap_or(0) as f64 * scale_factor) as i32;
+
+        MonitorInfo {
+            id: monitor_id,
+            x: monitor_x,
+            y: monitor_y,
+            width: monitor_width,
+            height: monitor_height,
+            scale_factor,
         }
     }
 }
