@@ -21,6 +21,7 @@ prost-types = { workspace = true }
 async-stream = "0.3.1"
 image = { workspace = true }
 eur-secret = { workspace = true }
+tonic-prost = { workspace = true }
 
 [build-dependencies]
-tonic-build = "0.14.0"
+tonic-prost-build = { workspace = true }
