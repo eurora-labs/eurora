@@ -13,8 +13,8 @@ use tracing_subscriber::{
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 mod launcher;
 mod util;
-use std::sync::{Arc, Mutex};
 use eur_screen_position::ActiveMonitor;
+use std::sync::{Arc, Mutex};
 
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
@@ -35,9 +35,7 @@ use eur_tauri::{
     },
     shared_types::{SharedPromptKitService, create_shared_timeline},
 };
-use launcher::{
-    monitor_cursor_for_hover, open_launcher_window, position_hover_window, set_launcher_visible,
-};
+use launcher::{monitor_cursor_for_hover, open_launcher_window, set_launcher_visible};
 use tauri::{
     AppHandle, Emitter, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -168,7 +166,7 @@ fn main() {
                         .expect("Failed to create hover window");
 
                     // Position hover window initially
-                    let active_monitor = ActiveMonitor::default(); 
+                    let active_monitor = ActiveMonitor::default();
                     let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(tauri::PhysicalSize::new(50, 50), 1.0, 0.75);
                     let _ = hover_window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x: hover_x, y: hover_y }));
 
