@@ -8,9 +8,9 @@ use axum::{
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
+use crate::error::error_to_http_response;
 use crate::service::AppState;
 use crate::types::UpdateParams;
-use crate::{UpdateResponse, error::error_to_http_response};
 
 /// Handler for the update endpoint
 #[instrument(skip(state), fields(
