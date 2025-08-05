@@ -137,10 +137,10 @@ fn main() {
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
 
-                    // let handle = tauri_app.handle().clone();
-                    // tauri::async_runtime::spawn(async move {
-                    //     update(handle).await.unwrap();
-                    // });
+                    let handle = tauri_app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        update(handle).await.unwrap();
+                    });
 
                     #[cfg(desktop)]
                     {
@@ -169,8 +169,10 @@ fn main() {
 
                     // Position hover window initially
                     let active_monitor = ActiveMonitor::default(); 
-                    let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(tauri::PhysicalSize::new(50, 50),1.0, 0.75);
+                    let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(tauri::PhysicalSize::new(50, 50), 1.0, 0.75);
                     let _ = hover_window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x: hover_x, y: hover_y }));
+
+                    let _ = hover_window.set_size(tauri::PhysicalSize::new(50, 50));
 
 
                     // Start cursor monitoring for hover window
