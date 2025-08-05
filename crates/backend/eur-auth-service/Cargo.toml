@@ -34,5 +34,6 @@ sha2 = "0.10"
 base64 = { workspace = true }
 rand = { workspace = true }
 hex = "0.4.3"
+
 [build-dependencies]
-tonic-build = { workspace = true }
+tonic-prost-build = { workspace = true }

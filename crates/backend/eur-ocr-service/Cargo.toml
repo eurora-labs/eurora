@@ -19,4 +19,4 @@ image = { workspace = true }
 eur-ocr = { path = "../../common/eur-ocr" }
 futures = "0.3"
 [build-dependencies]
-tonic-build = { workspace = true }
+tonic-prost-build = { workspace = true }
