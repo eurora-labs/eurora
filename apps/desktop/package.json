@@ -39,7 +39,7 @@
 		"@eurora/typescript-config": "workspace:*",
 		"taurpc": "^1.8.1",
 		"uuid": "^11.1.0",
-		"@playwright/test": "^1.54.1",
+		"@playwright/test": "^1.54.2",
 		"@sveltejs/adapter-node": "^5.2.13",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "catalog:svelte",
@@ -70,7 +70,7 @@
 		"remark-parse": "^11.0.0",
 		"remark-rehype": "^11.1.2",
 		"unified": "^11.0.5",
-		"@lucide/svelte": "^0.532.0",
+		"@lucide/svelte": "^0.536.0",
 		"postcss-nesting": "^13.0.2",
 		"postcss-pxtorem": "^6.1.0",
 		"prettier": "^3.6.2",
@@ -79,8 +79,8 @@
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
 		"tinykeys": "^2.1.0",
-		"typescript": "^5.8.3",
-		"typescript-eslint": "^8.38.0",
+		"typescript": "^5.9.2",
+		"typescript-eslint": "^8.39.0",
 		"vite": "catalog:",
 		"vitest": "catalog:"
 	}
