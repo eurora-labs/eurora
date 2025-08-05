@@ -11,7 +11,7 @@ fn main() -> Result<()> {
     #[cfg(target_os = "windows")]
     {
         let common_dir = PathBuf::from("C:\\protoc\\include");
-        tonic_build::configure()
+        tonic_prost_build::configure()
             .build_server(true)
             .build_client(true)
             // .compile_well_known_types(true)
@@ -21,7 +21,7 @@ fn main() -> Result<()> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        tonic_build::configure()
+        tonic_prost_build::configure()
             .build_server(true)
             .build_client(true)
             .protoc_arg("--experimental_allow_proto3_optional")
