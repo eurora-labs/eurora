@@ -248,11 +248,26 @@
 	{/if}
 </div>
 
-<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0">
+<svg
+	xmlns="http://www.w3.org/2000/svg"
+	style="position:absolute;width:0;height:0"
+	class="blur-bright"
+>
 	<filter id="blur-bright" filterUnits="objectBoundingBox">
-		<feGaussianBlur in="SourceGraphic" stdDeviation="36" edgeMode="duplicate" result="blur" />
-		<feFlood flood-color="#ffffff" flood-opacity="0.1" result="white" />
-		<feComposite in="white" in2="blur" operator="over" />
+		<feGaussianBlur
+			in="SourceGraphic"
+			stdDeviation="36"
+			edgeMode="duplicate"
+			result="blur"
+			color-interpolation-filters="sRGB"
+		/>
+		<feFlood
+			flood-color="#ffffff"
+			flood-opacity="0.1"
+			result="white"
+			color-interpolation-filters="sRGB"
+		/>
+		<feComposite in="white" in2="blur" operator="over" color-interpolation-filters="sRGB" />
 	</filter>
 </svg>
 
@@ -266,10 +281,9 @@
 	@reference 'tailwindcss';
 	.backdrop-custom {
 		z-index: 2;
-		backdrop-filter: none;
-		-webkit-backdrop-filter: none;
+		backdrop-filter: blur(36px);
+		-webkit-backdrop-filter: blur(36px);
 		background-color: rgba(255, 255, 255, 0.2);
-		background: transparent;
 	}
 
 	.backdrop-custom-2 {
@@ -278,16 +292,23 @@
 		height: 100%;
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
+		background-color: rgba(255, 255, 255, 0.2);
 	}
 	:global(body.linux-app .backdrop-custom) {
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
 		background: transparent;
+		background-color: transparent;
 	}
+
 	:global(body.linux-app .backdrop-custom-2) {
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
 		background: transparent;
 		background-color: transparent;
+	}
+
+	:global(body.windows-app .blur-bright) {
+		display: none;
 	}
 </style>
