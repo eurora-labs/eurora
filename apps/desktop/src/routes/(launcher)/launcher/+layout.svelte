@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import { onMount } from 'svelte';
+	import { platform } from '@tauri-apps/plugin-os';
 
 	// Create TauRPC proxy
 	const taurpc = createTauRPCProxy();
@@ -20,6 +21,7 @@
 	}
 
 	onMount(() => {
+		document.body.classList.add(`${platform()}-app`);
 		resizeWindow();
 		// const resizeObserver = new ResizeObserver(resizeWindow);
 
