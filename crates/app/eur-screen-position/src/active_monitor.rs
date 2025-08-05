@@ -1,6 +1,6 @@
+use crate::MonitorInfo;
 use crate::platform::ImplActiveMonitor;
-use crate::{CursorMonitorResult, MonitorInfo};
-use tauri::{LogicalSize, PhysicalSize};
+use tauri::PhysicalSize;
 
 /// ActiveMonitor represents the currently active monitor (based on cursor position)
 /// and provides generalized positioning methods for that monitor
