@@ -53,15 +53,15 @@ impl UserApi for UserApiImpl {
 
             // Always try to unregister any existing shortcuts to avoid conflicts
             // First, try to unregister the current user's custom shortcut if it exists
-            if !user.hotkeys.open_launcher.key.is_empty() {
-                if let Some(old_shortcut) = user_hotkey_to_shortcut(&user.hotkeys.open_launcher) {
-                    match app_handle.global_shortcut().unregister(old_shortcut) {
-                        Ok(_) => info!(
-                            "Successfully unregistered old custom shortcut: {:?}",
-                            old_shortcut
-                        ),
-                        Err(e) => error!("Failed to unregister old custom shortcut: {}", e),
-                    }
+            if !user.hotkeys.open_launcher.key.is_empty()
+                && let Some(old_shortcut) = user_hotkey_to_shortcut(&user.hotkeys.open_launcher)
+            {
+                match app_handle.global_shortcut().unregister(old_shortcut) {
+                    Ok(_) => info!(
+                        "Successfully unregistered old custom shortcut: {:?}",
+                        old_shortcut
+                    ),
+                    Err(e) => error!("Failed to unregister old custom shortcut: {}", e),
                 }
             }
 
