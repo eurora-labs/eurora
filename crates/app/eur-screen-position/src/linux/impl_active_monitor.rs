@@ -1,5 +1,6 @@
 use super::util::find_cursor_monitor;
 use crate::MonitorInfo;
+use enigo::{Enigo, Mouse, Settings};
 use tauri::PhysicalSize;
 use xcap::Monitor;
 
@@ -11,6 +12,14 @@ pub struct ImplActiveMonitor {
 impl ImplActiveMonitor {
     pub fn new(info: MonitorInfo) -> Self {
         Self { info }
+    }
+
+    pub fn get_info(&self) -> &MonitorInfo {
+        &self.info
+    }
+
+    pub fn convert_absolute_position_to_relative(&self, x: i32, y: i32) -> (i32, i32) {
+        (x - self.info.x, y - self.info.y)
     }
 
     pub fn calculate_position_for_percentage(
@@ -107,8 +116,15 @@ impl Default for ImplActiveMonitor {
     /// Create an ImplActiveMonitor for the monitor containing the cursor
     /// Falls back to primary monitor if cursor position cannot be determined
     fn default() -> Self {
+        let (cursor_x, cursor_y) = Enigo::new(&Settings::default())
+            .unwrap()
+            .location()
+            .unwrap();
         // Try to get cursor position from a dummy position (0,0) to find current monitor
-        if let Some(cursor_monitor) = find_cursor_monitor(tauri::PhysicalPosition::new(0.0, 0.0)) {
+        if let Some(cursor_monitor) = find_cursor_monitor(tauri::PhysicalPosition::new(
+            cursor_x as f64,
+            cursor_y as f64,
+        )) {
             Self::new(cursor_monitor.monitor)
         } else if let Some(primary_monitor) = ImplActiveMonitor::get_primary_monitor() {
             Self::new(primary_monitor)
