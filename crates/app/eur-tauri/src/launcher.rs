@@ -1,3 +1,4 @@
+use eur_screen_position::ActiveMonitor;
 use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Emitter;
@@ -232,54 +233,74 @@ pub async fn monitor_cursor_for_hover(hover_window: tauri::WebviewWindow) {
         // Very fast polling for maximum responsiveness - check every 16ms (~60fps)
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        if let Ok(cursor_position) = hover_window.cursor_position() {
-            // Only proceed if cursor actually moved (avoid unnecessary work)
-            if (cursor_position.x - last_cursor_x).abs() < 1.0
-                && (cursor_position.y - last_cursor_y).abs() < 1.0
-            {
-                continue;
-            }
+        let active_monitor = ActiveMonitor::default();
+        let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(
+            tauri::PhysicalSize::new(50, 50),
+            1.0,
+            0.75,
+        );
 
-            last_cursor_x = cursor_position.x;
-            last_cursor_y = cursor_position.y;
+        let _ = hover_window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+            x: hover_x,
+            y: hover_y,
+        }));
 
-            // Use consolidated monitor detection function
-            if let Some(cursor_monitor) = find_cursor_monitor(&hover_window) {
-                let monitor = &cursor_monitor.monitor;
+        // if let Ok(cursor_position) = hover_window.cursor_position() {
+        //     // Only proceed if cursor actually moved (avoid unnecessary work)
+        //     if (cursor_position.x - last_cursor_x).abs() < 1.0
+        //         && (cursor_position.y - last_cursor_y).abs() < 1.0
+        //     {
+        //         continue;
+        //     }
 
-                // If cursor moved to a different monitor, reposition hover window immediately
-                if monitor.id != last_monitor_id {
-                    info!(
-                        "Cursor moved to monitor: {} (immediate repositioning)",
-                        monitor.id
-                    );
-                    last_monitor_id = monitor.id.clone();
+        //     last_cursor_x = cursor_position.x;
+        //     last_cursor_y = cursor_position.y;
 
-                    // Position hover window on the new monitor
-                    let window_size = hover_window.inner_size().unwrap_or(tauri::PhysicalSize {
-                        width: 50,
-                        height: 50,
-                    });
+        //     // Use consolidated monitor detection function
+        //     if let Some(cursor_monitor) = find_cursor_monitor(&hover_window) {
+        //         let monitor = &cursor_monitor.monitor;
 
-                    // Calculate hover position using consolidated function
-                    let (hover_x, hover_y) = calculate_hover_position(monitor, window_size);
+        //         // If cursor moved to a different monitor, reposition hover window immediately
+        //         if monitor.id != last_monitor_id {
+        //             info!(
+        //                 "Cursor moved to monitor: {} (immediate repositioning)",
+        //                 monitor.id
+        //             );
+        //             last_monitor_id = monitor.id.clone();
 
-                    info!(
-                        "Repositioning hover window to: ({}, {}) on monitor {}x{}",
-                        hover_x, hover_y, monitor.width, monitor.height
-                    );
+        //             // Position hover window on the new monitor
+        //             let window_size = hover_window.inner_size().unwrap_or(tauri::PhysicalSize {
+        //                 width: 50,
+        //                 height: 50,
+        //             });
 
-                    if let Err(e) = hover_window.set_position(tauri::Position::Physical(
-                        tauri::PhysicalPosition {
-                            x: hover_x,
-                            y: hover_y,
-                        },
-                    )) {
-                        error!("Failed to reposition hover window: {}", e);
-                    }
-                }
-            }
-        }
+        //             let active_monitor = ActiveMonitor::default();
+        //             let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(
+        //                 tauri::PhysicalSize::new(50, 50),
+        //                 1.0,
+        //                 0.75,
+        //             );
+
+        //             // Calculate hover position using consolidated function
+        //             // let (hover_x, hover_y) =
+        //             //     active_monitor.calculate_position_for_percentage(window_size, 0.75, 0.75);
+
+        //             info!(
+        //                 "Repositioning hover window to: ({}, {}) on monitor {}x{}",
+        //                 hover_x, hover_y, monitor.width, monitor.height
+        //             );
+
+        //             if let Err(e) = hover_window.set_position(tauri::Position::Physical(
+        //                 tauri::PhysicalPosition {
+        //                     x: hover_x,
+        //                     y: hover_y,
+        //                 },
+        //             )) {
+        //                 error!("Failed to reposition hover window: {}", e);
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
 
