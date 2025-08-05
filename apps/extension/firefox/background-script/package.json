@@ -18,7 +18,7 @@
 		"@eslint/js": "^9.32.0",
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
-		"@playwright/test": "^1.54.1",
+		"@playwright/test": "^1.54.2",
 		"@testing-library/jest-dom": "^6.6.4",
 		"@types/firefox-webext-browser": "^120.0.4",
 		"eslint": "^9.32.0",
@@ -28,14 +28,14 @@
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
 		"prettier": "^3.6.2",
-		"typescript": "^5.8.3",
-		"typescript-eslint": "^8.38.0",
+		"typescript": "^5.9.2",
+		"typescript-eslint": "^8.39.0",
 		"vite": "catalog:",
 		"vite-plugin-dts": "^4.5.3",
 		"vitest": "catalog:"
 	},
 	"dependencies": {
-		"@sentry/browser": "^9.42.1",
+		"@sentry/browser": "^9.44.2",
 		"@sentry/vite-plugin": "^3.6.1"
 	}
 }
