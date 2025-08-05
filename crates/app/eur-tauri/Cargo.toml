@@ -1,6 +1,6 @@
 [package]
 name = "eur-tauri"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 authors = ["Eurora <andreroelofsai@gmail.com>"]
 publish = false
@@ -41,6 +41,7 @@ tauri-plugin-store = "2.3.0"
 tauri-plugin-updater = "2.9.0"
 tauri-plugin-window-state = "2.4.0"
 eur-vision = { path = "../eur-vision" }
+eur-screen-position = { path = "../eur-screen-position" }
 image.workspace = true
 parking_lot.workspace = true
 log = "^0.4"
