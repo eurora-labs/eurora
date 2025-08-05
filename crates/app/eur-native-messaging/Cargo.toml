@@ -28,7 +28,7 @@ tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
 winreg = "0.55"
 
 [build-dependencies]
-tonic-build = { workspace = true }
+tonic-prost-build = { workspace = true }
 
 [lints.clippy]
 all = "deny"

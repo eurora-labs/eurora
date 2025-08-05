@@ -31,4 +31,4 @@ tonic-health = "0.14.0"
 axum = "0.8.4"
 
 [build-dependencies]
-tonic-build = { workspace = true }
+tonic-prost-build = { workspace = true }
