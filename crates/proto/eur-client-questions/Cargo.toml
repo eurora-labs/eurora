@@ -12,5 +12,6 @@ anyhow = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 prost = { workspace = true }
+
 [build-dependencies]
-tonic-build = { workspace = true }
+tonic-prost-build = { workspace = true }
