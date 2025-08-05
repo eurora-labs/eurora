@@ -233,9 +233,9 @@ pub fn position_hover_window(hover_window: &tauri::WebviewWindow) {
 
 /// Monitor cursor position and reposition hover window when cursor moves to different screen
 pub async fn monitor_cursor_for_hover(hover_window: tauri::WebviewWindow) {
-    let mut last_monitor_id = String::new();
-    let mut last_cursor_x = 0.0;
-    let mut last_cursor_y = 0.0;
+    let last_monitor_id = String::new();
+    let last_cursor_x = 0.0;
+    let last_cursor_y = 0.0;
 
     loop {
         // Very fast polling for maximum responsiveness - check every 16ms (~60fps)
