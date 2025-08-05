@@ -26,10 +26,10 @@ pub struct AuthManager {
     jwt_config: JwtConfig,
 }
 
-impl AuthManager {
-    pub(super) const ACCESS_TOKEN_HANDLE: &'static str = "AUTH_ACCESS_TOKEN";
-    pub(super) const REFRESH_TOKEN_HANDLE: &'static str = "AUTH_REFRESH_TOKEN";
+pub const ACCESS_TOKEN_HANDLE: &'static str = "AUTH_ACCESS_TOKEN";
+pub const REFRESH_TOKEN_HANDLE: &'static str = "AUTH_REFRESH_TOKEN";
 
+impl AuthManager {
     pub async fn new() -> Result<Self> {
         let refresh_offset = std::env::var("JWT_REFRESH_OFFSET").unwrap_or("15".to_string());
         Ok(Self {
@@ -57,12 +57,12 @@ impl AuthManager {
     }
 
     fn get_access_token(&self) -> Result<Sensitive<String>> {
-        secret::retrieve(Self::ACCESS_TOKEN_HANDLE, secret::Namespace::BuildKind)?
+        secret::retrieve(ACCESS_TOKEN_HANDLE, secret::Namespace::BuildKind)?
             .ok_or_else(|| anyhow!("No access token found"))
     }
 
     fn get_refresh_token(&self) -> Result<Sensitive<String>> {
-        secret::retrieve(Self::REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)?
+        secret::retrieve(REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)?
             .ok_or_else(|| anyhow!("No refresh token found"))
     }
 
@@ -151,7 +151,7 @@ fn extract_claims(token: &str) -> Result<Claims> {
 
 fn store_access_token(token: String) -> Result<()> {
     secret::persist(
-        AuthManager::ACCESS_TOKEN_HANDLE,
+        ACCESS_TOKEN_HANDLE,
         &Sensitive(token),
         secret::Namespace::BuildKind,
     )
@@ -160,7 +160,7 @@ fn store_access_token(token: String) -> Result<()> {
 
 fn store_refresh_token(token: String) -> Result<()> {
     secret::persist(
-        AuthManager::REFRESH_TOKEN_HANDLE,
+        REFRESH_TOKEN_HANDLE,
         &Sensitive(token),
         secret::Namespace::BuildKind,
     )

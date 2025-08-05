@@ -1,5 +1,10 @@
+use async_from::AsyncTryFrom;
+use eur_eurora_provider::EuroraConfig;
 use eur_prompt_kit::{OllamaConfig, OpenAIConfig};
+use eur_secret::secret;
 use tauri::{Manager, Runtime};
+use tracing::info;
+use url::Url;
 
 use crate::shared_types::SharedPromptKitService;
 
@@ -90,10 +95,50 @@ impl PromptApi for PromptApiImpl {
     ) -> Result<String, String> {
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let guard = state.lock().await;
-        let client = guard
-            .as_ref()
-            .ok_or_else(|| "PromptKitService not initialized".to_string())?;
-        client.get_service_name().map_err(|e| e.to_string())
+
+        let client = guard.as_ref();
+        if let Some(client) = client {
+            let service_name = client.get_service_name().map_err(|e| e.to_string())?;
+            let state: tauri::State<SharedPromptKitService> = app_handle.state();
+            let mut guard = state.lock().await;
+            *guard = Some(client.clone());
+            Ok(service_name)
+        } else {
+            secret::retrieve(eur_user::REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| "Refresh token not found".to_string())?;
+
+            // Initialize prompt kit
+            let config = EuroraConfig::new(
+                Url::parse(
+                    std::env::var("API_BASE_URL")
+                        .unwrap_or("https://api.eurora-labs.com".to_string())
+                        .as_str(),
+                )
+                .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
+            );
+
+            let promptkit_client = eur_prompt_kit::PromptKitService::async_try_from(config)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            TauRpcPromptApiEventTrigger::new(app_handle.clone())
+                .prompt_service_change(Some(
+                    promptkit_client
+                        .get_service_name()
+                        .map_err(|e| e.to_string())?,
+                ))
+                .map_err(|e| e.to_string())?;
+
+            let service_name = promptkit_client
+                .get_service_name()
+                .map_err(|e| e.to_string())?;
+
+            let state: tauri::State<SharedPromptKitService> = app_handle.state();
+            let mut guard = state.lock().await;
+            *guard = Some(promptkit_client);
+            Ok(service_name)
+        }
     }
 
     async fn disconnect<R: Runtime>(self, app_handle: tauri::AppHandle<R>) -> Result<(), String> {

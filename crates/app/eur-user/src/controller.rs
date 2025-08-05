@@ -50,8 +50,8 @@ impl Controller {
     pub fn delete_user(&self) -> Result<()> {
         self.storage.delete().context("failed to delete user")?;
         let namespace = secret::Namespace::BuildKind;
-        secret::delete(AuthManager::ACCESS_TOKEN_HANDLE, namespace).ok();
-        secret::delete(AuthManager::REFRESH_TOKEN_HANDLE, namespace).ok();
+        secret::delete(crate::ACCESS_TOKEN_HANDLE, namespace).ok();
+        secret::delete(crate::REFRESH_TOKEN_HANDLE, namespace).ok();
         Ok(())
     }
 
