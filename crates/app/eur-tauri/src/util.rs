@@ -128,15 +128,13 @@ pub fn get_default_shortcut() -> Shortcut {
 /// Get the launcher shortcut from user settings or default
 #[allow(unused)]
 pub fn get_launcher_shortcut(app_handle: &tauri::AppHandle) -> Shortcut {
-    if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>() {
-        if let Ok(Some(user)) = user_controller.get_user() {
-            if !user.hotkeys.open_launcher.key.is_empty() {
-                if let Some(shortcut) = user_hotkey_to_shortcut(&user.hotkeys.open_launcher) {
-                    info!("Using custom launcher shortcut: {:?}", shortcut);
-                    return shortcut;
-                }
-            }
-        }
+    if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>()
+        && let Ok(Some(user)) = user_controller.get_user()
+        && !user.hotkeys.open_launcher.key.is_empty()
+        && let Some(shortcut) = user_hotkey_to_shortcut(&user.hotkeys.open_launcher)
+    {
+        info!("Using custom launcher shortcut: {:?}", shortcut);
+        return shortcut;
     }
 
     let default = get_default_shortcut();
