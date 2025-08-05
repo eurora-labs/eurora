@@ -327,8 +327,7 @@ fn main() {
                         let app_handle_focus = app_handle.clone();
                         let launcher_label_linux = launcher_label.clone();
                         launcher_window.on_window_event(move |event| {
-                            if let tauri::WindowEvent::Focused(false) = event {
-                                if let Some(launcher) =
+                            if let tauri::WindowEvent::Focused(false) = event && let Some(launcher) =
                                     app_handle_focus.get_window(&launcher_label_linux)
                                 {
                                     launcher.hide().expect("Failed to hide launcher window");
@@ -338,7 +337,6 @@ fn main() {
                                         .expect("Failed to emit launcher_closed event");
                                     set_launcher_visible(false);
                                     // Ensure state is updated
-                                }
                             }
                         });
                     }
