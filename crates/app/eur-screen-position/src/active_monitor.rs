@@ -25,6 +25,15 @@ impl ActiveMonitor {
         self.impl_active_monitor
             .calculate_position_for_percentage(size, x_percentage, y_percentage)
     }
+
+    pub fn get_info(&self) -> &MonitorInfo {
+        self.impl_active_monitor.get_info()
+    }
+
+    pub fn convert_absolute_position_to_relative(&self, x: i32, y: i32) -> (i32, i32) {
+        self.impl_active_monitor
+            .convert_absolute_position_to_relative(x, y)
+    }
 }
 
 impl Default for ActiveMonitor {
