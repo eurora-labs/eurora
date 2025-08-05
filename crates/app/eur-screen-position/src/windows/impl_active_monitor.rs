@@ -15,6 +15,14 @@ impl ImplActiveMonitor {
         Self { info }
     }
 
+    pub fn get_info(&self) -> &MonitorInfo {
+        &self.info
+    }
+
+    pub fn convert_absolute_position_to_relative(&self, x: i32, y: i32) -> (i32, i32) {
+        (x - self.info.x, y - self.info.y)
+    }
+
     pub fn calculate_position_for_percentage(
         &self,
         size: PhysicalSize<u32>,
@@ -26,13 +34,7 @@ impl ImplActiveMonitor {
 
         let x = self.info.x + monitor_width as i32 - size.width as i32;
         let y = self.info.y + monitor_height as i32 - size.height as i32;
-        info!(
-            "monitor_width: {}, monitor_height: {}",
-            monitor_width, monitor_height
-        );
-        info!("x: {}, y: {}", x, y);
         (x, y)
-        // (400, 500)
     }
 
     /// Get all available monitors
