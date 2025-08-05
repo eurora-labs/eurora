@@ -104,9 +104,15 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     LAUNCHER_VISIBLE.store(true, Ordering::SeqCst);
 
     let active_monitor = ActiveMonitor::default();
-    let mut window_size = launcher
-        .outer_size()
-        .map_err(|e| format!("Failed to get window size: {}", e))?;
+
+    #[cfg(target_os = "linux")]
+    let mut window_size = launcher.inner_size().unwrap();
+
+    #[cfg(target_os = "windows")]
+    let mut window_size = launcher.outer_size().unwrap();
+
+    #[cfg(target_os = "macos")]
+    let mut window_size = launcher.inner_size().unwrap();
 
     window_size.width /= 2;
     window_size.height /= 2;
