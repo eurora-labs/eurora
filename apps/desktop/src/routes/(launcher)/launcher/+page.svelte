@@ -254,9 +254,20 @@
 	class="blur-bright"
 >
 	<filter id="blur-bright" filterUnits="objectBoundingBox">
-		<feGaussianBlur in="SourceGraphic" stdDeviation="36" edgeMode="duplicate" result="blur" />
-		<feFlood flood-color="#ffffff" flood-opacity="0.1" result="white" />
-		<feComposite in="white" in2="blur" operator="over" />
+		<feGaussianBlur
+			in="SourceGraphic"
+			stdDeviation="36"
+			edgeMode="duplicate"
+			result="blur"
+			color-interpolation-filters="sRGB"
+		/>
+		<feFlood
+			flood-color="#ffffff"
+			flood-opacity="0.1"
+			result="white"
+			color-interpolation-filters="sRGB"
+		/>
+		<feComposite in="white" in2="blur" operator="over" color-interpolation-filters="sRGB" />
 	</filter>
 </svg>
 
