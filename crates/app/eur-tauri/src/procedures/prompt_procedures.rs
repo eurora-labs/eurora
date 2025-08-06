@@ -94,15 +94,11 @@ impl PromptApi for PromptApiImpl {
         app_handle: tauri::AppHandle<R>,
     ) -> Result<String, String> {
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
-        let guard = state.lock().await;
+        let mut guard = state.lock().await;
 
         let client = guard.as_ref();
         if let Some(client) = client {
-            let service_name = client.get_service_name().map_err(|e| e.to_string())?;
-            let state: tauri::State<SharedPromptKitService> = app_handle.state();
-            let mut guard = state.lock().await;
-            *guard = Some(client.clone());
-            Ok(service_name)
+            Ok(client.get_service_name().map_err(|e| e.to_string())?)
         } else {
             secret::retrieve(eur_user::REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)
                 .map_err(|e| e.to_string())?
@@ -134,9 +130,8 @@ impl PromptApi for PromptApiImpl {
                 .get_service_name()
                 .map_err(|e| e.to_string())?;
 
-            let state: tauri::State<SharedPromptKitService> = app_handle.state();
-            let mut guard = state.lock().await;
             *guard = Some(promptkit_client);
+
             Ok(service_name)
         }
     }
