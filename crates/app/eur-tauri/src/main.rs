@@ -116,6 +116,19 @@ fn main() {
     //         ..Default::default()
     //     },
     // ));
+    #[cfg(not(debug_assertions))]
+    {
+        let _guard = sentry::init((
+            "https://c274bba2ddbc19e4c2c34cedc1779588@o4508907847352320.ingest.de.sentry.io/4509796610605136",
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                // Capture user IPs and potentially sensitive headers when using HTTP server integrations
+                // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
+                send_default_pii: true,
+                ..Default::default()
+            },
+        ));
+    }
 
     // Regular application startup
     let tauri_context = generate_context!();
