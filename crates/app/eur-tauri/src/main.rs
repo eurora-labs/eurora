@@ -262,22 +262,22 @@ fn main() {
                     });
 
                     // Initialize OpenAI client if API key exists
-                    let app_handle_openai = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let api_key =
-                            secret::retrieve("OPENAI_API_KEY", secret::Namespace::Global).unwrap();
-                        if api_key.is_some() {
-                            let prompt_kit_service = PromptKitService::default();
+                    // let app_handle_openai = app_handle.clone();
+                    // tauri::async_runtime::spawn(async move {
+                    //     let api_key =
+                    //         secret::retrieve("OPENAI_API_KEY", secret::Namespace::Global).unwrap();
+                    //     if api_key.is_some() {
+                    //         let prompt_kit_service = PromptKitService::default();
 
-                            let state: tauri::State<SharedPromptKitService> =
-                                app_handle_openai.state();
-                            let mut guard = state.lock().await;
-                            *guard = Some(prompt_kit_service);
-                            info!("PromptKitService initialized with API key from keyring");
-                        } else {
-                            info!("No API key found in keyring, PromptKitService not initialized");
-                        }
-                    });
+                    //         let state: tauri::State<SharedPromptKitService> =
+                    //             app_handle_openai.state();
+                    //         let mut guard = state.lock().await;
+                    //         *guard = Some(prompt_kit_service);
+                    //         info!("PromptKitService initialized with API key from keyring");
+                    //     } else {
+                    //         info!("No API key found in keyring, PromptKitService not initialized");
+                    //     }
+                    // });
 
                     // Initialize conversation storage
                     let _db_path = get_db_path(app_handle);
@@ -327,8 +327,7 @@ fn main() {
                         let app_handle_focus = app_handle.clone();
                         let launcher_label_linux = launcher_label.clone();
                         launcher_window.on_window_event(move |event| {
-                            if let tauri::WindowEvent::Focused(false) = event {
-                                if let Some(launcher) =
+                            if let tauri::WindowEvent::Focused(false) = event && let Some(launcher) =
                                     app_handle_focus.get_window(&launcher_label_linux)
                                 {
                                     launcher.hide().expect("Failed to hide launcher window");
@@ -338,7 +337,6 @@ fn main() {
                                         .expect("Failed to emit launcher_closed event");
                                     set_launcher_visible(false);
                                     // Ensure state is updated
-                                }
                             }
                         });
                     }
