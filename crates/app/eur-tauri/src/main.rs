@@ -109,22 +109,14 @@ fn main() {
         .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
 
     fmt().with_env_filter(filter).init();
-    // let _guard = sentry::init((
-    //     "https://5181d08d2bfcb209a768ab99e1e48f1b@o4508907847352320.ingest.de.sentry.io/4508907850694736",
-    //     sentry::ClientOptions {
-    //         release: sentry::release_name!(),
-    //         ..Default::default()
-    //     },
-    // ));
+
     #[cfg(not(debug_assertions))]
     {
         let _guard = sentry::init((
             "https://c274bba2ddbc19e4c2c34cedc1779588@o4508907847352320.ingest.de.sentry.io/4509796610605136",
             sentry::ClientOptions {
                 release: sentry::release_name!(),
-                // Capture user IPs and potentially sensitive headers when using HTTP server integrations
-                // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
-                send_default_pii: true,
+                send_default_pii: false,
                 ..Default::default()
             },
         ));
