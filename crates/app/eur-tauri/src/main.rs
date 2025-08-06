@@ -109,13 +109,18 @@ fn main() {
         .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
 
     fmt().with_env_filter(filter).init();
-    // let _guard = sentry::init((
-    //     "https://5181d08d2bfcb209a768ab99e1e48f1b@o4508907847352320.ingest.de.sentry.io/4508907850694736",
-    //     sentry::ClientOptions {
-    //         release: sentry::release_name!(),
-    //         ..Default::default()
-    //     },
-    // ));
+
+    #[cfg(not(debug_assertions))]
+    {
+        let _guard = sentry::init((
+            "https://c274bba2ddbc19e4c2c34cedc1779588@o4508907847352320.ingest.de.sentry.io/4509796610605136",
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                send_default_pii: false,
+                ..Default::default()
+            },
+        ));
+    }
 
     // Regular application startup
     let tauri_context = generate_context!();
@@ -134,6 +139,7 @@ fn main() {
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
+                    let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -145,7 +151,7 @@ fn main() {
                         use tauri_plugin_autostart::MacosLauncher;
                         use tauri_plugin_autostart::ManagerExt;
 
-                        let _ = tauri_app.handle().plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--flag1", "--flag2"]) /* arbitrary number of args to pass to your app */));
+                        let _ = tauri_app.handle().plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--startup-launch"]) /* arbitrary number of args to pass to your app */));
 
                         // Get the autostart manager
                         let autostart_manager = tauri_app.autolaunch();
@@ -156,6 +162,10 @@ fn main() {
                     }
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
                         .expect("Failed to create main window");
+
+                    if started_by_autostart {
+                        main_window.hide().expect("Failed to hide main window");
+                    }
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
