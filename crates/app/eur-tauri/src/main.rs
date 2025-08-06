@@ -134,6 +134,7 @@ fn main() {
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
+                    let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -145,7 +146,7 @@ fn main() {
                         use tauri_plugin_autostart::MacosLauncher;
                         use tauri_plugin_autostart::ManagerExt;
 
-                        let _ = tauri_app.handle().plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--flag1", "--flag2"]) /* arbitrary number of args to pass to your app */));
+                        let _ = tauri_app.handle().plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--startup-launch"]) /* arbitrary number of args to pass to your app */));
 
                         // Get the autostart manager
                         let autostart_manager = tauri_app.autolaunch();
@@ -156,6 +157,10 @@ fn main() {
                     }
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
                         .expect("Failed to create main window");
+
+                    if started_by_autostart {
+                        main_window.hide().expect("Failed to hide main window");
+                    }
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
