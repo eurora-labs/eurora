@@ -2897,6 +2897,7 @@ version = "0.0.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "eur-secret",
  "ferrous-llm-core 0.3.0",
