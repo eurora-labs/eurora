@@ -70,6 +70,7 @@ impl ChatApi for ChatApiImpl {
             })
             .map_err(|e| format!("Failed to send initial response: {e}"))?;
 
+        info!("Sending chat stream");
         match client.chat_stream(messages).await {
             Ok(mut stream) => {
                 info!("Starting to consume stream...");
