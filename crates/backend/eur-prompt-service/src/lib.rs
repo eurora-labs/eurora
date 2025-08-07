@@ -12,7 +12,7 @@ use ferrous_llm::{
 };
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
-use tracing::info;
+use tracing::{error, info};
 
 /// Extract and validate JWT token from request metadata
 pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
@@ -126,11 +126,6 @@ impl ProtoChatService for PromptService {
             parameters: Default::default(),
             metadata: Default::default(),
         };
-
-        // let test_response = self.provider.chat(chat_request.clone()).await;
-        // info!("Test response: {:#?}", test_response);
-
-        info!("Chat request: {:#?}", chat_request.clone());
 
         let openai_stream = self
             .provider
