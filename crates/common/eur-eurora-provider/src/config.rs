@@ -105,51 +105,51 @@ impl ProviderConfig for EuroraConfig {
         }
 
         // Validate timeouts
-        if let Some(timeout) = self.timeout {
-            if timeout.is_zero() {
-                return Err(ConfigError::invalid_value(
-                    "timeout",
-                    "Timeout must be greater than zero",
-                ));
-            }
+        if let Some(timeout) = self.timeout
+            && timeout.is_zero()
+        {
+            return Err(ConfigError::invalid_value(
+                "timeout",
+                "Timeout must be greater than zero",
+            ));
         }
 
-        if let Some(connect_timeout) = self.connect_timeout {
-            if connect_timeout.is_zero() {
-                return Err(ConfigError::invalid_value(
-                    "connect_timeout",
-                    "Connect timeout must be greater than zero",
-                ));
-            }
+        if let Some(connect_timeout) = self.connect_timeout
+            && connect_timeout.is_zero()
+        {
+            return Err(ConfigError::invalid_value(
+                "connect_timeout",
+                "Connect timeout must be greater than zero",
+            ));
         }
 
         // Validate message sizes
-        if let Some(max_request_size) = self.max_request_size {
-            if max_request_size == 0 {
-                return Err(ConfigError::invalid_value(
-                    "max_request_size",
-                    "Max request size must be greater than zero",
-                ));
-            }
+        if let Some(max_request_size) = self.max_request_size
+            && max_request_size == 0
+        {
+            return Err(ConfigError::invalid_value(
+                "max_request_size",
+                "Max request size must be greater than zero",
+            ));
         }
 
-        if let Some(max_response_size) = self.max_response_size {
-            if max_response_size == 0 {
-                return Err(ConfigError::invalid_value(
-                    "max_response_size",
-                    "Max response size must be greater than zero",
-                ));
-            }
+        if let Some(max_response_size) = self.max_response_size
+            && max_response_size == 0
+        {
+            return Err(ConfigError::invalid_value(
+                "max_response_size",
+                "Max response size must be greater than zero",
+            ));
         }
 
         // Validate concurrent requests
-        if let Some(max_concurrent) = self.max_concurrent_requests {
-            if max_concurrent == 0 {
-                return Err(ConfigError::invalid_value(
-                    "max_concurrent_requests",
-                    "Max concurrent requests must be greater than zero",
-                ));
-            }
+        if let Some(max_concurrent) = self.max_concurrent_requests
+            && max_concurrent == 0
+        {
+            return Err(ConfigError::invalid_value(
+                "max_concurrent_requests",
+                "Max concurrent requests must be greater than zero",
+            ));
         }
 
         Ok(())
