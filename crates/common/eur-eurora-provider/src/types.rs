@@ -431,28 +431,9 @@ impl From<ProtoImageSource> for ImageSource {
             Some(ProtoSourceType::Url(url)) => {
                 ImageSource::Url(format!("data:image/png;base64,{}", url))
             }
-            Some(ProtoSourceType::Data(data)) => {
-                tracing::debug!("Received data: {}", data.len());
-                match image::load_from_memory_with_format(&data, image::ImageFormat::Png) {
-                    Ok(image) => {
-                        let image = image.to_rgb8();
-                        let mut buffer = std::io::Cursor::new(Vec::new());
-                        image
-                            .write_to(&mut buffer, image::ImageFormat::Png)
-                            .unwrap();
-                        let image_data = buffer.into_inner();
-                        let base64_image = general_purpose::STANDARD.encode(&image_data);
-                        let data_url = format!("data:image/png;base64,{base64_image}");
-
-                        ImageSource::Url(data_url)
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to load image from bytes: {}", e);
-                        // Fallback to empty URL if image loading fails
-                        ImageSource::Url(String::new())
-                    }
-                }
-            }
+            Some(ProtoSourceType::Data(data)) => ImageSource::DynamicImage(
+                image::load_from_memory(&data).expect("Failed to load image"),
+            ),
             None => ImageSource::Url(String::new()),
         }
     }
