@@ -2797,7 +2797,7 @@ dependencies = [
  "eur-native-messaging",
  "eur-proto",
  "ferrous-focus",
- "ferrous-llm-core 0.3.0",
+ "ferrous-llm-core",
  "image",
  "serde",
  "serde_json",
@@ -2900,7 +2900,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "eur-secret",
- "ferrous-llm-core 0.3.0",
+ "ferrous-llm-core",
  "futures",
  "image",
  "prost",
@@ -3031,7 +3031,7 @@ dependencies = [
  "eur-eurora-provider",
  "eur-proto",
  "eur-util",
- "ferrous-llm 0.3.1",
+ "ferrous-llm",
  "futures",
  "image",
  "regex",
@@ -3052,7 +3052,7 @@ dependencies = [
  "eur-auth",
  "eur-eurora-provider",
  "eur-ocr",
- "ferrous-llm 0.3.1",
+ "ferrous-llm",
  "futures",
  "image",
  "prost",
@@ -3159,7 +3159,7 @@ dependencies = [
  "eur-timeline",
  "eur-user",
  "eur-vision",
- "ferrous-llm-core 0.3.0",
+ "ferrous-llm-core",
  "futures",
  "image",
  "lazy_static",
@@ -3214,8 +3214,8 @@ dependencies = [
  "eur-native-messaging",
  "eur-proto",
  "ferrous-focus",
- "ferrous-llm 0.2.0",
- "ferrous-llm-core 0.3.0",
+ "ferrous-llm",
+ "ferrous-llm-core",
  "image",
  "parking_lot",
  "serde",
@@ -3385,31 +3385,16 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm"
-version = "0.2.0"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=main#755505ab166b6dd12e34ae7516255a017030c95f"
-dependencies = [
- "chrono",
- "dotenv",
- "ferrous-llm-core 0.2.0",
- "ferrous-llm-openai 0.2.0",
- "futures",
- "serde_json",
- "thiserror 2.0.12",
- "tokio",
-]
-
-[[package]]
-name = "ferrous-llm"
-version = "0.3.1"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f401cd489286ee33bd441de23369248d4a815a90dd750251197712ee82b4e189"
+checksum = "28f4ee330f84243d67ca41700cd12b5514ca1abe1762f25a7ba6f8878feaa202"
 dependencies = [
  "chrono",
  "dotenv",
  "ferrous-llm-anthropic",
- "ferrous-llm-core 0.3.0",
+ "ferrous-llm-core",
  "ferrous-llm-ollama",
- "ferrous-llm-openai 0.3.0",
+ "ferrous-llm-openai",
  "futures",
  "serde_json",
  "thiserror 2.0.12",
@@ -3418,13 +3403,13 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-anthropic"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a10f5dcd9c5b5455bc75cafdf73ae7529d5a6aeb7c6148659a5e2ecb3033f8c0"
+checksum = "72f7daa13ee78dd60fd36d9a9d211745bbdb9ff6643dec8dd753abdb2f0e3b0c"
 dependencies = [
  "async-trait",
  "chrono",
- "ferrous-llm-core 0.3.0",
+ "ferrous-llm-core",
  "futures",
  "reqwest",
  "serde",
@@ -3437,25 +3422,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-core"
-version = "0.2.0"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=main#755505ab166b6dd12e34ae7516255a017030c95f"
-dependencies = [
- "async-trait",
- "chrono",
- "futures",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
- "tokio",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "ferrous-llm-core"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7261de02a7f0c02d245d3c6508277823d8924c4c4750772a25fbb3b50220bed"
+checksum = "788143e4aebf382fbe1b4589be3940929995494c12340c0924a9bda97b831683"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3471,13 +3440,13 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-ollama"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51bc390563de7263aad9dcbcf123b3b0f31c66a8652967d50b5276e940b1f82c"
+checksum = "06f8b113d05e5c7c0825d2465ea9f77d8b3a45d91b350036f33cc03a2bb8da5e"
 dependencies = [
  "async-trait",
  "chrono",
- "ferrous-llm-core 0.3.0",
+ "ferrous-llm-core",
  "futures",
  "reqwest",
  "serde",
@@ -3490,31 +3459,13 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-openai"
-version = "0.2.0"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=main#755505ab166b6dd12e34ae7516255a017030c95f"
-dependencies = [
- "async-trait",
- "chrono",
- "ferrous-llm-core 0.2.0",
- "futures",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
- "tokio",
- "tokio-stream",
- "url",
-]
-
-[[package]]
-name = "ferrous-llm-openai"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adeabb7a0e4b9d12b1be513bb51084518e7b9fdd4ea0548c83490d0915705bdd"
+checksum = "3b2ce5eddbe1868f19ed1220b52c6d448707753021a144d71115f28e7c98f535"
 dependencies = [
  "async-trait",
  "chrono",
- "ferrous-llm-core 0.3.0",
+ "ferrous-llm-core",
  "futures",
  "reqwest",
  "serde",

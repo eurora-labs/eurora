@@ -52,11 +52,11 @@ impl PromptService {
     pub fn new(jwt_config: Option<JwtConfig>) -> Self {
         let mut config = OpenAIConfig::new(
             std::env::var("OPENAI_API_KEY").unwrap_or_default(),
-            "gpt-4o-2024-08-06",
-            // "meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+            // "gpt-4o-2024-08-06",
+            "meta-llama/Llama-4-Maverick-17B-128E-Instruct",
             // "deepseek-ai/DeepSeek-V3-0324",
         );
-        // config.base_url = Some("https://api.chat.nebul.io/v1".parse().unwrap());
+        config.base_url = Some("https://api.chat.nebul.io/v1".parse().unwrap());
         Self {
             provider: OpenAIProvider::new(config).expect("Failed to create OpenAI provider"),
             jwt_config: jwt_config.unwrap_or_default(),
