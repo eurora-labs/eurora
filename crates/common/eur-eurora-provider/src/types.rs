@@ -428,9 +428,7 @@ impl From<ImageSource> for ProtoImageSource {
 impl From<ProtoImageSource> for ImageSource {
     fn from(source: ProtoImageSource) -> Self {
         match source.proto_source_type {
-            Some(ProtoSourceType::Url(url)) => {
-                ImageSource::Url(format!("data:image/png;base64,{}", url))
-            }
+            Some(ProtoSourceType::Url(url)) => ImageSource::Url(url),
             Some(ProtoSourceType::Data(data)) => ImageSource::DynamicImage(
                 image::load_from_memory(&data).expect("Failed to load image"),
             ),
