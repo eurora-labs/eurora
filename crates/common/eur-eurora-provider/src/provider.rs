@@ -11,6 +11,7 @@ use tonic::{
     service::{Interceptor, interceptor::InterceptedService},
     transport::{Channel, ClientTlsConfig, Endpoint},
 };
+use tracing::info;
 
 use crate::{
     config::EuroraConfig,
@@ -164,6 +165,7 @@ impl StreamingProvider for EuroraStreamingProvider {
         &self,
         request: ferrous_llm_core::types::ChatRequest,
     ) -> Result<Self::Stream, Self::Error> {
+        info!("Sending chat stream");
         let proto_request = request.into();
         let mut client = self.inner.client.clone();
 
