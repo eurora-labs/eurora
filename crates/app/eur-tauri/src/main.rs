@@ -318,24 +318,24 @@ fn main() {
 
 
                     // Linux-specific focus handling
-                    #[cfg(target_os = "linux")]
-                    {
-                        let app_handle_focus = app_handle.clone();
-                        let launcher_label_linux = launcher_label.clone();
-                        launcher_window.on_window_event(move |event| {
-                            if let tauri::WindowEvent::Focused(false) = event && let Some(launcher) =
-                                    app_handle_focus.get_window(&launcher_label_linux)
-                                {
-                                    launcher.hide().expect("Failed to hide launcher window");
-                                    // Emit an event to clear the conversation when launcher is hidden
-                                    launcher
-                                        .emit("launcher_closed", ())
-                                        .expect("Failed to emit launcher_closed event");
-                                    set_launcher_visible(false);
-                                    // Ensure state is updated
-                            }
-                        });
-                    }
+                    // #[cfg(target_os = "linux")]
+                    // {
+                    //     let app_handle_focus = app_handle.clone();
+                    //     let launcher_label_linux = launcher_label.clone();
+                    //     launcher_window.on_window_event(move |event| {
+                    //         if let tauri::WindowEvent::Focused(false) = event && let Some(launcher) =
+                    //                 app_handle_focus.get_window(&launcher_label_linux)
+                    //             {
+                    //                 launcher.hide().expect("Failed to hide launcher window");
+                    //                 // Emit an event to clear the conversation when launcher is hidden
+                    //                 launcher
+                    //                     .emit("launcher_closed", ())
+                    //                     .expect("Failed to emit launcher_closed event");
+                    //                 set_launcher_visible(false);
+                    //                 // Ensure state is updated
+                    //         }
+                    //     });
+                    // }
 
                     Ok(())
                 })
@@ -371,19 +371,19 @@ fn main() {
                     }
                     tauri::WindowEvent::Focused(false) => {
                         // Handle launcher window focus loss for non-Linux OS
-                        #[cfg(not(target_os = "linux"))]
-                        {
-                            // Check if this is the launcher window
-                            if window.label() == "launcher" {
-                                window.hide().expect("Failed to hide launcher window");
-                                // Emit an event to clear the conversation when launcher is hidden
-                                window
-                                    .emit("launcher_closed", ())
-                                    .expect("Failed to emit launcher_closed event");
-                                set_launcher_visible(false);
-                                // Ensure state is updated
-                            }
-                        }
+                        // #[cfg(not(target_os = "linux"))]
+                        // {
+                        //     // Check if this is the launcher window
+                        //     if window.label() == "launcher" {
+                        //         window.hide().expect("Failed to hide launcher window");
+                        //         // Emit an event to clear the conversation when launcher is hidden
+                        //         window
+                        //             .emit("launcher_closed", ())
+                        //             .expect("Failed to emit launcher_closed event");
+                        //         set_launcher_visible(false);
+                        //         // Ensure state is updated
+                        //     }
+                        // }
                     }
 
                     _ => {}
