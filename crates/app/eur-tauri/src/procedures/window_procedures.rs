@@ -63,7 +63,7 @@ impl WindowApi for WindowApiImpl {
             .get_window("launcher")
             .ok_or_else(|| "Launcher window not found".to_string())?;
 
-        open_launcher(&window).expect("Failed to open launcher window");
+        open_launcher(&window).map_err(|e| format!("Failed to open launcher window: {e}"))?;
         Ok(())
     }
 }

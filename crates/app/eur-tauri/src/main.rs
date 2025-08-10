@@ -267,10 +267,10 @@ fn main() {
                             })
                             .unwrap();
                         app_handle_user.manage(user_controller);
-                        
+
                         // Register the initial global shortcut now that user controller is available
                         let launcher_shortcut = crate::util::get_launcher_shortcut(&app_handle_user);
-                        
+
                         // Register the global shortcut
                         if let Err(e) = app_handle_user.global_shortcut().register(launcher_shortcut) {
                             error!("Failed to register initial launcher shortcut: {}", e);
