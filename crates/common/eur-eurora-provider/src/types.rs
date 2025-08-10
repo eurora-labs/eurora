@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use ferrous_llm_core::types::*;
 
