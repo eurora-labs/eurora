@@ -12,7 +12,7 @@ use ferrous_llm::{
 };
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
-use tracing::info;
+use tracing::{error, info};
 
 /// Extract and validate JWT token from request metadata
 pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
@@ -52,7 +52,11 @@ impl PromptService {
     pub fn new(jwt_config: Option<JwtConfig>) -> Self {
         let mut config = OpenAIConfig::new(
             std::env::var("OPENAI_API_KEY").unwrap_or_default(),
-            "deepseek-ai/DeepSeek-V3-0324",
+            // "gpt-4o-2024-08-06",
+            // "meta-llama/Llama-4-Maverick-17B-128E-Instruct",
+            std::env::var("OPENAI_MODEL").unwrap_or_default(),
+            // "Llama Maverick",
+            // "deepseek-ai/DeepSeek-V3-0324",
         );
         config.base_url = Some("https://api.chat.nebul.io/v1".parse().unwrap());
         Self {
@@ -124,9 +128,6 @@ impl ProtoChatService for PromptService {
             parameters: Default::default(),
             metadata: Default::default(),
         };
-
-        // let test_response = self.provider.chat(chat_request.clone()).await;
-        // info!("Test response: {:#?}", test_response);
 
         let openai_stream = self
             .provider
