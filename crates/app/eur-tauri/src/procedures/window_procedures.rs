@@ -1,5 +1,7 @@
+use crate::launcher::open_launcher_window as open_launcher;
 use tauri::{Manager, Runtime};
 use tracing::info;
+
 #[taurpc::procedures(path = "window")]
 pub trait WindowApi {
     async fn get_scale_factor<R: Runtime>(
@@ -60,18 +62,8 @@ impl WindowApi for WindowApiImpl {
         let window = app_handle
             .get_window("launcher")
             .ok_or_else(|| "Launcher window not found".to_string())?;
-        let active_monitor = eur_screen_position::ActiveMonitor::default();
-        let mut window_size = window.inner_size().unwrap();
 
-        window_size.width /= 2;
-        window_size.height /= 2;
-
-        let (x, y) = active_monitor.calculate_position_for_percentage(window_size, 0.5, 0.25);
-
-        window
-            .set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }))
-            .map_err(|e| format!("Failed to set launcher position: {}", e))?;
-        let _ = window.show();
+        open_launcher(&window).map_err(|e| format!("Failed to open launcher window: {e}"))?;
         Ok(())
     }
 }
