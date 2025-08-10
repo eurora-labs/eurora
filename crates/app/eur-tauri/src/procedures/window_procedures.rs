@@ -1,4 +1,4 @@
-use crate::launcher::open_launcher_window as open_launcher;
+use crate::launcher::toggle_launcher_window as toggle_launcher;
 use tauri::{Manager, Runtime};
 use tracing::info;
 
@@ -63,7 +63,7 @@ impl WindowApi for WindowApiImpl {
             .get_window("launcher")
             .ok_or_else(|| "Launcher window not found".to_string())?;
 
-        open_launcher(&window).map_err(|e| format!("Failed to open launcher window: {e}"))?;
+        toggle_launcher(&window).map_err(|e| format!("Failed to open launcher window: {e}"))?;
         Ok(())
     }
 }
