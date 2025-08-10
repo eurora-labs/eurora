@@ -98,6 +98,19 @@ pub fn calculate_hover_position(
     (hover_x, hover_y)
 }
 
+pub fn toggle_launcher_window<R: tauri::Runtime>(
+    launcher: &tauri::Window<R>,
+) -> Result<(), String> {
+    if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
+        launcher
+            .hide()
+            .map_err(|e| format!("Failed to hide launcher window: {}", e))?;
+    } else {
+        open_launcher_window(launcher)?;
+    }
+    Ok(())
+}
+
 /// Open and position the launcher window with background capture
 pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> Result<(), String> {
     // Update the shared state to indicate launcher is visible
