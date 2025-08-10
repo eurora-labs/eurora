@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use ferrous_llm_core::types::*;
 
@@ -403,9 +404,23 @@ impl From<ImageSource> for ProtoImageSource {
             ImageSource::Url(url) => ProtoImageSource {
                 proto_source_type: Some(ProtoSourceType::Url(url)),
             },
-            ImageSource::DynamicImage(image) => ProtoImageSource {
-                proto_source_type: Some(ProtoSourceType::Data(image.into_bytes())),
-            },
+            ImageSource::DynamicImage(image) => {
+                // Convert image to RGB
+                let rgb_image = image.to_rgb8();
+                // Encode the image as PNG bytes
+                let mut buffer = std::io::Cursor::new(Vec::new());
+                if let Err(e) = rgb_image.write_to(&mut buffer, image::ImageFormat::Png) {
+                    tracing::error!("Failed to encode image as PNG: {}", e);
+                    // Fallback to empty bytes if encoding fails
+                    return ProtoImageSource {
+                        proto_source_type: Some(ProtoSourceType::Data(Vec::new())),
+                    };
+                }
+
+                ProtoImageSource {
+                    proto_source_type: Some(ProtoSourceType::Data(buffer.into_inner())),
+                }
+            }
         }
     }
 }
