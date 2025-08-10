@@ -18,8 +18,6 @@ use std::sync::{Arc, Mutex};
 
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
-use eur_prompt_kit::PromptKitService;
-use eur_secret::secret;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
     procedures::{
@@ -42,7 +40,7 @@ use tauri::{
     plugin::TauriPlugin,
     tray::TrayIconBuilder,
 };
-use tauri_plugin_global_shortcut::ShortcutState;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{error, info};
@@ -269,6 +267,16 @@ fn main() {
                             })
                             .unwrap();
                         app_handle_user.manage(user_controller);
+                        
+                        // Register the initial global shortcut now that user controller is available
+                        let launcher_shortcut = crate::util::get_launcher_shortcut(&app_handle_user);
+                        
+                        // Register the global shortcut
+                        if let Err(e) = app_handle_user.global_shortcut().register(launcher_shortcut) {
+                            error!("Failed to register initial launcher shortcut: {}", e);
+                        } else {
+                            info!("Successfully registered initial launcher shortcut: {:?}", launcher_shortcut);
+                        }
                     });
 
                     // Initialize OpenAI client if API key exists
@@ -321,15 +329,11 @@ fn main() {
 
                     // info!("Setting up global shortcut");
 
-                    // Get the launcher shortcut from user settings or use default
-                    // let launcher_shortcut = get_launcher_shortcut(app_handle);
                     let launcher_label = launcher_window.label().to_string();
 
                     // Register the shortcut plugin
                     app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
 
-                    // Register the global shortcut
-                    // app_handle.global_shortcut().register(launcher_shortcut)?;
 
                     // Linux-specific focus handling
                     #[cfg(target_os = "linux")]
