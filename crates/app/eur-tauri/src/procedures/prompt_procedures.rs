@@ -3,7 +3,6 @@ use eur_eurora_provider::EuroraConfig;
 use eur_prompt_kit::{OllamaConfig, OpenAIConfig};
 use eur_secret::secret;
 use tauri::{Manager, Runtime};
-use tracing::info;
 use url::Url;
 
 use crate::shared_types::SharedPromptKitService;
