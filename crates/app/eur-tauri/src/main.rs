@@ -279,24 +279,6 @@ fn main() {
                         }
                     });
 
-                    // Initialize OpenAI client if API key exists
-                    // let app_handle_openai = app_handle.clone();
-                    // tauri::async_runtime::spawn(async move {
-                    //     let api_key =
-                    //         secret::retrieve("OPENAI_API_KEY", secret::Namespace::Global).unwrap();
-                    //     if api_key.is_some() {
-                    //         let prompt_kit_service = PromptKitService::default();
-
-                    //         let state: tauri::State<SharedPromptKitService> =
-                    //             app_handle_openai.state();
-                    //         let mut guard = state.lock().await;
-                    //         *guard = Some(prompt_kit_service);
-                    //         info!("PromptKitService initialized with API key from keyring");
-                    //     } else {
-                    //         info!("No API key found in keyring, PromptKitService not initialized");
-                    //     }
-                    // });
-
                     // Initialize conversation storage
                     let _db_path = get_db_path(app_handle);
                     let db_app_handle = app_handle.clone();
