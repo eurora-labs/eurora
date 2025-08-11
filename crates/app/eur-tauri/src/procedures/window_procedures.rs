@@ -79,10 +79,11 @@ impl WindowApi for WindowApiImpl {
 
         main_window
             .unminimize()
-            .expect("Failed to set window state");
+            .map_err(|e| format!("Failed to unminimize main window: {e}"))?;
+
         main_window
             .show()
-            .map_err(|e| format!("Failed to open main window: {e}"))?;
+            .map_err(|e| format!("Failed to show main window: {e}"))?;
 
         let launcher_window = app_handle
             .get_window("launcher")
