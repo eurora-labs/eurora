@@ -74,6 +74,7 @@
 
 	// Listen for launcher opened event to refresh activities
 	listen<any>('launcher_opened', async (event) => {
+		await isPromptKitServiceAvailable();
 		if (editorRef) {
 			clearQuery(editorRef);
 		}
@@ -87,12 +88,22 @@
 	});
 
 	async function isPromptKitServiceAvailable() {
-		const serviceName = await taurpc.prompt.get_service_name();
-		return serviceName.length > 0;
+		try {
+			const serviceName = await taurpc.prompt.get_service_name();
+			console.log('get_service_name', serviceName);
+			return serviceName.length > 0;
+		} catch (e) {
+			console.error('get_service_name failed', e);
+			return false;
+		}
 	}
 
-	function openMainWindow() {
-		taurpc.window.open_main_window().then((result) => console.log(result));
+	async function openMainWindow() {
+		try {
+			await taurpc.window.open_main_window();
+		} catch (e) {
+			console.error('open_main_window failed', e);
+		}
 	}
 
 	function addExampleMessages() {
@@ -151,9 +162,19 @@
 		});
 		document.addEventListener('keydown', handleEscapeKey);
 
+		let unlisten: any;
+		taurpc.prompt.prompt_service_change
+			.on((name) => {
+				promptKitServiceAvailable = name ? name.length > 0 : false;
+			})
+			.then((unlistenFn) => {
+				unlisten = unlistenFn;
+			});
+
 		// Clean up event listener when component is unmounted
 		return () => {
 			document.removeEventListener('keydown', handleEscapeKey);
+			unlisten?.();
 		};
 	});
 
@@ -233,39 +254,42 @@
 </script>
 
 <div class="backdrop-custom relative h-full overflow-hidden">
-	{#if promptKitServiceAvailable}
-		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 ">
-			<Launcher.Input
-				placeholder="What can I help you with?"
-				bind:query={searchQuery}
-				bind:editorRef
-				onkeydown={handleKeydown}
-				class="min-h-[100px] h-fit w-full"
-			/>
-		</Launcher.Root>
+	<Launcher.Root
+		class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0"
+		hidden={!promptKitServiceAvailable}
+	>
+		<Launcher.Input
+			placeholder="What can I help you with?"
+			bind:query={searchQuery}
+			bind:editorRef
+			onkeydown={handleKeydown}
+			class="min-h-[100px] h-fit w-full"
+		/>
+	</Launcher.Root>
 
-		{#if messages.length > 0}
-			<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
-				{#each messages as message}
-					{#if message.content.length > 0}
-						<Message.Root
-							variant={message.role === 'user' ? 'default' : 'agent'}
-							finishRendering={() => {}}
-						>
-							<Message.Content>
-								<Katex math={message.content} finishRendering={() => {}} />
-							</Message.Content>
-						</Message.Root>
-					{/if}
-				{/each}
-			</Chat>
-		{/if}
-	{:else}
-		<div class="flex justify-center items-center h-full flex-col gap-4">
-			<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
-			<Button onclick={openMainWindow}>Initialize Now</Button>
-		</div>
+	{#if messages.length > 0}
+		<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
+			{#each messages as message}
+				{#if message.content.length > 0}
+					<Message.Root
+						variant={message.role === 'user' ? 'default' : 'agent'}
+						finishRendering={() => {}}
+					>
+						<Message.Content>
+							<Katex math={message.content} finishRendering={() => {}} />
+						</Message.Content>
+					</Message.Root>
+				{/if}
+			{/each}
+		</Chat>
 	{/if}
+	<div
+		class="flex justify-center items-center h-full flex-col gap-4"
+		hidden={promptKitServiceAvailable}
+	>
+		<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
+		<Button onclick={openMainWindow}>Initialize Now</Button>
+	</div>
 </div>
 <svg
 	xmlns="http://www.w3.org/2000/svg"
@@ -282,7 +306,7 @@
 		/>
 		<feFlood
 			flood-color="#ffffff"
-			flood-opacity="0.1"
+			flood-opacity="0.2"
 			result="white"
 			color-interpolation-filters="sRGB"
 		/>
