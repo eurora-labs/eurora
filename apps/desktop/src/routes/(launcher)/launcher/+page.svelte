@@ -28,12 +28,14 @@
 	} from '@eurora/prosemirror-core/index';
 	// Import the extension factory instead of individual extensions
 	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
+	import Button from '@eurora/ui/components/button/button.svelte';
 
 	// Create TauRPC proxy
 	const taurpc = createTauRPCProxy();
 	// Define a type for Conversation based on what we know from main.rs
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
+	let promptKitServiceAvailable = $state(false);
 	registerCoreExtensions();
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
@@ -72,6 +74,7 @@
 
 	// Listen for launcher opened event to refresh activities
 	listen<any>('launcher_opened', async (event) => {
+		await isPromptKitServiceAvailable();
 		if (editorRef) {
 			clearQuery(editorRef);
 		}
@@ -83,6 +86,25 @@
 		currentMonitorId = launcherInfo?.monitor_id || '';
 		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
 	});
+
+	async function isPromptKitServiceAvailable() {
+		try {
+			const serviceName = await taurpc.prompt.get_service_name();
+			console.log('get_service_name', serviceName);
+			return serviceName.length > 0;
+		} catch (e) {
+			console.error('get_service_name failed', e);
+			return false;
+		}
+	}
+
+	async function openMainWindow() {
+		try {
+			await taurpc.window.open_main_window();
+		} catch (e) {
+			console.error('open_main_window failed', e);
+		}
+	}
 
 	function addExampleMessages() {
 		messages.push(
@@ -135,11 +157,24 @@
 
 	// Add global keydown event listener when component is mounted
 	onMount(() => {
+		isPromptKitServiceAvailable().then((available) => {
+			promptKitServiceAvailable = available;
+		});
 		document.addEventListener('keydown', handleEscapeKey);
+
+		let unlisten: any;
+		taurpc.prompt.prompt_service_change
+			.on((name) => {
+				promptKitServiceAvailable = name ? name.length > 0 : false;
+			})
+			.then((unlistenFn) => {
+				unlisten = unlistenFn;
+			});
 
 		// Clean up event listener when component is unmounted
 		return () => {
 			document.removeEventListener('keydown', handleEscapeKey);
+			unlisten?.();
 		};
 	});
 
@@ -219,8 +254,10 @@
 </script>
 
 <div class="backdrop-custom relative h-full overflow-hidden">
-	<!-- Launcher component -->
-	<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 ">
+	<Launcher.Root
+		class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0"
+		hidden={!promptKitServiceAvailable}
+	>
 		<Launcher.Input
 			placeholder="What can I help you with?"
 			bind:query={searchQuery}
@@ -246,8 +283,14 @@
 			{/each}
 		</Chat>
 	{/if}
+	<div
+		class="flex justify-center items-center h-full flex-col gap-4"
+		hidden={promptKitServiceAvailable}
+	>
+		<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
+		<Button onclick={openMainWindow}>Initialize Now</Button>
+	</div>
 </div>
-
 <svg
 	xmlns="http://www.w3.org/2000/svg"
 	style="position:absolute;width:0;height:0"
@@ -263,7 +306,7 @@
 		/>
 		<feFlood
 			flood-color="#ffffff"
-			flood-opacity="0.1"
+			flood-opacity="0.2"
 			result="white"
 			color-interpolation-filters="sRGB"
 		/>
