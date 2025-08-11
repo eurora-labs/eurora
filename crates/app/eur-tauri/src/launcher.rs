@@ -105,19 +105,19 @@ pub fn toggle_launcher_window<R: tauri::Runtime>(
 
     if is_visible {
         // Hide the launcher window and emit the closed event
-        launcher.hide().expect("Failed to hide launcher window");
+        launcher
+            .hide()
+            .map_err(|e| format!("Failed to hide launcher window: {e}"))?;
         launcher
             .emit("launcher_closed", ())
-            .expect("Failed to emit launcher_closed event");
-
+            .map_err(|e| format!("Failed to emit launcher_closed event: {e}"))?;
         // Update the shared state to indicate launcher is hidden
         set_launcher_visible(false);
     } else {
-        // Use the extracted launcher opening function
-        if let Err(e) = open_launcher_window(&launcher) {
-            error!("Failed to open launcher window: {}", e);
-        }
+        // Open and position the launcher window
+        open_launcher_window(launcher)?;
     }
+
     Ok(())
 }
 
