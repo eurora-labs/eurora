@@ -236,8 +236,8 @@ fn main() {
                             }
                             if event.id == "open" {
                                 let main_window = tray_icon_handle.get_window("main").expect("Failed to get main window");
-                                main_window.unminimize().expect("Failed to set window state");
-                                main_window.show().expect("Failed to show main window");
+                                main_window.unminimize().map_err(|e| error!("Failed to set window state: {}", e)).ok();
+                                main_window.show().map_err(|e| error!("Failed to show main window: {}", e)).ok();
                             }
                         })
                         .build(tauri_app)
