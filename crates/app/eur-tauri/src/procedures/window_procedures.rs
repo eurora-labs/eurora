@@ -84,7 +84,9 @@ impl WindowApi for WindowApiImpl {
             .show()
             .map_err(|e| format!("Failed to open main window: {e}"))?;
 
-        let launcher_window = app_handle.get_window("launcher").unwrap();
+        let launcher_window = app_handle
+            .get_window("launcher")
+            .ok_or_else(|| "Launcher window not found".to_string())?;
 
         toggle_launcher(&launcher_window)
             .map_err(|e| format!("Failed to open launcher window: {e}"))?;
