@@ -28,12 +28,14 @@
 	} from '@eurora/prosemirror-core/index';
 	// Import the extension factory instead of individual extensions
 	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
+	import Button from '@eurora/ui/components/button/button.svelte';
 
 	// Create TauRPC proxy
 	const taurpc = createTauRPCProxy();
 	// Define a type for Conversation based on what we know from main.rs
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
+	let promptKitServiceAvailable = $state(false);
 	registerCoreExtensions();
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
@@ -83,6 +85,15 @@
 		currentMonitorId = launcherInfo?.monitor_id || '';
 		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
 	});
+
+	async function isPromptKitServiceAvailable() {
+		const serviceName = await taurpc.prompt.get_service_name();
+		return serviceName.length > 0;
+	}
+
+	function openMainWindow() {
+		taurpc.window.open_main_window().then((result) => console.log(result));
+	}
 
 	function addExampleMessages() {
 		messages.push(
@@ -135,6 +146,9 @@
 
 	// Add global keydown event listener when component is mounted
 	onMount(() => {
+		isPromptKitServiceAvailable().then((available) => {
+			promptKitServiceAvailable = available;
+		});
 		document.addEventListener('keydown', handleEscapeKey);
 
 		// Clean up event listener when component is unmounted
@@ -219,35 +233,40 @@
 </script>
 
 <div class="backdrop-custom relative h-full overflow-hidden">
-	<!-- Launcher component -->
-	<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 ">
-		<Launcher.Input
-			placeholder="What can I help you with?"
-			bind:query={searchQuery}
-			bind:editorRef
-			onkeydown={handleKeydown}
-			class="min-h-[100px] h-fit w-full"
-		/>
-	</Launcher.Root>
+	{#if promptKitServiceAvailable}
+		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 ">
+			<Launcher.Input
+				placeholder="What can I help you with?"
+				bind:query={searchQuery}
+				bind:editorRef
+				onkeydown={handleKeydown}
+				class="min-h-[100px] h-fit w-full"
+			/>
+		</Launcher.Root>
 
-	{#if messages.length > 0}
-		<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
-			{#each messages as message}
-				{#if message.content.length > 0}
-					<Message.Root
-						variant={message.role === 'user' ? 'default' : 'agent'}
-						finishRendering={() => {}}
-					>
-						<Message.Content>
-							<Katex math={message.content} finishRendering={() => {}} />
-						</Message.Content>
-					</Message.Root>
-				{/if}
-			{/each}
-		</Chat>
+		{#if messages.length > 0}
+			<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
+				{#each messages as message}
+					{#if message.content.length > 0}
+						<Message.Root
+							variant={message.role === 'user' ? 'default' : 'agent'}
+							finishRendering={() => {}}
+						>
+							<Message.Content>
+								<Katex math={message.content} finishRendering={() => {}} />
+							</Message.Content>
+						</Message.Root>
+					{/if}
+				{/each}
+			</Chat>
+		{/if}
+	{:else}
+		<div class="flex justify-center items-center h-full flex-col gap-4">
+			<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
+			<Button onclick={openMainWindow}>Initialize Now</Button>
+		</div>
 	{/if}
 </div>
-
 <svg
 	xmlns="http://www.w3.org/2000/svg"
 	style="position:absolute;width:0;height:0"
