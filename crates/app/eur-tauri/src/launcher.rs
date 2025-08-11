@@ -101,12 +101,22 @@ pub fn calculate_hover_position(
 pub fn toggle_launcher_window<R: tauri::Runtime>(
     launcher: &tauri::Window<R>,
 ) -> Result<(), String> {
-    if LAUNCHER_VISIBLE.load(Ordering::SeqCst) {
+    let is_visible = is_launcher_visible();
+
+    if is_visible {
+        // Hide the launcher window and emit the closed event
+        launcher.hide().expect("Failed to hide launcher window");
         launcher
-            .hide()
-            .map_err(|e| format!("Failed to hide launcher window: {}", e))?;
+            .emit("launcher_closed", ())
+            .expect("Failed to emit launcher_closed event");
+
+        // Update the shared state to indicate launcher is hidden
+        set_launcher_visible(false);
     } else {
-        open_launcher_window(launcher)?;
+        // Use the extracted launcher opening function
+        if let Err(e) = open_launcher_window(&launcher) {
+            error!("Failed to open launcher window: {}", e);
+        }
     }
     Ok(())
 }
