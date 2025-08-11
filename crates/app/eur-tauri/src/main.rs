@@ -13,11 +13,9 @@ use tracing_subscriber::{
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 mod launcher;
 mod util;
-use eur_screen_position::ActiveMonitor;
-use std::sync::{Arc, Mutex};
-
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
+use eur_screen_position::ActiveMonitor;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
     procedures::{
@@ -33,9 +31,11 @@ use eur_tauri::{
     },
     shared_types::{SharedPromptKitService, create_shared_timeline},
 };
-use launcher::{monitor_cursor_for_hover, open_launcher_window, set_launcher_visible};
+use launcher::monitor_cursor_for_hover;
+use launcher::toggle_launcher_window;
+use std::sync::{Arc, Mutex};
 use tauri::{
-    AppHandle, Emitter, Manager, Wry, generate_context,
+    AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
     plugin::TauriPlugin,
     tray::TrayIconBuilder,
@@ -236,8 +236,8 @@ fn main() {
                             }
                             if event.id == "open" {
                                 let main_window = tray_icon_handle.get_window("main").expect("Failed to get main window");
-                                main_window.unminimize().expect("Failed to set window state");
-                                main_window.show().expect("Failed to show main window");
+                                main_window.unminimize().map_err(|e| error!("Failed to set window state: {}", e)).ok();
+                                main_window.show().map_err(|e| error!("Failed to show main window: {}", e)).ok();
                             }
                         })
                         .build(tauri_app)
@@ -430,25 +430,7 @@ fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
             let Some(launcher) = app.get_window(&launcher_label) else {
                 return;
             };
-            let Ok(is_visible) = launcher.is_visible() else {
-                return;
-            };
-
-            if is_visible {
-                // Hide the launcher window and emit the closed event
-                launcher.hide().expect("Failed to hide launcher window");
-                launcher
-                    .emit("launcher_closed", ())
-                    .expect("Failed to emit launcher_closed event");
-
-                // Update the shared state to indicate launcher is hidden
-                set_launcher_visible(false);
-            } else {
-                // Use the extracted launcher opening function
-                if let Err(e) = open_launcher_window(&launcher) {
-                    error!("Failed to open launcher window: {}", e);
-                }
-            }
+            toggle_launcher_window(&launcher);
         })
         .build()
 }
