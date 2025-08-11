@@ -31,11 +31,11 @@ use eur_tauri::{
     },
     shared_types::{SharedPromptKitService, create_shared_timeline},
 };
+use launcher::monitor_cursor_for_hover;
 use launcher::toggle_launcher_window;
-use launcher::{monitor_cursor_for_hover, open_launcher_window, set_launcher_visible};
 use std::sync::{Arc, Mutex};
 use tauri::{
-    AppHandle, Emitter, Manager, Wry, generate_context,
+    AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
     plugin::TauriPlugin,
     tray::TrayIconBuilder,
@@ -431,26 +431,6 @@ fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
                 return;
             };
             toggle_launcher_window(&launcher);
-
-            // let Ok(is_visible) = launcher.is_visible() else {
-            //     return;
-            // };
-
-            // if is_visible {
-            //     // Hide the launcher window and emit the closed event
-            //     launcher.hide().expect("Failed to hide launcher window");
-            //     launcher
-            //         .emit("launcher_closed", ())
-            //         .expect("Failed to emit launcher_closed event");
-
-            //     // Update the shared state to indicate launcher is hidden
-            //     set_launcher_visible(false);
-            // } else {
-            //     // Use the extracted launcher opening function
-            //     if let Err(e) = open_launcher_window(&launcher) {
-            //         error!("Failed to open launcher window: {}", e);
-            //     }
-            // }
         })
         .build()
 }
