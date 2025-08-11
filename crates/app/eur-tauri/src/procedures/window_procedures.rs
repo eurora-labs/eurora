@@ -18,6 +18,8 @@ pub trait WindowApi {
     async fn open_launcher_window<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<(), String>;
+
+    async fn open_main_window<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
 }
 
 #[derive(Clone)]
@@ -64,6 +66,28 @@ impl WindowApi for WindowApiImpl {
             .ok_or_else(|| "Launcher window not found".to_string())?;
 
         toggle_launcher(&window).map_err(|e| format!("Failed to open launcher window: {e}"))?;
+        Ok(())
+    }
+
+    async fn open_main_window<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<(), String> {
+        let main_window = app_handle
+            .get_window("main")
+            .ok_or_else(|| "Main window not found".to_string())?;
+
+        main_window
+            .unminimize()
+            .expect("Failed to set window state");
+        main_window
+            .show()
+            .map_err(|e| format!("Failed to open main window: {e}"))?;
+
+        let launcher_window = app_handle.get_window("launcher").unwrap();
+
+        toggle_launcher(&launcher_window)
+            .map_err(|e| format!("Failed to open launcher window: {e}"))?;
         Ok(())
     }
 }
