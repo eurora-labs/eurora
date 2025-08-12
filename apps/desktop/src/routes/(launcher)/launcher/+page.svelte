@@ -306,7 +306,7 @@
 		/>
 		<feFlood
 			flood-color="#ffffff"
-			flood-opacity="0.2"
+			flood-opacity="0.4"
 			result="white"
 			color-interpolation-filters="sRGB"
 		/>
@@ -329,9 +329,9 @@
 	@reference 'tailwindcss';
 	.backdrop-custom {
 		z-index: 2;
-		/* backdrop-filter: blur(36px); */
-		/* -webkit-backdrop-filter: blur(36px); */
-		/* background-color: rgba(255, 255, 255, 0.2); */
+		backdrop-filter: blur(36px);
+		-webkit-backdrop-filter: blur(36px);
+		background-color: rgba(255, 255, 255, 0.2);
 	}
 
 	.backdrop-custom-2 {
@@ -340,7 +340,7 @@
 		height: 100%;
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
-		/* background-color: rgba(255, 255, 255, 0.2); */
+		background-color: rgba(255, 255, 255, 0.2);
 	}
 	:global(body.linux-app .backdrop-custom) {
 		backdrop-filter: none;
@@ -357,6 +357,10 @@
 	}
 
 	:global(body.windows-app .blur-bright) {
+		display: none;
+	}
+
+	:global(body.mac-app .blur-bright) {
 		display: none;
 	}
 </style>
