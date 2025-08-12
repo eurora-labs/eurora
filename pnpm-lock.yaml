@@ -1138,8 +1138,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.35
-        version: 2.0.0-next.35(svelte@5.37.3)
+        specifier: 2.0.0-next.36
+        version: 2.0.0-next.36(svelte@5.37.3)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.37.3)
@@ -1610,8 +1610,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.35
-        version: 2.0.0-next.35(svelte@5.37.3)
+        specifier: 2.0.0-next.36
+        version: 2.0.0-next.36(svelte@5.37.3)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.37.3)
@@ -1817,8 +1817,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.35
-        version: 2.0.0-next.35(svelte@5.37.3)
+        specifier: 2.0.0-next.36
+        version: 2.0.0-next.36(svelte@5.37.3)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.37.3)
@@ -5723,8 +5723,8 @@ packages:
     resolution: {integrity: sha512-7W0vV3rqv5tokqkBAFV1LbR7HPOWzXQDpDgEuib/aJ1jsZZx6x3c2mBI+TJhJzOhkGeaLbCKEHXEXLfirtG2JA==}
     engines: {node: '>=18'}
 
-  layerchart@2.0.0-next.35:
-    resolution: {integrity: sha512-Ha6pgT3kke4WGOnm8Wa8apl/tU9pg9EMcMoI+6kmp/kdTuxEsjUgfwk4Kv/6pqDCmzvpwoZzX5cYfRIiXOoKXQ==}
+  layerchart@2.0.0-next.36:
+    resolution: {integrity: sha512-/GfbQX31HHqZYjErC+UrLpck5SUPzxpiyssvEdSwN9IPktmKVaqOn3xYSqQVpOTVaM9C91oiqKGKaw5e+zzYKA==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -12288,7 +12288,7 @@ snapshots:
     dependencies:
       package-json: 10.0.1
 
-  layerchart@2.0.0-next.35(svelte@5.37.3):
+  layerchart@2.0.0-next.36(svelte@5.37.3):
     dependencies:
       '@dagrejs/dagre': 1.1.5
       '@layerstack/svelte-actions': 1.0.1-next.14
