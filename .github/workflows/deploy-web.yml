@@ -36,7 +36,7 @@ jobs:
         environment: amplify-web
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
 
             - name: Pull Git LFS files
               run: git lfs pull
