@@ -130,6 +130,7 @@ pub fn create_hover(
     .always_on_top(true)
     .transparent(true)
     .shadow(false)
+    .skip_taskbar(true)
     // .position(0.0, 0.0)
     // .center()
     .visible(true)
@@ -186,6 +187,35 @@ pub fn create_launcher(
     .hidden_title(true)
     .visible(false)
     .content_protected(true)
+    .build()?;
+
+    Ok(window)
+}
+
+#[cfg(target_os = "macos")]
+pub fn create_hover(
+    handle: &AppHandle,
+    label: &str,
+    window_relative_url: String,
+) -> tauri::Result<tauri::WebviewWindow> {
+    info!("creating window '{label}' created at '{window_relative_url}'");
+    let window = tauri::WebviewWindowBuilder::new(
+        handle,
+        label,
+        tauri::WebviewUrl::App(window_relative_url.into()),
+    )
+    .inner_size(50.0, 50.0)
+    .max_inner_size(50.0, 50.0)
+    .resizable(false)
+    // .disable_drag_drop_handler()
+    .decorations(false)
+    .title_bar_style(tauri::TitleBarStyle::Transparent)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .shadow(false)
+    // .position(0.0, 0.0)
+    // .center()
+    .visible(true)
     .build()?;
 
     Ok(window)
