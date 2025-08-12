@@ -17,10 +17,16 @@ export async function getCurrentTab() {
 	}
 }
 
-function handlePortDisconnect() {
+function handlePortDisconnect(disconnected = false) {
+	if (disconnected) {
+		setTimeout(() => {
+			handlePortDisconnect();
+		}, 5000);
+		return;
+	}
 	port = browser.runtime.connectNative('com.eurora.app');
 	port.onDisconnect.addListener(() => {
-		handlePortDisconnect();
+		handlePortDisconnect(true);
 	});
 }
 
