@@ -327,14 +327,14 @@
 
 <style lang="postcss">
 	@reference 'tailwindcss';
-	.backdrop-custom {
+	:global(.backdrop-custom) {
 		z-index: 2;
 		backdrop-filter: blur(36px);
 		-webkit-backdrop-filter: blur(36px);
 		background-color: rgba(255, 255, 255, 0.2);
 	}
 
-	.backdrop-custom-2 {
+	:global(.backdrop-custom-2) {
 		z-index: 1;
 		width: 100%;
 		height: 100%;
