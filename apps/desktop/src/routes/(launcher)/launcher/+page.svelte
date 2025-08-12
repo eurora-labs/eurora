@@ -314,6 +314,11 @@
 	</filter>
 </svg>
 
+<!-- <div
+	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
+	bind:this={backdropCustom2Ref}
+></div> -->
+
 <div
 	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
 	style="filter:url(#blur-bright)"
@@ -324,8 +329,8 @@
 	@reference 'tailwindcss';
 	.backdrop-custom {
 		z-index: 2;
-		backdrop-filter: blur(36px);
-		-webkit-backdrop-filter: blur(36px);
+		/* backdrop-filter: blur(36px); */
+		/* -webkit-backdrop-filter: blur(36px); */
 		/* background-color: rgba(255, 255, 255, 0.2); */
 	}
 
