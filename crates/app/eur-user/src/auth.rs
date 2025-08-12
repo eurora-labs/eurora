@@ -57,12 +57,12 @@ impl AuthManager {
     }
 
     fn get_access_token(&self) -> Result<Sensitive<String>> {
-        secret::retrieve(ACCESS_TOKEN_HANDLE, secret::Namespace::BuildKind)?
+        secret::retrieve(ACCESS_TOKEN_HANDLE, secret::Namespace::Global)?
             .ok_or_else(|| anyhow!("No access token found"))
     }
 
     fn get_refresh_token(&self) -> Result<Sensitive<String>> {
-        secret::retrieve(REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)?
+        secret::retrieve(REFRESH_TOKEN_HANDLE, secret::Namespace::Global)?
             .ok_or_else(|| anyhow!("No refresh token found"))
     }
 
@@ -153,7 +153,7 @@ fn store_access_token(token: String) -> Result<()> {
     secret::persist(
         ACCESS_TOKEN_HANDLE,
         &Sensitive(token),
-        secret::Namespace::BuildKind,
+        secret::Namespace::Global,
     )
     .map_err(|e| anyhow!("Failed to store access token: {}", e))
 }
@@ -162,7 +162,7 @@ fn store_refresh_token(token: String) -> Result<()> {
     secret::persist(
         REFRESH_TOKEN_HANDLE,
         &Sensitive(token),
-        secret::Namespace::BuildKind,
+        secret::Namespace::Global,
     )
     .map_err(|e| anyhow!("Failed to store refresh token: {}", e))
 }

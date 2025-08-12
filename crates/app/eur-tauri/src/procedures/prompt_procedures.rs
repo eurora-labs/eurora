@@ -99,7 +99,7 @@ impl PromptApi for PromptApiImpl {
         if let Some(client) = client {
             Ok(client.get_service_name().map_err(|e| e.to_string())?)
         } else {
-            secret::retrieve(eur_user::REFRESH_TOKEN_HANDLE, secret::Namespace::BuildKind)
+            secret::retrieve(eur_user::REFRESH_TOKEN_HANDLE, secret::Namespace::Global)
                 .map_err(|e| e.to_string())?
                 .ok_or_else(|| "Refresh token not found".to_string())?;
 
