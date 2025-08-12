@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 // use image::{ImageBuffer, Rgb, Rgba};
 use base64::{Engine as _, engine::general_purpose};
 use image::{ImageBuffer, Rgb, Rgba};
+use tracing::info;
 use xcap::Monitor;
 
 // use eur_ocr::{self};
@@ -69,6 +70,7 @@ pub fn capture_monitor_region(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+    info!("Capturing monitor region");
     // let monitor_width = monitor.width().unwrap();
     // let monitor_height = monitor.height().unwrap();
 
@@ -95,9 +97,15 @@ pub fn capture_monitor_region_rgba(
     // let region_width = width.min(monitor_width - x) as u32;
     // let region_height = height.min(monitor_height - y) as u32;
 
+    info!(
+        "Capturing monitor region x:{}, y:{} width:{} height:{}",
+        x, y, width, height
+    );
     let image_region = monitor
         .capture_region(x, y, width, height)
         .map_err(|e| anyhow!("Failed to capture region: {}", e))?;
+    let dimensions = image_region.dimensions();
+    info!("Captured monitor region {:?}", dimensions);
 
     Ok(image_region)
 }
@@ -162,12 +170,16 @@ pub fn capture_focused_region_rgba(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+    info!(
+        "Capturing focused region x: {}, y: {}, width: {}, height: {}",
+        x, y, width, height
+    );
     let monitors = Monitor::all()?;
     if monitors.is_empty() {
         return Err(anyhow!("No monitors found"));
     }
     if monitors.len() == 1 {
-        return Ok(monitors[0].capture_image()?);
+        return Ok(monitors[0].capture_region(x, y, width, height)?);
     }
     let requested = monitor_id
         .parse::<u32>()
@@ -214,7 +226,7 @@ pub fn capture_region_rgba(
 ///
 /// # Returns
 ///
-/// A base64 encoded PNG string  
+/// A base64 encoded PNG string
 pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
     let mut buffer = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut buffer);
