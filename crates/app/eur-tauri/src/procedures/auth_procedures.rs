@@ -55,7 +55,7 @@ impl AuthApi for AuthApiImpl {
             secret::persist(
                 LOGIN_CODE_VERIFIER,
                 &Sensitive(code_verifier.clone()),
-                secret::Namespace::BuildKind,
+                secret::Namespace::Global,
             )
             .map_err(|e| format!("Failed to persist code verifier: {}", e))?;
             Ok(LoginToken {
@@ -70,12 +70,12 @@ impl AuthApi for AuthApiImpl {
 
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
         if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>() {
-            let login_token = secret::retrieve(LOGIN_CODE_VERIFIER, secret::Namespace::BuildKind)
+            let login_token = secret::retrieve(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
                 .map_err(|e| format!("Failed to retrieve login token: {}", e))?
                 .ok_or_else(|| "Login token not found".to_string())?;
             match user_controller.login_by_login_token(login_token.0).await {
                 Ok(_) => {
-                    secret::delete(LOGIN_CODE_VERIFIER, secret::Namespace::BuildKind)
+                    secret::delete(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
                         .map_err(|e| format!("Failed to remove login token: {}", e))?;
 
                     let config = EuroraConfig::new(
