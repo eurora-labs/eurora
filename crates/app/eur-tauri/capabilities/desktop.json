@@ -7,7 +7,8 @@
   ],
   "windows": [
     "main",
-    "launcher"
+    "launcher",
+    "hover"
   ],
   "permissions": [
     "global-shortcut:allow-is-registered",
