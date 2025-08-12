@@ -72,29 +72,32 @@ impl Default for ImplActiveMonitor {
     /// Create an ImplActiveMonitor for the monitor containing the cursor
     /// Falls back to primary monitor if cursor position cannot be determined
     fn default() -> Self {
-        let (cursor_x, cursor_y) = Enigo::new(&Settings::default())
-            .unwrap()
-            .location()
-            .unwrap();
-        // Try to get cursor position from a dummy position (0,0) to find current monitor
-        if let Some(cursor_monitor) = find_cursor_monitor(tauri::PhysicalPosition::new(
-            cursor_x as f64,
-            cursor_y as f64,
-        )) {
-            Self::new(cursor_monitor.monitor)
-        } else if let Some(primary_monitor) = ImplActiveMonitor::get_primary_monitor() {
-            Self::new(primary_monitor)
-        } else {
-            // Fallback to a default monitor if nothing else works
-            Self::new(MonitorInfo {
-                id: "default".to_string(),
-                x: 0,
-                y: 0,
-                width: 1920,
-                height: 1080,
-                scale_factor: 1.0,
-            })
+        let cursor_xy = Enigo::new(&Settings::default())
+            .ok()
+            .and_then(|e| e.location().ok());
+
+        if let Some((cursor_x, cursor_y)) = cursor_xy
+            && let Some(cursor_monitor) = find_cursor_monitor(tauri::PhysicalPosition::new(
+                cursor_x as f64,
+                cursor_y as f64,
+            ))
+        {
+            return Self::new(cursor_monitor.monitor);
         }
+
+        if let Some(primary_monitor) = ImplActiveMonitor::get_primary_monitor() {
+            return Self::new(primary_monitor);
+        }
+
+        // Fallback to a default monitor if nothing else works
+        Self::new(MonitorInfo {
+            id: "default".to_string(),
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+            scale_factor: 1.0,
+        })
     }
 }
 
