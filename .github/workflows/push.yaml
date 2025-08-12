@@ -19,7 +19,7 @@ jobs:
             node: ${{ steps.filter.outputs.node }}
             rust: ${{ steps.filter.outputs.rust }}
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
@@ -60,7 +60,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'false' &&  needs.changes.outputs.docs == 'true'}}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - uses: ./.github/actions/init-env-node
             - run: pnpm prettier
 
@@ -69,7 +69,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - uses: ./.github/actions/init-env-node
             - run: pnpm lint
 
@@ -78,7 +78,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - uses: ./.github/actions/init-env-node
             - name: Install Protoc
               uses: arduino/setup-protoc@v3
@@ -93,7 +93,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - uses: ./.github/actions/init-env-node
             - run: pnpm test
 
@@ -106,7 +106,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - run: cargo fmt --check --all
             - run: cargo check --workspace --all-targets
 
@@ -119,7 +119,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             # TODO(qix-): we have to exclude the app here for now because for some
             # TODO(qix-): reason it doesn't build with the docs feature enabled.
             - run: cargo doc --no-deps --all-features --document-private-items -p eurora-desktop
@@ -148,7 +148,7 @@ jobs:
                     - [tokio]
                     - [devtools]
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - uses: ./.github/actions/check-crate
               with:
                   features: ${{ toJson(matrix.features) }}
@@ -177,7 +177,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - name: Rust Cache
               uses: Swatinem/rust-cache@v2.7.8
               with:
