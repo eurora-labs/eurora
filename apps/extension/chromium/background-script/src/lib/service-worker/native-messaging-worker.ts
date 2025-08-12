@@ -2,6 +2,31 @@
 // Keep track of the native port connection
 let nativePort: chrome.runtime.Port | null = null;
 
+handlePortDisconnect();
+
+function handlePortDisconnect(disconnected = false) {
+	if (disconnected) {
+		setTimeout(() => {
+			handlePortDisconnect();
+		}, 5000);
+		return;
+	}
+	connectToNativeHost().then(
+		(connected) => {
+			if (connected) processQueue();
+
+			nativePort.onDisconnect.addListener(() => {
+				handlePortDisconnect(true);
+			});
+		},
+		(error) => {
+			console.error('Failed to connect to native host:', error);
+			nativePort = null;
+			handlePortDisconnect(true);
+		},
+	);
+}
+
 // Store queued messages if connection isn't ready
 const messageQueue: any[] = [];
 
