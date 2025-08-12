@@ -1,6 +1,7 @@
 console.log('Extension background services started');
 
-let port = browser.runtime.connectNative('com.eurora.app');
+let port: browser.runtime.Port;
+handlePortDisconnect();
 
 export async function getCurrentTab() {
 	try {
@@ -14,6 +15,13 @@ export async function getCurrentTab() {
 		console.error('Error getting current tab:', error);
 		return null;
 	}
+}
+
+function handlePortDisconnect() {
+	port = browser.runtime.connectNative('com.eurora.app');
+	port.onDisconnect.addListener(() => {
+		handlePortDisconnect();
+	});
 }
 
 async function handleTabMessage(messageType: string) {
