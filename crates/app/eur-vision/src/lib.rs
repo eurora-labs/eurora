@@ -91,21 +91,9 @@ pub fn capture_monitor_region_rgba(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
-    // let monitor_width = monitor.width().unwrap();
-    // let monitor_height = monitor.height().unwrap();
-
-    // let region_width = width.min(monitor_width - x) as u32;
-    // let region_height = height.min(monitor_height - y) as u32;
-
-    info!(
-        "Capturing monitor region x:{}, y:{} width:{} height:{}",
-        x, y, width, height
-    );
     let image_region = monitor
         .capture_region(x, y, width, height)
         .map_err(|e| anyhow!("Failed to capture region: {}", e))?;
-    let dimensions = image_region.dimensions();
-    info!("Captured monitor region {:?}", dimensions);
 
     Ok(image_region)
 }
@@ -170,10 +158,6 @@ pub fn capture_focused_region_rgba(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
-    info!(
-        "Capturing focused region x: {}, y: {}, width: {}, height: {}",
-        x, y, width, height
-    );
     let monitors = Monitor::all()?;
     if monitors.is_empty() {
         return Err(anyhow!("No monitors found"));
