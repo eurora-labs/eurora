@@ -5,142 +5,55 @@ let nativePort: chrome.runtime.Port | null = null;
 // Store queued messages if connection isn't ready
 const messageQueue: any[] = [];
 
-// Initialize connection to native host
-function connectToNativeHost(): Promise<boolean> {
-	return new Promise((resolve) => {
-		try {
-			console.log('Connecting to native host...');
-			nativePort = chrome.runtime.connectNative('com.eurora.app');
-
-			nativePort.onMessage.addListener((response) => {
-				console.log('Received response from native host:', response);
-
-				// Broadcast response to all tabs
-				chrome.tabs.query({}, (tabs) => {
-					tabs.forEach((tab) => {
-						console.log('Sending message to tab', tab.id);
-						console.log('Response', response);
-						if (tab.id) {
-							chrome.tabs.sendMessage(tab.id, {
-								type: 'NATIVE_RESPONSE',
-								payload: response,
-							});
-						}
-					});
-				});
-			});
-
-			nativePort.onDisconnect.addListener(() => {
-				const error = chrome.runtime.lastError;
-				console.error('Native port disconnected:', error?.message || 'Unknown error');
-				nativePort = null;
-
-				// Try to reconnect after a delay
-				setTimeout(() => {
-					connectToNativeHost().then((connected) => {
-						if (connected) processQueue();
-					});
-				}, 5000);
-			});
-
-			console.log('Successfully connected to native host');
-			resolve(true);
-		} catch (error) {
-			console.error('Failed to connect to native host:', error);
-			nativePort = null;
-			resolve(false);
-
-			// Try to reconnect after a delay
-			setTimeout(() => {
-				connectToNativeHost().then((connected) => {
-					if (connected) processQueue();
-				});
-			}, 5000);
-		}
-	});
+async function connect() {
+	nativePort = chrome.runtime.connectNative('com.eurora.app');
+	nativePort.onMessage.addListener(onMessageListener);
+	nativePort.onDisconnect.addListener(onDisconnectListener);
 }
 
-// Process any queued messages
-function processQueue() {
-	console.log(`Processing queue with ${messageQueue.length} messages`);
-	while (messageQueue.length > 0) {
-		const { payload, tabId } = messageQueue.shift();
-		sendMessageToNativeHost(payload, tabId);
+async function onMessageListener(message: any, sender: chrome.runtime.Port) {
+	switch (message.type) {
+		case 'GENERATE_ASSETS':
+			handleGenerateReport()
+				.then((response) => {
+					console.log('Sending GENERATE_REPORT_RESPONSE message', response);
+					sender.postMessage(response);
+				})
+				.catch((error) => {
+					console.log('Error generating report', error);
+					sender.postMessage({ success: false, error: String(error) });
+				});
+			return true; // Indicates we'll call sendResponse asynchronously
+		case 'GENERATE_SNAPSHOT':
+			handleGenerateSnapshot()
+				.then((response) => {
+					console.log('Sending GENERATE_SNAPSHOT_RESPONSE message', response);
+					sender.postMessage(response);
+				})
+				.catch((error) => {
+					console.log('Error generating snapshot', error);
+					sender.postMessage({ success: false, error: String(error) });
+				});
+			return true; // Indicates we'll call sendResponse asynchronously
+		default:
+			throw new Error(`Unknown message type: ${message.type}`);
 	}
 }
 
-function sendMessageToNativeHost(payload: any, tabId?: number) {
-	console.log('Sending message to native host:', payload);
-	console.log('Native port:', nativePort);
-	try {
-		// Forward the payload directly as it should already be in protocol format
-		// The payload comes from content scripts that construct proper protocol messages
-		nativePort!.postMessage(payload);
+function onDisconnectListener() {
+	const error = chrome.runtime.lastError;
+	console.error('Native port disconnected:', error?.message || 'Unknown error');
+	nativePort = null;
 
-		return { status: 'sent' };
-	} catch (error) {
-		console.error('Failed to send message to native host:', error);
-
-		// Return error to caller
-		const errorResponse = {
-			status: 'error',
-			error: error instanceof Error ? error.message : String(error),
-		};
-
-		// Notify content script of failure
-		if (tabId) {
-			chrome.tabs.sendMessage(tabId, {
-				type: 'NATIVE_RESPONSE',
-				payload: errorResponse,
-			});
-		}
-
-		// Reconnect on error
-		nativePort = null;
-		setTimeout(() => {
-			connectToNativeHost().then((connected) => {
-				if (connected) processQueue();
-			});
-		}, 1000);
-
-		return errorResponse;
-	}
+	// Try to reconnect after a delay
+	setTimeout(() => {
+		connect().then(() => {
+			console.log('Reconnected to native host');
+		});
+	}, 5000);
 }
 
-// // Initialize the connection when the service worker starts
-connectToNativeHost().then((connected) => {
-	console.log(
-		`Native messaging service worker initialized, connection status: ${connected ? 'connected' : 'failed'}`,
-	);
-	nativePort.onMessage.addListener(async (message, sender) => {
-		switch (message.type) {
-			case 'GENERATE_ASSETS':
-				handleGenerateReport()
-					.then((response) => {
-						console.log('Sending GENERATE_REPORT_RESPONSE message', response);
-						sender.postMessage(response);
-					})
-					.catch((error) => {
-						console.log('Error generating report', error);
-						sender.postMessage({ success: false, error: String(error) });
-					});
-				return true; // Indicates we'll call sendResponse asynchronously
-			case 'GENERATE_SNAPSHOT':
-				handleGenerateSnapshot()
-					.then((response) => {
-						console.log('Sending GENERATE_SNAPSHOT_RESPONSE message', response);
-						sender.postMessage(response);
-					})
-					.catch((error) => {
-						console.log('Error generating snapshot', error);
-						sender.postMessage({ success: false, error: String(error) });
-					});
-				return true; // Indicates we'll call sendResponse asynchronously
-			default:
-				throw new Error(`Unknown message type: ${message.type}`);
-		}
-	});
-});
+connect();
 
 console.log('Native messaging service worker registered');
 
