@@ -1,10 +1,4 @@
-use std::{
-    fs::{self, File, OpenOptions},
-    io::{Read, Write},
-    net::ToSocketAddrs,
-    path::PathBuf,
-    process,
-};
+use std::{fs::File, net::ToSocketAddrs, process};
 
 use anyhow::{anyhow, Result};
 // Import the PORT constant from lib.rs
@@ -22,51 +16,96 @@ mod server;
 mod snapshot_context;
 mod snapshot_converter;
 
-/// Get the path to the lock file
-fn get_lock_file_path() -> Result<PathBuf> {
-    let config_dir =
-        dirs::config_dir().ok_or_else(|| anyhow!("Could not determine config directory"))?;
-    let app_config_dir = config_dir.join("eurora");
+/// Find processes by name and return their PIDs
+fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
+    let mut pids = Vec::new();
+    let current_pid = process::id();
 
-    // Create the directory if it doesn't exist
-    if !app_config_dir.exists() {
-        fs::create_dir_all(&app_config_dir)?;
-    }
-
-    Ok(app_config_dir.join("native-messaging.lock"))
-}
-
-/// Check if a process with the given PID is running
-fn is_process_running(pid: u32) -> bool {
     #[cfg(target_family = "unix")]
     {
         use std::process::Command;
-        // On Unix-like systems, we can check if the process exists by sending signal 0
-        // This doesn't actually send a signal, but checks if the process exists
-        let output = Command::new("kill").args(["-0", &pid.to_string()]).output();
+        // On Unix-like systems, use pgrep to find processes by name
+        let output = Command::new("pgrep").args(["-f", process_name]).output();
 
         match output {
-            Ok(output) => output.status.success(),
-            Err(_) => false,
+            Ok(output) => {
+                if output.status.success() {
+                    let output_str = String::from_utf8_lossy(&output.stdout);
+                    for line in output_str.lines() {
+                        if let Ok(pid) = line.trim().parse::<u32>() {
+                            // Don't include our own process
+                            if pid != current_pid {
+                                pids.push(pid);
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                info!("Failed to run pgrep: {}", e);
+                // Fallback: try using ps
+                let output = Command::new("ps").args(["aux"]).output();
+
+                if let Ok(output) = output {
+                    let output_str = String::from_utf8_lossy(&output.stdout);
+                    for line in output_str.lines() {
+                        if line.contains(process_name) {
+                            let parts: Vec<&str> = line.split_whitespace().collect();
+                            if parts.len() > 1 {
+                                if let Ok(pid) = parts[1].parse::<u32>() {
+                                    if pid != current_pid {
+                                        pids.push(pid);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
     #[cfg(target_family = "windows")]
     {
         use std::process::Command;
-        // On Windows, we can use tasklist to check if the process exists
+        // On Windows, use tasklist to find processes by name
         let output = Command::new("tasklist")
-            .args(["/FI", &format!("PID eq {}", pid), "/NH"])
+            .args([
+                "/FI",
+                &format!("IMAGENAME eq {}.exe", process_name),
+                "/FO",
+                "CSV",
+                "/NH",
+            ])
             .output();
 
         match output {
             Ok(output) => {
-                let output_str = String::from_utf8_lossy(&output.stdout);
-                output_str.contains(&pid.to_string())
+                if output.status.success() {
+                    let output_str = String::from_utf8_lossy(&output.stdout);
+                    for line in output_str.lines() {
+                        if !line.trim().is_empty() {
+                            // Parse CSV format: "process.exe","PID","Session Name","Session#","Mem Usage"
+                            let parts: Vec<&str> = line.split(',').collect();
+                            if parts.len() > 1 {
+                                let pid_str = parts[1].trim_matches('"');
+                                if let Ok(pid) = pid_str.parse::<u32>() {
+                                    if pid != current_pid {
+                                        pids.push(pid);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            Err(_) => false,
+            Err(e) => {
+                info!("Failed to run tasklist: {}", e);
+            }
         }
     }
+
+    Ok(pids)
 }
 
 /// Kill a process with the given PID
@@ -103,49 +142,24 @@ fn kill_process(pid: u32) -> Result<()> {
 
 /// Ensure only one instance is running
 fn ensure_single_instance() -> Result<()> {
-    let lock_file_path = get_lock_file_path()?;
+    // Define the process name to search for
+    let process_name = "eur-native-messaging";
 
-    // Check if the lock file exists
-    if lock_file_path.exists() {
-        // Read the PID from the lock file
-        let mut file = File::open(&lock_file_path)?;
-        let mut pid_str = String::new();
-        file.read_to_string(&mut pid_str)?;
+    // Find any existing instances of this process
+    let existing_pids = find_processes_by_name(process_name)?;
 
-        // Parse the PID
-        let pid = pid_str
-            .trim()
-            .parse::<u32>()
-            .map_err(|_| anyhow!("Invalid PID in lock file: {}", pid_str))?;
-
-        // Check if the process is still running
-        if is_process_running(pid) {
-            info!("Found existing instance with PID {}. Killing it...", pid);
-            // Kill the existing process
-            kill_process(pid)?;
-        } else {
-            info!("Found stale lock file. Removing it...");
+    // Kill all existing instances
+    for pid in existing_pids {
+        info!("Found existing instance with PID {}. Killing it...", pid);
+        if let Err(e) = kill_process(pid) {
+            info!("Failed to kill process {}: {}", pid, e);
+            // Continue trying to kill other processes even if one fails
         }
-
-        // Remove the lock file (whether it was stale or we killed the process)
-        fs::remove_file(&lock_file_path)?;
     }
 
-    // Create a new lock file with our PID
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(&lock_file_path)?;
-
-    let current_pid = process::id();
-    file.write_all(current_pid.to_string().as_bytes())?;
-
-    // Register a shutdown handler to remove the lock file when the process exits
-    let lock_file_path_clone = lock_file_path.clone();
+    // Register a shutdown handler for clean exit
     ctrlc::set_handler(move || {
-        info!("Received shutdown signal. Cleaning up...");
-        let _ = fs::remove_file(&lock_file_path_clone);
+        info!("Received shutdown signal. Exiting...");
         process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
