@@ -254,42 +254,39 @@
 </script>
 
 <div class="backdrop-custom relative h-full overflow-hidden">
-	<Launcher.Root
-		class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0"
-		hidden={!promptKitServiceAvailable}
-	>
-		<Launcher.Input
-			placeholder="What can I help you with?"
-			bind:query={searchQuery}
-			bind:editorRef
-			onkeydown={handleKeydown}
-			class="min-h-[100px] h-fit w-full"
-		/>
-	</Launcher.Root>
+	{#if promptKitServiceAvailable}
+		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0">
+			<Launcher.Input
+				placeholder="What can I help you with?"
+				bind:query={searchQuery}
+				bind:editorRef
+				onkeydown={handleKeydown}
+				class="min-h-[100px] h-fit w-full"
+			/>
+		</Launcher.Root>
 
-	{#if messages.length > 0}
-		<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
-			{#each messages as message}
-				{#if message.content.length > 0}
-					<Message.Root
-						variant={message.role === 'user' ? 'default' : 'agent'}
-						finishRendering={() => {}}
-					>
-						<Message.Content>
-							<Katex math={message.content} finishRendering={() => {}} />
-						</Message.Content>
-					</Message.Root>
-				{/if}
-			{/each}
-		</Chat>
+		{#if messages.length > 0}
+			<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
+				{#each messages as message}
+					{#if message.content.length > 0}
+						<Message.Root
+							variant={message.role === 'user' ? 'default' : 'agent'}
+							finishRendering={() => {}}
+						>
+							<Message.Content>
+								<Katex math={message.content} finishRendering={() => {}} />
+							</Message.Content>
+						</Message.Root>
+					{/if}
+				{/each}
+			</Chat>
+		{/if}
+	{:else}
+		<div class="flex justify-center items-center h-full flex-col gap-4">
+			<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
+			<Button onclick={openMainWindow}>Initialize Now</Button>
+		</div>
 	{/if}
-	<div
-		class="flex justify-center items-center h-full flex-col gap-4"
-		hidden={promptKitServiceAvailable}
-	>
-		<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
-		<Button onclick={openMainWindow}>Initialize Now</Button>
-	</div>
 </div>
 <svg
 	xmlns="http://www.w3.org/2000/svg"
