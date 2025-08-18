@@ -5,6 +5,6 @@ use serde::{Deserialize, Serialize};
 pub struct HoverSettings {
     /// Whether hover window is enabled
     pub enabled: bool,
-    /// Position of hover window
-    pub position: (i64, i64),
+    // /// Position of hover window
+    // pub position: (i64, i64),
 }
