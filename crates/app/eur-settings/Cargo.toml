@@ -12,3 +12,4 @@ serde_json = { workspace = true, features = ["std", "arbitrary_precision"] }
 tracing = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 dirs = { workspace = true }
+specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
