@@ -10,6 +10,10 @@ pub trait SettingsApi {
     async fn get_hover_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<HoverSettings, String>;
+
+    async fn get_telemetry_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<TelemetrySettings, String>;
 }
 #[derive(Clone)]
 pub struct SettingsApiImpl;
@@ -23,5 +27,14 @@ impl SettingsApi for SettingsApiImpl {
         let settings: tauri::State<SharedAppSettings> = app_handle.state();
         let settings = settings.lock().await;
         Ok(settings.hover.clone())
+    }
+
+    async fn get_telemetry_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<TelemetrySettings, String> {
+        let settings: tauri::State<SharedAppSettings> = app_handle.state();
+        let settings = settings.lock().await;
+        Ok(settings.telemetry.clone())
     }
 }
