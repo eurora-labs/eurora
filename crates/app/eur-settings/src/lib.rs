@@ -10,7 +10,6 @@ pub struct Settings {
     pub telemetry: telemetry::TelemetrySettings,
     /// Hover settings
     pub hover: hover::HoverSettings,
-
     /// Backend provider settings
     // TODO: Refactor prompt service to here
     pub backend_provider: String,
