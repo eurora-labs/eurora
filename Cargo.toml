@@ -66,6 +66,7 @@ eur-proto-client = { path = "crates/common/eur-proto-client" }
 eur-prompt-kit = { path = "crates/common/eur-prompt-kit" }
 eur-util = { path = "crates/common/eur-util" }
 eur-storage = { path = "crates/app/eur-storage" }
+eur-settings = { path = "crates/app/eur-settings" }
 
 eur-prompt-service = { path = "crates/backend/eur-prompt-service" }
 eur-auth-service = { path = "crates/backend/eur-auth-service" }
