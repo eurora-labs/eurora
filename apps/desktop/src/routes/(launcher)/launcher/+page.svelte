@@ -255,11 +255,6 @@
 
 <div class="backdrop-custom relative h-full overflow-hidden">
 	{#if promptKitServiceAvailable}
-		<div class="flex justify-center items-center h-full flex-col gap-4">
-			<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
-			<Button onclick={openMainWindow}>Initialize Now</Button>
-		</div>
-	{:else}
 		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0">
 			<Launcher.Input
 				placeholder="What can I help you with?"
@@ -286,6 +281,11 @@
 				{/each}
 			</Chat>
 		{/if}
+	{:else}
+		<div class="flex justify-center items-center h-full flex-col gap-4">
+			<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
+			<Button onclick={openMainWindow}>Initialize Now</Button>
+		</div>
 	{/if}
 </div>
 <svg
