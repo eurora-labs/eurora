@@ -1,0 +1,14 @@
+[package]
+name = "eur-settings"
+version = "0.0.0"
+edition = "2024"
+authors = ["Andre Roelofs andre@eurora-labs.com"]
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true, features = ["std", "arbitrary_precision"] }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+dirs = { workspace = true }

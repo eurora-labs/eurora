@@ -3129,6 +3129,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "eur-settings"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "dirs 6.0.0",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "eur-storage"
 version = "0.0.0"
 
