@@ -1,4 +1,4 @@
-use crate::Settings;
+use crate::AppSettings;
 use crate::json::{json_difference, merge_non_null_json_value};
 use crate::watch::SETTINGS_FILE;
 use anyhow::Result;
@@ -9,7 +9,7 @@ use std::path::Path;
 
 pub(crate) static DEFAULTS: &str = include_str!("../assets/defaults.jsonc");
 
-impl Settings {
+impl AppSettings {
     pub fn load(config_path: &Path) -> Result<Self> {
         if !config_path.exists() {
             create_dirs_then_write(config_path, "{}\n")?;
@@ -27,13 +27,13 @@ impl Settings {
             .expect("missing config dir")
             .join("eurora");
         std::fs::create_dir_all(&config_dir).expect("failed to create config dir");
-        Settings::load(config_dir.join(SETTINGS_FILE).as_path())
+        AppSettings::load(config_dir.join(SETTINGS_FILE).as_path())
     }
 
     /// Save all value in this instance to the custom configuration file *if they differ* from the defaults.
     pub fn save(&self, config_path: &Path) -> Result<()> {
         // Load the current settings
-        let current = serde_json::to_value(Settings::load(config_path)?)?;
+        let current = serde_json::to_value(AppSettings::load(config_path)?)?;
 
         // Derive changed values only compared to the current settings
         let update = serde_json::to_value(self)?;

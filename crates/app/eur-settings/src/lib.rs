@@ -1,17 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-mod hover;
 mod json;
 mod persistence;
-mod telemetry;
+mod settings;
 mod watch;
 
-pub use hover::HoverSettings;
-pub use telemetry::TelemetrySettings;
+pub use settings::HoverSettings;
+pub use settings::TelemetrySettings;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct Settings {
+pub struct AppSettings {
     /// Telemetry settings
     pub telemetry: TelemetrySettings,
     /// Hover settings
