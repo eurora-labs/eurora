@@ -24,6 +24,7 @@ use eur_tauri::{
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
+        settings_procedures::{SettingsApi, SettingsApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         user_procedures::{UserApi, UserApiImpl},
@@ -33,7 +34,7 @@ use eur_tauri::{
 };
 use launcher::monitor_cursor_for_hover;
 use launcher::toggle_launcher_window;
-use std::sync::{Arc, Mutex};
+use std::{path::Path, sync::{Arc, Mutex}};
 use tauri::{
     AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -44,6 +45,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{error, info};
+use eur_settings::AppSettings;
 
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
@@ -139,13 +141,16 @@ fn main() {
                 .setup(move |tauri_app| {
                     let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
 
+                    let app_settings = AppSettings::load_from_default_path_creating().unwrap();
+
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
                         update(handle).await.unwrap();
                     });
 
+
                     #[cfg(desktop)]
-                    {
+                    if app_settings.general.autostart && !started_by_autostart {
                         use tauri_plugin_autostart::MacosLauncher;
                         use tauri_plugin_autostart::ManagerExt;
 
@@ -158,34 +163,34 @@ fn main() {
                         // Check enable state
                         info!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
                     }
+
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
                         .expect("Failed to create main window");
 
                     if started_by_autostart {
                         main_window.hide().expect("Failed to hide main window");
-                    }
+                    } 
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
                         create_launcher(tauri_app.handle(), "launcher", "launcher".into())
                             .expect("Failed to create launcher window");
 
-                    let hover_window = create_hover(tauri_app.handle(), "hover", "hover".into())
-                        .expect("Failed to create hover window");
+                        let hover_window = create_hover(tauri_app.handle(), "hover", "hover".into())
+                            .expect("Failed to create hover window");
 
-                    // Position hover window initially
-                    let active_monitor = ActiveMonitor::default();
-                    let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(tauri::PhysicalSize::new(50, 50), 1.0, 0.75);
-                    let _ = hover_window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x: hover_x, y: hover_y }));
+                        // Position hover window initially
+                        util::position_hover_window(&hover_window);
 
-                    let _ = hover_window.set_size(tauri::PhysicalSize::new(50, 50));
+                        // Start cursor monitoring for hover window
+                        let hover_window_clone = hover_window.clone();
+                        tauri::async_runtime::spawn(async move {
+                            monitor_cursor_for_hover(hover_window_clone).await;
+                        });
 
-
-                    // Start cursor monitoring for hover window
-                    let hover_window_clone = hover_window.clone();
-                    tauri::async_runtime::spawn(async move {
-                        monitor_cursor_for_hover(hover_window_clone).await;
-                    });
+                    if !app_settings.hover.enabled {
+                        hover_window.hide().expect("Failed to hide hover window");
+                    }
 
                     let app_handle = tauri_app.handle();
 
@@ -402,6 +407,7 @@ fn main() {
                         .bigint(specta_typescript::BigIntExportBehavior::BigInt),
                 )
                 .merge(AuthApiImpl.into_handler())
+                .merge(SettingsApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
                 .merge(SystemApiImpl.into_handler())
