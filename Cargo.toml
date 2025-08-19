@@ -18,6 +18,7 @@ bstr = "1.11.1"
 insta = "1.41.1"
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
 serde = { version = "1.0", features = ["derive"], default-features = false }
+serde_json_lenient = "0.2.4"
 thiserror = "2.0.9"
 tokio = { version = "1.46.1", default-features = false }
 keyring = { version = "3.6.3", features = [
@@ -66,6 +67,8 @@ eur-proto-client = { path = "crates/common/eur-proto-client" }
 eur-prompt-kit = { path = "crates/common/eur-prompt-kit" }
 eur-util = { path = "crates/common/eur-util" }
 eur-storage = { path = "crates/app/eur-storage" }
+eur-settings = { path = "crates/app/eur-settings" }
+eur-fs = { path = "crates/common/eur-fs" }
 
 eur-prompt-service = { path = "crates/backend/eur-prompt-service" }
 eur-auth-service = { path = "crates/backend/eur-auth-service" }

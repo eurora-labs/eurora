@@ -14,6 +14,7 @@
 	import KeyboardIcon from '@lucide/svelte/icons/keyboard';
 	import WebhookIcon from '@lucide/svelte/icons/webhook';
 	import MailIcon from '@lucide/svelte/icons/mail';
+	import InspectionPanelIcon from '@lucide/svelte/icons/inspection-panel';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { page } from '$app/state';
@@ -23,6 +24,11 @@
 			title: 'General',
 			url: '/settings',
 			icon: BoltIcon,
+		},
+		{
+			title: 'Hover',
+			url: '/settings/hover',
+			icon: InspectionPanelIcon,
 		},
 		{
 			title: 'Hotkey',
