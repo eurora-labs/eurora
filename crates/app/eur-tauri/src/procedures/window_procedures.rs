@@ -1,4 +1,4 @@
-use crate::launcher::toggle_launcher_window as toggle_launcher;
+use crate::{launcher::toggle_launcher_window as toggle_launcher, window::create_hover};
 use tauri::{Manager, Runtime};
 use tracing::info;
 
@@ -20,6 +20,10 @@ pub trait WindowApi {
     ) -> Result<(), String>;
 
     async fn open_main_window<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
+
+    async fn hide_hover_window<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
+
+    async fn show_hover_window<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
 }
 
 #[derive(Clone)]
@@ -91,6 +95,34 @@ impl WindowApi for WindowApiImpl {
 
         toggle_launcher(&launcher_window)
             .map_err(|e| format!("Failed to open launcher window: {e}"))?;
+        Ok(())
+    }
+
+    async fn hide_hover_window<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<(), String> {
+        let hover_window = app_handle
+            .get_window("hover")
+            .ok_or_else(|| "Hover window not found".to_string())?;
+
+        hover_window
+            .hide()
+            .map_err(|e| format!("Failed to hide hover window: {e}"))?;
+        Ok(())
+    }
+
+    async fn show_hover_window<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<(), String> {
+        // Get or create hover window
+        let hover_window = app_handle.get_window("hover");
+
+        hover_window
+            .expect("Hover window not found")
+            .show()
+            .map_err(|e| format!("Failed to show hover window: {e}"))?;
         Ok(())
     }
 }
