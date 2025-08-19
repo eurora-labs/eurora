@@ -1,7 +1,8 @@
+use eur_settings::AppSettings;
 use eur_settings::{GeneralSettings, HoverSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
 
-use crate::shared_types::SharedAppSettings;
+// use crate::shared_types::SharedAppSettings;
 
 #[taurpc::procedures(path = "settings")]
 pub trait SettingsApi {
@@ -26,8 +27,7 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<HoverSettings, String> {
-        let settings: tauri::State<SharedAppSettings> = app_handle.state();
-        let settings = settings.lock().await;
+        let settings = AppSettings::load_from_default_path_creating().unwrap();
         Ok(settings.hover.clone())
     }
 
@@ -35,8 +35,7 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<TelemetrySettings, String> {
-        let settings: tauri::State<SharedAppSettings> = app_handle.state();
-        let settings = settings.lock().await;
+        let settings = AppSettings::load_from_default_path_creating().unwrap();
         Ok(settings.telemetry.clone())
     }
 
@@ -44,8 +43,7 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<GeneralSettings, String> {
-        let settings: tauri::State<SharedAppSettings> = app_handle.state();
-        let settings = settings.lock().await;
+        let settings = AppSettings::load_from_default_path_creating().unwrap();
         Ok(settings.general.clone())
     }
 }
