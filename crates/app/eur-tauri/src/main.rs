@@ -34,7 +34,7 @@ use eur_tauri::{
 };
 use launcher::monitor_cursor_for_hover;
 use launcher::toggle_launcher_window;
-use std::sync::{Arc, Mutex};
+use std::{path::Path, sync::{Arc, Mutex}};
 use tauri::{
     AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -45,6 +45,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{error, info};
+use eur_settings::AppSettings;
 
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
@@ -140,13 +141,20 @@ fn main() {
                 .setup(move |tauri_app| {
                     let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
 
+                    let app_settings = if started_by_autostart {
+                        AppSettings::load(Path::new("settings.json")).unwrap()
+                    } else {
+                        AppSettings::load_from_default_path_creating().unwrap()
+                    };
+
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
                         update(handle).await.unwrap();
                     });
 
+
                     #[cfg(desktop)]
-                    {
+                    if app_settings.general.autostart && !started_by_autostart {
                         use tauri_plugin_autostart::MacosLauncher;
                         use tauri_plugin_autostart::ManagerExt;
 
@@ -159,12 +167,13 @@ fn main() {
                         // Check enable state
                         info!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
                     }
+
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
                         .expect("Failed to create main window");
 
                     if started_by_autostart {
                         main_window.hide().expect("Failed to hide main window");
-                    }
+                    } 
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
@@ -173,6 +182,8 @@ fn main() {
 
                     let hover_window = create_hover(tauri_app.handle(), "hover", "hover".into())
                         .expect("Failed to create hover window");
+
+                    
 
                     // Position hover window initially
                     let active_monitor = ActiveMonitor::default();
