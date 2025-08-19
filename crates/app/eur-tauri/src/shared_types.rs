@@ -1,4 +1,4 @@
-use eur_settings::Settings as AppSettings;
+use eur_settings::AppSettings;
 use std::sync::Arc;
 
 use async_mutex::Mutex;
