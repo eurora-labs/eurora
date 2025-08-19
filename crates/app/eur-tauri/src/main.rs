@@ -176,24 +176,23 @@ fn main() {
                         create_launcher(tauri_app.handle(), "launcher", "launcher".into())
                             .expect("Failed to create launcher window");
 
-                    let hover_window = create_hover(tauri_app.handle(), "hover", "hover".into())
-                        .expect("Failed to create hover window");
+                    if app_settings.hover.enabled {
+                        let hover_window = create_hover(tauri_app.handle(), "hover", "hover".into())
+                            .expect("Failed to create hover window");
 
-                    
+                        // Position hover window initially
+                        let active_monitor = ActiveMonitor::default();
+                        let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(tauri::PhysicalSize::new(50, 50), 1.0, 0.75);
+                        let _ = hover_window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x: hover_x, y: hover_y }));
 
-                    // Position hover window initially
-                    let active_monitor = ActiveMonitor::default();
-                    let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(tauri::PhysicalSize::new(50, 50), 1.0, 0.75);
-                    let _ = hover_window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x: hover_x, y: hover_y }));
+                        let _ = hover_window.set_size(tauri::PhysicalSize::new(50, 50));
 
-                    let _ = hover_window.set_size(tauri::PhysicalSize::new(50, 50));
-
-
-                    // Start cursor monitoring for hover window
-                    let hover_window_clone = hover_window.clone();
-                    tauri::async_runtime::spawn(async move {
-                        monitor_cursor_for_hover(hover_window_clone).await;
-                    });
+                        // Start cursor monitoring for hover window
+                        let hover_window_clone = hover_window.clone();
+                        tauri::async_runtime::spawn(async move {
+                            monitor_cursor_for_hover(hover_window_clone).await;
+                        });
+                    }
 
                     let app_handle = tauri_app.handle();
 
