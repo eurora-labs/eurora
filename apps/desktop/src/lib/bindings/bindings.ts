@@ -6,6 +6,12 @@ type TAURI_CHANNEL<T> = (response: T) => void
 
 export type ContextChip = { id: string; extension_id: string; name: string; attrs: Partial<{ [key in string]: string }>; icon: string | null; position: number | null }
 
+export type GeneralSettings = { 
+/**
+ * Whether to start the app on autostart
+ */
+autostart: boolean }
+
 export type HoverSettings = { 
 /**
  * Whether hover window is enabled
@@ -36,7 +42,7 @@ nonAnonymousMetrics: boolean;
  */
 distinctId: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"send_query":["channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_hover_settings":[],"get_telemetry_settings":[]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"send_query":["channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_general_settings":[],"get_hover_settings":[],"get_telemetry_settings":[]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
 "chat": {send_query: (channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
@@ -47,7 +53,8 @@ get_service_name: () => Promise<string>,
 prompt_service_change: (serviceName: string | null) => Promise<void>, 
 switch_to_ollama: (baseUrl: string, model: string) => Promise<null>, 
 switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<null>},
-"settings": {get_hover_settings: () => Promise<HoverSettings>, 
+"settings": {get_general_settings: () => Promise<GeneralSettings>, 
+get_hover_settings: () => Promise<HoverSettings>, 
 get_telemetry_settings: () => Promise<TelemetrySettings>},
 "system": {check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
 list_activities: () => Promise<ContextChip[]>, 
