@@ -54,4 +54,14 @@ impl AppSettings {
         eur_fs::create_dirs_then_write(config_path, to_string_pretty(&customizations)?)?;
         Ok(())
     }
+
+    pub fn save_to_default_path(&self) -> Result<()> {
+        self.save(
+            dirs::config_dir()
+                .expect("missing config dir")
+                .join("eurora")
+                .join(SETTINGS_FILE)
+                .as_path(),
+        )
+    }
 }
