@@ -48,49 +48,6 @@ pub fn list_files<P: AsRef<Path>>(
     Ok(files)
 }
 
-// Return an iterator of worktree-relative slash-separated paths for files inside the `worktree_dir`, recursively.
-// Fails if the `worktree_dir` isn't a valid git repository.
-pub fn iter_worktree_files(
-    worktree_dir: impl AsRef<Path>,
-) -> Result<impl Iterator<Item = BString>> {
-    let worktree_dir = worktree_dir.as_ref();
-
-    // Check if it's a git repository by looking for .git directory or file
-    let git_dir = worktree_dir.join(".git");
-    if !git_dir.exists() {
-        return Err(anyhow::anyhow!(
-            "Not a git repository: {}",
-            worktree_dir.display()
-        ));
-    }
-
-    // Use git ls-files to get tracked files
-    let output = Command::new("git")
-        .arg("ls-files")
-        .arg("--cached")
-        .arg("--others")
-        .arg("--exclude-standard")
-        .current_dir(worktree_dir)
-        .output()
-        .context("Failed to execute git ls-files")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("git ls-files failed: {}", stderr));
-    }
-
-    let stdout =
-        String::from_utf8(output.stdout).context("git ls-files output is not valid UTF-8")?;
-
-    let files: Vec<BString> = stdout
-        .lines()
-        .filter(|line| !line.is_empty())
-        .map(|line| BString::from(line))
-        .collect();
-
-    Ok(files.into_iter())
-}
-
 /// Write a single file so that the write either fully succeeds, or fully fails,
 /// assuming the containing directory already exists.
 pub fn write<P: AsRef<Path>>(file_path: P, contents: impl AsRef<[u8]>) -> anyhow::Result<()> {
