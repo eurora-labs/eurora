@@ -1,4 +1,4 @@
-use crate::launcher::toggle_launcher_window as toggle_launcher;
+use crate::{launcher::toggle_launcher_window as toggle_launcher, window::create_hover};
 use tauri::{Manager, Runtime};
 use tracing::info;
 
@@ -116,11 +116,11 @@ impl WindowApi for WindowApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<(), String> {
-        let hover_window = app_handle
-            .get_window("hover")
-            .ok_or_else(|| "Hover window not found".to_string())?;
+        // Get or create hover window
+        let hover_window = app_handle.get_window("hover");
 
         hover_window
+            .expect("Hover window not found")
             .show()
             .map_err(|e| format!("Failed to show hover window: {e}"))?;
         Ok(())
