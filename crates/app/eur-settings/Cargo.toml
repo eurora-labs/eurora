@@ -9,7 +9,10 @@ publish = false
 anyhow = { workspace = true }
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true, features = ["std", "arbitrary_precision"] }
+serde_json_lenient = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
 dirs = { workspace = true }
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
+eur-fs = { workspace = true }
+notify = { version = "8.2.0" }
