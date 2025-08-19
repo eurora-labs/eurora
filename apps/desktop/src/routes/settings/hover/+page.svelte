@@ -9,13 +9,31 @@
 	let hoverSettings = $state<HoverSettings | null>(null);
 	let hoverEnabled = $state(false);
 
-	async function loadSettings() {
-		hoverSettings = await taurpc.settings.get_hover_settings();
-		hoverEnabled = hoverSettings?.enabled ?? false;
+	async function saveSettings() {
+		await taurpc.settings.set_hover_settings({
+			...hoverSettings,
+			enabled: hoverEnabled,
+		});
+	}
+
+	async function onHoverEnabledChange() {
+		await taurpc.settings.set_hover_settings({
+			...hoverSettings,
+			enabled: hoverEnabled,
+		});
+
+		if (hoverEnabled) {
+			taurpc.window.show_hover_window();
+		} else {
+			taurpc.window.hide_hover_window();
+		}
 	}
 
 	onMount(() => {
-		loadSettings();
+		taurpc.settings.get_hover_settings().then((settings) => {
+			hoverSettings = settings;
+			hoverEnabled = hoverSettings?.enabled ?? false;
+		});
 	});
 </script>
 
@@ -23,7 +41,7 @@
 	<h1 class="text-2xl font-bold">Hover Settings</h1>
 
 	<div class="flex w-full items-start justify-start gap-2 py-2">
-		<Switch checked={hoverEnabled} />
+		<Switch bind:checked={hoverEnabled} onCheckedChange={onHoverEnabledChange} />
 		<Label>Enable hover window</Label>
 	</div>
 </div>
