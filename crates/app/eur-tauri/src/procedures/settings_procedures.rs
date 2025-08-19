@@ -1,7 +1,5 @@
-use eur_settings::{HoverSettings, TelemetrySettings};
+use eur_settings::{GeneralSettings, HoverSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
-use tauri_plugin_global_shortcut::GlobalShortcutExt;
-use tracing::{error, info};
 
 use crate::shared_types::SharedAppSettings;
 
@@ -14,6 +12,10 @@ pub trait SettingsApi {
     async fn get_telemetry_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<TelemetrySettings, String>;
+
+    async fn get_general_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<GeneralSettings, String>;
 }
 #[derive(Clone)]
 pub struct SettingsApiImpl;
@@ -36,5 +38,14 @@ impl SettingsApi for SettingsApiImpl {
         let settings: tauri::State<SharedAppSettings> = app_handle.state();
         let settings = settings.lock().await;
         Ok(settings.telemetry.clone())
+    }
+
+    async fn get_general_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<GeneralSettings, String> {
+        let settings: tauri::State<SharedAppSettings> = app_handle.state();
+        let settings = settings.lock().await;
+        Ok(settings.general.clone())
     }
 }
