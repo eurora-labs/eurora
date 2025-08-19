@@ -1,7 +1,6 @@
 use eur_settings::AppSettings;
 use eur_settings::{GeneralSettings, HoverSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
-use tracing::info;
 
 // use crate::shared_types::SharedAppSettings;
 
@@ -22,6 +21,11 @@ pub trait SettingsApi {
     async fn set_general_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         general_settings: GeneralSettings,
+    ) -> Result<(), String>;
+
+    async fn set_hover_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        hover_settings: HoverSettings,
     ) -> Result<(), String>;
 }
 #[derive(Clone)]
@@ -62,7 +66,17 @@ impl SettingsApi for SettingsApiImpl {
         settings.general = general_settings;
         settings.save_to_default_path().unwrap();
 
-        info!("General settings updated");
+        Ok(())
+    }
+
+    async fn set_hover_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        hover_settings: HoverSettings,
+    ) -> Result<(), String> {
+        let mut settings = AppSettings::load_from_default_path_creating().unwrap();
+        settings.hover = hover_settings;
+        settings.save_to_default_path().unwrap();
 
         Ok(())
     }
