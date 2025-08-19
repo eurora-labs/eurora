@@ -1,0 +1,14 @@
+{
+    "general": {
+        "autostart": true
+    },
+    "hover": {
+        "enabled": true
+    },
+    "telemetry": {
+        "anonymousMetrics": true,
+        "anonymousErrors": true,
+        "nonAnonymousMetrics": false,
+        "distinctId": null
+    }
+}
