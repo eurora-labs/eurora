@@ -6,13 +6,43 @@ type TAURI_CHANNEL<T> = (response: T) => void
 
 export type ContextChip = { id: string; extension_id: string; name: string; attrs: Partial<{ [key in string]: string }>; icon: string | null; position: number | null }
 
+export type GeneralSettings = { 
+/**
+ * Whether to start the app on autostart
+ */
+autostart: boolean }
+
+export type HoverSettings = { 
+/**
+ * Whether hover window is enabled
+ */
+enabled: boolean }
+
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
 export type Query = { text: string; assets: string[] }
 
 export type ResponseChunk = { chunk: string }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"send_query":["channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"]}' }
+export type TelemetrySettings = { 
+/**
+ * Anonymous metrics
+ */
+anonymousMetrics: boolean; 
+/**
+ * Anonymous error reporting
+ */
+anonymousErrors: boolean; 
+/**
+ * Non-anonymous metrics
+ */
+nonAnonymousMetrics: boolean; 
+/**
+ * Distinct ID, if non-anonymous metrics are enabled
+ */
+distinctId: string | null }
+
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"send_query":["channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_general_settings":[],"get_hover_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_hover_settings":["hover_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"hide_hover_window":[],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"],"show_hover_window":[]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
 "chat": {send_query: (channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
@@ -23,6 +53,11 @@ get_service_name: () => Promise<string>,
 prompt_service_change: (serviceName: string | null) => Promise<void>, 
 switch_to_ollama: (baseUrl: string, model: string) => Promise<null>, 
 switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<null>},
+"settings": {get_general_settings: () => Promise<GeneralSettings>, 
+get_hover_settings: () => Promise<HoverSettings>, 
+get_telemetry_settings: () => Promise<TelemetrySettings>, 
+set_general_settings: (generalSettings: GeneralSettings) => Promise<null>, 
+set_hover_settings: (hoverSettings: HoverSettings) => Promise<null>},
 "system": {check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
 list_activities: () => Promise<ContextChip[]>, 
 send_key_to_launcher: (key: string) => Promise<null>},
@@ -30,9 +65,11 @@ send_key_to_launcher: (key: string) => Promise<null>},
 save_api_key: (apiKey: string) => Promise<null>},
 "user": {set_launcher_hotkey: (key: string, modifiers: string[]) => Promise<null>},
 "window": {get_scale_factor: (height: number) => Promise<number>, 
+hide_hover_window: () => Promise<null>, 
 open_launcher_window: () => Promise<null>, 
 open_main_window: () => Promise<null>, 
-resize_launcher_window: (height: number, scaleFactor: number) => Promise<null>} };
+resize_launcher_window: (height: number, scaleFactor: number) => Promise<null>, 
+show_hover_window: () => Promise<null>} };
 
 
 export const createTauRPCProxy = () => createProxy<Router>(ARGS_MAP)
