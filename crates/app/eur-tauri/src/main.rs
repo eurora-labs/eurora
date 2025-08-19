@@ -141,11 +141,7 @@ fn main() {
                 .setup(move |tauri_app| {
                     let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
 
-                    let app_settings = if started_by_autostart {
-                        AppSettings::load(Path::new("settings.json")).unwrap()
-                    } else {
-                        AppSettings::load_from_default_path_creating().unwrap()
-                    };
+                    let app_settings = AppSettings::load_from_default_path_creating().unwrap();
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
