@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 mod hover;
+mod json;
+mod persistence;
 mod telemetry;
+mod watch;
 
 pub use hover::HoverSettings;
 pub use telemetry::TelemetrySettings;
