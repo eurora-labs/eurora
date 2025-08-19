@@ -64,6 +64,7 @@ eur-client-grpc = { path = "../../proto/eur-client-grpc" }
 eur-personal-db = { path = "../eur-personal-db" }
 eur-native-messaging = { path = "../eur-native-messaging" }
 eur-settings = { path = "../eur-settings" }
+
 chrono = { workspace = true }
 defer = "0.2.1"
 futures = { workspace = true }

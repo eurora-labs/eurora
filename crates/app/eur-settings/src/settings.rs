@@ -22,3 +22,10 @@ pub struct HoverSettings {
     // /// Position of hover window
     // pub position: (i64, i64),
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneralSettings {
+    /// Whether to start the app on autostart
+    pub autostart: bool,
+}
