@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { Label } from '@eurora/ui/components/label/index';
 	import type { LauncherSettings, Hotkey } from '$lib/bindings/bindings';
+	import { default as HotkeyComponent } from '$lib/components/Hotkey.svelte';
 	import { createTauRPCProxy } from '$lib/bindings/bindings';
 	import { onMount } from 'svelte';
 
@@ -12,7 +13,7 @@
 	let launcherSettings = $state<LauncherSettings | null>(null);
 	let hotkey = $state<Hotkey | null>(null);
 
-	async function onLauncherEnabledChange() {
+	async function onHotkeyChange(hotkey: Hotkey) {
 		if (!hotkey) return;
 
 		await taurpc.settings.set_launcher_settings({
@@ -35,13 +36,14 @@
 	<div class="flex w-full items-center justify-start gap-2 py-2">
 		<Label>Current hotkey</Label>
 		{#if hotkey}
-			<Button variant="ghost" onclick={() => goto('/settings/hotkey')}>
+			<HotkeyComponent {hotkey} {onHotkeyChange} />
+			<!-- <Button variant="ghost" onclick={() => goto('/settings/hotkey')}>
 				{#each hotkey.modifiers as mod}
 					{mod + ' '}
 				{/each}
 				+
 				{hotkey.key}
-			</Button>
+			</Button> -->
 		{/if}
 	</div>
 </div>
