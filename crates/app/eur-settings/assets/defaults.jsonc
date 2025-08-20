@@ -10,5 +10,6 @@
         "anonymousErrors": true,
         "nonAnonymousMetrics": false,
         "distinctId": null
-    }
+    },
+    "launcher": {}
 }

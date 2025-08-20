@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 
 	import { toast } from 'svelte-sonner';
@@ -37,4 +37,4 @@
 			Save
 		</Button>
 	</div>
-</div>
+</div> -->
