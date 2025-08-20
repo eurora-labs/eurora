@@ -24,6 +24,9 @@ impl AppSettings {
         let mut settings: AppSettings = serde_json::from_value(settings)?;
         if settings.launcher.hotkey.key == "None" {
             settings.launcher.hotkey = Hotkey::default();
+            settings
+                .save_to_default_path()
+                .expect("failed to save settings");
         }
 
         Ok(settings)
