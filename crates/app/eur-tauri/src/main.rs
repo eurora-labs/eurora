@@ -279,7 +279,7 @@ fn main() {
                         app_handle_user.manage(user_controller);
 
                         // Register the initial global shortcut now that user controller is available
-                        let launcher_shortcut = crate::util::get_launcher_shortcut(&app_handle_user);
+                        let launcher_shortcut = crate::util::convert_hotkey_to_shortcut(app_settings.launcher.hotkey.clone());
 
                         // Register the global shortcut
                         if let Err(e) = app_handle_user.global_shortcut().register(launcher_shortcut) {
