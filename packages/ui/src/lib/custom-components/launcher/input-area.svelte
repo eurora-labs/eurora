@@ -37,6 +37,6 @@
 <Editor
 	bind:this={ref}
 	bind:value
-	class={cn(className, 'ProsemirrorEditor h-fit min-h-[100px] text-[40px]  shadow-none')}
+	class={cn(className, 'ProsemirrorEditor h-fit min-h-[100px] shadow-none')}
 	{...restProps}
 />

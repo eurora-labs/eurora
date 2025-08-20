@@ -261,7 +261,7 @@
 				bind:query={searchQuery}
 				bind:editorRef
 				onkeydown={handleKeydown}
-				class="min-h-[100px] h-fit w-full"
+				class="min-h-[100px] h-fit w-full text-[40px]"
 			/>
 		</Launcher.Root>
 

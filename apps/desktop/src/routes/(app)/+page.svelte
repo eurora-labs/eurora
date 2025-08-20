@@ -202,7 +202,7 @@
 	>
 		<Launcher.Input
 			placeholder="What can I help you with?"
-			class="min-h-[100px] h-fit w-full text-black placeholder:text-white text-sm"
+			class="min-h-[40px] h-fit w-full text-black placeholder:text-white text-[24px]"
 			bind:query={searchQuery}
 			bind:editorRef
 			onkeydown={handleKeydown}
