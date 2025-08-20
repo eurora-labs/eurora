@@ -3,6 +3,7 @@
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import type { Hotkey } from '$lib/bindings/bindings.js';
 
 	let taurpc = createTauRPCProxy();
 	let settingHotkey = $state(false);
