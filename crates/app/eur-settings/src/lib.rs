@@ -6,6 +6,7 @@ mod persistence;
 mod settings;
 mod watch;
 
+pub use hotkey::Hotkey;
 pub use settings::GeneralSettings;
 pub use settings::HoverSettings;
 pub use settings::LauncherSettings;
