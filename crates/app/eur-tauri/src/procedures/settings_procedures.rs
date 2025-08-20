@@ -91,7 +91,9 @@ impl SettingsApi for SettingsApiImpl {
         let mut settings = state.lock().await;
 
         settings.general = general_settings;
-        settings.save_to_default_path().unwrap();
+        settings
+            .save_to_default_path()
+            .map_err(|e| format!("Failed to persist hover settings: {e}"))?;
 
         Ok(())
     }
@@ -105,7 +107,9 @@ impl SettingsApi for SettingsApiImpl {
         let mut settings = state.lock().await;
 
         settings.hover = hover_settings;
-        settings.save_to_default_path().unwrap();
+        settings
+            .save_to_default_path()
+            .map_err(|e| format!("Failed to persist hover settings: {e}"))?;
 
         Ok(())
     }
@@ -130,7 +134,9 @@ impl SettingsApi for SettingsApiImpl {
         }
 
         settings.launcher = launcher_settings;
-        settings.save_to_default_path().unwrap();
+        settings
+            .save_to_default_path()
+            .map_err(|e| format!("Failed to persist launcher settings: {e}"))?;
 
         Ok(())
     }
