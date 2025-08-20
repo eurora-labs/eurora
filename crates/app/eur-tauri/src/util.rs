@@ -1,4 +1,5 @@
 use eur_screen_position::ActiveMonitor;
+use eur_settings::Hotkey;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
 use tracing::info;
@@ -156,4 +157,10 @@ pub fn position_hover_window(hover_window: &tauri::WebviewWindow) {
     }));
 
     let _ = hover_window.set_size(tauri::PhysicalSize::new(50, 50));
+}
+
+pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
+    let key_code = string_key_to_tauri_code(&hotkey.key).expect("Invalid key");
+    let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
+    Shortcut::new(modifiers, key_code)
 }

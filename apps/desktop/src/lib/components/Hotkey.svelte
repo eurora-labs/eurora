@@ -1,15 +1,23 @@
+<script lang="ts" module>
+	export interface HotkeyProps {
+		hotkey: Hotkey;
+		onHotkeyChange?: (hotkey: Hotkey) => void;
+	}
+</script>
+
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
-	import { Badge } from '@eurora/ui/components/badge/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import type { Hotkey } from '$lib/bindings/bindings.js';
 
 	let taurpc = createTauRPCProxy();
 	let settingHotkey = $state(false);
-	let currentHotkey = $state('Ctrl + Space');
-	let recordedKeys = $state<string[]>([]);
+	let recordedHotkey = $state<Hotkey | null>(null);
 	let isRecording = $state(false);
 	let recordingTimeout: NodeJS.Timeout | null = null;
+
+	let { hotkey, onHotkeyChange }: HotkeyProps = $props();
 
 	// Key mapping for better display
 	const keyDisplayMap: Record<string, string> = {
@@ -31,10 +39,9 @@
 
 	export async function saveHotkey() {
 		try {
-			const keys = currentHotkey.split(' + ');
 			await taurpc.user.set_launcher_hotkey(
-				keys[keys.length - 1].toLowerCase(),
-				keys.slice(0, keys.length - 1).map((key) => key.toLowerCase()),
+				hotkey.key.toLowerCase(),
+				hotkey.modifiers.map((modifier: string) => modifier.toLowerCase()),
 			);
 		} catch (error) {
 			console.error('Error setting hotkey:', error);
@@ -45,59 +52,69 @@
 		return keyDisplayMap[key] || key.toUpperCase();
 	}
 
+	function hotkeyToString(hotkey: Hotkey): string {
+		return [...hotkey.modifiers, hotkey.key].join(' + ');
+	}
+
 	function handleKeyDown(event: KeyboardEvent) {
 		if (!isRecording) return;
 
 		event.preventDefault();
 		event.stopPropagation();
 
-		const keys: string[] = [];
+		// Handle Escape key to cancel recording
+		if (event.key === 'Escape') {
+			cancelRecording();
+			return;
+		}
+
+		const modifiers: string[] = [];
 
 		// Add modifiers in consistent order
 		if (event.ctrlKey || event.metaKey) {
-			keys.push(event.ctrlKey ? 'Ctrl' : 'Cmd');
+			modifiers.push(event.ctrlKey ? 'Ctrl' : 'Cmd');
 		}
 		if (event.altKey) {
-			keys.push('Alt');
+			modifiers.push('Alt');
 		}
 		if (event.shiftKey) {
-			keys.push('Shift');
+			modifiers.push('Shift');
 		}
 
 		// Add the main key (if it's not a modifier)
 		if (!['Control', 'Meta', 'Alt', 'Shift'].includes(event.key)) {
-			keys.push(getKeyDisplay(event.key));
-		}
+			const key = getKeyDisplay(event.key);
 
-		// Only update if we have at least one modifier + main key, or special keys
-		if (
-			keys.length >= 2 ||
-			['Escape', 'Enter', 'Tab', 'Space'].includes(event.key) ||
-			/^F\d+$/.test(event.key)
-		) {
-			recordedKeys = keys;
+			// Only update if we have at least one modifier + main key, or special keys
+			if (
+				modifiers.length >= 1 ||
+				['Enter', 'Tab', 'Space'].includes(event.key) ||
+				/^F\d+$/.test(event.key)
+			) {
+				recordedHotkey = { modifiers, key };
 
-			// Clear existing timeout
-			if (recordingTimeout) {
-				clearTimeout(recordingTimeout);
+				// Clear existing timeout
+				if (recordingTimeout) {
+					clearTimeout(recordingTimeout);
+				}
+
+				// Set timeout to finalize recording
+				recordingTimeout = setTimeout(() => {
+					finalizeRecording();
+				}, 1000);
 			}
-
-			// Set timeout to finalize recording
-			recordingTimeout = setTimeout(() => {
-				finalizeRecording();
-			}, 1000);
 		}
 	}
 
 	async function finalizeRecording() {
-		if (recordedKeys.length > 0) {
-			const newHotkey = recordedKeys.join(' + ');
-			currentHotkey = newHotkey;
+		if (recordedHotkey) {
+			hotkey = recordedHotkey;
+			onHotkeyChange?.(recordedHotkey);
 		}
 
 		isRecording = false;
 		settingHotkey = false;
-		recordedKeys = [];
+		recordedHotkey = null;
 
 		if (recordingTimeout) {
 			clearTimeout(recordingTimeout);
@@ -108,7 +125,7 @@
 	function cancelRecording() {
 		isRecording = false;
 		settingHotkey = false;
-		recordedKeys = [];
+		recordedHotkey = null;
 
 		if (recordingTimeout) {
 			clearTimeout(recordingTimeout);
@@ -119,7 +136,7 @@
 	async function setHotkey() {
 		settingHotkey = true;
 		isRecording = true;
-		recordedKeys = [];
+		recordedHotkey = null;
 
 		// Focus the window to ensure we capture key events
 		window.focus();
@@ -149,42 +166,19 @@
 	});
 </script>
 
-<div class="flex flex-col justify-center items-center gap-6">
-	<div class="text-center">
-		<h2 class="text-lg font-semibold mb-2">Current hotkey:</h2>
-		<Badge variant="outline" class="text-lg">{currentHotkey}</Badge>
-	</div>
-
-	{#if isRecording && recordedKeys.length > 0}
-		<div class="text-center">
-			<p class="text-sm mb-2">Recording...</p>
-			<Badge variant="outline" class="text-lg">{recordedKeys.join(' + ')}</Badge>
-			<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Release keys to confirm</p>
-		</div>
-	{/if}
-
-	<div class="flex gap-3">
-		<Button disabled={settingHotkey} onclick={setHotkey} variant="secondary" class="min-w-32">
-			{#if settingHotkey}
-				<Loader2Icon class="animate-spin mr-2" size={16} />
-				{isRecording ? 'Press keys...' : 'Starting...'}
-			{:else}
-				Set hotkey
-			{/if}
-		</Button>
-
+<Button disabled={settingHotkey} onclick={setHotkey} variant="ghost" class="min-w-32">
+	{#if settingHotkey}
+		<Loader2Icon class="animate-spin mr-2" size={16} />
 		{#if isRecording}
-			<Button onclick={cancelRecording} variant="outline">Cancel</Button>
+			{#if recordedHotkey}
+				{hotkeyToString(recordedHotkey)}
+			{:else}
+				Recording keys...
+			{/if}
+		{:else}
+			Starting...
 		{/if}
-	</div>
-
-	{#if isRecording}
-		<div class="text-center max-w-md">
-			<p class="text-sm text-gray-600 dark:text-gray-400">
-				Press a key combination (e.g., Ctrl+Shift+A).
-				<br />
-				Make sure to include at least one modifier key.
-			</p>
-		</div>
+	{:else}
+		{hotkeyToString(hotkey)}
 	{/if}
-</div>
+</Button>
