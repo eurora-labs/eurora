@@ -1,16 +1,23 @@
+<script lang="ts" module>
+	export interface HotkeyProps {
+		hotkey: Hotkey;
+		onHotkeyChange?: (hotkey: Hotkey) => void;
+	}
+</script>
+
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
-	import { Badge } from '@eurora/ui/components/badge/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import type { Hotkey } from '$lib/bindings/bindings.js';
 
 	let taurpc = createTauRPCProxy();
 	let settingHotkey = $state(false);
-	let currentHotkey = $state<Hotkey>({ modifiers: ['Ctrl'], key: 'Space' });
 	let recordedHotkey = $state<Hotkey | null>(null);
 	let isRecording = $state(false);
 	let recordingTimeout: NodeJS.Timeout | null = null;
+
+	let { hotkey, onHotkeyChange }: HotkeyProps = $props();
 
 	// Key mapping for better display
 	const keyDisplayMap: Record<string, string> = {
@@ -33,8 +40,8 @@
 	export async function saveHotkey() {
 		try {
 			await taurpc.user.set_launcher_hotkey(
-				currentHotkey.key.toLowerCase(),
-				currentHotkey.modifiers.map((modifier) => modifier.toLowerCase()),
+				hotkey.key.toLowerCase(),
+				hotkey.modifiers.map((modifier: string) => modifier.toLowerCase()),
 			);
 		} catch (error) {
 			console.error('Error setting hotkey:', error);
@@ -54,6 +61,12 @@
 
 		event.preventDefault();
 		event.stopPropagation();
+
+		// Handle Escape key to cancel recording
+		if (event.key === 'Escape') {
+			cancelRecording();
+			return;
+		}
 
 		const modifiers: string[] = [];
 
@@ -75,7 +88,7 @@
 			// Only update if we have at least one modifier + main key, or special keys
 			if (
 				modifiers.length >= 1 ||
-				['Escape', 'Enter', 'Tab', 'Space'].includes(event.key) ||
+				['Enter', 'Tab', 'Space'].includes(event.key) ||
 				/^F\d+$/.test(event.key)
 			) {
 				recordedHotkey = { modifiers, key };
@@ -95,7 +108,8 @@
 
 	async function finalizeRecording() {
 		if (recordedHotkey) {
-			currentHotkey = recordedHotkey;
+			hotkey = recordedHotkey;
+			onHotkeyChange?.(recordedHotkey);
 		}
 
 		isRecording = false;
@@ -152,42 +166,19 @@
 	});
 </script>
 
-<div class="flex flex-col justify-center items-center gap-6">
-	<div class="text-center">
-		<h2 class="text-lg font-semibold mb-2">Current hotkey:</h2>
-		<Badge variant="outline" class="text-lg">{hotkeyToString(currentHotkey)}</Badge>
-	</div>
-
-	{#if isRecording && recordedHotkey}
-		<div class="text-center">
-			<p class="text-sm mb-2">Recording...</p>
-			<Badge variant="outline" class="text-lg">{hotkeyToString(recordedHotkey)}</Badge>
-			<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Release keys to confirm</p>
-		</div>
-	{/if}
-
-	<div class="flex gap-3">
-		<Button disabled={settingHotkey} onclick={setHotkey} variant="secondary" class="min-w-32">
-			{#if settingHotkey}
-				<Loader2Icon class="animate-spin mr-2" size={16} />
-				{isRecording ? 'Press keys...' : 'Starting...'}
-			{:else}
-				Set hotkey
-			{/if}
-		</Button>
-
+<Button disabled={settingHotkey} onclick={setHotkey} variant="ghost" class="min-w-32">
+	{#if settingHotkey}
+		<Loader2Icon class="animate-spin mr-2" size={16} />
 		{#if isRecording}
-			<Button onclick={cancelRecording} variant="outline">Cancel</Button>
+			{#if recordedHotkey}
+				{hotkeyToString(recordedHotkey)}
+			{:else}
+				Recording keys...
+			{/if}
+		{:else}
+			Starting...
 		{/if}
-	</div>
-
-	{#if isRecording}
-		<div class="text-center max-w-md">
-			<p class="text-sm text-gray-600 dark:text-gray-400">
-				Press a key combination (e.g., Ctrl+Shift+A).
-				<br />
-				Make sure to include at least one modifier key.
-			</p>
-		</div>
+	{:else}
+		{hotkeyToString(hotkey)}
 	{/if}
-</div>
+</Button>
