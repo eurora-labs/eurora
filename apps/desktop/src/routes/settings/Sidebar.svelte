@@ -31,8 +31,8 @@
 			icon: InspectionPanelIcon,
 		},
 		{
-			title: 'Hotkey',
-			url: '/settings/hotkey',
+			title: 'Launcher',
+			url: '/settings/launcher',
 			icon: KeyboardIcon,
 		},
 		{
