@@ -7,8 +7,8 @@
 
 	let taurpc = createTauRPCProxy();
 	let settingHotkey = $state(false);
-	let currentHotkey = $state('Ctrl + Space');
-	let recordedKeys = $state<string[]>([]);
+	let currentHotkey = $state<Hotkey>({ modifiers: ['Ctrl'], key: 'Space' });
+	let recordedHotkey = $state<Hotkey | null>(null);
 	let isRecording = $state(false);
 	let recordingTimeout: NodeJS.Timeout | null = null;
 
@@ -32,10 +32,9 @@
 
 	export async function saveHotkey() {
 		try {
-			const keys = currentHotkey.split(' + ');
 			await taurpc.user.set_launcher_hotkey(
-				keys[keys.length - 1].toLowerCase(),
-				keys.slice(0, keys.length - 1).map((key) => key.toLowerCase()),
+				currentHotkey.key.toLowerCase(),
+				currentHotkey.modifiers.map((modifier) => modifier.toLowerCase()),
 			);
 		} catch (error) {
 			console.error('Error setting hotkey:', error);
@@ -46,59 +45,62 @@
 		return keyDisplayMap[key] || key.toUpperCase();
 	}
 
+	function hotkeyToString(hotkey: Hotkey): string {
+		return [...hotkey.modifiers, hotkey.key].join(' + ');
+	}
+
 	function handleKeyDown(event: KeyboardEvent) {
 		if (!isRecording) return;
 
 		event.preventDefault();
 		event.stopPropagation();
 
-		const keys: string[] = [];
+		const modifiers: string[] = [];
 
 		// Add modifiers in consistent order
 		if (event.ctrlKey || event.metaKey) {
-			keys.push(event.ctrlKey ? 'Ctrl' : 'Cmd');
+			modifiers.push(event.ctrlKey ? 'Ctrl' : 'Cmd');
 		}
 		if (event.altKey) {
-			keys.push('Alt');
+			modifiers.push('Alt');
 		}
 		if (event.shiftKey) {
-			keys.push('Shift');
+			modifiers.push('Shift');
 		}
 
 		// Add the main key (if it's not a modifier)
 		if (!['Control', 'Meta', 'Alt', 'Shift'].includes(event.key)) {
-			keys.push(getKeyDisplay(event.key));
-		}
+			const key = getKeyDisplay(event.key);
 
-		// Only update if we have at least one modifier + main key, or special keys
-		if (
-			keys.length >= 2 ||
-			['Escape', 'Enter', 'Tab', 'Space'].includes(event.key) ||
-			/^F\d+$/.test(event.key)
-		) {
-			recordedKeys = keys;
+			// Only update if we have at least one modifier + main key, or special keys
+			if (
+				modifiers.length >= 1 ||
+				['Escape', 'Enter', 'Tab', 'Space'].includes(event.key) ||
+				/^F\d+$/.test(event.key)
+			) {
+				recordedHotkey = { modifiers, key };
 
-			// Clear existing timeout
-			if (recordingTimeout) {
-				clearTimeout(recordingTimeout);
+				// Clear existing timeout
+				if (recordingTimeout) {
+					clearTimeout(recordingTimeout);
+				}
+
+				// Set timeout to finalize recording
+				recordingTimeout = setTimeout(() => {
+					finalizeRecording();
+				}, 1000);
 			}
-
-			// Set timeout to finalize recording
-			recordingTimeout = setTimeout(() => {
-				finalizeRecording();
-			}, 1000);
 		}
 	}
 
 	async function finalizeRecording() {
-		if (recordedKeys.length > 0) {
-			const newHotkey = recordedKeys.join(' + ');
-			currentHotkey = newHotkey;
+		if (recordedHotkey) {
+			currentHotkey = recordedHotkey;
 		}
 
 		isRecording = false;
 		settingHotkey = false;
-		recordedKeys = [];
+		recordedHotkey = null;
 
 		if (recordingTimeout) {
 			clearTimeout(recordingTimeout);
@@ -109,7 +111,7 @@
 	function cancelRecording() {
 		isRecording = false;
 		settingHotkey = false;
-		recordedKeys = [];
+		recordedHotkey = null;
 
 		if (recordingTimeout) {
 			clearTimeout(recordingTimeout);
@@ -120,7 +122,7 @@
 	async function setHotkey() {
 		settingHotkey = true;
 		isRecording = true;
-		recordedKeys = [];
+		recordedHotkey = null;
 
 		// Focus the window to ensure we capture key events
 		window.focus();
@@ -153,13 +155,13 @@
 <div class="flex flex-col justify-center items-center gap-6">
 	<div class="text-center">
 		<h2 class="text-lg font-semibold mb-2">Current hotkey:</h2>
-		<Badge variant="outline" class="text-lg">{currentHotkey}</Badge>
+		<Badge variant="outline" class="text-lg">{hotkeyToString(currentHotkey)}</Badge>
 	</div>
 
-	{#if isRecording && recordedKeys.length > 0}
+	{#if isRecording && recordedHotkey}
 		<div class="text-center">
 			<p class="text-sm mb-2">Recording...</p>
-			<Badge variant="outline" class="text-lg">{recordedKeys.join(' + ')}</Badge>
+			<Badge variant="outline" class="text-lg">{hotkeyToString(recordedHotkey)}</Badge>
 			<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Release keys to confirm</p>
 		</div>
 	{/if}
