@@ -1,6 +1,8 @@
 use crate::shared_types::SharedAppSettings;
+use crate::util::convert_hotkey_to_shortcut;
 use eur_settings::{GeneralSettings, HoverSettings, LauncherSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[taurpc::procedures(path = "settings")]
 pub trait SettingsApi {
@@ -115,6 +117,17 @@ impl SettingsApi for SettingsApiImpl {
     ) -> Result<(), String> {
         let state = app_handle.state::<SharedAppSettings>();
         let mut settings = state.lock().await;
+
+        if settings.launcher.hotkey != launcher_settings.hotkey {
+            let previous_hotkey = convert_hotkey_to_shortcut(settings.launcher.hotkey.clone());
+            let new_hotkey = convert_hotkey_to_shortcut(launcher_settings.hotkey.clone());
+
+            app_handle
+                .global_shortcut()
+                .unregister(previous_hotkey)
+                .unwrap();
+            app_handle.global_shortcut().register(new_hotkey).unwrap();
+        }
 
         settings.launcher = launcher_settings;
         settings.save_to_default_path().unwrap();
