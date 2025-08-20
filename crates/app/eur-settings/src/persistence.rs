@@ -1,4 +1,5 @@
 use crate::AppSettings;
+use crate::hotkey::Hotkey;
 use crate::json::{json_difference, merge_non_null_json_value};
 use crate::watch::SETTINGS_FILE;
 use anyhow::Result;
@@ -19,7 +20,13 @@ impl AppSettings {
         let mut settings: serde_json::Value = serde_json_lenient::from_str(DEFAULTS)?;
 
         merge_non_null_json_value(customizations, &mut settings);
-        Ok(serde_json::from_value(settings)?)
+
+        let mut settings: AppSettings = serde_json::from_value(settings)?;
+        if settings.launcher.hotkey.key == "None" {
+            settings.launcher.hotkey = Hotkey::default();
+        }
+
+        Ok(settings)
     }
 
     pub fn load_from_default_path_creating() -> Result<Self> {
