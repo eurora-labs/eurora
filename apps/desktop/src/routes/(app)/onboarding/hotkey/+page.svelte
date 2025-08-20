@@ -24,7 +24,7 @@
 	}
 
 	function handleSkip() {
-		goto('/');
+		goto('/onboarding/hotkey/trial');
 	}
 </script>
 
