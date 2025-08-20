@@ -8,7 +8,7 @@
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 
 	import { listen } from '@tauri-apps/api/event';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 
 	let taurpc = createTauRPCProxy();
 
@@ -28,7 +28,8 @@
 		});
 
 		// Listen for launcher_opened event
-		listen<any>('launcher_opened', async () => {
+		let unlistenLauncherOpened: (() => void) | undefined;
+		listen('launcher_opened', async () => {
 			launcherOpened = true;
 			// Skip countdown if launcher is opened
 			if (countdownInterval) {
@@ -37,6 +38,8 @@
 			}
 			countdown = 0;
 			buttonDisabled = false;
+		}).then((unsub) => {
+			unlistenLauncherOpened = unsub;
 		});
 
 		// Start countdown timer
@@ -49,15 +52,20 @@
 				}
 			}
 		}, 1000);
-	});
 
-	onDestroy(() => {
-		if (countdownInterval) {
-			clearInterval(countdownInterval);
-		}
+		return () => {
+			unlistenLauncherOpened?.();
+			if (countdownInterval) {
+				clearInterval(countdownInterval);
+			}
+		};
 	});
 
 	async function onHotkeyChange(key: Hotkey) {
+		if (!launcherSettings) {
+			console.warn('Launcher settings not loaded yet; skipping hotkey persist');
+			return;
+		}
 		await taurpc.settings.set_launcher_settings({ ...launcherSettings, hotkey: key });
 		hotkey = key;
 		launcherOpened = false; // Reset success state when hotkey changes
@@ -113,7 +121,7 @@
 
 	<!-- Navigation -->
 	<div class="flex justify-between">
-		<Button variant="secondary" onclick={handleBack}>Back</Button>
+		<Button variant="ghost" onclick={handleBack}>Back</Button>
 
 		<Button onclick={handleContinue} disabled={buttonDisabled}>
 			{#if buttonDisabled}
