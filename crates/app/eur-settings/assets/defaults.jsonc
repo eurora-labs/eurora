@@ -11,10 +11,5 @@
         "nonAnonymousMetrics": false,
         "distinctId": null
     },
-    "launcher": {
-      "hotkey": {
-        "modifiers": [],
-        "key": "None"
-    }
-    }
+    "launcher": {}
 }

@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { Switch } from '@eurora/ui/components/switch/index';
-	import { Button } from '@eurora/ui/components/button/index';
-	import { goto } from '$app/navigation';
 	import { Label } from '@eurora/ui/components/label/index';
 	import type { LauncherSettings, Hotkey } from '$lib/bindings/bindings';
 	import { default as HotkeyComponent } from '$lib/components/Hotkey.svelte';
@@ -37,13 +34,6 @@
 		<Label>Current hotkey</Label>
 		{#if hotkey}
 			<HotkeyComponent {hotkey} {onHotkeyChange} />
-			<!-- <Button variant="ghost" onclick={() => goto('/settings/hotkey')}>
-				{#each hotkey.modifiers as mod}
-					{mod + ' '}
-				{/each}
-				+
-				{hotkey.key}
-			</Button> -->
 		{/if}
 	</div>
 </div>
