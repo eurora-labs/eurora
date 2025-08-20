@@ -7,8 +7,8 @@
 
 	const taurpc = createTauRPCProxy();
 
-	let launcherSettings = $state<LauncherSettings | null>(null);
-	let hotkey = $state<Hotkey | null>(null);
+	let launcherSettings = $state<LauncherSettings | undefined>(undefined);
+	let hotkey = $state<Hotkey | undefined>(undefined);
 
 	async function onHotkeyChange(hotkey: Hotkey) {
 		if (!hotkey) return;

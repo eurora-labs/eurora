@@ -159,7 +159,7 @@
 	}
 </script>
 
-<div class="absolute top-1/2 w-full h-fit">
+<!-- <div class="absolute top-1/2 w-full h-fit">
 	<div class=" flex flex-col justify-center items-center gap-4 w-full">
 		{#if messages.length === 0}
 			<h1 class="text-2xl font-bold">Eurora is ready!</h1>
@@ -169,9 +169,13 @@
 			</div>
 		{/if}
 	</div>
-</div>
+</div> -->
 
-<div class="w-full h-full flex flex-col justify-end items-center gap-4">
+<div
+	class="w-full h-full flex flex-col {messages.length === 0
+		? 'justify-center'
+		: 'justify-end'} items-center gap-4 pb-4"
+>
 	{#if messages.length > 0}
 		<ScrollArea
 			class="w-full max-h-[calc(80vh-100px)] px-6 flex flex-col justify-end items-center gap-4"
@@ -192,10 +196,13 @@
 			</Chat>
 		</ScrollArea>
 	{/if}
-	<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 ">
+
+	<Launcher.Root
+		class="h-fit rounded-[36px] shadow-none flex flex-col p-0 m-0 w-[70%] bg-gray-200"
+	>
 		<Launcher.Input
 			placeholder="What can I help you with?"
-			class="min-h-[100px] h-fit w-full "
+			class="min-h-[40px] h-fit w-full text-black placeholder:text-white text-[24px]"
 			bind:query={searchQuery}
 			bind:editorRef
 			onkeydown={handleKeydown}
