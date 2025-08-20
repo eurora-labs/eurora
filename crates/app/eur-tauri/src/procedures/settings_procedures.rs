@@ -1,8 +1,6 @@
-use eur_settings::AppSettings;
-use eur_settings::{GeneralSettings, HoverSettings, TelemetrySettings};
+use crate::shared_types::SharedAppSettings;
+use eur_settings::{GeneralSettings, HoverSettings, LauncherSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
-
-// use crate::shared_types::SharedAppSettings;
 
 #[taurpc::procedures(path = "settings")]
 pub trait SettingsApi {
@@ -18,6 +16,10 @@ pub trait SettingsApi {
         app_handle: tauri::AppHandle<R>,
     ) -> Result<GeneralSettings, String>;
 
+    async fn get_launcher_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<LauncherSettings, String>;
+
     async fn set_general_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         general_settings: GeneralSettings,
@@ -26,6 +28,11 @@ pub trait SettingsApi {
     async fn set_hover_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         hover_settings: HoverSettings,
+    ) -> Result<(), String>;
+
+    async fn set_launcher_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        launcher_settings: LauncherSettings,
     ) -> Result<(), String>;
 }
 #[derive(Clone)]
@@ -37,7 +44,9 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<HoverSettings, String> {
-        let settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
         Ok(settings.hover.clone())
     }
 
@@ -45,7 +54,9 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<TelemetrySettings, String> {
-        let settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
         Ok(settings.telemetry.clone())
     }
 
@@ -53,8 +64,20 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<GeneralSettings, String> {
-        let settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
         Ok(settings.general.clone())
+    }
+
+    async fn get_launcher_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<LauncherSettings, String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
+        Ok(settings.launcher.clone())
     }
 
     async fn set_general_settings<R: Runtime>(
@@ -62,7 +85,9 @@ impl SettingsApi for SettingsApiImpl {
         app_handle: tauri::AppHandle<R>,
         general_settings: GeneralSettings,
     ) -> Result<(), String> {
-        let mut settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut settings = state.lock().await;
+
         settings.general = general_settings;
         settings.save_to_default_path().unwrap();
 
@@ -74,8 +99,24 @@ impl SettingsApi for SettingsApiImpl {
         app_handle: tauri::AppHandle<R>,
         hover_settings: HoverSettings,
     ) -> Result<(), String> {
-        let mut settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut settings = state.lock().await;
+
         settings.hover = hover_settings;
+        settings.save_to_default_path().unwrap();
+
+        Ok(())
+    }
+
+    async fn set_launcher_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        launcher_settings: LauncherSettings,
+    ) -> Result<(), String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut settings = state.lock().await;
+
+        settings.launcher = launcher_settings;
         settings.save_to_default_path().unwrap();
 
         Ok(())
