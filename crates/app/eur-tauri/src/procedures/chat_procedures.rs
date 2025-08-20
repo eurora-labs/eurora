@@ -46,7 +46,7 @@ impl ChatApi for ChatApiImpl {
 
         let mut messages: Vec<Message> = Vec::new();
         if query.assets.len() > 0 {
-            let mut messages = timeline.construct_asset_messages();
+            messages = timeline.construct_asset_messages();
             messages.extend(timeline.construct_snapshot_messages());
         }
 
