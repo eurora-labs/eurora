@@ -1,8 +1,8 @@
-use eur_settings::AppSettings;
-use eur_settings::{GeneralSettings, HoverSettings, TelemetrySettings};
+use crate::shared_types::SharedAppSettings;
+use crate::util::convert_hotkey_to_shortcut;
+use eur_settings::{GeneralSettings, HoverSettings, LauncherSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
-
-// use crate::shared_types::SharedAppSettings;
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[taurpc::procedures(path = "settings")]
 pub trait SettingsApi {
@@ -18,6 +18,10 @@ pub trait SettingsApi {
         app_handle: tauri::AppHandle<R>,
     ) -> Result<GeneralSettings, String>;
 
+    async fn get_launcher_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<LauncherSettings, String>;
+
     async fn set_general_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         general_settings: GeneralSettings,
@@ -26,6 +30,11 @@ pub trait SettingsApi {
     async fn set_hover_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         hover_settings: HoverSettings,
+    ) -> Result<(), String>;
+
+    async fn set_launcher_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        launcher_settings: LauncherSettings,
     ) -> Result<(), String>;
 }
 #[derive(Clone)]
@@ -37,7 +46,9 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<HoverSettings, String> {
-        let settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
         Ok(settings.hover.clone())
     }
 
@@ -45,7 +56,9 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<TelemetrySettings, String> {
-        let settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
         Ok(settings.telemetry.clone())
     }
 
@@ -53,8 +66,20 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<GeneralSettings, String> {
-        let settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
         Ok(settings.general.clone())
+    }
+
+    async fn get_launcher_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<LauncherSettings, String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
+        Ok(settings.launcher.clone())
     }
 
     async fn set_general_settings<R: Runtime>(
@@ -62,9 +87,13 @@ impl SettingsApi for SettingsApiImpl {
         app_handle: tauri::AppHandle<R>,
         general_settings: GeneralSettings,
     ) -> Result<(), String> {
-        let mut settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut settings = state.lock().await;
+
         settings.general = general_settings;
-        settings.save_to_default_path().unwrap();
+        settings
+            .save_to_default_path()
+            .map_err(|e| format!("Failed to persist hover settings: {e}"))?;
 
         Ok(())
     }
@@ -74,9 +103,40 @@ impl SettingsApi for SettingsApiImpl {
         app_handle: tauri::AppHandle<R>,
         hover_settings: HoverSettings,
     ) -> Result<(), String> {
-        let mut settings = AppSettings::load_from_default_path_creating().unwrap();
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut settings = state.lock().await;
+
         settings.hover = hover_settings;
-        settings.save_to_default_path().unwrap();
+        settings
+            .save_to_default_path()
+            .map_err(|e| format!("Failed to persist hover settings: {e}"))?;
+
+        Ok(())
+    }
+
+    async fn set_launcher_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        launcher_settings: LauncherSettings,
+    ) -> Result<(), String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut settings = state.lock().await;
+
+        if settings.launcher.hotkey != launcher_settings.hotkey {
+            let previous_hotkey = convert_hotkey_to_shortcut(settings.launcher.hotkey.clone());
+            let new_hotkey = convert_hotkey_to_shortcut(launcher_settings.hotkey.clone());
+
+            app_handle
+                .global_shortcut()
+                .unregister(previous_hotkey)
+                .unwrap();
+            app_handle.global_shortcut().register(new_hotkey).unwrap();
+        }
+
+        settings.launcher = launcher_settings;
+        settings
+            .save_to_default_path()
+            .map_err(|e| format!("Failed to persist launcher settings: {e}"))?;
 
         Ok(())
     }
