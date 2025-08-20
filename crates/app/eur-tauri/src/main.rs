@@ -16,6 +16,7 @@ mod util;
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
 use eur_screen_position::ActiveMonitor;
+use eur_settings::AppSettings;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
     procedures::{
@@ -34,7 +35,10 @@ use eur_tauri::{
 };
 use launcher::monitor_cursor_for_hover;
 use launcher::toggle_launcher_window;
-use std::{path::Path, sync::{Arc, Mutex}};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
 use tauri::{
     AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -45,7 +49,6 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{error, info};
-use eur_settings::AppSettings;
 
 type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
 type SharedPersonalDb = Arc<DatabaseManager>;
@@ -142,6 +145,7 @@ fn main() {
                     let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
 
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
+                    tauri_app.manage(async_mutex::Mutex::new(app_settings.clone()));
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -169,7 +173,8 @@ fn main() {
 
                     if started_by_autostart {
                         main_window.hide().expect("Failed to hide main window");
-                    } 
+                    }
+
 
                     // Create launcher window without Arc<Mutex>
                     let launcher_window =
