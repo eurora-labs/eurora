@@ -21,12 +21,7 @@ impl AppSettings {
 
         merge_non_null_json_value(customizations, &mut settings);
 
-        let mut settings: AppSettings = serde_json::from_value(settings)?;
-        if settings.launcher.hotkey.key == "None" {
-            settings.launcher.hotkey = Hotkey::default();
-        }
-
-        Ok(settings)
+        Ok(serde_json::from_value(settings)?)
     }
 
     pub fn load_from_default_path_creating() -> Result<Self> {
