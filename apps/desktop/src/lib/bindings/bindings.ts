@@ -20,7 +20,7 @@ export type HoverSettings = {
  */
 enabled: boolean }
 
-export type LauncherSettings = { hotkey: Hotkey }
+export type LauncherSettings = { hotkey?: Hotkey }
 
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
