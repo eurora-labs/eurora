@@ -8,7 +8,7 @@
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 
 	import { listen } from '@tauri-apps/api/event';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	let taurpc = createTauRPCProxy();
 
@@ -16,6 +16,9 @@
 	let hotkey = $state<Hotkey | undefined>(undefined);
 	let launcherOpened = $state(false);
 	let waitingForHotkey = $state(true);
+	let countdown = $state(5);
+	let buttonDisabled = $state(true);
+	let countdownInterval: ReturnType<typeof setInterval> | undefined;
 
 	onMount(() => {
 		taurpc.settings.get_launcher_settings().then((settings) => {
@@ -25,10 +28,32 @@
 		});
 
 		// Listen for launcher_opened event
-		if (typeof window !== 'undefined') {
-			listen<any>('launcher_opened', async (event) => {
-				launcherOpened = true;
-			});
+		listen<any>('launcher_opened', async () => {
+			launcherOpened = true;
+			// Skip countdown if launcher is opened
+			if (countdownInterval) {
+				clearInterval(countdownInterval);
+				countdownInterval = undefined;
+			}
+			countdown = 0;
+			buttonDisabled = false;
+		});
+
+		// Start countdown timer
+		countdownInterval = setInterval(() => {
+			countdown--;
+			if (countdown <= 0) {
+				buttonDisabled = false;
+				if (countdownInterval) {
+					clearInterval(countdownInterval);
+				}
+			}
+		}, 1000);
+	});
+
+	onDestroy(() => {
+		if (countdownInterval) {
+			clearInterval(countdownInterval);
 		}
 	});
 
@@ -63,6 +88,13 @@
 						>
 					</h2>
 				</div>
+
+				<div class="flex flex-col items-center justify-center py-8 gap-4">
+					<p class="text-muted-foreground">Or change the hotkey here</p>
+					<p>
+						<HotkeyComponent variant="default" {hotkey} {onHotkeyChange} />
+					</p>
+				</div>
 			{/if}
 
 			<!-- Success State -->
@@ -83,8 +115,10 @@
 	<div class="flex justify-between">
 		<Button variant="secondary" onclick={handleBack}>Back</Button>
 
-		<Button onclick={handleContinue}>
-			{#if launcherOpened}
+		<Button onclick={handleContinue} disabled={buttonDisabled}>
+			{#if buttonDisabled}
+				Skip in {countdown}s
+			{:else if launcherOpened}
 				Continue
 				<ArrowRightIcon class="w-4 h-4 ml-2" />
 			{:else}
