@@ -1,7 +1,9 @@
 <script lang="ts" module>
+	import { type ButtonVariant } from '@eurora/ui/components/button/index';
 	export interface HotkeyProps {
 		hotkey: Hotkey;
 		onHotkeyChange?: (hotkey: Hotkey) => void;
+		variant?: ButtonVariant;
 	}
 </script>
 
@@ -17,7 +19,7 @@
 	let isRecording = $state(false);
 	let recordingTimeout: NodeJS.Timeout | null = null;
 
-	let { hotkey, onHotkeyChange }: HotkeyProps = $props();
+	let { hotkey, onHotkeyChange, variant = 'secondary' }: HotkeyProps = $props();
 
 	// Key mapping for better display
 	const keyDisplayMap: Record<string, string> = {
@@ -166,19 +168,21 @@
 	});
 </script>
 
-<Button disabled={settingHotkey} onclick={setHotkey} variant="ghost" class="min-w-32">
-	{#if settingHotkey}
-		<Loader2Icon class="animate-spin mr-2" size={16} />
-		{#if isRecording}
-			{#if recordedHotkey}
-				{hotkeyToString(recordedHotkey)}
+{#if hotkey}
+	<Button disabled={settingHotkey} onclick={setHotkey} {variant} class="min-w-32">
+		{#if settingHotkey}
+			<Loader2Icon class="animate-spin mr-2" size={16} />
+			{#if isRecording}
+				{#if recordedHotkey}
+					{hotkeyToString(recordedHotkey)}
+				{:else}
+					Recording keys...
+				{/if}
 			{:else}
-				Recording keys...
+				Starting...
 			{/if}
 		{:else}
-			Starting...
+			{hotkeyToString(hotkey)}
 		{/if}
-	{:else}
-		{hotkeyToString(hotkey)}
-	{/if}
-</Button>
+	</Button>
+{/if}
