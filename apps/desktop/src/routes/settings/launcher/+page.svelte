@@ -33,7 +33,7 @@
 	<div class="flex w-full items-center justify-start gap-2 py-2">
 		<Label>Current hotkey</Label>
 		{#if hotkey}
-			<HotkeyComponent {hotkey} {onHotkeyChange} />
+			<HotkeyComponent variant="ghost" {hotkey} {onHotkeyChange} />
 		{/if}
 	</div>
 </div>

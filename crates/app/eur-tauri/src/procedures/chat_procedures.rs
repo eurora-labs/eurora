@@ -44,8 +44,11 @@ impl ChatApi for ChatApiImpl {
         let timeline = timeline_state.inner();
         let title: String = "Placeholder Title".to_string();
 
-        let mut messages = timeline.construct_asset_messages();
-        messages.extend(timeline.construct_snapshot_messages());
+        let mut messages: Vec<Message> = Vec::new();
+        if query.assets.len() > 0 {
+            let mut messages = timeline.construct_asset_messages();
+            messages.extend(timeline.construct_snapshot_messages());
+        }
 
         messages.push(Message {
             role: Role::User,
