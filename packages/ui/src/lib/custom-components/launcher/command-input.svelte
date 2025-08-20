@@ -4,6 +4,7 @@
 	interface Props extends CommandPrimitive.InputProps {
 		query?: Query;
 		editorRef?: ProsemirrorEditor;
+		iconSize?: number;
 	}
 </script>
 
@@ -19,6 +20,7 @@
 		height = $bindable('100px'),
 		query = $bindable(undefined),
 		editorRef = $bindable(),
+		iconSize = $bindable(40),
 		...restProps
 	}: Props = $props();
 </script>
@@ -28,7 +30,7 @@
 	data-command-input-wrapper=""
 >
 	<div class="flex">
-		<SearchIcon class="opacity-30 shrink-0 text-black/80 mt-7" size="40" />
+		<SearchIcon class="opacity-30 shrink-0 text-black/80 mt-7" size={iconSize} />
 	</div>
 	<div class="mr-2 h-[100px] w-2 shrink-0"></div>
 	<CommandPrimitive.Input
