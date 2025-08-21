@@ -79,9 +79,16 @@ impl PromptApi for PromptApiImpl {
         model: String,
     ) -> Result<(), String> {
         let config = OpenAIConfig::builder()
-            .api_key(api_key)
+            .api_key(api_key.clone())
             .model(model)
             .build();
+
+        eur_secret::secret::persist(
+            "OPENAI_API_KEY",
+            &eur_secret::Sensitive(api_key.clone()),
+            eur_secret::secret::Namespace::Global,
+        )
+        .expect("Failed to store OpenAI API key");
 
         let state = app_handle.state::<SharedAppSettings>();
         let mut app_settings = state.lock().await;
