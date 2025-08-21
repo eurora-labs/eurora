@@ -7,6 +7,7 @@ mod settings;
 mod watch;
 
 pub use hotkey::Hotkey;
+pub use settings::BackendSettings;
 pub use settings::GeneralSettings;
 pub use settings::HoverSettings;
 pub use settings::LauncherSettings;
@@ -23,7 +24,7 @@ pub struct AppSettings {
     pub hover: HoverSettings,
     /// Launcher settings
     pub launcher: LauncherSettings,
-    // /// Backend provider settings
-    // // TODO: Refactor prompt service to here
-    // pub backend_provider: String,
+    /// Backend provider settings
+    #[serde(default)]
+    pub backend: BackendSettings,
 }
