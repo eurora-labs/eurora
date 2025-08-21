@@ -3,12 +3,13 @@
 use async_from::AsyncTryFrom;
 use eur_eurora_provider::EuroraConfig;
 use eur_secret::{Sensitive, secret};
+use eur_settings::BackendType;
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
 use crate::{
     procedures::prompt_procedures::TauRpcPromptApiEventTrigger,
-    shared_types::SharedPromptKitService,
+    shared_types::{SharedAppSettings, SharedPromptKitService},
 };
 
 #[taurpc::ipc_type]
@@ -86,6 +87,14 @@ impl AuthApi for AuthApiImpl {
                         )
                         .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
                     );
+
+                    let state = app_handle.state::<SharedAppSettings>();
+                    let mut settings = state.lock().await;
+
+                    settings.backend = config.clone().into();
+                    settings
+                        .save_to_default_path()
+                        .map_err(|e| format!("Failed to save settings: {}", e))?;
 
                     // TODO: re-enable remote eurora provider
                     let promptkit_client = eur_prompt_kit::PromptKitService::async_try_from(config)
