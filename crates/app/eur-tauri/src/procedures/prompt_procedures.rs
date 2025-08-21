@@ -2,10 +2,11 @@ use async_from::AsyncTryFrom;
 use eur_eurora_provider::EuroraConfig;
 use eur_prompt_kit::{OllamaConfig, OpenAIConfig};
 use eur_secret::secret;
+use eur_settings::{AppSettings, BackendSettings};
 use tauri::{Manager, Runtime};
 use url::Url;
 
-use crate::shared_types::SharedPromptKitService;
+use crate::shared_types::{SharedAppSettings, SharedPromptKitService};
 
 #[taurpc::procedures(path = "prompt")]
 pub trait PromptApi {
@@ -47,6 +48,14 @@ impl PromptApi for PromptApiImpl {
             .expect("Failed to connect to Ollama")
             .keep_alive(300)
             .build();
+
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut app_settings = state.lock().await;
+        app_settings.backend = config.clone().into();
+        app_settings
+            .save_to_default_path()
+            .expect("Failed to save settings");
+
         let llm_provider = eur_prompt_kit::PromptKitService::from(config);
 
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
@@ -73,6 +82,14 @@ impl PromptApi for PromptApiImpl {
             .api_key(api_key)
             .model(model)
             .build();
+
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut app_settings = state.lock().await;
+        app_settings.backend = config.clone().into();
+        app_settings
+            .save_to_default_path()
+            .expect("Failed to save settings");
+
         let llm_provider = eur_prompt_kit::PromptKitService::from(config);
 
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
