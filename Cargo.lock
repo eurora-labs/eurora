@@ -3158,6 +3158,7 @@ dependencies = [
  "dirs 6.0.0",
  "eur-fs",
  "eur-prompt-kit",
+ "eur-secret",
  "notify",
  "serde",
  "serde_json",
