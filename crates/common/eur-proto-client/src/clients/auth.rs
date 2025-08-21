@@ -88,16 +88,19 @@ impl AuthClient {
 
     /// Refresh access token using refresh token
     pub async fn refresh_token(&self, refresh_token: impl Into<String>) -> Result<TokenResponse> {
+        let refresh_token: String = refresh_token.into();
         let mut client = self.try_init_client().await?;
-        let response = client
-            .refresh_token(RefreshTokenRequest {
-                refresh_token: refresh_token.into(),
-            })
-            .await
-            .map_err(|e| {
-                error!("Token refresh failed: {}", e);
-                anyhow!("Token refresh failed: {}", e)
-            })?;
+        let mut request = tonic::Request::new(RefreshTokenRequest {
+            refresh_token: refresh_token.clone(),
+        });
+        request.metadata_mut().insert(
+            "authorization",
+            format!("Bearer {}", refresh_token).parse().unwrap(),
+        );
+        let response = client.refresh_token(request).await.map_err(|e| {
+            error!("Token refresh failed: {}", e);
+            anyhow!("Token refresh failed: {}", e)
+        })?;
 
         Ok(response.into_inner())
     }
