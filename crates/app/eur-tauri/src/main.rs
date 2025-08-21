@@ -143,15 +143,18 @@ fn main() {
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
                     tauri_app.manage(async_mutex::Mutex::new(app_settings.clone()));
 
-                    if let Ok(prompt_kit_service) = app_settings.backend.initialize() {
-                        let service: SharedPromptKitService = async_mutex::Mutex::new(Some(prompt_kit_service));
-                        tauri_app.manage(service);
-                    } else {
+                    let handle = tauri_app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Ok(prompt_kit_service) = app_settings.backend.initialize().await {
+                            let service: SharedPromptKitService = async_mutex::Mutex::new(Some(prompt_kit_service));
+                            handle.manage(service);
+                        } else {
+                            let service: SharedPromptKitService = async_mutex::Mutex::new(None);
+                            handle.manage(service);
+                            info!("No backend available");
+                        }
+                    });
 
-                        let service: SharedPromptKitService = async_mutex::Mutex::new(None);
-                        tauri_app.manage(service);
-                        info!("No backend available");
-                    }
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
