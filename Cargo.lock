@@ -3155,7 +3155,9 @@ name = "eur-settings"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "async_from",
  "dirs 6.0.0",
+ "eur-eurora-provider",
  "eur-fs",
  "eur-prompt-kit",
  "eur-secret",
