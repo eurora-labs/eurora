@@ -86,7 +86,7 @@ eur-proto-client = { workspace = true }
 dotenv = "0.15.0"
 eur-user = { workspace = true }
 uuid.workspace = true
-ferrous-llm-core = { version = "0.4.1" }
+ferrous-llm-core = { version = "0.5.0" }
 eur-eurora-provider = { path = "../../common/eur-eurora-provider" }
 async_from = { workspace = true }
 

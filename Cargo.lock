@@ -3425,9 +3425,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28f4ee330f84243d67ca41700cd12b5514ca1abe1762f25a7ba6f8878feaa202"
+checksum = "8c40dd490ec0ad924a136d2c809483991c8e396044b1b6bd578c4b836fafe111"
 dependencies = [
  "chrono",
  "dotenv",
@@ -3443,9 +3443,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-anthropic"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72f7daa13ee78dd60fd36d9a9d211745bbdb9ff6643dec8dd753abdb2f0e3b0c"
+checksum = "c11ccaa1f0f3737ccc5822699187210c1baad7f0720c92292bb50d96b96a7f67"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3462,9 +3462,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-core"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "788143e4aebf382fbe1b4589be3940929995494c12340c0924a9bda97b831683"
+checksum = "9952b989eaa1c3937f490aa2afda8fa919ade54d0970fc29787a21d2b36e7f02"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3480,9 +3480,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-ollama"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06f8b113d05e5c7c0825d2465ea9f77d8b3a45d91b350036f33cc03a2bb8da5e"
+checksum = "e169a41ff1d497b5ff4692e9177d9bc9286167a56b7387eea2d74cd400b85c44"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3499,9 +3499,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-openai"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b2ce5eddbe1868f19ed1220b52c6d448707753021a144d71115f28e7c98f535"
+checksum = "8126bd09f86370b948c4796f7dbb888201b6465d35d5b75ec0c1eb04b7f54c58"
 dependencies = [
  "async-trait",
  "chrono",
