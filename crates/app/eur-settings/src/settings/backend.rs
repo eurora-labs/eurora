@@ -45,7 +45,7 @@ impl BackendSettings {
             BackendType::Ollama => {
                 if let Some(config) = &self.config {
                     let config: OllamaConfig = serde_json::from_value(config.clone())
-                        .expect("Failed to deserialize OllamaConfig");
+                        .map_err(|e| format!("Failed to deserialize OllamaConfig: {e}"))?;
 
                     Ok(eur_prompt_kit::PromptKitService::from(config))
                 } else {
@@ -61,7 +61,7 @@ impl BackendSettings {
                         "OPENAI_API_KEY",
                         eur_secret::secret::Namespace::Global,
                     )
-                    .expect("Failed to retrieve OpenAI API key")
+                    .map_err(|e| format!("Failed to retrieve OpenAI API key: {e}"))?
                     {
                         config.api_key = api_key.0.into();
                     } else {
