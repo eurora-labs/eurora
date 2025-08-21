@@ -37,3 +37,43 @@ impl From<OpenAIConfig> for BackendSettings {
         }
     }
 }
+
+impl BackendSettings {
+    pub fn initialize(&self) -> Result<eur_prompt_kit::PromptKitService, String> {
+        match self.backend_type {
+            BackendType::None => Err("No backend selected".to_string()),
+            BackendType::Ollama => {
+                if let Some(config) = &self.config {
+                    let config: OllamaConfig = serde_json::from_value(config.clone())
+                        .expect("Failed to deserialize OllamaConfig");
+
+                    Ok(eur_prompt_kit::PromptKitService::from(config))
+                } else {
+                    Err("No Ollama config provided".to_string())
+                }
+            }
+            BackendType::OpenAI => {
+                if let Some(config) = &self.config {
+                    let mut config: OpenAIConfig = serde_json::from_value(config.clone())
+                        .expect("Failed to deserialize OpenAIConfig");
+
+                    if let Some(api_key) = eur_secret::secret::retrieve(
+                        "OPENAI_API_KEY",
+                        eur_secret::secret::Namespace::Global,
+                    )
+                    .expect("Failed to retrieve OpenAI API key")
+                    {
+                        config.api_key = api_key.0.into();
+                    } else {
+                        return Err("No OpenAI API key provided".to_string());
+                    }
+
+                    Ok(eur_prompt_kit::PromptKitService::from(config))
+                } else {
+                    Err("No OpenAI config provided".to_string())
+                }
+            }
+            _ => Err("Unsupported backend".to_string()),
+        }
+    }
+}
