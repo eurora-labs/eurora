@@ -58,7 +58,7 @@ impl PromptService {
             // "Llama Maverick",
             // "deepseek-ai/DeepSeek-V3-0324",
         );
-        config.base_url = Some("https://api.chat.nebul.io/v1".parse().unwrap());
+        // config.base_url = Some("https://api.chat.nebul.io/v1".parse().unwrap());
         Self {
             provider: OpenAIProvider::new(config).expect("Failed to create OpenAI provider"),
             jwt_config: jwt_config.unwrap_or_default(),
