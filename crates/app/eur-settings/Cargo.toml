@@ -15,5 +15,6 @@ tokio = { workspace = true, features = ["macros", "rt"] }
 dirs = { workspace = true }
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
 eur-fs = { workspace = true }
+eur-secret = { workspace = true }
 notify = { version = "8.2.0" }
 eur-prompt-kit = { workspace = true }
