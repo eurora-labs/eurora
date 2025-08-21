@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
-ferrous-llm-core = { version = "0.4.1", features = ["dynamic-image"] }
+ferrous-llm-core = { version = "0.5.0", features = ["dynamic-image"] }
 thiserror = "2.0.12"
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
