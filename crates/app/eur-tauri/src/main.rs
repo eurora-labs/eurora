@@ -70,10 +70,6 @@ fn create_shared_client() -> SharedQuestionsClient {
     Arc::new(Mutex::new(None))
 }
 
-fn create_shared_promptkit_client() -> SharedPromptKitService {
-    Arc::new(async_mutex::Mutex::new(None))
-}
-
 fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     let base_path = app_handle.path().app_data_dir().unwrap();
     std::fs::create_dir_all(&base_path).unwrap();
@@ -146,6 +142,16 @@ fn main() {
 
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
                     tauri_app.manage(async_mutex::Mutex::new(app_settings.clone()));
+
+                    if let Ok(prompt_kit_service) = app_settings.backend.initialize() {
+                        let service: SharedPromptKitService = async_mutex::Mutex::new(Some(prompt_kit_service));
+                        tauri_app.manage(service);
+                    } else {
+
+                        let service: SharedPromptKitService = async_mutex::Mutex::new(None);
+                        tauri_app.manage(service);
+                        info!("No backend available");
+                    }
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -261,8 +267,6 @@ fn main() {
                     app_handle.manage(questions_client.clone());
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
-                    let promptkit_client = create_shared_promptkit_client();
-                    app_handle.manage(promptkit_client.clone());
                     let current_conversation_id = Arc::new(None::<String>);
                     app_handle.manage(current_conversation_id.clone());
 

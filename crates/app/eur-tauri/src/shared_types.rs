@@ -4,7 +4,7 @@ use std::sync::Arc;
 use async_mutex::Mutex;
 use eur_prompt_kit::PromptKitService;
 use eur_timeline::Timeline;
-pub type SharedPromptKitService = Arc<Mutex<Option<PromptKitService>>>;
+pub type SharedPromptKitService = Mutex<Option<PromptKitService>>;
 pub type SharedTimeline = Arc<Timeline>;
 pub type SharedAppSettings = Mutex<AppSettings>;
 
