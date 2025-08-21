@@ -143,6 +143,9 @@ fn main() {
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
                     tauri_app.manage(async_mutex::Mutex::new(app_settings.clone()));
 
+                    // Ensure state exists immediately
+                    tauri_app.manage::<SharedPromptKitService>(async_mutex::Mutex::new(None));
+
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
                         if let Ok(prompt_kit_service) = app_settings.backend.initialize().await {
