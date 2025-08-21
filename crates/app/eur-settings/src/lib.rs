@@ -8,6 +8,7 @@ mod watch;
 
 pub use hotkey::Hotkey;
 pub use settings::BackendSettings;
+pub use settings::BackendType;
 pub use settings::GeneralSettings;
 pub use settings::HoverSettings;
 pub use settings::LauncherSettings;
