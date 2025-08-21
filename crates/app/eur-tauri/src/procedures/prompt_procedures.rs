@@ -88,7 +88,7 @@ impl PromptApi for PromptApiImpl {
             &eur_secret::Sensitive(api_key.clone()),
             eur_secret::secret::Namespace::Global,
         )
-        .expect("Failed to store OpenAI API key");
+        .map_err(|e| e.to_string())?;
 
         let state = app_handle.state::<SharedAppSettings>();
         let mut app_settings = state.lock().await;
