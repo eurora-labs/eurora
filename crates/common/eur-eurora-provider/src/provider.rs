@@ -6,11 +6,14 @@ use async_trait::async_trait;
 use eur_secret::secret;
 use ferrous_llm_core::traits::{ChatProvider, StreamingProvider};
 use futures::Stream;
+use tokio::sync::RwLock;
 use tonic::{
     Request, Status, Streaming,
     service::{Interceptor, interceptor::InterceptedService},
     transport::{Channel, ClientTlsConfig, Endpoint},
 };
+use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
+use tower::{BoxError, Service, ServiceBuilder, layer::Layer};
 use tracing::info;
 
 use crate::{
@@ -19,23 +22,48 @@ use crate::{
     proto::chat::{proto_chat_service_client::ProtoChatServiceClient, *},
 };
 
-#[derive(Clone)]
-struct AuthInterceptor;
+async fn auth_interceptor(request: Request<()>) -> Result<Request<()>, Status> {
+    Ok(request)
+}
 
-impl Interceptor for AuthInterceptor {
-    fn call(&mut self, mut request: Request<()>) -> Result<Request<()>, Status> {
-        let access_token = secret::retrieve("AUTH_ACCESS_TOKEN", secret::Namespace::Global)
-            .map_err(|e| Status::internal(format!("Failed to retrieve access token: {}", e)))?
-            .ok_or_else(|| Status::unauthenticated("AUTH_ACCESS_TOKEN not found"))?;
-        request.metadata_mut().insert(
-            "authorization",
-            format!("Bearer {}", access_token.0).parse().unwrap(),
-        );
-        Ok(request)
+#[derive(Clone)]
+struct AuthInterceptor {
+    auth: eur_user::AuthManager,
+}
+
+impl AuthInterceptor {
+    pub fn new(auth: eur_user::AuthManager) -> Self {
+        Self { auth }
     }
 }
 
-type EuroraGrpcClient = ProtoChatServiceClient<InterceptedService<Channel, AuthInterceptor>>;
+impl AsyncInterceptor for AuthInterceptor {
+    type Future = Pin<Box<dyn Future<Output = Result<Request<()>, Status>> + Send>>;
+
+    fn call(&mut self, mut request: Request<()>) -> Self::Future {
+        let auth = self.auth.clone();
+        info!("AuthInterceptor called");
+        Box::pin(async move {
+            let access_token = auth
+                .get_or_refresh_access_token()
+                .await
+                .map_err(|e| Status::internal(format!("Failed to retrieve access token: {}", e)))?;
+            // let access_token = secret::retrieve("AUTH_ACCESS_TOKEN", secret::Namespace::Global)
+            //     .map_err(|e| Status::internal(format!("Failed to retrieve access token: {}", e)))?
+            //     .ok_or_else(|| Status::unauthenticated("AUTH_ACCESS_TOKEN not found"))?;
+            request.metadata_mut().insert(
+                "authorization",
+                format!("Bearer {}", access_token.0).parse().unwrap(),
+            );
+            info!("Access token set");
+            Ok(request)
+        })
+    }
+}
+
+type EuroraGrpcClient = ProtoChatServiceClient<
+    tonic_async_interceptor::AsyncInterceptedService<Channel, AuthInterceptor>,
+>;
 
 /// Eurora-based chat provider.
 #[derive(Debug, Clone)]
@@ -90,7 +118,16 @@ impl EuroraChatProvider {
         }
 
         let channel = endpoint.connect().await?;
-        let mut client = ProtoChatServiceClient::with_interceptor(channel, AuthInterceptor);
+        let auth_manager = eur_user::AuthManager::new()
+            .await
+            .map_err(|err| EuroraError::Authentication(err.to_string()))?;
+        let auth_interceptor = AuthInterceptor::new(auth_manager);
+        // let mut client = ProtoChatServiceClient::with_interceptor(channel, auth_interceptor);
+
+        let service = ServiceBuilder::new()
+            .layer(async_interceptor(auth_interceptor))
+            .service(channel);
+        let mut client = ProtoChatServiceClient::new(service);
 
         // Configure message size limits
         if let Some(max_request_size) = config.max_request_size {
