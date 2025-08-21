@@ -7,7 +7,7 @@ edition = "2024"
 anyhow = { workspace = true }
 futures = { workspace = true }
 image = { workspace = true }
-ferrous-llm = { version = "0.4.1", features = [
+ferrous-llm = { version = "0.5.0", features = [
     "openai",
     "ollama",
     "anthropic",
