@@ -16,14 +16,15 @@ pub enum BackendType {
 #[serde(rename_all = "camelCase")]
 pub struct BackendSettings {
     pub backend_type: BackendType,
-    pub config: Option<String>,
+    #[specta(skip)]
+    pub config: Option<serde_json::Value>,
 }
 
 impl From<OllamaConfig> for BackendSettings {
     fn from(config: OllamaConfig) -> Self {
         Self {
             backend_type: BackendType::Ollama,
-            config: Some(serde_json::to_string(&config).unwrap()),
+            config: Some(serde_json::to_value(config).expect("Failed to serialize OllamaConfig")),
         }
     }
 }
@@ -32,7 +33,7 @@ impl From<OpenAIConfig> for BackendSettings {
     fn from(config: OpenAIConfig) -> Self {
         Self {
             backend_type: BackendType::OpenAI,
-            config: Some(serde_json::to_string(&config).unwrap()),
+            config: Some(serde_json::to_value(config).expect("Failed to serialize OpenAIConfig")),
         }
     }
 }
