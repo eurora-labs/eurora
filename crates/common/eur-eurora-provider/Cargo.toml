@@ -21,9 +21,12 @@ prost-types = { workspace = true }
 async-stream = "0.3.1"
 image = { workspace = true }
 eur-secret = { workspace = true }
+eur-user = { workspace = true }
 tonic-prost = { workspace = true }
 tracing = { workspace = true }
 base64 = { workspace = true }
+tonic-async-interceptor = "0.14.1"
+tower = "0.5.2"
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }
