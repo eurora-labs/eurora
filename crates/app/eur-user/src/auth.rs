@@ -17,6 +17,7 @@ pub struct Claims {
 
 #[derive(Clone)]
 pub struct JwtConfig {
+    /// Minutes offset
     refresh_offset: i64,
 }
 
@@ -81,7 +82,7 @@ impl AuthManager {
         match self.get_access_token_payload() {
             Ok(claims) => {
                 let now = chrono::Utc::now().timestamp();
-                let expiry_with_offset = claims.exp - self.jwt_config.refresh_offset;
+                let expiry_with_offset = claims.exp - self.jwt_config.refresh_offset * 60;
 
                 if now < expiry_with_offset {
                     // Token is still valid
