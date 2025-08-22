@@ -14,7 +14,7 @@ use tonic::{
 };
 use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
 use tower::{BoxError, Service, ServiceBuilder, layer::Layer};
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     config::EuroraConfig,
@@ -44,19 +44,24 @@ impl AsyncInterceptor for AuthInterceptor {
         let auth = self.auth.clone();
         info!("AuthInterceptor called");
         Box::pin(async move {
-            let access_token = auth
-                .get_or_refresh_access_token()
-                .await
-                .map_err(|e| Status::internal(format!("Failed to retrieve access token: {}", e)))?;
+            let access_token = auth.get_or_refresh_access_token().await.map_err(|e| {
+                Status::unauthenticated(format!("Failed to retrieve access token: {}", e))
+            })?;
             // let access_token = secret::retrieve("AUTH_ACCESS_TOKEN", secret::Namespace::Global)
             //     .map_err(|e| Status::internal(format!("Failed to retrieve access token: {}", e)))?
             //     .ok_or_else(|| Status::unauthenticated("AUTH_ACCESS_TOKEN not found"))?;
-            request.metadata_mut().insert(
-                "authorization",
-                format!("Bearer {}", access_token.0).parse().unwrap(),
-            );
-            info!("Access token set");
-            Ok(request)
+            let header: String = format!("Bearer {}", access_token.0);
+
+            match header.parse() {
+                Ok(value) => {
+                    request.metadata_mut().insert("authorization", value);
+                    Ok(request)
+                }
+                Err(err) => {
+                    error!("Failed to parse authorization header: {}", err);
+                    Ok(request)
+                }
+            }
         })
     }
 }
