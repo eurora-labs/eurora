@@ -17,6 +17,7 @@ pub struct Claims {
 
 #[derive(Clone)]
 pub struct JwtConfig {
+    /// Minutes offset
     refresh_offset: i64,
 }
 
@@ -81,18 +82,28 @@ impl AuthManager {
         match self.get_access_token_payload() {
             Ok(claims) => {
                 let now = chrono::Utc::now().timestamp();
-                let expiry_with_offset = claims.exp - self.jwt_config.refresh_offset;
+                let expiry_with_offset = claims.exp - self.jwt_config.refresh_offset * 60;
+
                 if now < expiry_with_offset {
                     // Token is still valid
-                    return self.get_access_token();
+                    self.get_access_token()
+                } else {
+                    self.refresh_tokens().await.map_err(|err| {
+                        error!("Failed to refresh tokens: {}", err);
+                        err
+                    })?;
+                    self.get_access_token()
                 }
             }
+
             Err(_) => {
-                // Token is invalid or missing, try to refresh
+                self.refresh_tokens().await.map_err(|err| {
+                    error!("Failed to refresh tokens: {}", err);
+                    err
+                })?;
+                self.get_access_token()
             }
         }
-
-        self.refresh_tokens().await
     }
 
     pub async fn refresh_tokens(&self) -> Result<Sensitive<String>> {

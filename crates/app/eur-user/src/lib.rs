@@ -4,6 +4,8 @@ mod storage;
 mod controller;
 pub use controller::Controller;
 
+pub use auth::AuthManager;
+
 mod user;
 pub use user::*;
 
