@@ -85,7 +85,19 @@
 
 		// Add the main key (if it's not a modifier)
 		if (!['Control', 'Meta', 'Alt', 'Shift'].includes(event.key)) {
-			const key = getKeyDisplay(event.key);
+			let key = event.key;
+
+			// Handle macOS Alt+key special character issue
+			if (
+				event.altKey &&
+				navigator.platform.toLowerCase().includes('mac') &&
+				event.code.startsWith('Key')
+			) {
+				// Extract the letter from the code (e.g., "KeyR" -> "r")
+				key = event.code.substring(3).toLowerCase();
+			}
+
+			const displayKey = getKeyDisplay(key);
 
 			// Only update if we have at least one modifier + main key, or special keys
 			if (
@@ -93,7 +105,7 @@
 				['Enter', 'Tab', 'Space'].includes(event.key) ||
 				/^F\d+$/.test(event.key)
 			) {
-				recordedHotkey = { modifiers, key };
+				recordedHotkey = { modifiers, key: displayKey };
 
 				// Clear existing timeout
 				if (recordingTimeout) {
