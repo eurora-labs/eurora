@@ -91,10 +91,14 @@
 			if (
 				event.altKey &&
 				navigator.platform.toLowerCase().includes('mac') &&
-				event.code.startsWith('Key')
+				(event.code.startsWith('Key') || event.code.startsWith('Digit'))
 			) {
-				// Extract the letter from the code (e.g., "KeyR" -> "r")
-				key = event.code.substring(3).toLowerCase();
+				// Extract the letter or number from the code (e.g., "KeyR" -> "r" or "Digit5" -> "5")
+				if (event.code.startsWith('Key')) {
+					key = event.code.substring(3).toLowerCase();
+				} else if (event.code.startsWith('Digit')) {
+					key = event.code.substring(5);
+				}
 			}
 
 			const displayKey = getKeyDisplay(key);
