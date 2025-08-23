@@ -167,7 +167,7 @@ pub fn position_hover_window(hover_window: &tauri::WebviewWindow) {
 
 pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
     info!("Converting hotkey to shortcut: {:?}", hotkey.clone());
-    let key_code = Code::from_str(&hotkey.key).expect("Invalid key");
+    let key_code = Code::from_str(&hotkey.key).unwrap_or(Code::Space);
     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
     Shortcut::new(modifiers, key_code)
 }
