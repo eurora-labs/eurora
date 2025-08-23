@@ -100,10 +100,10 @@
 	}
 
 	onMount(() => {
-		document.body.onkeydown = handleKeyDown;
+		document.body.addEventListener('keydown', handleKeyDown);
 
 		return () => {
-			document.body.onkeydown = null;
+			document.body.removeEventListener('keydown', handleKeyDown);
 			cleanup();
 		};
 	});
