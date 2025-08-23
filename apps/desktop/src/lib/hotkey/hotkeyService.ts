@@ -10,22 +10,10 @@ export class HotkeyService {
 		if (!details.hasKey) return null;
 		const keys = event2String(event);
 
-		// The aggregated keys should contain at least one regular key
-		// if (
-		// 	!keys.includes('Key') &&
-		// 	!keys.includes('Digit') &&
-		// 	!keys.includes('Numpad') &&
-		// 	!keys.includes('Space')
-		// )
-		// 	return null;
-
-		console.log(keys);
-
 		const modifiers = keys.split(' + ');
-		let key = modifiers.pop();
+		const key = modifiers.pop();
 
 		if (!key) throw new Error('Malformed hotkey string');
-		console.log(modifiers, key);
 
 		return { modifiers, key };
 	}
