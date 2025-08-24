@@ -10,14 +10,22 @@
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { type Conversation } from '$lib/bindings/bindings.js';
+	import { inject } from '@eurora/shared/context';
 	import { onMount } from 'svelte';
 
-	// type SidebarState = ReturnType<typeof
+	const taurpc = inject(TAURPC_SERVICE);
+	let conversations: Conversation[] = $state([]);
 
-	let sidebarState: ReturnType<typeof useSidebar> | undefined = undefined;
+	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
 
 	onMount(() => {
 		sidebarState = useSidebar();
+
+		taurpc.conversation.list(5, 0).then((res) => {
+			conversations = res;
+		});
 	});
 
 	// Menu items.
@@ -63,6 +71,28 @@
 		</div>
 	</Sidebar.Header>
 	<Sidebar.Content>
+		{#if conversations.length > 0 && sidebarState?.open}
+			<Sidebar.Group>
+				<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
+
+				<Sidebar.GroupContent>
+					<Sidebar.Menu>
+						{#each conversations as item (item.title)}
+							<Sidebar.MenuItem>
+								<Sidebar.MenuButton>
+									{#snippet child({ props })}
+										<a {...props}>
+											<!-- <item.icon /> -->
+											<span>{item.title}</span>
+										</a>
+									{/snippet}
+								</Sidebar.MenuButton>
+							</Sidebar.MenuItem>
+						{/each}
+					</Sidebar.Menu>
+				</Sidebar.GroupContent>
+			</Sidebar.Group>
+		{/if}
 		<!-- <Sidebar.Group>
 			<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>

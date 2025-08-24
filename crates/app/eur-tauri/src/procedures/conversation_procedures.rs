@@ -8,6 +8,11 @@ use tracing::info;
 
 #[taurpc::procedures(path = "conversation")]
 pub trait ConversationApi {
+    async fn list<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        limit: u16,
+        offset: u16,
+    ) -> Result<Vec<Conversation>, String>;
     async fn create<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Conversation, String>;
 }
 
@@ -16,6 +21,19 @@ pub struct ConversationApiImpl;
 
 #[taurpc::resolvers]
 impl ConversationApi for ConversationApiImpl {
+    async fn list<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        limit: u16,
+        offset: u16,
+    ) -> Result<Vec<Conversation>, String> {
+        let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+        Ok(personal_db
+            .list_conversations(limit, offset)
+            .await
+            .map_err(|e| e.to_string())?)
+    }
+
     async fn create<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
