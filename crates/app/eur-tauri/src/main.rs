@@ -300,7 +300,6 @@ fn main() {
                     });
 
                     // Initialize conversation storage
-                    let _db_path = get_db_path(app_handle);
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         let db = create_shared_database_manager(&db_app_handle).await;
