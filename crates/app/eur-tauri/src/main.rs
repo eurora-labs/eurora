@@ -6,16 +6,11 @@
 use anyhow::Result;
 use dotenv::dotenv;
 use eur_client_questions::QuestionsClient;
-use tracing_subscriber::{
-    filter::{EnvFilter, LevelFilter},
-    fmt,
-};
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 mod launcher;
 mod util;
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Conversation, DatabaseManager};
-use eur_screen_position::ActiveMonitor;
 use eur_settings::AppSettings;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
@@ -35,10 +30,7 @@ use eur_tauri::{
 };
 use launcher::monitor_cursor_for_hover;
 use launcher::toggle_launcher_window;
-use std::{
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 use tauri::{
     AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -103,11 +95,6 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
 
 fn main() {
     dotenv().ok();
-    let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
-        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
-
-    fmt().with_env_filter(filter).init();
 
     #[cfg(not(debug_assertions))]
     {
@@ -269,12 +256,18 @@ fn main() {
                     // --- State Initialization ---
                     let transcript_state = Arc::new(Mutex::new(None::<String>));
                     app_handle.manage(transcript_state);
+
                     let questions_client = create_shared_client();
                     app_handle.manage(questions_client.clone());
+
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
+
                     let current_conversation_id = Arc::new(None::<String>);
                     app_handle.manage(current_conversation_id.clone());
+
+                    let launcher_label = launcher_window.label().to_string();
+                    app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
 
                     let app_handle_user = app_handle.clone();
                     let path = tauri_app.path().app_data_dir().unwrap();
@@ -300,7 +293,6 @@ fn main() {
                     });
 
                     // Initialize conversation storage
-                    let _db_path = get_db_path(app_handle);
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         let db = create_shared_database_manager(&db_app_handle).await;
@@ -329,12 +321,6 @@ fn main() {
                         }
                     });
 
-                    // info!("Setting up global shortcut");
-
-                    let launcher_label = launcher_window.label().to_string();
-
-                    // Register the shortcut plugin
-                    app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
 
 
                     // Linux-specific focus handling
@@ -363,8 +349,17 @@ fn main() {
                 // .plugin(
                 //     tauri_plugin_log::Builder::default()
                 //         .level(log::LevelFilter::Error)
+                //         .fi
                 //         .build(),
-                // )
+                // 
+                // .plugin(log_plugin)
+                .plugin(
+                    tauri_plugin_log::Builder::new()
+                            .filter(|metadata| metadata.target().starts_with("eur_") || metadata.level() == log::Level::Warn)
+                            .level(log::LevelFilter::Info)
+                            // .level_for("eur_", log::LevelFilter::Trace)
+                            .build()
+                )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
                 // .plugin(

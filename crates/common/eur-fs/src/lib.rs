@@ -2,11 +2,9 @@ use std::{
     fs::{self, File},
     io::Read,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 use anyhow::{Context, Result};
-use bstr::BString;
 use serde::de::DeserializeOwned;
 use walkdir::WalkDir;
 
