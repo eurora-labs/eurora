@@ -1,4 +1,4 @@
-use crate::{launcher::toggle_launcher_window as toggle_launcher, window::create_hover};
+use crate::launcher::toggle_launcher_window as toggle_launcher;
 use tauri::{Manager, Runtime};
 use tracing::info;
 
