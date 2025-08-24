@@ -1,5 +1,5 @@
 mod db;
 mod types;
 
-pub use db::DatabaseManager;
+pub use db::PersonalDatabaseManager;
 pub use types::*;
