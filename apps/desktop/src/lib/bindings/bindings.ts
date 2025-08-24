@@ -32,6 +32,8 @@ export type BackendType = "None" | "Ollama" | "Eurora" | "OpenAI" | "Anthropic"
 
 export type ContextChip = { id: string; extension_id: string; name: string; attrs: Partial<{ [key in string]: string }>; icon: string | null; position: number | null }
 
+export type Conversation = { id: string; title: string; created_at: string; updated_at: string }
+
 export type GeneralSettings = { 
 /**
  * Whether to start the app on autostart
@@ -72,12 +74,13 @@ nonAnonymousMetrics: boolean;
  */
 distinctId: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"new_conversation":[],"send_query":["channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_hover_settings":[],"get_launcher_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_hover_settings":["hover_settings"],"set_launcher_settings":["launcher_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"hide_hover_window":[],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"],"show_hover_window":[]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"new_conversation":[],"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"create":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_hover_settings":[],"get_launcher_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_hover_settings":["hover_settings"],"set_launcher_settings":["launcher_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"hide_hover_window":[],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"],"show_hover_window":[]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
 "chat": {new_conversation: () => Promise<string>, 
-send_query: (channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
+send_query: (conversationId: string, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
 "context_chip": {get: () => Promise<ContextChip[]>},
+"conversation": {create: () => Promise<Conversation>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "prompt": {disconnect: () => Promise<null>, 
 get_service_name: () => Promise<string>, 
