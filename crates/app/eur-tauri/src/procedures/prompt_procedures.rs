@@ -2,7 +2,6 @@ use async_from::AsyncTryFrom;
 use eur_eurora_provider::EuroraConfig;
 use eur_prompt_kit::{OllamaConfig, OpenAIConfig};
 use eur_secret::secret;
-use eur_settings::{AppSettings, BackendSettings};
 use tauri::{Manager, Runtime};
 use url::Url;
 
