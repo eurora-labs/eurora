@@ -124,14 +124,21 @@ impl PersonalDatabaseManager {
         Ok(conversation)
     }
 
-    pub async fn list_conversations(&self) -> Result<Vec<Conversation>, sqlx::Error> {
+    pub async fn list_conversations(
+        &self,
+        limit: u16,
+        offset: u16,
+    ) -> Result<Vec<Conversation>, sqlx::Error> {
         let conversations = sqlx::query_as(
             r#"
             SELECT id, title, created_at, updated_at
             FROM conversation
             ORDER BY created_at DESC
+            LIMIT $1,$2
             "#,
         )
+        .bind(offset)
+        .bind(limit)
         .fetch_all(&self.pool)
         .await?;
 
