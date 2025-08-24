@@ -15,11 +15,11 @@ use tracing::{debug, info};
 
 use crate::types::{Activity, ActivityAsset, ChatMessage, Conversation};
 
-pub struct DatabaseManager {
+pub struct PersonalDatabaseManager {
     pub pool: SqlitePool,
 }
 
-impl DatabaseManager {
+impl PersonalDatabaseManager {
     pub async fn new(database_path: &str) -> Result<Self, sqlx::Error> {
         debug!(
             "Initializing DatabaseManager with database path: {}",
@@ -63,7 +63,7 @@ impl DatabaseManager {
             .connect_with(opts)
             .await?;
 
-        let db_manager = DatabaseManager { pool };
+        let db_manager = PersonalDatabaseManager { pool };
 
         // Run migrations after establishing the connection and setting up encryption
         Self::run_migrations(&db_manager.pool)
