@@ -2,7 +2,7 @@ import { InjectionToken } from '@eurora/shared/context';
 import type { Hotkey } from '$lib/bindings/bindings.js';
 import { toString as event2String, details as eventDetails } from 'keyboard-event-to-string';
 
-export const HotkeyServiceToken = new InjectionToken<HotkeyService>('HotkeyService');
+export const HOTKEY_SERVICE = new InjectionToken<HotkeyService>('HotkeyService');
 
 export class HotkeyService {
 	public interpretHotkey(event: KeyboardEvent): Hotkey | null {

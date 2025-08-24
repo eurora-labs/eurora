@@ -1,12 +1,18 @@
 use crate::shared_types::SharedAppSettings;
 use crate::util::convert_hotkey_to_shortcut;
-use eur_settings::{GeneralSettings, HoverSettings, LauncherSettings, TelemetrySettings};
+use eur_settings::{
+    AppSettings, GeneralSettings, HoverSettings, LauncherSettings, TelemetrySettings,
+};
 use tauri::{Manager, Runtime};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tracing::info;
 
 #[taurpc::procedures(path = "settings")]
 pub trait SettingsApi {
+    async fn get_all_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<AppSettings, String>;
+
     async fn get_hover_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<HoverSettings, String>;
@@ -43,6 +49,16 @@ pub struct SettingsApiImpl;
 
 #[taurpc::resolvers]
 impl SettingsApi for SettingsApiImpl {
+    async fn get_all_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<AppSettings, String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
+        Ok(settings.clone())
+    }
+
     async fn get_hover_settings<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
