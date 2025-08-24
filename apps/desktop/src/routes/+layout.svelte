@@ -3,7 +3,12 @@
 	import '../app.pcss';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
+	import { initDependencies } from '$lib/bootstrap/deps';
+
 	let { children } = $props();
+
+	initDependencies();
+
 	onMount(() => {
 		setMode('light');
 	});
