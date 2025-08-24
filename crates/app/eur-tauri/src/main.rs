@@ -253,18 +253,8 @@ fn main() {
                         .expect("Failed to create tray icon");
 
 
-                    // --- State Initialization ---
-                    let transcript_state = Arc::new(Mutex::new(None::<String>));
-                    app_handle.manage(transcript_state);
-
-                    let questions_client = create_shared_client();
-                    app_handle.manage(questions_client.clone());
-
                     let timeline = create_shared_timeline();
                     app_handle.manage(timeline.clone());
-
-                    let current_conversation_id = Arc::new(None::<String>);
-                    app_handle.manage(current_conversation_id.clone());
 
                     let launcher_label = launcher_window.label().to_string();
                     app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
@@ -321,55 +311,17 @@ fn main() {
                         }
                     });
 
-
-
-                    // Linux-specific focus handling
-                    // #[cfg(target_os = "linux")]
-                    // {
-                    //     let app_handle_focus = app_handle.clone();
-                    //     let launcher_label_linux = launcher_label.clone();
-                    //     launcher_window.on_window_event(move |event| {
-                    //         if let tauri::WindowEvent::Focused(false) = event && let Some(launcher) =
-                    //                 app_handle_focus.get_window(&launcher_label_linux)
-                    //             {
-                    //                 launcher.hide().expect("Failed to hide launcher window");
-                    //                 // Emit an event to clear the conversation when launcher is hidden
-                    //                 launcher
-                    //                     .emit("launcher_closed", ())
-                    //                     .expect("Failed to emit launcher_closed event");
-                    //                 set_launcher_visible(false);
-                    //                 // Ensure state is updated
-                    //         }
-                    //     });
-                    // }
-
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
-                // .plugin(
-                //     tauri_plugin_log::Builder::default()
-                //         .level(log::LevelFilter::Error)
-                //         .fi
-                //         .build(),
-                // 
-                // .plugin(log_plugin)
                 .plugin(
                     tauri_plugin_log::Builder::new()
                             .filter(|metadata| metadata.target().starts_with("eur_") || metadata.level() == log::Level::Warn)
                             .level(log::LevelFilter::Info)
-                            // .level_for("eur_", log::LevelFilter::Trace)
                             .build()
                 )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
-                // .plugin(
-                //     tauri_plugin_log::Builder::default()
-                //         .targets([
-                //             Target::new(TargetKind::Stdout),
-                //             Target::new(TargetKind::LogDir { file_name: None }),
-                //         ])
-                //         .build(),
-                // )
                 .on_window_event(|window, event| match event {
                     #[cfg(target_os = "macos")]
                     tauri::WindowEvent::CloseRequested { .. } => {
