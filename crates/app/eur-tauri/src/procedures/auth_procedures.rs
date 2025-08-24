@@ -3,7 +3,6 @@
 use async_from::AsyncTryFrom;
 use eur_eurora_provider::EuroraConfig;
 use eur_secret::{Sensitive, secret};
-use eur_settings::BackendType;
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
