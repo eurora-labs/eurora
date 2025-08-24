@@ -1,5 +1,4 @@
 use crate::AppSettings;
-use crate::hotkey::Hotkey;
 use crate::json::{json_difference, merge_non_null_json_value};
 use crate::watch::SETTINGS_FILE;
 use anyhow::Result;
