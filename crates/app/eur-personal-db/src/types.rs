@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use sqlx::FromRow;
 
-#[derive(FromRow, Debug, Serialize, Deserialize)]
+#[derive(FromRow, Debug, Serialize, Deserialize, Type, Clone)]
 pub struct Conversation {
     pub id: String,
     pub title: String,
@@ -10,7 +11,7 @@ pub struct Conversation {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(FromRow, Debug, Serialize, Deserialize)]
+#[derive(FromRow, Debug, Serialize, Deserialize, Type)]
 pub struct ChatMessage {
     pub id: String,
     pub conversation_id: String,
