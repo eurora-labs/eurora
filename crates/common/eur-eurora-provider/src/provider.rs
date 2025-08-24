@@ -3,17 +3,14 @@
 use std::pin::Pin;
 
 use async_trait::async_trait;
-use eur_secret::secret;
 use ferrous_llm_core::traits::{ChatProvider, StreamingProvider};
 use futures::Stream;
-use tokio::sync::RwLock;
 use tonic::{
     Request, Status, Streaming,
-    service::{Interceptor, interceptor::InterceptedService},
     transport::{Channel, ClientTlsConfig, Endpoint},
 };
 use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
-use tower::{BoxError, Service, ServiceBuilder, layer::Layer};
+use tower::{ServiceBuilder, layer::Layer};
 use tracing::{error, info};
 
 use crate::{

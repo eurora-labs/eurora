@@ -12,6 +12,11 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import type { Hotkey } from '$lib/bindings/bindings.js';
+	import { HOTKEY_SERVICE } from '$lib/hotkey/hotkeyService';
+	import { inject } from '@eurora/shared/context';
+	import { onMount } from 'svelte';
+
+	let hotkeyService = inject(HOTKEY_SERVICE);
 
 	let taurpc = createTauRPCProxy();
 	let settingHotkey = $state(false);
@@ -20,24 +25,6 @@
 	let recordingTimeout: NodeJS.Timeout | null = null;
 
 	let { hotkey, onHotkeyChange, variant = 'secondary' }: HotkeyProps = $props();
-
-	// Key mapping for better display
-	const keyDisplayMap: Record<string, string> = {
-		Control: 'Ctrl',
-		Meta: 'Cmd',
-		Alt: 'Alt',
-		Shift: 'Shift',
-		' ': 'Space',
-		ArrowUp: '↑',
-		ArrowDown: '↓',
-		ArrowLeft: '←',
-		ArrowRight: '→',
-		Escape: 'Esc',
-		Enter: 'Enter',
-		Tab: 'Tab',
-		Backspace: 'Backspace',
-		Delete: 'Del',
-	};
 
 	export async function saveHotkey() {
 		try {
@@ -50,16 +37,14 @@
 		}
 	}
 
-	function getKeyDisplay(key: string): string {
-		return keyDisplayMap[key] || key.toUpperCase();
-	}
-
 	function hotkeyToString(hotkey: Hotkey): string {
 		return [...hotkey.modifiers, hotkey.key].join(' + ');
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
+		console.log(event);
 		if (!isRecording) return;
+		window.focus();
 
 		event.preventDefault();
 		event.stopPropagation();
@@ -70,54 +55,22 @@
 			return;
 		}
 
-		const modifiers: string[] = [];
+		const interpretedHotkey = hotkeyService.interpretHotkey(event);
+		if (!interpretedHotkey) return;
+		recordedHotkey = interpretedHotkey;
+		hotkey = interpretedHotkey;
 
-		// Add modifiers in consistent order
-		if (event.ctrlKey || event.metaKey) {
-			modifiers.push(event.ctrlKey ? 'Ctrl' : 'Cmd');
+		isRecording = false;
+
+		// Clear existing timeout
+		if (recordingTimeout) {
+			clearTimeout(recordingTimeout);
 		}
-		if (event.altKey) {
-			modifiers.push('Alt');
-		}
-		if (event.shiftKey) {
-			modifiers.push('Shift');
-		}
 
-		// Add the main key (if it's not a modifier)
-		if (!['Control', 'Meta', 'Alt', 'Shift'].includes(event.key)) {
-			let key = event.key;
-
-			// Handle macOS Alt+key special character issue
-			if (
-				event.altKey &&
-				navigator.platform.toLowerCase().includes('mac') &&
-				event.code.startsWith('Key')
-			) {
-				// Extract the letter from the code (e.g., "KeyR" -> "r")
-				key = event.code.substring(3).toLowerCase();
-			}
-
-			const displayKey = getKeyDisplay(key);
-
-			// Only update if we have at least one modifier + main key, or special keys
-			if (
-				modifiers.length >= 1 ||
-				['Enter', 'Tab', 'Space'].includes(event.key) ||
-				/^F\d+$/.test(event.key)
-			) {
-				recordedHotkey = { modifiers, key: displayKey };
-
-				// Clear existing timeout
-				if (recordingTimeout) {
-					clearTimeout(recordingTimeout);
-				}
-
-				// Set timeout to finalize recording
-				recordingTimeout = setTimeout(() => {
-					finalizeRecording();
-				}, 1000);
-			}
-		}
+		// Set timeout to finalize recording
+		recordingTimeout = setTimeout(() => {
+			finalizeRecording();
+		}, 1000);
 	}
 
 	async function finalizeRecording() {
@@ -147,6 +100,15 @@
 		}
 	}
 
+	onMount(() => {
+		document.body.addEventListener('keydown', handleKeyDown);
+
+		return () => {
+			document.body.removeEventListener('keydown', handleKeyDown);
+			cleanup();
+		};
+	});
+
 	async function setHotkey() {
 		settingHotkey = true;
 		isRecording = true;
@@ -162,22 +124,6 @@
 			clearTimeout(recordingTimeout);
 		}
 	}
-
-	// Add global event listener when recording
-	$effect(() => {
-		if (isRecording) {
-			document.addEventListener('keydown', handleKeyDown, true);
-
-			return () => {
-				document.removeEventListener('keydown', handleKeyDown, true);
-			};
-		}
-	});
-
-	// Cleanup effect
-	$effect(() => {
-		return cleanup;
-	});
 </script>
 
 {#if hotkey}

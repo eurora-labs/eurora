@@ -1,11 +1,18 @@
 use crate::shared_types::SharedAppSettings;
 use crate::util::convert_hotkey_to_shortcut;
-use eur_settings::{GeneralSettings, HoverSettings, LauncherSettings, TelemetrySettings};
+use eur_settings::{
+    AppSettings, GeneralSettings, HoverSettings, LauncherSettings, TelemetrySettings,
+};
 use tauri::{Manager, Runtime};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
+use tracing::info;
 
 #[taurpc::procedures(path = "settings")]
 pub trait SettingsApi {
+    async fn get_all_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<AppSettings, String>;
+
     async fn get_hover_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<HoverSettings, String>;
@@ -42,6 +49,16 @@ pub struct SettingsApiImpl;
 
 #[taurpc::resolvers]
 impl SettingsApi for SettingsApiImpl {
+    async fn get_all_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<AppSettings, String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
+        Ok(settings.clone())
+    }
+
     async fn get_hover_settings<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
@@ -121,6 +138,7 @@ impl SettingsApi for SettingsApiImpl {
     ) -> Result<(), String> {
         let state = app_handle.state::<SharedAppSettings>();
         let mut settings = state.lock().await;
+        info!("Launcher settings changed: {:?}", launcher_settings);
 
         if settings.launcher.hotkey != launcher_settings.hotkey {
             let previous_hotkey = convert_hotkey_to_shortcut(settings.launcher.hotkey.clone());
@@ -129,8 +147,17 @@ impl SettingsApi for SettingsApiImpl {
             app_handle
                 .global_shortcut()
                 .unregister(previous_hotkey)
-                .unwrap();
-            app_handle.global_shortcut().register(new_hotkey).unwrap();
+                .map_err(|e| {
+                    format!(
+                        "Failed to unregister previous shortcut '{}': {}",
+                        previous_hotkey, e
+                    )
+                })?;
+
+            app_handle
+                .global_shortcut()
+                .register(new_hotkey)
+                .map_err(|e| format!("Failed to register new shortcut '{}': {}", new_hotkey, e))?;
         }
 
         settings.launcher = launcher_settings;
