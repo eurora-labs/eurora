@@ -50,7 +50,7 @@ pub struct PromptService {
 
 impl PromptService {
     pub fn new(jwt_config: Option<JwtConfig>) -> Self {
-        let mut config = OpenAIConfig::new(
+        let config = OpenAIConfig::new(
             std::env::var("OPENAI_API_KEY").unwrap_or_default(),
             // "gpt-4o-2024-08-06",
             // "meta-llama/Llama-4-Maverick-17B-128E-Instruct",
