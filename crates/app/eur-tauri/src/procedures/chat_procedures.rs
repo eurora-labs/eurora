@@ -30,10 +30,6 @@ pub trait ChatApi {
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
-
-    async fn new_conversation<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<String, String>;
 }
 
 #[derive(Clone)]
@@ -132,12 +128,5 @@ impl ChatApi for ChatApiImpl {
         }
 
         Ok(complete_response)
-    }
-
-    async fn new_conversation<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<String, String> {
-        Ok("New conversation created".to_string())
     }
 }
