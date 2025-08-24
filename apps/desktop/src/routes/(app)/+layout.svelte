@@ -14,9 +14,9 @@
 </script>
 
 <Menubar />
-<Sidebar.Provider>
+<Sidebar.Provider open={false}>
 	<MainSidebar />
-	<main class="flex flex-col h-full w-full">
+	<main class="flex flex-col h-[calc(100vh-70px)] w-full">
 		<div class="flex-1">{@render children?.()}</div>
 	</main>
 </Sidebar.Provider>

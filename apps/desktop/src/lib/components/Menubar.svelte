@@ -42,13 +42,13 @@
 	}
 </script>
 
-<div class="flex items-center justify-between p-4 h-[70px]">
-	<div class="flex items-center gap-2">
+<div class="flex items-center justify-end p-4 h-[70px]">
+	<!-- <div class="flex items-center gap-2">
 		<a href="/onboarding" class="flex items-center gap-2">
 			<EuroraLogo class="size-12" />
 			Eurora Labs
 		</a>
-	</div>
+	</div> -->
 	<div class="flex items-center gap-2">
 		{#if service_name}
 			<DropdownMenu.Root>
