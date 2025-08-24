@@ -107,7 +107,14 @@ fn main() {
         .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
         .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
 
-    fmt().with_env_filter(filter).init();
+    // let log_plugin = tauri_plugin_log::Builder::new()
+    //     .filter(|metadata| metadata.target() != "hyper")
+    //     .filter(|metadata| metadata.target() != "tokio")
+    //     .level(log::LevelFilter::Error)
+    //     .level_for("eur_", log::LevelFilter::Trace)
+    //     .build();
+
+    // fmt().with_env_filter(filter).init();
 
     #[cfg(not(debug_assertions))]
     {
@@ -362,8 +369,17 @@ fn main() {
                 // .plugin(
                 //     tauri_plugin_log::Builder::default()
                 //         .level(log::LevelFilter::Error)
+                //         .fi
                 //         .build(),
                 // )
+                // .plugin(log_plugin)
+                .plugin(
+                    tauri_plugin_log::Builder::new()
+                            .filter(|metadata| metadata.target().starts_with("eur_") || metadata.level() == log::Level::Error)
+                            .level(log::LevelFilter::Info)
+                            // .level_for("eur_", log::LevelFilter::Trace)
+                            .build()
+                )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
                 // .plugin(
