@@ -39,17 +39,22 @@ impl DatabaseManager {
             >(sqlite3_vec_init as *const ())));
         }
 
-        let key = init_key().map_err(|e| sqlx::Error::Configuration(e.into()))?;
-        let opts = SqliteConnectOptions::from_str(&connection_string)?
-            .pragma("key", format!("'{}'", key.0))
-            .pragma("kdf_iter", "64000")
-            .pragma("cipher_page_size", "4096")
-            .pragma("cipher_hmac_algorithm", "HMAC_SHA512")
-            .pragma("cipher_kdf_algorithm", "PBKDF2_HMAC_SHA512")
+        let mut opts = SqliteConnectOptions::from_str(&connection_string)?
             .pragma("journal_mode", "WAL")
             .pragma("cache_size", "2000")
             .pragma("temp_store", "MEMORY")
             .create_if_missing(true);
+
+        // The database for development is unencrypted
+        if cfg!(not(debug_assertions)) {
+            let key = init_key().map_err(|e| sqlx::Error::Configuration(e.into()))?;
+            opts = opts
+                .pragma("key", format!("'{}'", key.0))
+                .pragma("kdf_iter", "64000")
+                .pragma("cipher_page_size", "4096")
+                .pragma("cipher_hmac_algorithm", "HMAC_SHA512")
+                .pragma("cipher_kdf_algorithm", "PBKDF2_HMAC_SHA512");
+        }
 
         let pool = SqlitePoolOptions::new()
             .max_connections(50)

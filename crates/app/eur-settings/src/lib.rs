@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 mod hotkey;
 mod json;
@@ -14,7 +15,7 @@ pub use settings::HoverSettings;
 pub use settings::LauncherSettings;
 pub use settings::TelemetrySettings;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     /// General settings
