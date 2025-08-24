@@ -1,3 +1,4 @@
+use eur_personal_db::Conversation;
 use eur_timeline::Timeline;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
@@ -25,6 +26,7 @@ pub struct Query {
 pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
@@ -42,6 +44,7 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
