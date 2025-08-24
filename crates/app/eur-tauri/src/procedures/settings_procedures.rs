@@ -147,8 +147,17 @@ impl SettingsApi for SettingsApiImpl {
             app_handle
                 .global_shortcut()
                 .unregister(previous_hotkey)
-                .unwrap();
-            app_handle.global_shortcut().register(new_hotkey).unwrap();
+                .map_err(|e| {
+                    format!(
+                        "Failed to unregister previous shortcut '{}': {}",
+                        previous_hotkey, e
+                    )
+                })?;
+
+            app_handle
+                .global_shortcut()
+                .register(new_hotkey)
+                .map_err(|e| format!("Failed to register new shortcut '{}': {}", new_hotkey, e))?;
         }
 
         settings.launcher = launcher_settings;
