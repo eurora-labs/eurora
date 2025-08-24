@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use eur_screen_position::ActiveMonitor;
 use eur_settings::Hotkey;
 use tauri::Manager;
@@ -57,48 +59,52 @@ pub fn string_key_to_tauri_code(key: &str) -> Option<Code> {
         "f11" => Some(Code::F11),
         "f12" => Some(Code::F12),
         // Single character keys
-        key if key.len() == 1 => {
-            let ch = key.chars().next().unwrap();
-            match ch {
-                'a' => Some(Code::KeyA),
-                'b' => Some(Code::KeyB),
-                'c' => Some(Code::KeyC),
-                'd' => Some(Code::KeyD),
-                'e' => Some(Code::KeyE),
-                'f' => Some(Code::KeyF),
-                'g' => Some(Code::KeyG),
-                'h' => Some(Code::KeyH),
-                'i' => Some(Code::KeyI),
-                'j' => Some(Code::KeyJ),
-                'k' => Some(Code::KeyK),
-                'l' => Some(Code::KeyL),
-                'm' => Some(Code::KeyM),
-                'n' => Some(Code::KeyN),
-                'o' => Some(Code::KeyO),
-                'p' => Some(Code::KeyP),
-                'q' => Some(Code::KeyQ),
-                'r' => Some(Code::KeyR),
-                's' => Some(Code::KeyS),
-                't' => Some(Code::KeyT),
-                'u' => Some(Code::KeyU),
-                'v' => Some(Code::KeyV),
-                'w' => Some(Code::KeyW),
-                'x' => Some(Code::KeyX),
-                'y' => Some(Code::KeyY),
-                'z' => Some(Code::KeyZ),
-                '0' => Some(Code::Digit0),
-                '1' => Some(Code::Digit1),
-                '2' => Some(Code::Digit2),
-                '3' => Some(Code::Digit3),
-                '4' => Some(Code::Digit4),
-                '5' => Some(Code::Digit5),
-                '6' => Some(Code::Digit6),
-                '7' => Some(Code::Digit7),
-                '8' => Some(Code::Digit8),
-                '9' => Some(Code::Digit9),
-                _ => None,
-            }
-        }
+        "keya" => Some(Code::KeyA),
+        "keyb" => Some(Code::KeyB),
+        "keyc" => Some(Code::KeyC),
+        "keyd" => Some(Code::KeyD),
+        "keye" => Some(Code::KeyE),
+        "keyf" => Some(Code::KeyF),
+        "keyg" => Some(Code::KeyG),
+        "keyh" => Some(Code::KeyH),
+        "keyi" => Some(Code::KeyI),
+        "keyj" => Some(Code::KeyJ),
+        "keyk" => Some(Code::KeyK),
+        "keyl" => Some(Code::KeyL),
+        "keym" => Some(Code::KeyM),
+        "keyn" => Some(Code::KeyN),
+        "keyo" => Some(Code::KeyO),
+        "keyp" => Some(Code::KeyP),
+        "keyq" => Some(Code::KeyQ),
+        "keyr" => Some(Code::KeyR),
+        "keys" => Some(Code::KeyS),
+        "keyt" => Some(Code::KeyT),
+        "keyu" => Some(Code::KeyU),
+        "keyv" => Some(Code::KeyV),
+        "keyw" => Some(Code::KeyW),
+        "keyx" => Some(Code::KeyX),
+        "keyy" => Some(Code::KeyY),
+        "keyz" => Some(Code::KeyZ),
+        "digit0" => Some(Code::Digit0),
+        "digit1" => Some(Code::Digit1),
+        "digit2" => Some(Code::Digit2),
+        "digit3" => Some(Code::Digit3),
+        "digit4" => Some(Code::Digit4),
+        "digit5" => Some(Code::Digit5),
+        "digit6" => Some(Code::Digit6),
+        "digit7" => Some(Code::Digit7),
+        "digit8" => Some(Code::Digit8),
+        "digit9" => Some(Code::Digit9),
+        "numpad0" => Some(Code::Numpad0),
+        "numpad1" => Some(Code::Numpad1),
+        "numpad2" => Some(Code::Numpad2),
+        "numpad3" => Some(Code::Numpad3),
+        "numpad4" => Some(Code::Numpad4),
+        "numpad5" => Some(Code::Numpad5),
+        "numpad6" => Some(Code::Numpad6),
+        "numpad7" => Some(Code::Numpad7),
+        "numpad8" => Some(Code::Numpad8),
+        "numpad9" => Some(Code::Numpad9),
         _ => None,
     }
 }
@@ -160,7 +166,8 @@ pub fn position_hover_window(hover_window: &tauri::WebviewWindow) {
 }
 
 pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
-    let key_code = string_key_to_tauri_code(&hotkey.key).expect("Invalid key");
+    info!("Converting hotkey to shortcut: {:?}", hotkey.clone());
+    let key_code = Code::from_str(&hotkey.key).unwrap_or(Code::Space);
     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
     Shortcut::new(modifiers, key_code)
 }
