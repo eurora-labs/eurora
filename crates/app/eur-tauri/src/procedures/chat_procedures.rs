@@ -45,7 +45,7 @@ impl ChatApi for ChatApiImpl {
         let title: String = "Placeholder Title".to_string();
 
         let mut messages: Vec<Message> = Vec::new();
-        if query.assets.len() > 0 {
+        if !query.assets.is_empty() {
             messages = timeline.construct_asset_messages();
             messages.extend(timeline.construct_snapshot_messages());
         }
