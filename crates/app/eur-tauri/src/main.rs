@@ -18,6 +18,7 @@ use eur_tauri::{
         auth_procedures::{AuthApi, AuthApiImpl},
         chat_procedures::{ChatApi, ChatApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
+        conversation_procedures::{ConversationApi, ConversationApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
         settings_procedures::{SettingsApi, SettingsApiImpl},
@@ -344,6 +345,7 @@ fn main() {
                         .bigint(specta_typescript::BigIntExportBehavior::BigInt),
                 )
                 .merge(AuthApiImpl.into_handler())
+                .merge(ConversationApiImpl.into_handler())
                 .merge(SettingsApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
