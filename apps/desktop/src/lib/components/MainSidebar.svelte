@@ -8,7 +8,6 @@
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import { Button } from '@eurora/ui/components/button/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import { onMount } from 'svelte';
@@ -22,33 +21,33 @@
 	});
 
 	// Menu items.
-	const items = [
-		{
-			title: 'Chat 1',
-			url: '#',
-			icon: House,
-		},
-		{
-			title: 'Chat 2',
-			url: '#',
-			icon: Inbox,
-		},
-		{
-			title: 'Chat 3',
-			url: '#',
-			icon: Calendar,
-		},
-		{
-			title: 'Chat 4',
-			url: '#',
-			icon: Search,
-		},
-		{
-			title: 'Chat 5',
-			url: '#',
-			icon: Settings,
-		},
-	];
+	// const items = [
+	// 	{
+	// 		title: 'Chat 1',
+	// 		url: '#',
+	// 		icon: House,
+	// 	},
+	// 	{
+	// 		title: 'Chat 2',
+	// 		url: '#',
+	// 		icon: Inbox,
+	// 	},
+	// 	{
+	// 		title: 'Chat 3',
+	// 		url: '#',
+	// 		icon: Calendar,
+	// 	},
+	// 	{
+	// 		title: 'Chat 4',
+	// 		url: '#',
+	// 		icon: Search,
+	// 	},
+	// 	{
+	// 		title: 'Chat 5',
+	// 		url: '#',
+	// 		icon: Settings,
+	// 	},
+	// ];
 </script>
 
 <Sidebar.Root collapsible="icon" class="border-none">
