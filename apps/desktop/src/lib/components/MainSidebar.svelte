@@ -5,6 +5,17 @@
 	import Search from '@lucide/svelte/icons/search';
 	import Settings from '@lucide/svelte/icons/settings';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
+	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
+	import { useSidebar } from '@eurora/ui/components/sidebar/index';
+	import { onMount } from 'svelte';
+
+	// type SidebarState = ReturnType<typeof
+
+	let sidebarState: ReturnType<typeof useSidebar> | undefined = undefined;
+
+	onMount(() => {
+		sidebarState = useSidebar();
+	});
 
 	// Menu items.
 	const items = [
@@ -36,8 +47,15 @@
 	];
 </script>
 
-<Sidebar.Root>
-	<Sidebar.Header>Header</Sidebar.Header>
+<Sidebar.Root collapsible="icon">
+	<Sidebar.Header>
+		<div class="flex items-center justify-between">
+			<EuroraLogo class="size-7" />
+			{#if sidebarState?.open}
+				<Sidebar.Trigger />
+			{/if}
+		</div>
+	</Sidebar.Header>
 	<Sidebar.Content>
 		<Sidebar.Group>
 			<Sidebar.GroupLabel>Application</Sidebar.GroupLabel>
