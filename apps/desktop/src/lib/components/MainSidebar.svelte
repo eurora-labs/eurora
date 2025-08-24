@@ -4,9 +4,13 @@
 	import Inbox from '@lucide/svelte/icons/inbox';
 	import Search from '@lucide/svelte/icons/search';
 	import Settings from '@lucide/svelte/icons/settings';
+	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
+	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
+	import { Button } from '@eurora/ui/components/button/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
+	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import { onMount } from 'svelte';
 
 	// type SidebarState = ReturnType<typeof
@@ -47,18 +51,21 @@
 	];
 </script>
 
-<Sidebar.Root collapsible="icon">
+<Sidebar.Root collapsible="icon" class="border-none">
 	<Sidebar.Header>
 		<div class="flex items-center justify-between">
-			<EuroraLogo class="size-7" />
+			<div class="flex items-center gap-2">
+				<EuroraLogo class="size-7" onclick={() => sidebarState?.setOpen(true)} />
+			</div>
+
 			{#if sidebarState?.open}
 				<Sidebar.Trigger />
 			{/if}
 		</div>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>Application</Sidebar.GroupLabel>
+		<!-- <Sidebar.Group>
+			<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
 					{#each items as item (item.title)}
@@ -75,7 +82,35 @@
 					{/each}
 				</Sidebar.Menu>
 			</Sidebar.GroupContent>
-		</Sidebar.Group>
+		</Sidebar.Group> -->
 	</Sidebar.Content>
-	<Sidebar.Footer>Footer</Sidebar.Footer>
+	<Sidebar.Footer>
+		<Sidebar.Menu>
+			<Sidebar.MenuItem>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Sidebar.MenuButton
+								{...props}
+								class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+							>
+								<CircleUserRoundIcon />
+								<span>Profile</span>
+								<ChevronUpIcon class="ml-auto" />
+							</Sidebar.MenuButton>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content side="top" class="w-(--bits-dropdown-menu-anchor-width)">
+						<DropdownMenu.Item>
+							{#snippet child({ props })}
+								<a {...props} href="/settings">
+									<span>Settings</span>
+								</a>
+							{/snippet}
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+			</Sidebar.MenuItem>
+		</Sidebar.Menu>
+	</Sidebar.Footer>
 </Sidebar.Root>
