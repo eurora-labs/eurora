@@ -12,10 +12,11 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import type { Hotkey } from '$lib/bindings/bindings.js';
-	import { HotkeyService } from '$lib/hotkey/hotkeyService';
+	import { HOTKEY_SERVICE } from '$lib/hotkey/hotkeyService';
+	import { inject } from '@eurora/shared/context';
 	import { onMount } from 'svelte';
 
-	let hotkeyService = new HotkeyService();
+	let hotkeyService = inject(HOTKEY_SERVICE);
 
 	let taurpc = createTauRPCProxy();
 	let settingHotkey = $state(false);
