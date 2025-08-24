@@ -1,9 +1,10 @@
+use eur_timeline::Timeline;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tracing::info;
 
-use crate::shared_types::{SharedPromptKitService, SharedTimeline};
+use crate::shared_types::SharedPromptKitService;
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
     chunk: String,
@@ -44,7 +45,7 @@ impl ChatApi for ChatApiImpl {
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
-        let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
+        let timeline_state: tauri::State<Timeline> = app_handle.state();
         let timeline = timeline_state.inner();
         let title: String = "Placeholder Title".to_string();
 
