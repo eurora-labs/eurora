@@ -39,7 +39,6 @@ impl DatabaseManager {
             >(sqlite3_vec_init as *const ())));
         }
 
-        let key = init_key().map_err(|e| sqlx::Error::Configuration(e.into()))?;
         let mut opts = SqliteConnectOptions::from_str(&connection_string)?
             .pragma("journal_mode", "WAL")
             .pragma("cache_size", "2000")
@@ -48,6 +47,7 @@ impl DatabaseManager {
 
         // The database for development is unencrypted
         if cfg!(not(debug_assertions)) {
+            let key = init_key().map_err(|e| sqlx::Error::Configuration(e.into()))?;
             opts = opts
                 .pragma("key", format!("'{}'", key.0))
                 .pragma("kdf_iter", "64000")
