@@ -704,7 +704,7 @@ mod tests {
 
         let asset = ArticleAsset::from(article_state);
         assert_eq!(asset.title, "article asset");
-        assert_eq!(asset.content, "Test article content");
+        assert_eq!(asset.content, "Test text content"); // Uses text_content field
         assert!(!asset.id.is_empty());
     }
 
@@ -725,7 +725,7 @@ mod tests {
         let chip = asset.get_context_chip().unwrap();
 
         assert_eq!(chip.name, "article");
-        assert_eq!(chip.extension_id, "None");
+        assert_eq!(chip.extension_id, "309f0906-d48c-4439-9751-7bcf915cdfc5");
         assert!(!chip.id.is_empty());
     }
 
