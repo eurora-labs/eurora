@@ -143,15 +143,15 @@ impl PromptApi for PromptApiImpl {
 
                     eur_prompt_kit::PromptKitService::async_try_from(config)
                         .await
-                        .map_err(|e| e.to_string())?
+                        .map_err(|e| e.to_string())
                 }
                 BackendType::Ollama => app_settings
                     .backend
                     .initialize()
                     .await
-                    .expect("Failed to initialize Ollama backend"),
-                _ => todo!(),
-            };
+                    .map_err(|e| e.to_string()),
+                _ => Err("Unsupported backend type".to_string()),
+            }?;
 
             let service_name = promptkit_client
                 .get_service_name()
