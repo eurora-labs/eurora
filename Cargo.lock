@@ -3033,6 +3033,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "eur-secret",
+ "ferrous-llm-core",
  "futures",
  "image",
  "libsqlite3-sys",
@@ -3432,9 +3433,8 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c40dd490ec0ad924a136d2c809483991c8e396044b1b6bd578c4b836fafe111"
+version = "0.5.1"
+source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
 dependencies = [
  "chrono",
  "dotenv",
@@ -3450,9 +3450,8 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-anthropic"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c11ccaa1f0f3737ccc5822699187210c1baad7f0720c92292bb50d96b96a7f67"
+version = "0.5.1"
+source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3469,9 +3468,8 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-core"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9952b989eaa1c3937f490aa2afda8fa919ade54d0970fc29787a21d2b36e7f02"
+version = "0.5.1"
+source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3480,6 +3478,7 @@ dependencies = [
  "image",
  "serde",
  "serde_json",
+ "specta",
  "thiserror 2.0.12",
  "tokio",
  "url",
@@ -3487,9 +3486,8 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-ollama"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e169a41ff1d497b5ff4692e9177d9bc9286167a56b7387eea2d74cd400b85c44"
+version = "0.5.1"
+source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3506,9 +3504,8 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-openai"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8126bd09f86370b948c4796f7dbb888201b6465d35d5b75ec0c1eb04b7f54c58"
+version = "0.5.1"
+source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8981,6 +8978,8 @@ dependencies = [
  "chrono",
  "ctor",
  "paste",
+ "serde",
+ "serde_json",
  "specta-macros",
  "thiserror 1.0.69",
 ]
