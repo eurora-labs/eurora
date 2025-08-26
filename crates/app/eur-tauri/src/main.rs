@@ -111,7 +111,7 @@ fn main() {
                     tauri_app.manage::<SharedPromptKitService>(async_mutex::Mutex::new(None));
 
                     // Ensure empty current conversation exists
-                    tauri_app.manage::<SharedCurrentConversation>(None);
+                    tauri_app.manage::<SharedCurrentConversation>(async_mutex::Mutex::new(None));
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -277,10 +277,21 @@ fn main() {
 
 
                     // Initialize conversation storage
+                    // let db_app_handle = app_handle.clone();
+                    // tauri::async_runtime::spawn(async move {
+                    //     let db = create_shared_database_manager(&db_app_handle).await;
+                    //     db_app_handle.manage(db);
+                    // });
+                    // Initialize conversation storage
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let db = create_shared_database_manager(&db_app_handle).await;
-                        db_app_handle.manage(db);
+                        match create_shared_database_manager(&db_app_handle).await {
+                            Ok(db) => {
+                                db_app_handle.manage(db);
+                                info!("Personal database manager initialized");
+                            }
+                            Err(e) => error!("Failed to initialize personal database manager: {}", e),
+                        }
                     });
 
 
