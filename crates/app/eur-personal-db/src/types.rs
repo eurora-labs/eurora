@@ -3,7 +3,6 @@ use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use sqlx::FromRow;
-use std::fmt;
 
 #[derive(FromRow, Debug, Serialize, Deserialize, Type, Clone)]
 pub struct Conversation {
