@@ -30,9 +30,39 @@ export type BackendSettings = { backendType: BackendType }
 
 export type BackendType = "None" | "Ollama" | "Eurora" | "OpenAI" | "Anthropic"
 
+/**
+ * A part of multimodal message content.
+ */
+export type ContentPart = 
+/**
+ * Text content
+ */
+{ type: "text"; text: string } | 
+/**
+ * Image content
+ */
+{ type: "image"; image_source: ImageSource; detail: string | null } | 
+/**
+ * Audio content
+ */
+{ type: "audio"; audio_url: string; format: string | null }
+
 export type ContextChip = { id: string; extension_id: string; name: string; attrs: Partial<{ [key in string]: string }>; icon: string | null; position: number | null }
 
 export type Conversation = { id: string; title: string; created_at: string; updated_at: string }
+
+/**
+ * A function call within a tool call.
+ */
+export type FunctionCall = { 
+/**
+ * Name of the function to call
+ */
+name: string; 
+/**
+ * Arguments to pass to the function (JSON string)
+ */
+arguments: string }
 
 export type GeneralSettings = { 
 /**
@@ -48,13 +78,70 @@ export type HoverSettings = {
  */
 enabled: boolean }
 
+export type ImageSource = 
+/**
+ * The URL or base64-encoded image data
+ */
+{ Url: string }
+
 export type LauncherSettings = { hotkey?: Hotkey }
 
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
+/**
+ * A message in a conversation.
+ */
+export type Message = { 
+/**
+ * The role of the message sender
+ */
+role: Role; 
+/**
+ * The content of the message
+ */
+content: MessageContent }
+
+/**
+ * Content of a message, which can be text or multimodal.
+ */
+export type MessageContent = 
+/**
+ * Simple text content
+ */
+string | 
+/**
+ * Multimodal content with text and other media
+ */
+ContentPart[] | 
+/**
+ * Tool-related content (calls and responses)
+ */
+ToolContent
+
 export type Query = { text: string; assets: string[] }
 
 export type ResponseChunk = { chunk: string }
+
+/**
+ * The role of a message sender.
+ */
+export type Role = 
+/**
+ * Message from the user
+ */
+"user" | 
+/**
+ * Message from the AI assistant
+ */
+"assistant" | 
+/**
+ * System message (instructions, context)
+ */
+"system" | 
+/**
+ * Message from a tool/function call
+ */
+"tool"
 
 export type TelemetrySettings = { 
 /**
@@ -74,13 +161,47 @@ nonAnonymousMetrics: boolean;
  */
 distinctId: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"new_conversation":[],"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"create":[],"list":["limit","offset"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_hover_settings":[],"get_launcher_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_hover_settings":["hover_settings"],"set_launcher_settings":["launcher_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"hide_hover_window":[],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"],"show_hover_window":[]}' }
+/**
+ * A tool/function call made by the AI.
+ */
+export type ToolCall = { 
+/**
+ * Unique identifier for this tool call
+ */
+id: string; 
+/**
+ * The type of tool call (usually "function")
+ */
+type: string; 
+/**
+ * The function being called
+ */
+function: FunctionCall }
+
+/**
+ * Tool-related message content.
+ */
+export type ToolContent = { 
+/**
+ * Tool calls made by the assistant
+ */
+tool_calls: ToolCall[] | null; 
+/**
+ * Tool call ID if this is a tool response
+ */
+tool_call_id: string | null; 
+/**
+ * Optional text content alongside tool data
+ */
+text: string | null }
+
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_hover_settings":[],"get_launcher_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_hover_settings":["hover_settings"],"set_launcher_settings":["launcher_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"hide_hover_window":[],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"],"show_hover_window":[]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
-"chat": {new_conversation: () => Promise<string>, 
-send_query: (conversationId: string, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
+"chat": {send_query: (conversationId: string, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "conversation": {create: () => Promise<Conversation>, 
+get_messages: (conversationId: string) => Promise<Message[]>, 
 list: (limit: number, offset: number) => Promise<Conversation[]>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "prompt": {disconnect: () => Promise<null>, 
