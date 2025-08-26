@@ -276,10 +276,21 @@ fn main() {
 
 
                     // Initialize conversation storage
+                    // let db_app_handle = app_handle.clone();
+                    // tauri::async_runtime::spawn(async move {
+                    //     let db = create_shared_database_manager(&db_app_handle).await;
+                    //     db_app_handle.manage(db);
+                    // });
+                    // Initialize conversation storage
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let db = create_shared_database_manager(&db_app_handle).await;
-                        db_app_handle.manage(db);
+                        match create_shared_database_manager(&db_app_handle).await {
+                            Ok(db) => {
+                                db_app_handle.manage(db);
+                                info!("Personal database manager initialized");
+                            }
+                            Err(e) => error!("Failed to initialize personal database manager: {}", e),
+                        }
                     });
 
 
