@@ -29,8 +29,6 @@ impl Default for StorageConfig {
 pub struct CollectorConfig {
     /// How often to collect activity snapshots
     pub collection_interval: Duration,
-    /// Whether focus tracking is enabled
-    pub focus_tracking_enabled: bool,
     /// Whether to automatically restart on errors
     pub auto_restart_on_error: bool,
     /// Maximum number of restart attempts
@@ -43,7 +41,6 @@ impl Default for CollectorConfig {
     fn default() -> Self {
         Self {
             collection_interval: Duration::from_secs(3),
-            focus_tracking_enabled: true,
             auto_restart_on_error: true,
             max_restart_attempts: 5,
             restart_delay: Duration::from_secs(1),
@@ -127,14 +124,12 @@ impl TimelineConfigBuilder {
     /// Disable focus tracking
     pub fn disable_focus_tracking(mut self) -> Self {
         self.config.focus_tracking.enabled = false;
-        self.config.collector.focus_tracking_enabled = false;
         self
     }
 
     /// Enable focus tracking
     pub fn enable_focus_tracking(mut self) -> Self {
         self.config.focus_tracking.enabled = true;
-        self.config.collector.focus_tracking_enabled = true;
         self
     }
 
