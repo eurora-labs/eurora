@@ -33,12 +33,11 @@ impl TimelineManager {
         info!("Creating timeline manager with config: {:?}", config);
 
         // Validate configuration
-        if let Err(e) = config.validate() {
-            warn!("Invalid configuration provided: {}", e);
-        }
+        config.validate().expect("Invalid timeline configuration");
 
         let storage = Arc::new(Mutex::new(TimelineStorage::new(config.storage.clone())));
-        let collector = CollectorService::new(Arc::clone(&storage), config.collector.clone());
+        let collector =
+            CollectorService::new_with_timeline_config(Arc::clone(&storage), config.clone());
 
         Self {
             storage,
