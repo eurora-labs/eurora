@@ -7,6 +7,7 @@
 		type ContextChip,
 		type Message,
 		type Conversation,
+		type Role,
 	} from '$lib/bindings/bindings.js';
 
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
@@ -42,14 +43,6 @@
 			extensionFactory.getExtension('309f0906-d48c-4439-9751-7bcf915cdfc5'),
 			extensionFactory.getExtension('2c434895-d32c-485f-8525-c4394863b83a'),
 		] as SveltePMExtension[],
-	});
-
-	$effect(() => {
-		if (conversation) {
-			taurpc.personal_db.message.get(conversation.id, 5, 0).then((new_messages) => {
-				messages = new_messages;
-			});
-		}
 	});
 
 	const taurpc = createTauRPCProxy();
@@ -125,9 +118,10 @@
 					return;
 				}
 				const query = processQuery(editorRef);
-				messages.push(
-					create(ProtoChatMessageSchema, { role: 'user', content: query.text }),
-				);
+				messages.push({
+					role: 'user',
+					content: query.text,
+				});
 				console.log('query', query);
 				searchQuery.text = '';
 				clearQuery(editorRef);
@@ -147,7 +141,11 @@
 				text: query.text,
 				assets: query.assets,
 			};
-			messages.push(create(ProtoChatMessageSchema, { role: 'agent', content: '' }));
+			// messages.push(create(ProtoChatMessageSchema, { role: 'agent', content: '' }));
+			messages.push({
+				role: 'assistant',
+				content: '',
+			});
 			const agentMessage = messages.at(-1);
 
 			const onEvent = (response: ResponseChunk) => {
@@ -167,17 +165,12 @@
 
 			// Use TauRPC send_query procedure
 			await taurpc.chat.send_query(conversation.id, onEvent, tauRpcQuery);
-
-			// Note: Conversation management is not yet available in TauRPC,
-			// so we skip the conversation refresh for now
 		} catch (error) {
 			console.error('Failed to get answer:', error);
-			messages.push(
-				create(ProtoChatMessageSchema, {
-					role: 'system',
-					content: 'Error: Failed to get response from server' + error,
-				}),
-			);
+			messages.push({
+				role: 'system',
+				content: 'Error: Failed to get response from server' + error,
+			});
 		}
 	}
 </script>
@@ -208,7 +201,7 @@
 					{#if typeof message.content === 'string'}
 						{#if message.content.length > 0}
 							<MessageComponent.Root
-								variant={message.role === 'user' ? 'default' : 'agent'}
+								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
 								<MessageComponent.Content>
