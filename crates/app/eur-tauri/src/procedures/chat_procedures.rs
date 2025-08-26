@@ -1,5 +1,5 @@
 use eur_personal_db::{Conversation, PersonalDatabaseManager};
-use eur_timeline::Timeline;
+use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
@@ -54,14 +54,14 @@ impl ChatApi for ChatApiImpl {
     ) -> Result<String, String> {
         let personal_db: &PersonalDatabaseManager =
             app_handle.state::<PersonalDatabaseManager>().inner();
-        let timeline_state: tauri::State<Timeline> = app_handle.state();
-        let timeline = timeline_state.inner();
+        let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
+        let timeline = timeline_state.lock().await;
         let title: String = "Placeholder Title".to_string();
 
         let mut messages: Vec<Message> = Vec::new();
         if !query.assets.is_empty() {
-            messages = timeline.construct_asset_messages();
-            messages.extend(timeline.construct_snapshot_messages());
+            messages = timeline.construct_asset_messages().await;
+            messages.extend(timeline.construct_snapshot_messages().await);
         }
 
         let user_message = Message {
@@ -69,10 +69,10 @@ impl ChatApi for ChatApiImpl {
             content: MessageContent::Text(query.text.clone()),
         };
 
-        personal_db
-            .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
-            .await
-            .expect("Failed to insert chat message");
+        // personal_db
+        //     .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
+        //     .await
+        //     .expect("Failed to insert chat message");
 
         messages.push(user_message);
 
@@ -105,7 +105,6 @@ impl ChatApi for ChatApiImpl {
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok(chunk) => {
-                                info!("Received chunk: {}", chunk);
                                 // Skip empty chunks to reduce noise
                                 if chunk.is_empty() {
                                     continue;
@@ -145,16 +144,16 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
-        personal_db
-            .insert_chat_message_from_message(
-                conversation_id.as_str(),
-                Message {
-                    role: Role::Assistant,
-                    content: MessageContent::Text(complete_response.clone()),
-                },
-            )
-            .await
-            .expect("Failed to insert chat message");
+        // personal_db
+        //     .insert_chat_message_from_message(
+        //         conversation_id.as_str(),
+        //         Message {
+        //             role: Role::Assistant,
+        //             content: MessageContent::Text(complete_response.clone()),
+        //         },
+        //     )
+        //     .await
+        //     .expect("Failed to insert chat message");
 
         Ok(complete_response)
     }
