@@ -32,7 +32,7 @@ use eur_tauri::{
         SharedCurrentConversation, SharedPromptKitService, create_shared_database_manager,
     },
 };
-use eur_timeline::Timeline;
+use eur_timeline::TimelineManager;
 use launcher::monitor_cursor_for_hover;
 use launcher::toggle_launcher_window;
 use tauri::{
@@ -234,13 +234,14 @@ fn main() {
 
 
                     let timeline = eur_timeline::create_default_timeline();
-                    app_handle.manage(timeline);
+                    app_handle.manage(async_mutex::Mutex::new(timeline));
 
                     // Start timeline collection
                     let timeline_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let timeline: &Timeline = timeline_handle.state::<Timeline>().inner();
-                        if let Err(e) = timeline.start_collection().await {
+                        let timeline_mutex = timeline_handle.state::<async_mutex::Mutex<TimelineManager>>();
+                        let mut timeline = timeline_mutex.lock().await;
+                        if let Err(e) = timeline.start().await {
                             error!("Failed to start timeline collection: {}", e);
                         } else {
                             info!("Timeline collection started successfully");
