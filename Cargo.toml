@@ -9,6 +9,9 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
+ferrous-llm-core = { git = "https://github.com/eurora-labs/ferrous-llm.git", branch = "feature/specta" }
+ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", branch = "feature/specta" }
+
 syn = "2.0" # collapse 2.0.101, 1.0.109, 1.0.109(build)
 toml_edit = "0.23.3" # collapse 0.22, 0.20, 0.19
 regex-syntax = "0.8" # collapse 0.8, 0.6
@@ -56,7 +59,6 @@ base64 = "0.22.1"
 sentry = { version = "0.42.0" }
 async-trait = "0.1.64"
 async_from = "0.2.0"
-
 eur-eurora-provider = { path = "crates/common/eur-eurora-provider" }
 eur-secret = { path = "crates/app/eur-secret" }
 eur-user = { path = "crates/app/eur-user" }
