@@ -69,16 +69,15 @@ impl ConversationApi for ConversationApiImpl {
         conversation_id: String,
     ) -> Result<Vec<Message>, String> {
         let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+
         let chat_messages = personal_db
             .get_chat_messages(&conversation_id)
             .await
-            .map_err(|e| e.to_string())?;
+            .expect("Failed to get chat messages");
 
-        let messages: Vec<Message> = chat_messages
+        Ok(chat_messages
             .into_iter()
             .map(|message| message.into())
-            .collect();
-
-        Ok(messages)
+            .collect::<Vec<Message>>())
     }
 }

@@ -63,7 +63,8 @@ impl ChatApi for ChatApiImpl {
 
         personal_db
             .insert_chat_message_from_message(conversation_id.as_str(), user_message)
-            .await;
+            .await
+            .expect("Failed to insert chat message");
 
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;
