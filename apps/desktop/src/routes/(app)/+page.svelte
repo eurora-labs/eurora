@@ -80,29 +80,29 @@
 		}
 	}
 
-	function addExampleMessages() {
-		messages.push(
-			create(ProtoChatMessageSchema, {
-				role: 'user',
-				content: 'What am I doing right now?',
-			}),
-		);
+	// function addExampleMessages() {
+	// 	messages.push(
+	// 		create(ProtoChatMessageSchema, {
+	// 			role: 'user',
+	// 			content: 'What am I doing right now?',
+	// 		}),
+	// 	);
 
-		messages.push(
-			create(ProtoChatMessageSchema, {
-				role: 'system',
-				content:
-					'You are currently looking at a website called Eurora AI. What would you like to know?',
-			}),
-		);
+	// 	messages.push(
+	// 		create(ProtoChatMessageSchema, {
+	// 			role: 'system',
+	// 			content:
+	// 				'You are currently looking at a website called Eurora AI. What would you like to know?',
+	// 		}),
+	// 	);
 
-		messages.push(
-			create(ProtoChatMessageSchema, {
-				role: 'user',
-				content: 'How do I install it?',
-			}),
-		);
-	}
+	// 	messages.push(
+	// 		create(ProtoChatMessageSchema, {
+	// 			role: 'user',
+	// 			content: 'How do I install it?',
+	// 		}),
+	// 	);
+	// }
 
 	// function handleKeydown(event: KeyboardEvent) {
 	// 	if (event.key === 'Enter') {
@@ -154,8 +154,11 @@
 				chatRef?.scrollToBottom();
 			};
 
-			const conversation = await taurpc.conversation.create();
-			console.log('conversation', conversation);
+			// If no conversation is selected create a new one
+			if (!conversation) {
+				conversation = await taurpc.conversation.create();
+				console.log('conversation', conversation);
+			}
 
 			// Use TauRPC send_query procedure
 			await taurpc.chat.send_query(conversation.id, onEvent, tauRpcQuery);
@@ -197,15 +200,17 @@
 		>
 			<Chat bind:this={chatRef} class="w-full h-full flex flex-col gap-4 overflow-hidden">
 				{#each messages as message}
-					{#if message.content.length > 0}
-						<MessageComponent.Root
-							variant={message.role === 'user' ? 'default' : 'agent'}
-							finishRendering={() => {}}
-						>
-							<MessageComponent.Content>
-								<Katex math={message.content} finishRendering={() => {}} />
-							</MessageComponent.Content>
-						</MessageComponent.Root>
+					{#if typeof message.content === 'string'}
+						{#if message.content.length > 0}
+							<MessageComponent.Root
+								variant={message.role === 'user' ? 'default' : 'agent'}
+								finishRendering={() => {}}
+							>
+								<MessageComponent.Content>
+									<Katex math={message.content} finishRendering={() => {}} />
+								</MessageComponent.Content>
+							</MessageComponent.Root>
+						{/if}
 					{/if}
 				{/each}
 			</Chat>

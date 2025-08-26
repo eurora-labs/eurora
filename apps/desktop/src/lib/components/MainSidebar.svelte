@@ -31,6 +31,13 @@
 
 	async function createChat() {}
 
+	async function switchConversation(id: string) {
+		const messages = await taurpc.conversation.get_messages(id);
+		console.log('messages: ', messages);
+
+		// taurpc.conversation.
+	}
+
 	async function getMessages(id: string) {
 		const messages = await taurpc.conversation.get_messages(id);
 		console.log('messages: ', messages);
@@ -101,7 +108,7 @@
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									onclick={() => {
-										getMessages(item.id);
+										switchConversation(item.id);
 									}}
 								>
 									{#snippet child({ props })}
