@@ -36,10 +36,10 @@ impl ConversationApi for ConversationApiImpl {
         offset: u16,
     ) -> Result<Vec<Conversation>, String> {
         let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
-        Ok(personal_db
+        personal_db
             .list_conversations(limit, offset)
             .await
-            .map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())
     }
 
     async fn create<R: Runtime>(
