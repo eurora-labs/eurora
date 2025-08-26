@@ -27,7 +27,9 @@ use eur_tauri::{
         user_procedures::{UserApi, UserApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
-    shared_types::{SharedPromptKitService, create_shared_database_manager},
+    shared_types::{
+        SharedCurrentConversation, SharedPromptKitService, create_shared_database_manager,
+    },
 };
 use eur_timeline::Timeline;
 use launcher::monitor_cursor_for_hover;
@@ -106,6 +108,9 @@ fn main() {
 
                     // Ensure state exists immediately
                     tauri_app.manage::<SharedPromptKitService>(async_mutex::Mutex::new(None));
+
+                    // Ensure empty current conversation exists
+                    tauri_app.manage::<SharedCurrentConversation>(None);
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -266,6 +271,8 @@ fn main() {
                             info!("Successfully registered initial launcher shortcut: {:?}", launcher_shortcut);
                         }
                     });
+
+
 
                     // Initialize conversation storage
                     let db_app_handle = app_handle.clone();

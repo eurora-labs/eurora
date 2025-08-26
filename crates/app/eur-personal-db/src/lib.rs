@@ -1,3 +1,4 @@
+mod custom_converter;
 mod db;
 mod types;
 

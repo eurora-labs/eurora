@@ -1,4 +1,4 @@
-use eur_personal_db::Conversation;
+use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use eur_timeline::Timeline;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
@@ -44,6 +44,8 @@ impl ChatApi for ChatApiImpl {
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
+        let personal_db: &PersonalDatabaseManager =
+            app_handle.state::<PersonalDatabaseManager>().inner();
         let timeline_state: tauri::State<Timeline> = app_handle.state();
         let timeline = timeline_state.inner();
         let title: String = "Placeholder Title".to_string();
@@ -54,10 +56,14 @@ impl ChatApi for ChatApiImpl {
             messages.extend(timeline.construct_snapshot_messages());
         }
 
-        messages.push(Message {
+        let user_message = Message {
             role: Role::User,
             content: MessageContent::Text(query.text.clone()),
-        });
+        };
+
+        personal_db
+            .insert_chat_message_from_message(conversation_id.as_str(), user_message)
+            .await;
 
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;

@@ -1,7 +1,9 @@
 use chrono::{DateTime, Utc};
+use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use sqlx::FromRow;
+use std::fmt;
 
 #[derive(FromRow, Debug, Serialize, Deserialize, Type, Clone)]
 pub struct Conversation {
@@ -78,98 +80,11 @@ pub struct FrameText {
     pub ocr_engine: String,
 }
 
-// /// Database schema initialization
-// pub async fn initialize_db(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
-//     // Create a connection pool to the SQLite database
-//     let pool = SqlitePool::connect(db_path).await?;
-
-//     // Run migrations
-//     sqlx::migrate!("./src/migrations").run(&pool).await?;
-
-//     Ok(pool)
-// }
-
-// // Query helper functions for common operations
-
-// /// Get all activities
-// pub async fn get_all_activities(pool: &SqlitePool) -> Result<Vec<Activity>, sqlx::Error> {
-//     sqlx::query_as!(
-//         Activity,
-//         r#"
-//         SELECT id, name, app_name, window_name, started_at, ended_at
-//         FROM activity
-//         "#
-//     )
-//     .fetch_all(pool)
-//     .await
-// }
-
-// /// Get activity by id
-// pub async fn get_activity(pool: &SqlitePool, id: &str) -> Result<Option<Activity>, sqlx::Error> {
-//     sqlx::query_as!(
-//         Activity,
-//         r#"
-//         SELECT id, name, app_name, window_name, started_at, ended_at
-//         FROM activity
-//         WHERE id = ?
-//         "#,
-//         id
-//     )
-//     .fetch_optional(pool)
-//     .await
-// }
-
-// /// Get frames for a video chunk
-// pub async fn get_frames_for_video_chunk(
-//     pool: &SqlitePool,
-//     video_chunk_id: &str,
-// ) -> Result<Vec<Frame>, sqlx::Error> {
-//     sqlx::query_as!(
-//         Frame,
-//         r#"
-//         SELECT id, video_chunk_id, relative_index
-//         FROM frame
-//         WHERE video_chunk_id = ?
-//         ORDER BY relative_index
-//         "#,
-//         video_chunk_id
-//     )
-//     .fetch_all(pool)
-//     .await
-// }
-
-// /// Get text for a frame
-// pub async fn get_frame_text(
-//     pool: &SqlitePool,
-//     frame_id: &str,
-// ) -> Result<Vec<FrameText>, sqlx::Error> {
-//     sqlx::query_as!(
-//         FrameText,
-//         r#"
-//         SELECT id, frame_id, text, text_json, ocr_engine
-//         FROM frame_text
-//         WHERE frame_id = ?
-//         "#,
-//         frame_id
-//     )
-//     .fetch_all(pool)
-//     .await
-// }
-
-// /// Get activity snapshots for an activity
-// pub async fn get_snapshots_for_activity(
-//     pool: &SqlitePool,
-//     activity_id: &str,
-// ) -> Result<Vec<ActivitySnapshot>, sqlx::Error> {
-//     sqlx::query_as!(
-//         ActivitySnapshot,
-//         r#"
-//         SELECT id, frame_id, activity_id
-//         FROM activity_snapshot
-//         WHERE activity_id = ?
-//         "#,
-//         activity_id
-//     )
-//     .fetch_all(pool)
-//     .await
-// }
+impl From<ChatMessage> for Message {
+    fn from(value: ChatMessage) -> Self {
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(value.content),
+        }
+    }
+}

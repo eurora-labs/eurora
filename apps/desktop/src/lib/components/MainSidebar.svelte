@@ -4,6 +4,7 @@
 	import Inbox from '@lucide/svelte/icons/inbox';
 	import Search from '@lucide/svelte/icons/search';
 	import Settings from '@lucide/svelte/icons/settings';
+	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
@@ -27,6 +28,13 @@
 			conversations = res;
 		});
 	});
+
+	async function createChat() {}
+
+	async function getMessages(id: string) {
+		const messages = await taurpc.conversation.get_messages(id);
+		console.log('messages: ', messages);
+	}
 
 	// Menu items.
 	// const items = [
@@ -71,6 +79,18 @@
 		</div>
 	</Sidebar.Header>
 	<Sidebar.Content>
+		<Sidebar.Group>
+			<Sidebar.GroupContent>
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton onclick={() => createChat()}>
+							<SquarePenIcon />
+							<span>New chat</span>
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+			</Sidebar.GroupContent>
+		</Sidebar.Group>
 		{#if conversations.length > 0 && sidebarState?.open}
 			<Sidebar.Group>
 				<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
@@ -79,7 +99,11 @@
 					<Sidebar.Menu>
 						{#each conversations as item (item.title)}
 							<Sidebar.MenuItem>
-								<Sidebar.MenuButton>
+								<Sidebar.MenuButton
+									onclick={() => {
+										getMessages(item.id);
+									}}
+								>
 									{#snippet child({ props })}
 										<a {...props}>
 											<!-- <item.icon /> -->
