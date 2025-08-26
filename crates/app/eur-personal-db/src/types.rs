@@ -83,7 +83,11 @@ pub struct FrameText {
 impl From<ChatMessage> for Message {
     fn from(value: ChatMessage) -> Self {
         Message {
-            role: Role::User,
+            role: match value.role.as_str() {
+                "user" => Role::User,
+                "assistant" => Role::Assistant,
+                _ => Role::System,
+            },
             content: MessageContent::Text(value.content),
         }
     }
