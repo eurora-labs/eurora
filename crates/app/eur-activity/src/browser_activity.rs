@@ -56,6 +56,7 @@ struct YoutubeAsset {
     pub transcript: Vec<TranscriptLine>,
     pub _current_time: f32,
 }
+
 struct ArticleAsset {
     pub id: String,
     pub _url: String,

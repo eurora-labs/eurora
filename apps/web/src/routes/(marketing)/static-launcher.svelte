@@ -83,7 +83,7 @@
 	<Chat class="w-full min-h-[265px]">
 		{#each messages as message}
 			<Message.Root
-				variant={message.role === 'user' ? 'default' : 'agent'}
+				variant={message.role === 'user' ? 'default' : 'assistant'}
 				finishRendering={() => {}}
 			>
 				<Message.Content>
