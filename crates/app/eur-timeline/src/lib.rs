@@ -1,275 +1,117 @@
 //! Timeline module for storing system state over time
 //!
 //! This crate provides functionality to capture system state at regular intervals
-//! and store it in memory for later retrieval. It works by sampling data every
-//! 3 seconds and maintaining a rolling history.
+//! and store it in memory for later retrieval. The new implementation focuses on
+//! simplicity, modularity, and ease of use.
+//!
+//! # Quick Start
+//!
+//! ```rust
+//! use eur_timeline::TimelineManager;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Create with sensible defaults
+//!     let mut timeline = TimelineManager::new();
+//!     
+//!     // Start collection (handles focus tracking automatically)
+//!     timeline.start().await?;
+//!     
+//!     // Get current activity
+//!     if let Some(activity) = timeline.get_current_activity().await {
+//!         println!("Current: {}", activity.name);
+//!     }
+//!     
+//!     // Get recent activities
+//!     let recent = timeline.get_recent_activities(10).await;
+//!     for activity in recent {
+//!         println!("Recent: {}", activity.name);
+//!     }
+//!     
+//!     // Stop when done
+//!     timeline.stop().await?;
+//!     Ok(())
+//! }
+//! ```
+//!
+//! # Advanced Usage
+//!
+//! ```rust
+//! use eur_timeline::{TimelineManager, TimelineConfig};
+//! use std::time::Duration;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Custom configuration
+//!     let config = TimelineConfig::builder()
+//!         .max_activities(500)
+//!         .collection_interval(Duration::from_secs(5))
+//!         .disable_focus_tracking()
+//!         .build();
+//!
+//!     let mut timeline = TimelineManager::with_config(config);
+//!
+//!     // Start collection
+//!     timeline.start().await?;
+//!
+//!     // Stop when done
+//!     timeline.stop().await?;
+//!
+//!     Ok(())
+//! }
+//! ```
 
-use std::{sync::Arc, time::Duration};
+// Re-export main types for easy access
+pub use collector::{CollectorService, CollectorStats};
+pub use config::{CollectorConfig, FocusTrackingConfig, StorageConfig, TimelineConfig};
+pub use error::{Result, TimelineError};
+pub use manager::{TimelineManager, create_default_timeline, create_timeline};
+pub use storage::{StorageStats, TimelineStorage};
 
-use anyhow::Result;
-use eur_activity::{ActivityStrategy, DisplayAsset, select_strategy_for_process};
-use ferrous_focus::{FerrousFocusResult, FocusedWindow, IconData};
-use ferrous_llm_core::Message;
-use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
-use tokio::{sync::mpsc, task::JoinHandle, time};
-use tracing::{error, info, warn};
+// Re-export activity types for convenience
+pub use eur_activity::{
+    Activity, ActivityAsset, ActivitySnapshot, ActivityStrategy, ContextChip, DisplayAsset,
+};
+pub use ferrous_llm_core::Message;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SystemState {}
+// Internal modules
+mod collector;
+mod config;
+mod error;
+mod manager;
+mod storage;
 
-/// A reference to a Timeline that can be safely shared between threads
-pub type TimelineRef = Arc<Timeline>;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// Timeline store that holds activities of system state over time
-pub struct Timeline {
-    /// The activities stored in the timeline
-    activities: Arc<RwLock<Vec<eur_activity::Activity>>>,
-
-    /// How many activities to keep in history
-    capacity: usize,
-
-    /// How often to capture a new activity (in seconds)
-    interval_seconds: u64,
-}
-
-impl Timeline {
-    /// Create a new timeline with the specified capacity
-    pub fn new(capacity: usize, interval_seconds: u64) -> Self {
-        // Browser strategy registration is now handled within eur_activity::REGISTRY initialization.
-        info!("Timeline created.");
-        Timeline {
-            activities: Arc::new(RwLock::new(Vec::new())),
-            capacity,
-            interval_seconds,
-        }
+    #[tokio::test]
+    async fn test_new_api() {
+        let timeline = TimelineManager::new();
+        assert!(!timeline.is_running());
+        assert!(timeline.is_empty().await);
     }
 
-    /// Create a shareable reference to this Timeline
-    pub fn clone_ref(&self) -> TimelineRef {
-        Arc::new(Timeline {
-            activities: Arc::clone(&self.activities),
-            capacity: self.capacity,
-            interval_seconds: self.interval_seconds,
-        })
+    #[tokio::test]
+    async fn test_config_builder() {
+        let config = TimelineConfig::builder()
+            .max_activities(100)
+            .collection_interval(std::time::Duration::from_secs(5))
+            .disable_focus_tracking()
+            .build();
+
+        assert!(config.validate().is_ok());
+
+        let timeline = TimelineManager::with_config(config);
+        assert_eq!(timeline.get_config().storage.max_activities, 100);
     }
 
-    pub fn add_activity(&self, activity: eur_activity::Activity) {
-        let mut activities = self.activities.write();
-        if activities.len() >= self.capacity {
-            activities.remove(0);
-        }
-        activities.push(activity);
+    #[tokio::test]
+    async fn test_convenience_functions() {
+        let timeline1 = create_default_timeline();
+        assert!(!timeline1.is_running());
+
+        let timeline2 = create_timeline(500, 5);
+        assert_eq!(timeline2.get_config().storage.max_activities, 500);
     }
-    pub fn get_context_chips(&self) -> Vec<eur_activity::ContextChip> {
-        let activities = self.activities.read();
-        info!("Number of activities: {:?}", activities.len());
-        if activities.is_empty() {
-            return Vec::new();
-        }
-        activities.last().unwrap().get_context_chips()
-    }
-
-    pub fn get_activities(&self) -> Vec<DisplayAsset> {
-        let activities = self.activities.read();
-
-        if activities.is_empty() {
-            return Vec::new();
-        }
-
-        let last_activity = activities.last().unwrap();
-
-        info!(
-            "Number of snapshots: {:?}",
-            last_activity.snapshots.len() as u32
-        );
-
-        activities.last().unwrap().get_display_assets()
-    }
-
-    pub fn construct_asset_messages(&self) -> Vec<Message> {
-        let activities = self.activities.read();
-        let last_activity = activities.last().unwrap();
-
-        last_activity
-            .assets
-            .iter()
-            .map(|asset| asset.construct_message())
-            .collect()
-    }
-
-    pub fn construct_snapshot_messages(&self) -> Vec<Message> {
-        let activities = self.activities.read();
-        let last_activity = activities.last();
-
-        if let Some(activity) = last_activity {
-            let last_snapshot = activity.snapshots.last();
-            if let Some(snapshot) = last_snapshot {
-                return vec![snapshot.construct_message()];
-            }
-        }
-
-        vec![]
-    }
-
-    pub async fn start_snapshot_collection(
-        &self,
-        _activity_strategy: Box<dyn ActivityStrategy>,
-        _s: &mut str,
-    ) {
-        todo!();
-    }
-
-    pub async fn start_collection_activity(
-        &self,
-        mut activity_strategy: Box<dyn ActivityStrategy>,
-        _s: &mut str,
-    ) {
-        // Retrieve initial assets from the activity
-        let assets = activity_strategy
-            .retrieve_assets()
-            .await
-            .unwrap_or(Vec::new());
-
-        // Create a new activity
-        let activity = eur_activity::Activity::new(
-            activity_strategy.get_name().to_string(),
-            activity_strategy.get_icon().to_string(),
-            activity_strategy.get_process_name().to_string(),
-            assets,
-        );
-
-        // Add the activity to the timeline
-        self.add_activity(activity);
-
-        // Clone the activities Arc for the background task
-        let activities = Arc::clone(&self.activities);
-
-        // Move the strategy into the background task
-        let mut strategy = activity_strategy;
-
-        let interval = Duration::from_secs(3);
-        let mut interval_timer = time::interval(interval);
-
-        loop {
-            interval_timer.tick().await;
-
-            match strategy.retrieve_snapshots().await {
-                Ok(snapshots) => {
-                    if !snapshots.is_empty() {
-                        // Get write access to the activities
-                        let mut activities_lock = activities.write();
-
-                        // Find the last activity (the one we just added)
-                        if let Some(last_activity) = activities_lock.last_mut() {
-                            // Add the snapshots to the activity
-                            for snapshot in snapshots {
-                                last_activity.snapshots.push(snapshot);
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    info!("Failed to retrieve snapshots: {:?}", e);
-                    // error!("Failed to retrieve snapshots: {:?}", e);
-                }
-            }
-        }
-    }
-
-    /// Start the timeline collection process
-    pub async fn start_collection(&self) -> Result<()> {
-        let (tx, mut rx) = mpsc::unbounded_channel::<FocusedWindow>();
-
-        // ----------------------------------  X11 thread
-        {
-            let tx = tx.clone(); // move into the thread
-
-            let tracker = ferrous_focus::FocusTracker::new();
-            std::thread::spawn(move || {
-                loop {
-                    info!("Starting focus tracker...");
-
-                    // Clone tx for this iteration
-                    let tx_clone = tx.clone();
-
-                    // this never blocks: it just ships events into the channel
-                    let result =
-                        tracker.track_focus(|window: FocusedWindow| -> FerrousFocusResult<()> {
-                            let process_name = window.process_name.clone().unwrap();
-                            let window_title = window.window_title.clone().unwrap();
-                            #[cfg(target_os = "windows")]
-                            let eurora_process = "eur-tauri.exe";
-                            #[cfg(not(target_os = "windows"))]
-                            let eurora_process = "eur-tauri";
-                            if process_name != eurora_process {
-                                info!("▶ {}: {}", process_name, window_title);
-                                let _ = tx_clone.send(window);
-                            }
-                            Ok(())
-                        });
-
-                    // Handle focus tracker errors gracefully
-                    match result {
-                        Ok(_) => {
-                            warn!("Focus tracker ended unexpectedly, restarting...");
-                        }
-                        Err(e) => {
-                            error!("Focus tracker crashed with error: {:?}", e);
-                            warn!("Restarting focus tracker in 1 second...");
-                        }
-                    }
-
-                    // Wait a bit before restarting to avoid rapid restart loops
-                    std::thread::sleep(std::time::Duration::from_secs(1));
-                }
-            });
-        }
-
-        // ----------------------------------  async event loop
-        let mut current_job: Option<JoinHandle<()>> = None;
-        let timeline = self.clone_ref(); // Arc / Rc to use inside tasks
-
-        while let Some(event) = rx.recv().await {
-            // shut down the previous collection (if it still runs)
-            if let Some(job) = current_job.take() {
-                job.abort(); // instant, non-blocking
-            }
-
-            // launch a new collection for this focus event
-            let timeline = timeline.clone_ref();
-            current_job = Some(tokio::spawn(async move {
-                // build a strategy for the newly-focused window
-                let process_name = event.process_name.unwrap();
-                let window_title = event.window_title.unwrap();
-                let icon = event.icon.unwrap_or(IconData {
-                    width: 0,
-                    height: 0,
-                    pixels: Vec::new(),
-                });
-
-                if let Ok(strategy) = select_strategy_for_process(
-                    &process_name,
-                    format!("{}: {}", process_name, window_title),
-                    icon,
-                )
-                .await
-                {
-                    // run the actual collection; ignore its own result
-                    let _ = timeline
-                        .start_collection_activity(strategy, &mut String::new())
-                        .await;
-                }
-                info!("block is done"); // printed when the task ends
-            }));
-        }
-
-        Ok(())
-    }
-}
-
-/// Create a new timeline with default settings
-pub fn create_default_timeline() -> Timeline {
-    // Default to 1 hour of history (1200 activities at 3-second intervals)
-    Timeline::new(1200, 3)
 }
