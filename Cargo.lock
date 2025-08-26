@@ -3256,6 +3256,7 @@ name = "eur-timeline"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "base64 0.22.1",
  "chrono",
  "eur-activity",
@@ -3268,6 +3269,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
+ "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
  "tonic",
