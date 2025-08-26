@@ -5,7 +5,7 @@ use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tracing::info;
 
-use crate::shared_types::SharedPromptKitService;
+use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
     chunk: String,
@@ -24,6 +24,14 @@ pub struct Query {
 
 #[taurpc::procedures(path = "chat")]
 pub trait ChatApi {
+    #[taurpc(event)]
+    async fn current_conversation_changed(conversation: Conversation);
+
+    async fn switch_conversation<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
+    ) -> Result<Conversation, String>;
+
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         conversation_id: String,
@@ -135,5 +143,26 @@ impl ChatApi for ChatApiImpl {
         }
 
         Ok(complete_response)
+    }
+
+    async fn switch_conversation<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
+    ) -> Result<Conversation, String> {
+        let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+
+        let conversation = personal_db
+            .get_conversation(&conversation_id)
+            .await
+            .map_err(|e| format!("Failed to get conversation: {}", e))?;
+
+        app_handle.manage::<SharedCurrentConversation>(Some(conversation.clone()));
+
+        TauRpcChatApiEventTrigger::new(app_handle.clone())
+            .current_conversation_changed(conversation.clone())
+            .map_err(|e| e.to_string())?;
+
+        Ok(conversation)
     }
 }

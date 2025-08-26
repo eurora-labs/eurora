@@ -24,7 +24,7 @@
 	onMount(() => {
 		sidebarState = useSidebar();
 
-		taurpc.conversation.list(5, 0).then((res) => {
+		taurpc.personal_db.conversation.list(5, 0).then((res) => {
 			conversations = res;
 		});
 	});
@@ -32,15 +32,7 @@
 	async function createChat() {}
 
 	async function switchConversation(id: string) {
-		const messages = await taurpc.conversation.get_messages(id);
-		console.log('messages: ', messages);
-
-		// taurpc.conversation.
-	}
-
-	async function getMessages(id: string) {
-		const messages = await taurpc.conversation.get_messages(id);
-		console.log('messages: ', messages);
+		await taurpc.chat.switch_conversation(id);
 	}
 
 	// Menu items.
