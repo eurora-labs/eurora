@@ -224,7 +224,7 @@
 				text: query.text,
 				assets: query.assets,
 			};
-			messages.push(create(ProtoChatMessageSchema, { role: 'agent', content: '' }));
+			messages.push(create(ProtoChatMessageSchema, { role: 'assistant', content: '' }));
 			const agentMessage = messages.at(-1);
 
 			const onEvent = (response: ResponseChunk) => {
@@ -270,7 +270,7 @@
 				{#each messages as message}
 					{#if message.content.length > 0}
 						<Message.Root
-							variant={message.role === 'user' ? 'default' : 'agent'}
+							variant={message.role === 'user' ? 'default' : 'assistant'}
 							finishRendering={() => {}}
 						>
 							<Message.Content>
