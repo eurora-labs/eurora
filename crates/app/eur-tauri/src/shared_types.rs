@@ -1,4 +1,5 @@
 use crate::util::get_db_path;
+use anyhow::Result;
 use eur_settings::AppSettings;
 use tracing::info;
 
@@ -11,13 +12,17 @@ pub type SharedCurrentConversation = Mutex<Option<Conversation>>;
 
 pub async fn create_shared_database_manager(
     app_handle: &tauri::AppHandle,
-) -> PersonalDatabaseManager {
+) -> Result<PersonalDatabaseManager> {
     let db_path = get_db_path(app_handle);
-    PersonalDatabaseManager::new(&db_path)
-        .await
-        .map_err(|e| {
-            info!("Failed to create database manager: {}", e);
-            e
-        })
-        .unwrap()
+    PersonalDatabaseManager::new(&db_path).await.map_err(|e| {
+        info!("Failed to create database manager: {}", e);
+        e.into()
+    })
+    // PersonalDatabaseManager::new(&db_path)
+    //     .await
+    //     .map_err(|e| {
+    //         info!("Failed to create database manager: {}", e);
+    //         e
+    //     })
+    //     .unwrap()
 }
