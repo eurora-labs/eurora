@@ -5,18 +5,16 @@
 		type ResponseChunk,
 		type Query,
 		type ContextChip,
+		type Message,
+		type Conversation,
 	} from '$lib/bindings/bindings.js';
 
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
-	import { goto } from '$app/navigation';
 	import { create } from '@eurora/shared/util/grpc';
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
 	import { Chat } from '@eurora/ui/custom-components/chat/index';
-	import {
-		ProtoChatMessageSchema,
-		type ProtoChatMessage,
-	} from '@eurora/shared/proto/questions_service_pb.js';
-	import * as Message from '@eurora/ui/custom-components/message/index';
+	import { ProtoChatMessageSchema } from '@eurora/shared/proto/questions_service_pb.js';
+	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
 	import Katex from '$lib/components/katex.svelte';
 	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
 	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
@@ -26,7 +24,9 @@
 		type SveltePMExtension,
 	} from '@eurora/prosemirror-core/index';
 
-	const messages = $state<ProtoChatMessage[]>([]);
+	let conversation = $state<Conversation | null>(null);
+	let messages = $state<Message[]>([]);
+
 	let status = $state<'loading' | 'ready'>('loading');
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
@@ -43,6 +43,14 @@
 		] as SveltePMExtension[],
 	});
 
+	$effect(() => {
+		if (conversation) {
+			taurpc.conversation.get_messages(conversation.id).then((new_messages) => {
+				messages = new_messages;
+			});
+		}
+	});
+
 	const taurpc = createTauRPCProxy();
 
 	onMount(() => {
@@ -57,6 +65,10 @@
 			.catch(() => {
 				// goto('/onboarding');
 			});
+
+		taurpc.conversation.current_conversation_changed.on((new_conv) => {
+			conversation = new_conv;
+		});
 
 		// addExampleMessages();
 	});
@@ -186,14 +198,14 @@
 			<Chat bind:this={chatRef} class="w-full h-full flex flex-col gap-4 overflow-hidden">
 				{#each messages as message}
 					{#if message.content.length > 0}
-						<Message.Root
+						<MessageComponent.Root
 							variant={message.role === 'user' ? 'default' : 'agent'}
 							finishRendering={() => {}}
 						>
-							<Message.Content>
+							<MessageComponent.Content>
 								<Katex math={message.content} finishRendering={() => {}} />
-							</Message.Content>
-						</Message.Root>
+							</MessageComponent.Content>
+						</MessageComponent.Root>
 					{/if}
 				{/each}
 			</Chat>
