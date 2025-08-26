@@ -1,5 +1,5 @@
 use eur_activity::ContextChip;
-use eur_timeline::Timeline;
+use eur_timeline::TimelineManager;
 use tauri::{Emitter, Manager, Runtime};
 use tracing::info;
 
@@ -51,11 +51,11 @@ impl SystemApi for SystemApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String> {
-        let timeline_state: tauri::State<Timeline> = app_handle.state();
-        let timeline = timeline_state.inner();
+        let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
+        let timeline = timeline_state.lock().await;
 
         // Get all activities from the timeline
-        let activities = timeline.get_context_chips();
+        let activities = timeline.get_context_chips().await;
 
         // Limit to the 5 most recent activities to avoid cluttering the UI
         let limited_activities = activities.into_iter().take(5).collect();
