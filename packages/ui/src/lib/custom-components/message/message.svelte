@@ -8,7 +8,8 @@
 			variant: {
 				default:
 					'max-w-[50%] bg-black/20 ml-auto text-primary/80 font-medium dark:bg-white/20',
-				agent: 'backdrop-blur-2xl bg-white/30 max-w-[95%] mr-auto text-primary/80 font-medium dark:bg-black/20',
+				assistant:
+					'backdrop-blur-2xl bg-white/30 max-w-[95%] mr-auto text-primary/80 font-medium dark:bg-black/20',
 			},
 		},
 		defaultVariants: {
