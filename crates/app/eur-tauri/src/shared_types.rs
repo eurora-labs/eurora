@@ -7,7 +7,7 @@ use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use eur_prompt_kit::PromptKitService;
 pub type SharedPromptKitService = Mutex<Option<PromptKitService>>;
 pub type SharedAppSettings = Mutex<AppSettings>;
-pub type SharedCurrentConversation = Option<Conversation>;
+pub type SharedCurrentConversation = Mutex<Option<Conversation>>;
 
 pub async fn create_shared_database_manager(
     app_handle: &tauri::AppHandle,
