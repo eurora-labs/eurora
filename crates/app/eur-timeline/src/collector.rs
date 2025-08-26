@@ -323,6 +323,7 @@ impl CollectorService {
                 // Start new collection task for this focus event
                 let storage_clone = Arc::clone(&storage);
                 let collection_interval = config.collection_interval;
+                let shutdown_signal_clone = Arc::clone(&shutdown_signal);
 
                 current_collection_task = Some(tokio::spawn(async move {
                     if let Some(process_name) = event.process_name
@@ -350,7 +351,7 @@ impl CollectorService {
 
                                 // Start periodic snapshot collection
                                 let mut interval = time::interval(collection_interval);
-                                loop {
+                                while !shutdown_signal_clone.load(Ordering::Relaxed) {
                                     interval.tick().await;
 
                                     match strategy.retrieve_snapshots().await {
