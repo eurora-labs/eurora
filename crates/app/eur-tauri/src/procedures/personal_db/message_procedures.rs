@@ -35,7 +35,7 @@ impl MessageApi for MessageApiImpl {
         let chat_messages = personal_db
             .get_chat_messages(&conversation_id)
             .await
-            .expect("Failed to get chat messages");
+            .map_err(|e| format!("Failed to get chat messages: {e}"))?;
 
         Ok(chat_messages
             .into_iter()

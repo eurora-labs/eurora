@@ -36,10 +36,10 @@ impl ConversationApi for ConversationApiImpl {
         offset: u16,
     ) -> Result<Vec<Conversation>, String> {
         let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
-        Ok(personal_db
+        personal_db
             .list_conversations(limit, offset)
             .await
-            .map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())
     }
 
     async fn create<R: Runtime>(
@@ -56,7 +56,9 @@ impl ConversationApi for ConversationApiImpl {
             .await
             .map_err(|e| e.to_string())?;
 
-        app_handle.manage::<SharedCurrentConversation>(Some(conversation.clone()));
+        let current = app_handle.state::<SharedCurrentConversation>();
+        let mut guard = current.lock().await;
+        *guard = Some(conversation.clone());
 
         Ok(conversation)
     }
@@ -71,7 +73,7 @@ impl ConversationApi for ConversationApiImpl {
         let chat_messages = personal_db
             .get_chat_messages(&conversation_id)
             .await
-            .expect("Failed to get chat messages");
+            .map_err(|e| format!("Failed to get chat messages: {e}"))?;
 
         Ok(chat_messages
             .into_iter()
