@@ -1,4 +1,5 @@
 use eur_activity::ContextChip;
+use eur_timeline::Timeline;
 use tauri::{Emitter, Manager, Runtime};
 use tracing::info;
 
@@ -50,7 +51,7 @@ impl SystemApi for SystemApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String> {
-        let timeline_state: tauri::State<crate::shared_types::SharedTimeline> = app_handle.state();
+        let timeline_state: tauri::State<Timeline> = app_handle.state();
         let timeline = timeline_state.inner();
 
         // Get all activities from the timeline

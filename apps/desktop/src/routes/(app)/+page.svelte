@@ -5,18 +5,17 @@
 		type ResponseChunk,
 		type Query,
 		type ContextChip,
+		type Message,
+		type Conversation,
+		type Role,
 	} from '$lib/bindings/bindings.js';
 
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
-	import { goto } from '$app/navigation';
 	import { create } from '@eurora/shared/util/grpc';
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
 	import { Chat } from '@eurora/ui/custom-components/chat/index';
-	import {
-		ProtoChatMessageSchema,
-		type ProtoChatMessage,
-	} from '@eurora/shared/proto/questions_service_pb.js';
-	import * as Message from '@eurora/ui/custom-components/message/index';
+	import { ProtoChatMessageSchema } from '@eurora/shared/proto/questions_service_pb.js';
+	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
 	import Katex from '$lib/components/katex.svelte';
 	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
 	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
@@ -25,8 +24,11 @@
 		Editor as ProsemirrorEditor,
 		type SveltePMExtension,
 	} from '@eurora/prosemirror-core/index';
+	import type { UnlistenFn } from '@tauri-apps/api/event';
 
-	const messages = $state<ProtoChatMessage[]>([]);
+	let conversation = $state<Conversation | null>(null);
+	let messages = $state<Message[]>([]);
+
 	let status = $state<'loading' | 'ready'>('loading');
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
@@ -58,7 +60,15 @@
 				// goto('/onboarding');
 			});
 
-		// addExampleMessages();
+		taurpc.chat.current_conversation_changed.on((new_conv) => {
+			conversation = new_conv;
+			console.log('New conversation changed: ', conversation);
+
+			taurpc.personal_db.message.get(conversation.id, 5, 0).then((response) => {
+				messages = response;
+				console.log('messages: ', messages);
+			});
+		});
 	});
 
 	function handleEscapeKey(event: KeyboardEvent) {
@@ -68,29 +78,29 @@
 		}
 	}
 
-	function addExampleMessages() {
-		messages.push(
-			create(ProtoChatMessageSchema, {
-				role: 'user',
-				content: 'What am I doing right now?',
-			}),
-		);
+	// function addExampleMessages() {
+	// 	messages.push(
+	// 		create(ProtoChatMessageSchema, {
+	// 			role: 'user',
+	// 			content: 'What am I doing right now?',
+	// 		}),
+	// 	);
 
-		messages.push(
-			create(ProtoChatMessageSchema, {
-				role: 'system',
-				content:
-					'You are currently looking at a website called Eurora AI. What would you like to know?',
-			}),
-		);
+	// 	messages.push(
+	// 		create(ProtoChatMessageSchema, {
+	// 			role: 'system',
+	// 			content:
+	// 				'You are currently looking at a website called Eurora AI. What would you like to know?',
+	// 		}),
+	// 	);
 
-		messages.push(
-			create(ProtoChatMessageSchema, {
-				role: 'user',
-				content: 'How do I install it?',
-			}),
-		);
-	}
+	// 	messages.push(
+	// 		create(ProtoChatMessageSchema, {
+	// 			role: 'user',
+	// 			content: 'How do I install it?',
+	// 		}),
+	// 	);
+	// }
 
 	// function handleKeydown(event: KeyboardEvent) {
 	// 	if (event.key === 'Enter') {
@@ -108,9 +118,10 @@
 					return;
 				}
 				const query = processQuery(editorRef);
-				messages.push(
-					create(ProtoChatMessageSchema, { role: 'user', content: query.text }),
-				);
+				messages.push({
+					role: 'user',
+					content: query.text,
+				});
 				console.log('query', query);
 				searchQuery.text = '';
 				clearQuery(editorRef);
@@ -130,7 +141,11 @@
 				text: query.text,
 				assets: query.assets,
 			};
-			messages.push(create(ProtoChatMessageSchema, { role: 'agent', content: '' }));
+			// messages.push(create(ProtoChatMessageSchema, { role: 'agent', content: '' }));
+			messages.push({
+				role: 'assistant',
+				content: '',
+			});
 			const agentMessage = messages.at(-1);
 
 			const onEvent = (response: ResponseChunk) => {
@@ -142,19 +157,20 @@
 				chatRef?.scrollToBottom();
 			};
 
-			// Use TauRPC send_query procedure
-			await taurpc.chat.send_query(onEvent, tauRpcQuery);
+			// If no conversation is selected create a new one
+			if (!conversation) {
+				conversation = await taurpc.personal_db.conversation.create();
+				console.log('conversation', conversation);
+			}
 
-			// Note: Conversation management is not yet available in TauRPC,
-			// so we skip the conversation refresh for now
+			// Use TauRPC send_query procedure
+			await taurpc.chat.send_query(conversation.id, onEvent, tauRpcQuery);
 		} catch (error) {
 			console.error('Failed to get answer:', error);
-			messages.push(
-				create(ProtoChatMessageSchema, {
-					role: 'system',
-					content: 'Error: Failed to get response from server' + error,
-				}),
-			);
+			messages.push({
+				role: 'system',
+				content: 'Error: Failed to get response from server' + error,
+			});
 		}
 	}
 </script>
@@ -182,15 +198,17 @@
 		>
 			<Chat bind:this={chatRef} class="w-full h-full flex flex-col gap-4 overflow-hidden">
 				{#each messages as message}
-					{#if message.content.length > 0}
-						<Message.Root
-							variant={message.role === 'user' ? 'default' : 'agent'}
-							finishRendering={() => {}}
-						>
-							<Message.Content>
-								<Katex math={message.content} finishRendering={() => {}} />
-							</Message.Content>
-						</Message.Root>
+					{#if typeof message.content === 'string'}
+						{#if message.content.length > 0}
+							<MessageComponent.Root
+								variant={message.role === 'user' ? 'default' : 'assistant'}
+								finishRendering={() => {}}
+							>
+								<MessageComponent.Content>
+									<Katex math={message.content} finishRendering={() => {}} />
+								</MessageComponent.Content>
+							</MessageComponent.Root>
+						{/if}
 					{/if}
 				{/each}
 			</Chat>
