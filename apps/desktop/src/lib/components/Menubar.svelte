@@ -7,6 +7,7 @@
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import type { UnlistenFn } from '@tauri-apps/api/event';
 
 	const taurpc = createTauRPCProxy();
 	let service_name: String | undefined = $state(undefined);
@@ -23,7 +24,7 @@
 				goto('/onboarding');
 				console.error('Failed to get service name:', error);
 			});
-		let unlisten: any;
+		let unlisten: UnlistenFn;
 		taurpc.prompt.prompt_service_change
 			.on((name) => {
 				service_name = name || undefined;
