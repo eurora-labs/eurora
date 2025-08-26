@@ -2,6 +2,7 @@ use async_from::AsyncTryFrom;
 use eur_eurora_provider::EuroraConfig;
 use eur_prompt_kit::{OllamaConfig, OpenAIConfig};
 use eur_secret::secret;
+use eur_settings::BackendType;
 use tauri::{Manager, Runtime};
 use url::Url;
 
@@ -122,34 +123,42 @@ impl PromptApi for PromptApiImpl {
         if let Some(client) = client {
             Ok(client.get_service_name().map_err(|e| e.to_string())?)
         } else {
-            secret::retrieve(eur_user::REFRESH_TOKEN_HANDLE, secret::Namespace::Global)
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| "Refresh token not found".to_string())?;
+            let app_settings_state = app_handle.state::<SharedAppSettings>();
+            let app_settings = app_settings_state.lock().await;
+            let promptkit_client = match app_settings.backend.backend_type {
+                BackendType::Eurora => {
+                    secret::retrieve(eur_user::REFRESH_TOKEN_HANDLE, secret::Namespace::Global)
+                        .map_err(|e| e.to_string())?
+                        .ok_or_else(|| "Refresh token not found".to_string())?;
 
-            // Initialize prompt kit
-            let config = EuroraConfig::new(
-                Url::parse(
-                    std::env::var("API_BASE_URL")
-                        .unwrap_or("https://api.eurora-labs.com".to_string())
-                        .as_str(),
-                )
-                .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
-            );
+                    // Initialize prompt kit
+                    let config = EuroraConfig::new(
+                        Url::parse(
+                            std::env::var("API_BASE_URL")
+                                .unwrap_or("https://api.eurora-labs.com".to_string())
+                                .as_str(),
+                        )
+                        .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
+                    );
 
-            let promptkit_client = eur_prompt_kit::PromptKitService::async_try_from(config)
-                .await
-                .map_err(|e| e.to_string())?;
-
-            TauRpcPromptApiEventTrigger::new(app_handle.clone())
-                .prompt_service_change(Some(
-                    promptkit_client
-                        .get_service_name()
-                        .map_err(|e| e.to_string())?,
-                ))
-                .map_err(|e| e.to_string())?;
+                    eur_prompt_kit::PromptKitService::async_try_from(config)
+                        .await
+                        .map_err(|e| e.to_string())?
+                }
+                BackendType::Ollama => app_settings
+                    .backend
+                    .initialize()
+                    .await
+                    .expect("Failed to initialize Ollama backend"),
+                _ => todo!(),
+            };
 
             let service_name = promptkit_client
                 .get_service_name()
+                .map_err(|e| e.to_string())?;
+
+            TauRpcPromptApiEventTrigger::new(app_handle.clone())
+                .prompt_service_change(Some(service_name.clone()))
                 .map_err(|e| e.to_string())?;
 
             *guard = Some(promptkit_client);

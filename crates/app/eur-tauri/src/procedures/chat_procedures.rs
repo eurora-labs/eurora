@@ -69,10 +69,12 @@ impl ChatApi for ChatApiImpl {
             content: MessageContent::Text(query.text.clone()),
         };
 
-        personal_db
-            .insert_chat_message_from_message(conversation_id.as_str(), user_message)
-            .await
-            .expect("Failed to insert chat message");
+        // personal_db
+        //     .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
+        //     .await
+        //     .expect("Failed to insert chat message");
+
+        messages.push(user_message);
 
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;
@@ -103,6 +105,7 @@ impl ChatApi for ChatApiImpl {
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok(chunk) => {
+                                info!("Received chunk: {}", chunk);
                                 // Skip empty chunks to reduce noise
                                 if chunk.is_empty() {
                                     continue;
@@ -141,6 +144,17 @@ impl ChatApi for ChatApiImpl {
                 return Err(format!("Failed to create chat stream: {}", e));
             }
         }
+
+        personal_db
+            .insert_chat_message_from_message(
+                conversation_id.as_str(),
+                Message {
+                    role: Role::System,
+                    content: MessageContent::Text(complete_response.clone()),
+                },
+            )
+            .await
+            .expect("Failed to insert chat message");
 
         Ok(complete_response)
     }
