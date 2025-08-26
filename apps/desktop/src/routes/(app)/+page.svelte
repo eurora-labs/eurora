@@ -23,6 +23,7 @@
 		Editor as ProsemirrorEditor,
 		type SveltePMExtension,
 	} from '@eurora/prosemirror-core/index';
+	import type { UnlistenFn } from '@tauri-apps/api/event';
 
 	let conversation = $state<Conversation | null>(null);
 	let messages = $state<Message[]>([]);
@@ -45,7 +46,7 @@
 
 	$effect(() => {
 		if (conversation) {
-			taurpc.conversation.get_messages(conversation.id).then((new_messages) => {
+			taurpc.personal_db.message.get(conversation.id, 5, 0).then((new_messages) => {
 				messages = new_messages;
 			});
 		}
@@ -66,11 +67,15 @@
 				// goto('/onboarding');
 			});
 
-		taurpc.conversation.current_conversation_changed.on((new_conv) => {
+		taurpc.chat.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
-		});
+			console.log('New conversation changed: ', conversation);
 
-		// addExampleMessages();
+			taurpc.personal_db.message.get(conversation.id, 5, 0).then((response) => {
+				messages = response;
+				console.log('messages: ', messages);
+			});
+		});
 	});
 
 	function handleEscapeKey(event: KeyboardEvent) {
@@ -156,7 +161,7 @@
 
 			// If no conversation is selected create a new one
 			if (!conversation) {
-				conversation = await taurpc.conversation.create();
+				conversation = await taurpc.personal_db.conversation.create();
 				console.log('conversation', conversation);
 			}
 
