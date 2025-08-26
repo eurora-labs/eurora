@@ -69,10 +69,10 @@ impl ChatApi for ChatApiImpl {
             content: MessageContent::Text(query.text.clone()),
         };
 
-        // personal_db
-        //     .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
-        //     .await
-        //     .expect("Failed to insert chat message");
+        personal_db
+            .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
+            .await
+            .expect("Failed to insert chat message");
 
         messages.push(user_message);
 
@@ -149,7 +149,7 @@ impl ChatApi for ChatApiImpl {
             .insert_chat_message_from_message(
                 conversation_id.as_str(),
                 Message {
-                    role: Role::System,
+                    role: Role::Assistant,
                     content: MessageContent::Text(complete_response.clone()),
                 },
             )
