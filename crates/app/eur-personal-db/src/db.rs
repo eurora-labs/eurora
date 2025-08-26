@@ -22,7 +22,7 @@ pub struct PersonalDatabaseManager {
 impl PersonalDatabaseManager {
     pub async fn new(database_path: &str) -> Result<Self, sqlx::Error> {
         debug!(
-            "Initializing DatabaseManager with database path: {}",
+            "Initializing PersonalDatabaseManager with database path: {}",
             database_path
         );
         let connection_string = format!("sqlite:{}", database_path);
@@ -150,7 +150,7 @@ impl PersonalDatabaseManager {
         conversation_id: &str,
     ) -> Result<(Conversation, Vec<ChatMessage>), sqlx::Error> {
         let conversation = self.get_conversation(conversation_id).await?;
-        // let messages = self.get_chat_messages(conversation_id).await?;
+        let messages = self.get_chat_messages(conversation_id).await?;
 
         // let conversation = self.get_conversation(conversation_id).await?;
         // let messages = self.get_chat_messages(conversation_id);
@@ -161,8 +161,8 @@ impl PersonalDatabaseManager {
         info!("Conversation: {:?}", conversation);
         // info!("Messages: {:?}", messages);
 
-        // Ok((conversation, messages))
-        Ok((conversation, vec![]))
+        Ok((conversation, messages))
+        // Ok((conversation, vec![]))
     }
 
     pub async fn insert_chat_message(
