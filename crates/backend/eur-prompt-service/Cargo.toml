@@ -20,7 +20,7 @@ image = { workspace = true }
 eur-ocr = { path = "../../common/eur-ocr" }
 futures = "0.3"
 chrono = { workspace = true }
-ferrous-llm = { version = "0.5.0", features = ["openai"] }
+ferrous-llm = { workspace = true, features = ["openai"] }
 async-trait = "0.1.77"
 eur-eurora-provider = { workspace = true }
 
