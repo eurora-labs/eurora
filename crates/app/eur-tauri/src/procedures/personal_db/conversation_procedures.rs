@@ -48,10 +48,11 @@ impl ConversationApi for ConversationApiImpl {
     ) -> Result<Conversation, String> {
         let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
         // Set title to current time string
-        let title = Utc::now().to_rfc3339();
+        let current_time = Utc::now();
+        let title = current_time.to_rfc3339();
 
         let conversation = personal_db
-            .insert_conversation(&title, Utc::now(), Utc::now())
+            .insert_conversation(&title, current_time, current_time)
             .await
             .map_err(|e| e.to_string())?;
 
