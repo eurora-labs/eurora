@@ -111,7 +111,7 @@ fn main() {
                     tauri_app.manage::<SharedPromptKitService>(async_mutex::Mutex::new(None));
 
                     // Ensure empty current conversation exists
-                    tauri_app.manage::<SharedCurrentConversation>(None);
+                    tauri_app.manage::<SharedCurrentConversation>(async_mutex::Mutex::new(None));
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
