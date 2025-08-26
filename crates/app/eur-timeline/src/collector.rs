@@ -109,10 +109,10 @@ impl CollectorService {
             // Wait for the task to finish with a timeout
             match tokio::time::timeout(Duration::from_secs(5), task).await {
                 Ok(result) => {
-                    if let Err(e) = result {
-                        if !e.is_cancelled() {
-                            warn!("Collection task ended with error: {}", e);
-                        }
+                    if let Err(e) = result
+                        && !e.is_cancelled()
+                    {
+                        warn!("Collection task ended with error: {}", e);
                     }
                 }
                 Err(_) => {
@@ -173,7 +173,7 @@ impl CollectorService {
     pub fn is_running(&self) -> bool {
         self.current_task
             .as_ref()
-            .map_or(false, |task| !task.is_finished())
+            .is_some_and(|task| !task.is_finished())
     }
 
     /// Collect activity once using the provided strategy
@@ -265,18 +265,18 @@ impl CollectorService {
                             return Ok(());
                         }
 
-                        if let Some(process_name) = &window.process_name {
-                            if let Some(window_title) = &window.window_title {
-                                // Filter out ignored processes
-                                #[cfg(target_os = "windows")]
-                                let eurora_process = "eur-tauri.exe";
-                                #[cfg(not(target_os = "windows"))]
-                                let eurora_process = "eur-tauri";
+                        if let Some(process_name) = &window.process_name
+                            && let Some(window_title) = &window.window_title
+                        {
+                            // Filter out ignored processes
+                            #[cfg(target_os = "windows")]
+                            let eurora_process = "eur-tauri.exe";
+                            #[cfg(not(target_os = "windows"))]
+                            let eurora_process = "eur-tauri";
 
-                                if process_name != eurora_process {
-                                    info!("▶ {}: {}", process_name, window_title);
-                                    let _ = tx_clone.send(window);
-                                }
+                            if process_name != eurora_process {
+                                info!("▶ {}: {}", process_name, window_title);
+                                let _ = tx_clone.send(window);
                             }
                         }
                         Ok(())
@@ -325,62 +325,58 @@ impl CollectorService {
                 let collection_interval = config.collection_interval;
 
                 current_collection_task = Some(tokio::spawn(async move {
-                    if let Some(process_name) = event.process_name {
-                        if let Some(window_title) = event.window_title {
-                            let display_name = format!("{}: {}", process_name, window_title);
-                            let icon = event.icon.unwrap_or_default();
+                    if let Some(process_name) = event.process_name
+                        && let Some(window_title) = event.window_title
+                    {
+                        let display_name = format!("{}: {}", process_name, window_title);
+                        let icon = event.icon.unwrap_or_default();
 
-                            match select_strategy_for_process(&process_name, display_name, icon)
-                                .await
-                            {
-                                Ok(mut strategy) => {
-                                    // Collect initial activity
-                                    if let Ok(assets) = strategy.retrieve_assets().await {
-                                        let activity = eur_activity::Activity::new(
-                                            strategy.get_name().clone(),
-                                            strategy.get_icon().clone(),
-                                            strategy.get_process_name().clone(),
-                                            assets,
-                                        );
+                        match select_strategy_for_process(&process_name, display_name, icon).await {
+                            Ok(mut strategy) => {
+                                // Collect initial activity
+                                if let Ok(assets) = strategy.retrieve_assets().await {
+                                    let activity = eur_activity::Activity::new(
+                                        strategy.get_name().clone(),
+                                        strategy.get_icon().clone(),
+                                        strategy.get_process_name().clone(),
+                                        assets,
+                                    );
 
-                                        {
-                                            let mut storage = storage_clone.lock().await;
-                                            storage.add_activity(activity);
-                                        }
+                                    {
+                                        let mut storage = storage_clone.lock().await;
+                                        storage.add_activity(activity);
                                     }
+                                }
 
-                                    // Start periodic snapshot collection
-                                    let mut interval = time::interval(collection_interval);
-                                    loop {
-                                        interval.tick().await;
+                                // Start periodic snapshot collection
+                                let mut interval = time::interval(collection_interval);
+                                loop {
+                                    interval.tick().await;
 
-                                        match strategy.retrieve_snapshots().await {
-                                            Ok(snapshots) => {
-                                                if !snapshots.is_empty() {
-                                                    let mut storage = storage_clone.lock().await;
-                                                    if let Some(current_activity) =
-                                                        storage.get_all_activities_mut().back_mut()
-                                                    {
-                                                        for snapshot in snapshots {
-                                                            current_activity
-                                                                .snapshots
-                                                                .push(snapshot);
-                                                        }
+                                    match strategy.retrieve_snapshots().await {
+                                        Ok(snapshots) => {
+                                            if !snapshots.is_empty() {
+                                                let mut storage = storage_clone.lock().await;
+                                                if let Some(current_activity) =
+                                                    storage.get_all_activities_mut().back_mut()
+                                                {
+                                                    for snapshot in snapshots {
+                                                        current_activity.snapshots.push(snapshot);
                                                     }
                                                 }
                                             }
-                                            Err(e) => {
-                                                debug!("Failed to retrieve snapshots: {:?}", e);
-                                            }
+                                        }
+                                        Err(e) => {
+                                            debug!("Failed to retrieve snapshots: {:?}", e);
                                         }
                                     }
                                 }
-                                Err(e) => {
-                                    warn!(
-                                        "Failed to create strategy for process {}: {}",
-                                        process_name, e
-                                    );
-                                }
+                            }
+                            Err(e) => {
+                                warn!(
+                                    "Failed to create strategy for process {}: {}",
+                                    process_name, e
+                                );
                             }
                         }
                     }
