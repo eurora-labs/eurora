@@ -25,3 +25,6 @@ ferrous-focus = { version = "0.2.5" }
 tracing = { workspace = true }
 ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
 base64 = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
