@@ -208,7 +208,7 @@ impl PersonalDatabaseManager {
     ) -> Result<Vec<ChatMessage>, sqlx::Error> {
         let messages = sqlx::query_as(
             r#"
-            SELECT id, role, content, visible, created_at, updated_at
+            SELECT id, conversation_id, role, content, visible, created_at, updated_at
             FROM chat_message
             WHERE conversation_id = ?
             "#,
