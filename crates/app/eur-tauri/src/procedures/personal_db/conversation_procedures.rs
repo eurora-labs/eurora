@@ -8,11 +8,8 @@ use tauri::ipc::Channel;
 use tauri::{Manager, Runtime};
 use tracing::info;
 
-#[taurpc::procedures(path = "conversation")]
+#[taurpc::procedures(path = "personal_db.conversation")]
 pub trait ConversationApi {
-    #[taurpc(event)]
-    async fn current_conversation_changed(conversation: Conversation);
-
     async fn list<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         limit: u16,

@@ -19,6 +19,7 @@ use eur_tauri::{
         chat_procedures::{ChatApi, ChatApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         conversation_procedures::{ConversationApi, ConversationApiImpl},
+        message_procedures::{MessageApi, MessageApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
         settings_procedures::{SettingsApi, SettingsApiImpl},
@@ -356,6 +357,7 @@ fn main() {
                 .merge(SettingsApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
+                .merge(MessageApiImpl.into_handler())
                 .merge(SystemApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
