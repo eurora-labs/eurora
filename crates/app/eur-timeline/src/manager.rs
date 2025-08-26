@@ -38,7 +38,8 @@ impl TimelineManager {
         }
 
         let storage = Arc::new(Mutex::new(TimelineStorage::new(config.storage.clone())));
-        let collector = CollectorService::new(Arc::clone(&storage), config.collector.clone());
+        let collector =
+            CollectorService::new_with_timeline_config(Arc::clone(&storage), config.clone());
 
         Self {
             storage,
