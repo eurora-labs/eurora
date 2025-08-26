@@ -72,7 +72,7 @@ impl ChatApi for ChatApiImpl {
         // personal_db
         //     .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
         //     .await
-        //     .expect("Failed to insert chat message");
+        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
         messages.push(user_message);
 
@@ -153,7 +153,7 @@ impl ChatApi for ChatApiImpl {
         //         },
         //     )
         //     .await
-        //     .expect("Failed to insert chat message");
+        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
         Ok(complete_response)
     }
@@ -170,7 +170,9 @@ impl ChatApi for ChatApiImpl {
             .await
             .map_err(|e| format!("Failed to get conversation: {}", e))?;
 
-        app_handle.manage::<SharedCurrentConversation>(Some(conversation.clone()));
+        let current = app_handle.state::<SharedCurrentConversation>();
+        let mut guard = current.lock().await;
+        *guard = Some(conversation.clone());
 
         TauRpcChatApiEventTrigger::new(app_handle.clone())
             .current_conversation_changed(conversation.clone())
