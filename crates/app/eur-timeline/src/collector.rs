@@ -392,6 +392,10 @@ impl CollectorService {
     async fn start_without_focus_tracking(&mut self) -> Result<()> {
         info!("Starting collection without focus tracking");
 
+        // Create shutdown signal for the cleanup task
+        let shutdown_signal = Arc::new(AtomicBool::new(false));
+        self.focus_shutdown_signal = Some(Arc::clone(&shutdown_signal));
+
         // For now, just create a placeholder task that does periodic cleanup
         let storage = Arc::clone(&self.storage);
         let cleanup_interval = Duration::from_secs(300); // 5 minutes
@@ -399,17 +403,27 @@ impl CollectorService {
         self.current_task = Some(tokio::spawn(async move {
             let mut interval = time::interval(cleanup_interval);
 
-            loop {
-                interval.tick().await;
-
-                // Perform periodic cleanup
-                {
-                    let mut storage = storage.lock().await;
-                    if storage.needs_cleanup() {
-                        storage.force_cleanup();
+            while !shutdown_signal.load(Ordering::Relaxed) {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        // Perform periodic cleanup
+                        {
+                            let mut storage = storage.lock().await;
+                            if storage.needs_cleanup() {
+                                storage.force_cleanup();
+                            }
+                        }
+                    }
+                    _ = tokio::time::sleep(Duration::from_millis(100)) => {
+                        // Check shutdown signal more frequently
+                        if shutdown_signal.load(Ordering::Relaxed) {
+                            break;
+                        }
                     }
                 }
             }
+
+            debug!("Cleanup task shutting down gracefully");
         }));
 
         Ok(())
@@ -494,12 +508,19 @@ mod tests {
     #[tokio::test]
     async fn test_collector_lifecycle() {
         let storage = Arc::new(Mutex::new(TimelineStorage::default()));
-        let config = CollectorConfig {
-            collection_interval: Duration::from_millis(100),
+        let timeline_config = crate::config::TimelineConfig {
+            collector: CollectorConfig {
+                collection_interval: Duration::from_millis(100),
+                ..Default::default()
+            },
+            focus_tracking: crate::config::FocusTrackingConfig {
+                enabled: false, // Disable focus tracking for tests
+                ..Default::default()
+            },
             ..Default::default()
         };
 
-        let mut collector = CollectorService::new(storage, config);
+        let mut collector = CollectorService::new_with_timeline_config(storage, timeline_config);
 
         // Start collector
         assert!(collector.start().await.is_ok());
@@ -519,13 +540,20 @@ mod tests {
     #[tokio::test]
     async fn test_collector_restart() {
         let storage = Arc::new(Mutex::new(TimelineStorage::default()));
-        let config = CollectorConfig {
-            collection_interval: Duration::from_millis(100),
-            restart_delay: Duration::from_millis(10),
+        let timeline_config = crate::config::TimelineConfig {
+            collector: CollectorConfig {
+                collection_interval: Duration::from_millis(100),
+                restart_delay: Duration::from_millis(10),
+                ..Default::default()
+            },
+            focus_tracking: crate::config::FocusTrackingConfig {
+                enabled: false, // Disable focus tracking for tests
+                ..Default::default()
+            },
             ..Default::default()
         };
 
-        let mut collector = CollectorService::new(storage, config);
+        let mut collector = CollectorService::new_with_timeline_config(storage, timeline_config);
 
         // Start and restart
         assert!(collector.start().await.is_ok());
