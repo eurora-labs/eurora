@@ -529,7 +529,7 @@ impl BrowserStrategy {
             "librewolf",
         ];
         #[cfg(target_os = "macos")]
-        let processes = vec!["Google Chrome"];
+        let processes = vec!["Google Chrome", "firefox", "chrome", "safari"];
         processes
     }
 
