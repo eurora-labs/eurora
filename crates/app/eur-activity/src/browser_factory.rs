@@ -47,17 +47,25 @@ impl StrategyFactory for BrowserStrategyFactory {
         if supported_processes.contains(&process_name) {
             MatchScore::PERFECT
         } else {
-            // Check for common browser process variations
+            // Heuristic: tokenize on non-alphanumeric boundaries and match common browser keywords.
             let process_lower = process_name.to_lowercase();
+            let indicators = [
+                "firefox", "chrome", "chromium", "safari", "msedge", "edge", "opera", "brave",
+            ];
+            let mut is_browserish = process_lower
+                .split(|c: char| !c.is_ascii_alphanumeric())
+                .filter(|t| !t.is_empty())
+                .any(|t| indicators.contains(&t));
 
-            if process_lower.contains("firefox")
-                || process_lower.contains("chrome")
-                || process_lower.contains("chromium")
-                || process_lower.contains("safari")
-                || process_lower.contains("edge")
-                || process_lower.contains("opera")
-                || process_lower.contains("brave")
-            {
+            // Handle common composite names without clear token boundaries
+            if !is_browserish {
+                is_browserish = process_lower.contains("microsoft-edge")
+                    || process_lower.contains("google chrome")
+                    || process_lower.ends_with(".exe")
+                        && indicators.iter().any(|k| process_lower.contains(k));
+            }
+
+            if is_browserish {
                 MatchScore::HIGH
             } else {
                 MatchScore::NO_MATCH

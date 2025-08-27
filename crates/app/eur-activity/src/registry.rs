@@ -117,7 +117,16 @@ impl StrategyRegistry {
             metadata.name, metadata.id
         );
 
-        self.factories.insert(metadata.id.clone(), factory);
+        if self
+            .factories
+            .insert(metadata.id.clone(), factory)
+            .is_some()
+        {
+            warn!(
+                "Strategy factory with id '{}' was already registered; overwriting previous factory",
+                metadata.id
+            );
+        }
 
         // Clear cache when new factories are registered
         self.process_cache.clear();
@@ -135,6 +144,8 @@ impl StrategyRegistry {
             if let Some(factory) = self.factories.get(strategy_id) {
                 debug!("Using cached strategy: {}", strategy_id);
                 return factory.create_strategy(context).await;
+            } else {
+                self.process_cache.remove(&context.process_name);
             }
         }
 
