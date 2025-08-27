@@ -1,9 +1,11 @@
+use eur_personal_db::{Conversation, PersonalDatabaseManager};
+use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tracing::info;
 
-use crate::shared_types::{SharedPromptKitService, SharedTimeline};
+use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
     chunk: String,
@@ -22,8 +24,17 @@ pub struct Query {
 
 #[taurpc::procedures(path = "chat")]
 pub trait ChatApi {
+    #[taurpc(event)]
+    async fn current_conversation_changed(conversation: Conversation);
+
+    async fn switch_conversation<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
+    ) -> Result<Conversation, String>;
+
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
@@ -37,23 +48,33 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
-        let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
-        let timeline = timeline_state.inner();
+        let personal_db: &PersonalDatabaseManager =
+            app_handle.state::<PersonalDatabaseManager>().inner();
+        let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
+        let timeline = timeline_state.lock().await;
         let title: String = "Placeholder Title".to_string();
 
         let mut messages: Vec<Message> = Vec::new();
         if !query.assets.is_empty() {
-            messages = timeline.construct_asset_messages();
-            messages.extend(timeline.construct_snapshot_messages());
+            messages = timeline.construct_asset_messages().await;
+            messages.extend(timeline.construct_snapshot_messages().await);
         }
 
-        messages.push(Message {
+        let user_message = Message {
             role: Role::User,
             content: MessageContent::Text(query.text.clone()),
-        });
+        };
+
+        // personal_db
+        //     .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
+        //     .await
+        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+
+        messages.push(user_message);
 
         let state: tauri::State<SharedPromptKitService> = app_handle.state();
         let mut guard = state.lock().await;
@@ -123,6 +144,40 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
+        // personal_db
+        //     .insert_chat_message_from_message(
+        //         conversation_id.as_str(),
+        //         Message {
+        //             role: Role::Assistant,
+        //             content: MessageContent::Text(complete_response.clone()),
+        //         },
+        //     )
+        //     .await
+        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+
         Ok(complete_response)
+    }
+
+    async fn switch_conversation<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
+    ) -> Result<Conversation, String> {
+        let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+
+        let conversation = personal_db
+            .get_conversation(&conversation_id)
+            .await
+            .map_err(|e| format!("Failed to get conversation: {}", e))?;
+
+        let current = app_handle.state::<SharedCurrentConversation>();
+        let mut guard = current.lock().await;
+        *guard = Some(conversation.clone());
+
+        TauRpcChatApiEventTrigger::new(app_handle.clone())
+            .current_conversation_changed(conversation.clone())
+            .map_err(|e| e.to_string())?;
+
+        Ok(conversation)
     }
 }

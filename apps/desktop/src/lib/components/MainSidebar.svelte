@@ -4,51 +4,65 @@
 	import Inbox from '@lucide/svelte/icons/inbox';
 	import Search from '@lucide/svelte/icons/search';
 	import Settings from '@lucide/svelte/icons/settings';
+	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import { Button } from '@eurora/ui/components/button/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { type Conversation } from '$lib/bindings/bindings.js';
+	import { inject } from '@eurora/shared/context';
 	import { onMount } from 'svelte';
 
-	// type SidebarState = ReturnType<typeof
+	const taurpc = inject(TAURPC_SERVICE);
+	let conversations: Conversation[] = $state([]);
 
-	let sidebarState: ReturnType<typeof useSidebar> | undefined = undefined;
+	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
 
 	onMount(() => {
 		sidebarState = useSidebar();
+
+		taurpc.personal_db.conversation.list(5, 0).then((res) => {
+			conversations = res;
+		});
 	});
 
+	async function createChat() {}
+
+	async function switchConversation(id: string) {
+		await taurpc.chat.switch_conversation(id);
+	}
+
 	// Menu items.
-	const items = [
-		{
-			title: 'Chat 1',
-			url: '#',
-			icon: House,
-		},
-		{
-			title: 'Chat 2',
-			url: '#',
-			icon: Inbox,
-		},
-		{
-			title: 'Chat 3',
-			url: '#',
-			icon: Calendar,
-		},
-		{
-			title: 'Chat 4',
-			url: '#',
-			icon: Search,
-		},
-		{
-			title: 'Chat 5',
-			url: '#',
-			icon: Settings,
-		},
-	];
+	// const items = [
+	// 	{
+	// 		title: 'Chat 1',
+	// 		url: '#',
+	// 		icon: House,
+	// 	},
+	// 	{
+	// 		title: 'Chat 2',
+	// 		url: '#',
+	// 		icon: Inbox,
+	// 	},
+	// 	{
+	// 		title: 'Chat 3',
+	// 		url: '#',
+	// 		icon: Calendar,
+	// 	},
+	// 	{
+	// 		title: 'Chat 4',
+	// 		url: '#',
+	// 		icon: Search,
+	// 	},
+	// 	{
+	// 		title: 'Chat 5',
+	// 		url: '#',
+	// 		icon: Settings,
+	// 	},
+	// ];
 </script>
 
 <Sidebar.Root collapsible="icon" class="border-none">
@@ -64,6 +78,44 @@
 		</div>
 	</Sidebar.Header>
 	<Sidebar.Content>
+		<Sidebar.Group>
+			<Sidebar.GroupContent>
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton onclick={() => createChat()}>
+							<SquarePenIcon />
+							<span>New chat</span>
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+			</Sidebar.GroupContent>
+		</Sidebar.Group>
+		{#if conversations.length > 0 && sidebarState?.open}
+			<Sidebar.Group>
+				<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
+
+				<Sidebar.GroupContent>
+					<Sidebar.Menu>
+						{#each conversations as item (item.title)}
+							<Sidebar.MenuItem>
+								<Sidebar.MenuButton
+									onclick={() => {
+										switchConversation(item.id);
+									}}
+								>
+									{#snippet child({ props })}
+										<a {...props}>
+											<!-- <item.icon /> -->
+											<span>{item.title}</span>
+										</a>
+									{/snippet}
+								</Sidebar.MenuButton>
+							</Sidebar.MenuItem>
+						{/each}
+					</Sidebar.Menu>
+				</Sidebar.GroupContent>
+			</Sidebar.Group>
+		{/if}
 		<!-- <Sidebar.Group>
 			<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>

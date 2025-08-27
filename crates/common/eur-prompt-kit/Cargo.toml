@@ -7,11 +7,7 @@ edition = "2024"
 anyhow = { workspace = true }
 futures = { workspace = true }
 image = { workspace = true }
-ferrous-llm = { version = "0.5.0", features = [
-    "openai",
-    "ollama",
-    "anthropic",
-] }
+ferrous-llm = { workspace = true, features = ["openai", "ollama", "anthropic"] }
 eur-eurora-provider = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }

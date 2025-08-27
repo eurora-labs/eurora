@@ -171,3 +171,10 @@ pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
     Shortcut::new(modifiers, key_code)
 }
+
+pub fn get_db_path(app_handle: &tauri::AppHandle) -> String {
+    let base_path = app_handle.path().app_data_dir().unwrap();
+    std::fs::create_dir_all(&base_path).unwrap();
+    let db_path = base_path.join("personal_database.sqlite");
+    db_path.to_string_lossy().to_string()
+}
