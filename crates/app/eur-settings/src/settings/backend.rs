@@ -3,6 +3,7 @@ use eur_eurora_provider::EuroraConfig;
 use eur_prompt_kit::{OllamaConfig, OpenAIConfig};
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use tracing::info;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type, Default)]
 pub enum BackendType {
@@ -74,7 +75,8 @@ impl BackendSettings {
                     )
                     .map_err(|e| format!("Failed to retrieve OpenAI API key: {e}"))?
                     {
-                        config.api_key = api_key.0.into();
+                        config.api_key = api_key.0.clone().into();
+                        config.base_url = None;
                     } else {
                         return Err("No OpenAI API key provided".to_string());
                     }
