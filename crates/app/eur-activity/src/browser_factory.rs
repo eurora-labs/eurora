@@ -78,8 +78,9 @@ impl StrategyFactory for BrowserStrategyFactory {
                                 || tokens.windows(2).any(|w| w[0] == "google" && w[1] == "chrome")
                                 // Restrict .exe fallback to exact basename match (avoids "chromedriver.exe")
                                 || (process_lower.ends_with(".exe")
-                                    && process_lower
-                                        .strip_suffix(".exe")
+                                    && std::path::Path::new(&process_lower)
+                                        .file_stem()
+                                        .and_then(|s| s.to_str())
                                         .map(|stem| indicators.contains(&stem))
                                         .unwrap_or(false));
             }
