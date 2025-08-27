@@ -7,6 +7,7 @@ use ferrous_llm::{
     openai::{OpenAIConfig, OpenAIProvider},
 };
 use tokio_stream::{Stream, StreamExt};
+use tracing::info;
 
 use crate::PromptKitError;
 
@@ -95,6 +96,8 @@ impl PromptKitService {
                 parameters: Default::default(),
                 metadata: Default::default(),
             };
+
+            info!("Sending request to OpenAI: {:?}", request.clone());
 
             let stream = provider
                 .chat_stream(request)
