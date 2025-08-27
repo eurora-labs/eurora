@@ -10,7 +10,7 @@ use eur_client_questions::QuestionsClient;
 mod launcher;
 mod util;
 use eur_native_messaging::create_grpc_ipc_client;
-use eur_personal_db::{Conversation, DatabaseManager};
+use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use eur_settings::AppSettings;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
@@ -18,6 +18,8 @@ use eur_tauri::{
         auth_procedures::{AuthApi, AuthApiImpl},
         chat_procedures::{ChatApi, ChatApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
+        conversation_procedures::{ConversationApi, ConversationApiImpl},
+        message_procedures::{MessageApi, MessageApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
         settings_procedures::{SettingsApi, SettingsApiImpl},
@@ -26,11 +28,13 @@ use eur_tauri::{
         user_procedures::{UserApi, UserApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
-    shared_types::{SharedPromptKitService, create_shared_timeline},
+    shared_types::{
+        SharedCurrentConversation, SharedPromptKitService, create_shared_database_manager,
+    },
 };
+use eur_timeline::TimelineManager;
 use launcher::monitor_cursor_for_hover;
 use launcher::toggle_launcher_window;
-use std::sync::{Arc, Mutex};
 use tauri::{
     AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -41,33 +45,6 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{error, info};
-
-type SharedQuestionsClient = Arc<Mutex<Option<QuestionsClient>>>;
-type SharedPersonalDb = Arc<DatabaseManager>;
-
-async fn create_shared_database_manager(app_handle: &tauri::AppHandle) -> SharedPersonalDb {
-    let db_path = get_db_path(app_handle);
-    Arc::new(
-        DatabaseManager::new(&db_path)
-            .await
-            .map_err(|e| {
-                info!("Failed to create database manager: {}", e);
-                e
-            })
-            .unwrap(),
-    )
-}
-
-fn create_shared_client() -> SharedQuestionsClient {
-    Arc::new(Mutex::new(None))
-}
-
-fn get_db_path(app_handle: &tauri::AppHandle) -> String {
-    let base_path = app_handle.path().app_data_dir().unwrap();
-    std::fs::create_dir_all(&base_path).unwrap();
-    let db_path = base_path.join("personal_database.sqlite");
-    db_path.to_string_lossy().to_string()
-}
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
@@ -132,6 +109,9 @@ fn main() {
 
                     // Ensure state exists immediately
                     tauri_app.manage::<SharedPromptKitService>(async_mutex::Mutex::new(None));
+
+                    // Ensure empty current conversation exists
+                    tauri_app.manage::<SharedCurrentConversation>(async_mutex::Mutex::new(None));
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -253,18 +233,20 @@ fn main() {
                         .expect("Failed to create tray icon");
 
 
-                    // --- State Initialization ---
-                    let transcript_state = Arc::new(Mutex::new(None::<String>));
-                    app_handle.manage(transcript_state);
+                    let timeline = eur_timeline::create_default_timeline();
+                    app_handle.manage(async_mutex::Mutex::new(timeline));
 
-                    let questions_client = create_shared_client();
-                    app_handle.manage(questions_client.clone());
-
-                    let timeline = create_shared_timeline();
-                    app_handle.manage(timeline.clone());
-
-                    let current_conversation_id = Arc::new(None::<String>);
-                    app_handle.manage(current_conversation_id.clone());
+                    // Start timeline collection
+                    let timeline_handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let timeline_mutex = timeline_handle.state::<async_mutex::Mutex<TimelineManager>>();
+                        let mut timeline = timeline_mutex.lock().await;
+                        if let Err(e) = timeline.start().await {
+                            error!("Failed to start timeline collection: {}", e);
+                        } else {
+                            info!("Timeline collection started successfully");
+                        }
+                    });
 
                     let launcher_label = launcher_window.label().to_string();
                     app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
@@ -292,22 +274,26 @@ fn main() {
                         }
                     });
 
+
+
+                    // Initialize conversation storage
+                    // let db_app_handle = app_handle.clone();
+                    // tauri::async_runtime::spawn(async move {
+                    //     let db = create_shared_database_manager(&db_app_handle).await;
+                    //     db_app_handle.manage(db);
+                    // });
                     // Initialize conversation storage
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let db = create_shared_database_manager(&db_app_handle).await;
-                        db_app_handle.manage(db.clone());
-                    });
-
-                    // Start timeline collection
-                    let timeline_clone = timeline.clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Err(e) = timeline_clone.start_collection().await {
-                            error!("Failed to start timeline collection: {}", e);
-                        } else {
-                            info!("Timeline collection started successfully");
+                        match create_shared_database_manager(&db_app_handle).await {
+                            Ok(db) => {
+                                db_app_handle.manage(db);
+                                info!("Personal database manager initialized");
+                            }
+                            Err(e) => error!("Failed to initialize personal database manager: {}", e),
                         }
                     });
+
 
                     // Initialize IPC client
                     let ipc_handle = app_handle.clone();
@@ -321,55 +307,17 @@ fn main() {
                         }
                     });
 
-
-
-                    // Linux-specific focus handling
-                    // #[cfg(target_os = "linux")]
-                    // {
-                    //     let app_handle_focus = app_handle.clone();
-                    //     let launcher_label_linux = launcher_label.clone();
-                    //     launcher_window.on_window_event(move |event| {
-                    //         if let tauri::WindowEvent::Focused(false) = event && let Some(launcher) =
-                    //                 app_handle_focus.get_window(&launcher_label_linux)
-                    //             {
-                    //                 launcher.hide().expect("Failed to hide launcher window");
-                    //                 // Emit an event to clear the conversation when launcher is hidden
-                    //                 launcher
-                    //                     .emit("launcher_closed", ())
-                    //                     .expect("Failed to emit launcher_closed event");
-                    //                 set_launcher_visible(false);
-                    //                 // Ensure state is updated
-                    //         }
-                    //     });
-                    // }
-
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
-                // .plugin(
-                //     tauri_plugin_log::Builder::default()
-                //         .level(log::LevelFilter::Error)
-                //         .fi
-                //         .build(),
-                // 
-                // .plugin(log_plugin)
                 .plugin(
                     tauri_plugin_log::Builder::new()
                             .filter(|metadata| metadata.target().starts_with("eur_") || metadata.level() == log::Level::Warn)
                             .level(log::LevelFilter::Info)
-                            // .level_for("eur_", log::LevelFilter::Trace)
                             .build()
                 )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
-                // .plugin(
-                //     tauri_plugin_log::Builder::default()
-                //         .targets([
-                //             Target::new(TargetKind::Stdout),
-                //             Target::new(TargetKind::LogDir { file_name: None }),
-                //         ])
-                //         .build(),
-                // )
                 .on_window_event(|window, event| match event {
                     #[cfg(target_os = "macos")]
                     tauri::WindowEvent::CloseRequested { .. } => {
@@ -417,9 +365,11 @@ fn main() {
                         .bigint(specta_typescript::BigIntExportBehavior::BigInt),
                 )
                 .merge(AuthApiImpl.into_handler())
+                .merge(ConversationApiImpl.into_handler())
                 .merge(SettingsApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
+                .merge(MessageApiImpl.into_handler())
                 .merge(SystemApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
@@ -427,7 +377,7 @@ fn main() {
                 .merge(ChatApiImpl.into_handler())
                 .merge(UserApiImpl.into_handler());
             builder
-                .invoke_handler(tauri::generate_handler![list_conversations,])
+                // .invoke_handler(tauri::generate_handler![list_conversations,])
                 .invoke_handler(router.into_handler())
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
@@ -449,11 +399,4 @@ fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
             toggle_launcher_window(&launcher);
         })
         .build()
-}
-
-#[tauri::command]
-async fn list_conversations(app_handle: tauri::AppHandle) -> Result<Vec<Conversation>, String> {
-    let db = app_handle.state::<SharedPersonalDb>().clone();
-    let conversations = db.list_conversations().await.unwrap();
-    Ok(conversations)
 }

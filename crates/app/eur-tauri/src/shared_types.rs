@@ -1,14 +1,28 @@
+use crate::util::get_db_path;
+use anyhow::Result;
 use eur_settings::AppSettings;
-use std::sync::Arc;
+use tracing::info;
 
 use async_mutex::Mutex;
+use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use eur_prompt_kit::PromptKitService;
-use eur_timeline::Timeline;
 pub type SharedPromptKitService = Mutex<Option<PromptKitService>>;
-pub type SharedTimeline = Arc<Timeline>;
 pub type SharedAppSettings = Mutex<AppSettings>;
+pub type SharedCurrentConversation = Mutex<Option<Conversation>>;
 
-pub fn create_shared_timeline() -> SharedTimeline {
-    // Create a timeline that collects state every 3 seconds and keeps 1 hour of history
-    Arc::new(eur_timeline::create_default_timeline())
+pub async fn create_shared_database_manager(
+    app_handle: &tauri::AppHandle,
+) -> Result<PersonalDatabaseManager> {
+    let db_path = get_db_path(app_handle);
+    PersonalDatabaseManager::new(&db_path).await.map_err(|e| {
+        info!("Failed to create database manager: {}", e);
+        e.into()
+    })
+    // PersonalDatabaseManager::new(&db_path)
+    //     .await
+    //     .map_err(|e| {
+    //         info!("Failed to create database manager: {}", e);
+    //         e
+    //     })
+    //     .unwrap()
 }
