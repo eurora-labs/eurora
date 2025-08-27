@@ -1,7 +1,7 @@
 use eur_activity::ContextChip;
+use eur_timeline::TimelineManager;
 use tauri::{Manager, Runtime};
 
-use crate::shared_types::SharedTimeline;
 #[taurpc::procedures(path = "context_chip")]
 pub trait ContextChipApi {
     async fn get<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Vec<ContextChip>, String>;
@@ -16,12 +16,11 @@ impl ContextChipApi for ContextChipApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String> {
-        let timeline_state: tauri::State<SharedTimeline> = app_handle.state();
-        let timeline = timeline_state.inner();
+        let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
+        let timeline = timeline_state.lock().await;
 
         // Get all activities from the timeline
-        // let mut activities = timeline.get_activities();
-        let activities = timeline.get_context_chips();
+        let activities = timeline.get_context_chips().await;
 
         // Sort activities by start time (most recent first)
         // activities.sort_by(|a, b| b.start.cmp(&a.start));
