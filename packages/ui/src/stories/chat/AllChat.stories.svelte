@@ -379,7 +379,7 @@ function handleScroll() {
 					<Chat class="h-[500px]">
 						{#each shortConversationMessages as message}
 							<Message.Root
-								variant={message.role === 'user' ? 'default' : 'agent'}
+								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
 								<Message.Content>{message.content}</Message.Content>
@@ -412,7 +412,7 @@ function handleScroll() {
 					<Chat class="h-[500px]">
 						{#each mediumConversationMessages as message}
 							<Message.Root
-								variant={message.role === 'user' ? 'default' : 'agent'}
+								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
 								<Message.Content>{message.content}</Message.Content>
@@ -445,7 +445,7 @@ function handleScroll() {
 					<Chat class="h-[500px]">
 						{#each longConversationMessages as message}
 							<Message.Root
-								variant={message.role === 'user' ? 'default' : 'agent'}
+								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
 								<Message.Content>{message.content}</Message.Content>
@@ -478,7 +478,7 @@ function handleScroll() {
 					<Chat class="h-[500px]">
 						{#each mixedContentMessages as message}
 							<Message.Root
-								variant={message.role === 'user' ? 'default' : 'agent'}
+								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
 								<Message.Content>{message.content}</Message.Content>
@@ -511,7 +511,7 @@ function handleScroll() {
 					<Chat class="h-[500px]">
 						{#each interactiveMessages as message}
 							<Message.Root
-								variant={message.role === 'user' ? 'default' : 'agent'}
+								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
 								<Message.Content>{message.content}</Message.Content>
