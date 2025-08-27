@@ -1141,8 +1141,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.36
-        version: 2.0.0-next.36(svelte@5.38.1)
+        specifier: 2.0.0-next.37
+        version: 2.0.0-next.37(svelte@5.38.1)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.38.1)
@@ -1613,8 +1613,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.36
-        version: 2.0.0-next.36(svelte@5.38.1)
+        specifier: 2.0.0-next.37
+        version: 2.0.0-next.37(svelte@5.38.1)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.38.1)
@@ -1820,8 +1820,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.36
-        version: 2.0.0-next.36(svelte@5.38.1)
+        specifier: 2.0.0-next.37
+        version: 2.0.0-next.37(svelte@5.38.1)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.38.1)
@@ -2440,6 +2440,9 @@ packages:
 
   '@floating-ui/dom@1.7.3':
     resolution: {integrity: sha512-uZA413QEpNuhtb3/iIKoYMSK07keHPYeXF02Zhd6e213j+d1NamLix/mCLxBUDW/Gx52sPH2m+chlUsyaBs/Ag==}
+
+  '@floating-ui/dom@1.7.4':
+    resolution: {integrity: sha512-OOchDgh4F2CchOX94cRVqhvy7b3AFb+/rQXyswmzmGakRfkMgoWVjfnLWkRirfLEfuD4ysVW16eXzwt3jHIzKA==}
 
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
@@ -5736,8 +5739,8 @@ packages:
     resolution: {integrity: sha512-7W0vV3rqv5tokqkBAFV1LbR7HPOWzXQDpDgEuib/aJ1jsZZx6x3c2mBI+TJhJzOhkGeaLbCKEHXEXLfirtG2JA==}
     engines: {node: '>=18'}
 
-  layerchart@2.0.0-next.36:
-    resolution: {integrity: sha512-/GfbQX31HHqZYjErC+UrLpck5SUPzxpiyssvEdSwN9IPktmKVaqOn3xYSqQVpOTVaM9C91oiqKGKaw5e+zzYKA==}
+  layerchart@2.0.0-next.37:
+    resolution: {integrity: sha512-PE16Hu3PA3AJ1B28LY68S1HqoiiEXfC2YNl4h5mdpjx5ZLwQSlP9sq68NxXYRcrzp/KPiytBVoDHpDHeJxnQCQ==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -8690,6 +8693,11 @@ snapshots:
       '@floating-ui/core': 1.7.3
       '@floating-ui/utils': 0.2.10
 
+  '@floating-ui/dom@1.7.4':
+    dependencies:
+      '@floating-ui/core': 1.7.3
+      '@floating-ui/utils': 0.2.10
+
   '@floating-ui/utils@0.2.10': {}
 
   '@fluent/syntax@0.19.0': {}
@@ -8786,7 +8794,7 @@ snapshots:
 
   '@layerstack/svelte-actions@1.0.1-next.14':
     dependencies:
-      '@floating-ui/dom': 1.7.3
+      '@floating-ui/dom': 1.7.4
       '@layerstack/utils': 2.0.0-next.14
       d3-scale: 4.0.2
 
@@ -12314,7 +12322,7 @@ snapshots:
     dependencies:
       package-json: 10.0.1
 
-  layerchart@2.0.0-next.36(svelte@5.38.1):
+  layerchart@2.0.0-next.37(svelte@5.38.1):
     dependencies:
       '@dagrejs/dagre': 1.1.5
       '@layerstack/svelte-actions': 1.0.1-next.14
