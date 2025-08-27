@@ -44,25 +44,44 @@ impl StrategyFactory for BrowserStrategyFactory {
     fn supports_process(&self, process_name: &str, _window_title: Option<&str>) -> MatchScore {
         let supported_processes = Self::get_supported_processes();
 
-        if supported_processes.contains(&process_name) {
+        if supported_processes
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(process_name))
+        {
             MatchScore::PERFECT
         } else {
             // Heuristic: tokenize on non-alphanumeric boundaries and match common browser keywords.
             let process_lower = process_name.to_lowercase();
             let indicators = [
-                "firefox", "chrome", "chromium", "safari", "msedge", "edge", "opera", "brave",
+                "firefox",
+                "chrome",
+                "chromium",
+                "safari",
+                "msedge",
+                "edge",
+                "opera",
+                "brave",
+                "vivaldi",
+                "librewolf",
             ];
-            let mut is_browserish = process_lower
+            let tokens: Vec<&str> = process_lower
                 .split(|c: char| !c.is_ascii_alphanumeric())
                 .filter(|t| !t.is_empty())
-                .any(|t| indicators.contains(&t));
-
+                .collect();
+            let mut is_browserish = tokens.iter().any(|t| indicators.contains(t));
             // Handle common composite names without clear token boundaries
             if !is_browserish {
-                is_browserish = process_lower.contains("microsoft-edge")
-                    || process_lower.contains("google chrome")
-                    || process_lower.ends_with(".exe")
-                        && indicators.iter().any(|k| process_lower.contains(k));
+                is_browserish =
+                                // e.g., "microsoft-edge"
+                                process_lower.contains("microsoft-edge")
+                                // e.g., "Google Chrome Helper"
+                                || tokens.windows(2).any(|w| w[0] == "google" && w[1] == "chrome")
+                                // Restrict .exe fallback to exact basename match (avoids "chromedriver.exe")
+                                || (process_lower.ends_with(".exe")
+                                    && process_lower
+                                        .strip_suffix(".exe")
+                                        .map(|stem| indicators.contains(&stem))
+                                        .unwrap_or(false));
             }
 
             if is_browserish {
@@ -110,13 +129,15 @@ mod tests {
     fn test_process_matching() {
         let factory = BrowserStrategyFactory::new();
 
-        // Test exact matches
+        // Test exact matches using the platform-supported list
+        let supported = BrowserStrategyFactory::get_supported_processes();
+        let first = supported
+            .first()
+            .expect("supported_processes must not be empty");
+        assert_eq!(factory.supports_process(first, None), MatchScore::PERFECT);
+        // Case-insensitive exact should also be PERFECT
         assert_eq!(
-            factory.supports_process("firefox", None),
-            MatchScore::PERFECT
-        );
-        assert_eq!(
-            factory.supports_process("chrome", None),
+            factory.supports_process(&first.to_lowercase(), None),
             MatchScore::PERFECT
         );
 
