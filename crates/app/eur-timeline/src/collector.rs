@@ -394,7 +394,6 @@ impl CollectorService {
 
         // Create shutdown signal for the cleanup task
         let shutdown_signal = Arc::new(AtomicBool::new(false));
-        self.focus_shutdown_signal = Some(Arc::clone(&shutdown_signal));
 
         // For now, just create a placeholder task that does periodic cleanup
         let storage = Arc::clone(&self.storage);
