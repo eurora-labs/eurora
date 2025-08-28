@@ -1,18 +1,19 @@
 [package]
 name = "eur-activity"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 authors = ["Eurora <eurora@company.com>"]
-description = "Timeline storage for capturing system state over time"
+description = "Refactored activity system with enum-based type-safe design"
 
 [dependencies]
-eur-proto = { path = "../../proto/eur-proto" }
-eur-native-messaging = { path = "../eur-native-messaging" }
+eur-proto = { workspace = true }
+eur-native-messaging = { workspace = true }
 image.workspace = true
 chrono = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, default-features = false }
-serde = { workspace = true }
-serde_json = "1.0.142"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+humantime-serde = { workspace = true }
 anyhow = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
@@ -25,6 +26,12 @@ ferrous-focus = { version = "0.2.5" }
 tracing = { workspace = true }
 ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
 base64 = { workspace = true }
+thiserror = { workspace = true }
+regex = "1.10.2"
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }
+
+[features]
+default = []
+compat = []  # Enable backward compatibility layer
