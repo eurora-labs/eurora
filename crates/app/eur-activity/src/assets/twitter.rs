@@ -140,9 +140,11 @@ impl TwitterAsset {
 
     /// Construct a message for LLM interaction
     pub fn construct_message(&self) -> Message {
+        let max_tweets = 20usize;
         let tweet_texts: Vec<String> = self
             .tweets
             .iter()
+            .take(max_tweets)
             .map(|tweet| tweet.get_formatted_text())
             .collect();
 
@@ -154,15 +156,23 @@ impl TwitterAsset {
             TwitterContextType::Hashtag => "hashtag feed",
         };
 
+        let mut text = format!(
+            "I am looking at Twitter {} content titled '{}' and have a question about it. \
+                         Here are the tweets I'm seeing: \n\n{}",
+            context_description,
+            self.title,
+            tweet_texts.join("\n\n")
+        );
+        if self.tweets.len() > max_tweets {
+            text.push_str(&format!(
+                "\n\n(+{} more tweets truncated)",
+                self.tweets.len() - max_tweets,
+            ));
+        }
+
         Message {
             role: Role::User,
-            content: MessageContent::Text(format!(
-                "I am looking at Twitter {} content titled '{}' and have a question about it. \
-                 Here are the tweets I'm seeing: \n\n{}",
-                context_description,
-                self.title,
-                tweet_texts.join("\n\n")
-            )),
+            content: MessageContent::Text(text),
         }
     }
 
