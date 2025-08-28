@@ -1,12 +1,8 @@
-use crate::shared_types::SharedCurrentConversation;
-use chrono::Utc;
-use eur_personal_db::{Conversation, PersonalDatabaseManager};
+use eur_personal_db::PersonalDatabaseManager;
 use ferrous_llm_core::Message;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use tauri::ipc::Channel;
 use tauri::{Manager, Runtime};
-use tracing::info;
 
 #[taurpc::procedures(path = "personal_db.message")]
 pub trait MessageApi {
