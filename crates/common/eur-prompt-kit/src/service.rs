@@ -7,6 +7,7 @@ use ferrous_llm::{
     openai::{OpenAIConfig, OpenAIProvider},
 };
 use tokio_stream::{Stream, StreamExt};
+use tracing::info;
 
 use crate::PromptKitError;
 
