@@ -2799,7 +2799,7 @@ dependencies = [
 
 [[package]]
 name = "eur-activity"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2815,6 +2815,32 @@ dependencies = [
  "specta",
  "specta-typescript",
  "taurpc",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "eur-activity-2"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "eur-native-messaging",
+ "eur-proto",
+ "ferrous-focus",
+ "ferrous-llm-core",
+ "image",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "taurpc",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
  "tonic",
