@@ -47,6 +47,9 @@ export type ContentPart =
  */
 { type: "audio"; audio_url: string; format: string | null }
 
+/**
+ * Context chip for UI integration
+ */
 export type ContextChip = { id: string; extension_id: string; name: string; attrs: Partial<{ [key in string]: string }>; icon: string | null; position: number | null }
 
 export type Conversation = { id: string; title: string; created_at: string; updated_at: string }

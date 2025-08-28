@@ -1,7 +1,7 @@
 //! Timeline storage implementation
 
+use crate::Activity;
 use chrono::{DateTime, Utc};
-use eur_activity::Activity;
 use std::collections::VecDeque;
 use std::time::Duration;
 use tracing::{debug, info};
