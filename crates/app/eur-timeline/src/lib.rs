@@ -6,7 +6,7 @@ pub use manager::{TimelineManager, create_default_timeline, create_timeline};
 pub use storage::{StorageStats, TimelineStorage};
 
 // Re-export activity types for convenience
-pub use eur_activity_2::{
+pub use eur_activity::{
     Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, ContextChip,
     DisplayAsset, select_strategy_for_process,
 };
