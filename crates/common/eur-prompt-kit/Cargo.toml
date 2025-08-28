@@ -1,6 +1,6 @@
 [package]
 name = "eur-prompt-kit"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 
 [dependencies]
@@ -11,7 +11,7 @@ ferrous-llm = { workspace = true, features = ["openai", "ollama", "anthropic"] }
 eur-eurora-provider = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
-thiserror = "2.0.12"
+thiserror = { workspace = true }
 eur-util = { workspace = true }
 regex = "1.9.6"
 tracing = { workspace = true }
