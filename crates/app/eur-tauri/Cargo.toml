@@ -71,7 +71,8 @@ futures = { workspace = true }
 tonic = { workspace = true }
 async-mutex = "1.4.1"
 sentry = { workspace = true }
-eur-activity = { path = "../eur-activity" }
+# eur-activity = { path = "../eur-activity" }
+eur-activity-2 = { path = "../eur-activity-2" }
 lazy_static = "1.4.0"
 pollster = "0.4"
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
