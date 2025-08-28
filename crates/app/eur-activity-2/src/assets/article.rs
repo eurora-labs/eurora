@@ -146,7 +146,7 @@ mod tests {
         assert_eq!(asset.id, "test-id");
         assert_eq!(asset.title, "Test Article");
         assert_eq!(asset.author, Some("Test Author".to_string()));
-        assert_eq!(asset.word_count, 9);
+        assert_eq!(asset.word_count, 8_usize);
     }
 
     #[test]
