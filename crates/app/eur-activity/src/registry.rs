@@ -1,14 +1,13 @@
 //! Strategy registry for dynamic activity strategy management
 
-use anyhow::Result;
+use crate::error::{ActivityError, Result};
+use crate::strategies::ActivityStrategy;
 use async_trait::async_trait;
 use ferrous_focus::IconData;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
-
-use crate::{ActivityError, ActivityStrategy};
 
 /// Score indicating how well a strategy matches a process
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -70,7 +69,7 @@ pub struct StrategyMetadata {
 }
 
 /// Categories of activity strategies
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum StrategyCategory {
     Browser,
     Development,
@@ -85,7 +84,7 @@ pub enum StrategyCategory {
 #[async_trait]
 pub trait StrategyFactory: Send + Sync {
     /// Create a new strategy instance for the given context
-    async fn create_strategy(&self, context: &ProcessContext) -> Result<Box<dyn ActivityStrategy>>;
+    async fn create_strategy(&self, context: &ProcessContext) -> Result<ActivityStrategy>;
 
     /// Check if this factory supports the given process
     fn supports_process(&self, process_name: &str, window_title: Option<&str>) -> MatchScore;
@@ -133,10 +132,7 @@ impl StrategyRegistry {
     }
 
     /// Select the best strategy for a given process context
-    pub async fn select_strategy(
-        &mut self,
-        context: &ProcessContext,
-    ) -> Result<Box<dyn ActivityStrategy>> {
+    pub async fn select_strategy(&mut self, context: &ProcessContext) -> Result<ActivityStrategy> {
         debug!("Selecting strategy for process: {}", context.process_name);
 
         // Check cache first
@@ -191,8 +187,7 @@ impl StrategyRegistry {
                 Err(ActivityError::InvalidData(format!(
                     "No strategy available for process: {}",
                     context.process_name
-                ))
-                .into())
+                )))
             }
         }
     }
@@ -225,7 +220,7 @@ impl Default for StrategyRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ActivityAsset, ActivitySnapshot};
+    use crate::types::{ActivityAsset, ActivitySnapshot};
 
     struct MockStrategyFactory {
         metadata: StrategyMetadata,
@@ -248,46 +243,16 @@ mod tests {
         }
     }
 
-    struct MockStrategy {
-        name: String,
-    }
-
-    #[async_trait]
-    impl ActivityStrategy for MockStrategy {
-        async fn retrieve_assets(&mut self) -> Result<Vec<Box<dyn ActivityAsset>>> {
-            Ok(vec![])
-        }
-
-        async fn retrieve_snapshots(&mut self) -> Result<Vec<Box<dyn ActivitySnapshot>>> {
-            Ok(vec![])
-        }
-
-        fn gather_state(&self) -> String {
-            String::new()
-        }
-
-        fn get_name(&self) -> &String {
-            &self.name
-        }
-
-        fn get_icon(&self) -> &String {
-            &self.name
-        }
-
-        fn get_process_name(&self) -> &String {
-            &self.name
-        }
-    }
-
     #[async_trait]
     impl StrategyFactory for MockStrategyFactory {
-        async fn create_strategy(
-            &self,
-            context: &ProcessContext,
-        ) -> Result<Box<dyn ActivityStrategy>> {
-            Ok(Box::new(MockStrategy {
-                name: context.display_name.clone(),
-            }))
+        async fn create_strategy(&self, context: &ProcessContext) -> Result<ActivityStrategy> {
+            use crate::strategies::DefaultStrategy;
+            let strategy = DefaultStrategy::new(
+                context.display_name.clone(),
+                "mock-icon".to_string(),
+                context.process_name.clone(),
+            )?;
+            Ok(ActivityStrategy::Default(strategy))
         }
 
         fn supports_process(&self, process_name: &str, _window_title: Option<&str>) -> MatchScore {

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Error}; // Import anyhow macro and Error
+use anyhow::{Error, anyhow}; // Import anyhow macro and Error
 use eur_proto::ipc::SnapshotResponse; // Import necessary proto types
 use tracing::info;
 
