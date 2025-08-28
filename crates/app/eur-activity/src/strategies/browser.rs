@@ -1,11 +1,11 @@
 //! Browser strategy implementation for the refactored activity system
 
-use crate::error::{ActivityError, Result};
+use crate::error::Result;
 use crate::types::{ActivityAsset, ActivitySnapshot};
 use crate::{ArticleAsset, TwitterAsset, YoutubeAsset};
 use crate::{ArticleSnapshot, TwitterSnapshot, YoutubeSnapshot};
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
-use eur_proto::ipc::{self, StateRequest, snapshot_response::Snapshot, state_response::State};
+use eur_proto::ipc::{self, StateRequest};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
