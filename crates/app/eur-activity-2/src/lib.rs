@@ -53,8 +53,12 @@ pub fn initialize_registry() -> Arc<Mutex<StrategyRegistry>> {
             let mut registry = StrategyRegistry::new();
 
             // Register built-in strategy factories
-            registry.register_factory(Arc::new(strategies::browser::BrowserStrategyFactory::new()));
-            registry.register_factory(Arc::new(strategies::default::DefaultStrategyFactory::new()));
+            registry.register_factory(Arc::new(
+                crate::strategies::browser::BrowserStrategyFactory::new(),
+            ));
+            registry.register_factory(Arc::new(
+                crate::strategies::default::DefaultStrategyFactory::new(),
+            ));
 
             info!(
                 "Initialized global strategy registry with {} strategies",
