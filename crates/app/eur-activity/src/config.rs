@@ -364,16 +364,20 @@ mod tests {
         assert_eq!(config.global.max_assets_per_activity, 5);
         assert!(!config.global.privacy.collect_content);
         assert!(config.global.privacy.anonymize_data);
-        assert!(config
-            .global
-            .privacy
-            .exclude_patterns
-            .contains(&"sensitive".to_string()));
-        assert!(config
-            .global
-            .privacy
-            .ignored_applications
-            .contains(&"private-app".to_string()));
+        assert!(
+            config
+                .global
+                .privacy
+                .exclude_patterns
+                .contains(&"sensitive".to_string())
+        );
+        assert!(
+            config
+                .global
+                .privacy
+                .ignored_applications
+                .contains(&"private-app".to_string())
+        );
     }
 
     #[test]
