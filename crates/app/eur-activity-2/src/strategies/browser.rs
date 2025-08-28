@@ -70,7 +70,15 @@ impl BrowserStrategy {
         ];
 
         #[cfg(target_os = "linux")]
-        let processes = vec!["firefox", "chrome", "chromium", "brave", "opera", "vivaldi"];
+        let processes = vec![
+            "firefox",
+            "chrome",
+            "chromium",
+            "brave",
+            "opera",
+            "vivaldi",
+            "librewolf",
+        ];
 
         processes
     }

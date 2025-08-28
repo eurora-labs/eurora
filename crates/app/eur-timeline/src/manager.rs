@@ -1,6 +1,6 @@
 //! High-level timeline manager implementation
 
-use eur_activity::{Activity, ActivityStrategy, ContextChip, DisplayAsset};
+use crate::{Activity, ActivityStrategy, ContextChip, DisplayAsset};
 use ferrous_llm_core::Message;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -186,7 +186,7 @@ impl TimelineManager {
     }
 
     /// Manually collect an activity using the provided strategy
-    pub async fn collect_activity(&self, strategy: Box<dyn ActivityStrategy>) -> Result<()> {
+    pub async fn collect_activity(&self, strategy: ActivityStrategy) -> Result<()> {
         self.collector.collect_once(strategy).await
     }
 
@@ -296,7 +296,7 @@ mod tests {
     use std::time::Duration;
 
     fn create_test_activity(name: &str) -> Activity {
-        eur_activity::Activity::new(
+        crate::Activity::new(
             name.to_string(),
             "test_icon".to_string(),
             "test_process".to_string(),
