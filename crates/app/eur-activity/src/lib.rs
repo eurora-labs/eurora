@@ -1,142 +1,47 @@
-//! Activity reporting module
+//! Refactored Activity System - Enum-Based Type-Safe Design
 //!
-//! This module provides functionality for tracking and reporting activities.
-//! It defines the Activity trait and the ActivityReporter struct, which
-//! can be used to collect data from activities and store it in a timeline.
-use std::collections::HashMap;
+//! This crate provides a completely refactored activity system that eliminates
+//! dynamic trait objects in favor of concrete enums, providing better performance,
+//! type safety, and cloneable activities.
 
-// use eur_timeline::TimelineRef;
-use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use ferrous_llm_core::Message;
-use serde::{Deserialize, Serialize};
-use tracing::info;
-pub mod browser_activity;
-pub mod browser_factory;
+pub mod assets;
 pub mod config;
-pub mod default_activity;
-pub mod default_factory;
 pub mod error;
 pub mod registry;
+pub mod snapshots;
+pub mod strategies;
+pub mod types;
 
-use anyhow::{Context, Result};
-pub use browser_activity::BrowserStrategy;
-pub use browser_factory::BrowserStrategyFactory;
+// Re-export core types
+pub use error::{ActivityError, Result};
+pub use strategies::ActivityStrategy;
+pub use types::{Activity, ActivityAsset, ActivitySnapshot, ContextChip, DisplayAsset};
+
+// Re-export asset types
+pub use assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
+
+// Re-export snapshot types
+pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSnapshot};
+
+// Re-export strategy types
+pub use strategies::{BrowserStrategy, DefaultStrategy};
+
+// Re-export configuration types
 pub use config::{
     ActivityConfig, ActivityConfigBuilder, ApplicationConfig, GlobalConfig, PrivacyConfig,
     SnapshotFrequency, StrategyConfig,
 };
-use default_activity::DefaultStrategy;
-pub use default_factory::DefaultStrategyFactory;
-pub use error::ActivityError;
-use ferrous_focus::IconData;
+
+// Re-export registry types
 pub use registry::{
     MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata,
     StrategyRegistry,
 };
 
+use ferrous_focus::IconData;
 use std::sync::{Arc, OnceLock};
 use tokio::sync::Mutex;
-
-#[taurpc::ipc_type]
-pub struct ContextChip {
-    pub id: String,
-    pub extension_id: String,
-    pub name: String,
-    pub attrs: HashMap<String, String>,
-    pub icon: Option<String>,
-    pub position: Option<u32>,
-}
-#[derive(Serialize, Deserialize)]
-pub struct DisplayAsset {
-    pub name: String,
-    // image base64
-    pub icon: String,
-}
-
-impl DisplayAsset {
-    pub fn new(name: String, icon: String) -> Self {
-        Self { name, icon }
-    }
-}
-
-pub trait ActivityAsset: Send + Sync {
-    fn get_name(&self) -> &String;
-    fn get_icon(&self) -> Option<&String>;
-
-    fn construct_message(&self) -> Message;
-    fn get_context_chip(&self) -> Option<ContextChip>;
-
-    // fn get_display(&self) -> DisplayAsset;
-}
-
-pub trait ActivitySnapshot: Send + Sync {
-    fn construct_message(&self) -> Message;
-
-    fn get_updated_at(&self) -> u64;
-    fn get_created_at(&self) -> u64;
-}
-
-pub struct Activity {
-    /// Name of the activity
-    pub name: String,
-
-    /// Icon representing the activity
-    pub icon: String,
-
-    /// Process name of the activity
-    pub process_name: String,
-
-    /// Start time (Unix timestamp)
-    pub start: DateTime<Utc>,
-
-    /// End time (Unix timestamp)
-    pub end: Option<DateTime<Utc>>,
-
-    // /// Snapshots of the activity
-    pub snapshots: Vec<Box<dyn ActivitySnapshot>>,
-    /// Assets associated with the activity
-    pub assets: Vec<Box<dyn ActivityAsset>>,
-}
-
-impl Activity {
-    /// Create a new activity
-    pub fn new(
-        name: String,
-        icon: String,
-        process_name: String,
-        assets: Vec<Box<dyn ActivityAsset>>,
-    ) -> Self {
-        Self {
-            name,
-            icon,
-            process_name,
-            start: Utc::now(),
-            end: None,
-            assets,
-            snapshots: Vec::new(),
-        }
-    }
-
-    pub fn get_display_assets(&self) -> Vec<DisplayAsset> {
-        self.assets
-            .iter()
-            .map(|asset| {
-                if let Some(icon) = asset.get_icon() {
-                    DisplayAsset::new(asset.get_name().clone(), icon.clone())
-                } else {
-                    DisplayAsset::new(asset.get_name().clone(), self.icon.clone())
-                }
-            })
-            .collect()
-    }
-    pub fn get_context_chips(&self) -> Vec<ContextChip> {
-        self.assets
-            .iter()
-            .filter_map(|asset| asset.get_context_chip())
-            .collect()
-    }
-}
+use tracing::info;
 
 /// Global strategy registry instance
 static GLOBAL_REGISTRY: OnceLock<Arc<Mutex<StrategyRegistry>>> = OnceLock::new();
@@ -147,9 +52,13 @@ pub fn initialize_registry() -> Arc<Mutex<StrategyRegistry>> {
         .get_or_init(|| {
             let mut registry = StrategyRegistry::new();
 
-            // Register built-in strategies
-            registry.register_factory(Arc::new(BrowserStrategyFactory::new()));
-            registry.register_factory(Arc::new(DefaultStrategyFactory::new()));
+            // Register built-in strategy factories
+            registry.register_factory(Arc::new(
+                crate::strategies::browser::BrowserStrategyFactory::new(),
+            ));
+            registry.register_factory(Arc::new(
+                crate::strategies::default::DefaultStrategyFactory::new(),
+            ));
 
             info!(
                 "Initialized global strategy registry with {} strategies",
@@ -176,12 +85,12 @@ pub fn get_registry() -> Arc<Mutex<StrategyRegistry>> {
 /// * `icon` - The icon data
 ///
 /// # Returns
-/// A Box<dyn ActivityStrategy> if a suitable strategy is found, or an error if no strategy supports the process
+/// A ActivityStrategy if a suitable strategy is found, or an error if no strategy supports the process
 pub async fn select_strategy_for_process(
     process_name: &str,
     display_name: String,
     icon: IconData,
-) -> Result<Box<dyn ActivityStrategy>> {
+) -> Result<ActivityStrategy> {
     info!("Selecting strategy for process: {}", process_name);
 
     let registry = get_registry();
@@ -190,70 +99,6 @@ pub async fn select_strategy_for_process(
     let context = ProcessContext::new(process_name.to_string(), display_name, icon);
 
     registry_guard.select_strategy(&context).await
-}
-
-/// Legacy function for backward compatibility
-///
-/// **DEPRECATED**: Use `select_strategy_for_process` instead.
-#[deprecated(since = "0.2.0", note = "Use select_strategy_for_process instead")]
-pub async fn select_strategy_for_process_legacy(
-    process_name: &str,
-    display_name: String,
-    _icon: IconData,
-) -> Result<Box<dyn ActivityStrategy>> {
-    // Check if this is a browser process
-    if BrowserStrategy::get_supported_processes().contains(&process_name) {
-        info!(
-            "Creating BrowserStrategy for browser process: {}",
-            process_name
-        );
-        let strategy = BrowserStrategy::new(display_name, "".to_string(), process_name.to_string())
-            .await
-            .context(format!(
-                "Failed to create browser strategy for process: {}",
-                process_name
-            ))?;
-        return Ok(Box::new(strategy) as Box<dyn ActivityStrategy>);
-    }
-
-    DefaultStrategy::new(display_name, "".to_string(), process_name.to_string())
-        .context(format!(
-            "Failed to create default strategy for process: {}",
-            process_name
-        ))
-        .map(|strategy| Box::new(strategy) as Box<dyn ActivityStrategy>)
-}
-
-/// Activity trait defines methods that must be implemented by activities
-/// that can be tracked and reported.
-#[async_trait]
-pub trait ActivityStrategy: Send + Sync {
-    /// Retrieve assets associated with this activity
-    ///
-    /// This method is called once when collection starts to gather
-    /// initial assets related to the activity.
-    async fn retrieve_assets(&mut self) -> Result<Vec<Box<dyn ActivityAsset>>>;
-
-    /// Retrieve snapshots associated with this activity
-    ///
-    /// This method is called periodically to gather snapshots of the
-    /// activity. The returned snapshots should represent the
-    /// current state of the activity.
-    async fn retrieve_snapshots(&mut self) -> Result<Vec<Box<dyn ActivitySnapshot>>>;
-
-    /// Gather the current state of the activity
-    ///
-    /// This method is called periodically to collect the current state
-    /// of the activity. The returned string should represent the state
-    /// in a format that can be parsed and stored in the timeline.
-    fn gather_state(&self) -> String;
-
-    /// Get name of the activity
-    fn get_name(&self) -> &String;
-    /// Get icon of the activity
-    fn get_icon(&self) -> &String;
-    /// Get process name of the activity
-    fn get_process_name(&self) -> &String;
 }
 
 #[cfg(test)]
@@ -278,16 +123,73 @@ mod tests {
     }
 
     #[test]
+    fn test_activity_clone() {
+        let mut activity = Activity::new(
+            "Test Activity".to_string(),
+            "test_icon".to_string(),
+            "test_process".to_string(),
+            vec![ActivityAsset::Default(DefaultAsset::simple(
+                "Test Asset".to_string(),
+            ))],
+        );
+
+        activity.add_snapshot(ActivitySnapshot::Default(DefaultSnapshot::new(
+            "Test state".to_string(),
+        )));
+
+        // This should compile and work - the main benefit of the refactor!
+        let cloned_activity = activity.clone();
+
+        assert_eq!(activity.name, cloned_activity.name);
+        assert_eq!(activity.assets.len(), cloned_activity.assets.len());
+        assert_eq!(activity.snapshots.len(), cloned_activity.snapshots.len());
+    }
+
+    #[test]
+    fn test_activity_serialization() {
+        let activity = Activity::new(
+            "Test Activity".to_string(),
+            "test_icon".to_string(),
+            "test_process".to_string(),
+            vec![ActivityAsset::Default(DefaultAsset::simple(
+                "Test Asset".to_string(),
+            ))],
+        );
+
+        // Test serialization
+        let serialized = serde_json::to_string(&activity).unwrap();
+        assert!(!serialized.is_empty());
+
+        // Test deserialization
+        let deserialized: Activity = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(activity.name, deserialized.name);
+        assert_eq!(activity.assets.len(), deserialized.assets.len());
+    }
+
+    #[test]
     fn test_activity_display_assets() {
         let activity = Activity::new(
             "Test Activity".to_string(),
             "default_icon".to_string(),
             "test_process".to_string(),
-            vec![],
+            vec![
+                ActivityAsset::Youtube(YoutubeAsset::new(
+                    "yt1".to_string(),
+                    "https://youtube.com/watch?v=test".to_string(),
+                    "Test Video".to_string(),
+                    vec![],
+                    0.0,
+                )),
+                ActivityAsset::Default(DefaultAsset::simple("Test Asset".to_string())),
+            ],
         );
 
         let display_assets = activity.get_display_assets();
-        assert!(display_assets.is_empty());
+        assert_eq!(display_assets.len(), 2);
+        assert_eq!(display_assets[0].name, "Test Video");
+        assert_eq!(display_assets[0].icon, "youtube-icon");
+        assert_eq!(display_assets[1].name, "Test Asset");
+        assert_eq!(display_assets[1].icon, "default_icon"); // Falls back to activity icon
     }
 
     #[test]
@@ -296,11 +198,21 @@ mod tests {
             "Test Activity".to_string(),
             "default_icon".to_string(),
             "test_process".to_string(),
-            vec![],
+            vec![
+                ActivityAsset::Youtube(YoutubeAsset::new(
+                    "yt1".to_string(),
+                    "https://youtube.com/watch?v=test".to_string(),
+                    "Test Video".to_string(),
+                    vec![],
+                    0.0,
+                )),
+                ActivityAsset::Default(DefaultAsset::simple("Test Asset".to_string())),
+            ],
         );
 
         let context_chips = activity.get_context_chips();
-        assert!(context_chips.is_empty());
+        assert_eq!(context_chips.len(), 1); // Only YouTube asset provides a context chip
+        assert_eq!(context_chips[0].name, "video");
     }
 
     #[tokio::test]
@@ -318,28 +230,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_select_strategy_for_process_browser() {
-        let result = select_strategy_for_process(
-            "firefox",
-            "Firefox Browser".to_string(),
-            IconData::default(),
-        )
-        .await;
-
-        // Note: This test might fail if browser communication is not available
-        match result {
-            Ok(strategy) => {
-                assert_eq!(strategy.get_name(), "Firefox Browser");
-                assert_eq!(strategy.get_process_name(), "firefox");
-            }
-            Err(_) => {
-                // Expected if browser communication is not available in test environment
-                // This is acceptable for unit tests
-            }
-        }
-    }
-
-    #[tokio::test]
     async fn test_select_strategy_for_process_default() {
         let result = select_strategy_for_process(
             "unknown_process",
@@ -354,39 +244,6 @@ mod tests {
         assert_eq!(strategy.get_process_name(), "unknown_process");
     }
 
-    #[tokio::test]
-    async fn test_registry_strategy_selection() {
-        let registry = get_registry();
-        let mut registry_guard = registry.lock().await;
-
-        // Test browser process selection
-        let browser_context = ProcessContext::new(
-            "chrome".to_string(),
-            "Google Chrome".to_string(),
-            IconData::default(),
-        );
-
-        let browser_result = registry_guard.select_strategy(&browser_context).await;
-        match browser_result {
-            Ok(_) => {
-                // Browser strategy should be selected
-            }
-            Err(_) => {
-                // Expected if browser communication is not available
-            }
-        }
-
-        // Test default process selection
-        let default_context = ProcessContext::new(
-            "notepad".to_string(),
-            "Notepad".to_string(),
-            IconData::default(),
-        );
-
-        let default_result = registry_guard.select_strategy(&default_context).await;
-        assert!(default_result.is_ok());
-    }
-
     #[test]
     fn test_global_registry_singleton() {
         let registry1 = get_registry();
@@ -397,27 +254,41 @@ mod tests {
     }
 
     #[test]
-    fn test_display_asset_creation() {
-        let asset = DisplayAsset::new("Test Asset".to_string(), "base64_icon_data".to_string());
+    fn test_asset_enum_methods() {
+        let youtube_asset = ActivityAsset::Youtube(YoutubeAsset::new(
+            "yt1".to_string(),
+            "https://youtube.com/watch?v=test".to_string(),
+            "Test Video".to_string(),
+            vec![],
+            0.0,
+        ));
 
-        assert_eq!(asset.name, "Test Asset");
-        assert_eq!(asset.icon, "base64_icon_data");
+        assert_eq!(youtube_asset.get_name(), "Test Video");
+        assert_eq!(youtube_asset.get_icon(), Some("youtube-icon"));
+        assert!(youtube_asset.get_context_chip().is_some());
+
+        let default_asset = ActivityAsset::Default(DefaultAsset::simple("Test Asset".to_string()));
+        assert_eq!(default_asset.get_name(), "Test Asset");
+        assert_eq!(default_asset.get_icon(), None);
+        assert!(default_asset.get_context_chip().is_none());
     }
 
     #[test]
-    fn test_context_chip_creation() {
-        let chip = ContextChip {
-            id: "test_id".to_string(),
-            extension_id: "ext_id".to_string(),
-            name: "Test Chip".to_string(),
-            attrs: std::collections::HashMap::new(),
-            icon: Some("icon_data".to_string()),
-            position: Some(1),
-        };
+    fn test_snapshot_enum_methods() {
+        let youtube_snapshot = ActivitySnapshot::Youtube(YoutubeSnapshot::new(
+            None,
+            120.0,
+            Some(300.0),
+            Some("Test Video".to_string()),
+            None,
+        ));
 
-        assert_eq!(chip.id, "test_id");
-        assert_eq!(chip.extension_id, "ext_id");
-        assert_eq!(chip.name, "Test Chip");
-        assert_eq!(chip.position, Some(1));
+        assert!(youtube_snapshot.get_created_at() > 0);
+        assert!(youtube_snapshot.get_updated_at() > 0);
+
+        let default_snapshot =
+            ActivitySnapshot::Default(DefaultSnapshot::new("Test state".to_string()));
+        assert!(default_snapshot.get_created_at() > 0);
+        assert!(default_snapshot.get_updated_at() > 0);
     }
 }
