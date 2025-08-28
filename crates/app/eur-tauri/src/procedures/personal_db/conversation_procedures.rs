@@ -4,9 +4,7 @@ use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use ferrous_llm_core::Message;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use tauri::ipc::Channel;
 use tauri::{Manager, Runtime};
-use tracing::info;
 
 #[taurpc::procedures(path = "personal_db.conversation")]
 pub trait ConversationApi {
