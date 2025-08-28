@@ -2976,7 +2976,7 @@ dependencies = [
 
 [[package]]
 name = "eur-native-messaging"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3054,7 +3054,7 @@ dependencies = [
 
 [[package]]
 name = "eur-prompt-kit"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "async_from",
@@ -3272,7 +3272,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
  "tonic",

@@ -31,7 +31,7 @@ impl TryFrom<&NativeArticleSnapshot> for ArticleSnapshot {
 
     fn try_from(obj: &NativeArticleSnapshot) -> Result<Self> {
         Ok(ArticleSnapshot(ProtoArticleSnapshot {
-            highlighted_content: obj.0 .0.highlighted_content.clone(),
+            highlighted_content: obj.0.0.highlighted_content.clone(),
         }))
     }
 }

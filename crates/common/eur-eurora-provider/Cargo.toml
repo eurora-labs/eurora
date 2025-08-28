@@ -8,7 +8,7 @@ publish = false
 serde = { workspace = true }
 serde_json = { workspace = true }
 ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
-thiserror = "2.0.12"
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 async-trait = "0.1.77"

@@ -74,7 +74,10 @@ impl JSONToProtoAssetConverter {
                     "Unsupported asset type '{}' in JSON: {:?}",
                     unknown_type, json
                 );
-                Err(anyhow::anyhow!("Unsupported asset type: '{}'. Supported types: YOUTUBE_STATE, ARTICLE_ASSET, PDF_STATE, TWITTER_STATE", unknown_type))
+                Err(anyhow::anyhow!(
+                    "Unsupported asset type: '{}'. Supported types: YOUTUBE_STATE, ARTICLE_ASSET, PDF_STATE, TWITTER_STATE",
+                    unknown_type
+                ))
             }
         }
     }

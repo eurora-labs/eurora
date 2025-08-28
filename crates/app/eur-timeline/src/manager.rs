@@ -72,70 +72,37 @@ impl TimelineManager {
     /// Get the current (most recent) activity
     pub async fn get_current_activity(&self) -> Option<Activity> {
         let storage = self.storage.lock().await;
-        storage.get_current_activity().map(|activity| {
-            // Create a new activity with the same data since Activity doesn't implement Clone
-            Activity::new(
-                activity.name.clone(),
-                activity.icon.clone(),
-                activity.process_name.clone(),
-                vec![], // We can't clone the assets easily, so return empty for now
-            )
-        })
+        storage.get_current_activity().cloned()
     }
 
-    /// Get recent activities (most recent first)
-    pub async fn get_recent_activities(&self, count: usize) -> Vec<Activity> {
-        let storage = self.storage.lock().await;
-        storage
-            .get_recent_activities(count)
-            .iter()
-            .map(|activity| {
-                Activity::new(
-                    activity.name.clone(),
-                    activity.icon.clone(),
-                    activity.process_name.clone(),
-                    vec![], // We can't clone the assets easily, so return empty for now
-                )
-            })
-            .collect()
-    }
+    // /// Get recent activities (most recent first)
+    // pub async fn get_recent_activities(&self, count: usize) -> Vec<Activity> {
+    //     let storage = self.storage.lock().await;
+    //     storage
+    //         .get_recent_activities(count)
+    //         .iter()
+    //         .cloned()
+    //         .collect()
+    // }
 
-    /// Get activities since a specific time
-    pub async fn get_activities_since(
-        &self,
-        since: chrono::DateTime<chrono::Utc>,
-    ) -> Vec<Activity> {
-        let storage = self.storage.lock().await;
-        storage
-            .get_activities_since(since)
-            .iter()
-            .map(|activity| {
-                Activity::new(
-                    activity.name.clone(),
-                    activity.icon.clone(),
-                    activity.process_name.clone(),
-                    vec![], // We can't clone the assets easily, so return empty for now
-                )
-            })
-            .collect()
-    }
+    // /// Get activities since a specific time
+    // pub async fn get_activities_since(
+    //     &self,
+    //     since: chrono::DateTime<chrono::Utc>,
+    // ) -> Vec<Activity> {
+    //     let storage = self.storage.lock().await;
+    //     storage
+    //         .get_activities_since(since)
+    //         .iter()
+    //         .map(|activity| activity.clone())
+    //         .collect()
+    // }
 
-    /// Get all activities
-    pub async fn get_all_activities(&self) -> Vec<Activity> {
-        let storage = self.storage.lock().await;
-        storage
-            .get_all_activities()
-            .iter()
-            .map(|activity| {
-                Activity::new(
-                    activity.name.clone(),
-                    activity.icon.clone(),
-                    activity.process_name.clone(),
-                    vec![], // We can't clone the assets easily, so return empty for now
-                )
-            })
-            .collect()
-    }
+    // /// Get all activities
+    // pub async fn get_all_activities(&self) -> Vec<Activity> {
+    //     let storage = self.storage.lock().await;
+    //     storage.get_all_activities().iter().cloned().collect()
+    // }
 
     /// Get context chips from the current activity
     pub async fn get_context_chips(&self) -> Vec<ContextChip> {
@@ -338,21 +305,21 @@ mod tests {
         assert_eq!(current.name, "Test Activity");
     }
 
-    #[tokio::test]
-    async fn test_get_recent_activities() {
-        let manager = TimelineManager::new();
+    // #[tokio::test]
+    // async fn test_get_recent_activities() {
+    //     let manager = TimelineManager::new();
 
-        for i in 1..=5 {
-            let activity = create_test_activity(&format!("Activity {}", i));
-            manager.add_activity(activity).await;
-        }
+    //     for i in 1..=5 {
+    //         let activity = create_test_activity(&format!("Activity {}", i));
+    //         manager.add_activity(activity).await;
+    //     }
 
-        let recent = manager.get_recent_activities(3).await;
-        assert_eq!(recent.len(), 3);
-        assert_eq!(recent[0].name, "Activity 5"); // Most recent first
-        assert_eq!(recent[1].name, "Activity 4");
-        assert_eq!(recent[2].name, "Activity 3");
-    }
+    //     let recent = manager.get_recent_activities(3).await;
+    //     assert_eq!(recent.len(), 3);
+    //     assert_eq!(recent[0].name, "Activity 5"); // Most recent first
+    //     assert_eq!(recent[1].name, "Activity 4");
+    //     assert_eq!(recent[2].name, "Activity 3");
+    // }
 
     #[tokio::test]
     async fn test_clear_activities() {
