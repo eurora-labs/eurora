@@ -18,14 +18,12 @@ test = false
 tauri-build = { version = "2.0.3", features = [] }
 
 [dependencies]
-tauri-utils = "2.6.0"                                     # single entry removes second 8.6 s build
+tauri-utils = "2.6.0"                                                       # single entry removes second 8.6 s build
 tauri-plugin-stronghold = "2.0.0"
 anyhow = { workspace = true }
-eur-secret = { path = "../eur-secret" }
-eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
-# eur-auth = { path = "../../common/eur-auth" }
+eur-secret = { workspace = true }
+eur-prompt-kit = { workspace = true }
 backtrace = { version = "0.3.75", optional = true }
-# console-subscriber = "0.4.1"
 reqwest = { version = "0.12.22", features = ["json", "native-tls"] }
 serde.workspace = true
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
@@ -41,8 +39,8 @@ tauri-plugin-single-instance = "2.3.2"
 tauri-plugin-store = "2.3.0"
 tauri-plugin-updater = "2.9.0"
 tauri-plugin-window-state = "2.4.0"
-eur-vision = { path = "../eur-vision" }
-eur-screen-position = { path = "../eur-screen-position" }
+eur-vision = { workspace = true }
+eur-screen-position = { workspace = true }
 image.workspace = true
 parking_lot.workspace = true
 log = "^0.4"
@@ -56,14 +54,13 @@ tracing-forest = { version = "0.2.0" }
 open = "5"
 url = "2.5.4"
 dirs = "6.0.0"
-eur-proto = { path = "../../proto/eur-proto" }
-eur-timeline = { path = "../eur-timeline" }
-eur-client-questions = { path = "../../proto/eur-client-questions" }
-eur-client-grpc = { path = "../../proto/eur-client-grpc" }
-# eur-conversation = { path = "../eur-conversation" }
-eur-personal-db = { path = "../eur-personal-db" }
-eur-native-messaging = { path = "../eur-native-messaging" }
-eur-settings = { path = "../eur-settings" }
+eur-proto = { workspace = true }
+eur-timeline = { workspace = true }
+eur-client-questions = { workspace = true }
+eur-client-grpc = { workspace = true }
+eur-personal-db = { workspace = true }
+eur-native-messaging = { workspace = true }
+eur-settings = { workspace = true }
 
 chrono = { workspace = true }
 defer = "0.2.1"
@@ -72,7 +69,6 @@ tonic = { workspace = true }
 async-mutex = "1.4.1"
 sentry = { workspace = true }
 eur-activity = { workspace = true }
-# eur-activity-2 = { path = "../eur-activity-2" }
 lazy_static = "1.4.0"
 pollster = "0.4"
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
@@ -88,7 +84,7 @@ dotenv = "0.15.0"
 eur-user = { workspace = true }
 uuid.workspace = true
 ferrous-llm-core = { workspace = true, features = ["specta"] }
-eur-eurora-provider = { path = "../../common/eur-eurora-provider" }
+eur-eurora-provider = { workspace = true }
 async_from = { workspace = true }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

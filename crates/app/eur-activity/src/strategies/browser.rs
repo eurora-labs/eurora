@@ -4,8 +4,8 @@ use crate::error::{ActivityError, Result};
 use crate::types::{ActivityAsset, ActivitySnapshot};
 use crate::{ArticleAsset, TwitterAsset, YoutubeAsset};
 use crate::{ArticleSnapshot, TwitterSnapshot, YoutubeSnapshot};
-use eur_native_messaging::{create_grpc_ipc_client, Channel, TauriIpcClient};
-use eur_proto::ipc::{self, snapshot_response::Snapshot, state_response::State, StateRequest};
+use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
+use eur_proto::ipc::{self, StateRequest, snapshot_response::Snapshot, state_response::State};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -33,7 +33,10 @@ impl BrowserStrategy {
                 Some(Arc::new(Mutex::new(client)))
             }
             Err(e) => {
-                warn!("Failed to create IPC client: {}. Browser strategy will work with limited functionality.", e);
+                warn!(
+                    "Failed to create IPC client: {}. Browser strategy will work with limited functionality.",
+                    e
+                );
                 None
             }
         };
