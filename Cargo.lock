@@ -2828,6 +2828,7 @@ name = "eur-activity-2"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "base64 0.22.1",
  "chrono",
  "eur-native-messaging",
@@ -2835,6 +2836,7 @@ dependencies = [
  "ferrous-focus",
  "ferrous-llm-core",
  "image",
+ "regex",
  "serde",
  "serde_json",
  "specta",
