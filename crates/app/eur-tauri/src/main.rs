@@ -3,14 +3,11 @@
     windows_subsystem = "windows"
 )]
 
-use anyhow::Result;
 use dotenv::dotenv;
-use eur_client_questions::QuestionsClient;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 mod launcher;
 mod util;
 use eur_native_messaging::create_grpc_ipc_client;
-use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use eur_settings::AppSettings;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,

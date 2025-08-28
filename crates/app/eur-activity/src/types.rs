@@ -5,6 +5,8 @@
 
 use crate::assets::*;
 use crate::snapshots::*;
+use crate::storage::{AssetStorage, SaveableAsset, SavedAssetInfo};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
@@ -81,6 +83,76 @@ impl ActivityAsset {
             ActivityAsset::Article(asset) => asset.get_context_chip(),
             ActivityAsset::Twitter(asset) => asset.get_context_chip(),
             ActivityAsset::Default(_) => None,
+        }
+    }
+
+    /// Save this asset to disk using the provided storage
+    pub async fn save_to_disk(
+        &self,
+        storage: &AssetStorage,
+    ) -> crate::error::Result<SavedAssetInfo> {
+        match self {
+            ActivityAsset::Youtube(asset) => storage.save_asset(asset).await,
+            ActivityAsset::Article(asset) => storage.save_asset(asset).await,
+            ActivityAsset::Twitter(asset) => storage.save_asset(asset).await,
+            ActivityAsset::Default(asset) => storage.save_asset(asset).await,
+        }
+    }
+}
+
+#[async_trait]
+impl SaveableAsset for ActivityAsset {
+    fn get_asset_type(&self) -> &'static str {
+        match self {
+            ActivityAsset::Youtube(asset) => asset.get_asset_type(),
+            ActivityAsset::Article(asset) => asset.get_asset_type(),
+            ActivityAsset::Twitter(asset) => asset.get_asset_type(),
+            ActivityAsset::Default(asset) => asset.get_asset_type(),
+        }
+    }
+
+    fn get_file_extension(&self) -> &'static str {
+        match self {
+            ActivityAsset::Youtube(asset) => asset.get_file_extension(),
+            ActivityAsset::Article(asset) => asset.get_file_extension(),
+            ActivityAsset::Twitter(asset) => asset.get_file_extension(),
+            ActivityAsset::Default(asset) => asset.get_file_extension(),
+        }
+    }
+
+    fn get_mime_type(&self) -> &'static str {
+        match self {
+            ActivityAsset::Youtube(asset) => asset.get_mime_type(),
+            ActivityAsset::Article(asset) => asset.get_mime_type(),
+            ActivityAsset::Twitter(asset) => asset.get_mime_type(),
+            ActivityAsset::Default(asset) => asset.get_mime_type(),
+        }
+    }
+
+    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+        match self {
+            ActivityAsset::Youtube(asset) => asset.serialize_content().await,
+            ActivityAsset::Article(asset) => asset.serialize_content().await,
+            ActivityAsset::Twitter(asset) => asset.serialize_content().await,
+            ActivityAsset::Default(asset) => asset.serialize_content().await,
+        }
+    }
+
+    fn get_unique_id(&self) -> String {
+        match self {
+            ActivityAsset::Youtube(asset) => asset.get_unique_id(),
+            ActivityAsset::Article(asset) => asset.get_unique_id(),
+            ActivityAsset::Twitter(asset) => asset.get_unique_id(),
+            ActivityAsset::Default(asset) => asset.get_unique_id(),
+        }
+    }
+
+    fn get_display_name(&self) -> String {
+        match self {
+            ActivityAsset::Youtube(asset) => asset.get_display_name(),
+            ActivityAsset::Article(asset) => asset.get_display_name(),
+            ActivityAsset::Twitter(asset) => asset.get_display_name(),
+            ActivityAsset::Default(asset) => asset.get_display_name(),
         }
     }
 }
@@ -199,5 +271,33 @@ impl Activity {
     /// Mark the activity as ended
     pub fn end_activity(&mut self) {
         self.end = Some(Utc::now());
+    }
+
+    /// Save all assets in this activity to disk
+    pub async fn save_assets_to_disk(
+        &self,
+        storage: &AssetStorage,
+    ) -> crate::error::Result<Vec<SavedAssetInfo>> {
+        let mut saved_assets = Vec::new();
+
+        for asset in &self.assets {
+            let saved_info = asset.save_to_disk(storage).await?;
+            saved_assets.push(saved_info);
+        }
+
+        Ok(saved_assets)
+    }
+
+    /// Save a specific asset by index to disk
+    pub async fn save_asset_by_index(
+        &self,
+        index: usize,
+        storage: &AssetStorage,
+    ) -> crate::error::Result<Option<SavedAssetInfo>> {
+        if let Some(asset) = self.assets.get(index) {
+            Ok(Some(asset.save_to_disk(storage).await?))
+        } else {
+            Ok(None)
+        }
     }
 }
