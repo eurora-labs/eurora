@@ -10,6 +10,7 @@ pub struct GlobalConfig {
     /// Whether activity collection is enabled
     pub enabled: bool,
     /// Default interval for collecting activity data
+    #[serde(with = "humantime_serde")]
     pub default_collection_interval: Duration,
     /// Maximum number of assets to collect per activity
     pub max_assets_per_activity: usize,
@@ -68,6 +69,7 @@ pub struct StrategyConfig {
     /// Priority of this strategy (higher = more preferred)
     pub priority: u32,
     /// Collection interval for this strategy
+    #[serde(with = "humantime_serde")]
     pub collection_interval: Duration,
     /// Types of assets this strategy should collect
     pub asset_types: Vec<String>,
@@ -96,7 +98,7 @@ pub enum SnapshotFrequency {
     /// Never collect snapshots
     Never,
     /// Collect snapshots at regular intervals
-    Interval(Duration),
+    Interval(#[serde(with = "humantime_serde")] Duration),
     /// Collect snapshots on specific events
     OnEvent(Vec<String>),
     /// Collect snapshots when content changes
@@ -113,6 +115,7 @@ pub struct ApplicationConfig {
     /// Application-specific privacy settings
     pub privacy_override: Option<PrivacyConfig>,
     /// Custom collection interval for this application
+    #[serde(with = "humantime_serde")]
     pub collection_interval_override: Option<Duration>,
     /// Application-specific settings
     pub settings: HashMap<String, String>,
@@ -319,6 +322,27 @@ impl ActivityConfig {
         for pattern in &self.global.privacy.exclude_patterns {
             if let Err(e) = regex::Regex::new(pattern) {
                 return Err(format!("Invalid regex pattern '{}': {}", pattern, e));
+            }
+        }
+
+        // Validate strategy intervals
+        for (id, sc) in &self.strategies {
+            if sc.collection_interval.is_zero() {
+                return Err(format!(
+                    "strategy '{}' collection_interval must be greater than 0",
+                    id
+                ));
+            }
+        }
+        // Validate application overrides
+        for (name, app) in &self.applications {
+            if let Some(d) = app.collection_interval_override {
+                if d.is_zero() {
+                    return Err(format!(
+                        "application '{}' collection_interval_override must be greater than 0",
+                        name
+                    ));
+                }
             }
         }
 
