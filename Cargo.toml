@@ -60,6 +60,7 @@ sentry = { version = "0.42.0" }
 async-trait = "0.1.64"
 async_from = "0.2.0"
 eur-eurora-provider = { path = "crates/common/eur-eurora-provider" }
+eur-native-messaging = { path = "crates/app/eur-native-messaging" }
 eur-secret = { path = "crates/app/eur-secret" }
 eur-user = { path = "crates/app/eur-user" }
 eur-auth = { path = "crates/common/eur-auth" }
