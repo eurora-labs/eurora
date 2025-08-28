@@ -5,12 +5,12 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use eur_proto::ipc::{SnapshotResponse, StateRequest, StateResponse};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
-use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
+use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::info;
 
@@ -30,10 +30,10 @@ fn match_for_io_error(err_status: &Status) -> Option<&std::io::Error> {
         }
 
         // h2::Error does not expose std::io::Error with `source()`
-        if let Some(h2_err) = err.downcast_ref::<h2::Error>() {
-            if let Some(io_err) = h2_err.get_io() {
-                return Some(io_err);
-            }
+        if let Some(h2_err) = err.downcast_ref::<h2::Error>()
+            && let Some(io_err) = h2_err.get_io()
+        {
+            return Some(io_err);
         }
 
         err = err.source()?;
@@ -250,11 +250,11 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                     }
                     Err(err) => {
                         info!("Error in gather state: {}", err);
-                        if let Some(io_err) = match_for_io_error(&err) {
-                            if io_err.kind() == ErrorKind::BrokenPipe {
-                                info!("Browser connection closed: broken pipe");
-                                break;
-                            }
+                        if let Some(io_err) = match_for_io_error(&err)
+                            && io_err.kind() == ErrorKind::BrokenPipe
+                        {
+                            info!("Browser connection closed: broken pipe");
+                            break;
                         }
                         match tx.send(Err(err.into())).await {
                             Ok(_) => {
