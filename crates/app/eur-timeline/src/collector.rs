@@ -1,6 +1,6 @@
 //! Timeline collector service implementation
 
-use eur_activity::{ActivityStrategy, select_strategy_for_process};
+use crate::{ActivityStrategy, select_strategy_for_process};
 use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -177,7 +177,7 @@ impl CollectorService {
     }
 
     /// Collect activity once using the provided strategy
-    pub async fn collect_once(&self, mut strategy: Box<dyn ActivityStrategy>) -> Result<()> {
+    pub async fn collect_once(&self, mut strategy: ActivityStrategy) -> Result<()> {
         debug!(
             "Collecting activity once for strategy: {}",
             strategy.get_name()
@@ -190,10 +190,10 @@ impl CollectorService {
             .map_err(|e| TimelineError::Collection(format!("Failed to retrieve assets: {}", e)))?;
 
         // Create activity
-        let activity = eur_activity::Activity::new(
-            strategy.get_name().clone(),
-            strategy.get_icon().clone(),
-            strategy.get_process_name().clone(),
+        let activity = crate::Activity::new(
+            strategy.get_name().to_string(),
+            strategy.get_icon().to_string(),
+            strategy.get_process_name().to_string(),
             assets,
         );
 
@@ -336,10 +336,10 @@ impl CollectorService {
                             Ok(mut strategy) => {
                                 // Collect initial activity
                                 if let Ok(assets) = strategy.retrieve_assets().await {
-                                    let activity = eur_activity::Activity::new(
-                                        strategy.get_name().clone(),
-                                        strategy.get_icon().clone(),
-                                        strategy.get_process_name().clone(),
+                                    let activity = crate::Activity::new(
+                                        strategy.get_name().to_string(),
+                                        strategy.get_icon().to_string(),
+                                        strategy.get_process_name().to_string(),
                                         assets,
                                     );
 

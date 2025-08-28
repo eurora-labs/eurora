@@ -2799,7 +2799,7 @@ dependencies = [
 
 [[package]]
 name = "eur-activity"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2809,12 +2809,15 @@ dependencies = [
  "eur-proto",
  "ferrous-focus",
  "ferrous-llm-core",
+ "humantime-serde",
  "image",
+ "regex",
  "serde",
  "serde_json",
  "specta",
  "specta-typescript",
  "taurpc",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -2974,7 +2977,7 @@ dependencies = [
 
 [[package]]
 name = "eur-native-messaging"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3052,7 +3055,7 @@ dependencies = [
 
 [[package]]
 name = "eur-prompt-kit"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "async_from",
@@ -3270,7 +3273,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -4559,6 +4562,22 @@ name = "httpdate"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
+
+[[package]]
+name = "humantime"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b112acc8b3adf4b107a8ec20977da0273a8c386765a3ec0229bd500a1443f9f"
+
+[[package]]
+name = "humantime-serde"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57a3db5ea5923d99402c94e9feb261dc5ee9b4efa158b0315f788cf549cc200c"
+dependencies = [
+ "humantime",
+ "serde",
+]
 
 [[package]]
 name = "hyper"
