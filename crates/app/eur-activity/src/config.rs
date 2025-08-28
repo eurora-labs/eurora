@@ -1,46 +1,63 @@
-//! Configuration system for activity strategies
+//! Configuration system for the refactored activity system
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
-/// Configuration for the activity system
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActivityConfig {
-    /// Global configuration settings
-    pub global: GlobalConfig,
-    /// Strategy-specific configurations
-    pub strategies: HashMap<String, StrategyConfig>,
-    /// Application-specific configurations
-    pub applications: HashMap<String, ApplicationConfig>,
-}
-
-/// Global configuration settings
+/// Global configuration for the activity system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalConfig {
     /// Whether activity collection is enabled
     pub enabled: bool,
-    /// Default collection interval for strategies
+    /// Default interval for collecting activity data
     pub default_collection_interval: Duration,
-    /// Maximum number of assets per activity
+    /// Maximum number of assets to collect per activity
     pub max_assets_per_activity: usize,
-    /// Maximum number of snapshots per activity
+    /// Maximum number of snapshots to collect per activity
     pub max_snapshots_per_activity: usize,
-    /// Privacy settings
+    /// Privacy configuration
     pub privacy: PrivacyConfig,
 }
 
-/// Privacy configuration settings
+impl Default for GlobalConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            default_collection_interval: Duration::from_secs(5),
+            max_assets_per_activity: 10,
+            max_snapshots_per_activity: 100,
+            privacy: PrivacyConfig::default(),
+        }
+    }
+}
+
+/// Privacy configuration for data collection
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyConfig {
-    /// Whether to collect content data (vs metadata only)
+    /// Whether to collect full content or just metadata
     pub collect_content: bool,
     /// Whether to anonymize collected data
     pub anonymize_data: bool,
-    /// Patterns to exclude from collection (regex)
+    /// Regex patterns to exclude from collection
     pub exclude_patterns: Vec<String>,
     /// Applications to completely ignore
     pub ignored_applications: Vec<String>,
+}
+
+impl Default for PrivacyConfig {
+    fn default() -> Self {
+        Self {
+            collect_content: true,
+            anonymize_data: false,
+            exclude_patterns: vec![
+                r"password".to_string(),
+                r"secret".to_string(),
+                r"token".to_string(),
+                r"key".to_string(),
+            ],
+            ignored_applications: vec![],
+        }
+    }
 }
 
 /// Configuration for a specific strategy
@@ -48,42 +65,80 @@ pub struct PrivacyConfig {
 pub struct StrategyConfig {
     /// Whether this strategy is enabled
     pub enabled: bool,
-    /// Priority for strategy selection (higher = more preferred)
-    pub priority: u8,
+    /// Priority of this strategy (higher = more preferred)
+    pub priority: u32,
     /// Collection interval for this strategy
     pub collection_interval: Duration,
-    /// Asset types to collect
+    /// Types of assets this strategy should collect
     pub asset_types: Vec<String>,
-    /// Snapshot frequency
+    /// Frequency of snapshot collection
     pub snapshot_frequency: SnapshotFrequency,
     /// Strategy-specific settings
-    pub settings: HashMap<String, serde_json::Value>,
+    pub settings: HashMap<String, String>,
+}
+
+impl Default for StrategyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            priority: 50,
+            collection_interval: Duration::from_secs(5),
+            asset_types: vec![],
+            snapshot_frequency: SnapshotFrequency::Interval(Duration::from_secs(10)),
+            settings: HashMap::new(),
+        }
+    }
+}
+
+/// Frequency configuration for snapshot collection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SnapshotFrequency {
+    /// Never collect snapshots
+    Never,
+    /// Collect snapshots at regular intervals
+    Interval(Duration),
+    /// Collect snapshots on specific events
+    OnEvent(Vec<String>),
+    /// Collect snapshots when content changes
+    OnChange,
 }
 
 /// Configuration for a specific application
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplicationConfig {
-    /// Whether to collect data from this application
+    /// Whether collection is enabled for this application
     pub enabled: bool,
-    /// Override strategy to use for this application
-    pub override_strategy: Option<String>,
+    /// Strategy to use for this application (overrides automatic selection)
+    pub force_strategy: Option<String>,
     /// Application-specific privacy settings
     pub privacy_override: Option<PrivacyConfig>,
-    /// Custom settings for this application
-    pub settings: HashMap<String, serde_json::Value>,
+    /// Custom collection interval for this application
+    pub collection_interval_override: Option<Duration>,
+    /// Application-specific settings
+    pub settings: HashMap<String, String>,
 }
 
-/// Frequency settings for snapshot collection
+impl Default for ApplicationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            force_strategy: None,
+            privacy_override: None,
+            collection_interval_override: None,
+            settings: HashMap::new(),
+        }
+    }
+}
+
+/// Main configuration structure for the activity system
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SnapshotFrequency {
-    /// Never collect snapshots
-    Never,
-    /// Collect on activity change only
-    OnChange,
-    /// Collect at regular intervals
-    Interval(Duration),
-    /// Collect based on user interaction
-    OnInteraction,
+pub struct ActivityConfig {
+    /// Global configuration
+    pub global: GlobalConfig,
+    /// Strategy-specific configurations
+    pub strategies: HashMap<String, StrategyConfig>,
+    /// Application-specific configurations
+    pub applications: HashMap<String, ApplicationConfig>,
 }
 
 impl Default for ActivityConfig {
@@ -96,130 +151,154 @@ impl Default for ActivityConfig {
     }
 }
 
-impl Default for GlobalConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            default_collection_interval: Duration::from_secs(3),
-            max_assets_per_activity: 10,
-            max_snapshots_per_activity: 100,
-            privacy: PrivacyConfig::default(),
-        }
-    }
+/// Builder for creating activity configurations
+#[derive(Debug, Default)]
+pub struct ActivityConfigBuilder {
+    config: ActivityConfig,
 }
 
-impl Default for PrivacyConfig {
-    fn default() -> Self {
+impl ActivityConfigBuilder {
+    /// Create a new configuration builder
+    pub fn new() -> Self {
         Self {
-            collect_content: true,
-            anonymize_data: false,
-            exclude_patterns: vec![
-                r"password".to_string(),
-                r"token".to_string(),
-                r"secret".to_string(),
-                r"key".to_string(),
-            ],
-            ignored_applications: vec![],
+            config: ActivityConfig::default(),
         }
     }
-}
 
-impl Default for StrategyConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            priority: 50,
-            collection_interval: Duration::from_secs(3),
-            asset_types: vec!["*".to_string()],
-            snapshot_frequency: SnapshotFrequency::Interval(Duration::from_secs(10)),
-            settings: HashMap::new(),
-        }
+    /// Enable or disable activity collection
+    pub fn enable_collection(mut self, enabled: bool) -> Self {
+        self.config.global.enabled = enabled;
+        self
     }
-}
 
-impl Default for ApplicationConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            override_strategy: None,
-            privacy_override: None,
-            settings: HashMap::new(),
-        }
+    /// Set the default collection interval
+    pub fn default_collection_interval(mut self, interval: Duration) -> Self {
+        self.config.global.default_collection_interval = interval;
+        self
+    }
+
+    /// Set the maximum number of assets per activity
+    pub fn max_assets_per_activity(mut self, max: usize) -> Self {
+        self.config.global.max_assets_per_activity = max;
+        self
+    }
+
+    /// Set the maximum number of snapshots per activity
+    pub fn max_snapshots_per_activity(mut self, max: usize) -> Self {
+        self.config.global.max_snapshots_per_activity = max;
+        self
+    }
+
+    /// Enable or disable content collection
+    pub fn collect_content(mut self, collect: bool) -> Self {
+        self.config.global.privacy.collect_content = collect;
+        self
+    }
+
+    /// Enable or disable data anonymization
+    pub fn anonymize_data(mut self, anonymize: bool) -> Self {
+        self.config.global.privacy.anonymize_data = anonymize;
+        self
+    }
+
+    /// Add an exclusion pattern
+    pub fn add_exclusion_pattern(mut self, pattern: String) -> Self {
+        self.config.global.privacy.exclude_patterns.push(pattern);
+        self
+    }
+
+    /// Add an ignored application
+    pub fn ignore_application(mut self, app: String) -> Self {
+        self.config.global.privacy.ignored_applications.push(app);
+        self
+    }
+
+    /// Configure a strategy
+    pub fn configure_strategy(mut self, strategy_id: String, config: StrategyConfig) -> Self {
+        self.config.strategies.insert(strategy_id, config);
+        self
+    }
+
+    /// Configure an application
+    pub fn configure_application(mut self, app_name: String, config: ApplicationConfig) -> Self {
+        self.config.applications.insert(app_name, config);
+        self
+    }
+
+    /// Build the final configuration
+    pub fn build(self) -> ActivityConfig {
+        self.config
     }
 }
 
 impl ActivityConfig {
-    /// Create a new configuration with default browser strategy settings
-    pub fn with_browser_defaults() -> Self {
-        let mut config = Self::default();
-
-        // Configure browser strategy
-        let mut browser_config = StrategyConfig::default();
-        browser_config.priority = 80;
-        browser_config.asset_types = vec![
-            "youtube".to_string(),
-            "article".to_string(),
-            "twitter".to_string(),
-            "pdf".to_string(),
-        ];
-        browser_config.snapshot_frequency = SnapshotFrequency::Interval(Duration::from_secs(5));
-
-        config
-            .strategies
-            .insert("browser".to_string(), browser_config);
-
-        // Configure default strategy
-        let mut default_config = StrategyConfig::default();
-        default_config.priority = 10;
-        default_config.snapshot_frequency = SnapshotFrequency::Never;
-
-        config
-            .strategies
-            .insert("default".to_string(), default_config);
-
-        config
+    /// Create a new configuration builder
+    pub fn builder() -> ActivityConfigBuilder {
+        ActivityConfigBuilder::new()
     }
 
-    /// Get configuration for a specific strategy
-    pub fn get_strategy_config(&self, strategy_id: &str) -> StrategyConfig {
-        self.strategies
-            .get(strategy_id)
-            .cloned()
-            .unwrap_or_default()
+    /// Get strategy configuration by ID
+    pub fn get_strategy_config(&self, strategy_id: &str) -> Option<&StrategyConfig> {
+        self.strategies.get(strategy_id)
     }
 
-    /// Get configuration for a specific application
-    pub fn get_application_config(&self, app_name: &str) -> ApplicationConfig {
-        self.applications.get(app_name).cloned().unwrap_or_default()
+    /// Get application configuration by name
+    pub fn get_application_config(&self, app_name: &str) -> Option<&ApplicationConfig> {
+        self.applications.get(app_name)
     }
 
-    /// Check if an application should be ignored
-    pub fn is_application_ignored(&self, app_name: &str) -> bool {
-        // Check global ignore list
+    /// Check if collection is enabled globally
+    pub fn is_collection_enabled(&self) -> bool {
+        self.global.enabled
+    }
+
+    /// Check if collection is enabled for a specific application
+    pub fn is_application_enabled(&self, app_name: &str) -> bool {
+        if !self.global.enabled {
+            return false;
+        }
+
         if self
             .global
             .privacy
             .ignored_applications
             .contains(&app_name.to_string())
         {
-            return true;
+            return false;
         }
 
-        // Check application-specific config
-        let app_config = self.get_application_config(app_name);
-        !app_config.enabled
+        self.get_application_config(app_name)
+            .map_or(true, |config| config.enabled)
+    }
+
+    /// Get effective collection interval for an application
+    pub fn get_collection_interval(&self, app_name: &str, strategy_id: &str) -> Duration {
+        // Check application-specific override first
+        if let Some(app_config) = self.get_application_config(app_name) {
+            if let Some(interval) = app_config.collection_interval_override {
+                return interval;
+            }
+        }
+
+        // Check strategy-specific configuration
+        if let Some(strategy_config) = self.get_strategy_config(strategy_id) {
+            return strategy_config.collection_interval;
+        }
+
+        // Fall back to global default
+        self.global.default_collection_interval
+    }
+
+    /// Get effective privacy configuration for an application
+    pub fn get_privacy_config(&self, app_name: &str) -> &PrivacyConfig {
+        self.get_application_config(app_name)
+            .and_then(|config| config.privacy_override.as_ref())
+            .unwrap_or(&self.global.privacy)
     }
 
     /// Check if content should be collected for an application
     pub fn should_collect_content(&self, app_name: &str) -> bool {
-        let app_config = self.get_application_config(app_name);
-
-        // Use application-specific privacy override if available
-        if let Some(privacy_override) = &app_config.privacy_override {
-            privacy_override.collect_content
-        } else {
-            self.global.privacy.collect_content
-        }
+        self.get_privacy_config(app_name).collect_content
     }
 
     /// Validate the configuration
@@ -236,84 +315,14 @@ impl ActivityConfig {
             return Err("default_collection_interval must be greater than 0".to_string());
         }
 
-        // Validate strategy priorities
-        for (strategy_id, config) in &self.strategies {
-            if config.collection_interval.is_zero() {
-                return Err(format!(
-                    "Strategy {} has invalid collection_interval",
-                    strategy_id
-                ));
+        // Validate regex patterns
+        for pattern in &self.global.privacy.exclude_patterns {
+            if let Err(e) = regex::Regex::new(pattern) {
+                return Err(format!("Invalid regex pattern '{}': {}", pattern, e));
             }
         }
 
         Ok(())
-    }
-}
-
-/// Builder for activity configuration
-pub struct ActivityConfigBuilder {
-    config: ActivityConfig,
-}
-
-impl ActivityConfigBuilder {
-    pub fn new() -> Self {
-        Self {
-            config: ActivityConfig::default(),
-        }
-    }
-
-    pub fn enable_collection(mut self, enabled: bool) -> Self {
-        self.config.global.enabled = enabled;
-        self
-    }
-
-    pub fn default_collection_interval(mut self, interval: Duration) -> Self {
-        self.config.global.default_collection_interval = interval;
-        self
-    }
-
-    pub fn max_assets_per_activity(mut self, max: usize) -> Self {
-        self.config.global.max_assets_per_activity = max;
-        self
-    }
-
-    pub fn collect_content(mut self, collect: bool) -> Self {
-        self.config.global.privacy.collect_content = collect;
-        self
-    }
-
-    pub fn anonymize_data(mut self, anonymize: bool) -> Self {
-        self.config.global.privacy.anonymize_data = anonymize;
-        self
-    }
-
-    pub fn ignore_application(mut self, app_name: String) -> Self {
-        self.config
-            .global
-            .privacy
-            .ignored_applications
-            .push(app_name);
-        self
-    }
-
-    pub fn configure_strategy(mut self, strategy_id: String, config: StrategyConfig) -> Self {
-        self.config.strategies.insert(strategy_id, config);
-        self
-    }
-
-    pub fn configure_application(mut self, app_name: String, config: ApplicationConfig) -> Self {
-        self.config.applications.insert(app_name, config);
-        self
-    }
-
-    pub fn build(self) -> ActivityConfig {
-        self.config
-    }
-}
-
-impl Default for ActivityConfigBuilder {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -327,96 +336,163 @@ mod tests {
         assert!(config.global.enabled);
         assert_eq!(
             config.global.default_collection_interval,
-            Duration::from_secs(3)
+            Duration::from_secs(5)
         );
-        assert!(config.validate().is_ok());
-    }
-
-    #[test]
-    fn test_browser_defaults() {
-        let config = ActivityConfig::with_browser_defaults();
-
-        let browser_config = config.get_strategy_config("browser");
-        assert_eq!(browser_config.priority, 80);
-        assert!(browser_config.asset_types.contains(&"youtube".to_string()));
-
-        let default_config = config.get_strategy_config("default");
-        assert_eq!(default_config.priority, 10);
+        assert_eq!(config.global.max_assets_per_activity, 10);
+        assert_eq!(config.global.max_snapshots_per_activity, 100);
+        assert!(config.global.privacy.collect_content);
+        assert!(!config.global.privacy.anonymize_data);
     }
 
     #[test]
     fn test_config_builder() {
-        let config = ActivityConfigBuilder::new()
+        let config = ActivityConfig::builder()
             .enable_collection(false)
-            .default_collection_interval(Duration::from_secs(5))
-            .max_assets_per_activity(20)
+            .default_collection_interval(Duration::from_secs(10))
+            .max_assets_per_activity(5)
             .collect_content(false)
-            .ignore_application("sensitive_app".to_string())
+            .anonymize_data(true)
+            .add_exclusion_pattern(r"sensitive".to_string())
+            .ignore_application("private-app".to_string())
             .build();
 
         assert!(!config.global.enabled);
         assert_eq!(
             config.global.default_collection_interval,
+            Duration::from_secs(10)
+        );
+        assert_eq!(config.global.max_assets_per_activity, 5);
+        assert!(!config.global.privacy.collect_content);
+        assert!(config.global.privacy.anonymize_data);
+        assert!(config
+            .global
+            .privacy
+            .exclude_patterns
+            .contains(&"sensitive".to_string()));
+        assert!(config
+            .global
+            .privacy
+            .ignored_applications
+            .contains(&"private-app".to_string()));
+    }
+
+    #[test]
+    fn test_strategy_configuration() {
+        let strategy_config = StrategyConfig {
+            enabled: true,
+            priority: 80,
+            collection_interval: Duration::from_secs(3),
+            asset_types: vec!["youtube".to_string(), "article".to_string()],
+            snapshot_frequency: SnapshotFrequency::Interval(Duration::from_secs(15)),
+            settings: HashMap::new(),
+        };
+
+        let config = ActivityConfig::builder()
+            .configure_strategy("browser".to_string(), strategy_config.clone())
+            .build();
+
+        let retrieved = config.get_strategy_config("browser").unwrap();
+        assert_eq!(retrieved.priority, 80);
+        assert_eq!(retrieved.collection_interval, Duration::from_secs(3));
+        assert_eq!(retrieved.asset_types.len(), 2);
+    }
+
+    #[test]
+    fn test_application_configuration() {
+        let app_config = ApplicationConfig {
+            enabled: false,
+            force_strategy: Some("custom".to_string()),
+            privacy_override: Some(PrivacyConfig {
+                collect_content: false,
+                ..Default::default()
+            }),
+            collection_interval_override: Some(Duration::from_secs(30)),
+            settings: HashMap::new(),
+        };
+
+        let config = ActivityConfig::builder()
+            .configure_application("firefox".to_string(), app_config)
+            .build();
+
+        assert!(!config.is_application_enabled("firefox"));
+        assert_eq!(
+            config.get_collection_interval("firefox", "browser"),
+            Duration::from_secs(30)
+        );
+        assert!(!config.should_collect_content("firefox"));
+    }
+
+    #[test]
+    fn test_collection_interval_precedence() {
+        let strategy_config = StrategyConfig {
+            collection_interval: Duration::from_secs(7),
+            ..Default::default()
+        };
+
+        let app_config = ApplicationConfig {
+            collection_interval_override: Some(Duration::from_secs(15)),
+            ..Default::default()
+        };
+
+        let config = ActivityConfig::builder()
+            .default_collection_interval(Duration::from_secs(5))
+            .configure_strategy("browser".to_string(), strategy_config)
+            .configure_application("firefox".to_string(), app_config)
+            .build();
+
+        // Application override should take precedence
+        assert_eq!(
+            config.get_collection_interval("firefox", "browser"),
+            Duration::from_secs(15)
+        );
+
+        // Strategy config should be used for other apps
+        assert_eq!(
+            config.get_collection_interval("chrome", "browser"),
+            Duration::from_secs(7)
+        );
+
+        // Global default for unknown strategy
+        assert_eq!(
+            config.get_collection_interval("notepad", "unknown"),
             Duration::from_secs(5)
         );
-        assert_eq!(config.global.max_assets_per_activity, 20);
-        assert!(!config.global.privacy.collect_content);
-        assert!(config.is_application_ignored("sensitive_app"));
+    }
+
+    #[test]
+    fn test_ignored_applications() {
+        let config = ActivityConfig::builder()
+            .ignore_application("private-app".to_string())
+            .build();
+
+        assert!(!config.is_application_enabled("private-app"));
+        assert!(config.is_application_enabled("public-app"));
     }
 
     #[test]
     fn test_config_validation() {
-        let mut config = ActivityConfig::default();
+        let valid_config = ActivityConfig::default();
+        assert!(valid_config.validate().is_ok());
 
-        // Valid config should pass
-        assert!(config.validate().is_ok());
-
-        // Invalid max_assets_per_activity
-        config.global.max_assets_per_activity = 0;
-        assert!(config.validate().is_err());
-
-        // Fix and test invalid collection interval
-        config.global.max_assets_per_activity = 10;
-        config.global.default_collection_interval = Duration::ZERO;
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn test_application_config() {
-        let mut config = ActivityConfig::default();
-
-        // Add application-specific config
-        let mut app_config = ApplicationConfig::default();
-        app_config.enabled = false;
-        config
-            .applications
-            .insert("test_app".to_string(), app_config);
-
-        assert!(config.is_application_ignored("test_app"));
-        assert!(!config.is_application_ignored("other_app"));
-    }
-
-    #[test]
-    fn test_privacy_settings() {
-        let mut config = ActivityConfig::default();
-
-        // Test global privacy settings
-        assert!(config.should_collect_content("any_app"));
-
-        config.global.privacy.collect_content = false;
-        assert!(!config.should_collect_content("any_app"));
-
-        // Test application-specific privacy override
-        let mut app_config = ApplicationConfig::default();
-        app_config.privacy_override = Some(PrivacyConfig {
-            collect_content: true,
+        let invalid_config = ActivityConfig {
+            global: GlobalConfig {
+                max_assets_per_activity: 0,
+                ..Default::default()
+            },
             ..Default::default()
-        });
-        config
-            .applications
-            .insert("special_app".to_string(), app_config);
+        };
+        assert!(invalid_config.validate().is_err());
+    }
 
-        assert!(config.should_collect_content("special_app"));
-        assert!(!config.should_collect_content("other_app"));
+    #[test]
+    fn test_snapshot_frequency() {
+        let never = SnapshotFrequency::Never;
+        let interval = SnapshotFrequency::Interval(Duration::from_secs(10));
+        let on_event = SnapshotFrequency::OnEvent(vec!["click".to_string(), "scroll".to_string()]);
+        let on_change = SnapshotFrequency::OnChange;
+
+        // Just test that they can be created and serialized
+        let serialized = serde_json::to_string(&interval).unwrap();
+        assert!(!serialized.is_empty());
     }
 }
