@@ -145,6 +145,11 @@ impl PromptApi for PromptApiImpl {
                         .await
                         .map_err(|e| e.to_string())
                 }
+                BackendType::OpenAI => app_settings
+                    .backend
+                    .initialize()
+                    .await
+                    .map_err(|e| e.to_string()),
                 BackendType::Ollama => app_settings
                     .backend
                     .initialize()
