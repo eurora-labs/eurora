@@ -4,7 +4,7 @@ use crate::{Activity, ActivityStrategy, ContextChip, DisplayAsset};
 use ferrous_llm_core::Message;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::collector::{CollectorService, CollectorStats};
 use crate::config::TimelineConfig;

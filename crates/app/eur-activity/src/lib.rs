@@ -9,6 +9,7 @@ pub mod config;
 pub mod error;
 pub mod registry;
 pub mod snapshots;
+pub mod storage;
 pub mod strategies;
 pub mod types;
 
@@ -19,6 +20,10 @@ pub use types::{Activity, ActivityAsset, ActivitySnapshot, ContextChip, DisplayA
 
 // Re-export asset types
 pub use assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
+
+// Re-export asset sub-types
+pub use assets::twitter::{TwitterContextType, TwitterTweet};
+pub use assets::youtube::TranscriptLine;
 
 // Re-export snapshot types
 pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSnapshot};
@@ -37,6 +42,9 @@ pub use registry::{
     MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata,
     StrategyRegistry,
 };
+
+// Re-export storage types
+pub use storage::{AssetStorage, SaveableAsset, SavedAssetInfo, StorageConfig};
 
 use ferrous_focus::IconData;
 use std::sync::{Arc, OnceLock};
