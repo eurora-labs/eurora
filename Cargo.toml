@@ -66,6 +66,9 @@ eur-user = { path = "crates/app/eur-user" }
 eur-auth = { path = "crates/common/eur-auth" }
 eur-tauri = { path = "crates/app/eur-tauri" }
 eur-proto = { path = "crates/proto/eur-proto" }
+eur-activity = { path = "crates/app/eur-activity" }
+eur-personal-db = { path = "crates/app/eur-personal-db" }
+# eur-activity = { path = "crates/app/eur-activity-2" }
 eur-proto-client = { path = "crates/common/eur-proto-client" }
 eur-prompt-kit = { path = "crates/common/eur-prompt-kit" }
 eur-util = { path = "crates/common/eur-util" }

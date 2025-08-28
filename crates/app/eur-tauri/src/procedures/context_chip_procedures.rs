@@ -1,4 +1,4 @@
-use eur_activity_2::ContextChip;
+use eur_activity::ContextChip;
 use eur_timeline::TimelineManager;
 use tauri::{Manager, Runtime};
 
