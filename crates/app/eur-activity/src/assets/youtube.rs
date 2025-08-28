@@ -1,7 +1,9 @@
 //! YouTube asset implementation
 
 use crate::error::ActivityError;
+use crate::storage::SaveableAsset;
 use crate::types::ContextChip;
+use async_trait::async_trait;
 use eur_proto::ipc::ProtoYoutubeState;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -106,6 +108,34 @@ impl YoutubeAsset {
             .map(|line| line.text.clone())
             .collect::<Vec<String>>()
             .join(" ")
+    }
+}
+
+#[async_trait]
+impl SaveableAsset for YoutubeAsset {
+    fn get_asset_type(&self) -> &'static str {
+        "youtube"
+    }
+
+    fn get_file_extension(&self) -> &'static str {
+        "json"
+    }
+
+    fn get_mime_type(&self) -> &'static str {
+        "application/json"
+    }
+
+    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+        let json = serde_json::to_string_pretty(self)?;
+        Ok(json.into_bytes())
+    }
+
+    fn get_unique_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn get_display_name(&self) -> String {
+        self.title.clone()
     }
 }
 

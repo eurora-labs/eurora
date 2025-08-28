@@ -1,7 +1,9 @@
 //! Article asset implementation
 
 use crate::error::ActivityError;
+use crate::storage::SaveableAsset;
 use crate::types::ContextChip;
+use async_trait::async_trait;
 use eur_proto::ipc::ProtoArticleState;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -119,6 +121,34 @@ impl ArticleAsset {
             || self.author.as_ref().map_or(false, |author| {
                 author.to_lowercase().contains(&keyword_lower)
             })
+    }
+}
+
+#[async_trait]
+impl SaveableAsset for ArticleAsset {
+    fn get_asset_type(&self) -> &'static str {
+        "article"
+    }
+
+    fn get_file_extension(&self) -> &'static str {
+        "json"
+    }
+
+    fn get_mime_type(&self) -> &'static str {
+        "application/json"
+    }
+
+    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+        let json = serde_json::to_string_pretty(self)?;
+        Ok(json.into_bytes())
+    }
+
+    fn get_unique_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn get_display_name(&self) -> String {
+        self.title.clone()
     }
 }
 
