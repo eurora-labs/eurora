@@ -97,8 +97,6 @@ impl PromptKitService {
                 metadata: Default::default(),
             };
 
-            info!("Sending request to OpenAI: {:?}", request.clone());
-
             let stream = provider
                 .chat_stream(request)
                 .await
