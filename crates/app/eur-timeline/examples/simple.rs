@@ -13,12 +13,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Current: {}", activity.name);
     }
 
-    // Get recent activities
-    let recent = timeline.get_recent_activities(10).await;
-    for activity in recent {
-        println!("Recent: {}", activity.name);
-    }
-
     // Stop when done
     timeline.stop().await?;
     Ok(())
