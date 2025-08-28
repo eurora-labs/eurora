@@ -12,7 +12,7 @@ ferrous-focus = { version = "0.2.5" }
 eur-native-messaging = { path = "../eur-native-messaging" }
 # eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 ferrous-llm-core = { workspace = true }
-eur-activity = { path = "../eur-activity" }
+eur-activity-2 = { path = "../eur-activity-2" }
 anyhow = { workspace = true }
 base64.workspace = true
 chrono = { workspace = true, features = ["serde"] }
