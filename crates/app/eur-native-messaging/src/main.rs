@@ -1,6 +1,6 @@
 use std::{fs::File, net::ToSocketAddrs, process};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 // Import the PORT constant from lib.rs
 use eur_native_messaging::PORT;
 use tonic::transport::Server;
@@ -51,12 +51,11 @@ fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
                     for line in output_str.lines() {
                         if line.contains(process_name) {
                             let parts: Vec<&str> = line.split_whitespace().collect();
-                            if parts.len() > 1 {
-                                if let Ok(pid) = parts[1].parse::<u32>() {
-                                    if pid != current_pid {
-                                        pids.push(pid);
-                                    }
-                                }
+                            if parts.len() > 1
+                                && let Ok(pid) = parts[1].parse::<u32>()
+                                && pid != current_pid
+                            {
+                                pids.push(pid);
                             }
                         }
                     }

@@ -1,0 +1,392 @@
+//! Twitter asset implementation
+
+use crate::error::ActivityError;
+use crate::types::ContextChip;
+use eur_proto::ipc::{ProtoTweet, ProtoTwitterState};
+use ferrous_llm_core::{Message, MessageContent, Role};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// Individual tweet data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TwitterTweet {
+    pub text: String,
+    pub timestamp: Option<String>,
+    pub author: Option<String>,
+    pub likes: Option<u32>,
+    pub retweets: Option<u32>,
+    pub replies: Option<u32>,
+}
+
+impl TwitterTweet {
+    /// Create a new tweet
+    pub fn new(text: String, author: Option<String>, timestamp: Option<String>) -> Self {
+        Self {
+            text,
+            timestamp,
+            author,
+            likes: None,
+            retweets: None,
+            replies: None,
+        }
+    }
+
+    /// Get formatted tweet text with author
+    pub fn get_formatted_text(&self) -> String {
+        if let Some(author) = &self.author {
+            format!("@{}: {}", author, self.text)
+        } else {
+            self.text.clone()
+        }
+    }
+
+    /// Check if tweet contains a hashtag
+    pub fn contains_hashtag(&self, hashtag: &str) -> bool {
+        let hashtag_with_hash = if hashtag.starts_with('#') {
+            hashtag.to_string()
+        } else {
+            format!("#{}", hashtag)
+        };
+        self.text
+            .to_lowercase()
+            .contains(&hashtag_with_hash.to_lowercase())
+    }
+
+    /// Extract hashtags from the tweet
+    pub fn extract_hashtags(&self) -> Vec<String> {
+        self.text
+            .split_whitespace()
+            .filter(|word| word.starts_with('#'))
+            .map(|hashtag| hashtag.to_string())
+            .collect()
+    }
+
+    /// Extract mentions from the tweet
+    pub fn extract_mentions(&self) -> Vec<String> {
+        self.text
+            .split_whitespace()
+            .filter(|word| word.starts_with('@'))
+            .map(|mention| mention.trim_start_matches('@').to_string())
+            .collect()
+    }
+}
+
+impl From<ProtoTweet> for TwitterTweet {
+    fn from(tweet: ProtoTweet) -> Self {
+        TwitterTweet {
+            text: tweet.text,
+            timestamp: tweet.timestamp,
+            author: tweet.author,
+            likes: None,
+            retweets: None,
+            replies: None,
+        }
+    }
+}
+
+/// Twitter asset containing multiple tweets and metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TwitterAsset {
+    pub id: String,
+    pub url: String,
+    pub title: String,
+    pub tweets: Vec<TwitterTweet>,
+    pub timestamp: String,
+    pub context_type: TwitterContextType,
+}
+
+/// Type of Twitter context being captured
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TwitterContextType {
+    Timeline,
+    Profile,
+    Thread,
+    Search,
+    Hashtag,
+}
+
+impl TwitterAsset {
+    /// Create a new Twitter asset
+    pub fn new(
+        id: String,
+        url: String,
+        title: String,
+        tweets: Vec<TwitterTweet>,
+        context_type: TwitterContextType,
+    ) -> Self {
+        Self {
+            id,
+            url,
+            title,
+            tweets,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            context_type,
+        }
+    }
+
+    /// Try to create from protocol buffer state
+    pub fn try_from(state: ProtoTwitterState) -> Result<Self, ActivityError> {
+        let tweets: Vec<TwitterTweet> = state.tweets.into_iter().map(TwitterTweet::from).collect();
+
+        Ok(TwitterAsset {
+            id: uuid::Uuid::new_v4().to_string(),
+            url: state.url,
+            title: state.title,
+            tweets,
+            timestamp: state.timestamp,
+            context_type: TwitterContextType::Timeline, // Default assumption
+        })
+    }
+
+    /// Construct a message for LLM interaction
+    pub fn construct_message(&self) -> Message {
+        let max_tweets = 20usize;
+        let tweet_texts: Vec<String> = self
+            .tweets
+            .iter()
+            .take(max_tweets)
+            .map(|tweet| tweet.get_formatted_text())
+            .collect();
+
+        let context_description = match self.context_type {
+            TwitterContextType::Timeline => "timeline",
+            TwitterContextType::Profile => "profile",
+            TwitterContextType::Thread => "thread",
+            TwitterContextType::Search => "search results",
+            TwitterContextType::Hashtag => "hashtag feed",
+        };
+
+        let mut text = format!(
+            "I am looking at Twitter {} content titled '{}' and have a question about it. \
+                         Here are the tweets I'm seeing: \n\n{}",
+            context_description,
+            self.title,
+            tweet_texts.join("\n\n")
+        );
+        if self.tweets.len() > max_tweets {
+            text.push_str(&format!(
+                "\n\n(+{} more tweets truncated)",
+                self.tweets.len() - max_tweets,
+            ));
+        }
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(text),
+        }
+    }
+
+    /// Get context chip for UI integration
+    pub fn get_context_chip(&self) -> Option<ContextChip> {
+        Some(ContextChip {
+            id: self.id.clone(),
+            name: "twitter".to_string(),
+            extension_id: "2c434895-d32c-485f-8525-c4394863b83a".to_string(),
+            attrs: HashMap::new(),
+            icon: None,
+            position: Some(0),
+        })
+    }
+
+    /// Get all unique hashtags from all tweets
+    pub fn get_all_hashtags(&self) -> Vec<String> {
+        let mut hashtags = Vec::new();
+        for tweet in &self.tweets {
+            hashtags.extend(tweet.extract_hashtags());
+        }
+        hashtags.sort();
+        hashtags.dedup();
+        hashtags
+    }
+
+    /// Get all unique mentions from all tweets
+    pub fn get_all_mentions(&self) -> Vec<String> {
+        let mut mentions = Vec::new();
+        for tweet in &self.tweets {
+            mentions.extend(tweet.extract_mentions());
+        }
+        mentions.sort();
+        mentions.dedup();
+        mentions
+    }
+
+    /// Filter tweets by author
+    pub fn get_tweets_by_author(&self, author: &str) -> Vec<&TwitterTweet> {
+        self.tweets
+            .iter()
+            .filter(|tweet| {
+                tweet
+                    .author
+                    .as_ref()
+                    .map_or(false, |a| a.eq_ignore_ascii_case(author))
+            })
+            .collect()
+    }
+
+    /// Search tweets containing specific text
+    pub fn search_tweets(&self, query: &str) -> Vec<&TwitterTweet> {
+        let query_lower = query.to_lowercase();
+        self.tweets
+            .iter()
+            .filter(|tweet| tweet.text.to_lowercase().contains(&query_lower))
+            .collect()
+    }
+
+    /// Get tweet count
+    pub fn get_tweet_count(&self) -> usize {
+        self.tweets.len()
+    }
+}
+
+impl From<ProtoTwitterState> for TwitterAsset {
+    fn from(state: ProtoTwitterState) -> Self {
+        Self::try_from(state).expect("Failed to convert ProtoTwitterState to TwitterAsset")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_twitter_tweet_creation() {
+        let tweet = TwitterTweet::new(
+            "Hello #world from @rust_lang!".to_string(),
+            Some("testuser".to_string()),
+            Some("2024-01-01T00:00:00Z".to_string()),
+        );
+
+        assert_eq!(tweet.text, "Hello #world from @rust_lang!");
+        assert_eq!(tweet.author, Some("testuser".to_string()));
+        assert_eq!(
+            tweet.get_formatted_text(),
+            "@testuser: Hello #world from @rust_lang!"
+        );
+    }
+
+    #[test]
+    fn test_hashtag_extraction() {
+        let tweet = TwitterTweet::new(
+            "Learning #rust and #programming today! #coding".to_string(),
+            None,
+            None,
+        );
+
+        let hashtags = tweet.extract_hashtags();
+        assert_eq!(hashtags, vec!["#rust", "#programming", "#coding"]);
+
+        assert!(tweet.contains_hashtag("rust"));
+        assert!(tweet.contains_hashtag("#programming"));
+        assert!(!tweet.contains_hashtag("python"));
+    }
+
+    #[test]
+    fn test_mention_extraction() {
+        let tweet = TwitterTweet::new(
+            "Thanks @rust_lang and @github for the great tools!".to_string(),
+            None,
+            None,
+        );
+
+        let mentions = tweet.extract_mentions();
+        assert_eq!(mentions, vec!["rust_lang", "github"]);
+    }
+
+    #[test]
+    fn test_twitter_asset_creation() {
+        let tweets = vec![
+            TwitterTweet::new("First tweet".to_string(), Some("user1".to_string()), None),
+            TwitterTweet::new(
+                "Second tweet #test".to_string(),
+                Some("user2".to_string()),
+                None,
+            ),
+        ];
+
+        let asset = TwitterAsset::new(
+            "test-id".to_string(),
+            "https://twitter.com/timeline".to_string(),
+            "My Timeline".to_string(),
+            tweets,
+            TwitterContextType::Timeline,
+        );
+
+        assert_eq!(asset.id, "test-id");
+        assert_eq!(asset.title, "My Timeline");
+        assert_eq!(asset.get_tweet_count(), 2);
+    }
+
+    #[test]
+    fn test_hashtag_aggregation() {
+        let tweets = vec![
+            TwitterTweet::new(
+                "Learning #rust today".to_string(),
+                Some("user1".to_string()),
+                None,
+            ),
+            TwitterTweet::new(
+                "More #rust and #programming".to_string(),
+                Some("user2".to_string()),
+                None,
+            ),
+        ];
+
+        let asset = TwitterAsset::new(
+            "test-id".to_string(),
+            "https://twitter.com/timeline".to_string(),
+            "Timeline".to_string(),
+            tweets,
+            TwitterContextType::Timeline,
+        );
+
+        let hashtags = asset.get_all_hashtags();
+        assert_eq!(hashtags, vec!["#programming", "#rust"]);
+    }
+
+    #[test]
+    fn test_tweet_search() {
+        let tweets = vec![
+            TwitterTweet::new(
+                "Learning Rust programming".to_string(),
+                Some("user1".to_string()),
+                None,
+            ),
+            TwitterTweet::new(
+                "Python is also great".to_string(),
+                Some("user2".to_string()),
+                None,
+            ),
+        ];
+
+        let asset = TwitterAsset::new(
+            "test-id".to_string(),
+            "https://twitter.com/timeline".to_string(),
+            "Timeline".to_string(),
+            tweets,
+            TwitterContextType::Timeline,
+        );
+
+        let rust_tweets = asset.search_tweets("rust");
+        assert_eq!(rust_tweets.len(), 1);
+        assert!(rust_tweets[0].text.contains("Rust"));
+
+        let programming_tweets = asset.search_tweets("programming");
+        assert_eq!(programming_tweets.len(), 1);
+    }
+
+    #[test]
+    fn test_context_chip() {
+        let asset = TwitterAsset::new(
+            "test-id".to_string(),
+            "https://twitter.com/timeline".to_string(),
+            "Timeline".to_string(),
+            vec![],
+            TwitterContextType::Timeline,
+        );
+
+        let chip = asset.get_context_chip().unwrap();
+        assert_eq!(chip.id, "test-id");
+        assert_eq!(chip.name, "twitter");
+        assert_eq!(chip.extension_id, "2c434895-d32c-485f-8525-c4394863b83a");
+    }
+}
