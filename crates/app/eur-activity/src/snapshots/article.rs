@@ -1,5 +1,6 @@
 //! Article snapshot implementation
 
+use crate::types::SnapshotFunctionality;
 use eur_proto::ipc::ProtoArticleSnapshot;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -47,35 +48,6 @@ impl ArticleSnapshot {
         }
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let mut content = String::new();
-
-        if let Some(title) = &self.page_title {
-            content.push_str(&format!("From article titled '{}': ", title));
-        }
-
-        if let Some(highlight) = &self.highlight {
-            content.push_str(&format!(
-                "I highlighted the following text: \"{}\"",
-                highlight
-            ));
-        } else if let Some(selection) = &self.selection_text {
-            content.push_str(&format!("I selected the following text: \"{}\"", selection));
-        } else {
-            content.push_str("I'm reading an article");
-        }
-
-        if let Some(url) = &self.page_url {
-            content.push_str(&format!(" (from: {})", url));
-        }
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }
-    }
-
     /// Update the timestamp
     pub fn touch(&mut self) {
         self.updated_at = chrono::Utc::now().timestamp() as u64;
@@ -116,6 +88,45 @@ impl ArticleSnapshot {
         }
 
         false
+    }
+}
+
+impl SnapshotFunctionality for ArticleSnapshot {
+    /// Construct a message for LLM interaction
+    fn construct_message(&self) -> Message {
+        let mut content = String::new();
+
+        if let Some(title) = &self.page_title {
+            content.push_str(&format!("From article titled '{}': ", title));
+        }
+
+        if let Some(highlight) = &self.highlight {
+            content.push_str(&format!(
+                "I highlighted the following text: \"{}\"",
+                highlight
+            ));
+        } else if let Some(selection) = &self.selection_text {
+            content.push_str(&format!("I selected the following text: \"{}\"", selection));
+        } else {
+            content.push_str("I'm reading an article");
+        }
+
+        if let Some(url) = &self.page_url {
+            content.push_str(&format!(" (from: {})", url));
+        }
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(content),
+        }
+    }
+
+    fn get_updated_at(&self) -> u64 {
+        self.updated_at
+    }
+
+    fn get_created_at(&self) -> u64 {
+        self.created_at
     }
 }
 
