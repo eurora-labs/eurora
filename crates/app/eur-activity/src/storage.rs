@@ -2,6 +2,7 @@
 
 use crate::error::{ActivityError, Result};
 use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -51,6 +52,7 @@ pub struct SavedAssetInfo {
 
 /// Trait for assets that can be saved to disk
 #[async_trait]
+// #[enum_dispatch(ActivityAsset)]
 pub trait SaveableAsset {
     /// Get the asset type for organizing files
     fn get_asset_type(&self) -> &'static str;

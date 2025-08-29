@@ -2730,6 +2730,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "enum_dispatch"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa18ce2bc66555b3218614519ac839ddb759a7d6720732f979ef8d13be147ecd"
+dependencies = [
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
 name = "enumflags2"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2805,6 +2817,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "enum_dispatch",
  "eur-native-messaging",
  "eur-proto",
  "ferrous-focus",
