@@ -2,7 +2,8 @@
 
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
-use crate::types::ContextChip;
+use crate::types::{CommonFunctionality, ContextChip, SaveFunctionality};
+use crate::{AssetStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use eur_proto::ipc::ProtoArticleState;
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -61,40 +62,6 @@ impl ArticleAsset {
         })
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let mut content = format!(
-            "I am reading an article titled '{}' and have a question about it.",
-            self.title
-        );
-
-        if let Some(author) = &self.author {
-            content.push_str(&format!(" The article is by {}.", author));
-        }
-
-        content.push_str(&format!(
-            " Here's the text content of the article: \n {}",
-            self.content
-        ));
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }
-    }
-
-    /// Get context chip for UI integration
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
-        Some(ContextChip {
-            id: self.id.clone(),
-            name: "article".to_string(),
-            extension_id: "309f0906-d48c-4439-9751-7bcf915cdfc5".to_string(),
-            attrs: HashMap::new(),
-            icon: None,
-            position: Some(0),
-        })
-    }
-
     /// Get a preview of the article content (first N words)
     pub fn get_preview(&self, word_limit: usize) -> String {
         let words: Vec<&str> = self.content.split_whitespace().collect();
@@ -121,6 +88,56 @@ impl ArticleAsset {
             || self.author.as_ref().map_or(false, |author| {
                 author.to_lowercase().contains(&keyword_lower)
             })
+    }
+}
+
+#[async_trait]
+impl SaveFunctionality for ArticleAsset {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
+        storage.save_asset(self).await
+    }
+}
+
+impl CommonFunctionality for ArticleAsset {
+    fn get_name(&self) -> &str {
+        &self.title
+    }
+
+    fn get_icon(&self) -> Option<&str> {
+        Some("article")
+    }
+
+    /// Construct a message for LLM interaction
+    fn construct_message(&self) -> Message {
+        let mut content = format!(
+            "I am reading an article titled '{}' and have a question about it.",
+            self.title
+        );
+
+        if let Some(author) = &self.author {
+            content.push_str(&format!(" The article is by {}.", author));
+        }
+
+        content.push_str(&format!(
+            " Here's the text content of the article: \n {}",
+            self.content
+        ));
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(content),
+        }
+    }
+
+    fn get_context_chip(&self) -> Option<ContextChip> {
+        Some(ContextChip {
+            id: self.id.clone(),
+            name: "article".to_string(),
+            extension_id: "309f0906-d48c-4439-9751-7bcf915cdfc5".to_string(),
+            attrs: HashMap::new(),
+            icon: None,
+            position: Some(0),
+        })
     }
 }
 
