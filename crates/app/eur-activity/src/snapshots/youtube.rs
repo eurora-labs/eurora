@@ -1,6 +1,7 @@
 //! YouTube snapshot implementation
 
 use crate::error::ActivityError;
+use crate::types::SnapshotFunctionality;
 use eur_proto::{ipc::ProtoYoutubeSnapshot, shared::ProtoImageFormat};
 use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
 use image::DynamicImage;
@@ -200,6 +201,20 @@ impl YoutubeSnapshot {
     /// Update the timestamp
     pub fn touch(&mut self) {
         self.updated_at = chrono::Utc::now().timestamp() as u64;
+    }
+}
+
+impl SnapshotFunctionality for YoutubeSnapshot {
+    fn construct_message(&self) -> Message {
+        self.construct_message()
+    }
+
+    fn get_updated_at(&self) -> u64 {
+        self.updated_at
+    }
+
+    fn get_created_at(&self) -> u64 {
+        self.created_at
     }
 }
 

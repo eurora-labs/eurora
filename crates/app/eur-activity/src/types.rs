@@ -38,7 +38,7 @@ impl DisplayAsset {
 }
 
 /// Enum containing all possible activity assets
-#[enum_dispatch(SaveableAsset, CommonFunctionality, SaveFunctionality)]
+#[enum_dispatch(SaveableAsset, AssetFunctionality, SaveFunctionality)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActivityAsset {
     YoutubeAsset,
@@ -48,7 +48,7 @@ pub enum ActivityAsset {
 }
 
 #[enum_dispatch]
-pub trait CommonFunctionality {
+pub trait AssetFunctionality {
     fn get_name(&self) -> &str;
     fn get_icon(&self) -> Option<&str>;
     fn construct_message(&self) -> Message;
@@ -61,45 +61,21 @@ pub trait SaveFunctionality {
     async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo>;
 }
 
-/// Enum containing all possible activity snapshots
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ActivitySnapshot {
-    Youtube(YoutubeSnapshot),
-    Article(ArticleSnapshot),
-    Twitter(TwitterSnapshot),
-    Default(DefaultSnapshot),
+#[enum_dispatch]
+pub trait SnapshotFunctionality {
+    fn construct_message(&self) -> Message;
+    fn get_updated_at(&self) -> u64;
+    fn get_created_at(&self) -> u64;
 }
 
-impl ActivitySnapshot {
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        match self {
-            ActivitySnapshot::Youtube(snapshot) => snapshot.construct_message(),
-            ActivitySnapshot::Article(snapshot) => snapshot.construct_message(),
-            ActivitySnapshot::Twitter(snapshot) => snapshot.construct_message(),
-            ActivitySnapshot::Default(snapshot) => snapshot.construct_message(),
-        }
-    }
-
-    /// Get the timestamp when this snapshot was last updated
-    pub fn get_updated_at(&self) -> u64 {
-        match self {
-            ActivitySnapshot::Youtube(snapshot) => snapshot.updated_at,
-            ActivitySnapshot::Article(snapshot) => snapshot.updated_at,
-            ActivitySnapshot::Twitter(snapshot) => snapshot.updated_at,
-            ActivitySnapshot::Default(snapshot) => snapshot.updated_at,
-        }
-    }
-
-    /// Get the timestamp when this snapshot was created
-    pub fn get_created_at(&self) -> u64 {
-        match self {
-            ActivitySnapshot::Youtube(snapshot) => snapshot.created_at,
-            ActivitySnapshot::Article(snapshot) => snapshot.created_at,
-            ActivitySnapshot::Twitter(snapshot) => snapshot.created_at,
-            ActivitySnapshot::Default(snapshot) => snapshot.created_at,
-        }
-    }
+/// Enum containing all possible activity snapshots
+#[enum_dispatch(SnapshotFunctionality)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ActivitySnapshot {
+    YoutubeSnapshot,
+    ArticleSnapshot,
+    TwitterSnapshot,
+    DefaultSnapshot,
 }
 
 /// Main activity structure - now fully cloneable and serializable

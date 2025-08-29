@@ -1,6 +1,7 @@
 //! High-level timeline manager implementation
 
-use crate::{Activity, ActivityStrategy, CommonFunctionality, ContextChip, DisplayAsset};
+use crate::{Activity, ActivityStrategy, AssetFunctionality, ContextChip, DisplayAsset};
+use eur_activity::types::SnapshotFunctionality;
 use ferrous_llm_core::Message;
 use std::sync::Arc;
 use tokio::sync::Mutex;
