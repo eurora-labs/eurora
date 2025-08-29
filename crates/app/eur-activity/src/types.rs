@@ -5,7 +5,7 @@
 
 use crate::assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
 use crate::snapshots::*;
-use crate::storage::{AssetStorage, SaveableAsset, SavedAssetInfo};
+use crate::storage::{AssetStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
