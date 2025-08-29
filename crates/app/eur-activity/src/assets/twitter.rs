@@ -89,12 +89,54 @@ impl AssetFunctionality for TwitterAsset {
         Some("twitter")
     }
 
+    /// Construct a message for LLM interaction
     fn construct_message(&self) -> Message {
-        todo!()
+        let max_tweets = 20usize;
+        let tweet_texts: Vec<String> = self
+            .tweets
+            .iter()
+            .take(max_tweets)
+            .map(|tweet| tweet.get_formatted_text())
+            .collect();
+
+        let context_description = match self.context_type {
+            TwitterContextType::Timeline => "timeline",
+            TwitterContextType::Profile => "profile",
+            TwitterContextType::Thread => "thread",
+            TwitterContextType::Search => "search results",
+            TwitterContextType::Hashtag => "hashtag feed",
+        };
+
+        let mut text = format!(
+            "I am looking at Twitter {} content titled '{}' and have a question about it. \
+                         Here are the tweets I'm seeing: \n\n{}",
+            context_description,
+            self.title,
+            tweet_texts.join("\n\n")
+        );
+        if self.tweets.len() > max_tweets {
+            text.push_str(&format!(
+                "\n\n(+{} more tweets truncated)",
+                self.tweets.len() - max_tweets,
+            ));
+        }
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(text),
+        }
     }
 
+    /// Get context chip for UI integration
     fn get_context_chip(&self) -> Option<ContextChip> {
-        todo!()
+        Some(ContextChip {
+            id: self.id.clone(),
+            name: "twitter".to_string(),
+            extension_id: "2c434895-d32c-485f-8525-c4394863b83a".to_string(),
+            attrs: HashMap::new(),
+            icon: None,
+            position: Some(0),
+        })
     }
 }
 
@@ -162,56 +204,6 @@ impl TwitterAsset {
             tweets,
             timestamp: state.timestamp,
             context_type: TwitterContextType::Timeline, // Default assumption
-        })
-    }
-
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let max_tweets = 20usize;
-        let tweet_texts: Vec<String> = self
-            .tweets
-            .iter()
-            .take(max_tweets)
-            .map(|tweet| tweet.get_formatted_text())
-            .collect();
-
-        let context_description = match self.context_type {
-            TwitterContextType::Timeline => "timeline",
-            TwitterContextType::Profile => "profile",
-            TwitterContextType::Thread => "thread",
-            TwitterContextType::Search => "search results",
-            TwitterContextType::Hashtag => "hashtag feed",
-        };
-
-        let mut text = format!(
-            "I am looking at Twitter {} content titled '{}' and have a question about it. \
-                         Here are the tweets I'm seeing: \n\n{}",
-            context_description,
-            self.title,
-            tweet_texts.join("\n\n")
-        );
-        if self.tweets.len() > max_tweets {
-            text.push_str(&format!(
-                "\n\n(+{} more tweets truncated)",
-                self.tweets.len() - max_tweets,
-            ));
-        }
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(text),
-        }
-    }
-
-    /// Get context chip for UI integration
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
-        Some(ContextChip {
-            id: self.id.clone(),
-            name: "twitter".to_string(),
-            extension_id: "2c434895-d32c-485f-8525-c4394863b83a".to_string(),
-            attrs: HashMap::new(),
-            icon: None,
-            position: Some(0),
         })
     }
 
@@ -446,7 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn twitter_trait_methods_work() {
+    fn trait_methods_work() {
         use crate::types::AssetFunctionality;
         let asset = TwitterAsset::new(
             "id".into(),

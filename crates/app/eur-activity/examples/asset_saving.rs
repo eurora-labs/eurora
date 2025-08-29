@@ -7,7 +7,9 @@
 //! - Retrieve saved asset information
 
 use eur_activity::{
-    types::SaveFunctionality, Activity, ActivityAsset, ArticleAsset, AssetStorage, AssetFunctionality, DefaultAsset, StorageConfig, TranscriptLine, TwitterAsset, TwitterContextType, TwitterTweet, YoutubeAsset
+    Activity, ActivityAsset, ArticleAsset, AssetFunctionality, AssetStorage, DefaultAsset,
+    StorageConfig, TranscriptLine, TwitterAsset, TwitterContextType, TwitterTweet, YoutubeAsset,
+    types::SaveFunctionality,
 };
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -23,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a temporary directory for this example
     let temp_dir = TempDir::new()?;
     let base_path = temp_dir.path().to_path_buf();
-    
+
     println!("📁 Using temporary directory: {}", base_path.display());
 
     // Configure asset storage
@@ -33,14 +35,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use_content_hash: true,
         max_file_size: Some(10 * 1024 * 1024), // 10MB limit
     };
-    
+
     let storage = AssetStorage::new(storage_config);
-    
+
     println!("⚙️  Storage configured with content hashing and type organization");
 
     // Create sample assets
     let assets = create_sample_assets();
-    
+
     println!("📦 Created {} sample assets", assets.len());
 
     // Create an activity with these assets
@@ -54,16 +56,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Save all assets to disk
     println!("\n💾 Saving assets to disk...");
     let saved_assets = activity.save_assets_to_disk(&storage).await?;
-    
+
     println!("✅ Successfully saved {} assets:", saved_assets.len());
-    
+
     for (i, saved_asset) in saved_assets.iter().enumerate() {
-        println!("  {}. {} -> {}", 
+        println!(
+            "  {}. {} -> {}",
             i + 1,
             saved_asset.file_path.display(),
             saved_asset.absolute_path.display()
         );
-        println!("     Size: {} bytes, Hash: {}", 
+        println!(
+            "     Size: {} bytes, Hash: {}",
             saved_asset.file_size,
             saved_asset.content_hash.as_deref().unwrap_or("none")
         );
@@ -82,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demonstrate storage configuration options
     println!("\n🔧 Testing different storage configurations...");
-    
+
     // Configuration without content hashing
     let no_hash_config = StorageConfig {
         base_dir: base_path.join("no_hash"),
@@ -90,22 +94,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use_content_hash: false,
         max_file_size: None,
     };
-    
+
     let no_hash_storage = AssetStorage::new(no_hash_config);
-    
+
     // Save the same YouTube asset with different config
     if let Some(youtube_asset) = activity.assets.first() {
         let saved_info = youtube_asset.save_to_disk(&no_hash_storage).await?;
-        println!("📁 Saved without hashing: {}", saved_info.file_path.display());
+        println!(
+            "📁 Saved without hashing: {}",
+            saved_info.file_path.display()
+        );
     }
 
     println!("\n🎉 Example completed successfully!");
     println!("💡 Check the temporary directory to see the saved files:");
     println!("   {}", base_path.display());
-    
+
     // Keep the temp directory around for inspection
     std::mem::forget(temp_dir);
-    
+
     Ok(())
 }
 
@@ -135,7 +142,7 @@ fn create_sample_assets() -> Vec<ActivityAsset> {
             ],
             45.2,
         )),
-        
+
         // Article asset
         ActivityAsset::ArticleAsset(ArticleAsset::new(
             "article-456".to_string(),
@@ -145,7 +152,7 @@ fn create_sample_assets() -> Vec<ActivityAsset> {
             Some("Jane Developer".to_string()),
             Some("2024-01-15".to_string()),
         )),
-        
+
         // Twitter asset
         ActivityAsset::TwitterAsset(TwitterAsset::new(
             "twitter-789".to_string(),
@@ -165,7 +172,7 @@ fn create_sample_assets() -> Vec<ActivityAsset> {
             ],
             TwitterContextType::Timeline,
         )),
-        
+
         // Default asset
         ActivityAsset::DefaultAsset(
             DefaultAsset::new(
@@ -181,12 +188,19 @@ fn create_sample_assets() -> Vec<ActivityAsset> {
     ]
 }
 
-async fn show_directory_structure(path: &PathBuf, depth: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn show_directory_structure(
+    path: &PathBuf,
+    depth: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
     let indent = "  ".repeat(depth);
-    
+
     if path.is_dir() {
-        println!("{}📁 {}", indent, path.file_name().unwrap_or_default().to_string_lossy());
-        
+        println!(
+            "{}📁 {}",
+            indent,
+            path.file_name().unwrap_or_default().to_string_lossy()
+        );
+
         let mut entries = tokio::fs::read_dir(path).await?;
         while let Some(entry) = entries.next_entry().await? {
             let entry_path = entry.path();
@@ -194,7 +208,8 @@ async fn show_directory_structure(path: &PathBuf, depth: usize) -> Result<(), Bo
                 Box::pin(show_directory_structure(&entry_path, depth + 1)).await?;
             } else {
                 let metadata = tokio::fs::metadata(&entry_path).await?;
-                println!("{}📄 {} ({} bytes)", 
+                println!(
+                    "{}📄 {} ({} bytes)",
                     "  ".repeat(depth + 1),
                     entry_path.file_name().unwrap_or_default().to_string_lossy(),
                     metadata.len()
@@ -202,6 +217,6 @@ async fn show_directory_structure(path: &PathBuf, depth: usize) -> Result<(), Bo
             }
         }
     }
-    
+
     Ok(())
 }
