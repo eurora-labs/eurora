@@ -39,7 +39,7 @@ impl DefaultStrategy {
             .with_metadata("process_name".to_string(), self.process_name.clone())
             .with_metadata("strategy".to_string(), "default".to_string());
 
-        Ok(vec![ActivityAsset::Default(asset)])
+        Ok(vec![ActivityAsset::DefaultAsset(asset)])
     }
 
     /// Retrieve snapshots (creates a simple state snapshot)
@@ -51,7 +51,7 @@ impl DefaultStrategy {
             self.name, self.process_name
         ));
 
-        Ok(vec![ActivitySnapshot::Default(snapshot)])
+        Ok(vec![ActivitySnapshot::DefaultSnapshot(snapshot)])
     }
 
     /// Gather current state as string
@@ -132,7 +132,7 @@ mod tests {
         assert_eq!(assets.len(), 1);
 
         match &assets[0] {
-            ActivityAsset::Default(asset) => {
+            ActivityAsset::DefaultAsset(asset) => {
                 assert_eq!(asset.name, "Test App");
                 assert_eq!(
                     asset.get_metadata("process_name"),
@@ -157,7 +157,7 @@ mod tests {
         assert_eq!(snapshots.len(), 1);
 
         match &snapshots[0] {
-            ActivitySnapshot::Default(snapshot) => {
+            ActivitySnapshot::DefaultSnapshot(snapshot) => {
                 assert!(snapshot.state.contains("Test App"));
                 assert!(snapshot.state.contains("test_process"));
             }

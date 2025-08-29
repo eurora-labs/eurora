@@ -1,6 +1,9 @@
 //! Default asset implementation for unsupported activity types
 
-use crate::types::ContextChip;
+use crate::storage::SaveableAsset;
+use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
+use crate::{AssetStorage, SavedAssetInfo};
+use async_trait::async_trait;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
@@ -57,34 +60,6 @@ impl DefaultAsset {
         self
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let mut content = format!("I am working with an application called '{}'", self.name);
-
-        if let Some(description) = &self.description {
-            content.push_str(&format!(" - {}", description));
-        }
-
-        if !self.metadata.is_empty() {
-            content.push_str(" with the following context:");
-            for (key, value) in &self.metadata {
-                content.push_str(&format!("\n- {}: {}", key, value));
-            }
-        }
-
-        content.push_str(" and have a question about it.");
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }
-    }
-
-    /// Get context chip for UI integration (returns None for default assets)
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
-        None
-    }
-
     /// Get a specific metadata value
     pub fn get_metadata(&self, key: &str) -> Option<&String> {
         self.metadata.get(key)
@@ -108,6 +83,79 @@ impl DefaultAsset {
     /// Update the icon
     pub fn set_icon(&mut self, icon: String) {
         self.icon = Some(icon);
+    }
+}
+
+#[async_trait]
+impl SaveFunctionality for DefaultAsset {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
+        storage.save_asset(self).await
+    }
+}
+
+impl AssetFunctionality for DefaultAsset {
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn get_icon(&self) -> Option<&str> {
+        Some("default")
+    }
+
+    /// Construct a message for LLM interaction
+    fn construct_message(&self) -> Message {
+        let mut content = format!("I am working with an application called '{}'", self.name);
+
+        if let Some(description) = &self.description {
+            content.push_str(&format!(" - {}", description));
+        }
+
+        if !self.metadata.is_empty() {
+            content.push_str(" with the following context:");
+            for (key, value) in &self.metadata {
+                content.push_str(&format!("\n- {}: {}", key, value));
+            }
+        }
+
+        content.push_str(" and have a question about it.");
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(content),
+        }
+    }
+
+    /// Get context chip for UI integration (returns None for default assets)
+    fn get_context_chip(&self) -> Option<ContextChip> {
+        None
+    }
+}
+
+#[async_trait]
+impl SaveableAsset for DefaultAsset {
+    fn get_asset_type(&self) -> &'static str {
+        "default"
+    }
+
+    fn get_file_extension(&self) -> &'static str {
+        "json"
+    }
+
+    fn get_mime_type(&self) -> &'static str {
+        "application/json"
+    }
+
+    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+        let json = serde_json::to_string_pretty(self)?;
+        Ok(json.into_bytes())
+    }
+
+    fn get_unique_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn get_display_name(&self) -> String {
+        self.name.clone()
     }
 }
 
@@ -214,5 +262,22 @@ mod tests {
     fn test_context_chip() {
         let asset = DefaultAsset::simple("Test App".to_string());
         assert!(asset.get_context_chip().is_none());
+    }
+
+    #[test]
+    fn trait_methods_work() {
+        use crate::types::AssetFunctionality;
+        let asset = DefaultAsset::new(
+            "test-id".to_string(),
+            "Test App".to_string(),
+            None,
+            Some("A test application".to_string()),
+        )
+        .with_metadata("version".to_string(), "1.0.0".to_string())
+        .with_metadata("status".to_string(), "active".to_string());
+        let msg = AssetFunctionality::construct_message(&asset);
+        let chip = AssetFunctionality::get_context_chip(&asset);
+        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(chip.is_none());
     }
 }

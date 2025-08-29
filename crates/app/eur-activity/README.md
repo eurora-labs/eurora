@@ -44,6 +44,151 @@ Collects data from web browsers including:
 ### Default Strategy
 Fallback strategy for unsupported applications that provides basic metadata collection.
 
+## Asset Storage
+
+The activity system now includes comprehensive asset storage functionality that allows you to save activity assets to disk for persistent storage and later reference in SQLite databases.
+
+### Key Features
+
+- **Type-safe asset saving**: Each asset type implements the `SaveableAsset` trait
+- **Content deduplication**: Uses SHA-256 hashing to avoid storing duplicate content
+- **Organized storage**: Assets can be organized by type in separate directories
+- **Configurable storage**: Flexible configuration for storage location and behavior
+- **Path generation**: Returns file paths suitable for SQLite storage
+- **Async support**: All operations are async for better performance
+
+### Storage Configuration
+
+```rust
+use eur_activity::{AssetStorage, StorageConfig};
+use std::path::PathBuf;
+
+// Create storage configuration
+let config = StorageConfig {
+    base_dir: PathBuf::from("./my_assets"),
+    organize_by_type: true,        // Create youtube/, article/, etc. subdirectories
+    use_content_hash: true,        // Enable content deduplication
+    max_file_size: Some(50 * 1024 * 1024), // 50MB limit
+};
+
+let storage = AssetStorage::new(config);
+
+// Or use the convenience constructor
+let storage = AssetStorage::with_base_dir("./my_assets");
+```
+
+### Saving Assets
+
+```rust
+use eur_activity::{Activity, AssetStorage, YoutubeAsset, TranscriptLine};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let storage = AssetStorage::with_base_dir("./assets");
+    
+    // Create a YouTube asset
+    let youtube_asset = YoutubeAsset::new(
+        "yt-123".to_string(),
+        "https://youtube.com/watch?v=example".to_string(),
+        "Rust Tutorial".to_string(),
+        vec![
+            TranscriptLine {
+                text: "Welcome to Rust programming".to_string(),
+                start: 0.0,
+                duration: 3.0,
+            }
+        ],
+        120.5,
+    );
+    
+    // Save individual asset
+    let saved_info = youtube_asset.save_to_disk(&storage).await?;
+    println!("Saved to: {}", saved_info.file_path.display());
+    println!("Full path: {}", saved_info.absolute_path.display());
+    
+    // Save all assets in an activity
+    let activity = Activity::new(
+        "My Activity".to_string(),
+        "icon".to_string(),
+        "process".to_string(),
+        vec![ActivityAsset::Youtube(youtube_asset)],
+    );
+    
+    let saved_assets = activity.save_assets_to_disk(&storage).await?;
+    for saved_asset in saved_assets {
+        // Store the file_path in your SQLite database
+        println!("Asset saved: {}", saved_asset.file_path.display());
+    }
+    
+    Ok(())
+}
+```
+
+### Storage Structure
+
+With `organize_by_type: true`, assets are organized like this:
+
+```
+assets/
+├── youtube/
+│   ├── a1b2c3d4e5f6g7h8_Rust_Tutorial.json
+│   └── f9e8d7c6b5a4g3h2_Advanced_Rust.json
+├── article/
+│   ├── 1a2b3c4d5e6f7g8h_Programming_Guide.json
+│   └── 8h7g6f5e4d3c2b1a_Best_Practices.json
+├── twitter/
+│   └── 9i8h7g6f5e4d3c2b_Timeline_Capture.json
+└── default/
+    └── 2b3c4d5e6f7g8h9i_VS_Code_Session.json
+```
+
+### Content Deduplication
+
+When `use_content_hash: true`, identical content is automatically deduplicated:
+
+```rust
+// These will result in the same file being used
+let asset1 = YoutubeAsset::new(/* same content */);
+let asset2 = YoutubeAsset::new(/* same content */);
+
+let saved1 = asset1.save_to_disk(&storage).await?;
+let saved2 = asset2.save_to_disk(&storage).await?;
+
+// saved1.file_path == saved2.file_path (same file!)
+assert_eq!(saved1.content_hash, saved2.content_hash);
+```
+
+### SQLite Integration
+
+The returned file paths are perfect for storing in SQLite:
+
+```sql
+CREATE TABLE saved_assets (
+    id INTEGER PRIMARY KEY,
+    activity_id INTEGER,
+    asset_type TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    content_hash TEXT,
+    file_size INTEGER,
+    saved_at DATETIME,
+    FOREIGN KEY (activity_id) REFERENCES activities(id)
+);
+```
+
+```rust
+// Store in database
+let saved_info = asset.save_to_disk(&storage).await?;
+sqlx::query!(
+    "INSERT INTO saved_assets (asset_type, file_path, content_hash, file_size, saved_at)
+     VALUES (?, ?, ?, ?, ?)",
+    saved_info.mime_type,
+    saved_info.file_path.to_string_lossy(),
+    saved_info.content_hash,
+    saved_info.file_size as i64,
+    saved_info.saved_at
+).execute(&pool).await?;
+```
+
 ## Usage
 
 ### Basic Usage
@@ -350,6 +495,24 @@ The architecture is designed to support:
 - **Cross-Platform Support**: Platform-specific optimizations
 
 ## Examples
+
+### Asset Saving Example
+
+Run the asset saving example to see the storage functionality in action:
+
+```bash
+cargo run --example asset_saving
+```
+
+This example demonstrates:
+- Creating different types of assets (YouTube, Article, Twitter, Default)
+- Configuring asset storage with different options
+- Saving assets to disk with content deduplication
+- Organizing assets by type
+- Directory structure creation
+- SQLite-ready file path generation
+
+### Extensible Activity System Example
 
 Run the comprehensive example:
 

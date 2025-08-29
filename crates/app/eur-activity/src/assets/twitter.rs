@@ -1,7 +1,10 @@
 //! Twitter asset implementation
 
 use crate::error::ActivityError;
-use crate::types::ContextChip;
+use crate::storage::SaveableAsset;
+use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
+use crate::{AssetStorage, SavedAssetInfo};
+use async_trait::async_trait;
 use eur_proto::ipc::{ProtoTweet, ProtoTwitterState};
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -68,6 +71,72 @@ impl TwitterTweet {
             .filter(|word| word.starts_with('@'))
             .map(|mention| mention.trim_start_matches('@').to_string())
             .collect()
+    }
+}
+#[async_trait]
+impl SaveFunctionality for TwitterAsset {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
+        storage.save_asset(self).await
+    }
+}
+
+impl AssetFunctionality for TwitterAsset {
+    fn get_name(&self) -> &str {
+        &self.title
+    }
+
+    fn get_icon(&self) -> Option<&str> {
+        Some("twitter")
+    }
+
+    /// Construct a message for LLM interaction
+    fn construct_message(&self) -> Message {
+        let max_tweets = 20usize;
+        let tweet_texts: Vec<String> = self
+            .tweets
+            .iter()
+            .take(max_tweets)
+            .map(|tweet| tweet.get_formatted_text())
+            .collect();
+
+        let context_description = match self.context_type {
+            TwitterContextType::Timeline => "timeline",
+            TwitterContextType::Profile => "profile",
+            TwitterContextType::Thread => "thread",
+            TwitterContextType::Search => "search results",
+            TwitterContextType::Hashtag => "hashtag feed",
+        };
+
+        let mut text = format!(
+            "I am looking at Twitter {} content titled '{}' and have a question about it. \
+                         Here are the tweets I'm seeing: \n\n{}",
+            context_description,
+            self.title,
+            tweet_texts.join("\n\n")
+        );
+        if self.tweets.len() > max_tweets {
+            text.push_str(&format!(
+                "\n\n(+{} more tweets truncated)",
+                self.tweets.len() - max_tweets,
+            ));
+        }
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(text),
+        }
+    }
+
+    /// Get context chip for UI integration
+    fn get_context_chip(&self) -> Option<ContextChip> {
+        Some(ContextChip {
+            id: self.id.clone(),
+            name: "twitter".to_string(),
+            extension_id: "2c434895-d32c-485f-8525-c4394863b83a".to_string(),
+            attrs: HashMap::new(),
+            icon: None,
+            position: Some(0),
+        })
     }
 }
 
@@ -138,56 +207,6 @@ impl TwitterAsset {
         })
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let max_tweets = 20usize;
-        let tweet_texts: Vec<String> = self
-            .tweets
-            .iter()
-            .take(max_tweets)
-            .map(|tweet| tweet.get_formatted_text())
-            .collect();
-
-        let context_description = match self.context_type {
-            TwitterContextType::Timeline => "timeline",
-            TwitterContextType::Profile => "profile",
-            TwitterContextType::Thread => "thread",
-            TwitterContextType::Search => "search results",
-            TwitterContextType::Hashtag => "hashtag feed",
-        };
-
-        let mut text = format!(
-            "I am looking at Twitter {} content titled '{}' and have a question about it. \
-                         Here are the tweets I'm seeing: \n\n{}",
-            context_description,
-            self.title,
-            tweet_texts.join("\n\n")
-        );
-        if self.tweets.len() > max_tweets {
-            text.push_str(&format!(
-                "\n\n(+{} more tweets truncated)",
-                self.tweets.len() - max_tweets,
-            ));
-        }
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(text),
-        }
-    }
-
-    /// Get context chip for UI integration
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
-        Some(ContextChip {
-            id: self.id.clone(),
-            name: "twitter".to_string(),
-            extension_id: "2c434895-d32c-485f-8525-c4394863b83a".to_string(),
-            attrs: HashMap::new(),
-            icon: None,
-            position: Some(0),
-        })
-    }
-
     /// Get all unique hashtags from all tweets
     pub fn get_all_hashtags(&self) -> Vec<String> {
         let mut hashtags = Vec::new();
@@ -241,6 +260,34 @@ impl TwitterAsset {
 impl From<ProtoTwitterState> for TwitterAsset {
     fn from(state: ProtoTwitterState) -> Self {
         Self::try_from(state).expect("Failed to convert ProtoTwitterState to TwitterAsset")
+    }
+}
+
+#[async_trait]
+impl SaveableAsset for TwitterAsset {
+    fn get_asset_type(&self) -> &'static str {
+        "twitter"
+    }
+
+    fn get_file_extension(&self) -> &'static str {
+        "json"
+    }
+
+    fn get_mime_type(&self) -> &'static str {
+        "application/json"
+    }
+
+    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+        let json = serde_json::to_string_pretty(self)?;
+        Ok(json.into_bytes())
+    }
+
+    fn get_unique_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn get_display_name(&self) -> String {
+        self.title.clone()
     }
 }
 
@@ -388,5 +435,21 @@ mod tests {
         assert_eq!(chip.id, "test-id");
         assert_eq!(chip.name, "twitter");
         assert_eq!(chip.extension_id, "2c434895-d32c-485f-8525-c4394863b83a");
+    }
+
+    #[test]
+    fn trait_methods_work() {
+        use crate::types::AssetFunctionality;
+        let asset = TwitterAsset::new(
+            "id".into(),
+            "url".into(),
+            "title".into(),
+            vec![],
+            TwitterContextType::Timeline,
+        );
+        let msg = AssetFunctionality::construct_message(&asset);
+        let chip = AssetFunctionality::get_context_chip(&asset);
+        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(chip.is_some());
     }
 }

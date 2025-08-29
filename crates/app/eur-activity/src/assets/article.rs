@@ -1,7 +1,10 @@
 //! Article asset implementation
 
 use crate::error::ActivityError;
-use crate::types::ContextChip;
+use crate::storage::SaveableAsset;
+use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
+use crate::{AssetStorage, SavedAssetInfo};
+use async_trait::async_trait;
 use eur_proto::ipc::ProtoArticleState;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -59,40 +62,6 @@ impl ArticleAsset {
         })
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let mut content = format!(
-            "I am reading an article titled '{}' and have a question about it.",
-            self.title
-        );
-
-        if let Some(author) = &self.author {
-            content.push_str(&format!(" The article is by {}.", author));
-        }
-
-        content.push_str(&format!(
-            " Here's the text content of the article: \n {}",
-            self.content
-        ));
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }
-    }
-
-    /// Get context chip for UI integration
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
-        Some(ContextChip {
-            id: self.id.clone(),
-            name: "article".to_string(),
-            extension_id: "309f0906-d48c-4439-9751-7bcf915cdfc5".to_string(),
-            attrs: HashMap::new(),
-            icon: None,
-            position: Some(0),
-        })
-    }
-
     /// Get a preview of the article content (first N words)
     pub fn get_preview(&self, word_limit: usize) -> String {
         let words: Vec<&str> = self.content.split_whitespace().collect();
@@ -119,6 +88,84 @@ impl ArticleAsset {
             || self.author.as_ref().map_or(false, |author| {
                 author.to_lowercase().contains(&keyword_lower)
             })
+    }
+}
+
+#[async_trait]
+impl SaveFunctionality for ArticleAsset {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
+        storage.save_asset(self).await
+    }
+}
+
+impl AssetFunctionality for ArticleAsset {
+    fn get_name(&self) -> &str {
+        &self.title
+    }
+
+    fn get_icon(&self) -> Option<&str> {
+        Some("article")
+    }
+
+    /// Construct a message for LLM interaction
+    fn construct_message(&self) -> Message {
+        let mut content = format!(
+            "I am reading an article titled '{}' and have a question about it.",
+            self.title
+        );
+
+        if let Some(author) = &self.author {
+            content.push_str(&format!(" The article is by {}.", author));
+        }
+
+        content.push_str(&format!(
+            " Here's the text content of the article: \n {}",
+            self.content
+        ));
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(content),
+        }
+    }
+
+    fn get_context_chip(&self) -> Option<ContextChip> {
+        Some(ContextChip {
+            id: self.id.clone(),
+            name: "article".to_string(),
+            extension_id: "309f0906-d48c-4439-9751-7bcf915cdfc5".to_string(),
+            attrs: HashMap::new(),
+            icon: None,
+            position: Some(0),
+        })
+    }
+}
+
+#[async_trait]
+impl SaveableAsset for ArticleAsset {
+    fn get_asset_type(&self) -> &'static str {
+        "article"
+    }
+
+    fn get_file_extension(&self) -> &'static str {
+        "json"
+    }
+
+    fn get_mime_type(&self) -> &'static str {
+        "application/json"
+    }
+
+    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+        let json = serde_json::to_string_pretty(self)?;
+        Ok(json.into_bytes())
+    }
+
+    fn get_unique_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn get_display_name(&self) -> String {
+        self.title.clone()
     }
 }
 
@@ -242,5 +289,22 @@ mod tests {
         assert_eq!(chip.id, "test-id");
         assert_eq!(chip.name, "article");
         assert_eq!(chip.extension_id, "309f0906-d48c-4439-9751-7bcf915cdfc5");
+    }
+
+    #[test]
+    fn trait_methods_work() {
+        use crate::types::AssetFunctionality;
+        let asset = ArticleAsset::new(
+            "test-id".to_string(),
+            "https://example.com/article".to_string(),
+            "Test Article".to_string(),
+            "This is a test article with some content.".to_string(),
+            Some("Test Author".to_string()),
+            Some("2024-01-01".to_string()),
+        );
+        let msg = AssetFunctionality::construct_message(&asset);
+        let chip = AssetFunctionality::get_context_chip(&asset);
+        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(chip.is_some());
     }
 }
