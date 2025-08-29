@@ -2,7 +2,8 @@
 
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
-use crate::types::ContextChip;
+use crate::types::{CommonFunctionality, ContextChip, SaveFunctionality};
+use crate::{AssetStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use eur_proto::ipc::ProtoYoutubeState;
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -64,8 +65,42 @@ impl YoutubeAsset {
         })
     }
 
+    /// Get transcript text at a specific time
+    pub fn get_transcript_at_time(&self, time: f32) -> Option<&str> {
+        self.transcript
+            .iter()
+            .find(|line| line.start <= time && time < line.start + line.duration)
+            .map(|line| line.text.as_str())
+    }
+
+    /// Get all transcript text as a single string
+    pub fn get_full_transcript(&self) -> String {
+        self.transcript
+            .iter()
+            .map(|line| line.text.clone())
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
+}
+
+#[async_trait]
+impl SaveFunctionality for YoutubeAsset {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
+        storage.save_asset(self).await
+    }
+}
+
+impl CommonFunctionality for YoutubeAsset {
+    fn get_name(&self) -> &str {
+        &self.title
+    }
+
+    fn get_icon(&self) -> Option<&str> {
+        Some("youtube")
+    }
+
     /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
+    fn construct_message(&self) -> Message {
         Message {
             role: Role::User,
             content: MessageContent::Text(format!(
@@ -82,7 +117,7 @@ impl YoutubeAsset {
     }
 
     /// Get context chip for UI integration
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
+    fn get_context_chip(&self) -> Option<ContextChip> {
         Some(ContextChip {
             id: self.id.clone(),
             name: "video".to_string(),
@@ -91,23 +126,6 @@ impl YoutubeAsset {
             icon: None,
             position: Some(0),
         })
-    }
-
-    /// Get transcript text at a specific time
-    pub fn get_transcript_at_time(&self, time: f32) -> Option<&str> {
-        self.transcript
-            .iter()
-            .find(|line| line.start <= time && time < line.start + line.duration)
-            .map(|line| line.text.as_str())
-    }
-
-    /// Get all transcript text as a single string
-    pub fn get_full_transcript(&self) -> String {
-        self.transcript
-            .iter()
-            .map(|line| line.text.clone())
-            .collect::<Vec<String>>()
-            .join(" ")
     }
 }
 

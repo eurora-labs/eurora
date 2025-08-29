@@ -2,7 +2,8 @@
 
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
-use crate::types::ContextChip;
+use crate::types::{CommonFunctionality, ContextChip, SaveFunctionality};
+use crate::{AssetStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use eur_proto::ipc::{ProtoTweet, ProtoTwitterState};
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -70,6 +71,30 @@ impl TwitterTweet {
             .filter(|word| word.starts_with('@'))
             .map(|mention| mention.trim_start_matches('@').to_string())
             .collect()
+    }
+}
+#[async_trait]
+impl SaveFunctionality for TwitterAsset {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
+        storage.save_asset(self).await
+    }
+}
+
+impl CommonFunctionality for TwitterAsset {
+    fn get_name(&self) -> &str {
+        &self.title
+    }
+
+    fn get_icon(&self) -> Option<&str> {
+        Some("twitter")
+    }
+
+    fn construct_message(&self) -> Message {
+        todo!()
+    }
+
+    fn get_context_chip(&self) -> Option<ContextChip> {
+        todo!()
     }
 }
 
