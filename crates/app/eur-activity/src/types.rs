@@ -3,7 +3,7 @@
 //! This module contains the enum-based replacements for the previous trait object system,
 //! providing better performance, type safety, and cloneable activities.
 
-use crate::assets::*;
+use crate::assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
 use crate::snapshots::*;
 use crate::storage::{AssetStorage, SaveableAsset, SavedAssetInfo};
 use async_trait::async_trait;
@@ -91,12 +91,7 @@ impl ActivityAsset {
         &self,
         storage: &AssetStorage,
     ) -> crate::error::Result<SavedAssetInfo> {
-        match self {
-            ActivityAsset::Youtube(asset) => storage.save_asset(asset).await,
-            ActivityAsset::Article(asset) => storage.save_asset(asset).await,
-            ActivityAsset::Twitter(asset) => storage.save_asset(asset).await,
-            ActivityAsset::Default(asset) => storage.save_asset(asset).await,
-        }
+        storage.save_asset(self).await
     }
 }
 
