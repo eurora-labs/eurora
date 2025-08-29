@@ -9,16 +9,23 @@ pub mod config;
 pub mod error;
 pub mod registry;
 pub mod snapshots;
+pub mod storage;
 pub mod strategies;
 pub mod types;
 
 // Re-export core types
 pub use error::{ActivityError, Result};
 pub use strategies::ActivityStrategy;
-pub use types::{Activity, ActivityAsset, ActivitySnapshot, ContextChip, DisplayAsset};
+pub use types::{
+    Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip, DisplayAsset,
+};
 
 // Re-export asset types
 pub use assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
+
+// Re-export asset sub-types
+pub use assets::twitter::{TwitterContextType, TwitterTweet};
+pub use assets::youtube::TranscriptLine;
 
 // Re-export snapshot types
 pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSnapshot};
@@ -37,6 +44,9 @@ pub use registry::{
     MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata,
     StrategyRegistry,
 };
+
+// Re-export storage types
+pub use storage::{AssetStorage, SaveableAsset, SavedAssetInfo, StorageConfig};
 
 use ferrous_focus::IconData;
 use std::sync::{Arc, OnceLock};
@@ -103,6 +113,8 @@ pub async fn select_strategy_for_process(
 
 #[cfg(test)]
 mod tests {
+    use crate::types::SnapshotFunctionality;
+
     use super::*;
 
     #[test]
@@ -128,12 +140,12 @@ mod tests {
             "Test Activity".to_string(),
             "test_icon".to_string(),
             "test_process".to_string(),
-            vec![ActivityAsset::Default(DefaultAsset::simple(
+            vec![ActivityAsset::DefaultAsset(DefaultAsset::simple(
                 "Test Asset".to_string(),
             ))],
         );
 
-        activity.add_snapshot(ActivitySnapshot::Default(DefaultSnapshot::new(
+        activity.add_snapshot(ActivitySnapshot::DefaultSnapshot(DefaultSnapshot::new(
             "Test state".to_string(),
         )));
 
@@ -151,7 +163,7 @@ mod tests {
             "Test Activity".to_string(),
             "test_icon".to_string(),
             "test_process".to_string(),
-            vec![ActivityAsset::Default(DefaultAsset::simple(
+            vec![ActivityAsset::DefaultAsset(DefaultAsset::simple(
                 "Test Asset".to_string(),
             ))],
         );
@@ -173,23 +185,23 @@ mod tests {
             "default_icon".to_string(),
             "test_process".to_string(),
             vec![
-                ActivityAsset::Youtube(YoutubeAsset::new(
+                ActivityAsset::YoutubeAsset(YoutubeAsset::new(
                     "yt1".to_string(),
                     "https://youtube.com/watch?v=test".to_string(),
                     "Test Video".to_string(),
                     vec![],
                     0.0,
                 )),
-                ActivityAsset::Default(DefaultAsset::simple("Test Asset".to_string())),
+                ActivityAsset::DefaultAsset(DefaultAsset::simple("Test Asset".to_string())),
             ],
         );
 
         let display_assets = activity.get_display_assets();
         assert_eq!(display_assets.len(), 2);
         assert_eq!(display_assets[0].name, "Test Video");
-        assert_eq!(display_assets[0].icon, "youtube-icon");
+        assert_eq!(display_assets[0].icon, "youtube");
         assert_eq!(display_assets[1].name, "Test Asset");
-        assert_eq!(display_assets[1].icon, "default_icon"); // Falls back to activity icon
+        assert_eq!(display_assets[1].icon, "default"); // Falls back to activity icon
     }
 
     #[test]
@@ -199,14 +211,14 @@ mod tests {
             "default_icon".to_string(),
             "test_process".to_string(),
             vec![
-                ActivityAsset::Youtube(YoutubeAsset::new(
+                ActivityAsset::YoutubeAsset(YoutubeAsset::new(
                     "yt1".to_string(),
                     "https://youtube.com/watch?v=test".to_string(),
                     "Test Video".to_string(),
                     vec![],
                     0.0,
                 )),
-                ActivityAsset::Default(DefaultAsset::simple("Test Asset".to_string())),
+                ActivityAsset::DefaultAsset(DefaultAsset::simple("Test Asset".to_string())),
             ],
         );
 
@@ -255,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_asset_enum_methods() {
-        let youtube_asset = ActivityAsset::Youtube(YoutubeAsset::new(
+        let youtube_asset = ActivityAsset::YoutubeAsset(YoutubeAsset::new(
             "yt1".to_string(),
             "https://youtube.com/watch?v=test".to_string(),
             "Test Video".to_string(),
@@ -264,18 +276,19 @@ mod tests {
         ));
 
         assert_eq!(youtube_asset.get_name(), "Test Video");
-        assert_eq!(youtube_asset.get_icon(), Some("youtube-icon"));
+        assert_eq!(youtube_asset.get_icon(), Some("youtube"));
         assert!(youtube_asset.get_context_chip().is_some());
 
-        let default_asset = ActivityAsset::Default(DefaultAsset::simple("Test Asset".to_string()));
+        let default_asset =
+            ActivityAsset::DefaultAsset(DefaultAsset::simple("Test Asset".to_string()));
         assert_eq!(default_asset.get_name(), "Test Asset");
-        assert_eq!(default_asset.get_icon(), None);
+        assert_eq!(default_asset.get_icon(), Some("default"));
         assert!(default_asset.get_context_chip().is_none());
     }
 
     #[test]
     fn test_snapshot_enum_methods() {
-        let youtube_snapshot = ActivitySnapshot::Youtube(YoutubeSnapshot::new(
+        let youtube_snapshot = ActivitySnapshot::YoutubeSnapshot(YoutubeSnapshot::new(
             None,
             120.0,
             Some(300.0),
@@ -287,7 +300,7 @@ mod tests {
         assert!(youtube_snapshot.get_updated_at() > 0);
 
         let default_snapshot =
-            ActivitySnapshot::Default(DefaultSnapshot::new("Test state".to_string()));
+            ActivitySnapshot::DefaultSnapshot(DefaultSnapshot::new("Test state".to_string()));
         assert!(default_snapshot.get_created_at() > 0);
         assert!(default_snapshot.get_updated_at() > 0);
     }
