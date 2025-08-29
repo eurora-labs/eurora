@@ -8,6 +8,7 @@ use crate::snapshots::*;
 use crate::storage::{AssetStorage, SaveableAsset, SavedAssetInfo};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use enum_dispatch::enum_dispatch;
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -37,119 +38,27 @@ impl DisplayAsset {
 }
 
 /// Enum containing all possible activity assets
+#[enum_dispatch(SaveableAsset, CommonFunctionality, SaveFunctionality)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActivityAsset {
-    Youtube(YoutubeAsset),
-    Article(ArticleAsset),
-    Twitter(TwitterAsset),
-    Default(DefaultAsset),
+    YoutubeAsset,
+    ArticleAsset,
+    TwitterAsset,
+    DefaultAsset,
 }
 
-impl ActivityAsset {
-    /// Get the name of the asset
-    pub fn get_name(&self) -> &str {
-        match self {
-            ActivityAsset::Youtube(asset) => &asset.title,
-            ActivityAsset::Article(asset) => &asset.title,
-            ActivityAsset::Twitter(asset) => &asset.title,
-            ActivityAsset::Default(asset) => &asset.name,
-        }
-    }
-
-    /// Get the icon of the asset
-    pub fn get_icon(&self) -> Option<&str> {
-        match self {
-            ActivityAsset::Youtube(_) => Some("youtube-icon"),
-            ActivityAsset::Article(_) => Some("article-icon"),
-            ActivityAsset::Twitter(_) => Some("twitter-icon"),
-            ActivityAsset::Default(asset) => asset.icon.as_deref(),
-        }
-    }
-
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.construct_message(),
-            ActivityAsset::Article(asset) => asset.construct_message(),
-            ActivityAsset::Twitter(asset) => asset.construct_message(),
-            ActivityAsset::Default(asset) => asset.construct_message(),
-        }
-    }
-
-    /// Get context chip for UI integration
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.get_context_chip(),
-            ActivityAsset::Article(asset) => asset.get_context_chip(),
-            ActivityAsset::Twitter(asset) => asset.get_context_chip(),
-            ActivityAsset::Default(_) => None,
-        }
-    }
-
-    /// Save this asset to disk using the provided storage
-    pub async fn save_to_disk(
-        &self,
-        storage: &AssetStorage,
-    ) -> crate::error::Result<SavedAssetInfo> {
-        storage.save_asset(self).await
-    }
+#[enum_dispatch]
+pub trait CommonFunctionality {
+    fn get_name(&self) -> &str;
+    fn get_icon(&self) -> Option<&str>;
+    fn construct_message(&self) -> Message;
+    fn get_context_chip(&self) -> Option<ContextChip>;
 }
 
 #[async_trait]
-impl SaveableAsset for ActivityAsset {
-    fn get_asset_type(&self) -> &'static str {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.get_asset_type(),
-            ActivityAsset::Article(asset) => asset.get_asset_type(),
-            ActivityAsset::Twitter(asset) => asset.get_asset_type(),
-            ActivityAsset::Default(asset) => asset.get_asset_type(),
-        }
-    }
-
-    fn get_file_extension(&self) -> &'static str {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.get_file_extension(),
-            ActivityAsset::Article(asset) => asset.get_file_extension(),
-            ActivityAsset::Twitter(asset) => asset.get_file_extension(),
-            ActivityAsset::Default(asset) => asset.get_file_extension(),
-        }
-    }
-
-    fn get_mime_type(&self) -> &'static str {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.get_mime_type(),
-            ActivityAsset::Article(asset) => asset.get_mime_type(),
-            ActivityAsset::Twitter(asset) => asset.get_mime_type(),
-            ActivityAsset::Default(asset) => asset.get_mime_type(),
-        }
-    }
-
-    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.serialize_content().await,
-            ActivityAsset::Article(asset) => asset.serialize_content().await,
-            ActivityAsset::Twitter(asset) => asset.serialize_content().await,
-            ActivityAsset::Default(asset) => asset.serialize_content().await,
-        }
-    }
-
-    fn get_unique_id(&self) -> String {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.get_unique_id(),
-            ActivityAsset::Article(asset) => asset.get_unique_id(),
-            ActivityAsset::Twitter(asset) => asset.get_unique_id(),
-            ActivityAsset::Default(asset) => asset.get_unique_id(),
-        }
-    }
-
-    fn get_display_name(&self) -> String {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.get_display_name(),
-            ActivityAsset::Article(asset) => asset.get_display_name(),
-            ActivityAsset::Twitter(asset) => asset.get_display_name(),
-            ActivityAsset::Default(asset) => asset.get_display_name(),
-        }
-    }
+#[enum_dispatch]
+pub trait SaveFunctionality {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo>;
 }
 
 /// Enum containing all possible activity snapshots
