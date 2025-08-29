@@ -1,11 +1,11 @@
 //! Browser strategy implementation for the refactored activity system
 
-use crate::error::{ActivityError, Result};
+use crate::error::Result;
 use crate::types::{ActivityAsset, ActivitySnapshot};
 use crate::{ArticleAsset, TwitterAsset, YoutubeAsset};
 use crate::{ArticleSnapshot, TwitterSnapshot, YoutubeSnapshot};
 use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
-use eur_proto::ipc::{self, StateRequest, snapshot_response::Snapshot, state_response::State};
+use eur_proto::ipc::{self, StateRequest};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -107,19 +107,19 @@ impl BrowserStrategy {
                     match state {
                         ipc::state_response::State::Youtube(youtube_state) => {
                             match YoutubeAsset::try_from(youtube_state) {
-                                Ok(asset) => assets.push(ActivityAsset::Youtube(asset)),
+                                Ok(asset) => assets.push(ActivityAsset::YoutubeAsset(asset)),
                                 Err(e) => warn!("Failed to create YouTube asset: {}", e),
                             }
                         }
                         ipc::state_response::State::Article(article_state) => {
                             match ArticleAsset::try_from(article_state) {
-                                Ok(asset) => assets.push(ActivityAsset::Article(asset)),
+                                Ok(asset) => assets.push(ActivityAsset::ArticleAsset(asset)),
                                 Err(e) => warn!("Failed to create article asset: {}", e),
                             }
                         }
                         ipc::state_response::State::Twitter(twitter_state) => {
                             match TwitterAsset::try_from(twitter_state) {
-                                Ok(asset) => assets.push(ActivityAsset::Twitter(asset)),
+                                Ok(asset) => assets.push(ActivityAsset::TwitterAsset(asset)),
                                 Err(e) => warn!("Failed to create Twitter asset: {}", e),
                             }
                         }
@@ -161,17 +161,19 @@ impl BrowserStrategy {
                     match snapshot {
                         ipc::snapshot_response::Snapshot::Youtube(youtube_snapshot) => {
                             match YoutubeSnapshot::try_from(youtube_snapshot) {
-                                Ok(snapshot) => snapshots.push(ActivitySnapshot::Youtube(snapshot)),
+                                Ok(snapshot) => {
+                                    snapshots.push(ActivitySnapshot::YoutubeSnapshot(snapshot))
+                                }
                                 Err(e) => warn!("Failed to create YouTube snapshot: {}", e),
                             }
                         }
                         ipc::snapshot_response::Snapshot::Article(article_snapshot) => {
                             let snapshot = ArticleSnapshot::from(article_snapshot);
-                            snapshots.push(ActivitySnapshot::Article(snapshot));
+                            snapshots.push(ActivitySnapshot::ArticleSnapshot(snapshot));
                         }
                         ipc::snapshot_response::Snapshot::Twitter(twitter_snapshot) => {
                             let snapshot = TwitterSnapshot::from(twitter_snapshot);
-                            snapshots.push(ActivitySnapshot::Twitter(snapshot));
+                            snapshots.push(ActivitySnapshot::TwitterSnapshot(snapshot));
                         }
                     }
                 }

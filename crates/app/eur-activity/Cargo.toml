@@ -10,7 +10,7 @@ eur-proto = { workspace = true }
 eur-native-messaging = { workspace = true }
 image.workspace = true
 chrono = { workspace = true, features = ["serde"] }
-tokio = { workspace = true, default-features = false }
+tokio = { workspace = true, default-features = false, features = ["fs", "macros", "rt-multi-thread"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 humantime-serde = { workspace = true }
@@ -28,6 +28,10 @@ ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
 base64 = { workspace = true }
 thiserror = { workspace = true }
 regex = "1.10.2"
+sha2 = "0.10.8"
+hex = "0.4.3"
+tempfile = "3.8.1"
+enum_dispatch = "0.3.13"
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }
