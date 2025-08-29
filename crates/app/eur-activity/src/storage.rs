@@ -152,6 +152,7 @@ impl AssetStorage {
                 Ok(mut file) => {
                     file.write_all(&content).await?;
                     file.flush().await?;
+                    file.sync_all().await?;
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                     // File already exists, no need to create a new one
@@ -169,10 +170,21 @@ impl AssetStorage {
             }
         } else {
             // Non-hash mode: allow overwrite
+            use std::ffi::OsStr;
+            let parent = absolute_path.parent().unwrap_or_else(|| Path::new("."));
+            let tmp_name = absolute_path
+                .file_name()
+                .and_then(OsStr::to_str)
+                .map(|n| format!(".{}.tmp", n))
+                .unwrap_or_else(|| ".tmpfile".to_string());
+            let tmp_path = parent.join(tmp_name);
             open_opts.create(true).write(true).truncate(true);
-            let mut file = open_opts.open(&absolute_path).await?;
+            let mut file = open_opts.open(&tmp_path).await?;
             file.write_all(&content).await?;
             file.flush().await?;
+            file.sync_all().await?;
+            // Persist atomically
+            fs::rename(&tmp_path, &absolute_path).await?;
         }
 
         Ok(SavedAssetInfo {
@@ -193,33 +205,19 @@ impl AssetStorage {
     ) -> Result<PathBuf> {
         let mut path = PathBuf::new();
 
-        // Add asset type directory if organizing by type
-        // if self.config.organize_by_type {
-        //     path.push(asset.get_asset_type());
-        // }
         if self.config.organize_by_type {
             path.push(sanitize_filename(asset.get_asset_type()));
         }
 
-        // // Generate filename
-        // let filename = if let Some(hash) = content_hash {
-        //     // Use content hash for deduplication
-        //     format!("{}.{}", &hash[..16], asset.get_file_extension())
-        // } else {
-        //     // Use unique ID + sanitized display name
-        //     let sanitized_name = sanitize_filename(&asset.get_display_name());
-        //     let unique_id = asset.get_unique_id();
-        //     format!(
-        //         "{}_{}.{}",
-        //         unique_id,
-        //         sanitized_name,
-        //         asset.get_file_extension()
-        //     )
-        // };
-
-        let ext = asset
+        let mut ext = asset
             .get_file_extension()
-            .trim_matches(|c| c == '.' || c == '/' || c == '\\');
+            .trim_matches(|c| c == '.' || c == '/' || c == '\\')
+            .to_ascii_lowercase();
+
+        if !ext.chars().all(|c| c.is_ascii_alphanumeric()) {
+            ext = "bin".to_string();
+        }
+
         let filename = if let Some(hash) = content_hash {
             // Use content hash for deduplication
             format!("{}.{}", &hash[..16], ext)
@@ -283,16 +281,20 @@ fn sanitize_filename(name: &str) -> String {
     for ch in invalid_chars {
         sanitized = sanitized.replace(ch, "_");
     }
+
     // Collapse whitespace to single spaces
     sanitized = sanitized.split_whitespace().collect::<Vec<_>>().join(" ");
+
     // Trim leading/trailing dots and spaces
     sanitized = sanitized
         .trim_matches(|c: char| c == '.' || c == ' ')
         .to_string();
+
     // Limit length to avoid filesystem issues
-    if sanitized.len() > 100 {
-        sanitized.truncate(100);
+    if sanitized.chars().count() > 100 {
+        sanitized = sanitized.chars().take(100).collect();
     }
+
     // Fallback to a default name if empty
     if sanitized.trim().is_empty() {
         "unnamed".to_string()
