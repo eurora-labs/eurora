@@ -161,17 +161,19 @@ impl BrowserStrategy {
                     match snapshot {
                         ipc::snapshot_response::Snapshot::Youtube(youtube_snapshot) => {
                             match YoutubeSnapshot::try_from(youtube_snapshot) {
-                                Ok(snapshot) => snapshots.push(ActivitySnapshot::Youtube(snapshot)),
+                                Ok(snapshot) => {
+                                    snapshots.push(ActivitySnapshot::YoutubeSnapshot(snapshot))
+                                }
                                 Err(e) => warn!("Failed to create YouTube snapshot: {}", e),
                             }
                         }
                         ipc::snapshot_response::Snapshot::Article(article_snapshot) => {
                             let snapshot = ArticleSnapshot::from(article_snapshot);
-                            snapshots.push(ActivitySnapshot::Article(snapshot));
+                            snapshots.push(ActivitySnapshot::ArticleSnapshot(snapshot));
                         }
                         ipc::snapshot_response::Snapshot::Twitter(twitter_snapshot) => {
                             let snapshot = TwitterSnapshot::from(twitter_snapshot);
-                            snapshots.push(ActivitySnapshot::Twitter(snapshot));
+                            snapshots.push(ActivitySnapshot::TwitterSnapshot(snapshot));
                         }
                     }
                 }

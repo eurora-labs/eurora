@@ -1,6 +1,7 @@
 //! Twitter snapshot implementation
 
 use crate::assets::twitter::TwitterTweet;
+use crate::types::SnapshotFunctionality;
 use eur_proto::ipc::ProtoTwitterSnapshot;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -211,6 +212,20 @@ impl TwitterSnapshot {
                 base_desc.to_string()
             }
         })
+    }
+}
+
+impl SnapshotFunctionality for TwitterSnapshot {
+    fn construct_message(&self) -> Message {
+        self.construct_message()
+    }
+
+    fn get_updated_at(&self) -> u64 {
+        self.updated_at
+    }
+
+    fn get_created_at(&self) -> u64 {
+        self.created_at
     }
 }
 
