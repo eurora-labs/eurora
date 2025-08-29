@@ -114,39 +114,6 @@ impl YoutubeSnapshot {
         })
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let mut content_parts = vec![ContentPart::Text {
-            text: format!(
-                "This is a frame from a YouTube video at {}s{}{}",
-                self.current_time,
-                if let Some(title) = &self.video_title {
-                    format!(" titled '{}'", title)
-                } else {
-                    String::new()
-                },
-                if let Some(duration) = self.video_duration {
-                    format!(" (total duration: {}s)", duration)
-                } else {
-                    String::new()
-                }
-            ),
-        }];
-
-        // Add image if available
-        if let Some(image) = &self.video_frame_image {
-            content_parts.push(ContentPart::Image {
-                image_source: ImageSource::DynamicImage(image.clone()),
-                detail: None,
-            });
-        }
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Multimodal(content_parts),
-        }
-    }
-
     /// Get the video frame as a DynamicImage
     pub fn get_video_frame(&mut self) -> Option<&DynamicImage> {
         // If we don't have the runtime image but have serialized data, deserialize it
@@ -205,8 +172,37 @@ impl YoutubeSnapshot {
 }
 
 impl SnapshotFunctionality for YoutubeSnapshot {
+    /// Construct a message for LLM interaction
     fn construct_message(&self) -> Message {
-        self.construct_message()
+        let mut content_parts = vec![ContentPart::Text {
+            text: format!(
+                "This is a frame from a YouTube video at {}s{}{}",
+                self.current_time,
+                if let Some(title) = &self.video_title {
+                    format!(" titled '{}'", title)
+                } else {
+                    String::new()
+                },
+                if let Some(duration) = self.video_duration {
+                    format!(" (total duration: {}s)", duration)
+                } else {
+                    String::new()
+                }
+            ),
+        }];
+
+        // Add image if available
+        if let Some(image) = &self.video_frame_image {
+            content_parts.push(ContentPart::Image {
+                image_source: ImageSource::DynamicImage(image.clone()),
+                detail: None,
+            });
+        }
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Multimodal(content_parts),
+        }
     }
 
     fn get_updated_at(&self) -> u64 {
