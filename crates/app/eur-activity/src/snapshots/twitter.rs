@@ -83,52 +83,6 @@ impl TwitterSnapshot {
         }
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let mut content = String::new();
-
-        // Add context about the page/interaction
-        if let Some(context) = &self.page_context {
-            content.push_str(&format!("I'm viewing Twitter {} ", context));
-        } else {
-            content.push_str("I'm viewing Twitter ");
-        }
-
-        // Add interaction context
-        if let Some(interaction) = &self.interaction_type {
-            let interaction_desc = match interaction {
-                TwitterInteractionType::View => "viewing",
-                TwitterInteractionType::Like => "liking",
-                TwitterInteractionType::Retweet => "retweeting",
-                TwitterInteractionType::Reply => "replying to",
-                TwitterInteractionType::Quote => "quote tweeting",
-                TwitterInteractionType::Follow => "following",
-                TwitterInteractionType::Bookmark => "bookmarking",
-            };
-            content.push_str(&format!("and {} ", interaction_desc));
-
-            if let Some(target) = &self.interaction_target {
-                content.push_str(&format!("content from {} ", target));
-            }
-        }
-
-        content.push_str("and have a question about it. Here are the tweets I'm seeing:\n\n");
-
-        // Add tweet content
-        let tweet_texts: Vec<String> = self
-            .tweets
-            .iter()
-            .map(|tweet| tweet.get_formatted_text())
-            .collect();
-
-        content.push_str(&tweet_texts.join("\n\n"));
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }
-    }
-
     /// Update the timestamp
     pub fn touch(&mut self) {
         self.updated_at = chrono::Utc::now().timestamp() as u64;
@@ -216,8 +170,50 @@ impl TwitterSnapshot {
 }
 
 impl SnapshotFunctionality for TwitterSnapshot {
+    /// Construct a message for LLM interaction
     fn construct_message(&self) -> Message {
-        self.construct_message()
+        let mut content = String::new();
+
+        // Add context about the page/interaction
+        if let Some(context) = &self.page_context {
+            content.push_str(&format!("I'm viewing Twitter {} ", context));
+        } else {
+            content.push_str("I'm viewing Twitter ");
+        }
+
+        // Add interaction context
+        if let Some(interaction) = &self.interaction_type {
+            let interaction_desc = match interaction {
+                TwitterInteractionType::View => "viewing",
+                TwitterInteractionType::Like => "liking",
+                TwitterInteractionType::Retweet => "retweeting",
+                TwitterInteractionType::Reply => "replying to",
+                TwitterInteractionType::Quote => "quote tweeting",
+                TwitterInteractionType::Follow => "following",
+                TwitterInteractionType::Bookmark => "bookmarking",
+            };
+            content.push_str(&format!("and {} ", interaction_desc));
+
+            if let Some(target) = &self.interaction_target {
+                content.push_str(&format!("content from {} ", target));
+            }
+        }
+
+        content.push_str("and have a question about it. Here are the tweets I'm seeing:\n\n");
+
+        // Add tweet content
+        let tweet_texts: Vec<String> = self
+            .tweets
+            .iter()
+            .map(|tweet| tweet.get_formatted_text())
+            .collect();
+
+        content.push_str(&tweet_texts.join("\n\n"));
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(content),
+        }
     }
 
     fn get_updated_at(&self) -> u64 {
