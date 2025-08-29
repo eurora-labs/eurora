@@ -1,7 +1,10 @@
 //! YouTube asset implementation
 
 use crate::error::ActivityError;
-use crate::types::ContextChip;
+use crate::storage::SaveableAsset;
+use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
+use crate::{AssetStorage, SavedAssetInfo};
+use async_trait::async_trait;
 use eur_proto::ipc::ProtoYoutubeState;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -62,8 +65,42 @@ impl YoutubeAsset {
         })
     }
 
+    /// Get transcript text at a specific time
+    pub fn get_transcript_at_time(&self, time: f32) -> Option<&str> {
+        self.transcript
+            .iter()
+            .find(|line| line.start <= time && time < line.start + line.duration)
+            .map(|line| line.text.as_str())
+    }
+
+    /// Get all transcript text as a single string
+    pub fn get_full_transcript(&self) -> String {
+        self.transcript
+            .iter()
+            .map(|line| line.text.clone())
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
+}
+
+#[async_trait]
+impl SaveFunctionality for YoutubeAsset {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
+        storage.save_asset(self).await
+    }
+}
+
+impl AssetFunctionality for YoutubeAsset {
+    fn get_name(&self) -> &str {
+        &self.title
+    }
+
+    fn get_icon(&self) -> Option<&str> {
+        Some("youtube")
+    }
+
     /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
+    fn construct_message(&self) -> Message {
         Message {
             role: Role::User,
             content: MessageContent::Text(format!(
@@ -80,7 +117,7 @@ impl YoutubeAsset {
     }
 
     /// Get context chip for UI integration
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
+    fn get_context_chip(&self) -> Option<ContextChip> {
         Some(ContextChip {
             id: self.id.clone(),
             name: "video".to_string(),
@@ -90,22 +127,33 @@ impl YoutubeAsset {
             position: Some(0),
         })
     }
+}
 
-    /// Get transcript text at a specific time
-    pub fn get_transcript_at_time(&self, time: f32) -> Option<&str> {
-        self.transcript
-            .iter()
-            .find(|line| line.start <= time && time < line.start + line.duration)
-            .map(|line| line.text.as_str())
+#[async_trait]
+impl SaveableAsset for YoutubeAsset {
+    fn get_asset_type(&self) -> &'static str {
+        "youtube"
     }
 
-    /// Get all transcript text as a single string
-    pub fn get_full_transcript(&self) -> String {
-        self.transcript
-            .iter()
-            .map(|line| line.text.clone())
-            .collect::<Vec<String>>()
-            .join(" ")
+    fn get_file_extension(&self) -> &'static str {
+        "json"
+    }
+
+    fn get_mime_type(&self) -> &'static str {
+        "application/json"
+    }
+
+    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+        let json = serde_json::to_string_pretty(self)?;
+        Ok(json.into_bytes())
+    }
+
+    fn get_unique_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn get_display_name(&self) -> String {
+        self.title.clone()
     }
 }
 
@@ -216,5 +264,21 @@ mod tests {
         assert_eq!(chip.id, "test-id");
         assert_eq!(chip.name, "video");
         assert_eq!(chip.extension_id, "7c7b59bb-d44d-431a-9f4d-64240172e092");
+    }
+
+    #[test]
+    fn trait_methods_work() {
+        use crate::types::AssetFunctionality;
+        let asset = YoutubeAsset::new(
+            "test-id".to_string(),
+            "https://youtube.com/watch?v=test".to_string(),
+            "Test Video".to_string(),
+            vec![],
+            0.0,
+        );
+        let msg = AssetFunctionality::construct_message(&asset);
+        let chip = AssetFunctionality::get_context_chip(&asset);
+        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(chip.is_some());
     }
 }

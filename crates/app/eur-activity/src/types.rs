@@ -3,9 +3,12 @@
 //! This module contains the enum-based replacements for the previous trait object system,
 //! providing better performance, type safety, and cloneable activities.
 
-use crate::assets::*;
+use crate::assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
 use crate::snapshots::*;
+use crate::storage::{AssetStorage, SavedAssetInfo};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use enum_dispatch::enum_dispatch;
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,95 +38,44 @@ impl DisplayAsset {
 }
 
 /// Enum containing all possible activity assets
+#[enum_dispatch(SaveableAsset, AssetFunctionality, SaveFunctionality)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActivityAsset {
-    Youtube(YoutubeAsset),
-    Article(ArticleAsset),
-    Twitter(TwitterAsset),
-    Default(DefaultAsset),
+    YoutubeAsset,
+    ArticleAsset,
+    TwitterAsset,
+    DefaultAsset,
 }
 
-impl ActivityAsset {
-    /// Get the name of the asset
-    pub fn get_name(&self) -> &str {
-        match self {
-            ActivityAsset::Youtube(asset) => &asset.title,
-            ActivityAsset::Article(asset) => &asset.title,
-            ActivityAsset::Twitter(asset) => &asset.title,
-            ActivityAsset::Default(asset) => &asset.name,
-        }
-    }
+#[enum_dispatch]
+pub trait AssetFunctionality {
+    fn get_name(&self) -> &str;
+    fn get_icon(&self) -> Option<&str>;
+    fn construct_message(&self) -> Message;
+    fn get_context_chip(&self) -> Option<ContextChip>;
+}
 
-    /// Get the icon of the asset
-    pub fn get_icon(&self) -> Option<&str> {
-        match self {
-            ActivityAsset::Youtube(_) => Some("youtube-icon"),
-            ActivityAsset::Article(_) => Some("article-icon"),
-            ActivityAsset::Twitter(_) => Some("twitter-icon"),
-            ActivityAsset::Default(asset) => asset.icon.as_deref(),
-        }
-    }
+#[async_trait]
+#[enum_dispatch]
+pub trait SaveFunctionality {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo>;
+}
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.construct_message(),
-            ActivityAsset::Article(asset) => asset.construct_message(),
-            ActivityAsset::Twitter(asset) => asset.construct_message(),
-            ActivityAsset::Default(asset) => asset.construct_message(),
-        }
-    }
-
-    /// Get context chip for UI integration
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
-        match self {
-            ActivityAsset::Youtube(asset) => asset.get_context_chip(),
-            ActivityAsset::Article(asset) => asset.get_context_chip(),
-            ActivityAsset::Twitter(asset) => asset.get_context_chip(),
-            ActivityAsset::Default(_) => None,
-        }
-    }
+#[enum_dispatch]
+pub trait SnapshotFunctionality {
+    fn construct_message(&self) -> Message;
+    fn get_updated_at(&self) -> u64;
+    fn get_created_at(&self) -> u64;
 }
 
 /// Enum containing all possible activity snapshots
+#[enum_dispatch(SnapshotFunctionality)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActivitySnapshot {
-    Youtube(YoutubeSnapshot),
-    Article(ArticleSnapshot),
-    Twitter(TwitterSnapshot),
-    Default(DefaultSnapshot),
-}
-
-impl ActivitySnapshot {
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        match self {
-            ActivitySnapshot::Youtube(snapshot) => snapshot.construct_message(),
-            ActivitySnapshot::Article(snapshot) => snapshot.construct_message(),
-            ActivitySnapshot::Twitter(snapshot) => snapshot.construct_message(),
-            ActivitySnapshot::Default(snapshot) => snapshot.construct_message(),
-        }
-    }
-
-    /// Get the timestamp when this snapshot was last updated
-    pub fn get_updated_at(&self) -> u64 {
-        match self {
-            ActivitySnapshot::Youtube(snapshot) => snapshot.updated_at,
-            ActivitySnapshot::Article(snapshot) => snapshot.updated_at,
-            ActivitySnapshot::Twitter(snapshot) => snapshot.updated_at,
-            ActivitySnapshot::Default(snapshot) => snapshot.updated_at,
-        }
-    }
-
-    /// Get the timestamp when this snapshot was created
-    pub fn get_created_at(&self) -> u64 {
-        match self {
-            ActivitySnapshot::Youtube(snapshot) => snapshot.created_at,
-            ActivitySnapshot::Article(snapshot) => snapshot.created_at,
-            ActivitySnapshot::Twitter(snapshot) => snapshot.created_at,
-            ActivitySnapshot::Default(snapshot) => snapshot.created_at,
-        }
-    }
+    YoutubeSnapshot,
+    ArticleSnapshot,
+    TwitterSnapshot,
+    DefaultSnapshot,
 }
 
 /// Main activity structure - now fully cloneable and serializable
@@ -199,5 +151,33 @@ impl Activity {
     /// Mark the activity as ended
     pub fn end_activity(&mut self) {
         self.end = Some(Utc::now());
+    }
+
+    /// Save all assets in this activity to disk
+    pub async fn save_assets_to_disk(
+        &self,
+        storage: &AssetStorage,
+    ) -> crate::error::Result<Vec<SavedAssetInfo>> {
+        let mut saved_assets = Vec::new();
+
+        for asset in &self.assets {
+            let saved_info = asset.save_to_disk(storage).await?;
+            saved_assets.push(saved_info);
+        }
+
+        Ok(saved_assets)
+    }
+
+    /// Save a specific asset by index to disk
+    pub async fn save_asset_by_index(
+        &self,
+        index: usize,
+        storage: &AssetStorage,
+    ) -> crate::error::Result<Option<SavedAssetInfo>> {
+        if let Some(asset) = self.assets.get(index) {
+            Ok(Some(asset.save_to_disk(storage).await?))
+        } else {
+            Ok(None)
+        }
     }
 }

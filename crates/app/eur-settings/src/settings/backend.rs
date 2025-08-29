@@ -3,7 +3,6 @@ use eur_eurora_provider::EuroraConfig;
 use eur_prompt_kit::{OllamaConfig, OpenAIConfig};
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tracing::info;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type, Default)]
 pub enum BackendType {
