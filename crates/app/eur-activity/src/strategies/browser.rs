@@ -107,19 +107,19 @@ impl BrowserStrategy {
                     match state {
                         ipc::state_response::State::Youtube(youtube_state) => {
                             match YoutubeAsset::try_from(youtube_state) {
-                                Ok(asset) => assets.push(ActivityAsset::Youtube(asset)),
+                                Ok(asset) => assets.push(ActivityAsset::YoutubeAsset(asset)),
                                 Err(e) => warn!("Failed to create YouTube asset: {}", e),
                             }
                         }
                         ipc::state_response::State::Article(article_state) => {
                             match ArticleAsset::try_from(article_state) {
-                                Ok(asset) => assets.push(ActivityAsset::Article(asset)),
+                                Ok(asset) => assets.push(ActivityAsset::ArticleAsset(asset)),
                                 Err(e) => warn!("Failed to create article asset: {}", e),
                             }
                         }
                         ipc::state_response::State::Twitter(twitter_state) => {
                             match TwitterAsset::try_from(twitter_state) {
-                                Ok(asset) => assets.push(ActivityAsset::Twitter(asset)),
+                                Ok(asset) => assets.push(ActivityAsset::TwitterAsset(asset)),
                                 Err(e) => warn!("Failed to create Twitter asset: {}", e),
                             }
                         }

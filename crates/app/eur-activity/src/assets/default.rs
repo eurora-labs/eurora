@@ -1,7 +1,8 @@
 //! Default asset implementation for unsupported activity types
 
 use crate::storage::SaveableAsset;
-use crate::types::ContextChip;
+use crate::types::{CommonFunctionality, ContextChip, SaveFunctionality};
+use crate::{AssetStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -59,34 +60,6 @@ impl DefaultAsset {
         self
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let mut content = format!("I am working with an application called '{}'", self.name);
-
-        if let Some(description) = &self.description {
-            content.push_str(&format!(" - {}", description));
-        }
-
-        if !self.metadata.is_empty() {
-            content.push_str(" with the following context:");
-            for (key, value) in &self.metadata {
-                content.push_str(&format!("\n- {}: {}", key, value));
-            }
-        }
-
-        content.push_str(" and have a question about it.");
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }
-    }
-
-    /// Get context chip for UI integration (returns None for default assets)
-    pub fn get_context_chip(&self) -> Option<ContextChip> {
-        None
-    }
-
     /// Get a specific metadata value
     pub fn get_metadata(&self, key: &str) -> Option<&String> {
         self.metadata.get(key)
@@ -110,6 +83,51 @@ impl DefaultAsset {
     /// Update the icon
     pub fn set_icon(&mut self, icon: String) {
         self.icon = Some(icon);
+    }
+}
+
+#[async_trait]
+impl SaveFunctionality for DefaultAsset {
+    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
+        storage.save_asset(self).await
+    }
+}
+
+impl CommonFunctionality for DefaultAsset {
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn get_icon(&self) -> Option<&str> {
+        Some("Default icon")
+    }
+
+    /// Construct a message for LLM interaction
+    fn construct_message(&self) -> Message {
+        let mut content = format!("I am working with an application called '{}'", self.name);
+
+        if let Some(description) = &self.description {
+            content.push_str(&format!(" - {}", description));
+        }
+
+        if !self.metadata.is_empty() {
+            content.push_str(" with the following context:");
+            for (key, value) in &self.metadata {
+                content.push_str(&format!("\n- {}: {}", key, value));
+            }
+        }
+
+        content.push_str(" and have a question about it.");
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(content),
+        }
+    }
+
+    /// Get context chip for UI integration (returns None for default assets)
+    fn get_context_chip(&self) -> Option<ContextChip> {
+        None
     }
 }
 
