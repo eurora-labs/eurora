@@ -48,35 +48,6 @@ impl ArticleSnapshot {
         }
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let mut content = String::new();
-
-        if let Some(title) = &self.page_title {
-            content.push_str(&format!("From article titled '{}': ", title));
-        }
-
-        if let Some(highlight) = &self.highlight {
-            content.push_str(&format!(
-                "I highlighted the following text: \"{}\"",
-                highlight
-            ));
-        } else if let Some(selection) = &self.selection_text {
-            content.push_str(&format!("I selected the following text: \"{}\"", selection));
-        } else {
-            content.push_str("I'm reading an article");
-        }
-
-        if let Some(url) = &self.page_url {
-            content.push_str(&format!(" (from: {})", url));
-        }
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }
-    }
-
     /// Update the timestamp
     pub fn touch(&mut self) {
         self.updated_at = chrono::Utc::now().timestamp() as u64;
@@ -121,8 +92,33 @@ impl ArticleSnapshot {
 }
 
 impl SnapshotFunctionality for ArticleSnapshot {
+    /// Construct a message for LLM interaction
     fn construct_message(&self) -> Message {
-        self.construct_message()
+        let mut content = String::new();
+
+        if let Some(title) = &self.page_title {
+            content.push_str(&format!("From article titled '{}': ", title));
+        }
+
+        if let Some(highlight) = &self.highlight {
+            content.push_str(&format!(
+                "I highlighted the following text: \"{}\"",
+                highlight
+            ));
+        } else if let Some(selection) = &self.selection_text {
+            content.push_str(&format!("I selected the following text: \"{}\"", selection));
+        } else {
+            content.push_str("I'm reading an article");
+        }
+
+        if let Some(url) = &self.page_url {
+            content.push_str(&format!(" (from: {})", url));
+        }
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(content),
+        }
     }
 
     fn get_updated_at(&self) -> u64 {

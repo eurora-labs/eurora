@@ -168,6 +168,12 @@ impl AssetStorage {
                 }
                 Err(e) => return Err(e.into()),
             }
+        } else {
+            // Non-hash mode: allow overwrite
+            open_opts.create(true).write(true).truncate(true);
+            let mut file = open_opts.open(&absolute_path).await?;
+            file.write_all(&content).await?;
+            file.flush().await?;
         }
 
         Ok(SavedAssetInfo {
@@ -393,5 +399,23 @@ mod tests {
         assert!(config.organize_by_type);
         assert!(config.use_content_hash);
         assert_eq!(config.max_file_size, Some(100 * 1024 * 1024));
+    }
+
+    #[tokio::test]
+    async fn test_write_non_hash_mode() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let cfg = StorageConfig {
+            base_dir: tmp.path().to_path_buf(),
+            use_content_hash: false,
+            ..Default::default()
+        };
+        let storage = AssetStorage::new(cfg);
+        let asset = MockAsset {
+            id: "x".into(),
+            name: "n".into(),
+            content: "abc".into(),
+        };
+        let info = storage.save_asset(&asset).await.unwrap();
+        assert!(info.absolute_path.exists());
     }
 }

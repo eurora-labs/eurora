@@ -444,4 +444,20 @@ mod tests {
         assert_eq!(chip.name, "twitter");
         assert_eq!(chip.extension_id, "2c434895-d32c-485f-8525-c4394863b83a");
     }
+
+    #[test]
+    fn twitter_trait_methods_work() {
+        use crate::types::AssetFunctionality;
+        let asset = TwitterAsset::new(
+            "id".into(),
+            "url".into(),
+            "title".into(),
+            vec![],
+            TwitterContextType::Timeline,
+        );
+        let msg = AssetFunctionality::construct_message(&asset);
+        let chip = AssetFunctionality::get_context_chip(&asset);
+        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(chip.is_some());
+    }
 }
