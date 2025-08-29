@@ -61,23 +61,6 @@ impl DefaultSnapshot {
         self.touch();
     }
 
-    /// Construct a message for LLM interaction
-    pub fn construct_message(&self) -> Message {
-        let mut content = format!("Current application state: {}", self.state);
-
-        if !self.metadata.is_empty() {
-            content.push_str(" with additional context:");
-            for (key, value) in &self.metadata {
-                content.push_str(&format!("\n- {}: {}", key, value));
-            }
-        }
-
-        Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }
-    }
-
     /// Update the timestamp
     pub fn touch(&mut self) {
         self.updated_at = chrono::Utc::now().timestamp() as u64;
@@ -124,8 +107,21 @@ impl DefaultSnapshot {
 }
 
 impl SnapshotFunctionality for DefaultSnapshot {
+    /// Construct a message for LLM interaction
     fn construct_message(&self) -> Message {
-        self.construct_message()
+        let mut content = format!("Current application state: {}", self.state);
+
+        if !self.metadata.is_empty() {
+            content.push_str(" with additional context:");
+            for (key, value) in &self.metadata {
+                content.push_str(&format!("\n- {}: {}", key, value));
+            }
+        }
+
+        Message {
+            role: Role::User,
+            content: MessageContent::Text(content),
+        }
     }
 
     fn get_updated_at(&self) -> u64 {
