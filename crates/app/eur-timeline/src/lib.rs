@@ -7,8 +7,8 @@ pub use storage::{StorageStats, TimelineStorage};
 
 // Re-export activity types for convenience
 pub use eur_activity::{
-    Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy,
-    CommonFunctionality, ContextChip, DisplayAsset, select_strategy_for_process,
+    Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, AssetFunctionality,
+    ContextChip, DisplayAsset, select_strategy_for_process,
 };
 pub use ferrous_llm_core::Message;
 
