@@ -51,7 +51,7 @@ impl DefaultStrategy {
             self.name, self.process_name
         ));
 
-        Ok(vec![ActivitySnapshot::Default(snapshot)])
+        Ok(vec![ActivitySnapshot::DefaultSnapshot(snapshot)])
     }
 
     /// Gather current state as string
@@ -157,7 +157,7 @@ mod tests {
         assert_eq!(snapshots.len(), 1);
 
         match &snapshots[0] {
-            ActivitySnapshot::Default(snapshot) => {
+            ActivitySnapshot::DefaultSnapshot(snapshot) => {
                 assert!(snapshot.state.contains("Test App"));
                 assert!(snapshot.state.contains("test_process"));
             }
