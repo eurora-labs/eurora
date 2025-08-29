@@ -1,7 +1,7 @@
 //! Default asset implementation for unsupported activity types
 
 use crate::storage::SaveableAsset;
-use crate::types::{CommonFunctionality, ContextChip, SaveFunctionality};
+use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
 use crate::{AssetStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -93,13 +93,13 @@ impl SaveFunctionality for DefaultAsset {
     }
 }
 
-impl CommonFunctionality for DefaultAsset {
+impl AssetFunctionality for DefaultAsset {
     fn get_name(&self) -> &str {
         &self.name
     }
 
     fn get_icon(&self) -> Option<&str> {
-        Some("Default icon")
+        Some("default")
     }
 
     /// Construct a message for LLM interaction

@@ -2,7 +2,7 @@
 
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
-use crate::types::{CommonFunctionality, ContextChip, SaveFunctionality};
+use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
 use crate::{AssetStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use eur_proto::ipc::ProtoYoutubeState;
@@ -90,7 +90,7 @@ impl SaveFunctionality for YoutubeAsset {
     }
 }
 
-impl CommonFunctionality for YoutubeAsset {
+impl AssetFunctionality for YoutubeAsset {
     fn get_name(&self) -> &str {
         &self.title
     }

@@ -7,8 +7,7 @@
 //! - Retrieve saved asset information
 
 use eur_activity::{
-    ArticleAsset, AssetStorage, DefaultAsset, StorageConfig, TwitterAsset, TwitterContextType,
-    TwitterTweet, YoutubeAsset, ActivityAsset, Activity, TranscriptLine
+    types::SaveFunctionality, Activity, ActivityAsset, ArticleAsset, AssetStorage, AssetFunctionality, DefaultAsset, StorageConfig, TranscriptLine, TwitterAsset, TwitterContextType, TwitterTweet, YoutubeAsset
 };
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -113,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn create_sample_assets() -> Vec<ActivityAsset> {
     vec![
         // YouTube asset
-        ActivityAsset::Youtube(YoutubeAsset::new(
+        ActivityAsset::YoutubeAsset(YoutubeAsset::new(
             "yt-123".to_string(),
             "https://youtube.com/watch?v=example".to_string(),
             "How to Build Amazing Rust Applications".to_string(),
@@ -138,7 +137,7 @@ fn create_sample_assets() -> Vec<ActivityAsset> {
         )),
         
         // Article asset
-        ActivityAsset::Article(ArticleAsset::new(
+        ActivityAsset::ArticleAsset(ArticleAsset::new(
             "article-456".to_string(),
             "https://example.com/rust-guide".to_string(),
             "The Complete Guide to Rust Programming".to_string(),
@@ -148,7 +147,7 @@ fn create_sample_assets() -> Vec<ActivityAsset> {
         )),
         
         // Twitter asset
-        ActivityAsset::Twitter(TwitterAsset::new(
+        ActivityAsset::TwitterAsset(TwitterAsset::new(
             "twitter-789".to_string(),
             "https://twitter.com/rustlang".to_string(),
             "Rust Language Updates".to_string(),
@@ -168,7 +167,7 @@ fn create_sample_assets() -> Vec<ActivityAsset> {
         )),
         
         // Default asset
-        ActivityAsset::Default(
+        ActivityAsset::DefaultAsset(
             DefaultAsset::new(
                 "default-101".to_string(),
                 "VS Code - Rust Project".to_string(),

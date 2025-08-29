@@ -1,5 +1,6 @@
 //! Article snapshot implementation
 
+use crate::types::SnapshotFunctionality;
 use eur_proto::ipc::ProtoArticleSnapshot;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -116,6 +117,20 @@ impl ArticleSnapshot {
         }
 
         false
+    }
+}
+
+impl SnapshotFunctionality for ArticleSnapshot {
+    fn construct_message(&self) -> Message {
+        self.construct_message()
+    }
+
+    fn get_updated_at(&self) -> u64 {
+        self.updated_at
+    }
+
+    fn get_created_at(&self) -> u64 {
+        self.created_at
     }
 }
 
