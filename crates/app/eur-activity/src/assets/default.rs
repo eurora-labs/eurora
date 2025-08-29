@@ -263,4 +263,21 @@ mod tests {
         let asset = DefaultAsset::simple("Test App".to_string());
         assert!(asset.get_context_chip().is_none());
     }
+
+    #[test]
+    fn trait_methods_work() {
+        use crate::types::AssetFunctionality;
+        let asset = DefaultAsset::new(
+            "test-id".to_string(),
+            "Test App".to_string(),
+            None,
+            Some("A test application".to_string()),
+        )
+        .with_metadata("version".to_string(), "1.0.0".to_string())
+        .with_metadata("status".to_string(), "active".to_string());
+        let msg = AssetFunctionality::construct_message(&asset);
+        let chip = AssetFunctionality::get_context_chip(&asset);
+        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(chip.is_none());
+    }
 }
