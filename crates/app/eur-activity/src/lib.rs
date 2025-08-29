@@ -16,7 +16,9 @@ pub mod types;
 // Re-export core types
 pub use error::{ActivityError, Result};
 pub use strategies::ActivityStrategy;
-pub use types::{Activity, ActivityAsset, ActivitySnapshot, ContextChip, DisplayAsset};
+pub use types::{
+    Activity, ActivityAsset, ActivitySnapshot, CommonFunctionality, ContextChip, DisplayAsset,
+};
 
 // Re-export asset types
 pub use assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
@@ -136,7 +138,7 @@ mod tests {
             "Test Activity".to_string(),
             "test_icon".to_string(),
             "test_process".to_string(),
-            vec![ActivityAsset::Default(DefaultAsset::simple(
+            vec![ActivityAsset::DefaultAsset(DefaultAsset::simple(
                 "Test Asset".to_string(),
             ))],
         );
@@ -159,7 +161,7 @@ mod tests {
             "Test Activity".to_string(),
             "test_icon".to_string(),
             "test_process".to_string(),
-            vec![ActivityAsset::Default(DefaultAsset::simple(
+            vec![ActivityAsset::DefaultAsset(DefaultAsset::simple(
                 "Test Asset".to_string(),
             ))],
         );
@@ -181,14 +183,14 @@ mod tests {
             "default_icon".to_string(),
             "test_process".to_string(),
             vec![
-                ActivityAsset::Youtube(YoutubeAsset::new(
+                ActivityAsset::YoutubeAsset(YoutubeAsset::new(
                     "yt1".to_string(),
                     "https://youtube.com/watch?v=test".to_string(),
                     "Test Video".to_string(),
                     vec![],
                     0.0,
                 )),
-                ActivityAsset::Default(DefaultAsset::simple("Test Asset".to_string())),
+                ActivityAsset::DefaultAsset(DefaultAsset::simple("Test Asset".to_string())),
             ],
         );
 
@@ -207,14 +209,14 @@ mod tests {
             "default_icon".to_string(),
             "test_process".to_string(),
             vec![
-                ActivityAsset::Youtube(YoutubeAsset::new(
+                ActivityAsset::YoutubeAsset(YoutubeAsset::new(
                     "yt1".to_string(),
                     "https://youtube.com/watch?v=test".to_string(),
                     "Test Video".to_string(),
                     vec![],
                     0.0,
                 )),
-                ActivityAsset::Default(DefaultAsset::simple("Test Asset".to_string())),
+                ActivityAsset::DefaultAsset(DefaultAsset::simple("Test Asset".to_string())),
             ],
         );
 
@@ -263,7 +265,7 @@ mod tests {
 
     #[test]
     fn test_asset_enum_methods() {
-        let youtube_asset = ActivityAsset::Youtube(YoutubeAsset::new(
+        let youtube_asset = ActivityAsset::YoutubeAsset(YoutubeAsset::new(
             "yt1".to_string(),
             "https://youtube.com/watch?v=test".to_string(),
             "Test Video".to_string(),
@@ -275,7 +277,8 @@ mod tests {
         assert_eq!(youtube_asset.get_icon(), Some("youtube-icon"));
         assert!(youtube_asset.get_context_chip().is_some());
 
-        let default_asset = ActivityAsset::Default(DefaultAsset::simple("Test Asset".to_string()));
+        let default_asset =
+            ActivityAsset::DefaultAsset(DefaultAsset::simple("Test Asset".to_string()));
         assert_eq!(default_asset.get_name(), "Test Asset");
         assert_eq!(default_asset.get_icon(), None);
         assert!(default_asset.get_context_chip().is_none());
