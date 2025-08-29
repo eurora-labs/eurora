@@ -265,4 +265,20 @@ mod tests {
         assert_eq!(chip.name, "video");
         assert_eq!(chip.extension_id, "7c7b59bb-d44d-431a-9f4d-64240172e092");
     }
+
+    #[test]
+    fn trait_methods_work() {
+        use crate::types::AssetFunctionality;
+        let asset = YoutubeAsset::new(
+            "test-id".to_string(),
+            "https://youtube.com/watch?v=test".to_string(),
+            "Test Video".to_string(),
+            vec![],
+            0.0,
+        );
+        let msg = AssetFunctionality::construct_message(&asset);
+        let chip = AssetFunctionality::get_context_chip(&asset);
+        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(chip.is_some());
+    }
 }

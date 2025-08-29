@@ -290,4 +290,21 @@ mod tests {
         assert_eq!(chip.name, "article");
         assert_eq!(chip.extension_id, "309f0906-d48c-4439-9751-7bcf915cdfc5");
     }
+
+    #[test]
+    fn trait_methods_work() {
+        use crate::types::AssetFunctionality;
+        let asset = ArticleAsset::new(
+            "test-id".to_string(),
+            "https://example.com/article".to_string(),
+            "Test Article".to_string(),
+            "This is a test article with some content.".to_string(),
+            Some("Test Author".to_string()),
+            Some("2024-01-01".to_string()),
+        );
+        let msg = AssetFunctionality::construct_message(&asset);
+        let chip = AssetFunctionality::get_context_chip(&asset);
+        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(chip.is_some());
+    }
 }
