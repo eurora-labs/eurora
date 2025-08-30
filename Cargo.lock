@@ -2085,6 +2085,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ct-codecs"
+version = "1.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b10589d1a5e400d61f9f38f12f884cfd080ff345de8f17efda36fe0e4a02aa8"
+
+[[package]]
 name = "ctor"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2123,7 +2129,7 @@ dependencies = [
  "cpufeatures",
  "curve25519-dalek-derive",
  "digest",
- "fiat-crypto",
+ "fiat-crypto 0.2.9",
  "rustc_version",
  "subtle",
  "zeroize",
@@ -2817,7 +2823,9 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "dirs 6.0.0",
  "enum_dispatch",
+ "eur-fs",
  "eur-native-messaging",
  "eur-proto",
  "ferrous-focus",
@@ -2825,6 +2833,8 @@ dependencies = [
  "hex",
  "humantime-serde",
  "image",
+ "orion",
+ "rand 0.9.2",
  "regex",
  "serde",
  "serde_json",
@@ -3273,20 +3283,24 @@ dependencies = [
 
 [[package]]
 name = "eur-timeline"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "dirs 6.0.0",
  "eur-activity",
+ "eur-fs",
  "eur-native-messaging",
  "eur-proto",
  "ferrous-focus",
  "ferrous-llm",
  "ferrous-llm-core",
  "image",
+ "orion",
  "parking_lot",
+ "rand 0.9.2",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -3567,6 +3581,12 @@ name = "fiat-crypto"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
+
+[[package]]
+name = "fiat-crypto"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64cd1e32ddd350061ae6edb1b082d7c54915b5c672c389143b9a63403a109f24"
 
 [[package]]
 name = "field-offset"
@@ -6720,6 +6740,19 @@ checksum = "9aa2b01e1d916879f73a53d01d1d6cee68adbb31d6d9177a8cfce093cced1d50"
 dependencies = [
  "futures-core",
  "pin-project-lite",
+]
+
+[[package]]
+name = "orion"
+version = "0.17.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21b3da83b2b4cdc74ab6a556b2e7b473da046d5aa4008c0a7a3ae96b1b4aabb4"
+dependencies = [
+ "ct-codecs",
+ "fiat-crypto 0.3.0",
+ "getrandom 0.3.2",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]

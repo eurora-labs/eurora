@@ -37,4 +37,4 @@ pub enum TimelineError {
 }
 
 /// Result type alias for timeline operations
-pub type Result<T> = std::result::Result<T, TimelineError>;
+pub type TimelineResult<T> = std::result::Result<T, TimelineError>;

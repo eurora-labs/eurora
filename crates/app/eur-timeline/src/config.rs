@@ -173,7 +173,7 @@ impl TimelineConfig {
     }
 
     /// Validate the configuration
-    pub fn validate(&self) -> crate::error::Result<()> {
+    pub fn validate(&self) -> crate::error::TimelineResult<()> {
         if self.storage.max_activities == 0 {
             return Err(crate::error::TimelineError::Configuration(
                 "max_activities must be greater than 0".to_string(),

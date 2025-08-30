@@ -1,6 +1,6 @@
 //! Strategy registry for dynamic activity strategy management
 
-use crate::error::{ActivityError, Result};
+use crate::error::{ActivityError, ActivityResult};
 use crate::strategies::ActivityStrategy;
 use async_trait::async_trait;
 use ferrous_focus::IconData;
@@ -84,7 +84,7 @@ pub enum StrategyCategory {
 #[async_trait]
 pub trait StrategyFactory: Send + Sync {
     /// Create a new strategy instance for the given context
-    async fn create_strategy(&self, context: &ProcessContext) -> Result<ActivityStrategy>;
+    async fn create_strategy(&self, context: &ProcessContext) -> ActivityResult<ActivityStrategy>;
 
     /// Check if this factory supports the given process
     fn supports_process(&self, process_name: &str, window_title: Option<&str>) -> MatchScore;
@@ -132,7 +132,10 @@ impl StrategyRegistry {
     }
 
     /// Select the best strategy for a given process context
-    pub async fn select_strategy(&mut self, context: &ProcessContext) -> Result<ActivityStrategy> {
+    pub async fn select_strategy(
+        &mut self,
+        context: &ProcessContext,
+    ) -> ActivityResult<ActivityStrategy> {
         debug!("Selecting strategy for process: {}", context.process_name);
 
         // Check cache first
@@ -245,7 +248,10 @@ mod tests {
 
     #[async_trait]
     impl StrategyFactory for MockStrategyFactory {
-        async fn create_strategy(&self, context: &ProcessContext) -> Result<ActivityStrategy> {
+        async fn create_strategy(
+            &self,
+            context: &ProcessContext,
+        ) -> ActivityResult<ActivityStrategy> {
             use crate::strategies::DefaultStrategy;
             let strategy = DefaultStrategy::new(
                 context.display_name.clone(),

@@ -11,7 +11,7 @@ use tokio::time;
 use tracing::{debug, error, info, warn};
 
 use crate::config::CollectorConfig;
-use crate::error::{Result, TimelineError};
+use crate::error::{TimelineError, TimelineResult};
 use crate::storage::TimelineStorage;
 
 /// Service responsible for collecting activities and managing the collection lifecycle
@@ -77,7 +77,7 @@ impl CollectorService {
     }
 
     /// Start the collection service
-    pub async fn start(&mut self) -> Result<()> {
+    pub async fn start(&mut self) -> TimelineResult<()> {
         if self.is_running() {
             return Err(TimelineError::AlreadyRunning);
         }
@@ -95,7 +95,7 @@ impl CollectorService {
     }
 
     /// Stop the collection service
-    pub async fn stop(&mut self) -> Result<()> {
+    pub async fn stop(&mut self) -> TimelineResult<()> {
         if !self.is_running() {
             return Err(TimelineError::NotRunning);
         }
@@ -154,7 +154,7 @@ impl CollectorService {
     }
 
     /// Restart the collection service
-    pub async fn restart(&mut self) -> Result<()> {
+    pub async fn restart(&mut self) -> TimelineResult<()> {
         info!("Restarting timeline collection service");
 
         if self.is_running() {
@@ -177,7 +177,7 @@ impl CollectorService {
     }
 
     /// Collect activity once using the provided strategy
-    pub async fn collect_once(&self, mut strategy: ActivityStrategy) -> Result<()> {
+    pub async fn collect_once(&self, mut strategy: ActivityStrategy) -> TimelineResult<()> {
         debug!(
             "Collecting activity once for strategy: {}",
             strategy.get_name()
@@ -237,7 +237,7 @@ impl CollectorService {
     }
 
     /// Start collection with focus tracking
-    async fn start_with_focus_tracking(&mut self) -> Result<()> {
+    async fn start_with_focus_tracking(&mut self) -> TimelineResult<()> {
         let (tx, mut rx) = mpsc::unbounded_channel::<FocusedWindow>();
         self.focus_sender = Some(tx.clone());
 
@@ -389,7 +389,7 @@ impl CollectorService {
     }
 
     /// Start collection without focus tracking (manual mode)
-    async fn start_without_focus_tracking(&mut self) -> Result<()> {
+    async fn start_without_focus_tracking(&mut self) -> TimelineResult<()> {
         info!("Starting collection without focus tracking");
 
         // Create shutdown signal for the cleanup task
@@ -429,7 +429,7 @@ impl CollectorService {
     }
 
     /// Handle restart with exponential backoff
-    async fn handle_restart_with_backoff(&mut self) -> Result<()> {
+    async fn handle_restart_with_backoff(&mut self) -> TimelineResult<()> {
         if !self.config.auto_restart_on_error {
             return Err(TimelineError::Collection(
                 "Auto-restart is disabled".to_string(),

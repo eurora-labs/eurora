@@ -1,6 +1,9 @@
 //! High-level timeline manager implementation
 
-use crate::{Activity, ActivityStrategy, AssetFunctionality, ContextChip, DisplayAsset};
+use crate::{
+    Activity, ActivityStorage, ActivityStorageConfig, ActivityStrategy, AssetFunctionality,
+    ContextChip, DisplayAsset,
+};
 use eur_activity::types::SnapshotFunctionality;
 use ferrous_llm_core::Message;
 use std::sync::Arc;
@@ -9,13 +12,114 @@ use tracing::info;
 
 use crate::collector::{CollectorService, CollectorStats};
 use crate::config::TimelineConfig;
-use crate::error::Result;
+use crate::error::TimelineResult;
 use crate::storage::{StorageStats, TimelineStorage};
+
+/// Builder for creating TimelineManager instances
+pub struct TimelineManagerBuilder {
+    timeline_config: Option<TimelineConfig>,
+    activity_storage_config: Option<ActivityStorageConfig>,
+}
+
+impl TimelineManagerBuilder {
+    /// Create a new builder with default settings
+    pub fn new() -> Self {
+        Self {
+            timeline_config: None,
+            activity_storage_config: None,
+        }
+    }
+
+    /// Set the timeline configuration
+    pub fn with_timeline_config(mut self, config: TimelineConfig) -> Self {
+        self.timeline_config = Some(config);
+        self
+    }
+
+    /// Set the activity storage configuration
+    pub fn with_activity_storage_config(mut self, config: ActivityStorageConfig) -> Self {
+        self.activity_storage_config = Some(config);
+        self
+    }
+
+    /// Set the maximum number of activities to store
+    pub fn with_max_activities(mut self, max_activities: usize) -> Self {
+        let mut config = self.timeline_config.unwrap_or_default();
+        config.storage.max_activities = max_activities;
+        self.timeline_config = Some(config);
+        self
+    }
+
+    /// Set the collection interval
+    pub fn with_collection_interval(mut self, interval: std::time::Duration) -> Self {
+        let mut config = self.timeline_config.unwrap_or_default();
+        config.collector.collection_interval = interval;
+        self.timeline_config = Some(config);
+        self
+    }
+
+    /// Disable focus tracking
+    pub fn disable_focus_tracking(mut self) -> Self {
+        let mut config = self.timeline_config.unwrap_or_default();
+        config.focus_tracking.enabled = false;
+        self.timeline_config = Some(config);
+        self
+    }
+
+    /// Enable focus tracking
+    pub fn enable_focus_tracking(mut self) -> Self {
+        let mut config = self.timeline_config.unwrap_or_default();
+        config.focus_tracking.enabled = true;
+        self.timeline_config = Some(config);
+        self
+    }
+
+    /// Build the TimelineManager
+    pub fn build(self) -> TimelineManager {
+        let timeline_config = self.timeline_config.unwrap_or_default();
+        let activity_storage_config = self.activity_storage_config.unwrap_or_default();
+
+        // Validate configuration
+        timeline_config
+            .validate()
+            .expect("Invalid timeline configuration");
+
+        info!(
+            "Creating timeline manager with config: {:?}",
+            timeline_config
+        );
+
+        let storage = Arc::new(Mutex::new(TimelineStorage::new(
+            timeline_config.storage.clone(),
+        )));
+        let collector = CollectorService::new_with_timeline_config(
+            Arc::clone(&storage),
+            timeline_config.clone(),
+        );
+
+        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new(activity_storage_config)));
+
+        TimelineManager {
+            storage,
+            collector,
+            config: timeline_config,
+            activity_storage,
+        }
+    }
+}
+
+impl Default for TimelineManagerBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// High-level timeline manager that provides a simple API for timeline operations
 pub struct TimelineManager {
     /// Shared storage for timeline data
     storage: Arc<Mutex<TimelineStorage>>,
+    /// Shared disk storage for saving activities
+    activity_storage: Arc<Mutex<ActivityStorage>>,
     /// Collection service
     collector: CollectorService,
     /// Configuration
@@ -23,44 +127,37 @@ pub struct TimelineManager {
 }
 
 impl TimelineManager {
+    /// Create a new builder for TimelineManager
+    pub fn builder() -> TimelineManagerBuilder {
+        TimelineManagerBuilder::new()
+    }
+
     /// Create a new timeline manager with default configuration
     pub fn new() -> Self {
-        let config = TimelineConfig::default();
-        Self::with_config(config)
+        TimelineManagerBuilder::new().build()
     }
 
     /// Create a new timeline manager with custom configuration
-    pub fn with_config(config: TimelineConfig) -> Self {
-        info!("Creating timeline manager with config: {:?}", config);
-
-        // Validate configuration
-        config.validate().expect("Invalid timeline configuration");
-
-        let storage = Arc::new(Mutex::new(TimelineStorage::new(config.storage.clone())));
-        let collector =
-            CollectorService::new_with_timeline_config(Arc::clone(&storage), config.clone());
-
-        Self {
-            storage,
-            collector,
-            config,
-        }
+    pub fn with_config(timeline_config: TimelineConfig) -> Self {
+        TimelineManagerBuilder::new()
+            .with_timeline_config(timeline_config)
+            .build()
     }
 
     /// Start the timeline manager (begins activity collection)
-    pub async fn start(&mut self) -> Result<()> {
+    pub async fn start(&mut self) -> TimelineResult<()> {
         info!("Starting timeline manager");
         self.collector.start().await
     }
 
     /// Stop the timeline manager (stops activity collection)
-    pub async fn stop(&mut self) -> Result<()> {
+    pub async fn stop(&mut self) -> TimelineResult<()> {
         info!("Stopping timeline manager");
         self.collector.stop().await
     }
 
     /// Restart the timeline manager
-    pub async fn restart(&mut self) -> Result<()> {
+    pub async fn restart(&mut self) -> TimelineResult<()> {
         info!("Restarting timeline manager");
         self.collector.restart().await
     }
@@ -125,6 +222,19 @@ impl TimelineManager {
         }
     }
 
+    /// Save the assets to disk
+    pub async fn save_assets_to_disk(&self) -> TimelineResult<()> {
+        info!("Getting locks");
+        let storage = self.storage.lock().await;
+        let activity_storage = self.activity_storage.lock().await;
+        info!("Locks acquired");
+
+        if let Some(activity) = storage.get_current_activity() {
+            activity_storage.save_assets_to_disk(activity).await;
+        }
+        Ok(())
+    }
+
     /// Construct messages from current activity assets
     pub async fn construct_asset_messages(&self) -> Vec<Message> {
         let storage = self.storage.lock().await;
@@ -154,7 +264,7 @@ impl TimelineManager {
     }
 
     /// Manually collect an activity using the provided strategy
-    pub async fn collect_activity(&self, strategy: ActivityStrategy) -> Result<()> {
+    pub async fn collect_activity(&self, strategy: ActivityStrategy) -> TimelineResult<()> {
         self.collector.collect_once(strategy).await
     }
 
@@ -200,7 +310,10 @@ impl TimelineManager {
     }
 
     /// Update storage configuration
-    pub async fn configure_storage(&mut self, config: crate::config::StorageConfig) -> Result<()> {
+    pub async fn configure_storage(
+        &mut self,
+        config: crate::config::StorageConfig,
+    ) -> TimelineResult<()> {
         let mut storage = self.storage.lock().await;
         storage.update_config(config.clone())?;
         self.config.storage = config;
@@ -214,7 +327,7 @@ impl TimelineManager {
     }
 
     /// Update the entire configuration
-    pub async fn update_config(&mut self, config: TimelineConfig) -> Result<()> {
+    pub async fn update_config(&mut self, config: TimelineConfig) -> TimelineResult<()> {
         config.validate()?;
 
         // Update storage config
@@ -242,19 +355,12 @@ impl Default for TimelineManager {
     }
 }
 
-/// Create a timeline manager with default settings (convenience function)
-pub fn create_default_timeline() -> TimelineManager {
-    TimelineManager::new()
-}
-
 /// Create a timeline manager with custom capacity and interval (convenience function)
 pub fn create_timeline(capacity: usize, interval_seconds: u64) -> TimelineManager {
-    let config = TimelineConfig::builder()
-        .max_activities(capacity)
-        .collection_interval(std::time::Duration::from_secs(interval_seconds))
-        .build();
-
-    TimelineManager::with_config(config)
+    TimelineManager::builder()
+        .with_max_activities(capacity)
+        .with_collection_interval(std::time::Duration::from_secs(interval_seconds))
+        .build()
 }
 
 #[cfg(test)]
@@ -290,6 +396,66 @@ mod tests {
         let manager = TimelineManager::with_config(config);
         assert!(!manager.is_running());
         assert_eq!(manager.get_config().storage.max_activities, 100);
+    }
+
+    #[tokio::test]
+    async fn test_builder_pattern() {
+        let manager = TimelineManager::builder()
+            .with_max_activities(200)
+            .with_collection_interval(Duration::from_secs(10))
+            .disable_focus_tracking()
+            .build();
+
+        assert!(!manager.is_running());
+        assert_eq!(manager.get_config().storage.max_activities, 200);
+        assert_eq!(
+            manager.get_config().collector.collection_interval,
+            Duration::from_secs(10)
+        );
+        assert!(!manager.get_config().focus_tracking.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_builder_with_timeline_config() {
+        let timeline_config = TimelineConfig::builder()
+            .max_activities(150)
+            .collection_interval(Duration::from_secs(3))
+            .build();
+
+        let activity_storage_config = ActivityStorageConfig::default();
+
+        let manager = TimelineManager::builder()
+            .with_timeline_config(timeline_config)
+            .with_activity_storage_config(activity_storage_config)
+            .build();
+
+        assert_eq!(manager.get_config().storage.max_activities, 150);
+        assert_eq!(
+            manager.get_config().collector.collection_interval,
+            Duration::from_secs(3)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_builder_enable_focus_tracking() {
+        let manager = TimelineManager::builder().enable_focus_tracking().build();
+
+        assert!(manager.get_config().focus_tracking.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_builder_default() {
+        let manager1 = TimelineManager::builder().build();
+        let manager2 = TimelineManager::new();
+
+        assert_eq!(
+            manager1.get_config().storage.max_activities,
+            manager2.get_config().storage.max_activities
+        );
+        assert_eq!(
+            manager1.get_config().collector.collection_interval,
+            manager2.get_config().collector.collection_interval
+        );
     }
 
     #[tokio::test]
@@ -361,7 +527,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_convenience_functions() {
-        let manager1 = create_default_timeline();
+        let manager1 = TimelineManager::new();
         assert!(!manager1.is_running());
 
         let manager2 = create_timeline(500, 5);

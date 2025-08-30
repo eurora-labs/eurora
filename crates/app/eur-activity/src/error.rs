@@ -66,7 +66,7 @@ impl ActivityError {
 }
 
 /// Result type alias for activity operations
-pub type Result<T> = std::result::Result<T, ActivityError>;
+pub type ActivityResult<T> = std::result::Result<T, ActivityError>;
 
 #[cfg(test)]
 mod tests {

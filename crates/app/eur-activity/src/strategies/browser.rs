@@ -1,6 +1,6 @@
 //! Browser strategy implementation for the refactored activity system
 
-use crate::error::Result;
+use crate::error::ActivityResult;
 use crate::types::{ActivityAsset, ActivitySnapshot};
 use crate::{ArticleAsset, TwitterAsset, YoutubeAsset};
 use crate::{ArticleSnapshot, TwitterSnapshot, YoutubeSnapshot};
@@ -23,7 +23,7 @@ pub struct BrowserStrategy {
 
 impl BrowserStrategy {
     /// Create a new browser strategy
-    pub async fn new(name: String, icon: String, process_name: String) -> Result<Self> {
+    pub async fn new(name: String, icon: String, process_name: String) -> ActivityResult<Self> {
         info!("Creating BrowserStrategy for process: {}", process_name);
 
         // Try to create the IPC client
@@ -87,7 +87,7 @@ impl BrowserStrategy {
     }
 
     /// Retrieve assets from the browser
-    pub async fn retrieve_assets(&mut self) -> Result<Vec<ActivityAsset>> {
+    pub async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
         let Some(client) = &self.client else {
@@ -141,7 +141,7 @@ impl BrowserStrategy {
     }
 
     /// Retrieve snapshots from the browser
-    pub async fn retrieve_snapshots(&mut self) -> Result<Vec<ActivitySnapshot>> {
+    pub async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
         debug!("Retrieving snapshots for browser strategy");
 
         let Some(client) = &self.client else {
@@ -211,7 +211,7 @@ use async_trait::async_trait;
 
 #[async_trait]
 impl StrategyFactory for BrowserStrategyFactory {
-    async fn create_strategy(&self, context: &ProcessContext) -> Result<ActivityStrategy> {
+    async fn create_strategy(&self, context: &ProcessContext) -> ActivityResult<ActivityStrategy> {
         let strategy = BrowserStrategy::new(
             context.display_name.clone(),
             "browser-icon".to_string(),
