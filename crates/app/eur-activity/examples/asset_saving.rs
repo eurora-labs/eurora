@@ -7,9 +7,9 @@
 //! - Retrieve saved asset information
 
 use eur_activity::{
-    Activity, ActivityAsset, ArticleAsset, AssetFunctionality, AssetStorage, DefaultAsset,
-    StorageConfig, TranscriptLine, TwitterAsset, TwitterContextType, TwitterTweet, YoutubeAsset,
-    types::SaveFunctionality,
+    Activity, ActivityAsset, ActivityStorage, ActivityStorageConfig, ArticleAsset,
+    AssetFunctionality, DefaultAsset, TranscriptLine, TwitterAsset, TwitterContextType,
+    TwitterTweet, YoutubeAsset, types::SaveFunctionality,
 };
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -29,14 +29,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("📁 Using temporary directory: {}", base_path.display());
 
     // Configure asset storage
-    let storage_config = StorageConfig {
+    let storage_config = ActivityStorageConfig {
         base_dir: base_path.clone(),
         organize_by_type: true,
         use_content_hash: true,
         max_file_size: Some(10 * 1024 * 1024), // 10MB limit
     };
 
-    let storage = AssetStorage::new(storage_config);
+    let storage = ActivityStorage::new(storage_config);
 
     println!("⚙️  Storage configured with content hashing and type organization");
 
@@ -88,14 +88,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🔧 Testing different storage configurations...");
 
     // Configuration without content hashing
-    let no_hash_config = StorageConfig {
+    let no_hash_config = ActivityStorageConfig {
         base_dir: base_path.join("no_hash"),
         organize_by_type: false,
         use_content_hash: false,
         max_file_size: None,
     };
 
-    let no_hash_storage = AssetStorage::new(no_hash_config);
+    let no_hash_storage = ActivityStorage::new(no_hash_config);
 
     // Save the same YouTube asset with different config
     if let Some(youtube_asset) = activity.assets.first() {
