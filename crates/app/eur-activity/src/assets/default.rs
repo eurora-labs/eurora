@@ -1,8 +1,8 @@
 //! Default asset implementation for unsupported activity types
 
 use crate::storage::SaveableAsset;
-use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
-use crate::{AssetStorage, SavedAssetInfo};
+use crate::types::{AssetFunctionality, ContextChip};
+use crate::{ActivityResult, ActivityStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -86,13 +86,6 @@ impl DefaultAsset {
     }
 }
 
-#[async_trait]
-impl SaveFunctionality for DefaultAsset {
-    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
-        storage.save_asset(self).await
-    }
-}
-
 impl AssetFunctionality for DefaultAsset {
     fn get_name(&self) -> &str {
         &self.name
@@ -137,15 +130,7 @@ impl SaveableAsset for DefaultAsset {
         "default"
     }
 
-    fn get_file_extension(&self) -> &'static str {
-        "json"
-    }
-
-    fn get_mime_type(&self) -> &'static str {
-        "application/json"
-    }
-
-    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+    async fn serialize_content(&self) -> ActivityResult<Vec<u8>> {
         let json = serde_json::to_string_pretty(self)?;
         Ok(json.into_bytes())
     }
@@ -192,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_metadata_operations() {
-        let mut asset = DefaultAsset::simple("Test App".to_string())
+        let asset = DefaultAsset::simple("Test App".to_string())
             .with_metadata("version".to_string(), "1.0.0".to_string())
             .with_metadata("author".to_string(), "Test Author".to_string());
 

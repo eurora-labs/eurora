@@ -2,7 +2,7 @@
 name = "eur-tauri"
 version = "0.0.0"
 edition = "2024"
-authors = ["Eurora <andreroelofsai@gmail.com>"]
+authors.workspace = true
 publish = false
 
 [lib]
