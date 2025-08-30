@@ -2,8 +2,8 @@
 
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
-use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
-use crate::{AssetStorage, SavedAssetInfo};
+use crate::types::{AssetFunctionality, ContextChip};
+use crate::{ActivityResult, ActivityStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use eur_proto::ipc::ProtoYoutubeState;
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -83,13 +83,6 @@ impl YoutubeAsset {
     }
 }
 
-#[async_trait]
-impl SaveFunctionality for YoutubeAsset {
-    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
-        storage.save_asset(self).await
-    }
-}
-
 impl AssetFunctionality for YoutubeAsset {
     fn get_name(&self) -> &str {
         &self.title
@@ -135,15 +128,7 @@ impl SaveableAsset for YoutubeAsset {
         "youtube"
     }
 
-    fn get_file_extension(&self) -> &'static str {
-        "json"
-    }
-
-    fn get_mime_type(&self) -> &'static str {
-        "application/json"
-    }
-
-    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+    async fn serialize_content(&self) -> ActivityResult<Vec<u8>> {
         let json = serde_json::to_string_pretty(self)?;
         Ok(json.into_bytes())
     }

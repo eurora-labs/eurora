@@ -8,6 +8,9 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+authors = ["Andre Roelofs andre@eurora-labs.com"]
+
 [workspace.dependencies]
 ferrous-llm-core = { git = "https://github.com/eurora-labs/ferrous-llm.git", branch = "feature/specta" }
 ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", branch = "feature/specta" }
