@@ -6,7 +6,7 @@ pub mod default;
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
 
-use crate::error::Result;
+use crate::error::ActivityResult;
 use crate::types::{ActivityAsset, ActivitySnapshot};
 
 /// Enum containing all possible activity strategies
@@ -18,7 +18,7 @@ pub enum ActivityStrategy {
 
 impl ActivityStrategy {
     /// Retrieve assets associated with this activity
-    pub async fn retrieve_assets(&mut self) -> Result<Vec<ActivityAsset>> {
+    pub async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         match self {
             ActivityStrategy::Browser(strategy) => strategy.retrieve_assets().await,
             ActivityStrategy::Default(strategy) => strategy.retrieve_assets().await,
@@ -26,7 +26,7 @@ impl ActivityStrategy {
     }
 
     /// Retrieve snapshots associated with this activity
-    pub async fn retrieve_snapshots(&mut self) -> Result<Vec<ActivitySnapshot>> {
+    pub async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
         match self {
             ActivityStrategy::Browser(strategy) => strategy.retrieve_snapshots().await,
             ActivityStrategy::Default(strategy) => strategy.retrieve_snapshots().await,

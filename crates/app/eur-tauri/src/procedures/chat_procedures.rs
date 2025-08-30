@@ -60,6 +60,12 @@ impl ChatApi for ChatApiImpl {
 
         let mut messages: Vec<Message> = Vec::new();
         if !query.assets.is_empty() {
+            info!("Starting to save asset");
+            timeline
+                .save_assets_to_disk()
+                .await
+                .expect("Failed to save assets");
+            info!("Finished saving asset");
             messages = timeline.construct_asset_messages().await;
             messages.extend(timeline.construct_snapshot_messages().await);
         }

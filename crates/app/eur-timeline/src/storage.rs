@@ -1,18 +1,21 @@
 //! Timeline storage implementation
 
-use crate::Activity;
+use crate::{Activity, ActivityAsset, SaveableAsset};
 use chrono::{DateTime, Utc};
+use eur_fs::write;
 use std::collections::VecDeque;
+use std::path::PathBuf;
 use std::time::Duration;
 use tracing::{debug, info};
 
 use crate::config::StorageConfig;
-use crate::error::Result;
+use crate::error::TimelineResult;
 
 /// Timeline storage that manages activities with configurable retention
 pub struct TimelineStorage {
     /// Activities stored in chronological order (oldest first)
     activities: VecDeque<Activity>,
+    ///
     /// Storage configuration
     config: StorageConfig,
     /// Last cleanup time
@@ -165,7 +168,7 @@ impl TimelineStorage {
     }
 
     /// Update storage configuration
-    pub fn update_config(&mut self, config: StorageConfig) -> Result<()> {
+    pub fn update_config(&mut self, config: StorageConfig) -> TimelineResult<()> {
         info!("Updating storage configuration");
 
         // If capacity decreased, remove excess activities
@@ -200,6 +203,22 @@ impl TimelineStorage {
         Utc::now() - self.last_cleanup
             > chrono::Duration::from_std(cleanup_interval)
                 .unwrap_or_else(|_| chrono::Duration::minutes(5))
+    }
+
+    pub async fn save_assets_to_disk(&self) -> TimelineResult<()> {
+        if let Some(activity) = self.get_current_activity() {
+            info!("Got current activity, preparing to serialize assets");
+            let assets = activity.serialize_assets().await?;
+            info!("Serialized the assets");
+
+            let bytes = assets.first().unwrap();
+            write(PathBuf::from("/home/andre/Desktop/test_asset"), &bytes).unwrap();
+            // for bytes in assets {
+            //     write(PathBuf::from("/home/andre/Desktop/test_asset"), &bytes).unwrap();
+            // }
+        }
+
+        Ok(())
     }
 }
 
