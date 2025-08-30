@@ -6,6 +6,7 @@
 
 pub mod assets;
 pub mod config;
+mod encryption;
 pub mod error;
 pub mod registry;
 pub mod snapshots;
@@ -14,7 +15,7 @@ pub mod strategies;
 pub mod types;
 
 // Re-export core types
-pub use error::{ActivityError, Result};
+pub use error::{ActivityError, ActivityResult};
 pub use strategies::ActivityStrategy;
 pub use types::{
     Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip, DisplayAsset,
@@ -46,7 +47,7 @@ pub use registry::{
 };
 
 // Re-export storage types
-pub use storage::{AssetStorage, SaveableAsset, SavedAssetInfo, StorageConfig};
+pub use storage::{ActivityStorage, ActivityStorageConfig, SaveableAsset, SavedAssetInfo};
 
 use ferrous_focus::IconData;
 use std::sync::{Arc, OnceLock};
@@ -100,7 +101,7 @@ pub async fn select_strategy_for_process(
     process_name: &str,
     display_name: String,
     icon: IconData,
-) -> Result<ActivityStrategy> {
+) -> ActivityResult<ActivityStrategy> {
     info!("Selecting strategy for process: {}", process_name);
 
     let registry = get_registry();
