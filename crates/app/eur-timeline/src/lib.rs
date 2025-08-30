@@ -1,14 +1,15 @@
 // Re-export main types for easy access
 pub use collector::{CollectorService, CollectorStats};
 pub use config::{CollectorConfig, FocusTrackingConfig, StorageConfig, TimelineConfig};
-pub use error::{Result, TimelineError};
-pub use manager::{TimelineManager, create_default_timeline, create_timeline};
+pub use error::{TimelineError, TimelineResult};
+pub use manager::{TimelineManager, TimelineManagerBuilder, create_timeline};
 pub use storage::{StorageStats, TimelineStorage};
 
 // Re-export activity types for convenience
 pub use eur_activity::{
-    Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, AssetFunctionality,
-    ContextChip, DisplayAsset, select_strategy_for_process,
+    Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStorage,
+    ActivityStorageConfig, ActivityStrategy, AssetFunctionality, ContextChip, DisplayAsset,
+    SaveableAsset, select_strategy_for_process,
 };
 pub use ferrous_llm_core::Message;
 
@@ -46,7 +47,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_convenience_functions() {
-        let timeline1 = create_default_timeline();
+        let timeline1 = TimelineManager::new();
         assert!(!timeline1.is_running());
 
         let timeline2 = create_timeline(500, 5);

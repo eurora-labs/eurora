@@ -4,14 +4,16 @@
 //! providing better performance, type safety, and cloneable activities.
 
 use crate::assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
+use crate::error::ActivityResult;
 use crate::snapshots::*;
-use crate::storage::{AssetStorage, SavedAssetInfo};
-use async_trait::async_trait;
+use crate::storage::{ActivityStorage, SaveableAsset, SavedAssetInfo};
+
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::info;
 
 /// Context chip for UI integration
 #[taurpc::ipc_type]
@@ -38,7 +40,7 @@ impl DisplayAsset {
 }
 
 /// Enum containing all possible activity assets
-#[enum_dispatch(SaveableAsset, AssetFunctionality, SaveFunctionality)]
+#[enum_dispatch(SaveableAsset, AssetFunctionality)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActivityAsset {
     YoutubeAsset,
@@ -53,12 +55,6 @@ pub trait AssetFunctionality {
     fn get_icon(&self) -> Option<&str>;
     fn construct_message(&self) -> Message;
     fn get_context_chip(&self) -> Option<ContextChip>;
-}
-
-#[async_trait]
-#[enum_dispatch]
-pub trait SaveFunctionality {
-    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo>;
 }
 
 #[enum_dispatch]
@@ -153,29 +149,25 @@ impl Activity {
         self.end = Some(Utc::now());
     }
 
-    /// Save all assets in this activity to disk
-    pub async fn save_assets_to_disk(
-        &self,
-        storage: &AssetStorage,
-    ) -> crate::error::Result<Vec<SavedAssetInfo>> {
-        let mut saved_assets = Vec::new();
+    /// Serialize the assets into bytes
+    pub async fn serialize_assets(&self) -> ActivityResult<Vec<Vec<u8>>> {
+        let mut serialized_assets = Vec::new();
 
+        info!("Serializing {} assets", &self.assets.len());
         for asset in &self.assets {
-            let saved_info = asset.save_to_disk(storage).await?;
-            saved_assets.push(saved_info);
+            serialized_assets.push(asset.serialize_content().await?);
         }
-
-        Ok(saved_assets)
+        Ok(serialized_assets)
     }
 
     /// Save a specific asset by index to disk
     pub async fn save_asset_by_index(
         &self,
         index: usize,
-        storage: &AssetStorage,
-    ) -> crate::error::Result<Option<SavedAssetInfo>> {
+        storage: &ActivityStorage,
+    ) -> ActivityResult<Option<SavedAssetInfo>> {
         if let Some(asset) = self.assets.get(index) {
-            Ok(Some(asset.save_to_disk(storage).await?))
+            Ok(Some(storage.save_asset(asset).await?))
         } else {
             Ok(None)
         }

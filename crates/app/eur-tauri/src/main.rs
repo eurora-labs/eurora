@@ -230,7 +230,9 @@ fn main() {
                         .expect("Failed to create tray icon");
 
 
-                    let timeline = eur_timeline::create_default_timeline();
+                    let timeline = eur_timeline::TimelineManagerBuilder::new()
+                    .with_activity_storage_config(eur_activity::ActivityStorageConfig { base_dir: app_handle.path().app_data_dir().unwrap(), use_content_hash: false, max_file_size: None })
+                        .build();
                     app_handle.manage(async_mutex::Mutex::new(timeline));
 
                     // Start timeline collection
