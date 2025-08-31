@@ -3469,8 +3469,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72c0a41f41fae9b73520002c69b61fa57cace8bbf11bfa3b5a3fa1b9cb6162d2"
 dependencies = [
  "chrono",
  "dotenv",
@@ -3486,8 +3487,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-anthropic"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e065f9531d456cd3bd5ed6775d7595dc4c77b12b57ea18e5da465d0cd53ad561"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3504,8 +3506,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-core"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39be37002fd827642b544d63b626e70f3f65c5260982ffae8b52955aa4bfcb49"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3522,8 +3525,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-ollama"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ef693d85d4dd3bf205961f8315376e1e5d7267940fe33c087342016d2bcf68e"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3540,8 +3544,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-openai"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8d1bb448116ca5f2e82d96b67a5d927fd81a2cf112ee603cf1a600f0c41388b"
 dependencies = [
  "async-trait",
  "chrono",
