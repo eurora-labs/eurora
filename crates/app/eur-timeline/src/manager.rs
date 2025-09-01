@@ -2,8 +2,9 @@
 
 use crate::{
     Activity, ActivityStorage, ActivityStorageConfig, ActivityStrategy, AssetFunctionality,
-    ContextChip, DisplayAsset,
+    ContextChip, DisplayAsset, TimelineError,
 };
+use eur_activity::SavedAssetInfo;
 use eur_activity::types::SnapshotFunctionality;
 use ferrous_llm_core::Message;
 use std::sync::Arc;
@@ -223,14 +224,16 @@ impl TimelineManager {
     }
 
     /// Save the assets to disk
-    pub async fn save_assets_to_disk(&self) -> TimelineResult<()> {
+    pub async fn save_assets_to_disk(&self) -> TimelineResult<Vec<SavedAssetInfo>> {
         let storage = self.storage.lock().await;
         let activity_storage = self.activity_storage.lock().await;
 
-        if let Some(activity) = storage.get_current_activity() {
-            activity_storage.save_assets_to_disk(activity).await?;
+        match storage.get_current_activity() {
+            Some(activity) => Ok(activity_storage.save_assets_to_disk(activity).await?),
+            None => Err(TimelineError::Storage(
+                "No current activity found".to_string(),
+            )),
         }
-        Ok(())
     }
 
     /// Construct messages from current activity assets

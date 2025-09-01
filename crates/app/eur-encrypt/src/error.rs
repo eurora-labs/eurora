@@ -1,10 +1,14 @@
 //! Error types for the activity system
 
+use orion::errors::UnknownCryptoError;
 use thiserror::Error;
 
 /// Errors that can occur in the activity system
 #[derive(Error, Debug)]
-pub enum EncryptError {}
+pub enum EncryptError {
+    #[error("Image processing error: {0}")]
+    CryptoError(#[from] UnknownCryptoError),
+}
 
 impl EncryptError {}
 

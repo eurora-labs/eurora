@@ -60,12 +60,14 @@ impl ChatApi for ChatApiImpl {
 
         let mut messages: Vec<Message> = Vec::new();
         if !query.assets.is_empty() {
-            info!("Starting to save asset");
-            timeline
+            let infos = timeline
                 .save_assets_to_disk()
                 .await
                 .expect("Failed to save assets");
-            info!("Finished saving asset");
+            for info in infos {
+                info!("Saved asset: {:?}", info);
+            }
+
             messages = timeline.construct_asset_messages().await;
             messages.extend(timeline.construct_snapshot_messages().await);
         }
@@ -75,10 +77,10 @@ impl ChatApi for ChatApiImpl {
             content: MessageContent::Text(query.text.clone()),
         };
 
-        // personal_db
-        //     .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
-        //     .await
-        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+        personal_db
+            .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
+            .await
+            .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
         messages.push(user_message);
 
@@ -150,16 +152,16 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
-        // personal_db
-        //     .insert_chat_message_from_message(
-        //         conversation_id.as_str(),
-        //         Message {
-        //             role: Role::Assistant,
-        //             content: MessageContent::Text(complete_response.clone()),
-        //         },
-        //     )
-        //     .await
-        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+        personal_db
+            .insert_chat_message_from_message(
+                conversation_id.as_str(),
+                Message {
+                    role: Role::Assistant,
+                    content: MessageContent::Text(complete_response.clone()),
+                },
+            )
+            .await
+            .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
         Ok(complete_response)
     }
