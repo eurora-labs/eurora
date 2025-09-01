@@ -25,13 +25,13 @@ CREATE TABLE chat_message (
 CREATE TABLE activity (
     id TEXT PRIMARY KEY,         -- UUID
     name TEXT NOT NULL,          -- Activity name
-    chat_message_id TEXT,        -- Foreign key to chat_message
+    conversation_id TEXT,        -- Foreign key to conversation
     icon_path TEXT,     -- Path to the icon
     process_name TEXT NOT NULL,  -- Process name
     started_at TEXT NOT NULL,    -- ISO8601 datetime when activity started
     ended_at TEXT,                -- ISO8601 datetime when activity ended (nullable)
 
-    FOREIGN KEY (chat_message_id) REFERENCES chat_message(id)
+    FOREIGN KEY (conversation_id) REFERENCES conversation(id)
 );
 
 -- Table for references to heavier prompt helpers
@@ -84,4 +84,4 @@ CREATE INDEX idx_activity_snapshot_frame_id ON activity_snapshot(frame_id);
 CREATE INDEX idx_frame_video_chunk_id ON frame(video_chunk_id);
 CREATE INDEX idx_frame_text_frame_id ON frame_text(frame_id);
 CREATE INDEX idx_chat_message_conversation_id ON chat_message(conversation_id);
-CREATE INDEX idx_activity_chat_message_id ON activity(chat_message_id);
+CREATE INDEX idx_activity_conversation_id ON activity(conversation_id);
