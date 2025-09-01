@@ -7,7 +7,9 @@ use dotenv::dotenv;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 mod launcher;
 mod util;
+use eur_encrypt::USER_MAIN_KEY_HANDLE;
 use eur_native_messaging::create_grpc_ipc_client;
+use eur_secret::{self, Sensitive, secret};
 use eur_settings::AppSettings;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
@@ -122,6 +124,10 @@ fn main() {
                         }
                     });
 
+                    // If no main key is available, generate a new one
+                    if let Err(err) = secret::retrieve(USER_MAIN_KEY_HANDLE, secret::Namespace::Global) {
+                        secret::persist(USER_MAIN_KEY_HANDLE, &Sensitive("".to_string()), secret::Namespace::Global);
+                    }
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -231,7 +237,12 @@ fn main() {
 
 
                     let timeline = eur_timeline::TimelineManagerBuilder::new()
-                    .with_activity_storage_config(eur_activity::ActivityStorageConfig { base_dir: app_handle.path().app_data_dir().unwrap(), use_content_hash: false, max_file_size: None })
+                    .with_activity_storage_config(
+                        eur_activity::ActivityStorageConfig {
+                        base_dir: app_handle.path().app_data_dir().unwrap(),
+                        use_content_hash: false,
+                        max_file_size: None,
+                        master_key: None })
                         .build();
                     app_handle.manage(async_mutex::Mutex::new(timeline));
 
