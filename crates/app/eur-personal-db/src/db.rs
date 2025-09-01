@@ -174,13 +174,14 @@ impl PersonalDatabaseManager {
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
     ) -> Result<ChatMessage, sqlx::Error> {
-        let id = sqlx::query(
+        let id = Uuid::new_v4().to_string();
+        let result = sqlx::query(
             r#"
             INSERT INTO chat_message (id, conversation_id, role, content, visible, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
         )
-        .bind(Uuid::new_v4().to_string())
+        .bind(&id)
         .bind(conversation_id)
         .bind(role)
         .bind(content)
@@ -188,11 +189,10 @@ impl PersonalDatabaseManager {
         .bind(created_at)
         .bind(updated_at)
         .execute(&self.pool)
-        .await?
-        .last_insert_rowid();
+        .await?;
 
         Ok(ChatMessage {
-            id: id.to_string(),
+            id,
             conversation_id: conversation_id.to_string(),
             role: role.to_string(),
             content: content.to_string(),
