@@ -9,6 +9,7 @@ description = "Refactored activity system with enum-based type-safe design"
 eur-proto = { workspace = true }
 eur-native-messaging = { workspace = true }
 eur-fs = { workspace = true }
+eur-secret = { workspace = true }
 image.workspace = true
 chrono = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, default-features = false, features = [
@@ -40,6 +41,7 @@ enum_dispatch = "0.3.13"
 dirs = { workspace = true }
 orion = "0.17.11"
 rand = { workspace = true }
+
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }
