@@ -9,7 +9,6 @@ impl TimelineManager {
         match activity {
             Some(activity) => Ok(DbActivity {
                 id: activity.id.clone(),
-                conversation_id: None,
                 name: activity.name.clone(),
                 icon_path: None,
                 process_name: activity.process_name.clone(),

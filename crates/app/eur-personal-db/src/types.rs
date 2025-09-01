@@ -25,15 +25,31 @@ pub struct ChatMessage {
 }
 
 /// Activity table structure
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Clone)]
 pub struct Activity {
     pub id: String,
-    pub conversation_id: Option<String>,
     pub name: String,
     pub icon_path: Option<String>,
     pub process_name: String,
     pub start: String,
     pub end: Option<String>,
+}
+
+/// Activity conversation table structure
+#[derive(Clone, Debug)]
+pub struct ActivityConversation {
+    pub id: String,
+    pub activity_id: String,
+    pub conversation_id: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Conversation with activities
+#[derive(Clone, Debug)]
+pub struct ConversationWithActivity {
+    pub conversation: Conversation,
+    pub activities: Vec<Activity>,
 }
 
 /// Activity asset table structure
