@@ -5,20 +5,11 @@ use crate::{Activity, error::ActivityResult};
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use eur_fs::create_dirs_then_write;
-use orion::{
-    aead,
-    kdf::{Password, Salt, derive_key},
-};
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::path::{Path, PathBuf};
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
 use tracing::info;
+
 /// Configuration for asset storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActivityStorageConfig {
@@ -28,6 +19,8 @@ pub struct ActivityStorageConfig {
     pub use_content_hash: bool,
     /// Maximum file size in bytes (None for no limit)
     pub max_file_size: Option<u64>,
+    /// Master key
+    pub master_key: Option<[u8; 32]>,
 }
 
 impl Default for ActivityStorageConfig {
@@ -36,6 +29,7 @@ impl Default for ActivityStorageConfig {
             base_dir: dirs::data_dir().unwrap_or_else(|| PathBuf::from("./assets")),
             use_content_hash: true,
             max_file_size: Some(100 * 1024 * 1024), // 100MB default limit
+            master_key: None,
         }
     }
 }
@@ -70,6 +64,9 @@ pub trait SaveableAsset {
 
     /// Get a human-readable name for the asset
     fn get_display_name(&self) -> String;
+
+    /// Whether the output should be encrypted
+    fn should_encrypt(&self) -> bool;
 }
 
 /// Asset storage manager
@@ -83,12 +80,12 @@ impl ActivityStorage {
         Self { config }
     }
 
-    /// Create with default configuration
-    pub fn with_base_dir<P: Into<PathBuf>>(base_dir: P) -> Self {
-        let mut config = ActivityStorageConfig::default();
-        config.base_dir = base_dir.into();
-        Self::new(config)
-    }
+    // /// Create with default configuration
+    // pub fn with_base_dir<P: Into<PathBuf>>(base_dir: P) -> Self {
+    //     let mut config = ActivityStorageConfig::default();
+    //     config.base_dir = base_dir.into();
+    //     Self::new(config)
+    // }
 
     /// Save all assets of an activity to disk
     pub async fn save_assets_to_disk(
@@ -107,15 +104,18 @@ impl ActivityStorage {
 
     /// Save an asset to disk
     pub async fn save_asset<T: SaveableAsset>(&self, asset: &T) -> ActivityResult<SavedAssetInfo> {
-        let bytes = asset.serialize_content().await?;
-        let out = encrypt_bytes(&bytes).await?;
+        let mut bytes = asset.serialize_content().await?;
+        if asset.should_encrypt() {
+            let mk = [0u8; 32];
+            bytes = encrypt_bytes(&mk, &bytes).await?;
+        }
 
         // Make a placeholder filepath
         let file_path = self.generate_asset_path(asset, None)?;
         let absolute_path = self.config.base_dir.join(&file_path);
         let final_path = self.config.base_dir.join(&absolute_path);
         info!("Saving asset to {}", final_path.display());
-        create_dirs_then_write(&final_path, &out)?;
+        create_dirs_then_write(&final_path, &bytes)?;
 
         // // Serialize the content
         // let content = asset.serialize_content().await?;
@@ -325,12 +325,22 @@ mod tests {
         fn get_display_name(&self) -> String {
             self.name.clone()
         }
+
+        fn should_encrypt(&self) -> bool {
+            true
+        }
     }
 
     #[tokio::test]
     async fn test_asset_storage_basic() {
         let temp_dir = TempDir::new().unwrap();
-        let storage = ActivityStorage::with_base_dir(temp_dir.path());
+        let storage_config = ActivityStorageConfig {
+            base_dir: temp_dir.path().into(),
+            use_content_hash: true,
+            max_file_size: Some(100 * 1024 * 1024),
+            master_key: None,
+        };
+        let storage = ActivityStorage::new(storage_config);
 
         let asset = MockAsset {
             id: "test-123".to_string(),
@@ -355,7 +365,13 @@ mod tests {
     #[tokio::test]
     async fn test_content_deduplication() {
         let temp_dir = TempDir::new().unwrap();
-        let storage = ActivityStorage::with_base_dir(temp_dir.path());
+        let storage_config = ActivityStorageConfig {
+            base_dir: temp_dir.path().into(),
+            use_content_hash: true,
+            max_file_size: Some(100 * 1024 * 1024),
+            master_key: None,
+        };
+        let storage = ActivityStorage::new(storage_config);
 
         let asset1 = MockAsset {
             id: "test-1".to_string(),

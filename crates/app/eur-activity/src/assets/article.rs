@@ -1,10 +1,9 @@
 //! Article asset implementation
 
-use crate::encryption::encrypt_bytes;
+use crate::ActivityResult;
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
 use crate::types::{AssetFunctionality, ContextChip};
-use crate::{ActivityResult, ActivityStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use eur_proto::ipc::ProtoArticleState;
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -143,9 +142,7 @@ impl SaveableAsset for ArticleAsset {
 
     async fn serialize_content(&self) -> ActivityResult<Vec<u8>> {
         let bytes = serde_json::to_vec(self)?;
-        let encrypted_bytes = encrypt_bytes(&bytes).await?;
-
-        Ok(encrypted_bytes)
+        Ok(bytes)
     }
 
     fn get_unique_id(&self) -> String {
@@ -154,6 +151,10 @@ impl SaveableAsset for ArticleAsset {
 
     fn get_display_name(&self) -> String {
         self.title.clone()
+    }
+
+    fn should_encrypt(&self) -> bool {
+        true
     }
 }
 

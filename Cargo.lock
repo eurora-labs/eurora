@@ -2828,6 +2828,7 @@ dependencies = [
  "eur-fs",
  "eur-native-messaging",
  "eur-proto",
+ "eur-secret",
  "ferrous-focus",
  "ferrous-llm-core",
  "hex",
@@ -2930,6 +2931,17 @@ dependencies = [
  "tonic",
  "tonic-prost-build",
  "tracing",
+]
+
+[[package]]
+name = "eur-encrypt"
+version = "0.0.0"
+dependencies = [
+ "base64 0.22.1",
+ "eur-secret",
+ "orion",
+ "rand 0.9.2",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -3225,6 +3237,7 @@ dependencies = [
  "eur-activity",
  "eur-client-grpc",
  "eur-client-questions",
+ "eur-encrypt",
  "eur-eurora-provider",
  "eur-native-messaging",
  "eur-personal-db",
