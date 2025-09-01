@@ -1,9 +1,11 @@
+use chrono::Utc;
 use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tracing::info;
+use uuid::Uuid;
 
 use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
 #[taurpc::ipc_type]
@@ -64,9 +66,6 @@ impl ChatApi for ChatApiImpl {
                 .save_assets_to_disk()
                 .await
                 .expect("Failed to save assets");
-            for info in infos {
-                info!("Saved asset: {:?}", info);
-            }
 
             messages = timeline.construct_asset_messages().await;
             messages.extend(timeline.construct_snapshot_messages().await);
@@ -77,10 +76,24 @@ impl ChatApi for ChatApiImpl {
             content: MessageContent::Text(query.text.clone()),
         };
 
-        personal_db
+        // Insert chat message into db
+        let chat_message = personal_db
             .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
             .await
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+
+        let mut db_activity = timeline
+            .get_db_activity()
+            .await
+            .expect("Failed to get db activity");
+
+        db_activity.chat_message_id = Some(chat_message.id.clone());
+
+        // Insert activity into db
+        personal_db
+            .insert_activity(&db_activity)
+            .await
+            .expect("Failed to insert activity");
 
         messages.push(user_message);
 
