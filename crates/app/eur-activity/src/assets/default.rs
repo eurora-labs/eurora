@@ -1,8 +1,8 @@
 //! Default asset implementation for unsupported activity types
 
+use crate::ActivityResult;
 use crate::storage::SaveableAsset;
 use crate::types::{AssetFunctionality, ContextChip};
-use crate::{ActivityResult, ActivityStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -141,6 +141,10 @@ impl SaveableAsset for DefaultAsset {
 
     fn get_display_name(&self) -> String {
         self.name.clone()
+    }
+
+    fn should_encrypt(&self) -> bool {
+        false
     }
 }
 
