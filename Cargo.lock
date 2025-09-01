@@ -2825,6 +2825,7 @@ dependencies = [
  "chrono",
  "dirs 6.0.0",
  "enum_dispatch",
+ "eur-encrypt",
  "eur-fs",
  "eur-native-messaging",
  "eur-proto",
@@ -2941,7 +2942,10 @@ dependencies = [
  "eur-secret",
  "orion",
  "rand 0.9.2",
+ "serde",
  "thiserror 2.0.12",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]

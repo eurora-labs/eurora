@@ -7,7 +7,7 @@ use dotenv::dotenv;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 mod launcher;
 mod util;
-use eur_encrypt::USER_MAIN_KEY_HANDLE;
+use eur_encrypt::{MainKey, USER_MAIN_KEY_HANDLE, generate_new_main_key};
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_secret::{self, Sensitive, secret};
 use eur_settings::AppSettings;
@@ -125,9 +125,7 @@ fn main() {
                     });
 
                     // If no main key is available, generate a new one
-                    if let Err(err) = secret::retrieve(USER_MAIN_KEY_HANDLE, secret::Namespace::Global) {
-                        secret::persist(USER_MAIN_KEY_HANDLE, &Sensitive("".to_string()), secret::Namespace::Global);
-                    }
+                    let key = MainKey::new();
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -242,7 +240,8 @@ fn main() {
                         base_dir: app_handle.path().app_data_dir().unwrap(),
                         use_content_hash: false,
                         max_file_size: None,
-                        master_key: None })
+                        main_key: Some(MainKey::new()) 
+                    })
                         .build();
                     app_handle.manage(async_mutex::Mutex::new(timeline));
 
