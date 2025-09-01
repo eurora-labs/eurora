@@ -87,7 +87,7 @@ impl ChatApi for ChatApiImpl {
             .await
             .expect("Failed to get db activity");
 
-        db_activity.chat_message_id = Some(chat_message.id.clone());
+        db_activity.conversation_id = Some(conversation_id.clone());
 
         // Insert activity into db
         personal_db

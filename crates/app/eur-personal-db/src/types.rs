@@ -28,7 +28,7 @@ pub struct ChatMessage {
 #[derive(FromRow, Debug)]
 pub struct Activity {
     pub id: String,
-    pub chat_message_id: Option<String>,
+    pub conversation_id: Option<String>,
     pub name: String,
     pub icon_path: Option<String>,
     pub process_name: String,

@@ -4,17 +4,13 @@
 		createTauRPCProxy,
 		type ResponseChunk,
 		type Query,
-		type ContextChip,
 		type Message,
 		type Conversation,
-		type Role,
 	} from '$lib/bindings/bindings.js';
 
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
-	import { create } from '@eurora/shared/util/grpc';
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
 	import { Chat } from '@eurora/ui/custom-components/chat/index';
-	import { ProtoChatMessageSchema } from '@eurora/shared/proto/questions_service_pb.js';
 	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
 	import Katex from '$lib/components/katex.svelte';
 	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
@@ -24,7 +20,6 @@
 		Editor as ProsemirrorEditor,
 		type SveltePMExtension,
 	} from '@eurora/prosemirror-core/index';
-	import type { UnlistenFn } from '@tauri-apps/api/event';
 
 	let conversation = $state<Conversation | null>(null);
 	let messages = $state<Message[]>([]);
