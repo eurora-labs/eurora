@@ -5,7 +5,7 @@ CREATE TABLE conversation (
     id TEXT PRIMARY KEY,         -- UUID
     title TEXT NOT NULL,          -- Conversation name
     created_at TEXT NOT NULL,    -- ISO8601 datetime when conversation was created
-    updated_at TEXT NOT NULL     -- ISO8601 datetime when conversation was last updated
+    updated_at TEXT NOT NULL    -- ISO8601 datetime when conversation was last updated
 );
 
 -- Table for conversation messages
@@ -25,13 +25,20 @@ CREATE TABLE chat_message (
 CREATE TABLE activity (
     id TEXT PRIMARY KEY,         -- UUID
     name TEXT NOT NULL,          -- Activity name
-    conversation_id TEXT,        -- Foreign key to conversation
     icon_path TEXT,     -- Path to the icon
     process_name TEXT NOT NULL,  -- Process name
     started_at TEXT NOT NULL,    -- ISO8601 datetime when activity started
-    ended_at TEXT,                -- ISO8601 datetime when activity ended (nullable)
+    ended_at TEXT                -- ISO8601 datetime when activity ended (nullable)
+);
 
-    FOREIGN KEY (conversation_id) REFERENCES conversation(id)
+-- Table for activity to conversation mapping
+CREATE TABLE activity_conversation (
+    activity_id TEXT NOT NULL,   -- Foreign key to activity
+    conversation_id TEXT NOT NULL, -- Foreign key to conversation
+    created_at TEXT NOT NULL,    -- ISO8601 datetime when mapping was created
+    PRIMARY KEY (activity_id, conversation_id),
+    FOREIGN KEY (activity_id) REFERENCES activity(id) ON DELETE CASCADE,
+    FOREIGN KEY (conversation_id) REFERENCES conversation(id) ON DELETE CASCADE
 );
 
 -- Table for references to heavier prompt helpers
@@ -84,4 +91,6 @@ CREATE INDEX idx_activity_snapshot_frame_id ON activity_snapshot(frame_id);
 CREATE INDEX idx_frame_video_chunk_id ON frame(video_chunk_id);
 CREATE INDEX idx_frame_text_frame_id ON frame_text(frame_id);
 CREATE INDEX idx_chat_message_conversation_id ON chat_message(conversation_id);
-CREATE INDEX idx_activity_conversation_id ON activity(conversation_id);
+
+CREATE INDEX idx_activity_conversation_activity_id ON activity_conversation(activity_id);
+CREATE INDEX idx_activity_conversation_conversation_id ON activity_conversation(conversation_id);
