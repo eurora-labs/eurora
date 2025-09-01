@@ -17,6 +17,7 @@
 		type ResponseChunk,
 		type Query,
 		type ContextChip,
+		type Conversation,
 	} from '$lib/bindings/bindings.js';
 	import { create } from '@eurora/shared/util/grpc';
 
@@ -49,7 +50,9 @@
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
 	const messages = $state<ProtoChatMessage[]>([]);
-	let currentConversationId = $state<string | null>(null);
+
+	let conversation = $state<Conversation | null>(null);
+
 	let backgroundImage = $state<string | null>(null);
 	let currentMonitorId = $state<string>('');
 	let launcherInfo = $state<{
@@ -68,7 +71,7 @@
 		// Clear messages array
 		messages.splice(0, messages.length);
 		// Reset current conversation ID to null to default to NEW on next interaction
-		currentConversationId = null;
+		conversation = null;
 		console.log('Launcher closed: cleared messages and reset conversation');
 	});
 
@@ -146,7 +149,7 @@
 	function handleEscapeKey(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
 			// When Escape is pressed, set conversation ID to NEW and clear messages
-			currentConversationId = 'NEW';
+			conversation = null;
 			messages.splice(0, messages.length);
 			console.log('Escape pressed: cleared messages and set conversation to NEW');
 
@@ -236,8 +239,14 @@
 				chatRef?.scrollToBottom();
 			};
 
+			// If no conversation is selected create a new one
+			if (!conversation) {
+				conversation = await taurpc.personal_db.conversation.create();
+				console.log('conversation', conversation);
+			}
+
 			// Use TauRPC send_query procedure
-			await taurpc.chat.send_query('testId', onEvent, tauRpcQuery);
+			await taurpc.chat.send_query(conversation.id, onEvent, tauRpcQuery);
 
 			// Note: Conversation management is not yet available in TauRPC,
 			// so we skip the conversation refresh for now
