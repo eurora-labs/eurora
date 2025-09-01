@@ -87,13 +87,13 @@ impl ChatApi for ChatApiImpl {
             .await
             .expect("Failed to get db activity");
 
-        db_activity.conversation_id = Some(conversation_id.clone());
+        // db_activity.conversation_id = Some(conversation_id.clone());
 
-        // Insert activity into db
-        personal_db
-            .insert_activity(&db_activity)
-            .await
-            .expect("Failed to insert activity");
+        // // Insert activity into db
+        // personal_db
+        //     .insert_activity(&db_activity)
+        //     .await
+        //     .expect("Failed to insert activity");
 
         messages.push(user_message);
 

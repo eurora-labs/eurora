@@ -223,13 +223,12 @@ impl PersonalDatabaseManager {
     pub async fn insert_activity(&self, activity: &Activity) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
-            INSERT INTO activity (id, name, conversation_id, icon_path, process_name, started_at, ended_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO activity (id, name, icon_path, process_name, started_at, ended_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(activity.id.clone())
         .bind(activity.name.clone())
-        .bind(activity.conversation_id.clone())
         .bind(activity.icon_path.clone())
         .bind(activity.process_name.clone())
         .bind(activity.start.clone())
