@@ -1,0 +1,13 @@
+[package]
+name = "eur-encrypt"
+version = "0.0.0"
+edition = "2024"
+authors.workspace = true
+description = "Handle user encryption and related functionalities"
+
+[dependencies]
+eur-secret = { workspace = true }
+orion = "0.17.11"
+rand = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }

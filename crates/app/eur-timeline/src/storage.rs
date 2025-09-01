@@ -1,6 +1,6 @@
 //! Timeline storage implementation
 
-use crate::{Activity, ActivityAsset, SaveableAsset};
+use crate::Activity;
 use chrono::{DateTime, Utc};
 use eur_fs::write;
 use std::collections::VecDeque;

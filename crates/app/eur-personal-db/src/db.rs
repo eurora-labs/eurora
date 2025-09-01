@@ -262,7 +262,7 @@ impl PersonalDatabaseManager {
     }
 }
 
-const PERSONAL_DB_KEY_HANDLE: &str = "PERSONAL_DB_KEY";
+pub const PERSONAL_DB_KEY_HANDLE: &str = "PERSONAL_DB_KEY";
 
 fn init_key() -> Result<Sensitive<String>> {
     let key = secret::retrieve(PERSONAL_DB_KEY_HANDLE, secret::Namespace::Global)
