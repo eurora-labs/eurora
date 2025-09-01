@@ -16,6 +16,7 @@ pub use ferrous_llm_core::Message;
 // Internal modules
 mod collector;
 mod config;
+mod db;
 mod error;
 mod manager;
 mod storage;

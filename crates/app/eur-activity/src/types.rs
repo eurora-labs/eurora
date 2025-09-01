@@ -14,6 +14,7 @@ use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::info;
+use uuid::Uuid;
 
 /// Context chip for UI integration
 #[taurpc::ipc_type]
@@ -77,6 +78,8 @@ pub enum ActivitySnapshot {
 /// Main activity structure - now fully cloneable and serializable
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Activity {
+    /// ID of the activity
+    pub id: String,
     /// Name of the activity
     pub name: String,
     /// Icon representing the activity
@@ -102,6 +105,7 @@ impl Activity {
         assets: Vec<ActivityAsset>,
     ) -> Self {
         Self {
+            id: Uuid::new_v4().to_string(),
             name,
             icon,
             process_name,
