@@ -4,6 +4,7 @@ use crate::encryption::encrypt_bytes;
 use crate::{Activity, error::ActivityResult};
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
+use eur_encrypt::MainKey;
 use eur_fs::create_dirs_then_write;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -20,7 +21,7 @@ pub struct ActivityStorageConfig {
     /// Maximum file size in bytes (None for no limit)
     pub max_file_size: Option<u64>,
     /// Master key
-    pub master_key: Option<[u8; 32]>,
+    pub main_key: Option<MainKey>,
 }
 
 impl Default for ActivityStorageConfig {
@@ -29,7 +30,7 @@ impl Default for ActivityStorageConfig {
             base_dir: dirs::data_dir().unwrap_or_else(|| PathBuf::from("./assets")),
             use_content_hash: true,
             max_file_size: Some(100 * 1024 * 1024), // 100MB default limit
-            master_key: None,
+            main_key: None,
         }
     }
 }
@@ -106,8 +107,7 @@ impl ActivityStorage {
     pub async fn save_asset<T: SaveableAsset>(&self, asset: &T) -> ActivityResult<SavedAssetInfo> {
         let mut bytes = asset.serialize_content().await?;
         if asset.should_encrypt() {
-            let mk = [0u8; 32];
-            bytes = encrypt_bytes(&mk, &bytes).await?;
+            bytes = encrypt_bytes(self.config.main_key.as_ref().unwrap(), &bytes).await?;
         }
 
         // Make a placeholder filepath
@@ -338,7 +338,7 @@ mod tests {
             base_dir: temp_dir.path().into(),
             use_content_hash: true,
             max_file_size: Some(100 * 1024 * 1024),
-            master_key: None,
+            main_key: None,
         };
         let storage = ActivityStorage::new(storage_config);
 
@@ -369,7 +369,7 @@ mod tests {
             base_dir: temp_dir.path().into(),
             use_content_hash: true,
             max_file_size: Some(100 * 1024 * 1024),
-            master_key: None,
+            main_key: None,
         };
         let storage = ActivityStorage::new(storage_config);
 
