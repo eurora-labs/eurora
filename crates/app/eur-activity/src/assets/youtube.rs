@@ -1,9 +1,9 @@
 //! YouTube asset implementation
 
+use crate::ActivityResult;
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
 use crate::types::{AssetFunctionality, ContextChip};
-use crate::{ActivityResult, ActivityStorage, SavedAssetInfo};
 use async_trait::async_trait;
 use eur_proto::ipc::ProtoYoutubeState;
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -139,6 +139,10 @@ impl SaveableAsset for YoutubeAsset {
 
     fn get_display_name(&self) -> String {
         self.title.clone()
+    }
+
+    fn should_encrypt(&self) -> bool {
+        false
     }
 }
 
