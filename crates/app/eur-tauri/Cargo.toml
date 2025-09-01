@@ -61,6 +61,10 @@ eur-client-grpc = { workspace = true }
 eur-personal-db = { workspace = true }
 eur-native-messaging = { workspace = true }
 eur-settings = { workspace = true }
+eur-proto-client = { workspace = true }
+eur-user = { workspace = true }
+eur-eurora-provider = { workspace = true }
+eur-encrypt = { workspace = true }
 
 chrono = { workspace = true }
 defer = "0.2.1"
@@ -79,12 +83,9 @@ tauri-specta = { version = "2.0.0-rc.21", features = [
 ] }
 taurpc = { version = "0.5.1" }
 base64 = "0.22.1"
-eur-proto-client = { workspace = true }
 dotenv = "0.15.0"
-eur-user = { workspace = true }
 uuid.workspace = true
 ferrous-llm-core = { workspace = true, features = ["specta"] }
-eur-eurora-provider = { workspace = true }
 async_from = { workspace = true }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
