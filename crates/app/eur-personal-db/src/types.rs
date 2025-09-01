@@ -28,11 +28,12 @@ pub struct ChatMessage {
 #[derive(FromRow, Debug)]
 pub struct Activity {
     pub id: String,
+    pub chat_message_id: Option<String>,
     pub name: String,
-    pub app_name: String,
-    pub window_name: String,
-    pub started_at: String,
-    pub ended_at: Option<String>,
+    pub icon_path: Option<String>,
+    pub process_name: String,
+    pub start: String,
+    pub end: Option<String>,
 }
 
 /// Activity asset table structure
