@@ -224,13 +224,11 @@ impl TimelineManager {
 
     /// Save the assets to disk
     pub async fn save_assets_to_disk(&self) -> TimelineResult<()> {
-        info!("Getting locks");
         let storage = self.storage.lock().await;
         let activity_storage = self.activity_storage.lock().await;
-        info!("Locks acquired");
 
         if let Some(activity) = storage.get_current_activity() {
-            activity_storage.save_assets_to_disk(activity).await;
+            activity_storage.save_assets_to_disk(activity).await?;
         }
         Ok(())
     }
