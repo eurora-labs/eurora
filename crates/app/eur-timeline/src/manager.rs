@@ -118,13 +118,13 @@ impl Default for TimelineManagerBuilder {
 /// High-level timeline manager that provides a simple API for timeline operations
 pub struct TimelineManager {
     /// Shared storage for timeline data
-    storage: Arc<Mutex<TimelineStorage>>,
+    pub storage: Arc<Mutex<TimelineStorage>>,
     /// Shared disk storage for saving activities
-    activity_storage: Arc<Mutex<ActivityStorage>>,
+    pub activity_storage: Arc<Mutex<ActivityStorage>>,
     /// Collection service
-    collector: CollectorService,
+    pub collector: CollectorService,
     /// Configuration
-    config: TimelineConfig,
+    pub config: TimelineConfig,
 }
 
 impl TimelineManager {
