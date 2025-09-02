@@ -67,6 +67,7 @@ CREATE TABLE chat_message_asset (
 -- Create indexes for foreign keys to improve query performance
 CREATE INDEX idx_asset_activity_id ON asset(activity_id);
 CREATE INDEX idx_chat_message_conversation_id ON chat_message(conversation_id);
+CREATE INDEX idx_chat_message_asset_asset_id ON chat_message_asset(asset_id);
 
 CREATE INDEX idx_activity_conversation_activity_id ON activity_conversation(activity_id);
 CREATE INDEX idx_activity_conversation_conversation_id ON activity_conversation(conversation_id);
