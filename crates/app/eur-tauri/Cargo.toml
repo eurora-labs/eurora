@@ -18,13 +18,13 @@ test = false
 tauri-build = { version = "2.0.3", features = [] }
 
 [dependencies]
-tauri-utils = "2.6.0"                                                       # single entry removes second 8.6 s build
+tauri-utils = "2.7.0"                                                       # single entry removes second 8.6 s build
 tauri-plugin-stronghold = "2.0.0"
 anyhow = { workspace = true }
 eur-secret = { workspace = true }
 eur-prompt-kit = { workspace = true }
 backtrace = { version = "0.3.75", optional = true }
-reqwest = { version = "0.12.22", features = ["json", "native-tls"] }
+reqwest = { version = "0.12.23", features = ["json", "native-tls"] }
 serde.workspace = true
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
 tauri = { version = "^2.7.0", features = ["unstable", "tray-icon"] }
@@ -34,9 +34,9 @@ tauri-plugin-http = "2.5.1"
 tauri-plugin-log = "2.6.0"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2.3.0"
-tauri-plugin-shell = "2.3.0"
-tauri-plugin-single-instance = "2.3.2"
-tauri-plugin-store = "2.3.0"
+tauri-plugin-shell = "2.3.1"
+tauri-plugin-single-instance = "2.3.3"
+tauri-plugin-store = "2.4.0"
 tauri-plugin-updater = "2.9.0"
 tauri-plugin-window-state = "2.4.0"
 eur-vision = { workspace = true }

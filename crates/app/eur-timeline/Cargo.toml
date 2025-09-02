@@ -24,7 +24,7 @@ serde_json = "1.0"
 parking_lot = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
-x11rb = "0.13.1"
+x11rb = "0.13.2"
 ferrous-llm = { workspace = true, features = ["openai"] }
 thiserror = { workspace = true }
 async-trait = "0.1"
