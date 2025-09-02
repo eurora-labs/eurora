@@ -42,7 +42,8 @@ mod tests {
 
         assert!(config.validate().is_ok());
 
-        let timeline = TimelineManager::with_config(config);
+        let timeline =
+            TimelineManager::with_config(config).expect("Failed to create timeline manager");
         assert_eq!(timeline.get_config().storage.max_activities, 100);
     }
 
@@ -51,7 +52,7 @@ mod tests {
         let timeline1 = TimelineManager::new();
         assert!(!timeline1.is_running());
 
-        let timeline2 = create_timeline(500, 5);
+        let timeline2 = create_timeline(500, 5).expect("Failed to create timeline manager");
         assert_eq!(timeline2.get_config().storage.max_activities, 500);
     }
 }
