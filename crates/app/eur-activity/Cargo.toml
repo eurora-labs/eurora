@@ -2,15 +2,22 @@
 name = "eur-activity"
 version = "0.0.0"
 edition = "2024"
-authors = ["Eurora <eurora@company.com>"]
+authors.workspace = true
 description = "Refactored activity system with enum-based type-safe design"
 
 [dependencies]
 eur-proto = { workspace = true }
 eur-native-messaging = { workspace = true }
+eur-fs = { workspace = true }
+eur-secret = { workspace = true }
+eur-encrypt = { workspace = true }
 image.workspace = true
 chrono = { workspace = true, features = ["serde"] }
-tokio = { workspace = true, default-features = false, features = ["fs", "macros", "rt-multi-thread"] }
+tokio = { workspace = true, default-features = false, features = [
+    "fs",
+    "macros",
+    "rt-multi-thread",
+] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 humantime-serde = { workspace = true }
@@ -32,6 +39,10 @@ sha2 = "0.10.8"
 hex = "0.4.3"
 tempfile = "3.8.1"
 enum_dispatch = "0.3.13"
+dirs = { workspace = true }
+orion = "0.17.11"
+rand = { workspace = true }
+
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }
