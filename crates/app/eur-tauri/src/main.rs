@@ -7,6 +7,7 @@ use dotenv::dotenv;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 mod launcher;
 mod util;
+use eur_encrypt::MainKey;
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_settings::AppSettings;
 use eur_tauri::{
@@ -122,6 +123,8 @@ fn main() {
                         }
                     });
 
+                    // If no main key is available, generate a new one
+                    let main_key = MainKey::new().expect("Failed to generate main key");
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -230,7 +233,15 @@ fn main() {
                         .expect("Failed to create tray icon");
 
 
-                    let timeline = eur_timeline::create_default_timeline();
+                    let timeline = eur_timeline::TimelineManagerBuilder::new()
+                    .with_activity_storage_config(
+                        eur_activity::ActivityStorageConfig {
+                        base_dir: app_handle.path().app_data_dir().unwrap(),
+                        use_content_hash: false,
+                        max_file_size: None,
+                        main_key: main_key.clone()
+                    })
+                        .build().expect("Failed to create timeline");
                     app_handle.manage(async_mutex::Mutex::new(timeline));
 
                     // Start timeline collection
