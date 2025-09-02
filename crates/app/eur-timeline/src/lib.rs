@@ -1,20 +1,22 @@
 // Re-export main types for easy access
 pub use collector::{CollectorService, CollectorStats};
 pub use config::{CollectorConfig, FocusTrackingConfig, StorageConfig, TimelineConfig};
-pub use error::{Result, TimelineError};
-pub use manager::{TimelineManager, create_default_timeline, create_timeline};
+pub use error::{TimelineError, TimelineResult};
+pub use manager::{TimelineManager, TimelineManagerBuilder, create_timeline};
 pub use storage::{StorageStats, TimelineStorage};
 
 // Re-export activity types for convenience
 pub use eur_activity::{
-    Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStrategy, AssetFunctionality,
-    ContextChip, DisplayAsset, select_strategy_for_process,
+    Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStorage,
+    ActivityStorageConfig, ActivityStrategy, AssetFunctionality, ContextChip, DisplayAsset,
+    SaveableAsset, select_strategy_for_process,
 };
 pub use ferrous_llm_core::Message;
 
 // Internal modules
 mod collector;
 mod config;
+mod db;
 mod error;
 mod manager;
 mod storage;
@@ -40,16 +42,17 @@ mod tests {
 
         assert!(config.validate().is_ok());
 
-        let timeline = TimelineManager::with_config(config);
+        let timeline =
+            TimelineManager::with_config(config).expect("Failed to create timeline manager");
         assert_eq!(timeline.get_config().storage.max_activities, 100);
     }
 
     #[tokio::test]
     async fn test_convenience_functions() {
-        let timeline1 = create_default_timeline();
+        let timeline1 = TimelineManager::new();
         assert!(!timeline1.is_running());
 
-        let timeline2 = create_timeline(500, 5);
+        let timeline2 = create_timeline(500, 5).expect("Failed to create timeline manager");
         assert_eq!(timeline2.get_config().storage.max_activities, 500);
     }
 }
