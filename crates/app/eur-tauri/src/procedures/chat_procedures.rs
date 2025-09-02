@@ -1,11 +1,9 @@
-use chrono::Utc;
 use eur_personal_db::{Conversation, NewAsset, PersonalDatabaseManager};
 use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tracing::info;
-use uuid::Uuid;
 
 use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
 #[taurpc::ipc_type]

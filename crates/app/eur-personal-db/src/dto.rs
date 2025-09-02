@@ -1,8 +1,4 @@
 use chrono::{DateTime, Utc};
-use ferrous_llm_core::{Message, MessageContent, Role};
-use serde::{Deserialize, Serialize};
-use specta::Type;
-use sqlx::FromRow;
 
 #[derive(Debug)]
 pub struct NewAsset {
