@@ -9,7 +9,6 @@ mod launcher;
 mod util;
 use eur_encrypt::MainKey;
 use eur_native_messaging::create_grpc_ipc_client;
-use eur_secret::{self};
 use eur_settings::AppSettings;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
@@ -125,7 +124,7 @@ fn main() {
                     });
 
                     // If no main key is available, generate a new one
-                    let key = MainKey::new();
+                    let main_key = MainKey::new().expect("Failed to generate main key");
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
@@ -240,7 +239,7 @@ fn main() {
                         base_dir: app_handle.path().app_data_dir().unwrap(),
                         use_content_hash: false,
                         max_file_size: None,
-                        main_key: Some(MainKey::new())
+                        main_key: Some(main_key)
                     })
                         .build();
                     app_handle.manage(async_mutex::Mutex::new(timeline));

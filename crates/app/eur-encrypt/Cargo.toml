@@ -14,3 +14,4 @@ base64 = { workspace = true }
 tracing = { workspace = true }
 zeroize = "1.8.1"
 serde = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
