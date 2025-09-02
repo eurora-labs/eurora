@@ -313,8 +313,8 @@ impl PersonalDatabaseManager {
         .bind(activity.name.clone())
         .bind(activity.icon_path.clone())
         .bind(activity.process_name.clone())
-        .bind(activity.start.clone())
-        .bind(activity.end.clone())
+        .bind(activity.started_at.clone())
+        .bind(activity.ended_at.clone())
         .execute(&self.pool)
         .await?;
 

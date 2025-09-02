@@ -17,7 +17,7 @@ CREATE TABLE chat_message (
     visible BOOLEAN NOT NULL,    -- Visibility of the message (true or false)
     created_at TEXT NOT NULL,    -- ISO8601 datetime when message was created
     updated_at TEXT NOT NULL,    -- ISO8601 datetime when message was last updated
-    FOREIGN KEY (conversation_id) REFERENCES conversation(id)
+    FOREIGN KEY (conversation_id) REFERENCES conversation(id) ON DELETE CASCADE
 );
 
 
@@ -50,7 +50,7 @@ CREATE TABLE asset (
     created_at TEXT NOT NULL,    -- ISO8601 datetime when asset was created
     updated_at TEXT NOT NULL,    -- ISO8601 datetime when asset was last updated
 
-    FOREIGN KEY (activity_id) REFERENCES activity(id)
+    FOREIGN KEY (activity_id) REFERENCES activity(id) ON DELETE SET NULL
 );
 
 -- Table for chat_message to asset mapping
