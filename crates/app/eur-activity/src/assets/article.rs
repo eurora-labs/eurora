@@ -1,9 +1,9 @@
 //! Article asset implementation
 
+use crate::ActivityResult;
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
-use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
-use crate::{AssetStorage, SavedAssetInfo};
+use crate::types::{AssetFunctionality, ContextChip};
 use async_trait::async_trait;
 use eur_proto::ipc::ProtoArticleState;
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -91,13 +91,6 @@ impl ArticleAsset {
     }
 }
 
-#[async_trait]
-impl SaveFunctionality for ArticleAsset {
-    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
-        storage.save_asset(self).await
-    }
-}
-
 impl AssetFunctionality for ArticleAsset {
     fn get_name(&self) -> &str {
         &self.title
@@ -147,17 +140,9 @@ impl SaveableAsset for ArticleAsset {
         "article"
     }
 
-    fn get_file_extension(&self) -> &'static str {
-        "json"
-    }
-
-    fn get_mime_type(&self) -> &'static str {
-        "application/json"
-    }
-
-    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
-        let json = serde_json::to_string_pretty(self)?;
-        Ok(json.into_bytes())
+    async fn serialize_content(&self) -> ActivityResult<Vec<u8>> {
+        let bytes = serde_json::to_vec(self)?;
+        Ok(bytes)
     }
 
     fn get_unique_id(&self) -> String {
@@ -166,6 +151,10 @@ impl SaveableAsset for ArticleAsset {
 
     fn get_display_name(&self) -> String {
         self.title.clone()
+    }
+
+    fn should_encrypt(&self) -> bool {
+        true
     }
 }
 
