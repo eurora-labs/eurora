@@ -2938,6 +2938,7 @@ dependencies = [
 name = "eur-encrypt"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "base64 0.22.1",
  "eur-secret",
  "orion",

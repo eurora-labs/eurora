@@ -78,7 +78,7 @@ impl ChatApi for ChatApiImpl {
         let infos = timeline
             .save_assets_to_disk()
             .await
-            .expect("Failed to save assets");
+            .map_err(|e| format!("Failed to save assets: {e}"))?;
 
         for info in infos {
             personal_db
