@@ -31,18 +31,16 @@ pub struct Activity {
     pub name: String,
     pub icon_path: Option<String>,
     pub process_name: String,
-    pub start: String,
-    pub end: Option<String>,
+    pub started_at: String,
+    pub ended_at: Option<String>,
 }
 
 /// Activity conversation table structure
 #[derive(Clone, Debug)]
 pub struct ActivityConversation {
-    pub id: String,
     pub activity_id: String,
     pub conversation_id: String,
     pub created_at: String,
-    pub updated_at: String,
 }
 
 /// Conversation with activities

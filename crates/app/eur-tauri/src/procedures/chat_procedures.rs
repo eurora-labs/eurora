@@ -81,12 +81,14 @@ impl ChatApi for ChatApiImpl {
             .map_err(|e| format!("Failed to save assets: {e}"))?;
 
         for info in infos {
+            let relative = info.file_path.to_string_lossy().into_owned();
+            let absolute = info.absolute_path.to_string_lossy().into_owned();
             personal_db
                 .insert_asset(&NewAsset {
                     id: None,
                     activity_id: None,
-                    relative_path: info.file_path.into_os_string().into_string().unwrap(),
-                    absolute_path: info.absolute_path.into_os_string().into_string().unwrap(),
+                    relative_path: relative,
+                    absolute_path: absolute,
                     chat_message_id: Some(chat_message.id.clone()),
                     created_at: Some(info.saved_at.clone()),
                     updated_at: Some(info.saved_at.clone()),
