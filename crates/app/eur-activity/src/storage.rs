@@ -67,7 +67,9 @@ pub trait SaveableAsset {
     fn get_display_name(&self) -> String;
 
     /// Whether the output should be encrypted
-    fn should_encrypt(&self) -> bool;
+    fn should_encrypt(&self) -> bool {
+        true
+    }
 }
 
 /// Asset storage manager
