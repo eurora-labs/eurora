@@ -1,4 +1,4 @@
-use std::{str::FromStr, time::Duration};
+use std::{path::PathBuf, str::FromStr, time::Duration};
 
 use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
@@ -13,7 +13,10 @@ use sqlx::{
 };
 use tracing::{debug, info};
 
-use crate::types::{Activity, ActivityAsset, ChatMessage, Conversation};
+use crate::{
+    ChatMessageAsset, NewAsset, NewChatMessageAsset,
+    types::{Activity, Asset, ChatMessage, Conversation},
+};
 
 pub struct PersonalDatabaseManager {
     pub pool: SqlitePool,
@@ -103,6 +106,84 @@ impl PersonalDatabaseManager {
             title: title.to_string(),
             created_at,
             updated_at,
+        })
+    }
+
+    pub async fn insert_asset(&self, na: &NewAsset) -> Result<Asset, sqlx::Error> {
+        let id: String;
+        if let Some(asset_id) = &na.id {
+            id = asset_id.clone();
+        } else {
+            id = Uuid::new_v4().to_string();
+        };
+
+        let created_at: DateTime<Utc>;
+        if let Some(created) = &na.created_at {
+            created_at = created.clone();
+        } else {
+            created_at = Utc::now();
+        }
+
+        let updated_at: DateTime<Utc>;
+        if let Some(updated) = &na.updated_at {
+            updated_at = updated.clone();
+        } else {
+            updated_at = created_at.clone();
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO asset (id, activity_id, relative_path, absolute_path, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(id.clone())
+        .bind(na.activity_id.clone())
+        .bind(na.relative_path.clone())
+        .bind(na.absolute_path.clone())
+        .bind(created_at.clone())
+        .bind(updated_at.clone())
+        .execute(&self.pool)
+        .await?;
+
+        if let Some(chat_message_id) = &na.chat_message_id {
+            self.insert_chat_message_asset(&NewChatMessageAsset {
+                chat_message_id: chat_message_id.clone(),
+                asset_id: id.clone(),
+            })
+            .await?;
+        }
+        Ok(Asset {
+            id,
+            activity_id: na.activity_id.clone(),
+            relative_path: na.relative_path.clone(),
+            absolute_path: na.absolute_path.clone(),
+            created_at: created_at.clone(),
+            updated_at: updated_at.clone(),
+        })
+    }
+
+    pub async fn insert_chat_message_asset(
+        &self,
+        ncma: &NewChatMessageAsset,
+    ) -> Result<ChatMessageAsset, sqlx::Error> {
+        let created_at = Utc::now();
+        sqlx::query(
+            r#"
+            INSERT INTO chat_message_asset (chat_message_id, asset_id, created_at)
+            VALUES (?, ?, ?)
+            "#,
+        )
+        .bind(ncma.chat_message_id.clone())
+        .bind(ncma.asset_id.clone())
+        .bind(created_at.clone())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(ChatMessageAsset {
+            chat_message_id: ncma.chat_message_id.clone(),
+            asset_id: ncma.asset_id.clone(),
+            created_at: created_at.to_string(),
         })
     }
 
@@ -242,17 +323,18 @@ impl PersonalDatabaseManager {
     pub async fn insert_activity_asset(
         &self,
         activity_id: &str,
-        asset: &ActivityAsset,
+        asset: &Asset,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
-            INSERT INTO activity_asset (id, activity_id, data, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO activity_asset (id, activity_id, relative_path, absolute_path, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(Uuid::new_v4().to_string())
         .bind(activity_id)
-        .bind(asset.data.clone())
+        .bind(asset.relative_path.clone())
+        .bind(asset.absolute_path.clone())
         .bind(asset.created_at.clone())
         .bind(asset.updated_at.clone())
         .execute(&self.pool)

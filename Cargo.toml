@@ -107,3 +107,6 @@ opt-level = 3
 incremental = true
 codegen-units = 256
 overflow-checks = false
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
