@@ -24,7 +24,7 @@
 	},
 	"dependencies": {
 		"@stripe/stripe-js": "^7.9.0",
-		"stripe": "^18.4.0",
+		"stripe": "^18.5.0",
 		"svelte-stripe": "^1.4.0"
 	},
 	"devDependencies": {
@@ -34,7 +34,7 @@
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
-		"@lucide/svelte": "^0.541.0",
+		"@lucide/svelte": "^0.542.0",
 		"@playwright/test": "^1.55.0",
 		"@sveltejs/adapter-auto": "^4.0.0",
 		"@sveltejs/adapter-static": "catalog:svelte",
@@ -47,7 +47,7 @@
 		"@tailwindcss/vite": "^4.1.12",
 		"@tauri-apps/plugin-updater": "^2.9.0",
 		"amplify-adapter": "^1.1.0",
-		"bits-ui": "^2.9.4",
+		"bits-ui": "^2.9.5",
 		"eslint": "^9.34.0",
 		"esm-env": "^1.2.2",
 		"grpc-web": "^1.5.0",
