@@ -1,4 +1,4 @@
-use eur_personal_db::{Conversation, PersonalDatabaseManager};
+use eur_personal_db::{Conversation, NewAsset, PersonalDatabaseManager};
 use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
@@ -69,10 +69,44 @@ impl ChatApi for ChatApiImpl {
             content: MessageContent::Text(query.text.clone()),
         };
 
-        // personal_db
-        //     .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
+        // Insert chat message into db
+        let chat_message = personal_db
+            .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
+            .await
+            .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+
+        let infos = timeline
+            .save_assets_to_disk()
+            .await
+            .map_err(|e| format!("Failed to save assets: {e}"))?;
+
+        for info in infos {
+            let relative = info.file_path.to_string_lossy().into_owned();
+            let absolute = info.absolute_path.to_string_lossy().into_owned();
+            personal_db
+                .insert_asset(&NewAsset {
+                    id: None,
+                    activity_id: None,
+                    relative_path: relative,
+                    absolute_path: absolute,
+                    chat_message_id: Some(chat_message.id.clone()),
+                    created_at: Some(info.saved_at.clone()),
+                    updated_at: Some(info.saved_at.clone()),
+                })
+                .await
+                .expect("Failed to insert asset info");
+        }
+
+        // let mut db_activity = timeline
+        //     .get_db_activity()
         //     .await
-        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+        //     .expect("Failed to get db activity");
+
+        // // Insert activity into db
+        // personal_db
+        //     .insert_activity(&db_activity)
+        //     .await
+        //     .expect("Failed to insert activity");
 
         messages.push(user_message);
 
@@ -144,16 +178,16 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
-        // personal_db
-        //     .insert_chat_message_from_message(
-        //         conversation_id.as_str(),
-        //         Message {
-        //             role: Role::Assistant,
-        //             content: MessageContent::Text(complete_response.clone()),
-        //         },
-        //     )
-        //     .await
-        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+        personal_db
+            .insert_chat_message_from_message(
+                conversation_id.as_str(),
+                Message {
+                    role: Role::Assistant,
+                    content: MessageContent::Text(complete_response.clone()),
+                },
+            )
+            .await
+            .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
         Ok(complete_response)
     }

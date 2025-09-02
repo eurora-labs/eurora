@@ -1,9 +1,9 @@
 //! Twitter asset implementation
 
+use crate::ActivityResult;
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
-use crate::types::{AssetFunctionality, ContextChip, SaveFunctionality};
-use crate::{AssetStorage, SavedAssetInfo};
+use crate::types::{AssetFunctionality, ContextChip};
 use async_trait::async_trait;
 use eur_proto::ipc::{ProtoTweet, ProtoTwitterState};
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -71,12 +71,6 @@ impl TwitterTweet {
             .filter(|word| word.starts_with('@'))
             .map(|mention| mention.trim_start_matches('@').to_string())
             .collect()
-    }
-}
-#[async_trait]
-impl SaveFunctionality for TwitterAsset {
-    async fn save_to_disk(&self, storage: &AssetStorage) -> crate::error::Result<SavedAssetInfo> {
-        storage.save_asset(self).await
     }
 }
 
@@ -269,15 +263,7 @@ impl SaveableAsset for TwitterAsset {
         "twitter"
     }
 
-    fn get_file_extension(&self) -> &'static str {
-        "json"
-    }
-
-    fn get_mime_type(&self) -> &'static str {
-        "application/json"
-    }
-
-    async fn serialize_content(&self) -> crate::error::Result<Vec<u8>> {
+    async fn serialize_content(&self) -> ActivityResult<Vec<u8>> {
         let json = serde_json::to_string_pretty(self)?;
         Ok(json.into_bytes())
     }
@@ -288,6 +274,10 @@ impl SaveableAsset for TwitterAsset {
 
     fn get_display_name(&self) -> String {
         self.title.clone()
+    }
+
+    fn should_encrypt(&self) -> bool {
+        false
     }
 }
 
