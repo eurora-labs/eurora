@@ -239,9 +239,9 @@ fn main() {
                         base_dir: app_handle.path().app_data_dir().unwrap(),
                         use_content_hash: false,
                         max_file_size: None,
-                        main_key: Some(main_key)
+                        main_key: Some(main_key.clone())
                     })
-                        .build();
+                        .build().expect("Failed to create timeline");
                     app_handle.manage(async_mutex::Mutex::new(timeline));
 
                     // Start timeline collection

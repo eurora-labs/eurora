@@ -11,8 +11,8 @@ impl TimelineManager {
                 name: activity.name.clone(),
                 icon_path: None,
                 process_name: activity.process_name.clone(),
-                start: activity.start.to_string(),
-                end: None,
+                started_at: activity.start.to_string(),
+                ended_at: None,
             }),
             None => Err(TimelineError::Storage("No activity found".to_string())),
         }
