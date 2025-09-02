@@ -7,9 +7,9 @@ use dotenv::dotenv;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 mod launcher;
 mod util;
-use eur_encrypt::{MainKey, USER_MAIN_KEY_HANDLE, generate_new_main_key};
+use eur_encrypt::MainKey;
 use eur_native_messaging::create_grpc_ipc_client;
-use eur_secret::{self, Sensitive, secret};
+use eur_secret::{self};
 use eur_settings::AppSettings;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
@@ -240,7 +240,7 @@ fn main() {
                         base_dir: app_handle.path().app_data_dir().unwrap(),
                         use_content_hash: false,
                         max_file_size: None,
-                        main_key: Some(MainKey::new()) 
+                        main_key: Some(MainKey::new())
                     })
                         .build();
                     app_handle.manage(async_mutex::Mutex::new(timeline));

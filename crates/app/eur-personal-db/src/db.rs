@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr, time::Duration};
+use std::{str::FromStr, time::Duration};
 
 use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
@@ -153,6 +153,7 @@ impl PersonalDatabaseManager {
             })
             .await?;
         }
+
         Ok(Asset {
             id,
             activity_id: na.activity_id.clone(),
