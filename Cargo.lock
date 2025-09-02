@@ -2085,6 +2085,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ct-codecs"
+version = "1.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b10589d1a5e400d61f9f38f12f884cfd080ff345de8f17efda36fe0e4a02aa8"
+
+[[package]]
 name = "ctor"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2123,7 +2129,7 @@ dependencies = [
  "cpufeatures",
  "curve25519-dalek-derive",
  "digest",
- "fiat-crypto",
+ "fiat-crypto 0.2.9",
  "rustc_version",
  "subtle",
  "zeroize",
@@ -2817,14 +2823,20 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "dirs 6.0.0",
  "enum_dispatch",
+ "eur-encrypt",
+ "eur-fs",
  "eur-native-messaging",
  "eur-proto",
+ "eur-secret",
  "ferrous-focus",
  "ferrous-llm-core",
  "hex",
  "humantime-serde",
  "image",
+ "orion",
+ "rand 0.9.2",
  "regex",
  "serde",
  "serde_json",
@@ -2920,6 +2932,21 @@ dependencies = [
  "tonic",
  "tonic-prost-build",
  "tracing",
+]
+
+[[package]]
+name = "eur-encrypt"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "eur-secret",
+ "orion",
+ "rand 0.9.2",
+ "serde",
+ "thiserror 2.0.12",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -3215,6 +3242,7 @@ dependencies = [
  "eur-activity",
  "eur-client-grpc",
  "eur-client-questions",
+ "eur-encrypt",
  "eur-eurora-provider",
  "eur-native-messaging",
  "eur-personal-db",
@@ -3273,20 +3301,25 @@ dependencies = [
 
 [[package]]
 name = "eur-timeline"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "dirs 6.0.0",
  "eur-activity",
+ "eur-fs",
  "eur-native-messaging",
+ "eur-personal-db",
  "eur-proto",
  "ferrous-focus",
  "ferrous-llm",
  "ferrous-llm-core",
  "image",
+ "orion",
  "parking_lot",
+ "rand 0.9.2",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -3455,8 +3488,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72c0a41f41fae9b73520002c69b61fa57cace8bbf11bfa3b5a3fa1b9cb6162d2"
 dependencies = [
  "chrono",
  "dotenv",
@@ -3472,8 +3506,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-anthropic"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e065f9531d456cd3bd5ed6775d7595dc4c77b12b57ea18e5da465d0cd53ad561"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3490,8 +3525,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-core"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39be37002fd827642b544d63b626e70f3f65c5260982ffae8b52955aa4bfcb49"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3508,8 +3544,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-ollama"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ef693d85d4dd3bf205961f8315376e1e5d7267940fe33c087342016d2bcf68e"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3526,8 +3563,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-llm-openai"
-version = "0.5.1"
-source = "git+https://github.com/eurora-labs/ferrous-llm.git?branch=feature%2Fspecta#b1db4040f468f7bdc7d4d63a375db8df2eca75c1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8d1bb448116ca5f2e82d96b67a5d927fd81a2cf112ee603cf1a600f0c41388b"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3567,6 +3605,12 @@ name = "fiat-crypto"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
+
+[[package]]
+name = "fiat-crypto"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64cd1e32ddd350061ae6edb1b082d7c54915b5c672c389143b9a63403a109f24"
 
 [[package]]
 name = "field-offset"
@@ -6720,6 +6764,19 @@ checksum = "9aa2b01e1d916879f73a53d01d1d6cee68adbb31d6d9177a8cfce093cced1d50"
 dependencies = [
  "futures-core",
  "pin-project-lite",
+]
+
+[[package]]
+name = "orion"
+version = "0.17.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21b3da83b2b4cdc74ab6a556b2e7b473da046d5aa4008c0a7a3ae96b1b4aabb4"
+dependencies = [
+ "ct-codecs",
+ "fiat-crypto 0.3.0",
+ "getrandom 0.3.2",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]

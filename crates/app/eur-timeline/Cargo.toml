@@ -1,26 +1,33 @@
 [package]
 name = "eur-timeline"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
-authors = ["Eurora <eurora@company.com>"]
+authors.workspace = true
 description = "Timeline storage for capturing system state over time"
 
 [dependencies]
-eur-proto = { path = "../../proto/eur-proto" }
+eur-proto = { workspace = true }
+eur-native-messaging = { workspace = true }
+eur-activity = { workspace = true }
+eur-fs = { workspace = true }
+eur-personal-db = { workspace = true }
 image.workspace = true
 ferrous-focus = { version = "0.2.5" }
-eur-native-messaging = { path = "../eur-native-messaging" }
 # eur-prompt-kit = { path = "../../common/eur-prompt-kit" }
 ferrous-llm-core = { workspace = true }
-eur-activity = { workspace = true }
 anyhow = { workspace = true }
 base64.workspace = true
 chrono = { workspace = true, features = ["serde"] }
-tokio = { workspace = true, default-features = false, features = ["rt", "sync", "time", "macros"] }
+tokio = { workspace = true, default-features = false, features = [
+    "rt",
+    "sync",
+    "time",
+    "macros",
+] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 serde = { workspace = true, features = ["derive"] }
-serde_json = "1.0"
+serde_json = { workspace = true }
 parking_lot = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
@@ -28,6 +35,9 @@ x11rb = "0.13.1"
 ferrous-llm = { workspace = true, features = ["openai"] }
 thiserror = { workspace = true }
 async-trait = "0.1"
+rand = { workspace = true }
+dirs = { workspace = true }
+orion = "0.17.11"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.60.2", features = [
