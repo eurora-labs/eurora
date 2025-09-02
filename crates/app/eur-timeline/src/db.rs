@@ -1,5 +1,4 @@
 use crate::{TimelineError, TimelineManager, TimelineResult};
-use eur_activity::Activity;
 use eur_personal_db::Activity as DbActivity;
 
 impl TimelineManager {
