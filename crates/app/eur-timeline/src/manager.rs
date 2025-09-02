@@ -91,6 +91,7 @@ impl TimelineManagerBuilder {
         let storage = Arc::new(Mutex::new(TimelineStorage::new(
             timeline_config.storage.clone(),
         )));
+
         let collector = CollectorService::new_with_timeline_config(
             Arc::clone(&storage),
             timeline_config.clone(),
