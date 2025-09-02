@@ -1,8 +1,5 @@
 use eur_encrypt::MainKey;
-use orion::{
-    aead,
-    kdf::{Password, Salt, derive_key},
-};
+use orion::{aead, kdf::Salt};
 use rand::RngCore;
 
 use crate::ActivityResult;
