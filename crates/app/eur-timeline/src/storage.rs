@@ -2,17 +2,20 @@
 
 use crate::Activity;
 use chrono::{DateTime, Utc};
+use eur_fs::write;
 use std::collections::VecDeque;
+use std::path::PathBuf;
 use std::time::Duration;
 use tracing::{debug, info};
 
 use crate::config::StorageConfig;
-use crate::error::Result;
+use crate::error::TimelineResult;
 
 /// Timeline storage that manages activities with configurable retention
 pub struct TimelineStorage {
     /// Activities stored in chronological order (oldest first)
     activities: VecDeque<Activity>,
+    ///
     /// Storage configuration
     config: StorageConfig,
     /// Last cleanup time
@@ -165,7 +168,7 @@ impl TimelineStorage {
     }
 
     /// Update storage configuration
-    pub fn update_config(&mut self, config: StorageConfig) -> Result<()> {
+    pub fn update_config(&mut self, config: StorageConfig) -> TimelineResult<()> {
         info!("Updating storage configuration");
 
         // If capacity decreased, remove excess activities

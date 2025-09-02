@@ -8,9 +8,12 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+authors = ["Andre Roelofs andre@eurora-labs.com"]
+
 [workspace.dependencies]
-ferrous-llm-core = { git = "https://github.com/eurora-labs/ferrous-llm.git", branch = "feature/specta" }
-ferrous-llm = { git = "https://github.com/eurora-labs/ferrous-llm.git", branch = "feature/specta" }
+ferrous-llm-core = { version = "0.6.1" }
+ferrous-llm = { version = "0.6.1" }
 
 syn = "2.0" # collapse 2.0.101, 1.0.109, 1.0.109(build)
 toml_edit = "0.23.3" # collapse 0.22, 0.20, 0.19
@@ -81,6 +84,7 @@ eur-client-questions = { path = "crates/proto/eur-client-questions" }
 eur-screen-position = { path = "crates/app/eur-screen-position" }
 eur-vision = { path = "crates/app/eur-vision" }
 eur-timeline = { path = "crates/app/eur-timeline" }
+eur-encrypt = { path = "crates/app/eur-encrypt" }
 
 eur-prompt-service = { path = "crates/backend/eur-prompt-service" }
 eur-auth-service = { path = "crates/backend/eur-auth-service" }
@@ -103,3 +107,6 @@ opt-level = 3
 incremental = true
 codegen-units = 256
 overflow-checks = false
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
