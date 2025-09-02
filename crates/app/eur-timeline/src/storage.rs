@@ -204,22 +204,6 @@ impl TimelineStorage {
             > chrono::Duration::from_std(cleanup_interval)
                 .unwrap_or_else(|_| chrono::Duration::minutes(5))
     }
-
-    pub async fn save_assets_to_disk(&self) -> TimelineResult<()> {
-        if let Some(activity) = self.get_current_activity() {
-            info!("Got current activity, preparing to serialize assets");
-            let assets = activity.serialize_assets().await?;
-            info!("Serialized the assets");
-
-            let bytes = assets.first().unwrap();
-            write(PathBuf::from("/home/andre/Desktop/test_asset"), &bytes).unwrap();
-            // for bytes in assets {
-            //     write(PathBuf::from("/home/andre/Desktop/test_asset"), &bytes).unwrap();
-            // }
-        }
-
-        Ok(())
-    }
 }
 
 /// Statistics about the timeline storage

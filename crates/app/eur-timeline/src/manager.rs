@@ -76,14 +76,12 @@ impl TimelineManagerBuilder {
     }
 
     /// Build the TimelineManager
-    pub fn build(self) -> TimelineManager {
+    pub fn build(self) -> TimelineResult<TimelineManager> {
         let timeline_config = self.timeline_config.unwrap_or_default();
         let activity_storage_config = self.activity_storage_config.unwrap_or_default();
 
         // Validate configuration
-        timeline_config
-            .validate()
-            .expect("Invalid timeline configuration");
+        timeline_config.validate()?;
 
         info!(
             "Creating timeline manager with config: {:?}",
@@ -100,12 +98,12 @@ impl TimelineManagerBuilder {
 
         let activity_storage = Arc::new(Mutex::new(ActivityStorage::new(activity_storage_config)));
 
-        TimelineManager {
+        Ok(TimelineManager {
             storage,
             collector,
             config: timeline_config,
             activity_storage,
-        }
+        })
     }
 }
 
@@ -135,11 +133,13 @@ impl TimelineManager {
 
     /// Create a new timeline manager with default configuration
     pub fn new() -> Self {
-        TimelineManagerBuilder::new().build()
+        TimelineManagerBuilder::new()
+            .build()
+            .expect("Failed to build timeline manager")
     }
 
     /// Create a new timeline manager with custom configuration
-    pub fn with_config(timeline_config: TimelineConfig) -> Self {
+    pub fn with_config(timeline_config: TimelineConfig) -> TimelineResult<Self> {
         TimelineManagerBuilder::new()
             .with_timeline_config(timeline_config)
             .build()
@@ -225,11 +225,16 @@ impl TimelineManager {
 
     /// Save the assets to disk
     pub async fn save_assets_to_disk(&self) -> TimelineResult<Vec<SavedAssetInfo>> {
-        let storage = self.storage.lock().await;
-        let activity_storage = self.activity_storage.lock().await;
+        let activity = {
+            let storage = self.storage.lock().await;
+            storage.get_current_activity().cloned()
+        };
 
-        match storage.get_current_activity() {
-            Some(activity) => Ok(activity_storage.save_assets_to_disk(activity).await?),
+        match activity {
+            Some(activity) => {
+                let activity_storage = self.activity_storage.lock().await;
+                return Ok(activity_storage.save_assets_to_disk(&activity).await?);
+            }
             None => Err(TimelineError::Storage(
                 "No current activity found".to_string(),
             )),
@@ -357,7 +362,7 @@ impl Default for TimelineManager {
 }
 
 /// Create a timeline manager with custom capacity and interval (convenience function)
-pub fn create_timeline(capacity: usize, interval_seconds: u64) -> TimelineManager {
+pub fn create_timeline(capacity: usize, interval_seconds: u64) -> TimelineResult<TimelineManager> {
     TimelineManager::builder()
         .with_max_activities(capacity)
         .with_collection_interval(std::time::Duration::from_secs(interval_seconds))
@@ -394,7 +399,8 @@ mod tests {
             .disable_focus_tracking()
             .build();
 
-        let manager = TimelineManager::with_config(config);
+        let manager =
+            TimelineManager::with_config(config).expect("Failed to create timeline manager");
         assert!(!manager.is_running());
         assert_eq!(manager.get_config().storage.max_activities, 100);
     }
@@ -405,7 +411,8 @@ mod tests {
             .with_max_activities(200)
             .with_collection_interval(Duration::from_secs(10))
             .disable_focus_tracking()
-            .build();
+            .build()
+            .expect("Failed to build timeline manager");
 
         assert!(!manager.is_running());
         assert_eq!(manager.get_config().storage.max_activities, 200);
@@ -428,7 +435,8 @@ mod tests {
         let manager = TimelineManager::builder()
             .with_timeline_config(timeline_config)
             .with_activity_storage_config(activity_storage_config)
-            .build();
+            .build()
+            .expect("Failed to build timeline manager");
 
         assert_eq!(manager.get_config().storage.max_activities, 150);
         assert_eq!(
@@ -439,14 +447,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_enable_focus_tracking() {
-        let manager = TimelineManager::builder().enable_focus_tracking().build();
+        let manager = TimelineManager::builder()
+            .enable_focus_tracking()
+            .build()
+            .expect("Failed to build timeline manager");
 
         assert!(manager.get_config().focus_tracking.enabled);
     }
 
     #[tokio::test]
     async fn test_builder_default() {
-        let manager1 = TimelineManager::builder().build();
+        let manager1 = TimelineManager::builder()
+            .build()
+            .expect("Failed to build timeline manager");
         let manager2 = TimelineManager::new();
 
         assert_eq!(
@@ -515,7 +528,8 @@ mod tests {
             .collection_interval(Duration::from_millis(100))
             .build();
 
-        let mut manager = TimelineManager::with_config(config);
+        let mut manager =
+            TimelineManager::with_config(config).expect("Failed to create timeline manager");
 
         // Start manager
         assert!(manager.start().await.is_ok());
@@ -531,7 +545,7 @@ mod tests {
         let manager1 = TimelineManager::new();
         assert!(!manager1.is_running());
 
-        let manager2 = create_timeline(500, 5);
+        let manager2 = create_timeline(500, 5).expect("Failed to create timeline");
         assert_eq!(manager2.get_config().storage.max_activities, 500);
         assert_eq!(
             manager2.get_config().collector.collection_interval,
