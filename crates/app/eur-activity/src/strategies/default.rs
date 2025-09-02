@@ -1,12 +1,13 @@
 //! Default strategy implementation for unsupported applications
 
-use crate::error::Result;
+use crate::error::ActivityResult;
 use crate::registry::{
     MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata,
 };
 use crate::strategies::ActivityStrategy;
 use crate::types::{ActivityAsset, ActivitySnapshot};
 use crate::{DefaultAsset, DefaultSnapshot};
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
@@ -21,7 +22,7 @@ pub struct DefaultStrategy {
 
 impl DefaultStrategy {
     /// Create a new default strategy
-    pub fn new(name: String, icon: String, process_name: String) -> Result<Self> {
+    pub fn new(name: String, icon: String, process_name: String) -> ActivityResult<Self> {
         info!("Creating DefaultStrategy for process: {}", process_name);
 
         Ok(Self {
@@ -32,7 +33,7 @@ impl DefaultStrategy {
     }
 
     /// Retrieve assets (creates a simple default asset)
-    pub async fn retrieve_assets(&mut self) -> Result<Vec<ActivityAsset>> {
+    pub async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for default strategy");
 
         let asset = DefaultAsset::simple(self.name.clone())
@@ -43,7 +44,7 @@ impl DefaultStrategy {
     }
 
     /// Retrieve snapshots (creates a simple state snapshot)
-    pub async fn retrieve_snapshots(&mut self) -> Result<Vec<ActivitySnapshot>> {
+    pub async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
         debug!("Retrieving snapshots for default strategy");
 
         let snapshot = DefaultSnapshot::new(format!(
@@ -71,7 +72,7 @@ impl DefaultStrategyFactory {
 
 #[async_trait]
 impl StrategyFactory for DefaultStrategyFactory {
-    async fn create_strategy(&self, context: &ProcessContext) -> Result<ActivityStrategy> {
+    async fn create_strategy(&self, context: &ProcessContext) -> ActivityResult<ActivityStrategy> {
         let strategy = DefaultStrategy::new(
             context.display_name.clone(),
             "default-icon".to_string(),
