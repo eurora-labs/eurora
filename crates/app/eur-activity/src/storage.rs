@@ -21,16 +21,17 @@ pub struct ActivityStorageConfig {
     /// Maximum file size in bytes (None for no limit)
     pub max_file_size: Option<u64>,
     /// Master key
-    pub main_key: Option<MainKey>,
+    pub main_key: MainKey,
 }
 
 impl Default for ActivityStorageConfig {
     fn default() -> Self {
+        let main_key = MainKey::new().expect("Failed to generate main key");
         Self {
             base_dir: dirs::data_dir().unwrap_or_else(|| PathBuf::from("./assets")),
             use_content_hash: true,
             max_file_size: Some(100 * 1024 * 1024), // 100MB default limit
-            main_key: None,
+            main_key: main_key,
         }
     }
 }
@@ -109,7 +110,7 @@ impl ActivityStorage {
     pub async fn save_asset<T: SaveableAsset>(&self, asset: &T) -> ActivityResult<SavedAssetInfo> {
         let mut bytes = asset.serialize_content().await?;
         if asset.should_encrypt() {
-            bytes = encrypt_bytes(self.config.main_key.as_ref().unwrap(), &bytes).await?;
+            bytes = encrypt_bytes(&self.config.main_key, &bytes).await?;
         }
 
         // Make a placeholder filepath
@@ -118,100 +119,6 @@ impl ActivityStorage {
         let final_path = self.config.base_dir.join(&absolute_path);
         info!("Saving asset to {}", final_path.display());
         create_dirs_then_write(&final_path, &bytes)?;
-
-        // // Serialize the content
-        // let content = asset.serialize_content().await?;
-
-        // // Check file size limit
-        // if let Some(max_size) = self.config.max_file_size {
-        //     if content.len() as u64 > max_size {
-        //         return Err(ActivityError::invalid_data(format!(
-        //             "Asset content size ({} bytes) exceeds maximum allowed size ({} bytes)",
-        //             content.len(),
-        //             max_size
-        //         )));
-        //     }
-        // }
-
-        // // Generate content hash if enabled
-        // let content_hash = if self.config.use_content_hash {
-        //     let mut hasher = Sha256::new();
-        //     hasher.update(&content);
-        //     Some(hex::encode(hasher.finalize()))
-        // } else {
-        //     None
-        // };
-
-        // // Determine the file path
-        // let file_path = self.generate_file_path(asset, content_hash.as_deref())?;
-        // let absolute_path = self.config.base_dir.join(&file_path);
-
-        // // Create parent directories if they don't exist
-        // if let Some(parent) = absolute_path.parent() {
-        //     fs::create_dir_all(parent).await?;
-        // }
-
-        // // // Check if file already exists (for deduplication)
-        // // if absolute_path.exists() && self.config.use_content_hash {
-        // //     // File already exists, return existing info
-        // //     let metadata = fs::metadata(&absolute_path).await?;
-        // //     return Ok(SavedAssetInfo {
-        // //         file_path,
-        // //         absolute_path,
-        // //         content_hash,
-        // //         file_size: metadata.len(),
-        // //         mime_type: asset.get_mime_type().to_string(),
-        // //         saved_at: chrono::Utc::now(),
-        // //     });
-        // // }
-
-        // // // Write the content to file
-        // // let mut file = fs::File::create(&absolute_path).await?;
-        // // file.write_all(&content).await?;
-        // // file.flush().await?;
-
-        // // Write the content to file (race-safe when hashing)
-        // let mut open_opts = fs::OpenOptions::new();
-        // if self.config.use_content_hash {
-        //     // Avoid clobbering and make dedup robust under concurrency
-        //     open_opts.create_new(true).write(true);
-        //     match open_opts.open(&absolute_path).await {
-        //         Ok(mut file) => {
-        //             file.write_all(&content).await?;
-        //             file.flush().await?;
-        //             file.sync_all().await?;
-        //         }
-        //         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-        //             // File already exists, no need to create a new one
-        //             let metadata = fs::metadata(&absolute_path).await?;
-        //             return Ok(SavedAssetInfo {
-        //                 file_path,
-        //                 absolute_path,
-        //                 content_hash,
-        //                 file_size: metadata.len(),
-        //                 saved_at: chrono::Utc::now(),
-        //             });
-        //         }
-        //         Err(e) => return Err(e.into()),
-        //     }
-        // } else {
-        //     // Non-hash mode: allow overwrite
-        //     use std::ffi::OsStr;
-        //     let parent = absolute_path.parent().unwrap_or_else(|| Path::new("."));
-        //     let tmp_name = absolute_path
-        //         .file_name()
-        //         .and_then(OsStr::to_str)
-        //         .map(|n| format!(".{}.tmp", n))
-        //         .unwrap_or_else(|| ".tmpfile".to_string());
-        //     let tmp_path = parent.join(tmp_name);
-        //     open_opts.create(true).write(true).truncate(true);
-        //     let mut file = open_opts.open(&tmp_path).await?;
-        //     file.write_all(&content).await?;
-        //     file.flush().await?;
-        //     file.sync_all().await?;
-        //     // Persist atomically
-        //     fs::rename(&tmp_path, &absolute_path).await?;
-        // }
 
         Ok(SavedAssetInfo {
             file_path,
@@ -336,11 +243,12 @@ mod tests {
     #[tokio::test]
     async fn test_asset_storage_basic() {
         let temp_dir = TempDir::new().unwrap();
+        let main_key = MainKey::new().expect("Failed to generate main key");
         let storage_config = ActivityStorageConfig {
             base_dir: temp_dir.path().into(),
             use_content_hash: true,
             max_file_size: Some(100 * 1024 * 1024),
-            main_key: None,
+            main_key: main_key,
         };
         let storage = ActivityStorage::new(storage_config);
 
@@ -367,11 +275,12 @@ mod tests {
     #[tokio::test]
     async fn test_content_deduplication() {
         let temp_dir = TempDir::new().unwrap();
+        let main_key = MainKey::new().expect("Failed to generate main key");
         let storage_config = ActivityStorageConfig {
             base_dir: temp_dir.path().into(),
             use_content_hash: true,
             max_file_size: Some(100 * 1024 * 1024),
-            main_key: None,
+            main_key: main_key,
         };
         let storage = ActivityStorage::new(storage_config);
 
