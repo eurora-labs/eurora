@@ -29,6 +29,9 @@ pub enum ActivityError {
     #[error("Configuration error: {0}")]
     Configuration(String),
 
+    #[error("Encryption error: {0}")]
+    Encryption(#[from] eur_encrypt::EncryptError),
+
     #[error("Unknown error: {0}")]
     Unknown(String),
 }
