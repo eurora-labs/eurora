@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Article asset with content and metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ArticleAsset {
     pub id: String,
     pub url: String,
@@ -137,7 +137,7 @@ impl AssetFunctionality for ArticleAsset {
 #[async_trait]
 impl SaveableAsset for ArticleAsset {
     fn get_asset_type(&self) -> &'static str {
-        "article"
+        "ArticleAsset"
     }
 
     async fn serialize_content(&self) -> ActivityResult<Vec<u8>> {
