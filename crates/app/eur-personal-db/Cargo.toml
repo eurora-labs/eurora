@@ -6,6 +6,8 @@ authors = ["Eurora <eurora@company.com>"]
 description = "Eurora Personal DB"
 
 [dependencies]
+eur-secret = { workspace = true }
+
 anyhow.workspace = true
 sqlx = { version = "0.8.6", features = [
     "runtime-tokio-rustls",
@@ -29,8 +31,7 @@ tracing = { workspace = true }
 zerocopy = { version = "0.8.26" }
 uuid = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-serde_json = "1.0"
-eur-secret = { workspace = true }
+serde_json = { workspace = true }
 rand = { workspace = true }
 base64 = { workspace = true }
 specta = { version = "=2.0.0-rc.22", features = [
@@ -38,8 +39,5 @@ specta = { version = "=2.0.0-rc.22", features = [
     "function",
     "chrono",
 ] }
-# ferrous-llm-core = { version = "0.5.1" }
 ferrous-llm-core = { workspace = true, features = ["specta"] }
-
-
 tokio = { workspace = true, features = ["full", "tracing"] }

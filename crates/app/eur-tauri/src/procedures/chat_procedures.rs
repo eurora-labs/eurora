@@ -56,9 +56,30 @@ impl ChatApi for ChatApiImpl {
             app_handle.state::<PersonalDatabaseManager>().inner();
         let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
-        let title: String = "Placeholder Title".to_string();
 
+        let title: String = "Placeholder Title".to_string();
         let mut messages: Vec<Message> = Vec::new();
+
+        // Add previous messages from this conversation
+        if let Ok(previous_messages) = personal_db.get_chat_messages(&conversation_id).await {
+            let chat_message_id = previous_messages
+                .last()
+                .map(|m| m.id.clone())
+                .unwrap_or_default();
+
+            let previous_messages = previous_messages
+                .into_iter()
+                .map(|message| message.into())
+                .collect::<Vec<Message>>();
+
+            // let assets = personal_db
+            //     .get_assets_by_chat_message_id(&chat_message_id)
+            //     .await
+            //     .map_err(|e| format!("Failed to get assets: {}", e))?;
+
+            messages.extend(previous_messages);
+        }
+
         if !query.assets.is_empty() {
             messages = timeline.construct_asset_messages().await;
             messages.extend(timeline.construct_snapshot_messages().await);

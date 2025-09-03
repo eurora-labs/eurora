@@ -1,12 +1,13 @@
 //! Asset storage functionality for saving activity assets to disk
 
-use crate::encryption::encrypt_bytes;
 use crate::{Activity, error::ActivityResult};
+use crate::{ActivityAsset, ActivityError, YoutubeAsset};
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use eur_encrypt::MainKey;
+use eur_encrypt::{MainKey, encrypt_file_contents};
 use eur_fs::create_dirs_then_write;
 use serde::{Deserialize, Serialize};
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::info;
@@ -55,6 +56,12 @@ pub struct SavedAssetInfo {
 #[async_trait]
 #[enum_dispatch]
 pub trait SaveableAsset {
+    // async fn load(bytes: &[u8]) -> ActivityResult<Self>
+    // where
+    //     Self: Sized,
+    // {
+    // }
+
     /// Get the asset type for organizing files
     fn get_asset_type(&self) -> &'static str;
 
@@ -91,6 +98,12 @@ impl ActivityStorage {
     //     Self::new(config)
     // }
 
+    /// Retrieve asset by path
+    pub async fn load_asset_from_path(&self, path: &Path) -> ActivityResult<ActivityAsset> {
+        // let asset = decrypt_bytes::<YoutubeAsset>(&self.config.main_key, path);
+        todo!()
+    }
+
     /// Save all assets of an activity to disk
     pub async fn save_assets_to_disk(
         &self,
@@ -110,7 +123,9 @@ impl ActivityStorage {
     pub async fn save_asset<T: SaveableAsset>(&self, asset: &T) -> ActivityResult<SavedAssetInfo> {
         let mut bytes = asset.serialize_content().await?;
         if asset.should_encrypt() {
-            bytes = encrypt_bytes(&self.config.main_key, &bytes).await?;
+            bytes = encrypt_file_contents(&self.config.main_key, &bytes, asset.get_asset_type())
+                .await
+                .map_err(|e| ActivityError::Encryption(e))?;
         }
 
         // Make a placeholder filepath
