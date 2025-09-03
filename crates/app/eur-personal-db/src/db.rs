@@ -109,6 +109,24 @@ impl PersonalDatabaseManager {
         })
     }
 
+    pub async fn get_assets_by_chat_message_id(
+        &self,
+        id: &String,
+    ) -> Result<Vec<Asset>, sqlx::Error> {
+        let assets = sqlx::query_as(
+            r#"
+            SELECT id, activity_id, relative_path, absolute_path, created_at, updated_at
+            FROM asset
+            WHERE chat_message_id = ?
+            "#,
+        )
+        .bind(id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(assets)
+    }
+
     pub async fn insert_asset(&self, na: &NewAsset) -> Result<Asset, sqlx::Error> {
         let id: String;
         if let Some(asset_id) = &na.id {
@@ -190,7 +208,7 @@ impl PersonalDatabaseManager {
 
     pub async fn get_conversation(
         &self,
-        conversation_id: &str,
+        conversation_id: &String,
     ) -> Result<Conversation, sqlx::Error> {
         let conversation = sqlx::query_as(
             r#"
@@ -229,10 +247,10 @@ impl PersonalDatabaseManager {
 
     pub async fn get_conversation_with_messages(
         &self,
-        conversation_id: &str,
+        conversation_id: &String,
     ) -> Result<(Conversation, Vec<ChatMessage>), sqlx::Error> {
-        let conversation = self.get_conversation(conversation_id).await?;
-        let messages = self.get_chat_messages(conversation_id).await?;
+        let conversation = self.get_conversation(&conversation_id).await?;
+        let messages = self.get_chat_messages(&conversation_id).await?;
 
         // let conversation = self.get_conversation(conversation_id).await?;
         // let messages = self.get_chat_messages(conversation_id);
@@ -286,7 +304,7 @@ impl PersonalDatabaseManager {
 
     pub async fn get_chat_messages(
         &self,
-        conversation_id: &str,
+        conversation_id: &String,
     ) -> Result<Vec<ChatMessage>, sqlx::Error> {
         let messages = sqlx::query_as(
             r#"
