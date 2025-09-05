@@ -1,6 +1,7 @@
 use std::{
     fs::File,
     io::{Read, Write},
+    path::Path,
 };
 
 use base64::prelude::*;
@@ -9,6 +10,7 @@ use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},
 };
 use eur_secret::{self, Sensitive, secret};
+use std::fs;
 // use orion::{
 //     aead,
 //     kdf::{Password, Salt, derive_key},
@@ -16,8 +18,9 @@ use eur_secret::{self, Sensitive, secret};
 use hkdf::Hkdf;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use sha2::Sha256;
-use tracing::error;
+use tracing::{error, info};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 mod error;
@@ -37,6 +40,7 @@ pub enum AeadAlg {
     XChaCha20Poly1305 = 1,
 }
 
+#[derive(Debug)]
 pub struct FileHeader {
     pub version: u8,
     pub tag: String,
@@ -102,6 +106,39 @@ pub fn generate_new_main_key() -> EncryptResult<MainKey> {
     Ok(MainKey(mk))
 }
 
+pub async fn load_encrypted_file<T>(mk: &MainKey, path: &Path) -> EncryptResult<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let buf = fs::read(path).map_err(|e| {
+        error!("Failed to read file: {}", e);
+        EncryptError::Io(e)
+    })?;
+
+    let header = parse_header(&buf)?;
+    let key = mk.derive_fek(&header.salt)?;
+    let cipher = XChaCha20Poly1305::new(&key);
+    let xnonce = XNonce::from_slice(&header.nonce);
+
+    // Calculate the total header length: MAGIC(8) + VERSION(1) + tag_len(2) + tag + salt(32) + nonce(24)
+    let header_len = 8 + 1 + 2 + header.tag.len() + 32 + 24;
+
+    let bytes = cipher.decrypt(
+        xnonce,
+        Payload {
+            msg: &buf[header_len..],
+            aad: &buf[..header_len],
+        },
+    )?;
+
+    let val = serde_json::from_slice::<T>(&bytes).map_err(|e| {
+        error!("Failed to deserialize JSON: {}", e);
+        EncryptError::Json(e)
+    })?;
+
+    Ok(val)
+}
+
 pub async fn encrypt_file_contents(
     mk: &MainKey,
     bytes: &[u8],
@@ -151,31 +188,31 @@ pub fn build_header(tag: &str, salt: &[u8; 32], nonce: &[u8; 24]) -> EncryptResu
 }
 
 pub fn parse_header(buf: &[u8]) -> EncryptResult<FileHeader> {
-    let min = 4 + 1 + 2 + 32 + 24;
+    let min = 8 + 1 + 2 + 32 + 24;
     if buf.len() < min {
         return Err(EncryptError::Format("Header too short".to_string()));
     }
-    if &buf[0..4] != MAGIC {
+    if &buf[0..8] != MAGIC {
         return Err(EncryptError::Format("Invalid magic number".to_string()));
     }
-    let version = buf[4];
+    let version = buf[8];
     if version != VERSION {
         return Err(EncryptError::Format("Invalid version".to_string()));
     }
-    let tag_len = u16::from_be_bytes([buf[5], buf[6]]);
+    let tag_len = u16::from_be_bytes([buf[9], buf[10]]);
     let tag_len_size = tag_len as usize;
-    let need = 4 + 1 + 2 + tag_len_size + 32 + 24;
+    let need = 8 + 1 + 2 + tag_len_size + 32 + 24;
     if buf.len() < need {
         return Err(EncryptError::Format(
             "Header too short with tag".to_string(),
         ));
     }
-    let tag = std::str::from_utf8(&buf[7..7 + tag_len_size])
+    let tag = std::str::from_utf8(&buf[11..11 + tag_len_size])
         .map_err(|_| EncryptError::Format("Invalid tag".to_string()))?;
     let mut salt = [0u8; 32];
-    salt.copy_from_slice(&buf[7 + tag_len_size..7 + tag_len_size + 32]);
+    salt.copy_from_slice(&buf[11 + tag_len_size..11 + tag_len_size + 32]);
     let mut nonce = [0u8; 24];
-    let nstart = 7 + tag_len_size + 32;
+    let nstart = 11 + tag_len_size + 32;
     nonce.copy_from_slice(&buf[nstart..nstart + 24]);
 
     Ok(FileHeader {
