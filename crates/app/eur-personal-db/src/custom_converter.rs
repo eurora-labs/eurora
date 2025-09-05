@@ -1,4 +1,4 @@
-use crate::{db::PersonalDatabaseManager, types::ChatMessage};
+use crate::{NewChatMessage, db::PersonalDatabaseManager, types::ChatMessage};
 use chrono::Utc;
 use ferrous_llm_core::{Message, MessageContent};
 
@@ -7,6 +7,7 @@ impl PersonalDatabaseManager {
         &self,
         conversation_id: &str,
         message: Message,
+        has_assets: bool,
     ) -> Result<ChatMessage, sqlx::Error> {
         let timestamp = Utc::now();
 
@@ -23,12 +24,20 @@ impl PersonalDatabaseManager {
         }
 
         self.insert_chat_message(
-            conversation_id,
-            message.role.to_string().as_str(),
-            content.unwrap().as_str(),
-            true,
-            timestamp,
-            timestamp,
+            NewChatMessage {
+                conversation_id: conversation_id.to_string(),
+                role: message.role.to_string(),
+                content: content.unwrap().to_string(),
+                has_assets,
+                created_at: Some(timestamp),
+                updated_at: Some(timestamp),
+            },
+            // conversation_id,
+            // message.role.to_string().as_str(),
+            // content.unwrap().as_str(),
+            // true,
+            // timestamp,
+            // timestamp,
         )
         .await
     }
