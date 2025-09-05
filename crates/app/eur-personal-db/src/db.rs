@@ -115,9 +115,10 @@ impl PersonalDatabaseManager {
     ) -> Result<Vec<Asset>, sqlx::Error> {
         let assets = sqlx::query_as(
             r#"
-            SELECT id, activity_id, relative_path, absolute_path, created_at, updated_at
-            FROM asset
-            WHERE chat_message_id = ?
+            SELECT a.id, a.activity_id, a.relative_path, a.absolute_path, a.created_at, a.updated_at
+            FROM asset a
+            INNER JOIN chat_message_asset cma ON a.id = cma.asset_id
+            WHERE cma.chat_message_id = ?
             "#,
         )
         .bind(id)
