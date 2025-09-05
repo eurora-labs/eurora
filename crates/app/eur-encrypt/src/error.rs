@@ -23,6 +23,12 @@ pub enum EncryptError {
 
     #[error("Encryption error: {0}")]
     Encryption(#[from] chacha20poly1305::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 /// Result type alias for encryption operations

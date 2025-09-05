@@ -1,9 +1,10 @@
+use eur_activity::AssetFunctionality;
 use eur_personal_db::{Asset, Conversation, NewAsset, PersonalDatabaseManager};
 use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
-use tracing::info;
+use tracing::{error, info};
 
 use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
 #[taurpc::ipc_type]
@@ -62,6 +63,7 @@ impl ChatApi for ChatApiImpl {
 
         // Add previous messages from this conversation
         if let Ok(previous_messages) = personal_db.get_chat_messages(&conversation_id).await {
+            info!("Adding previous messages to convo");
             let chat_message_id = previous_messages
                 .last()
                 .map(|m| m.id.clone())
@@ -74,6 +76,15 @@ impl ChatApi for ChatApiImpl {
                     && let Ok(assets) = personal_db.get_assets_by_chat_message_id(&message.id).await
                 {
                     previous_assets.extend(assets);
+                }
+            }
+
+            info!("Found {} previous assets", previous_assets.len());
+
+            for asset in &previous_assets {
+                if let Ok(recon_asset) = timeline.load_assets_from_disk(vec![asset]).await {
+                    let ra = recon_asset[0].construct_message();
+                    messages.push(ra);
                 }
             }
 
