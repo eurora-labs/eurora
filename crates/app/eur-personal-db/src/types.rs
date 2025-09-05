@@ -52,7 +52,7 @@ pub struct ConversationWithActivity {
 }
 
 /// Activity asset table structure
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Clone)]
 pub struct Asset {
     pub id: String,
     pub activity_id: Option<String>,
