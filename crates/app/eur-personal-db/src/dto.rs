@@ -16,3 +16,14 @@ pub struct NewChatMessageAsset {
     pub chat_message_id: String,
     pub asset_id: String,
 }
+
+#[derive(Debug)]
+pub struct NewChatMessage {
+    pub conversation_id: String,
+    pub role: String,
+    pub content: String,
+    pub has_assets: bool,
+
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
