@@ -1,4 +1,4 @@
-use eur_personal_db::{Conversation, NewAsset, PersonalDatabaseManager};
+use eur_personal_db::{Asset, Conversation, NewAsset, PersonalDatabaseManager};
 use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
@@ -67,6 +67,16 @@ impl ChatApi for ChatApiImpl {
                 .map(|m| m.id.clone())
                 .unwrap_or_default();
 
+            // Collect assets for all messages that have them
+            let mut previous_assets: Vec<eur_personal_db::Asset> = Vec::new();
+            for message in &previous_messages {
+                if message.has_assets
+                    && let Ok(assets) = personal_db.get_assets_by_chat_message_id(&message.id).await
+                {
+                    previous_assets.extend(assets);
+                }
+            }
+
             let previous_messages = previous_messages
                 .into_iter()
                 .map(|message| message.into())
@@ -80,7 +90,9 @@ impl ChatApi for ChatApiImpl {
             messages.extend(previous_messages);
         }
 
-        if !query.assets.is_empty() {
+        let has_assets = !query.assets.is_empty();
+
+        if has_assets {
             messages = timeline.construct_asset_messages().await;
             messages.extend(timeline.construct_snapshot_messages().await);
         }
@@ -92,7 +104,11 @@ impl ChatApi for ChatApiImpl {
 
         // Insert chat message into db
         let chat_message = personal_db
-            .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
+            .insert_chat_message_from_message(
+                conversation_id.as_str(),
+                user_message.clone(),
+                has_assets,
+            )
             .await
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
@@ -111,8 +127,8 @@ impl ChatApi for ChatApiImpl {
                     relative_path: relative,
                     absolute_path: absolute,
                     chat_message_id: Some(chat_message.id.clone()),
-                    created_at: Some(info.saved_at.clone()),
-                    updated_at: Some(info.saved_at.clone()),
+                    created_at: Some(info.saved_at),
+                    updated_at: Some(info.saved_at),
                 })
                 .await
                 .expect("Failed to insert asset info");
@@ -206,6 +222,7 @@ impl ChatApi for ChatApiImpl {
                     role: Role::Assistant,
                     content: MessageContent::Text(complete_response.clone()),
                 },
+                false,
             )
             .await
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;
