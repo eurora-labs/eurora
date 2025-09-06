@@ -13,7 +13,6 @@ use enum_dispatch::enum_dispatch;
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use strum::EnumString;
 use tracing::info;
 use uuid::Uuid;
 
@@ -43,7 +42,7 @@ impl DisplayAsset {
 
 /// Enum containing all possible activity assets
 #[enum_dispatch(SaveableAsset, AssetFunctionality)]
-#[derive(Debug, Clone, Serialize, Deserialize, EnumString)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActivityAsset {
     YoutubeAsset,
     ArticleAsset,
