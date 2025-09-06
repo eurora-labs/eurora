@@ -23,7 +23,7 @@
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@internationalized/date": "^3.9.0",
-		"@lucide/svelte": "^0.541.0",
+		"@lucide/svelte": "^0.542.0",
 		"@playwright/test": "^1.55.0",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "catalog:svelte",
