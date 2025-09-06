@@ -24,10 +24,10 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
 image = { workspace = true }
 futures = "0.3"
 sentry = { workspace = true }
-tonic-web = "0.14.0"
+tonic-web = "0.14.2"
 tower = "0.5.2"
 tower-http = { version = "0.6.4", features = ["cors"] }
-tonic-health = "0.14.0"
+tonic-health = "0.14.2"
 axum = "0.8.4"
 
 [build-dependencies]
