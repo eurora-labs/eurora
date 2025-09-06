@@ -109,10 +109,7 @@ impl PersonalDatabaseManager {
         })
     }
 
-    pub async fn get_assets_by_chat_message_id(
-        &self,
-        id: &String,
-    ) -> Result<Vec<Asset>, sqlx::Error> {
+    pub async fn get_assets_by_chat_message_id(&self, id: &str) -> Result<Vec<Asset>, sqlx::Error> {
         let assets = sqlx::query_as(
             r#"
             SELECT a.id, a.activity_id, a.relative_path, a.absolute_path, a.created_at, a.updated_at
@@ -209,7 +206,7 @@ impl PersonalDatabaseManager {
 
     pub async fn get_conversation(
         &self,
-        conversation_id: &String,
+        conversation_id: &str,
     ) -> Result<Conversation, sqlx::Error> {
         let conversation = sqlx::query_as(
             r#"
@@ -248,7 +245,7 @@ impl PersonalDatabaseManager {
 
     pub async fn get_conversation_with_messages(
         &self,
-        conversation_id: &String,
+        conversation_id: &str,
     ) -> Result<(Conversation, Vec<ChatMessage>), sqlx::Error> {
         let conversation = self.get_conversation(&conversation_id).await?;
         let messages = self.get_chat_messages(&conversation_id).await?;
@@ -314,7 +311,7 @@ impl PersonalDatabaseManager {
 
     pub async fn get_chat_messages(
         &self,
-        conversation_id: &String,
+        conversation_id: &str,
     ) -> Result<Vec<ChatMessage>, sqlx::Error> {
         let messages = sqlx::query_as(
             r#"

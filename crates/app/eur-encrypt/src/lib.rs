@@ -82,7 +82,7 @@ impl MainKey {
         let mut out = [0u8; 32];
         hk.expand(MAGIC, &mut out).map_err(|e| {
             error!("Failed to derive FEK: {}", e);
-            EncryptError::InvalidKeyLength
+            EncryptError::Format(format!("FEK derivation failed: {}", e))
         })?;
         Ok(Key::from(out))
     }
