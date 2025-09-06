@@ -16,7 +16,7 @@ CREATE TABLE chat_message (
     role TEXT NOT NULL,          -- Role of the message sender (user or assistant)
     content TEXT NOT NULL,       -- Content of the message
 
-    has_assets BOOLEAN NOT NULL, -- Whether the message has assets (true or false)
+    has_assets BOOLEAN NOT NULL DEFAULT 0, -- Whether the message has assets (true or false)
 
     created_at TEXT NOT NULL,    -- ISO8601 datetime when message was created
     updated_at TEXT NOT NULL,    -- ISO8601 datetime when message was last updated

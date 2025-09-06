@@ -27,13 +27,19 @@ mod error;
 
 pub use error::{EncryptError, EncryptResult};
 
-const MAGIC: &[u8; 8] = b"EURFILE\x01";
+const MAGIC: &[u8; 8] = b"EURFILES";
 const VERSION: u8 = 1;
 
 pub const USER_MAIN_KEY_HANDLE: &str = "USER_MAIN_KEY_HANDLE";
 
-#[derive(Zeroize, ZeroizeOnDrop, Clone, Debug, Serialize, Deserialize)]
+#[derive(Zeroize, ZeroizeOnDrop, Clone, Serialize, Deserialize)]
 pub struct MainKey(pub [u8; 32]);
+
+impl std::fmt::Debug for MainKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("MainKey([REDACTED 32 bytes])")
+    }
+}
 
 #[repr(u8)]
 pub enum AeadAlg {
@@ -84,7 +90,9 @@ impl MainKey {
             error!("Failed to derive FEK: {}", e);
             EncryptError::Format(format!("FEK derivation failed: {}", e))
         })?;
-        Ok(Key::from(out))
+        let key = Key::from(out);
+        out.zeroize();
+        Ok(key)
     }
 }
 
@@ -124,8 +132,8 @@ where
     let cipher = XChaCha20Poly1305::new(&key);
     let xnonce = XNonce::from_slice(&header.nonce);
 
-    // Calculate the total header length: MAGIC(8) + VERSION(1) + tag_len(2) + tag + salt(32) + nonce(24)
-    let header_len = 8 + 1 + 2 + header.tag.len() + 32 + 24;
+    // Calculate the total header length: MAGIC + VERSION(1) + tag_len(2) + tag + salt(32) + nonce(24)
+    let header_len = MAGIC.len() + 1 + 2 + header.tag.len() + 32 + 24;
 
     let bytes = cipher.decrypt(
         xnonce,
@@ -188,7 +196,7 @@ pub fn build_header(tag: &str, salt: &[u8; 32], nonce: &[u8; 24]) -> EncryptResu
         return Err(EncryptError::Format("Tag too long".to_string()));
     }
 
-    let mut hdr = Vec::with_capacity(4 + 1 + 2 + tag_bytes.len() + 32 + 24);
+    let mut hdr = Vec::with_capacity(MAGIC.len() + 1 + 2 + tag_bytes.len() + 32 + 24);
     hdr.extend_from_slice(MAGIC);
     hdr.push(VERSION);
     hdr.extend_from_slice(&(tag_bytes.len() as u16).to_be_bytes());
@@ -200,8 +208,8 @@ pub fn build_header(tag: &str, salt: &[u8; 32], nonce: &[u8; 24]) -> EncryptResu
 }
 
 pub fn parse_header(buf: &[u8]) -> EncryptResult<FileHeader> {
-    let min = 8 + 1 + 2 + 32 + 24;
-    if buf.len() < min {
+    let header_len = MAGIC.len() + 1 + 2 + 32 + 24;
+    if buf.len() < header_len {
         return Err(EncryptError::Format("Header too short".to_string()));
     }
     if &buf[0..8] != MAGIC {
