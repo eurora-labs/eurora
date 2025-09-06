@@ -11,7 +11,7 @@ ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
-async-trait = "0.1.77"
+async-trait = "0.1.89"
 url = "2.5.1"
 tonic = { workspace = true, features = ["tls-native-roots", "channel"] }
 futures = { workspace = true }
