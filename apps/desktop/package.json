@@ -29,7 +29,7 @@
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
-		"@lucide/svelte": "^0.541.0",
+		"@lucide/svelte": "^0.542.0",
 		"@playwright/test": "^1.55.0",
 		"@sveltejs/adapter-node": "^5.3.1",
 		"@sveltejs/adapter-static": "catalog:svelte",
