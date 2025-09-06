@@ -31,7 +31,7 @@ serde_json = { workspace = true }
 parking_lot = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
-x11rb = "0.13.1"
+x11rb = "0.13.2"
 ferrous-llm = { workspace = true, features = ["openai"] }
 thiserror = { workspace = true }
 async-trait = "0.1"
@@ -40,7 +40,7 @@ dirs = { workspace = true }
 orion = "0.17.11"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.60.2", features = [
+windows-sys = { version = "0.61.0", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",

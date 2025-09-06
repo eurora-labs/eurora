@@ -21,7 +21,7 @@ eur-ocr = { path = "../../common/eur-ocr" }
 futures = "0.3"
 chrono = { workspace = true }
 ferrous-llm = { workspace = true, features = ["openai"] }
-async-trait = "0.1.77"
+async-trait = "0.1.89"
 eur-eurora-provider = { workspace = true }
 
 [build-dependencies]
