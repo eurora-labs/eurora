@@ -106,16 +106,20 @@ pub fn generate_new_main_key() -> EncryptResult<MainKey> {
     Ok(MainKey(mk))
 }
 
-pub async fn load_encrypted_file<T>(mk: &MainKey, path: &Path) -> EncryptResult<T>
-where
-    T: serde::de::DeserializeOwned,
-{
+pub async fn load_file_and_header(path: &Path) -> EncryptResult<(FileHeader, Vec<u8>)> {
     let buf = fs::read(path).map_err(|e| {
         error!("Failed to read file: {}", e);
         EncryptError::Io(e)
     })?;
 
     let header = parse_header(&buf)?;
+    Ok((header, buf))
+}
+
+pub async fn decrypt_file<T>(mk: &MainKey, header: FileHeader, bytes: Vec<u8>) -> EncryptResult<T>
+where
+    T: serde::de::DeserializeOwned,
+{
     let key = mk.derive_fek(&header.salt)?;
     let cipher = XChaCha20Poly1305::new(&key);
     let xnonce = XNonce::from_slice(&header.nonce);
@@ -126,8 +130,8 @@ where
     let bytes = cipher.decrypt(
         xnonce,
         Payload {
-            msg: &buf[header_len..],
-            aad: &buf[..header_len],
+            msg: &bytes[header_len..],
+            aad: &bytes[..header_len],
         },
     )?;
 
@@ -137,6 +141,14 @@ where
     })?;
 
     Ok(val)
+}
+
+pub async fn load_encrypted_file<T>(mk: &MainKey, path: &Path) -> EncryptResult<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let (header, bytes) = load_file_and_header(path).await?;
+    decrypt_file::<T>(mk, header, bytes).await
 }
 
 pub async fn encrypt_file_contents(
