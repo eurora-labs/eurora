@@ -12,9 +12,12 @@ CREATE TABLE conversation (
 CREATE TABLE chat_message (
     id TEXT PRIMARY KEY,         -- UUID
     conversation_id TEXT NOT NULL, -- Foreign key to conversation
+
     role TEXT NOT NULL,          -- Role of the message sender (user or assistant)
     content TEXT NOT NULL,       -- Content of the message
-    visible BOOLEAN NOT NULL,    -- Visibility of the message (true or false)
+
+    has_assets BOOLEAN NOT NULL DEFAULT 0, -- Whether the message has assets (true or false)
+
     created_at TEXT NOT NULL,    -- ISO8601 datetime when message was created
     updated_at TEXT NOT NULL,    -- ISO8601 datetime when message was last updated
     FOREIGN KEY (conversation_id) REFERENCES conversation(id) ON DELETE CASCADE

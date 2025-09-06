@@ -14,7 +14,7 @@ use sqlx::{
 use tracing::{debug, info};
 
 use crate::{
-    ChatMessageAsset, NewAsset, NewChatMessageAsset,
+    ChatMessageAsset, NewAsset, NewChatMessage, NewChatMessageAsset,
     types::{Activity, Asset, ChatMessage, Conversation},
 };
 
@@ -107,6 +107,22 @@ impl PersonalDatabaseManager {
             created_at,
             updated_at,
         })
+    }
+
+    pub async fn get_assets_by_chat_message_id(&self, id: &str) -> Result<Vec<Asset>, sqlx::Error> {
+        let assets = sqlx::query_as(
+            r#"
+            SELECT a.id, a.activity_id, a.relative_path, a.absolute_path, a.created_at, a.updated_at
+            FROM asset a
+            INNER JOIN chat_message_asset cma ON a.id = cma.asset_id
+            WHERE cma.chat_message_id = ?
+            "#,
+        )
+        .bind(id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(assets)
     }
 
     pub async fn insert_asset(&self, na: &NewAsset) -> Result<Asset, sqlx::Error> {
@@ -231,8 +247,8 @@ impl PersonalDatabaseManager {
         &self,
         conversation_id: &str,
     ) -> Result<(Conversation, Vec<ChatMessage>), sqlx::Error> {
-        let conversation = self.get_conversation(conversation_id).await?;
-        let messages = self.get_chat_messages(conversation_id).await?;
+        let conversation = self.get_conversation(&conversation_id).await?;
+        let messages = self.get_chat_messages(&conversation_id).await?;
 
         // let conversation = self.get_conversation(conversation_id).await?;
         // let messages = self.get_chat_messages(conversation_id);
@@ -249,25 +265,34 @@ impl PersonalDatabaseManager {
 
     pub async fn insert_chat_message(
         &self,
-        conversation_id: &str,
-        role: &str,
-        content: &str,
-        visible: bool,
-        created_at: DateTime<Utc>,
-        updated_at: DateTime<Utc>,
+        new_message: NewChatMessage,
     ) -> Result<ChatMessage, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
+        let created_at: DateTime<Utc>;
+        if let Some(ca) = new_message.created_at {
+            created_at = ca;
+        } else {
+            created_at = Utc::now();
+        }
+
+        let updated_at: DateTime<Utc>;
+        if let Some(ua) = new_message.updated_at {
+            updated_at = ua;
+        } else {
+            updated_at = Utc::now();
+        }
+
         let result = sqlx::query(
             r#"
-            INSERT INTO chat_message (id, conversation_id, role, content, visible, created_at, updated_at)
+            INSERT INTO chat_message (id, conversation_id, role, content, has_assets, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&id)
-        .bind(conversation_id)
-        .bind(role)
-        .bind(content)
-        .bind(visible)
+        .bind(&new_message.conversation_id)
+        .bind(&new_message.role)
+        .bind(&new_message.content)
+        .bind(&new_message.has_assets)
         .bind(created_at)
         .bind(updated_at)
         .execute(&self.pool)
@@ -275,10 +300,10 @@ impl PersonalDatabaseManager {
 
         Ok(ChatMessage {
             id,
-            conversation_id: conversation_id.to_string(),
-            role: role.to_string(),
-            content: content.to_string(),
-            visible,
+            conversation_id: new_message.conversation_id.to_string(),
+            role: new_message.role.to_string(),
+            content: new_message.content.to_string(),
+            has_assets: new_message.has_assets,
             created_at,
             updated_at,
         })
@@ -290,7 +315,7 @@ impl PersonalDatabaseManager {
     ) -> Result<Vec<ChatMessage>, sqlx::Error> {
         let messages = sqlx::query_as(
             r#"
-            SELECT id, conversation_id, role, content, visible, created_at, updated_at
+            SELECT id, conversation_id, role, content, has_assets, created_at, updated_at
             FROM chat_message
             WHERE conversation_id = ?
             "#,

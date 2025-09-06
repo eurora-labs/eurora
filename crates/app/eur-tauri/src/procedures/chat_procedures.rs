@@ -1,9 +1,10 @@
-use eur_personal_db::{Conversation, NewAsset, PersonalDatabaseManager};
+use eur_activity::AssetFunctionality;
+use eur_personal_db::{Asset, Conversation, NewAsset, PersonalDatabaseManager};
 use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
-use tracing::info;
+use tracing::{error, info};
 
 use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
 #[taurpc::ipc_type]
@@ -56,10 +57,57 @@ impl ChatApi for ChatApiImpl {
             app_handle.state::<PersonalDatabaseManager>().inner();
         let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
-        let title: String = "Placeholder Title".to_string();
 
+        let title: String = "Placeholder Title".to_string();
         let mut messages: Vec<Message> = Vec::new();
-        if !query.assets.is_empty() {
+
+        // Add previous messages from this conversation
+        if let Ok(previous_messages) = personal_db.get_chat_messages(&conversation_id).await {
+            info!("Adding previous messages to convo");
+            let chat_message_id = previous_messages
+                .last()
+                .map(|m| m.id.clone())
+                .unwrap_or_default();
+
+            // Collect assets for all messages that have them
+            let mut previous_assets: Vec<eur_personal_db::Asset> = Vec::new();
+            for message in &previous_messages {
+                if message.has_assets
+                    && let Ok(assets) = personal_db.get_assets_by_chat_message_id(&message.id).await
+                {
+                    previous_assets.extend(assets);
+                }
+            }
+
+            info!("Found {} previous assets", previous_assets.len());
+            match timeline.load_assets_from_disk(&previous_assets).await {
+                Ok(recon_assets) => {
+                    for asset in recon_assets {
+                        let message = asset.construct_message();
+                        messages.push(message);
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to load assets: {}", e);
+                }
+            }
+
+            let previous_messages = previous_messages
+                .into_iter()
+                .map(|message| message.into())
+                .collect::<Vec<Message>>();
+
+            // let assets = personal_db
+            //     .get_assets_by_chat_message_id(&chat_message_id)
+            //     .await
+            //     .map_err(|e| format!("Failed to get assets: {}", e))?;
+
+            messages.extend(previous_messages);
+        }
+
+        let has_assets = !query.assets.is_empty();
+
+        if has_assets {
             messages = timeline.construct_asset_messages().await;
             messages.extend(timeline.construct_snapshot_messages().await);
         }
@@ -71,42 +119,32 @@ impl ChatApi for ChatApiImpl {
 
         // Insert chat message into db
         let chat_message = personal_db
-            .insert_chat_message_from_message(conversation_id.as_str(), user_message.clone())
+            .insert_chat_message_from_message(
+                conversation_id.as_str(),
+                user_message.clone(),
+                has_assets,
+            )
             .await
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
-        let infos = timeline
-            .save_assets_to_disk()
-            .await
-            .map_err(|e| format!("Failed to save assets: {e}"))?;
-
-        for info in infos {
-            let relative = info.file_path.to_string_lossy().into_owned();
-            let absolute = info.absolute_path.to_string_lossy().into_owned();
-            personal_db
-                .insert_asset(&NewAsset {
-                    id: None,
-                    activity_id: None,
-                    relative_path: relative,
-                    absolute_path: absolute,
-                    chat_message_id: Some(chat_message.id.clone()),
-                    created_at: Some(info.saved_at.clone()),
-                    updated_at: Some(info.saved_at.clone()),
-                })
-                .await
-                .expect("Failed to insert asset info");
+        if let Ok(infos) = timeline.save_assets_to_disk().await {
+            for info in infos {
+                let relative = info.file_path.to_string_lossy().into_owned();
+                let absolute = info.absolute_path.to_string_lossy().into_owned();
+                personal_db
+                    .insert_asset(&NewAsset {
+                        id: None,
+                        activity_id: None,
+                        relative_path: relative,
+                        absolute_path: absolute,
+                        chat_message_id: Some(chat_message.id.clone()),
+                        created_at: Some(info.saved_at),
+                        updated_at: Some(info.saved_at),
+                    })
+                    .await
+                    .expect("Failed to insert asset info");
+            }
         }
-
-        // let mut db_activity = timeline
-        //     .get_db_activity()
-        //     .await
-        //     .expect("Failed to get db activity");
-
-        // // Insert activity into db
-        // personal_db
-        //     .insert_activity(&db_activity)
-        //     .await
-        //     .expect("Failed to insert activity");
 
         messages.push(user_message);
 
@@ -185,6 +223,7 @@ impl ChatApi for ChatApiImpl {
                     role: Role::Assistant,
                     content: MessageContent::Text(complete_response.clone()),
                 },
+                false,
             )
             .await
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;

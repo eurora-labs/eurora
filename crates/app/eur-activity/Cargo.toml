@@ -11,6 +11,7 @@ eur-native-messaging = { workspace = true }
 eur-fs = { workspace = true }
 eur-secret = { workspace = true }
 eur-encrypt = { workspace = true }
+
 image.workspace = true
 chrono = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, default-features = false, features = [
@@ -40,7 +41,6 @@ hex = "0.4.3"
 tempfile = "3.8.1"
 enum_dispatch = "0.3.13"
 dirs = { workspace = true }
-orion = "0.17.11"
 rand = { workspace = true }
 
 
