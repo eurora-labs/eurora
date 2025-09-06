@@ -5,6 +5,6 @@ edition = "2024"
 
 [dependencies]
 tauri = { version = "^2.5.1", features = ["unstable", "tray-icon"] }
-xcap = { version = "0.6.2" }
+xcap = { version = "0.7.0" }
 tracing = { workspace = true }
-enigo = "0.5.0"
+enigo = "0.6.1"
