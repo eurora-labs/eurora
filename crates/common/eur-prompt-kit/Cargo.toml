@@ -13,7 +13,7 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 thiserror = { workspace = true }
 eur-util = { workspace = true }
-regex = "1.9.6"
+regex = "1.11.2"
 tracing = { workspace = true }
 eur-proto = { workspace = true }
 # eur-proto-client = { workspace = true }
