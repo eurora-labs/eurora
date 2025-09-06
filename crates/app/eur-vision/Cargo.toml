@@ -10,9 +10,9 @@ tokio = { workspace = true }
 image = { workspace = true }
 rusty-tesseract = "1.1.10"
 anyhow = { workspace = true }
-xcap = { version = "0.6.2" }
+xcap = { version = "0.7.0" }
 wgpu = "25.0.2"
-bytemuck = "1.23.1"
+bytemuck = "1.23.2"
 pollster = "0.4.0"
 futures-intrusive = "0.5.0"
 base64.workspace = true
