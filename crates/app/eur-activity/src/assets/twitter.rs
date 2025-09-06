@@ -99,6 +99,7 @@ impl AssetFunctionality for TwitterAsset {
             TwitterContextType::Thread => "thread",
             TwitterContextType::Search => "search results",
             TwitterContextType::Hashtag => "hashtag feed",
+            TwitterContextType::Other => "other",
         };
 
         let mut text = format!(
@@ -148,7 +149,7 @@ impl From<ProtoTweet> for TwitterTweet {
 }
 
 /// Twitter asset containing multiple tweets and metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TwitterAsset {
     pub id: String,
     pub url: String,
@@ -159,13 +160,15 @@ pub struct TwitterAsset {
 }
 
 /// Type of Twitter context being captured
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum TwitterContextType {
     Timeline,
     Profile,
     Thread,
     Search,
     Hashtag,
+    #[default]
+    Other,
 }
 
 impl TwitterAsset {
