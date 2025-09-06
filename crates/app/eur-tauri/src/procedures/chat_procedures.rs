@@ -127,38 +127,24 @@ impl ChatApi for ChatApiImpl {
             .await
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
-        let infos = timeline
-            .save_assets_to_disk()
-            .await
-            .map_err(|e| format!("Failed to save assets: {e}"))?;
-
-        for info in infos {
-            let relative = info.file_path.to_string_lossy().into_owned();
-            let absolute = info.absolute_path.to_string_lossy().into_owned();
-            personal_db
-                .insert_asset(&NewAsset {
-                    id: None,
-                    activity_id: None,
-                    relative_path: relative,
-                    absolute_path: absolute,
-                    chat_message_id: Some(chat_message.id.clone()),
-                    created_at: Some(info.saved_at),
-                    updated_at: Some(info.saved_at),
-                })
-                .await
-                .expect("Failed to insert asset info");
+        if let Ok(infos) = timeline.save_assets_to_disk().await {
+            for info in infos {
+                let relative = info.file_path.to_string_lossy().into_owned();
+                let absolute = info.absolute_path.to_string_lossy().into_owned();
+                personal_db
+                    .insert_asset(&NewAsset {
+                        id: None,
+                        activity_id: None,
+                        relative_path: relative,
+                        absolute_path: absolute,
+                        chat_message_id: Some(chat_message.id.clone()),
+                        created_at: Some(info.saved_at),
+                        updated_at: Some(info.saved_at),
+                    })
+                    .await
+                    .expect("Failed to insert asset info");
+            }
         }
-
-        // let mut db_activity = timeline
-        //     .get_db_activity()
-        //     .await
-        //     .expect("Failed to get db activity");
-
-        // // Insert activity into db
-        // personal_db
-        //     .insert_activity(&db_activity)
-        //     .await
-        //     .expect("Failed to insert activity");
 
         messages.push(user_message);
 
