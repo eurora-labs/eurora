@@ -8,7 +8,7 @@ use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
 /// Default asset for activities that don't have specific implementations
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DefaultAsset {
     pub id: String,
     pub name: String,

@@ -18,7 +18,8 @@ pub struct ChatMessage {
     pub conversation_id: String,
     pub role: String,
     pub content: String,
-    pub visible: bool,
+
+    pub has_assets: bool,
 
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -51,7 +52,7 @@ pub struct ConversationWithActivity {
 }
 
 /// Activity asset table structure
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Clone)]
 pub struct Asset {
     pub id: String,
     pub activity_id: Option<String>,
