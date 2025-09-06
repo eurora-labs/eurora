@@ -19,7 +19,7 @@ pub struct TranscriptLine {
 }
 
 /// YouTube video asset with transcript and metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct YoutubeAsset {
     pub id: String,
     pub url: String,
