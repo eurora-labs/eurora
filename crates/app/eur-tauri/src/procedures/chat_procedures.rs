@@ -80,17 +80,15 @@ impl ChatApi for ChatApiImpl {
             }
 
             info!("Found {} previous assets", previous_assets.len());
-
-            for asset in &previous_assets {
-                let recon_asset = timeline.load_assets_from_disk(vec![asset]).await;
-                match recon_asset {
-                    Ok(recon_asset) => {
-                        let ra = recon_asset[0].construct_message();
-                        messages.push(ra);
+            match timeline.load_assets_from_disk(&previous_assets).await {
+                Ok(recon_assets) => {
+                    for asset in recon_assets {
+                        let message = asset.construct_message();
+                        messages.push(message);
                     }
-                    Err(e) => {
-                        error!("Failed to load asset: {}", e);
-                    }
+                }
+                Err(e) => {
+                    error!("Failed to load assets: {}", e);
                 }
             }
 
