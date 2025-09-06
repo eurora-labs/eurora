@@ -6,7 +6,6 @@
 
 pub mod assets;
 pub mod config;
-mod encryption;
 pub mod error;
 pub mod registry;
 pub mod snapshots;

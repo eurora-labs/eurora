@@ -18,7 +18,7 @@ pub enum TimelineError {
     Configuration(String),
 
     #[error("Activity strategy error: {0}")]
-    ActivityStrategy(#[from] crate::ActivityError),
+    Activity(#[from] crate::ActivityError),
 
     #[error("Join error: {0}")]
     Join(#[from] tokio::task::JoinError),
