@@ -52,7 +52,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use sha2::Sha256;
 use tracing::error;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 mod error;
 
@@ -286,15 +286,17 @@ where
         ));
     }
 
-    let decrypted_bytes = cipher
-        .decrypt(
-            xnonce,
-            Payload {
-                msg: &bytes[header_len..],
-                aad: &bytes[..header_len],
-            },
-        )
-        .map_err(EncryptError::Encryption)?;
+    let decrypted_bytes = Zeroizing::new(
+        cipher
+            .decrypt(
+                xnonce,
+                Payload {
+                    msg: &bytes[header_len..],
+                    aad: &bytes[..header_len],
+                },
+            )
+            .map_err(EncryptError::Encryption)?,
+    );
 
     // Zero out the original encrypted data
     bytes.zeroize();
