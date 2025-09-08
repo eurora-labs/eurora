@@ -1,5 +1,5 @@
 use eur_activity::AssetFunctionality;
-use eur_personal_db::{Asset, Conversation, NewAsset, PersonalDatabaseManager};
+use eur_personal_db::{Asset, Conversation, NewAsset, PersonalDatabaseManager, UpdateConversation};
 use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
@@ -7,16 +7,12 @@ use tauri::{Manager, Runtime, ipc::Channel};
 use tracing::{error, info};
 
 use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
+
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
     chunk: String,
 }
-// enum ResponseChunk<'a> {
-//     #[serde(rename_all = "camelCase")]
-//     Message { message: &'a str },
-//     #[serde(rename_all = "camelCase")]
-//     Append { chunk: &'a str },
-// }
+
 #[taurpc::ipc_type]
 pub struct Query {
     text: String,
@@ -35,7 +31,7 @@ pub trait ChatApi {
 
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
+        conversation: Conversation,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
@@ -49,7 +45,7 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
+        conversation: Conversation,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
@@ -58,17 +54,10 @@ impl ChatApi for ChatApiImpl {
         let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
 
-        let title: String = "Placeholder Title".to_string();
         let mut messages: Vec<Message> = Vec::new();
 
         // Add previous messages from this conversation
-        if let Ok(previous_messages) = personal_db.get_chat_messages(&conversation_id).await {
-            info!("Adding previous messages to convo");
-            let chat_message_id = previous_messages
-                .last()
-                .map(|m| m.id.clone())
-                .unwrap_or_default();
-
+        if let Ok(previous_messages) = personal_db.get_chat_messages(&conversation.id).await {
             // Collect assets for all messages that have them
             let mut previous_assets: Vec<eur_personal_db::Asset> = Vec::new();
             for message in &previous_messages {
@@ -79,7 +68,6 @@ impl ChatApi for ChatApiImpl {
                 }
             }
 
-            info!("Found {} previous assets", previous_assets.len());
             match timeline.load_assets_from_disk(&previous_assets).await {
                 Ok(recon_assets) => {
                     for asset in recon_assets {
@@ -96,11 +84,6 @@ impl ChatApi for ChatApiImpl {
                 .into_iter()
                 .map(|message| message.into())
                 .collect::<Vec<Message>>();
-
-            // let assets = personal_db
-            //     .get_assets_by_chat_message_id(&chat_message_id)
-            //     .await
-            //     .map_err(|e| format!("Failed to get assets: {}", e))?;
 
             messages.extend(previous_messages);
         }
@@ -119,13 +102,19 @@ impl ChatApi for ChatApiImpl {
 
         // Insert chat message into db
         let chat_message = personal_db
-            .insert_chat_message_from_message(
-                conversation_id.as_str(),
-                user_message.clone(),
-                has_assets,
-            )
+            .insert_chat_message_from_message(&conversation.id, user_message.clone(), has_assets)
             .await
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+
+        if conversation.title.is_none() {
+            personal_db
+                .update_conversation(UpdateConversation {
+                    id: conversation.id.clone(),
+                    title: Some(query.text.clone().chars().take(35).collect()),
+                })
+                .await
+                .map_err(|e| format!("Failed to update conversation title: {e}"))?;
+        }
 
         if let Ok(infos) = timeline.save_assets_to_disk().await {
             for info in infos {
@@ -153,9 +142,6 @@ impl ChatApi for ChatApiImpl {
         let client = guard
             .as_mut()
             .ok_or_else(|| "PromptKitService not initialized".to_string())?;
-
-        // Create new conversation and store it in SQLite
-        info!("Creating new conversation with title: {}", title);
 
         let mut complete_response = String::new();
 
@@ -218,7 +204,7 @@ impl ChatApi for ChatApiImpl {
 
         personal_db
             .insert_chat_message_from_message(
-                conversation_id.as_str(),
+                &conversation.id,
                 Message {
                     role: Role::Assistant,
                     content: MessageContent::Text(complete_response.clone()),
