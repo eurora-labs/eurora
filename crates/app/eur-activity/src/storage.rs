@@ -74,11 +74,6 @@ pub trait SaveableAsset {
 
     /// Get a human-readable name for the asset
     fn get_display_name(&self) -> String;
-
-    /// Whether the output should be encrypted
-    fn should_encrypt(&self) -> bool {
-        true
-    }
 }
 
 /// Asset storage manager
@@ -126,11 +121,9 @@ impl ActivityStorage {
         // Serialize the entire ActivityAsset enum, not just the individual asset
         let mut bytes = serde_json::to_vec(asset)?;
 
-        if asset.should_encrypt() {
-            bytes = encrypt_file_contents(&self.config.main_key, &bytes, asset.get_asset_type())
-                .await
-                .map_err(|e| ActivityError::Encryption(e))?;
-        }
+        bytes = encrypt_file_contents(&self.config.main_key, &bytes, asset.get_asset_type())
+            .await
+            .map_err(|e| ActivityError::Encryption(e))?;
 
         // Make a placeholder filepath
         let file_path = self.generate_asset_path(asset, None)?;
@@ -252,10 +245,6 @@ mod tests {
 
         fn get_display_name(&self) -> String {
             self.name.clone()
-        }
-
-        fn should_encrypt(&self) -> bool {
-            true
         }
     }
 
