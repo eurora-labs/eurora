@@ -3,6 +3,7 @@
 use crate::ActivityResult;
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
+use crate::types::ActivityAsset;
 use crate::types::{AssetFunctionality, ContextChip};
 use async_trait::async_trait;
 use eur_proto::ipc::ProtoArticleState;
@@ -141,7 +142,7 @@ impl SaveableAsset for ArticleAsset {
     }
 
     async fn serialize_content(&self) -> ActivityResult<Vec<u8>> {
-        let bytes = serde_json::to_vec(self)?;
+        let bytes = serde_json::to_vec(&self)?;
         Ok(bytes)
     }
 
@@ -151,10 +152,6 @@ impl SaveableAsset for ArticleAsset {
 
     fn get_display_name(&self) -> String {
         self.title.clone()
-    }
-
-    fn should_encrypt(&self) -> bool {
-        true
     }
 }
 
