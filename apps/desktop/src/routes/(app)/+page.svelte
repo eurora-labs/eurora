@@ -159,7 +159,7 @@
 			}
 
 			// Use TauRPC send_query procedure
-			await taurpc.chat.send_query(conversation.id, onEvent, tauRpcQuery);
+			await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
 		} catch (error) {
 			console.error('Failed to get answer:', error);
 			messages.push({

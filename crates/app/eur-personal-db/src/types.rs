@@ -7,7 +7,7 @@ use sqlx::FromRow;
 #[derive(FromRow, Debug, Serialize, Deserialize, Type, Clone)]
 pub struct Conversation {
     pub id: String,
-    pub title: String,
+    pub title: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
