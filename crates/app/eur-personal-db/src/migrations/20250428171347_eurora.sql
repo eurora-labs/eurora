@@ -3,7 +3,7 @@
 -- Table for conversation history
 CREATE TABLE conversation (
     id TEXT PRIMARY KEY,         -- UUID
-    title TEXT NOT NULL,          -- Conversation name
+    title TEXT,          -- Conversation name
     created_at TEXT NOT NULL,    -- ISO8601 datetime when conversation was created
     updated_at TEXT NOT NULL    -- ISO8601 datetime when conversation was last updated
 );

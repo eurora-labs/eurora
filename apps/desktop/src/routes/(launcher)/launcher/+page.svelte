@@ -246,7 +246,7 @@
 			}
 
 			// Use TauRPC send_query procedure
-			await taurpc.chat.send_query(conversation.id, onEvent, tauRpcQuery);
+			await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
 
 			// Note: Conversation management is not yet available in TauRPC,
 			// so we skip the conversation refresh for now
