@@ -1,6 +1,6 @@
 use crate::shared_types::SharedCurrentConversation;
 use chrono::Utc;
-use eur_personal_db::{Conversation, PersonalDatabaseManager};
+use eur_personal_db::{Conversation, NewConversation, PersonalDatabaseManager};
 use ferrous_llm_core::Message;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -45,12 +45,9 @@ impl ConversationApi for ConversationApiImpl {
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Conversation, String> {
         let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
-        // Set title to current time string
-        let current_time = Utc::now();
-        let title = current_time.to_rfc3339();
 
         let conversation = personal_db
-            .insert_conversation(&title, current_time, current_time)
+            .insert_empty_conversation()
             .await
             .map_err(|e| e.to_string())?;
 

@@ -14,7 +14,8 @@ use sqlx::{
 use tracing::{debug, info};
 
 use crate::{
-    ChatMessageAsset, NewAsset, NewChatMessage, NewChatMessageAsset,
+    ChatMessageAsset, NewAsset, NewChatMessage, NewChatMessageAsset, NewConversation,
+    UpdateConversation,
     types::{Activity, Asset, ChatMessage, Conversation},
 };
 
@@ -81,13 +82,55 @@ impl PersonalDatabaseManager {
         migrator.run(pool).await
     }
 
+    pub async fn update_conversation(
+        &self,
+        conversation: UpdateConversation,
+    ) -> Result<Conversation, sqlx::Error> {
+        let updated_at = Utc::now();
+        let created_at: DateTime<Utc> = sqlx::query_scalar(
+            r#"
+            UPDATE conversation
+            SET title = ?, updated_at = ?
+            WHERE id = ?
+            RETURNING created_at
+            "#,
+        )
+        .bind(&conversation.title)
+        .bind(updated_at)
+        .bind(&conversation.id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?;
+
+        Ok(Conversation {
+            id: conversation.id,
+            title: conversation.title,
+            created_at,
+            updated_at,
+        })
+    }
+
+    pub async fn insert_empty_conversation(&self) -> Result<Conversation, sqlx::Error> {
+        self.insert_conversation(NewConversation {
+            title: None,
+            created_at: None,
+        })
+        .await
+    }
+
     pub async fn insert_conversation(
         &self,
-        title: &str,
-        created_at: DateTime<Utc>,
-        updated_at: DateTime<Utc>,
+        new_conversation: NewConversation,
     ) -> Result<Conversation, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
+        let created_at: DateTime<Utc>;
+        if new_conversation.created_at.is_some() {
+            created_at = new_conversation.created_at.unwrap();
+        } else {
+            created_at = Utc::now();
+        }
+        let updated_at = created_at;
+
         sqlx::query(
             r#"
             INSERT INTO conversation (id, title, created_at, updated_at)
@@ -95,7 +138,7 @@ impl PersonalDatabaseManager {
             "#,
         )
         .bind(id.clone())
-        .bind(title)
+        .bind(&new_conversation.title)
         .bind(created_at)
         .bind(updated_at)
         .execute(&self.pool)
@@ -103,7 +146,7 @@ impl PersonalDatabaseManager {
 
         Ok(Conversation {
             id: id.to_string(),
-            title: title.to_string(),
+            title: new_conversation.title,
             created_at,
             updated_at,
         })

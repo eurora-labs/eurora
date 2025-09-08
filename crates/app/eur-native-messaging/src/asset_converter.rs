@@ -1,6 +1,6 @@
 use anyhow::Error;
 use eur_proto::ipc::StateResponse;
-use tracing::info;
+use tracing::{debug, info};
 
 pub use crate::asset_context::{
     ArticleState, NativeArticleAsset, NativeTwitterState, NativeYoutubeState, PdfState,
@@ -38,7 +38,7 @@ impl JSONToProtoAssetConverter {
 
         match json
             .get("type")
-            .unwrap_or(&serde_json::Value::String("ARTICLE_STATE".to_string()))
+            .unwrap_or(&serde_json::Value::String("ARTICLE_ASSET".to_string()))
             .as_str()
             .unwrap()
         {
