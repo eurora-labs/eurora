@@ -87,7 +87,7 @@ impl PersonalDatabaseManager {
         conversation: UpdateConversation,
     ) -> Result<Conversation, sqlx::Error> {
         let updated_at = Utc::now();
-        sqlx::query(
+        let result = sqlx::query(
             r#"
             UPDATE conversation
             SET title = ?, updated_at = ?
@@ -99,6 +99,10 @@ impl PersonalDatabaseManager {
         .bind(&conversation.id)
         .execute(&self.pool)
         .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(sqlx::Error::RowNotFound);
+        }
 
         let created_at = self.get_conversation(&conversation.id).await?.created_at;
 

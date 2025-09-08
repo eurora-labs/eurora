@@ -51,7 +51,7 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sha2::Sha256;
-use tracing::{error, info};
+use tracing::error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 mod error;
@@ -300,8 +300,6 @@ where
 
     // Zero out the original encrypted data
     bytes.zeroize();
-
-    info!("Decrypted data: {:?}", decrypted_bytes);
 
     let val = serde_json::from_slice::<T>(&decrypted_bytes).map_err(|e| {
         error!("Failed to deserialize JSON: {}", e);
