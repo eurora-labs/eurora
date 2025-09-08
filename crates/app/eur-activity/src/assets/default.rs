@@ -127,12 +127,12 @@ impl AssetFunctionality for DefaultAsset {
 #[async_trait]
 impl SaveableAsset for DefaultAsset {
     fn get_asset_type(&self) -> &'static str {
-        "default"
+        "DefaultAsset"
     }
 
     async fn serialize_content(&self) -> ActivityResult<Vec<u8>> {
-        let json = serde_json::to_string_pretty(self)?;
-        Ok(json.into_bytes())
+        let json = serde_json::to_vec(self)?;
+        Ok(json)
     }
 
     fn get_unique_id(&self) -> String {
@@ -141,10 +141,6 @@ impl SaveableAsset for DefaultAsset {
 
     fn get_display_name(&self) -> String {
         self.name.clone()
-    }
-
-    fn should_encrypt(&self) -> bool {
-        false
     }
 }
 
