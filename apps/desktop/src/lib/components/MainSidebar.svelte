@@ -1,9 +1,4 @@
 <script lang="ts">
-	import Calendar from '@lucide/svelte/icons/calendar';
-	import House from '@lucide/svelte/icons/house';
-	import Inbox from '@lucide/svelte/icons/inbox';
-	import Search from '@lucide/svelte/icons/search';
-	import Settings from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
@@ -96,7 +91,7 @@
 
 				<Sidebar.GroupContent>
 					<Sidebar.Menu>
-						{#each conversations as item (item.title)}
+						{#each conversations as item (item.id)}
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									onclick={() => {
