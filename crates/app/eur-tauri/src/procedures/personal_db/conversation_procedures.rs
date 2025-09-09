@@ -8,6 +8,9 @@ use tauri::{Manager, Runtime};
 
 #[taurpc::procedures(path = "personal_db.conversation")]
 pub trait ConversationApi {
+    #[taurpc(event)]
+    async fn new_conversation_added(conversation: Conversation);
+
     async fn list<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         limit: u16,
@@ -54,6 +57,10 @@ impl ConversationApi for ConversationApiImpl {
         let current = app_handle.state::<SharedCurrentConversation>();
         let mut guard = current.lock().await;
         *guard = Some(conversation.clone());
+
+        TauRpcConversationApiEventTrigger::new(app_handle.clone())
+            .new_conversation_added(conversation.clone())
+            .map_err(|e| e.to_string())?;
 
         Ok(conversation)
     }
