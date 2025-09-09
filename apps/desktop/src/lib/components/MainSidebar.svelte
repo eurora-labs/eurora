@@ -22,42 +22,19 @@
 		taurpc.personal_db.conversation.list(5, 0).then((res) => {
 			conversations = res;
 		});
+
+		taurpc.personal_db.conversation.new_conversation_added.on((conversation) => {
+			conversations = [conversation, ...conversations];
+		});
 	});
 
-	async function createChat() {}
+	async function createChat() {
+		await taurpc.personal_db.conversation.create();
+	}
 
 	async function switchConversation(id: string) {
 		await taurpc.chat.switch_conversation(id);
 	}
-
-	// Menu items.
-	// const items = [
-	// 	{
-	// 		title: 'Chat 1',
-	// 		url: '#',
-	// 		icon: House,
-	// 	},
-	// 	{
-	// 		title: 'Chat 2',
-	// 		url: '#',
-	// 		icon: Inbox,
-	// 	},
-	// 	{
-	// 		title: 'Chat 3',
-	// 		url: '#',
-	// 		icon: Calendar,
-	// 	},
-	// 	{
-	// 		title: 'Chat 4',
-	// 		url: '#',
-	// 		icon: Search,
-	// 	},
-	// 	{
-	// 		title: 'Chat 5',
-	// 		url: '#',
-	// 		icon: Settings,
-	// 	},
-	// ];
 </script>
 
 <Sidebar.Root collapsible="icon" class="border-none">
@@ -101,7 +78,7 @@
 									{#snippet child({ props })}
 										<a {...props}>
 											<!-- <item.icon /> -->
-											<span>{item.title}</span>
+											<span>{item.title ?? 'New Conversation'}</span>
 										</a>
 									{/snippet}
 								</Sidebar.MenuButton>
