@@ -24,11 +24,11 @@ serde_json = { workspace = true }
 humantime-serde = { workspace = true }
 anyhow = { workspace = true }
 tokio-stream = { workspace = true }
-tonic = { workspace = true }
+tonic = { workspace = true, features = ["server", "tls-native-roots", "channel", "router"] }
 async-trait = "0.1.89"
 uuid = { workspace = true }
 taurpc = { version = "0.5.1" }
-specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
+specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
 ferrous-focus = { version = "0.2.5" }
 tracing = { workspace = true }
@@ -42,7 +42,6 @@ tempfile = "3.21.0"
 enum_dispatch = "0.3.13"
 dirs = { workspace = true }
 rand = { workspace = true }
-
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }
