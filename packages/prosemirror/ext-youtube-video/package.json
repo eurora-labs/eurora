@@ -44,6 +44,6 @@
 	},
 	"dependencies": {
 		"prosemirror-model": "^1.25.3",
-		"prosemirror-view": "^1.40.1"
+		"prosemirror-view": "^1.41.0"
 	}
 }
