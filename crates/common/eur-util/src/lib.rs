@@ -1,26 +1,26 @@
-use eur_proto::ipc::ProtoTranscriptLine;
+// use eur_proto::ipc::ProtoTranscriptLine;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-pub fn flatten_transcript_with_highlight(
-    transcript: Vec<ProtoTranscriptLine>,
-    current_time: f32,
-    highlight_tag: String,
-) -> String {
-    let mut flat_transcript = String::new();
-    let mut highlighted = false;
-    for line in transcript {
-        if line.start > current_time && !highlighted {
-            flat_transcript += &highlight_tag;
-            flat_transcript += &line.text;
-            flat_transcript += &highlight_tag;
-            highlighted = true;
-        } else {
-            flat_transcript += &line.text.to_string();
-        }
-    }
-    flat_transcript
-}
+// pub fn flatten_transcript_with_highlight(
+//     transcript: Vec<ProtoTranscriptLine>,
+//     current_time: f32,
+//     highlight_tag: String,
+// ) -> String {
+//     let mut flat_transcript = String::new();
+//     let mut highlighted = false;
+//     for line in transcript {
+//         if line.start > current_time && !highlighted {
+//             flat_transcript += &highlight_tag;
+//             flat_transcript += &line.text;
+//             flat_transcript += &highlight_tag;
+//             highlighted = true;
+//         } else {
+//             flat_transcript += &line.text.to_string();
+//         }
+//     }
+//     flat_transcript
+// }
 
 static EMAIL_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b").unwrap());

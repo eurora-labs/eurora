@@ -1,58 +1,33 @@
 use std::{
-    error::Error,
-    io::{self, ErrorKind, Read, Write},
+    io::{self, Read, Write},
     pin::Pin,
     sync::Arc,
 };
 
 use anyhow::{Result, anyhow};
-use eur_proto::ipc::{SnapshotResponse, StateRequest, StateResponse};
-use serde::{Deserialize, Serialize};
+use eur_proto::ipc::{AssetRequest, AssetResponse};
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::info;
 
-use crate::{
-    asset_converter::JSONToProtoAssetConverter, snapshot_converter::JSONToProtoSnapshotConverter,
-};
+use crate::types::NativeAsset;
 
 type IpcResult<T> = Result<Response<T>, Status>;
-type ResponseStream = Pin<Box<dyn Stream<Item = Result<StateResponse, Status>> + Send>>;
-
-fn match_for_io_error(err_status: &Status) -> Option<&std::io::Error> {
-    let mut err: &(dyn Error + 'static) = err_status;
-
-    loop {
-        if let Some(io_err) = err.downcast_ref::<std::io::Error>() {
-            return Some(io_err);
-        }
-
-        // h2::Error does not expose std::io::Error with `source()`
-        if let Some(h2_err) = err.downcast_ref::<h2::Error>()
-            && let Some(io_err) = h2_err.get_io()
-        {
-            return Some(io_err);
-        }
-
-        err = err.source()?;
-    }
-}
+type ResponseStream = Pin<Box<dyn Stream<Item = Result<AssetResponse, Status>> + Send>>;
 
 // Message type for native messaging
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct NativeMessage {
-    pub r#type: String,
-    #[serde(flatten)]
-    pub payload: Value,
+    pub command: String,
 }
 
 // Request type for internal communication
 #[derive(Debug)]
 struct NativeMessageRequest {
     message: NativeMessage,
-    response_sender: oneshot::Sender<Result<Value>>,
+    response_sender: oneshot::Sender<anyhow::Result<NativeAsset>>,
 }
 
 #[derive(Clone)]
@@ -78,7 +53,7 @@ impl TauriIpcServer {
         let stdin = io::stdin();
         let stdout = io::stdout();
 
-        // Use a mutex to prevent concurrent access to stdin/stdout
+        // Use mutexes to prevent concurrent access to stdin/stdout
         let stdin_mutex = Arc::new(tokio::sync::Mutex::new(stdin));
         let stdout_mutex = Arc::new(tokio::sync::Mutex::new(stdout));
 
@@ -86,15 +61,13 @@ impl TauriIpcServer {
             tokio::select! {
                 Some(request) = request_rx.recv() => {
                     let NativeMessageRequest { message, response_sender } = request;
-                    let message_value = match serde_json::to_value(&message) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            let _ = response_sender.send(Err(anyhow!("Serialization error: {}", e)));
-                            continue;
-                        }
-                    };
 
-                    // Use single mutex to prevent deadlock - acquire both stdin and stdout atomically
+                    // Create the message to send to Chrome extension
+                    let message_value = json!({
+                        "command": message.command
+                    });
+
+                    // Acquire mutexes for atomic stdio operation
                     let stdout_guard = stdout_mutex.lock().await;
                     let stdin_guard = stdin_mutex.lock().await;
 
@@ -102,15 +75,20 @@ impl TauriIpcServer {
                     let result = async {
                         write_message(&*stdout_guard, &message_value)
                             .map_err(|e| anyhow!("Write error: {}", e))?;
-                        read_message(&*stdin_guard)
-                            .map_err(|e| anyhow!("Read error: {}", e))
+                        let response = read_message(&*stdin_guard)
+                            .map_err(|e| anyhow!("Read error: {}", e))?;
+
+                        // Parse the response as NativeAsset
+                        let native_asset: NativeAsset = serde_json::from_value(response)
+                            .map_err(|e| anyhow!("Failed to parse response as NativeAsset: {}", e))?;
+
+                        Ok(native_asset)
                     }.await;
 
                     let _ = response_sender.send(result);
                 },
                 Some(native_message) = native_rx.recv() => {
                     // Process incoming native messages (if any)
-                    // This is for handling incoming messages from the browser
                     info!("Received native message: {:?}", native_message);
                 }
                 else => break,
@@ -119,16 +97,14 @@ impl TauriIpcServer {
     }
 
     pub async fn handle_stdio(&self) -> Result<()> {
-        // This function is called from main and can just wait indefinitely
-        // since the actual stdio handling is done in the separate task
-        std::future::pending::<()>().await;
+        // Keep the process alive to handle gRPC requests
+        tokio::signal::ctrl_c().await?;
         Ok(())
     }
 
-    async fn send_native_message(&self, message_type: &str, payload: Value) -> Result<Value> {
+    async fn send_native_message(&self, command: &str) -> Result<NativeAsset> {
         let message = NativeMessage {
-            r#type: message_type.to_string(),
-            payload,
+            command: command.to_string(),
         };
 
         let (tx, rx) = oneshot::channel();
@@ -145,25 +121,39 @@ impl TauriIpcServer {
         rx.await
             .map_err(|_| anyhow!("Failed to receive response"))?
     }
+
+    fn native_asset_to_response(&self, asset: NativeAsset) -> Result<AssetResponse> {
+        // Serialize the NativeAsset to bytes
+        let content = serde_json::to_vec(&asset)
+            .map_err(|e| anyhow!("Failed to serialize NativeAsset: {}", e))?;
+
+        // Get the kind from the enum variant
+        let kind = match asset {
+            NativeAsset::NativeYoutubeAsset(_) => "NativeYoutubeAsset",
+            NativeAsset::NativeArticleAsset(_) => "NativeArticleAsset",
+            NativeAsset::NativeTwitterAsset(_) => "NativeTwitterAsset",
+        }
+        .to_string();
+
+        Ok(AssetResponse { kind, content })
+    }
 }
 
 #[tonic::async_trait]
 impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
-    type GetStateStreamingStream = ResponseStream;
+    type GetAssetsStreamingStream = ResponseStream;
 
-    async fn get_state(&self, _req: Request<StateRequest>) -> IpcResult<StateResponse> {
-        info!("Received get_state request");
+    async fn get_assets(&self, _req: Request<AssetRequest>) -> IpcResult<AssetResponse> {
+        info!("Received get_assets request");
 
-        // Send GENERATE_REPORT request via native messaging
-        match self.send_native_message("GENERATE_ASSETS", json!({})).await {
-            Ok(response) => {
-                // Convert JSON response to StateResponse proto
-                let state_response =
-                    JSONToProtoAssetConverter::convert(&response).map_err(|e| {
-                        Status::internal(format!("Failed to convert JSON to StateResponse: {}", e))
-                    })?;
-                Ok(Response::new(state_response))
-            }
+        match self.send_native_message("GENERATE_ASSETS").await {
+            Ok(native_asset) => match self.native_asset_to_response(native_asset) {
+                Ok(response) => Ok(Response::new(response)),
+                Err(e) => {
+                    info!("Error converting asset to response: {}", e);
+                    Err(Status::internal(format!("Conversion error: {}", e)))
+                }
+            },
             Err(e) => {
                 info!("Error in native messaging: {}", e);
                 Err(Status::internal(format!("Native messaging error: {}", e)))
@@ -171,25 +161,17 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         }
     }
 
-    async fn get_snapshot(&self, _req: Request<StateRequest>) -> IpcResult<SnapshotResponse> {
-        info!("Received get_snapshot request");
+    async fn get_snapshots(&self, _req: Request<AssetRequest>) -> IpcResult<AssetResponse> {
+        info!("Received get_snapshots request");
 
-        // Send GENERATE_REPORT request via native messaging
-        match self
-            .send_native_message("GENERATE_SNAPSHOT", json!({}))
-            .await
-        {
-            Ok(response) => {
-                // Convert JSON response to SnapshotResponse proto
-                let snapshot_response =
-                    JSONToProtoSnapshotConverter::convert(&response).map_err(|e| {
-                        Status::internal(format!(
-                            "Failed to convert JSON to SnapshotResponse: {}",
-                            e
-                        ))
-                    })?;
-                Ok(Response::new(snapshot_response))
-            }
+        match self.send_native_message("GENERATE_SNAPSHOTS").await {
+            Ok(native_asset) => match self.native_asset_to_response(native_asset) {
+                Ok(response) => Ok(Response::new(response)),
+                Err(e) => {
+                    info!("Error converting asset to response: {}", e);
+                    Err(Status::internal(format!("Conversion error: {}", e)))
+                }
+            },
             Err(e) => {
                 info!("Error in native messaging: {}", e);
                 Err(Status::internal(format!("Native messaging error: {}", e)))
@@ -197,91 +179,77 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         }
     }
 
-    async fn get_state_streaming(
+    async fn get_assets_streaming(
         &self,
-        req: Request<Streaming<StateRequest>>,
-    ) -> IpcResult<Self::GetStateStreamingStream> {
+        req: Request<Streaming<AssetRequest>>,
+    ) -> IpcResult<Self::GetAssetsStreamingStream> {
         let mut in_stream = req.into_inner();
-        let (tx, rx) = mpsc::channel(128); // Increased buffer size to match example
+        let (tx, rx) = mpsc::channel::<Result<AssetResponse, Status>>(128);
         let server_clone = self.clone();
 
-        // This spawn is required to handle the bidirectional streaming properly
-        // When using a bidirectional stream, we need to process the incoming requests
-        // and send responses back, all while keeping the connection open
         tokio::spawn(async move {
             while let Some(request) = in_stream.next().await {
                 match request {
                     Ok(_) => {
-                        info!("Received gather state request");
-                        // Send GENERATE_REPORT request via native messaging
-                        match server_clone
-                            .send_native_message("GENERATE_REPORT", json!({}))
-                            .await
-                        {
-                            Ok(response) => {
-                                // info!("Received GENERATE_REPORT response {:?}", response);
+                        info!("Received streaming assets request");
 
-                                let state_response = JSONToProtoAssetConverter::convert(&response);
-
-                                match tx.send(Ok(state_response)).await {
-                                    Ok(_) => {
-                                        // Message successfully sent, continue processing
-                                        // Unlike the previous implementation, we don't break the loop here
+                        match server_clone.send_native_message("GENERATE_ASSETS").await {
+                            Ok(native_asset) => {
+                                match server_clone.native_asset_to_response(native_asset) {
+                                    Ok(response) => {
+                                        if tx.send(Ok(response)).await.is_err() {
+                                            info!("Client disconnected");
+                                            break;
+                                        }
                                     }
                                     Err(e) => {
-                                        info!("Error sending response: {}", e);
-                                        break; // Channel closed, client disconnected
+                                        info!("Error converting asset: {}", e);
+                                        if tx
+                                            .send(Err(Status::internal(format!(
+                                                "Conversion error: {}",
+                                                e
+                                            ))))
+                                            .await
+                                            .is_err()
+                                        {
+                                            break;
+                                        }
                                     }
                                 }
                             }
                             Err(e) => {
                                 info!("Error in native messaging: {}", e);
-                                match tx.send(Err(e)).await {
-                                    Ok(_) => {
-                                        // Error message sent, but we continue processing
-                                    }
-                                    Err(e) => {
-                                        info!("Error sending error response: {}", e);
-                                        break; // Channel closed, client disconnected
-                                    }
+                                if tx
+                                    .send(Err(Status::internal(format!(
+                                        "Native messaging error: {}",
+                                        e
+                                    ))))
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
                                 }
                             }
                         }
                     }
                     Err(err) => {
-                        info!("Error in gather state: {}", err);
-                        if let Some(io_err) = match_for_io_error(&err)
-                            && io_err.kind() == ErrorKind::BrokenPipe
+                        info!("Error in streaming request: {}", err);
+                        if tx
+                            .send(Err(Status::internal(format!("Stream error: {}", err))))
+                            .await
+                            .is_err()
                         {
-                            info!("Browser connection closed: broken pipe");
                             break;
-                        }
-                        match tx.send(Err(err.into())).await {
-                            Ok(_) => {
-                                // Continue processing after error
-                            }
-                            Err(e) => {
-                                info!("Error sending state response: {}", e);
-                                break;
-                            }
                         }
                     }
                 }
             }
-            info!("Browser connection closed: stream ended");
+            info!("Streaming connection closed");
         });
 
         let out_stream = ReceiverStream::new(rx);
-
-        // Fix for the type mismatch error - map the stream items to the expected type
-        let mapped_stream = out_stream.map(|result| match result {
-            Ok(Ok(response)) => Ok(response),
-            Ok(Err(err)) => Err(Status::internal(err.to_string())),
-            Err(err) => Err(Status::internal(err.to_string())),
-        });
-
         Ok(Response::new(
-            Box::pin(mapped_stream) as Self::GetStateStreamingStream
+            Box::pin(out_stream) as Self::GetAssetsStreamingStream
         ))
     }
 }

@@ -3,10 +3,9 @@
 use crate::ActivityResult;
 use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
-use crate::types::ActivityAsset;
 use crate::types::{AssetFunctionality, ContextChip};
 use async_trait::async_trait;
-use eur_proto::ipc::ProtoArticleState;
+use eur_native_messaging::NativeArticleAsset;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -46,17 +45,17 @@ impl ArticleAsset {
     }
 
     /// Try to create from protocol buffer state
-    pub fn try_from(state: ProtoArticleState) -> Result<Self, ActivityError> {
-        let word_count = state.text_content.split_whitespace().count();
+    pub fn try_from(asset: NativeArticleAsset) -> Result<Self, ActivityError> {
+        let word_count = asset.content.split_whitespace().count();
         Ok(ArticleAsset {
             id: uuid::Uuid::new_v4().to_string(),
             url: "".to_string(),
-            title: if state.title.is_empty() {
+            title: if asset.title.is_empty() {
                 "Article".to_string()
             } else {
-                state.title
+                asset.title
             },
-            content: state.text_content,
+            content: asset.text_content,
             author: None,
             published_date: None,
             word_count,
@@ -155,9 +154,9 @@ impl SaveableAsset for ArticleAsset {
     }
 }
 
-impl From<ProtoArticleState> for ArticleAsset {
-    fn from(state: ProtoArticleState) -> Self {
-        Self::try_from(state).expect("Failed to convert ProtoArticleState to ArticleAsset")
+impl From<NativeArticleAsset> for ArticleAsset {
+    fn from(asset: NativeArticleAsset) -> Self {
+        Self::try_from(asset).expect("Failed to convert NativeArticleAsset to ArticleAsset")
     }
 }
 
