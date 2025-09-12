@@ -2,10 +2,12 @@
 
 use crate::error::ActivityResult;
 use crate::types::{ActivityAsset, ActivitySnapshot};
-use crate::{ArticleAsset, TwitterAsset, YoutubeAsset};
+use crate::{ActivityError, ArticleAsset, TwitterAsset, YoutubeAsset};
 use crate::{ArticleSnapshot, TwitterSnapshot, YoutubeSnapshot};
-use eur_native_messaging::{Channel, TauriIpcClient, create_grpc_ipc_client};
-use eur_proto::ipc::{self, StateRequest};
+use eur_native_messaging::{
+    Channel, NativeArticleAsset, NativeAsset, TauriIpcClient, create_grpc_ipc_client,
+};
+use eur_proto::ipc::{self, AssetRequest};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -96,45 +98,81 @@ impl BrowserStrategy {
         };
 
         let mut client_guard = client.lock().await;
-        let request = StateRequest {};
+        let request = AssetRequest {};
 
-        match client_guard.get_state(request).await {
+        match client_guard.get_assets(request).await {
             Ok(response) => {
-                debug!("Received state response from browser extension");
-                let mut assets = Vec::new();
+                info!("Received assets response from browser extension");
+                let mut assets: Vec<ActivityAsset> = Vec::new();
 
-                if let Some(state) = response.into_inner().state {
-                    match state {
-                        ipc::state_response::State::Youtube(youtube_state) => {
-                            match YoutubeAsset::try_from(youtube_state) {
-                                Ok(asset) => assets.push(ActivityAsset::YoutubeAsset(asset)),
-                                Err(e) => warn!("Failed to create YouTube asset: {}", e),
-                            }
+                let resp = response.into_inner();
+
+                let native_asset = serde_json::from_slice::<NativeAsset>(&resp.content).map_err(
+                    |e| -> ActivityError {
+                        info!("Failed to deserialize article asset: {}", e);
+                        ActivityError::from(e)
+                    },
+                )?;
+
+                match native_asset {
+                    NativeAsset::NativeArticleAsset(asset) => match ArticleAsset::try_from(asset) {
+                        Ok(asset) => {
+                            info!("Created article asset from browser extension");
+                            assets.push(ActivityAsset::ArticleAsset(asset));
                         }
-                        ipc::state_response::State::Article(article_state) => {
-                            match ArticleAsset::try_from(article_state) {
-                                Ok(asset) => assets.push(ActivityAsset::ArticleAsset(asset)),
-                                Err(e) => warn!("Failed to create article asset: {}", e),
-                            }
-                        }
-                        ipc::state_response::State::Twitter(twitter_state) => {
-                            match TwitterAsset::try_from(twitter_state) {
-                                Ok(asset) => assets.push(ActivityAsset::TwitterAsset(asset)),
-                                Err(e) => warn!("Failed to create Twitter asset: {}", e),
-                            }
-                        }
-                        ipc::state_response::State::Pdf(_pdf_state) => {
-                            // PDF support could be added here in the future
-                            debug!("PDF state received but not yet supported in refactored system");
-                        }
+                        Err(e) => warn!("Failed to create article asset: {}", e),
+                    },
+                    _ => {
+                        warn!("Unknown asset kind: {:?}", native_asset);
                     }
                 }
+
+                // match resp.kind.as_str() {
+                //     "YOUTUBE_ASSET" => {}
+                //     "NativeArticleAsset" => {
+                //         ArticleAsset::try_from(native_asset);
+                //         info!("Received article asset from browser extension");
+                //         info!("Article asset: {:#?}", asset);
+                //         match ArticleAsset::try_from(asset) {
+                //             Ok(asset) => {
+                //                 info!("Created article asset from browser extension");
+                //                 assets.push(ActivityAsset::ArticleAsset(asset));
+                //             }
+                //             Err(e) => warn!("Failed to create article asset: {}", e),
+                //         }
+                //     }
+                //     "TWITTER_ASSET" => {}
+                //     _ => {
+                //         warn!("Unknown asset kind: {}", resp.kind);
+                //     } // ipc::assets_response::State::Youtube(youtube_state) => {
+                //       //     match YoutubeAsset::try_from(youtube_state) {
+                //       //         Ok(asset) => assets.push(ActivityAsset::YoutubeAsset(asset)),
+                //       //         Err(e) => warn!("Failed to create YouTube asset: {}", e),
+                //       //     }
+                //       // }
+                //       // ipc::state_response::State::Article(article_state) => {
+                //       //     match ArticleAsset::try_from(article_state) {
+                //       //         Ok(asset) => assets.push(ActivityAsset::ArticleAsset(asset)),
+                //       //         Err(e) => warn!("Failed to create article asset: {}", e),
+                //       //     }
+                //       // }
+                //       // ipc::state_response::State::Twitter(twitter_state) => {
+                //       //     match TwitterAsset::try_from(twitter_state) {
+                //       //         Ok(asset) => assets.push(ActivityAsset::TwitterAsset(asset)),
+                //       //         Err(e) => warn!("Failed to create Twitter asset: {}", e),
+                //       //     }
+                //       // }
+                //       // ipc::state_response::State::Pdf(_pdf_state) => {
+                //       //     // PDF support could be added here in the future
+                //       //     debug!("PDF state received but not yet supported in refactored system");
+                //       // }
+                // }
 
                 info!("Retrieved {} assets from browser", assets.len());
                 Ok(assets)
             }
             Err(e) => {
-                warn!("Failed to retrieve browser state: {}", e);
+                warn!("Failed to retrieve assets from browser: {}", e);
                 Ok(vec![])
             }
         }
@@ -142,50 +180,51 @@ impl BrowserStrategy {
 
     /// Retrieve snapshots from the browser
     pub async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        debug!("Retrieving snapshots for browser strategy");
+        Ok(vec![])
+        // debug!("Retrieving snapshots for browser strategy");
 
-        let Some(client) = &self.client else {
-            warn!("No IPC client available for browser strategy");
-            return Ok(vec![]);
-        };
+        // let Some(client) = &self.client else {
+        //     warn!("No IPC client available for browser strategy");
+        //     return Ok(vec![]);
+        // };
 
-        let mut client_guard = client.lock().await;
-        let request = StateRequest {};
+        // let mut client_guard = client.lock().await;
+        // let request = StateRequest {};
 
-        match client_guard.get_snapshot(request).await {
-            Ok(response) => {
-                debug!("Received snapshot response from browser extension");
-                let mut snapshots = Vec::new();
+        // match client_guard.get_snapshots(request).await {
+        //     Ok(response) => {
+        //         debug!("Received snapshot response from browser extension");
+        //         let mut snapshots = Vec::new();
 
-                if let Some(snapshot) = response.into_inner().snapshot {
-                    match snapshot {
-                        ipc::snapshot_response::Snapshot::Youtube(youtube_snapshot) => {
-                            match YoutubeSnapshot::try_from(youtube_snapshot) {
-                                Ok(snapshot) => {
-                                    snapshots.push(ActivitySnapshot::YoutubeSnapshot(snapshot))
-                                }
-                                Err(e) => warn!("Failed to create YouTube snapshot: {}", e),
-                            }
-                        }
-                        ipc::snapshot_response::Snapshot::Article(article_snapshot) => {
-                            let snapshot = ArticleSnapshot::from(article_snapshot);
-                            snapshots.push(ActivitySnapshot::ArticleSnapshot(snapshot));
-                        }
-                        ipc::snapshot_response::Snapshot::Twitter(twitter_snapshot) => {
-                            let snapshot = TwitterSnapshot::from(twitter_snapshot);
-                            snapshots.push(ActivitySnapshot::TwitterSnapshot(snapshot));
-                        }
-                    }
-                }
+        //         if let Some(snapshot) = response.into_inner().snapshot {
+        //             match snapshot {
+        //                 ipc::snapshot_response::Snapshot::Youtube(youtube_snapshot) => {
+        //                     match YoutubeSnapshot::try_from(youtube_snapshot) {
+        //                         Ok(snapshot) => {
+        //                             snapshots.push(ActivitySnapshot::YoutubeSnapshot(snapshot))
+        //                         }
+        //                         Err(e) => warn!("Failed to create YouTube snapshot: {}", e),
+        //                     }
+        //                 }
+        //                 ipc::snapshot_response::Snapshot::Article(article_snapshot) => {
+        //                     let snapshot = ArticleSnapshot::from(article_snapshot);
+        //                     snapshots.push(ActivitySnapshot::ArticleSnapshot(snapshot));
+        //                 }
+        //                 ipc::snapshot_response::Snapshot::Twitter(twitter_snapshot) => {
+        //                     let snapshot = TwitterSnapshot::from(twitter_snapshot);
+        //                     snapshots.push(ActivitySnapshot::TwitterSnapshot(snapshot));
+        //                 }
+        //             }
+        //         }
 
-                info!("Retrieved {} snapshots from browser", snapshots.len());
-                Ok(snapshots)
-            }
-            Err(e) => {
-                warn!("Failed to retrieve browser snapshots: {}", e);
-                Ok(vec![])
-            }
-        }
+        //         info!("Retrieved {} snapshots from browser", snapshots.len());
+        //         Ok(snapshots)
+        //     }
+        //     Err(e) => {
+        //         warn!("Failed to retrieve browser snapshots: {}", e);
+        //         Ok(vec![])
+        //     }
+        // }
     }
 
     /// Gather current state as string

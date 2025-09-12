@@ -4,6 +4,7 @@ import {
 	ProtoNativeArticleAssetSchema,
 	ProtoNativeArticleSnapshotSchema,
 } from '@eurora/shared/proto/native_messaging_pb.js';
+import { NativeArticleAsset } from '@eurora/chrome-ext-shared/bindings';
 import { create } from '@eurora/shared/util/grpc';
 import { Readability } from '@mozilla/readability';
 
@@ -60,21 +61,19 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 
 			console.log('Parsed article:', article);
 
-			// Prepare report data
-			const reportData = create(ProtoNativeArticleAssetSchema, {
-				type: 'ARTICLE_ASSET',
+			const reportData: NativeArticleAsset = {
 				content: article?.content || '',
-				textContent: article?.textContent || '',
+				text_content: article?.textContent || '',
 				title: article?.title || document.title,
-				siteName: article?.siteName || '',
+				site_name: article?.siteName || '',
 				language: article?.lang || '',
 				excerpt: article?.excerpt || '',
 				length: article?.length || 0,
-				selectedText: window.getSelection()?.toString() || '',
-			});
+				selected_text: window.getSelection()?.toString() || '',
+			};
 
 			// Send response back to background script
-			response(reportData);
+			response({ kind: 'NativeArticleAsset', data: reportData });
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			const contextualError = `Failed to generate article assets for ${window.location.href}: ${errorMessage}`;
