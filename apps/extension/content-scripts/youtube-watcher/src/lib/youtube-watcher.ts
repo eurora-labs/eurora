@@ -7,6 +7,7 @@ import {
 	ProtoNativeYoutubeStateSchema,
 	ProtoNativeYoutubeSnapshotSchema,
 } from '@eurora/shared/proto/native_messaging_pb.js';
+import { NativeYoutubeAsset } from '@eurora/chrome-ext-shared/bindings';
 
 interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
@@ -100,21 +101,28 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		try {
 			// Get current timestamp
 			const currentTime = this.getCurrentVideoTime();
-			const reportData = create(ProtoNativeYoutubeStateSchema, {
-				type: 'YOUTUBE_STATE',
+			const reportData: NativeYoutubeAsset = {
 				url: window.location.href,
 				title: document.title,
 				transcript: this.params.videoTranscript
 					? JSON.stringify(this.params.videoTranscript)
 					: '',
-				currentTime: Math.round(currentTime),
-			});
+				current_time: Math.round(currentTime),
+			};
+			// const reportData = create(ProtoNativeYoutubeStateSchema, {
+			// 	type: 'YOUTUBE_STATE',
+			// 	url: window.location.href,
+			// 	title: document.title,
+			// 	transcript: this.params.videoTranscript
+			// 		? JSON.stringify(this.params.videoTranscript)
+			// 		: '',
+			// 	currentTime: Math.round(currentTime),
+			// });
 			if (reportData.transcript === '') {
 				this.ensureTranscript()
 					.then((transcript) => {
 						reportData.transcript = JSON.stringify(transcript);
-						console.log(reportData);
-						response(reportData);
+						response({ kind: 'YOUTUBE_ASSET', ...reportData });
 					})
 					.catch((error) => {
 						response({
@@ -124,8 +132,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 					});
 				return true;
 			} else {
-				response(reportData);
-				console.log(reportData);
+				response({ kind: 'YOUTUBE_ASSET', ...reportData });
 				return true;
 			}
 		} catch (error) {
