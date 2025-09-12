@@ -6,12 +6,6 @@
 
 // Include the generated code
 pub mod generated {
-    // Re-export all generated modules
-    pub mod questions_service {
-        tonic::include_proto!("questions_service");
-        pub use super::*;
-    }
-
     pub mod shared {
         tonic::include_proto!("shared");
         pub use super::*;

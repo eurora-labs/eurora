@@ -4,23 +4,23 @@ import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurp
 type TAURI_CHANNEL<T> = (response: T) => void
 
 
-export type AppSettings = {
+export type AppSettings = { 
 /**
  * General settings
  */
-general: GeneralSettings;
+general: GeneralSettings; 
 /**
  * Telemetry settings
  */
-telemetry: TelemetrySettings;
+telemetry: TelemetrySettings; 
 /**
  * Hover settings
  */
-hover: HoverSettings;
+hover: HoverSettings; 
 /**
  * Launcher settings
  */
-launcher: LauncherSettings;
+launcher: LauncherSettings; 
 /**
  * Backend provider settings
  */
@@ -33,15 +33,15 @@ export type BackendType = "None" | "Ollama" | "Eurora" | "OpenAI" | "Anthropic"
 /**
  * A part of multimodal message content.
  */
-export type ContentPart =
+export type ContentPart = 
 /**
  * Text content
  */
-{ type: "text"; text: string } |
+{ type: "text"; text: string } | 
 /**
  * Image content
  */
-{ type: "image"; image_source: ImageSource; detail: string | null } |
+{ type: "image"; image_source: ImageSource; detail: string | null } | 
 /**
  * Audio content
  */
@@ -57,17 +57,17 @@ export type Conversation = { id: string; title: string | null; created_at: strin
 /**
  * A function call within a tool call.
  */
-export type FunctionCall = {
+export type FunctionCall = { 
 /**
  * Name of the function to call
  */
-name: string;
+name: string; 
 /**
  * Arguments to pass to the function (JSON string)
  */
 arguments: string }
 
-export type GeneralSettings = {
+export type GeneralSettings = { 
 /**
  * Whether to start the app on autostart
  */
@@ -75,13 +75,13 @@ autostart: boolean }
 
 export type Hotkey = { modifiers: string[]; key: string }
 
-export type HoverSettings = {
+export type HoverSettings = { 
 /**
  * Whether hover window is enabled
  */
 enabled: boolean }
 
-export type ImageSource =
+export type ImageSource = 
 /**
  * The URL or base64-encoded image data
  */
@@ -94,11 +94,11 @@ export type LoginToken = { code_challenge: string; expires_in: bigint; url: stri
 /**
  * A message in a conversation.
  */
-export type Message = {
+export type Message = { 
 /**
  * The role of the message sender
  */
-role: Role;
+role: Role; 
 /**
  * The content of the message
  */
@@ -107,15 +107,15 @@ content: MessageContent }
 /**
  * Content of a message, which can be text or multimodal.
  */
-export type MessageContent =
+export type MessageContent = 
 /**
  * Simple text content
  */
-string |
+string | 
 /**
  * Multimodal content with text and other media
  */
-ContentPart[] |
+ContentPart[] | 
 /**
  * Tool-related content (calls and responses)
  */
@@ -128,37 +128,37 @@ export type ResponseChunk = { chunk: string }
 /**
  * The role of a message sender.
  */
-export type Role =
+export type Role = 
 /**
  * Message from the user
  */
-"user" |
+"user" | 
 /**
  * Message from the AI assistant
  */
-"assistant" |
+"assistant" | 
 /**
  * System message (instructions, context)
  */
-"system" |
+"system" | 
 /**
  * Message from a tool/function call
  */
 "tool"
 
-export type TelemetrySettings = {
+export type TelemetrySettings = { 
 /**
  * Anonymous metrics
  */
-anonymousMetrics: boolean;
+anonymousMetrics: boolean; 
 /**
  * Anonymous error reporting
  */
-anonymousErrors: boolean;
+anonymousErrors: boolean; 
 /**
  * Non-anonymous metrics
  */
-nonAnonymousMetrics: boolean;
+nonAnonymousMetrics: boolean; 
 /**
  * Distinct ID, if non-anonymous metrics are enabled
  */
@@ -167,15 +167,15 @@ distinctId: string | null }
 /**
  * A tool/function call made by the AI.
  */
-export type ToolCall = {
+export type ToolCall = { 
 /**
  * Unique identifier for this tool call
  */
-id: string;
+id: string; 
 /**
  * The type of tool call (usually "function")
  */
-type: string;
+type: string; 
 /**
  * The function being called
  */
@@ -184,57 +184,57 @@ function: FunctionCall }
 /**
  * Tool-related message content.
  */
-export type ToolContent = {
+export type ToolContent = { 
 /**
  * Tool calls made by the assistant
  */
-tool_calls: ToolCall[] | null;
+tool_calls: ToolCall[] | null; 
 /**
  * Tool call ID if this is a tool response
  */
-tool_call_id: string | null;
+tool_call_id: string | null; 
 /**
  * Optional text content alongside tool data
  */
 text: string | null }
 
 const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["conversation","channel","query"],"switch_conversation":["conversation_id"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'personal_db.conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"]}', 'personal_db.message':'{"get":["conversation_id","limit","offset"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_hover_settings":[],"get_launcher_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_hover_settings":["hover_settings"],"set_launcher_settings":["launcher_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"hide_hover_window":[],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"],"show_hover_window":[]}' }
-export type Router = { "auth": {get_login_token: () => Promise<LoginToken>,
+export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
-"chat": {current_conversation_changed: (conversation: Conversation) => Promise<void>,
-send_query: (conversation: Conversation, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>,
+"chat": {current_conversation_changed: (conversation: Conversation) => Promise<void>, 
+send_query: (conversation: Conversation, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>, 
 switch_conversation: (conversationId: string) => Promise<Conversation>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
-"personal_db.conversation": {create: () => Promise<Conversation>,
-get_messages: (conversationId: string) => Promise<Message[]>,
-list: (limit: number, offset: number) => Promise<Conversation[]>,
+"personal_db.conversation": {create: () => Promise<Conversation>, 
+get_messages: (conversationId: string) => Promise<Message[]>, 
+list: (limit: number, offset: number) => Promise<Conversation[]>, 
 new_conversation_added: (conversation: Conversation) => Promise<void>},
 "personal_db.message": {get: (conversationId: string, limit: number | null, offset: number | null) => Promise<Message[]>},
-"prompt": {disconnect: () => Promise<null>,
-get_service_name: () => Promise<string>,
-prompt_service_change: (serviceName: string | null) => Promise<void>,
-switch_to_ollama: (baseUrl: string, model: string) => Promise<null>,
+"prompt": {disconnect: () => Promise<null>, 
+get_service_name: () => Promise<string>, 
+prompt_service_change: (serviceName: string | null) => Promise<void>, 
+switch_to_ollama: (baseUrl: string, model: string) => Promise<null>, 
 switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<null>},
-"settings": {get_all_settings: () => Promise<AppSettings>,
-get_general_settings: () => Promise<GeneralSettings>,
-get_hover_settings: () => Promise<HoverSettings>,
-get_launcher_settings: () => Promise<LauncherSettings>,
-get_telemetry_settings: () => Promise<TelemetrySettings>,
-set_general_settings: (generalSettings: GeneralSettings) => Promise<null>,
-set_hover_settings: (hoverSettings: HoverSettings) => Promise<null>,
+"settings": {get_all_settings: () => Promise<AppSettings>, 
+get_general_settings: () => Promise<GeneralSettings>, 
+get_hover_settings: () => Promise<HoverSettings>, 
+get_launcher_settings: () => Promise<LauncherSettings>, 
+get_telemetry_settings: () => Promise<TelemetrySettings>, 
+set_general_settings: (generalSettings: GeneralSettings) => Promise<null>, 
+set_hover_settings: (hoverSettings: HoverSettings) => Promise<null>, 
 set_launcher_settings: (launcherSettings: LauncherSettings) => Promise<null>},
-"system": {check_grpc_server_connection: (serverAddress: string | null) => Promise<string>,
-list_activities: () => Promise<ContextChip[]>,
+"system": {check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
+list_activities: () => Promise<ContextChip[]>, 
 send_key_to_launcher: (key: string) => Promise<null>},
-"third_party": {check_api_key_exists: () => Promise<boolean>,
+"third_party": {check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>},
 "user": {set_launcher_hotkey: (key: string, modifiers: string[]) => Promise<null>},
-"window": {get_scale_factor: (height: number) => Promise<number>,
-hide_hover_window: () => Promise<null>,
-open_launcher_window: () => Promise<null>,
-open_main_window: () => Promise<null>,
-resize_launcher_window: (height: number, scaleFactor: number) => Promise<null>,
+"window": {get_scale_factor: (height: number) => Promise<number>, 
+hide_hover_window: () => Promise<null>, 
+open_launcher_window: () => Promise<null>, 
+open_main_window: () => Promise<null>, 
+resize_launcher_window: (height: number, scaleFactor: number) => Promise<null>, 
 show_hover_window: () => Promise<null>} };
 
 

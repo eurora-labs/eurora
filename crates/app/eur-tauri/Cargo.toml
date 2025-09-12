@@ -56,7 +56,6 @@ url = "2.5.4"
 dirs = "6.0.0"
 eur-proto = { workspace = true }
 eur-timeline = { workspace = true }
-eur-client-questions = { workspace = true }
 eur-client-grpc = { workspace = true }
 eur-personal-db = { workspace = true }
 eur-native-messaging = { workspace = true }
