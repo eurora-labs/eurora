@@ -117,56 +117,23 @@ impl BrowserStrategy {
                 match native_asset {
                     NativeAsset::NativeArticleAsset(asset) => match ArticleAsset::try_from(asset) {
                         Ok(asset) => {
-                            info!("Created article asset from browser extension");
                             assets.push(ActivityAsset::ArticleAsset(asset));
                         }
                         Err(e) => warn!("Failed to create article asset: {}", e),
                     },
-                    _ => {
-                        warn!("Unknown asset kind: {:?}", native_asset);
-                    }
+                    NativeAsset::NativeYoutubeAsset(asset) => match YoutubeAsset::try_from(asset) {
+                        Ok(asset) => {
+                            assets.push(ActivityAsset::YoutubeAsset(asset));
+                        }
+                        Err(e) => warn!("Failed to create youtube asset: {}", e),
+                    },
+                    NativeAsset::NativeTwitterAsset(asset) => match TwitterAsset::try_from(asset) {
+                        Ok(asset) => {
+                            assets.push(ActivityAsset::TwitterAsset(asset));
+                        }
+                        Err(e) => warn!("Failed to create twitter asset: {}", e),
+                    },
                 }
-
-                // match resp.kind.as_str() {
-                //     "YOUTUBE_ASSET" => {}
-                //     "NativeArticleAsset" => {
-                //         ArticleAsset::try_from(native_asset);
-                //         info!("Received article asset from browser extension");
-                //         info!("Article asset: {:#?}", asset);
-                //         match ArticleAsset::try_from(asset) {
-                //             Ok(asset) => {
-                //                 info!("Created article asset from browser extension");
-                //                 assets.push(ActivityAsset::ArticleAsset(asset));
-                //             }
-                //             Err(e) => warn!("Failed to create article asset: {}", e),
-                //         }
-                //     }
-                //     "TWITTER_ASSET" => {}
-                //     _ => {
-                //         warn!("Unknown asset kind: {}", resp.kind);
-                //     } // ipc::assets_response::State::Youtube(youtube_state) => {
-                //       //     match YoutubeAsset::try_from(youtube_state) {
-                //       //         Ok(asset) => assets.push(ActivityAsset::YoutubeAsset(asset)),
-                //       //         Err(e) => warn!("Failed to create YouTube asset: {}", e),
-                //       //     }
-                //       // }
-                //       // ipc::state_response::State::Article(article_state) => {
-                //       //     match ArticleAsset::try_from(article_state) {
-                //       //         Ok(asset) => assets.push(ActivityAsset::ArticleAsset(asset)),
-                //       //         Err(e) => warn!("Failed to create article asset: {}", e),
-                //       //     }
-                //       // }
-                //       // ipc::state_response::State::Twitter(twitter_state) => {
-                //       //     match TwitterAsset::try_from(twitter_state) {
-                //       //         Ok(asset) => assets.push(ActivityAsset::TwitterAsset(asset)),
-                //       //         Err(e) => warn!("Failed to create Twitter asset: {}", e),
-                //       //     }
-                //       // }
-                //       // ipc::state_response::State::Pdf(_pdf_state) => {
-                //       //     // PDF support could be added here in the future
-                //       //     debug!("PDF state received but not yet supported in refactored system");
-                //       // }
-                // }
 
                 info!("Retrieved {} assets from browser", assets.len());
                 Ok(assets)
