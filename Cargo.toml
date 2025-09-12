@@ -64,6 +64,7 @@ async-trait = "0.1.89"
 async_from = "0.2.0"
 humantime-serde = "1.1.1"
 specta = { version = "=2.0.0-rc.22"}
+enum_dispatch = "0.3.13"
 
 eur-eurora-provider = { path = "crates/common/eur-eurora-provider" }
 eur-native-messaging = { path = "crates/app/eur-native-messaging" }
