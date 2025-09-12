@@ -2936,19 +2936,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-client-questions"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "eur-client-grpc",
- "eur-proto",
- "prost",
- "tonic",
- "tonic-prost-build",
- "tracing",
-]
-
-[[package]]
 name = "eur-encrypt"
 version = "0.0.0"
 dependencies = [
@@ -3263,7 +3250,6 @@ dependencies = [
  "dotenv",
  "eur-activity",
  "eur-client-grpc",
- "eur-client-questions",
  "eur-encrypt",
  "eur-eurora-provider",
  "eur-native-messaging",
