@@ -3044,6 +3044,7 @@ dependencies = [
  "base64 0.22.1",
  "ctrlc",
  "dirs 6.0.0",
+ "enum_dispatch",
  "eur-proto",
  "futures",
  "h2 0.4.12",
