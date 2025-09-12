@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 eur-proto = {workspace = true}
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
@@ -23,7 +23,8 @@ sentry = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
-specta = { workspace = true, features = ["derive", "function"] }
+specta = { workspace = true, features = ["derive", "function", "export", "serde", "serde_json"] }
+enum_dispatch = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
