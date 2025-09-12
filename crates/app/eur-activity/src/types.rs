@@ -10,6 +10,7 @@ use crate::storage::{ActivityStorage, SaveableAsset, SavedAssetInfo};
 
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
+use eur_native_messaging::NativeAsset;
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -54,6 +55,7 @@ pub enum ActivityAsset {
 pub trait AssetFunctionality {
     fn get_name(&self) -> &str;
     fn get_icon(&self) -> Option<&str>;
+    // fn from_native(asset: NativeAsset) -> Self;
     fn construct_message(&self) -> Message;
     fn get_context_chip(&self) -> Option<ContextChip>;
 }
