@@ -107,33 +107,25 @@ impl BrowserStrategy {
 
                 let resp = response.into_inner();
 
-                let native_asset = serde_json::from_slice::<NativeAsset>(&resp.content).map_err(
-                    |e| -> ActivityError {
-                        info!("Failed to deserialize article asset: {}", e);
-                        ActivityError::from(e)
-                    },
-                )?;
+                let native_asset = serde_json::from_slice::<NativeAsset>(&resp.content)
+                    .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
-                match native_asset {
+                let asset = match native_asset {
                     NativeAsset::NativeArticleAsset(asset) => match ArticleAsset::try_from(asset) {
-                        Ok(asset) => {
-                            assets.push(ActivityAsset::ArticleAsset(asset));
-                        }
-                        Err(e) => warn!("Failed to create article asset: {}", e),
+                        Ok(asset) => Ok(ActivityAsset::ArticleAsset(asset)),
+                        Err(e) => Err(ActivityError::from(e)),
                     },
                     NativeAsset::NativeYoutubeAsset(asset) => match YoutubeAsset::try_from(asset) {
-                        Ok(asset) => {
-                            assets.push(ActivityAsset::YoutubeAsset(asset));
-                        }
-                        Err(e) => warn!("Failed to create youtube asset: {}", e),
+                        Ok(asset) => Ok(ActivityAsset::YoutubeAsset(asset)),
+                        Err(e) => Err(ActivityError::from(e)),
                     },
                     NativeAsset::NativeTwitterAsset(asset) => match TwitterAsset::try_from(asset) {
-                        Ok(asset) => {
-                            assets.push(ActivityAsset::TwitterAsset(asset));
-                        }
-                        Err(e) => warn!("Failed to create twitter asset: {}", e),
+                        Ok(asset) => Ok(ActivityAsset::TwitterAsset(asset)),
+                        Err(e) => Err(ActivityError::from(e)),
                     },
-                }
+                }?;
+
+                assets.push(asset);
 
                 info!("Retrieved {} assets from browser", assets.len());
                 Ok(assets)

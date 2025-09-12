@@ -5,7 +5,7 @@ use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
 use crate::types::{AssetFunctionality, ContextChip};
 use async_trait::async_trait;
-use eur_native_messaging::NativeArticleAsset;
+use eur_native_messaging::{NativeArticleAsset, NativeAsset};
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -132,6 +132,13 @@ impl AssetFunctionality for ArticleAsset {
             position: Some(0),
         })
     }
+
+    // fn from_native(asset: NativeAsset) -> Self {
+    //     match asset {
+    //         NativeAsset::Article(article) => Self::from(article),
+    //         _ => panic!("Invalid asset type"),
+    //     }
+    // }
 }
 
 #[async_trait]
