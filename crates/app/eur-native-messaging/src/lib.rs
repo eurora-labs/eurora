@@ -2,6 +2,8 @@ use anyhow::Result;
 pub use eur_proto::ipc::tauri_ipc_client::TauriIpcClient;
 pub use tonic::transport::Channel;
 
+mod types;
+
 pub mod asset_context;
 pub mod asset_converter;
 pub mod server;
