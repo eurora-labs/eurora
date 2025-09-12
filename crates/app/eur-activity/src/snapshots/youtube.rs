@@ -2,7 +2,8 @@
 
 use crate::error::ActivityError;
 use crate::types::SnapshotFunctionality;
-use eur_proto::{ipc::ProtoYoutubeSnapshot, shared::ProtoImageFormat};
+use eur_native_messaging::types::NativeYoutubeSnapshot;
+use eur_proto::shared::ProtoImageFormat;
 use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
 use image::DynamicImage;
 use serde::{Deserialize, Serialize};
@@ -81,12 +82,13 @@ impl YoutubeSnapshot {
     }
 
     /// Try to create from protocol buffer snapshot
-    pub fn try_from(snapshot: ProtoYoutubeSnapshot) -> Result<Self, ActivityError> {
-        let video_frame_image = if let Some(proto_image) = snapshot.video_frame {
-            Some(load_image_from_proto(proto_image)?)
-        } else {
-            None
-        };
+    pub fn try_from(snapshot: NativeYoutubeSnapshot) -> Result<Self, ActivityError> {
+        // let video_frame_image = if let Some(proto_image) = snapshot.video_frame {
+        //     Some(load_image_from_proto(proto_image)?)
+        // } else {
+        //     None
+        // };
+        let video_frame_image: Option<DynamicImage> = None;
 
         let now = chrono::Utc::now().timestamp() as u64;
 
@@ -214,9 +216,10 @@ impl SnapshotFunctionality for YoutubeSnapshot {
     }
 }
 
-impl From<ProtoYoutubeSnapshot> for YoutubeSnapshot {
-    fn from(snapshot: ProtoYoutubeSnapshot) -> Self {
-        Self::try_from(snapshot).expect("Failed to convert ProtoYoutubeSnapshot to YoutubeSnapshot")
+impl From<NativeYoutubeSnapshot> for YoutubeSnapshot {
+    fn from(snapshot: NativeYoutubeSnapshot) -> Self {
+        Self::try_from(snapshot)
+            .expect("Failed to convert NativeYoutubeSnapshot to YoutubeSnapshot")
     }
 }
 

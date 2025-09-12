@@ -11,8 +11,8 @@ async function connect() {
 	nativePort.onDisconnect.addListener(onDisconnectListener);
 }
 
-async function onMessageListener(message: any, sender: chrome.runtime.Port) {
-	switch (message.type) {
+async function onMessageListener(message: { command: string }, sender: chrome.runtime.Port) {
+	switch (message.command) {
 		case 'GENERATE_ASSETS':
 			handleGenerateReport()
 				.then((response) => {
@@ -36,7 +36,8 @@ async function onMessageListener(message: any, sender: chrome.runtime.Port) {
 				});
 			return true; // Indicates we'll call sendResponse asynchronously
 		default:
-			throw new Error(`Unknown message type: ${message.type}`);
+			console.log('Unknown message type:', message);
+			throw new Error(`Unknown message type: ${message.command}`);
 	}
 }
 
