@@ -227,12 +227,8 @@ impl SnapshotFunctionality for TwitterSnapshot {
 
 impl From<NativeTwitterSnapshot> for TwitterSnapshot {
     fn from(snapshot: NativeTwitterSnapshot) -> Self {
-        // let tweets: Vec<TwitterTweet> = snapshot
-        //     .tweets
-        //     .into_iter()
-        //     .map(TwitterTweet::from)
-        //     .collect();
-        let tweets = Vec::new();
+        let tweets = serde_json::from_str::<Vec<TwitterTweet>>(snapshot.tweets.as_str())
+            .unwrap_or_else(|_| Vec::new());
 
         let now = chrono::Utc::now().timestamp() as u64;
         Self {
