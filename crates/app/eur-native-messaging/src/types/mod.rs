@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 use strum_macros::AsRefStr;
 
 mod assets;
+mod shared;
 mod snapshots;
 
 pub use assets::*;
+pub use shared::*;
 pub use snapshots::*;
 
 #[allow(clippy::enum_variant_names)]

@@ -2,13 +2,12 @@ import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { YoutubeChromeMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from './transcript/index.js';
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
-import { create } from '@eurora/shared/util/grpc';
-import { ProtoNativeYoutubeSnapshotSchema } from '@eurora/shared/proto/native_messaging_pb.js';
-import { NativeYoutubeAsset } from '@eurora/chrome-ext-shared/bindings';
+import { NativeYoutubeAsset, NativeYoutubeSnapshot } from '@eurora/chrome-ext-shared/bindings';
 
 interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
 }
+
 class YoutubeWatcher extends Watcher<WatcherParams> {
 	private youtubeTranscriptApi: YouTubeTranscriptApi;
 	constructor(params: WatcherParams) {
@@ -119,7 +118,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				this.ensureTranscript()
 					.then((transcript) => {
 						reportData.transcript = JSON.stringify(transcript);
-						response({ kind: 'YOUTUBE_ASSET', ...reportData });
+						response({ kind: 'NativeYoutubeAsset', ...reportData });
 					})
 					.catch((error) => {
 						response({
@@ -164,16 +163,15 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		const currentTime = this.getCurrentVideoTime();
 		const videoFrame = this.getCurrentVideoFrame();
 
-		const reportData = create(ProtoNativeYoutubeSnapshotSchema, {
-			type: 'YOUTUBE_SNAPSHOT',
-			currentTime: Math.round(currentTime),
-			videoFrameBase64: videoFrame.dataBase64,
-			videoFrameWidth: videoFrame.width,
-			videoFrameHeight: videoFrame.height,
-			videoFrameFormat: videoFrame.format,
-		});
+		const reportData: NativeYoutubeSnapshot = {
+			current_time: Math.round(currentTime),
+			video_frame_base64: videoFrame.dataBase64,
+			video_frame_width: videoFrame.width,
+			video_frame_height: videoFrame.height,
+			// video_frame_format: videoFrame.format,
+		};
 
-		response(reportData);
+		response({ kind: 'NativeYoutubeSnapshot', ...reportData });
 		return true;
 	}
 
