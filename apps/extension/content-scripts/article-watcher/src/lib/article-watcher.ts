@@ -1,11 +1,6 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { ArticleChromeMessage, type ArticleMessageType, type WatcherParams } from './types.js';
-import {
-	ProtoNativeArticleAssetSchema,
-	ProtoNativeArticleSnapshotSchema,
-} from '@eurora/shared/proto/native_messaging_pb.js';
-import { NativeArticleAsset } from '@eurora/chrome-ext-shared/bindings';
-import { create } from '@eurora/shared/util/grpc';
+import { NativeArticleAsset, NativeArticleSnapshot } from '@eurora/chrome-ext-shared/bindings';
 import { Readability } from '@mozilla/readability';
 
 class ArticleWatcher extends Watcher<WatcherParams> {
@@ -100,13 +95,11 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 		sender: chrome.runtime.MessageSender,
 		response: (response?: any) => void,
 	) {
-		console.log('Generating article snapshot');
-		// get what the user has highlighted
 		const selectedText = window.getSelection()?.toString() || '';
-		const snapshot = create(ProtoNativeArticleSnapshotSchema, {
-			type: 'ARTICLE_SNAPSHOT',
-			highlightedText: selectedText,
-		});
+		const snapshot: NativeArticleSnapshot = {
+			highlighted_text: selectedText,
+		};
+
 		response(snapshot);
 		return true;
 	}
