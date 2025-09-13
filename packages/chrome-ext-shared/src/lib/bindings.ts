@@ -6,7 +6,7 @@ export type NativeArticleSnapshot = { highlighted_text: string | null }
 
 export type NativeTwitterAsset = { url: string; title: string; tweets: NativeTwitterTweet[]; timestamp: string }
 
-export type NativeTwitterSnapshot = { tweets: string; timestamp: string }
+export type NativeTwitterSnapshot = { tweets: NativeTwitterTweet[]; timestamp: string }
 
 export type NativeTwitterTweet = { text: string; timestamp: string | null; author: string | null }
 
