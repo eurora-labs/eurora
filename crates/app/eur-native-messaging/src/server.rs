@@ -5,29 +5,29 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use eur_proto::ipc::{AssetRequest, AssetResponse};
+use eur_proto::ipc::{MessageRequest, MessageResponse};
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::info;
 
-use crate::types::NativeAsset;
+use crate::types::NativeMessage;
 
 type IpcResult<T> = Result<Response<T>, Status>;
-type ResponseStream = Pin<Box<dyn Stream<Item = Result<AssetResponse, Status>> + Send>>;
+type ResponseStream = Pin<Box<dyn Stream<Item = Result<MessageResponse, Status>> + Send>>;
 
 // Message type for native messaging
 #[derive(Clone, Debug)]
-pub struct NativeMessage {
+pub struct NativeCommand {
     pub command: String,
 }
 
 // Request type for internal communication
 #[derive(Debug)]
 struct NativeMessageRequest {
-    message: NativeMessage,
-    response_sender: oneshot::Sender<anyhow::Result<NativeAsset>>,
+    message: NativeCommand,
+    response_sender: oneshot::Sender<anyhow::Result<NativeMessage>>,
 }
 
 #[derive(Clone)]
@@ -36,9 +36,9 @@ pub struct TauriIpcServer {
 }
 
 impl TauriIpcServer {
-    pub fn new() -> (Self, mpsc::Sender<NativeMessage>) {
+    pub fn new() -> (Self, mpsc::Sender<NativeCommand>) {
         let (tx, rx) = mpsc::channel::<NativeMessageRequest>(32);
-        let (native_tx, native_rx) = mpsc::channel::<NativeMessage>(32);
+        let (native_tx, native_rx) = mpsc::channel::<NativeCommand>(32);
 
         // Spawn a task to handle the stdio communication
         tokio::spawn(Self::handle_stdio_task(rx, native_rx));
@@ -48,7 +48,7 @@ impl TauriIpcServer {
 
     async fn handle_stdio_task(
         mut request_rx: mpsc::Receiver<NativeMessageRequest>,
-        mut native_rx: mpsc::Receiver<NativeMessage>,
+        mut native_rx: mpsc::Receiver<NativeCommand>,
     ) {
         let stdin = io::stdin();
         let stdout = io::stdout();
@@ -78,9 +78,9 @@ impl TauriIpcServer {
                         let response = read_message(&*stdin_guard)
                             .map_err(|e| anyhow!("Read error: {}", e))?;
 
-                        // Parse the response as NativeAsset
-                        let native_asset: NativeAsset = serde_json::from_value(response)
-                            .map_err(|e| anyhow!("Failed to parse response as NativeAsset: {}", e))?;
+                        // Parse the response as NativeMessage
+                        let native_asset: NativeMessage = serde_json::from_value(response)
+                            .map_err(|e| anyhow!("Failed to parse response as NativeMessage: {}", e))?;
 
                         Ok(native_asset)
                     }.await;
@@ -102,8 +102,8 @@ impl TauriIpcServer {
         Ok(())
     }
 
-    async fn send_native_message(&self, command: &str) -> Result<NativeAsset> {
-        let message = NativeMessage {
+    async fn send_native_message(&self, command: &str) -> Result<NativeMessage> {
+        let message = NativeCommand {
             command: command.to_string(),
         };
 
@@ -122,20 +122,15 @@ impl TauriIpcServer {
             .map_err(|_| anyhow!("Failed to receive response"))?
     }
 
-    fn native_asset_to_response(&self, asset: NativeAsset) -> Result<AssetResponse> {
-        // Serialize the NativeAsset to bytes
+    fn native_message_to_response(&self, asset: NativeMessage) -> Result<MessageResponse> {
+        // Serialize the NativeMessage to bytes
         let content = serde_json::to_vec(&asset)
-            .map_err(|e| anyhow!("Failed to serialize NativeAsset: {}", e))?;
+            .map_err(|e| anyhow!("Failed to serialize NativeMessage: {}", e))?;
 
         // Get the kind from the enum variant
-        let kind = match asset {
-            NativeAsset::NativeYoutubeAsset(_) => "NativeYoutubeAsset",
-            NativeAsset::NativeArticleAsset(_) => "NativeArticleAsset",
-            NativeAsset::NativeTwitterAsset(_) => "NativeTwitterAsset",
-        }
-        .to_string();
+        let kind = asset.as_ref().to_owned();
 
-        Ok(AssetResponse { kind, content })
+        Ok(MessageResponse { kind, content })
     }
 }
 
@@ -143,11 +138,11 @@ impl TauriIpcServer {
 impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
     type GetAssetsStreamingStream = ResponseStream;
 
-    async fn get_assets(&self, _req: Request<AssetRequest>) -> IpcResult<AssetResponse> {
+    async fn get_assets(&self, _req: Request<MessageRequest>) -> IpcResult<MessageResponse> {
         info!("Received get_assets request");
 
         match self.send_native_message("GENERATE_ASSETS").await {
-            Ok(native_asset) => match self.native_asset_to_response(native_asset) {
+            Ok(native_asset) => match self.native_message_to_response(native_asset) {
                 Ok(response) => Ok(Response::new(response)),
                 Err(e) => {
                     info!("Error converting asset to response: {}", e);
@@ -161,11 +156,11 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         }
     }
 
-    async fn get_snapshots(&self, _req: Request<AssetRequest>) -> IpcResult<AssetResponse> {
+    async fn get_snapshots(&self, _req: Request<MessageRequest>) -> IpcResult<MessageResponse> {
         info!("Received get_snapshots request");
 
         match self.send_native_message("GENERATE_SNAPSHOTS").await {
-            Ok(native_asset) => match self.native_asset_to_response(native_asset) {
+            Ok(native_asset) => match self.native_message_to_response(native_asset) {
                 Ok(response) => Ok(Response::new(response)),
                 Err(e) => {
                     info!("Error converting asset to response: {}", e);
@@ -181,10 +176,10 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
 
     async fn get_assets_streaming(
         &self,
-        req: Request<Streaming<AssetRequest>>,
+        req: Request<Streaming<MessageRequest>>,
     ) -> IpcResult<Self::GetAssetsStreamingStream> {
         let mut in_stream = req.into_inner();
-        let (tx, rx) = mpsc::channel::<Result<AssetResponse, Status>>(128);
+        let (tx, rx) = mpsc::channel::<Result<MessageResponse, Status>>(128);
         let server_clone = self.clone();
 
         tokio::spawn(async move {
@@ -195,7 +190,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
 
                         match server_clone.send_native_message("GENERATE_ASSETS").await {
                             Ok(native_asset) => {
-                                match server_clone.native_asset_to_response(native_asset) {
+                                match server_clone.native_message_to_response(native_asset) {
                                     Ok(response) => {
                                         if tx.send(Ok(response)).await.is_err() {
                                             info!("Client disconnected");
