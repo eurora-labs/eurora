@@ -5,7 +5,7 @@ use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
 use crate::types::{AssetFunctionality, ContextChip};
 use async_trait::async_trait;
-use eur_native_messaging::{NativeArticleAsset, NativeAsset};
+use eur_native_messaging::{NativeArticleAsset, NativeMessage};
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -37,7 +37,8 @@ async function onMessageListener(message: { command: string }, sender: chrome.ru
 			return true; // Indicates we'll call sendResponse asynchronously
 		default:
 			console.log('Unknown message type:', message);
-			throw new Error(`Unknown message type: ${message.command}`);
+			sender.postMessage({ success: false, error: 'Unknown message type' });
+			return false;
 	}
 }
 
