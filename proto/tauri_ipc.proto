@@ -2,16 +2,14 @@ syntax = "proto3";
 package ipc;
 
 service TauriIPC {
-    rpc GetAssets(AssetRequest) returns (AssetResponse) {}
-    rpc GetAssetsStreaming(stream AssetRequest) returns (stream AssetResponse) {}
-    rpc GetSnapshots(AssetRequest) returns (AssetResponse) {}
+    rpc GetAssets(MessageRequest) returns (MessageResponse) {}
+    rpc GetAssetsStreaming(stream MessageRequest) returns (stream MessageResponse) {}
+    rpc GetSnapshots(MessageRequest) returns (MessageResponse) {}
 }
 
-message AssetRequest {}
+message MessageRequest {}
 
-message AssetResponse {
+message MessageResponse {
     string kind = 1;
     bytes content = 2;
 }
-
-
