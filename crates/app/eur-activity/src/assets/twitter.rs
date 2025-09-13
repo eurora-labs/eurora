@@ -5,7 +5,7 @@ use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
 use crate::types::{AssetFunctionality, ContextChip};
 use async_trait::async_trait;
-use eur_proto::ipc::{ProtoTweet, ProtoTwitterState};
+use eur_native_messaging::{NativeTwitterAsset, NativeTwitterTweet};
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -135,8 +135,8 @@ impl AssetFunctionality for TwitterAsset {
     }
 }
 
-impl From<ProtoTweet> for TwitterTweet {
-    fn from(tweet: ProtoTweet) -> Self {
+impl From<NativeTwitterTweet> for TwitterTweet {
+    fn from(tweet: NativeTwitterTweet) -> Self {
         TwitterTweet {
             text: tweet.text,
             timestamp: tweet.timestamp,
@@ -191,15 +191,15 @@ impl TwitterAsset {
     }
 
     /// Try to create from protocol buffer state
-    pub fn try_from(state: ProtoTwitterState) -> Result<Self, ActivityError> {
-        let tweets: Vec<TwitterTweet> = state.tweets.into_iter().map(TwitterTweet::from).collect();
+    pub fn try_from(asset: NativeTwitterAsset) -> Result<Self, ActivityError> {
+        let tweets: Vec<TwitterTweet> = asset.tweets.into_iter().map(TwitterTweet::from).collect();
 
         Ok(TwitterAsset {
             id: uuid::Uuid::new_v4().to_string(),
-            url: state.url,
-            title: state.title,
+            url: asset.url,
+            title: asset.title,
             tweets,
-            timestamp: state.timestamp,
+            timestamp: asset.timestamp,
             context_type: TwitterContextType::Timeline, // Default assumption
         })
     }
@@ -254,9 +254,9 @@ impl TwitterAsset {
     }
 }
 
-impl From<ProtoTwitterState> for TwitterAsset {
-    fn from(state: ProtoTwitterState) -> Self {
-        Self::try_from(state).expect("Failed to convert ProtoTwitterState to TwitterAsset")
+impl From<NativeTwitterAsset> for TwitterAsset {
+    fn from(asset: NativeTwitterAsset) -> Self {
+        Self::try_from(asset).expect("Failed to convert NativeTwitterAsset to TwitterAsset")
     }
 }
 
