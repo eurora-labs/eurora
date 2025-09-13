@@ -3,10 +3,7 @@ import { YoutubeChromeMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from './transcript/index.js';
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import { create } from '@eurora/shared/util/grpc';
-import {
-	ProtoNativeYoutubeStateSchema,
-	ProtoNativeYoutubeSnapshotSchema,
-} from '@eurora/shared/proto/native_messaging_pb.js';
+import { ProtoNativeYoutubeSnapshotSchema } from '@eurora/shared/proto/native_messaging_pb.js';
 import { NativeYoutubeAsset } from '@eurora/chrome-ext-shared/bindings';
 
 interface EurImage extends Partial<ProtoImage> {

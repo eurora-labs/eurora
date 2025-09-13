@@ -5,9 +5,9 @@ use crate::types::{ActivityAsset, ActivitySnapshot};
 use crate::{ActivityError, ArticleAsset, TwitterAsset, YoutubeAsset};
 use crate::{ArticleSnapshot, TwitterSnapshot, YoutubeSnapshot};
 use eur_native_messaging::{
-    Channel, NativeArticleAsset, NativeAsset, TauriIpcClient, create_grpc_ipc_client,
+    Channel, NativeArticleAsset, NativeMessage, TauriIpcClient, create_grpc_ipc_client,
 };
-use eur_proto::ipc::{self, AssetRequest};
+use eur_proto::ipc::{self, MessageRequest};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -98,7 +98,7 @@ impl BrowserStrategy {
         };
 
         let mut client_guard = client.lock().await;
-        let request = AssetRequest {};
+        let request = MessageRequest {};
 
         match client_guard.get_assets(request).await {
             Ok(response) => {
@@ -107,23 +107,13 @@ impl BrowserStrategy {
 
                 let resp = response.into_inner();
 
-                let native_asset = serde_json::from_slice::<NativeAsset>(&resp.content)
+                let native_asset = serde_json::from_slice::<NativeMessage>(&resp.content)
                     .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
-                let asset = match native_asset {
-                    NativeAsset::NativeArticleAsset(asset) => match ArticleAsset::try_from(asset) {
-                        Ok(asset) => Ok(ActivityAsset::ArticleAsset(asset)),
-                        Err(e) => Err(ActivityError::from(e)),
-                    },
-                    NativeAsset::NativeYoutubeAsset(asset) => match YoutubeAsset::try_from(asset) {
-                        Ok(asset) => Ok(ActivityAsset::YoutubeAsset(asset)),
-                        Err(e) => Err(ActivityError::from(e)),
-                    },
-                    NativeAsset::NativeTwitterAsset(asset) => match TwitterAsset::try_from(asset) {
-                        Ok(asset) => Ok(ActivityAsset::TwitterAsset(asset)),
-                        Err(e) => Err(ActivityError::from(e)),
-                    },
-                }?;
+                let asset =
+                    ActivityAsset::try_from(native_asset).map_err(|e| -> ActivityError {
+                        ActivityError::InvalidAssetType(e.to_string())
+                    })?;
 
                 assets.push(asset);
 
