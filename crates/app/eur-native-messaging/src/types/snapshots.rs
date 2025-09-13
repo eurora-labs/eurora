@@ -1,3 +1,4 @@
+use crate::types::NativeTwitterTweet;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -17,6 +18,6 @@ pub struct NativeArticleSnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
 pub struct NativeTwitterSnapshot {
-    pub tweets: String,
+    pub tweets: Vec<NativeTwitterTweet>,
     pub timestamp: String,
 }
