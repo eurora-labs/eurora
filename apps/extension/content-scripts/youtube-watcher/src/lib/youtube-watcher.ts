@@ -118,7 +118,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				this.ensureTranscript()
 					.then((transcript) => {
 						reportData.transcript = JSON.stringify(transcript);
-						response({ kind: 'NativeYoutubeAsset', ...reportData });
+						response({ kind: 'NativeYoutubeAsset', data: reportData });
 					})
 					.catch((error) => {
 						response({
@@ -128,7 +128,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 					});
 				return true;
 			} else {
-				response({ kind: 'YOUTUBE_ASSET', ...reportData });
+				response({ kind: 'NativeYoutubeAsset', data: reportData });
 				return true;
 			}
 		} catch (error) {
@@ -171,7 +171,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 			// video_frame_format: videoFrame.format,
 		};
 
-		response({ kind: 'NativeYoutubeSnapshot', ...reportData });
+		response({ kind: 'NativeYoutubeSnapshot', data: reportData });
 		return true;
 	}
 
