@@ -10,6 +10,7 @@ use crate::storage::{ActivityStorage, SaveableAsset, SavedAssetInfo};
 
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
+use eur_native_messaging::NativeMessage;
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -49,6 +50,41 @@ pub enum ActivityAsset {
     TwitterAsset,
     DefaultAsset,
 }
+
+impl TryFrom<NativeMessage> for ActivityAsset {
+    type Error = anyhow::Error;
+
+    fn try_from(value: NativeMessage) -> Result<Self, Self::Error> {
+        match value {
+            NativeMessage::NativeYoutubeAsset(asset) => {
+                Ok(ActivityAsset::YoutubeAsset(YoutubeAsset::from(asset)))
+            }
+            NativeMessage::NativeArticleAsset(asset) => {
+                Ok(ActivityAsset::ArticleAsset(ArticleAsset::from(asset)))
+            }
+            NativeMessage::NativeTwitterAsset(asset) => {
+                Ok(ActivityAsset::TwitterAsset(TwitterAsset::from(asset)))
+            }
+            _ => Err(anyhow::anyhow!("Invalid asset type")),
+        }
+    }
+}
+
+// impl From<NativeMessage> for ActivityAsset {
+//     fn from(asset: NativeMessage) -> Self {
+//         match asset {
+//             NativeMessage::NativeYoutubeAsset(asset) => {
+//                 ActivityAsset::YoutubeAsset(YoutubeAsset::from(asset))
+//             }
+//             NativeMessage::NativeArticleAsset(asset) => {
+//                 ActivityAsset::ArticleAsset(ArticleAsset::from(asset))
+//             }
+//             NativeMessage::NativeTwitterAsset(asset) => {
+//                 ActivityAsset::TwitterAsset(TwitterAsset::from(asset))
+//             }
+//         }
+//     }
+// }
 
 #[enum_dispatch]
 pub trait AssetFunctionality {
