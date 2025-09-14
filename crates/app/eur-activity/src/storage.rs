@@ -1,7 +1,10 @@
 //! Asset storage functionality for saving activity assets to disk
 
 use crate::{Activity, error::ActivityResult};
-use crate::{ActivityAsset, ActivityError, ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
+use crate::{
+    ActivityAsset, ActivityError, ArticleAsset, AssetFunctionality, DefaultAsset, TwitterAsset,
+    YoutubeAsset,
+};
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use eur_encrypt::{MainKey, encrypt_file_contents};
@@ -99,6 +102,24 @@ impl ActivityStorage {
         let asset =
             eur_encrypt::load_encrypted_file::<ActivityAsset>(&self.config.main_key, path).await?;
         Ok(asset)
+    }
+
+    /// Save all assets of an activity to disk by ids
+    pub async fn save_assets_to_disk_by_ids(
+        &self,
+        activity: &Activity,
+        ids: &Vec<String>,
+    ) -> ActivityResult<Vec<SavedAssetInfo>> {
+        let mut saved_assets = Vec::new();
+
+        for asset in &activity.assets {
+            if ids.contains(&asset.get_id().to_string()) {
+                let saved_info = self.save_asset(asset).await?;
+                saved_assets.push(saved_info);
+            }
+        }
+
+        Ok(saved_assets)
     }
 
     /// Save all assets of an activity to disk
