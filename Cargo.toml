@@ -63,6 +63,10 @@ sentry = { version = "0.42.0" }
 async-trait = "0.1.89"
 async_from = "0.2.0"
 humantime-serde = "1.1.1"
+specta = { version = "=2.0.0-rc.22" }
+enum_dispatch = "0.3.13"
+strum = "0.27.2"
+strum_macros = "0.27.2"
 
 eur-eurora-provider = { path = "crates/common/eur-eurora-provider" }
 eur-native-messaging = { path = "crates/app/eur-native-messaging" }
@@ -80,7 +84,6 @@ eur-storage = { path = "crates/app/eur-storage" }
 eur-settings = { path = "crates/app/eur-settings" }
 eur-fs = { path = "crates/common/eur-fs" }
 eur-client-grpc = { path = "crates/proto/eur-client-grpc" }
-eur-client-questions = { path = "crates/proto/eur-client-questions" }
 eur-screen-position = { path = "crates/app/eur-screen-position" }
 eur-vision = { path = "crates/app/eur-vision" }
 eur-timeline = { path = "crates/app/eur-timeline" }
