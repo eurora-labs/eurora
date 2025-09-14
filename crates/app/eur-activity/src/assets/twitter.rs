@@ -133,6 +133,10 @@ impl AssetFunctionality for TwitterAsset {
             position: Some(0),
         })
     }
+
+    fn get_id(&self) -> &str {
+        &self.id
+    }
 }
 
 impl From<NativeTwitterTweet> for TwitterTweet {
