@@ -1,10 +1,6 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { ArticleChromeMessage, type ArticleMessageType, type WatcherParams } from './types.js';
-import {
-	ProtoNativeArticleAssetSchema,
-	ProtoNativeArticleSnapshotSchema,
-} from '@eurora/shared/proto/native_messaging_pb.js';
-import { create } from '@eurora/shared/util/grpc';
+import type { NativeArticleAsset, NativeArticleSnapshot } from '@eurora/chrome-ext-shared/bindings';
 import { Readability } from '@mozilla/readability';
 
 class ArticleWatcher extends Watcher<WatcherParams> {
@@ -60,21 +56,19 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 
 			console.log('Parsed article:', article);
 
-			// Prepare report data
-			const reportData = create(ProtoNativeArticleAssetSchema, {
-				type: 'ARTICLE_ASSET',
+			const reportData: NativeArticleAsset = {
 				content: article?.content || '',
-				textContent: article?.textContent || '',
+				text_content: article?.textContent || '',
 				title: article?.title || document.title,
-				siteName: article?.siteName || '',
+				site_name: article?.siteName || '',
 				language: article?.lang || '',
 				excerpt: article?.excerpt || '',
 				length: article?.length || 0,
-				selectedText: window.getSelection()?.toString() || '',
-			});
+				selected_text: window.getSelection()?.toString() || '',
+			};
 
 			// Send response back to background script
-			response(reportData);
+			response({ kind: 'NativeArticleAsset', data: reportData });
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			const contextualError = `Failed to generate article assets for ${window.location.href}: ${errorMessage}`;
@@ -101,14 +95,12 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 		sender: chrome.runtime.MessageSender,
 		response: (response?: any) => void,
 	) {
-		console.log('Generating article snapshot');
-		// get what the user has highlighted
 		const selectedText = window.getSelection()?.toString() || '';
-		const snapshot = create(ProtoNativeArticleSnapshotSchema, {
-			type: 'ARTICLE_SNAPSHOT',
-			highlightedText: selectedText,
-		});
-		response(snapshot);
+		const snapshot: NativeArticleSnapshot = {
+			highlighted_text: selectedText,
+		};
+
+		response({ kind: 'NativeArticleSnapshot', data: snapshot });
 		return true;
 	}
 

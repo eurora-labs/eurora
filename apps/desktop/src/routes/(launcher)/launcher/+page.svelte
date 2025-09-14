@@ -2,24 +2,21 @@
 	import 'katex/dist/katex.min.css';
 	import Katex from '$lib/components/katex.svelte';
 	import { listen } from '@tauri-apps/api/event';
-
-	import * as Message from '@eurora/ui/custom-components/message/index';
-	import {
-		ProtoChatMessageSchema,
-		type ProtoChatMessage,
-	} from '@eurora/shared/proto/questions_service_pb.js';
-	import { onMount } from 'svelte';
-	import { Chat } from '@eurora/ui/custom-components/chat/index';
-	import { executeCommand } from '$lib/commands.js';
-	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
 	import {
 		createTauRPCProxy,
 		type ResponseChunk,
 		type Query,
-		type ContextChip,
+		type Message,
 		type Conversation,
+		type ContextChip,
 	} from '$lib/bindings/bindings.js';
-	import { create } from '@eurora/shared/util/grpc';
+
+	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
+
+	import { onMount } from 'svelte';
+	import { Chat } from '@eurora/ui/custom-components/chat/index';
+	import { executeCommand } from '$lib/commands.js';
+	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
 
 	// Import the Launcher component
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
@@ -49,7 +46,7 @@
 		] as SveltePMExtension[],
 	});
 	let backdropCustom2Ref = $state<HTMLDivElement | null>(null);
-	const messages = $state<ProtoChatMessage[]>([]);
+	const messages = $state<Message[]>([]);
 
 	let conversation = $state<Conversation | null>(null);
 
@@ -107,30 +104,6 @@
 		} catch (e) {
 			console.error('open_main_window failed', e);
 		}
-	}
-
-	function addExampleMessages() {
-		messages.push(
-			create(ProtoChatMessageSchema, {
-				role: 'user',
-				content: 'What am I doing right now?',
-			}),
-		);
-
-		messages.push(
-			create(ProtoChatMessageSchema, {
-				role: 'system',
-				content:
-					'You are currently looking at a website called Eurora AI. What would you like to know?',
-			}),
-		);
-
-		messages.push(
-			create(ProtoChatMessageSchema, {
-				role: 'user',
-				content: 'How do I install it?',
-			}),
-		);
 	}
 
 	// Listen for background image event
@@ -205,9 +178,7 @@
 
 			try {
 				const query = processQuery(editorRef!);
-				messages.push(
-					create(ProtoChatMessageSchema, { role: 'user', content: query.text }),
-				);
+				messages.push({ role: 'user', content: query.text });
 				console.log('query', query);
 				searchQuery.text = '';
 				clearQuery(editorRef!);
@@ -227,7 +198,7 @@
 				text: query.text,
 				assets: query.assets,
 			};
-			messages.push(create(ProtoChatMessageSchema, { role: 'assistant', content: '' }));
+			messages.push({ role: 'assistant', content: '' });
 			const agentMessage = messages.at(-1);
 
 			const onEvent = (response: ResponseChunk) => {
@@ -252,12 +223,10 @@
 			// so we skip the conversation refresh for now
 		} catch (error) {
 			console.error('Failed to get answer:', error);
-			messages.push(
-				create(ProtoChatMessageSchema, {
-					role: 'system',
-					content: 'Error: Failed to get response from server' + error,
-				}),
-			);
+			messages.push({
+				role: 'system',
+				content: 'Error: Failed to get response from server' + error,
+			});
 		}
 	}
 </script>
@@ -277,15 +246,17 @@
 		{#if messages.length > 0}
 			<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
 				{#each messages as message}
-					{#if message.content.length > 0}
-						<Message.Root
-							variant={message.role === 'user' ? 'default' : 'assistant'}
-							finishRendering={() => {}}
-						>
-							<Message.Content>
-								<Katex math={message.content} finishRendering={() => {}} />
-							</Message.Content>
-						</Message.Root>
+					{#if typeof message.content === 'string'}
+						{#if message.content.length > 0}
+							<MessageComponent.Root
+								variant={message.role === 'user' ? 'default' : 'assistant'}
+								finishRendering={() => {}}
+							>
+								<MessageComponent.Content>
+									<Katex math={message.content} finishRendering={() => {}} />
+								</MessageComponent.Content>
+							</MessageComponent.Root>
+						{/if}
 					{/if}
 				{/each}
 			</Chat>

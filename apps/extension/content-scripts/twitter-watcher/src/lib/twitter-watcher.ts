@@ -1,26 +1,19 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
-import {
-	TwitterChromeMessage,
-	type TwitterMessageType,
-	type WatcherParams,
-	type TwitterTweet,
-} from './types.js';
+import { TwitterChromeMessage, type TwitterMessageType, type WatcherParams } from './types.js';
 
-import { create } from '@eurora/shared/util/grpc';
-import {
-	ProtoNativeTwitterState,
-	ProtoNativeTwitterSnapshot,
-	ProtoNativeTwitterStateSchema,
-	ProtoNativeTwitterSnapshotSchema,
-} from '@eurora/shared/proto/native_messaging_pb.js';
+import type {
+	NativeTwitterAsset,
+	NativeTwitterSnapshot,
+	NativeTwitterTweet,
+} from '@eurora/chrome-ext-shared/bindings';
 
 class TwitterWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
 		super(params);
 	}
 
-	private getTweetTexts(): TwitterTweet[] {
-		const tweets: TwitterTweet[] = [];
+	private getTweetTexts(): NativeTwitterTweet[] {
+		const tweets: NativeTwitterTweet[] = [];
 
 		// Find all tweet elements with data-testid="tweetText"
 		const tweetElements = document.querySelectorAll('[data-testid="tweetText"]');
@@ -31,6 +24,8 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 			if (spanElement && spanElement.textContent) {
 				tweets.push({
 					text: spanElement.textContent.trim(),
+					timestamp: null,
+					author: null,
 				});
 			}
 		});
@@ -99,16 +94,14 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 			// Get current tweet texts
 			const currentTweets = this.getTweetTexts();
 
-			const reportData = create(ProtoNativeTwitterStateSchema, {
-				type: 'TWITTER_STATE',
+			const reportData: NativeTwitterAsset = {
 				url: window.location.href,
 				title: document.title,
-				tweets: JSON.stringify(currentTweets),
+				tweets: currentTweets,
 				timestamp: new Date().toISOString(),
-			});
+			};
 
-			console.log('Twitter assets generated:', reportData);
-			response(reportData);
+			response({ kind: 'NativeTwitterAsset', data: reportData });
 			return true;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
@@ -141,13 +134,13 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 		try {
 			const currentTweets = this.getTweetTexts();
 
-			const reportData = create(ProtoNativeTwitterSnapshotSchema, {
-				type: 'TWITTER_SNAPSHOT',
-				tweets: JSON.stringify(currentTweets),
+			const reportData: NativeTwitterSnapshot = {
+				tweets: currentTweets,
 				timestamp: new Date().toISOString(),
-			});
+			};
 
-			response(reportData);
+			response({ kind: 'NativeTwitterSnapshot', data: reportData });
+
 			return true;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
