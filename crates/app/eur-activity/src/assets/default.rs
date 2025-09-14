@@ -122,6 +122,10 @@ impl AssetFunctionality for DefaultAsset {
     fn get_context_chip(&self) -> Option<ContextChip> {
         None
     }
+
+    fn get_id(&self) -> &str {
+        &self.id
+    }
 }
 
 #[async_trait]
