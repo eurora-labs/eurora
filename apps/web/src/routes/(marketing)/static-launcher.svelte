@@ -2,30 +2,31 @@
 	export interface Props {
 		class?: string;
 	}
+
+	export interface Message {
+		role: string;
+		content: string;
+	}
 </script>
 
 <script lang="ts">
 	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
 	import { processQuery, clearQuery } from '@eurora/prosemirror-core/util';
-	import {
-		ProtoChatMessageSchema,
-		type ProtoChatMessage,
-	} from '@eurora/shared/proto/questions_service_pb.js';
+
 	import { Chat } from '@eurora/ui/custom-components/chat/index';
-	import { create } from '@eurora/shared/util/grpc';
-	import * as Message from '@eurora/ui/custom-components/message/index';
+	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
 	import { cn } from '@eurora/ui/utils';
 	import { onMount } from 'svelte';
-	let messages: ProtoChatMessage[] = $state([
-		create(ProtoChatMessageSchema, {
+	let messages: Message[] = $state([
+		{
 			role: 'user',
 			content: 'What am I doing right now?',
-		}),
-		create(ProtoChatMessageSchema, {
+		},
+		{
 			role: 'system',
 			content:
 				'You are currently looking at a website called Eurora AI. What would you like to know?',
-		}),
+		},
 	]);
 	let searchQuery = $state({
 		text: '',
@@ -50,20 +51,16 @@
 			placeholder = 'What can I help you with?';
 			event.preventDefault();
 			const value = processQuery(launcherInputRef);
-			messages.push(
-				create(ProtoChatMessageSchema, {
-					role: 'user',
-					content: value.text,
-				}),
-			);
+			messages.push({
+				role: 'user',
+				content: value.text,
+			});
 			searchQuery.text = '';
 			clearQuery(launcherInputRef);
-			messages.push(
-				create(ProtoChatMessageSchema, {
-					role: 'system',
-					content: 'Download Eurora to get started',
-				}),
-			);
+			messages.push({
+				role: 'system',
+				content: 'Download Eurora to get started',
+			});
 			launcherInputRef.view?.focus();
 		}
 	}
@@ -82,14 +79,14 @@
 	</Launcher.Root>
 	<Chat class="w-full min-h-[265px]">
 		{#each messages as message}
-			<Message.Root
+			<MessageComponent.Root
 				variant={message.role === 'user' ? 'default' : 'assistant'}
 				finishRendering={() => {}}
 			>
-				<Message.Content>
+				<MessageComponent.Content>
 					{message.content}
-				</Message.Content>
-			</Message.Root>
+				</MessageComponent.Content>
+			</MessageComponent.Root>
 		{/each}
 	</Chat>
 </div>
