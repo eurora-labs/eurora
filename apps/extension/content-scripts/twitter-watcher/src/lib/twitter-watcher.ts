@@ -101,15 +101,7 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 				timestamp: new Date().toISOString(),
 			};
 
-			// const reportData = create(ProtoNativeTwitterStateSchema, {
-			// 	type: 'TWITTER_STATE',
-			// 	url: window.location.href,
-			// 	title: document.title,
-			// 	tweets: JSON.stringify(currentTweets),
-			// 	timestamp: new Date().toISOString(),
-			// });
-
-			response({ kind: 'NativeTwitterSnapshot', ...reportData });
+			response({ kind: 'NativeTwitterAsset', data: reportData });
 			return true;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
@@ -147,7 +139,7 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 				timestamp: new Date().toISOString(),
 			};
 
-			response({ kind: 'NativeTwitterSnapshot', ...reportData });
+			response({ kind: 'NativeTwitterSnapshot', data: reportData });
 
 			return true;
 		} catch (error) {
