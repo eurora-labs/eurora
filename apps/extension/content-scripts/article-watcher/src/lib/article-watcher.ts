@@ -1,6 +1,6 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { ArticleChromeMessage, type ArticleMessageType, type WatcherParams } from './types.js';
-import { NativeArticleAsset, NativeArticleSnapshot } from '@eurora/chrome-ext-shared/bindings';
+import type { NativeArticleAsset, NativeArticleSnapshot } from '@eurora/chrome-ext-shared/bindings';
 import { Readability } from '@mozilla/readability';
 
 class ArticleWatcher extends Watcher<WatcherParams> {

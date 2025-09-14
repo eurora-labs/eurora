@@ -1,7 +1,7 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { TwitterChromeMessage, type TwitterMessageType, type WatcherParams } from './types.js';
 
-import {
+import type {
 	NativeTwitterAsset,
 	NativeTwitterSnapshot,
 	NativeTwitterTweet,
