@@ -16,11 +16,6 @@ pub mod generated {
         pub use super::*;
     }
 
-    pub mod native_messaging {
-        tonic::include_proto!("native_messaging");
-        pub use super::*;
-    }
-
     pub mod proto_ocr_service {
         tonic::include_proto!("ocr_service");
         pub use super::*;
