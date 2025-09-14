@@ -115,6 +115,10 @@ impl AssetFunctionality for YoutubeAsset {
             position: Some(0),
         })
     }
+
+    fn get_id(&self) -> &str {
+        &self.id
+    }
 }
 
 #[async_trait]
