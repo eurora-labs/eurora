@@ -1,7 +1,7 @@
 //! Article snapshot implementation
 
 use crate::types::SnapshotFunctionality;
-use eur_proto::ipc::ProtoArticleSnapshot;
+use eur_native_messaging::types::NativeArticleSnapshot;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
@@ -130,15 +130,11 @@ impl SnapshotFunctionality for ArticleSnapshot {
     }
 }
 
-impl From<ProtoArticleSnapshot> for ArticleSnapshot {
-    fn from(snapshot: ProtoArticleSnapshot) -> Self {
+impl From<NativeArticleSnapshot> for ArticleSnapshot {
+    fn from(snapshot: NativeArticleSnapshot) -> Self {
         let now = chrono::Utc::now().timestamp() as u64;
         Self {
-            highlight: if snapshot.highlighted_content.is_empty() {
-                None
-            } else {
-                Some(snapshot.highlighted_content)
-            },
+            highlight: snapshot.highlighted_text,
             selection_text: None,
             page_url: None,
             page_title: None,
@@ -249,27 +245,5 @@ mod tests {
         snapshot.touch();
 
         assert!(snapshot.updated_at >= original_updated_at);
-    }
-
-    #[test]
-    fn test_from_proto() {
-        let proto_snapshot = ProtoArticleSnapshot {
-            highlighted_content: "Proto highlight".to_string(),
-        };
-
-        let snapshot = ArticleSnapshot::from(proto_snapshot);
-        assert_eq!(snapshot.highlight, Some("Proto highlight".to_string()));
-        assert!(snapshot.created_at > 0);
-    }
-
-    #[test]
-    fn test_from_proto_empty() {
-        let proto_snapshot = ProtoArticleSnapshot {
-            highlighted_content: "".to_string(),
-        };
-
-        let snapshot = ArticleSnapshot::from(proto_snapshot);
-        assert_eq!(snapshot.highlight, None);
-        assert!(!snapshot.has_content());
     }
 }
