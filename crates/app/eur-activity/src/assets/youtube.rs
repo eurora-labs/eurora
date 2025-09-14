@@ -5,7 +5,7 @@ use crate::error::ActivityError;
 use crate::storage::SaveableAsset;
 use crate::types::{AssetFunctionality, ContextChip};
 use async_trait::async_trait;
-use eur_proto::ipc::ProtoYoutubeState;
+use eur_native_messaging::NativeYoutubeAsset;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -47,21 +47,16 @@ impl YoutubeAsset {
     }
 
     /// Try to create from protocol buffer state
-    pub fn try_from(state: ProtoYoutubeState) -> Result<Self, ActivityError> {
+    pub fn try_from(asset: NativeYoutubeAsset) -> Result<Self, ActivityError> {
+        let transcript = serde_json::from_str::<Vec<TranscriptLine>>(&asset.transcript)
+            .map_err(|e| ActivityError::from(e))?;
+
         Ok(YoutubeAsset {
             id: uuid::Uuid::new_v4().to_string(),
-            url: state.url,
-            title: "YouTube Video".to_string(),
-            transcript: state
-                .transcript
-                .into_iter()
-                .map(|line| TranscriptLine {
-                    text: line.text,
-                    start: line.start,
-                    duration: line.duration,
-                })
-                .collect(),
-            current_time: state.current_time,
+            url: asset.url,
+            title: asset.title,
+            transcript,
+            current_time: asset.current_time,
         })
     }
 
@@ -142,9 +137,9 @@ impl SaveableAsset for YoutubeAsset {
     }
 }
 
-impl From<ProtoYoutubeState> for YoutubeAsset {
-    fn from(state: ProtoYoutubeState) -> Self {
-        Self::try_from(state).expect("Failed to convert ProtoYoutubeState to YoutubeAsset")
+impl From<NativeYoutubeAsset> for YoutubeAsset {
+    fn from(asset: NativeYoutubeAsset) -> Self {
+        Self::try_from(asset).expect("Failed to convert NativeYoutubeAsset to YoutubeAsset")
     }
 }
 
