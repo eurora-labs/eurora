@@ -2,7 +2,7 @@
 
 use crate::assets::twitter::TwitterTweet;
 use crate::types::SnapshotFunctionality;
-use eur_proto::ipc::ProtoTwitterSnapshot;
+use eur_native_messaging::types::NativeTwitterSnapshot;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
@@ -225,8 +225,8 @@ impl SnapshotFunctionality for TwitterSnapshot {
     }
 }
 
-impl From<ProtoTwitterSnapshot> for TwitterSnapshot {
-    fn from(snapshot: ProtoTwitterSnapshot) -> Self {
+impl From<NativeTwitterSnapshot> for TwitterSnapshot {
+    fn from(snapshot: NativeTwitterSnapshot) -> Self {
         let tweets: Vec<TwitterTweet> = snapshot
             .tweets
             .into_iter()

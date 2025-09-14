@@ -1,4 +1,4 @@
-use std::{fs::File, net::ToSocketAddrs, process};
+use std::{env, fs::File, net::ToSocketAddrs, process};
 
 use anyhow::{Result, anyhow};
 // Import the PORT constant from lib.rs
@@ -10,11 +10,8 @@ use tracing_subscriber::{
     fmt,
 };
 
-mod asset_context;
-mod asset_converter;
 mod server;
-mod snapshot_context;
-mod snapshot_converter;
+mod types;
 
 /// Find processes by name and return their PIDs
 fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
@@ -166,8 +163,30 @@ fn ensure_single_instance() -> Result<()> {
     Ok(())
 }
 
+/// Generate TypeScript definitions using Specta
+fn generate_typescript_definitions() -> Result<()> {
+    use specta_typescript::Typescript;
+
+    Typescript::default()
+        .export_to(
+            "packages/chrome-ext-shared/src/lib/bindings.ts",
+            &specta::export(),
+        )
+        .unwrap();
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Check for command line arguments
+    let args: Vec<String> = env::args().collect();
+
+    // Handle the generate_specta argument
+    if args.len() > 1 && args[1] == "--generate_specta" {
+        return generate_typescript_definitions();
+    }
+
     // Ensure only one instance is running
     ensure_single_instance()?;
 
