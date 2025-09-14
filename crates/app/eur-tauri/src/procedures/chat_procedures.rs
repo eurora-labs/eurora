@@ -91,8 +91,10 @@ impl ChatApi for ChatApiImpl {
         let has_assets = !query.assets.is_empty();
 
         if has_assets {
-            messages = timeline.construct_asset_messages().await;
-            messages.extend(timeline.construct_snapshot_messages().await);
+            messages = timeline
+                .construct_asset_messages_by_ids(&query.assets)
+                .await;
+            // messages.extend(timeline.construct_snapshot_messages().await);
         }
 
         let user_message = Message {
@@ -100,7 +102,7 @@ impl ChatApi for ChatApiImpl {
             content: MessageContent::Text(query.text.clone()),
         };
 
-        // Insert chat message into db
+        // Save chat message into db
         let chat_message = personal_db
             .insert_chat_message_from_message(&conversation.id, user_message.clone(), has_assets)
             .await
@@ -116,13 +118,17 @@ impl ChatApi for ChatApiImpl {
                 .map_err(|e| format!("Failed to update conversation title: {e}"))?;
         }
 
-        if let Ok(infos) = timeline.save_assets_to_disk().await {
+        if let Ok(infos) = timeline.save_assets_to_disk_by_ids(&query.assets).await {
             for info in infos {
                 let relative = info.file_path.to_string_lossy().into_owned();
                 let absolute = info.absolute_path.to_string_lossy().into_owned();
+                let id = match info.file_path.file_name() {
+                    Some(name) => Some(name.to_string_lossy().into_owned()),
+                    None => None,
+                };
                 personal_db
                     .insert_asset(&NewAsset {
-                        id: None,
+                        id,
                         activity_id: None,
                         relative_path: relative,
                         absolute_path: absolute,
