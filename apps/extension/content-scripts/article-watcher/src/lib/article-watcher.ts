@@ -100,7 +100,7 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 			highlighted_text: selectedText,
 		};
 
-		response(snapshot);
+		response({ kind: 'NativeArticleSnapshot', data: snapshot });
 		return true;
 	}
 
