@@ -24,8 +24,6 @@
 	let conversation = $state<Conversation | null>(null);
 	let messages = $state<Message[]>([]);
 
-	let status = $state<'loading' | 'ready'>('loading');
-
 	let editorRef: ProsemirrorEditor | undefined = $state();
 	let chatRef = $state<Chat | null>(null);
 
