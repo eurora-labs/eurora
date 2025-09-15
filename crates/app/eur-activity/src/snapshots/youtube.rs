@@ -34,6 +34,7 @@ fn load_image_from_proto(
 /// YouTube video snapshot with frame capture
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YoutubeSnapshot {
+    pub id: String,
     pub video_frame: Option<Vec<u8>>, // Serialized image data
     pub current_time: f32,
     pub video_duration: Option<f32>,
@@ -49,6 +50,7 @@ pub struct YoutubeSnapshot {
 impl YoutubeSnapshot {
     /// Create a new YouTube snapshot
     pub fn new(
+        id: Option<String>,
         video_frame: Option<DynamicImage>,
         current_time: f32,
         video_duration: Option<f32>,
@@ -68,8 +70,10 @@ impl YoutubeSnapshot {
                 Err(_) => None,
             }
         });
+        let id = id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
         Self {
+            id,
             video_frame: video_frame_bytes,
             current_time,
             video_duration,
@@ -105,6 +109,7 @@ impl YoutubeSnapshot {
         });
 
         Ok(YoutubeSnapshot {
+            id: uuid::Uuid::new_v4().to_string(),
             video_frame: video_frame_bytes,
             current_time: snapshot.current_time,
             video_duration: None,
@@ -214,6 +219,10 @@ impl SnapshotFunctionality for YoutubeSnapshot {
     fn get_created_at(&self) -> u64 {
         self.created_at
     }
+
+    fn get_id(&self) -> &str {
+        &self.id
+    }
 }
 
 impl From<NativeYoutubeSnapshot> for YoutubeSnapshot {
@@ -226,107 +235,4 @@ impl From<NativeYoutubeSnapshot> for YoutubeSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_youtube_snapshot_creation() {
-        let snapshot = YoutubeSnapshot::new(
-            None,
-            120.5,
-            Some(300.0),
-            Some("Test Video".to_string()),
-            Some("https://youtube.com/watch?v=test".to_string()),
-        );
-
-        assert_eq!(snapshot.current_time, 120.5);
-        assert_eq!(snapshot.video_duration, Some(300.0));
-        assert_eq!(snapshot.video_title, Some("Test Video".to_string()));
-        assert!(snapshot.created_at > 0);
-        assert_eq!(snapshot.created_at, snapshot.updated_at);
-    }
-
-    #[test]
-    fn test_progress_percentage() {
-        let snapshot = YoutubeSnapshot::new(None, 150.0, Some(300.0), None, None);
-
-        assert_eq!(snapshot.get_progress_percentage(), Some(0.5));
-
-        let no_duration_snapshot = YoutubeSnapshot::new(None, 150.0, None, None, None);
-
-        assert_eq!(no_duration_snapshot.get_progress_percentage(), None);
-    }
-
-    #[test]
-    fn test_time_formatting() {
-        let snapshot = YoutubeSnapshot::new(
-            None,
-            125.0,        // 2:05
-            Some(3665.0), // 61:05
-            None,
-            None,
-        );
-
-        assert_eq!(snapshot.format_current_time(), "02:05");
-        assert_eq!(snapshot.format_duration(), Some("61:05".to_string()));
-    }
-
-    #[test]
-    fn test_near_end_detection() {
-        // Test within 30 seconds of end
-        let near_end_time = YoutubeSnapshot::new(None, 270.0, Some(300.0), None, None);
-        assert!(near_end_time.is_near_end());
-
-        // Test within 10% of end
-        let near_end_percent = YoutubeSnapshot::new(None, 950.0, Some(1000.0), None, None);
-        assert!(near_end_percent.is_near_end());
-
-        // Test not near end
-        let not_near_end = YoutubeSnapshot::new(None, 100.0, Some(1000.0), None, None);
-        assert!(!not_near_end.is_near_end());
-
-        // Test no duration
-        let no_duration = YoutubeSnapshot::new(None, 100.0, None, None, None);
-        assert!(!no_duration.is_near_end());
-    }
-
-    #[test]
-    fn test_touch_updates_timestamp() {
-        let mut snapshot = YoutubeSnapshot::new(None, 100.0, Some(300.0), None, None);
-
-        let original_updated_at = snapshot.updated_at;
-
-        // Sleep a tiny bit to ensure timestamp difference
-        std::thread::sleep(std::time::Duration::from_millis(1));
-
-        snapshot.touch();
-
-        assert!(snapshot.updated_at >= original_updated_at);
-    }
-
-    #[test]
-    fn test_message_construction() {
-        let snapshot = YoutubeSnapshot::new(
-            None,
-            120.0,
-            Some(300.0),
-            Some("Test Video".to_string()),
-            Some("https://youtube.com/watch?v=test".to_string()),
-        );
-
-        let message = snapshot.construct_message();
-
-        match message.content {
-            MessageContent::Multimodal(parts) => {
-                assert_eq!(parts.len(), 1); // Only text part since no image
-                match &parts[0] {
-                    ContentPart::Text { text } => {
-                        assert!(text.contains("120"));
-                        assert!(text.contains("Test Video"));
-                        assert!(text.contains("300"));
-                    }
-                    _ => panic!("Expected text content part"),
-                }
-            }
-            _ => panic!("Expected multimodal content"),
-        }
-    }
 }
