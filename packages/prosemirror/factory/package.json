@@ -29,6 +29,10 @@
 		"test": "vitest run --mode development",
 		"test:watch": "vitest --watch --mode development"
 	},
+	"dependencies": {
+		"@eurora/prosemirror-core": "workspace:*",
+		"@eurora/prosemirror-extensions": "workspace:*"
+	},
 	"peerDependencies": {
 		"svelte": "^5.0.0"
 	},
