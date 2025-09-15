@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Default snapshot for activities that don't have specific implementations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefaultSnapshot {
+    pub id: String,
     pub state: String,
     pub metadata: std::collections::HashMap<String, String>,
     pub created_at: u64,
@@ -18,6 +19,7 @@ impl DefaultSnapshot {
     pub fn new(state: String) -> Self {
         let now = chrono::Utc::now().timestamp() as u64;
         Self {
+            id: uuid::Uuid::new_v4().to_string(),
             state,
             metadata: std::collections::HashMap::new(),
             created_at: now,
@@ -32,6 +34,7 @@ impl DefaultSnapshot {
     ) -> Self {
         let now = chrono::Utc::now().timestamp() as u64;
         Self {
+            id: uuid::Uuid::new_v4().to_string(),
             state,
             metadata,
             created_at: now,
@@ -130,6 +133,10 @@ impl SnapshotFunctionality for DefaultSnapshot {
 
     fn get_created_at(&self) -> u64 {
         self.created_at
+    }
+
+    fn get_id(&self) -> &str {
+        &self.id
     }
 }
 
