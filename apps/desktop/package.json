@@ -25,6 +25,7 @@
 		"@eurora/ext-video": "workspace:*",
 		"@eurora/ext-youtube-video": "workspace:*",
 		"@eurora/prosemirror-core": "workspace:*",
+		"@eurora/prosemirror-view": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
