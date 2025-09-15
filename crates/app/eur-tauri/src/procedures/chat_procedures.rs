@@ -1,4 +1,4 @@
-use eur_activity::AssetFunctionality;
+use eur_activity::{AssetFunctionality, snapshots};
 use eur_personal_db::{Asset, Conversation, NewAsset, PersonalDatabaseManager, UpdateConversation};
 use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
@@ -91,9 +91,11 @@ impl ChatApi for ChatApiImpl {
         let has_assets = !query.assets.is_empty();
 
         if has_assets {
-            messages = timeline
-                .construct_asset_messages_by_ids(&query.assets)
-                .await;
+            messages.extend(
+                timeline
+                    .construct_asset_messages_by_ids(&query.assets)
+                    .await,
+            );
             messages.extend(
                 timeline
                     .construct_snapshot_messages_by_ids(&query.assets)
