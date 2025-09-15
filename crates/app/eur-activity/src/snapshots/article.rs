@@ -193,7 +193,7 @@ mod tests {
             Some("https://example.com/article".to_string()),
             Some("Test Article".to_string()),
         );
-        assert_eq!(with_highlight.get_primary_content(), Some("Highlight"));
+        assert_eq!(with_highlight.get_primary_content(), Some("Highlight text"));
 
         let with_selection =
             ArticleSnapshot::new(None, None, Some("Selection".to_string()), None, None);
