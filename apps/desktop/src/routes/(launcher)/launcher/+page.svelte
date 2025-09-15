@@ -19,7 +19,7 @@
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
 
 	// Import the Launcher component
-	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
+	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import {
 		Editor as ProsemirrorEditor,
 		type SveltePMExtension,
