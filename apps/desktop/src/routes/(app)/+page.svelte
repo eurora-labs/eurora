@@ -13,7 +13,8 @@
 	import { Chat } from '@eurora/ui/custom-components/chat/index';
 	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
 	import Katex from '$lib/components/katex.svelte';
-	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
+	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
+	// import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
 	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
 
 	import {
@@ -31,7 +32,7 @@
 	let searchQuery = $state({
 		text: '',
 		extensions: [
-			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A'),
+			// extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A'),
 			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092'),
 			extensionFactory.getExtension('309f0906-d48c-4439-9751-7bcf915cdfc5'),
 			extensionFactory.getExtension('2c434895-d32c-485f-8525-c4394863b83a'),

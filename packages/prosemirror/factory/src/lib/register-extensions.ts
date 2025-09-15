@@ -1,11 +1,12 @@
 import { extensionFactory } from './factory.js';
 
 // Import extensions
-import { videoExtension, videoExtensionID } from '@eurora/ext-video/index';
-import { transcriptExtension, transcriptExtensionID } from '@eurora/ext-transcript/index';
-import { youtubeVideoExtension, youtubeVideoExtensionID } from '@eurora/ext-youtube-video/index';
-import { articleExtension, articleExtensionID } from '$lib/prosemirror/extensions/article/index.js';
-import { twitterExtension, twitterExtensionID } from '@eurora/ext-twitter/index';
+import { articleExtension, articleExtensionID } from '@eurora/prosemirror-extensions/article/index';
+import {
+	youtubeVideoExtension,
+	youtubeVideoExtensionID,
+} from '@eurora/prosemirror-extensions/youtube/index';
+import { twitterExtension, twitterExtensionID } from '@eurora/prosemirror-extensions/twitter/index';
 
 /**
  * Register all known core extensions
@@ -13,10 +14,8 @@ import { twitterExtension, twitterExtensionID } from '@eurora/ext-twitter/index'
  * Additional extensions can be registered by applications as needed.
  */
 export function registerCoreExtensions(): void {
-	extensionFactory.register(videoExtensionID, videoExtension);
-	extensionFactory.register(transcriptExtensionID, transcriptExtension);
-	extensionFactory.register(youtubeVideoExtensionID, youtubeVideoExtension);
 	extensionFactory.register(articleExtensionID, articleExtension);
+	extensionFactory.register(youtubeVideoExtensionID, youtubeVideoExtension);
 	extensionFactory.register(twitterExtensionID, twitterExtension);
 }
 

@@ -5,13 +5,12 @@
 
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
-	import { transcriptExtension } from '@eurora/ext-transcript/index';
 	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core/index';
 	let editorRef: ProsemirrorEditor | undefined = $state(undefined);
 
 	let exampleInput = $state({
 		text: '',
-		extensions: [transcriptExtension()],
+		extensions: [],
 	});
 
 	function addExerciseSheet() {
