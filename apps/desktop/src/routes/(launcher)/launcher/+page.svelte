@@ -25,7 +25,7 @@
 		type SveltePMExtension,
 	} from '@eurora/prosemirror-core/index';
 	// Import the extension factory instead of individual extensions
-	import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
+	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
 	import Button from '@eurora/ui/components/button/button.svelte';
 
 	// Create TauRPC proxy
@@ -39,7 +39,7 @@
 	let searchQuery = $state({
 		text: '',
 		extensions: [
-			extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A'),
+			// extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A'),
 			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092'),
 			extensionFactory.getExtension('309f0906-d48c-4439-9751-7bcf915cdfc5'),
 			extensionFactory.getExtension('2c434895-d32c-485f-8525-c4394863b83a'),
