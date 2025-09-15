@@ -5,11 +5,12 @@
 		query?: Query;
 		editorRef?: ProsemirrorEditor;
 		iconSize?: number;
+		height?: string;
 	}
 </script>
 
 <script lang="ts">
-	import { cn } from '$lib/utils.js';
+	import { cn } from '$lib/utils';
 	import InputArea from './input-area.svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
 
