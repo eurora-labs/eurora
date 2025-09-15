@@ -18,6 +18,7 @@
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/ext-transcript": "workspace:*",
 		"@eurora/prosemirror-core": "workspace:*",
+		"@eurora/prosemirror-view": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@tailwindcss/vite": "^4.1.13",
