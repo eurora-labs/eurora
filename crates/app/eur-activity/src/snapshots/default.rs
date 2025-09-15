@@ -131,6 +131,10 @@ impl SnapshotFunctionality for DefaultSnapshot {
     fn get_created_at(&self) -> u64 {
         self.created_at
     }
+
+    fn get_id(&self) -> &str {
+        todo!()
+    }
 }
 
 #[cfg(test)]
