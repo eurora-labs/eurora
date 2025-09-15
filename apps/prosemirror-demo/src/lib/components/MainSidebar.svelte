@@ -1,37 +1,11 @@
 <script lang="ts">
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import HouseIcon from '@lucide/svelte/icons/house';
-	import InboxIcon from '@lucide/svelte/icons/inbox';
-	import CalendarIcon from '@lucide/svelte/icons/calendar';
-	import SearchIcon from '@lucide/svelte/icons/search';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
-	const items = [
-		{
-			title: 'Chat 1',
-			url: '#',
-			icon: HouseIcon,
-		},
-		{
-			title: 'Chat 2',
-			url: '#',
-			icon: InboxIcon,
-		},
-		{
-			title: 'Chat 3',
-			url: '#',
-			icon: CalendarIcon,
-		},
-		{
-			title: 'Chat 4',
-			url: '#',
-			icon: SearchIcon,
-		},
-		{
-			title: 'Chat 5',
-			url: '#',
-			icon: SettingsIcon,
-		},
+	import TextCursorInputIcon from '@lucide/svelte/icons/text-cursor-input';
+	import ListIcon from '@lucide/svelte/icons/list';
+	const components = [
+		{ title: 'Input Box', url: '/components/input-box', icon: TextCursorInputIcon },
+		{ title: 'File List', url: '/components/launcher', icon: ListIcon },
 	];
 </script>
 
@@ -57,23 +31,7 @@
 			<Sidebar.GroupLabel>Components</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton>
-							{#snippet child({ props })}
-								<a href="/components/launcher" {...props}>
-									<span>Launcher</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>Application</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					{#each items as item (item.title)}
+					{#each components as item (item.title)}
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton>
 								{#snippet child({ props })}
