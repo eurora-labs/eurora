@@ -1,6 +1,6 @@
 //! Article snapshot implementation
 
-use crate::types::SnapshotFunctionality;
+use crate::{ActivityResult, types::SnapshotFunctionality};
 use eur_native_messaging::types::NativeArticleSnapshot;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Article snapshot with highlighted content
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArticleSnapshot {
+    pub id: String,
     pub highlight: Option<String>,
     pub selection_text: Option<String>,
     pub page_url: Option<String>,
@@ -18,27 +19,17 @@ pub struct ArticleSnapshot {
 
 impl ArticleSnapshot {
     /// Create a new article snapshot
-    pub fn new(highlight: Option<String>) -> Self {
-        let now = chrono::Utc::now().timestamp() as u64;
-        Self {
-            highlight,
-            selection_text: None,
-            page_url: None,
-            page_title: None,
-            created_at: now,
-            updated_at: now,
-        }
-    }
-
-    /// Create a snapshot with full context
-    pub fn with_context(
+    pub fn new(
+        id: Option<String>,
         highlight: Option<String>,
         selection_text: Option<String>,
         page_url: Option<String>,
         page_title: Option<String>,
     ) -> Self {
         let now = chrono::Utc::now().timestamp() as u64;
+        let id = id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         Self {
+            id,
             highlight,
             selection_text,
             page_url,
@@ -46,6 +37,19 @@ impl ArticleSnapshot {
             created_at: now,
             updated_at: now,
         }
+    }
+
+    fn try_from(snapshot: NativeArticleSnapshot) -> ActivityResult<Self> {
+        let now = chrono::Utc::now().timestamp() as u64;
+        Ok(ArticleSnapshot {
+            id: uuid::Uuid::new_v4().to_string(),
+            highlight: snapshot.highlighted_text,
+            selection_text: None,
+            page_url: None,
+            page_title: None,
+            created_at: now,
+            updated_at: now,
+        })
     }
 
     /// Update the timestamp
@@ -128,19 +132,16 @@ impl SnapshotFunctionality for ArticleSnapshot {
     fn get_created_at(&self) -> u64 {
         self.created_at
     }
+
+    fn get_id(&self) -> &str {
+        &self.id
+    }
 }
 
 impl From<NativeArticleSnapshot> for ArticleSnapshot {
     fn from(snapshot: NativeArticleSnapshot) -> Self {
-        let now = chrono::Utc::now().timestamp() as u64;
-        Self {
-            highlight: snapshot.highlighted_text,
-            selection_text: None,
-            page_url: None,
-            page_title: None,
-            created_at: now,
-            updated_at: now,
-        }
+        Self::try_from(snapshot)
+            .expect("Failed to convert NativeArticleSnapshot to ArticleSnapshot")
     }
 }
 
@@ -150,7 +151,13 @@ mod tests {
 
     #[test]
     fn test_article_snapshot_creation() {
-        let snapshot = ArticleSnapshot::new(Some("Important text".to_string()));
+        let snapshot = ArticleSnapshot::new(
+            None,
+            Some("Highlighted text".to_string()),
+            Some("Selected text".to_string()),
+            Some("https://example.com/article".to_string()),
+            Some("Test Article".to_string()),
+        );
 
         assert_eq!(snapshot.highlight, Some("Important text".to_string()));
         assert!(snapshot.created_at > 0);
@@ -160,7 +167,8 @@ mod tests {
 
     #[test]
     fn test_article_snapshot_with_context() {
-        let snapshot = ArticleSnapshot::with_context(
+        let snapshot = ArticleSnapshot::new(
+            None,
             Some("Highlighted text".to_string()),
             Some("Selected text".to_string()),
             Some("https://example.com/article".to_string()),
@@ -178,30 +186,38 @@ mod tests {
 
     #[test]
     fn test_primary_content() {
-        let with_highlight = ArticleSnapshot::new(Some("Highlight".to_string()));
-        assert_eq!(with_highlight.get_primary_content(), Some("Highlight"));
+        let with_highlight = ArticleSnapshot::new(
+            None,
+            Some("Highlighted text".to_string()),
+            Some("Selected text".to_string()),
+            Some("https://example.com/article".to_string()),
+            Some("Test Article".to_string()),
+        );
+        assert_eq!(with_highlight.get_primary_content(), Some("Highlight text"));
 
         let with_selection =
-            ArticleSnapshot::with_context(None, Some("Selection".to_string()), None, None);
+            ArticleSnapshot::new(None, None, Some("Selection".to_string()), None, None);
         assert_eq!(with_selection.get_primary_content(), Some("Selection"));
 
-        let empty = ArticleSnapshot::new(None);
+        let empty = ArticleSnapshot::new(None, None, None, None, None);
         assert_eq!(empty.get_primary_content(), None);
         assert!(!empty.has_content());
     }
 
     #[test]
     fn test_content_length() {
-        let snapshot = ArticleSnapshot::new(Some("Hello world".to_string()));
+        let snapshot =
+            ArticleSnapshot::new(None, Some("Hello world".to_string()), None, None, None);
         assert_eq!(snapshot.get_content_length(), 11);
 
-        let empty = ArticleSnapshot::new(None);
+        let empty = ArticleSnapshot::new(None, None, None, None, None);
         assert_eq!(empty.get_content_length(), 0);
     }
 
     #[test]
     fn test_keyword_search() {
-        let snapshot = ArticleSnapshot::with_context(
+        let snapshot = ArticleSnapshot::new(
+            None,
             Some("Rust programming language".to_string()),
             None,
             None,
@@ -217,7 +233,8 @@ mod tests {
 
     #[test]
     fn test_message_construction() {
-        let snapshot = ArticleSnapshot::with_context(
+        let snapshot = ArticleSnapshot::new(
+            None,
             Some("Important quote".to_string()),
             None,
             Some("https://example.com".to_string()),
@@ -238,7 +255,7 @@ mod tests {
 
     #[test]
     fn test_touch_updates_timestamp() {
-        let mut snapshot = ArticleSnapshot::new(Some("Test".to_string()));
+        let mut snapshot = ArticleSnapshot::new(None, Some("Test".to_string()), None, None, None);
         let original_updated_at = snapshot.updated_at;
 
         std::thread::sleep(std::time::Duration::from_millis(1));
