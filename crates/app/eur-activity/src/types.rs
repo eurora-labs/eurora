@@ -88,6 +88,7 @@ impl TryFrom<NativeMessage> for ActivityAsset {
 
 #[enum_dispatch]
 pub trait AssetFunctionality {
+    fn get_id(&self) -> &str;
     fn get_name(&self) -> &str;
     fn get_icon(&self) -> Option<&str>;
     fn construct_message(&self) -> Message;
@@ -96,6 +97,7 @@ pub trait AssetFunctionality {
 
 #[enum_dispatch]
 pub trait SnapshotFunctionality {
+    fn get_id(&self) -> &str;
     fn construct_message(&self) -> Message;
     fn get_updated_at(&self) -> u64;
     fn get_created_at(&self) -> u64;
