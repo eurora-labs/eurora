@@ -94,7 +94,11 @@ impl ChatApi for ChatApiImpl {
             messages = timeline
                 .construct_asset_messages_by_ids(&query.assets)
                 .await;
-            // messages.extend(timeline.construct_snapshot_messages().await);
+            messages.extend(
+                timeline
+                    .construct_snapshot_messages_by_ids(&query.assets)
+                    .await,
+            );
         }
 
         let user_message = Message {
