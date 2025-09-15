@@ -10,7 +10,7 @@
 </script>
 
 <script lang="ts">
-	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
+	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { processQuery, clearQuery } from '@eurora/prosemirror-core/util';
 
 	import { Chat } from '@eurora/ui/custom-components/chat/index';

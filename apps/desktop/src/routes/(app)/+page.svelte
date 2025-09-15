@@ -9,7 +9,7 @@
 	} from '$lib/bindings/bindings.js';
 
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
-	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
+	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { Chat } from '@eurora/ui/custom-components/chat/index';
 	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
 	import Katex from '$lib/components/katex.svelte';

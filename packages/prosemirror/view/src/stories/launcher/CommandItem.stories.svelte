@@ -1,5 +1,5 @@
 <script module lang="ts">
-	import { CommandItem } from '$lib/custom-components/launcher/index.js';
+	import { CommandItem } from '$lib/launcher/index.js';
 	import { defineMeta, type StoryContext, type Args } from '@storybook/addon-svelte-csf';
 
 	const { Story } = defineMeta({
@@ -27,8 +27,8 @@
 </script>
 
 <script lang="ts">
-	import * as Command from '$lib/custom-components/launcher/index.js';
-	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
+	import * as Command from '$lib/launcher/index.js';
+	import { StorybookContainer } from '@eurora/ui/storybook-container/index.js';
 	import {
 		Calendar,
 		Calculator,
