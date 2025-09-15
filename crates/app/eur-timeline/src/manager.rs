@@ -328,6 +328,22 @@ impl TimelineManager {
         }
     }
 
+    /// Construct messages from current activity snapshots by ids
+    pub async fn construct_snapshot_messages_by_ids(&self, ids: &Vec<String>) -> Vec<Message> {
+        let storage = self.storage.lock().await;
+        if let Some(activity) = storage.get_current_activity() {
+            if let Some(snapshot) = activity.snapshots.last()
+                && ids.contains(&snapshot.get_id().to_string())
+            {
+                vec![snapshot.construct_message()]
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Construct messages from current activity snapshots
     pub async fn construct_snapshot_messages(&self) -> Vec<Message> {
         let storage = self.storage.lock().await;
