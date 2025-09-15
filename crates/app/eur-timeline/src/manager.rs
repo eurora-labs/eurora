@@ -258,6 +258,29 @@ impl TimelineManager {
         // Ok(vec![asset])
     }
 
+    /// Save the assets to disk by ids
+    pub async fn save_assets_to_disk_by_ids(
+        &self,
+        ids: &Vec<String>,
+    ) -> TimelineResult<Vec<SavedAssetInfo>> {
+        let activity = {
+            let storage = self.storage.lock().await;
+            storage.get_current_activity().cloned()
+        };
+
+        match activity {
+            Some(activity) => {
+                let activity_storage = self.activity_storage.lock().await;
+                return Ok(activity_storage
+                    .save_assets_to_disk_by_ids(&activity, ids)
+                    .await?);
+            }
+            None => Err(TimelineError::Storage(
+                "No current activity found".to_string(),
+            )),
+        }
+    }
+
     /// Save the assets to disk
     pub async fn save_assets_to_disk(&self) -> TimelineResult<Vec<SavedAssetInfo>> {
         let activity = {
@@ -276,6 +299,21 @@ impl TimelineManager {
         }
     }
 
+    /// Construct messages from current activity by ids
+    pub async fn construct_asset_messages_by_ids(&self, ids: &Vec<String>) -> Vec<Message> {
+        let storage = self.storage.lock().await;
+        if let Some(activity) = storage.get_current_activity() {
+            activity
+                .assets
+                .iter()
+                .filter(|asset| ids.contains(&asset.get_id().to_string()))
+                .map(|asset| asset.construct_message())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Construct messages from current activity assets
     pub async fn construct_asset_messages(&self) -> Vec<Message> {
         let storage = self.storage.lock().await;
@@ -285,6 +323,22 @@ impl TimelineManager {
                 .iter()
                 .map(|asset| asset.construct_message())
                 .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Construct messages from current activity snapshots by ids
+    pub async fn construct_snapshot_messages_by_ids(&self, ids: &Vec<String>) -> Vec<Message> {
+        let storage = self.storage.lock().await;
+        if let Some(activity) = storage.get_current_activity() {
+            if let Some(snapshot) = activity.snapshots.last()
+                && ids.contains(&snapshot.get_id().to_string())
+            {
+                vec![snapshot.construct_message()]
+            } else {
+                Vec::new()
+            }
         } else {
             Vec::new()
         }
