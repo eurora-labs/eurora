@@ -11,22 +11,7 @@
 
 <Sidebar.Root>
 	<Sidebar.Header><EuroraLogo />Eurora Labs</Sidebar.Header>
-	<Sidebar.Content
-		><Sidebar.Group>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton>Welcome</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton>Getting Started</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton>Why Eurora</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
+	<Sidebar.Content>
 		<Sidebar.Group>
 			<Sidebar.GroupLabel>Components</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>
