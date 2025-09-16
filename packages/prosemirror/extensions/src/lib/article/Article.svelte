@@ -28,20 +28,19 @@
 			(acc, [key, value]) => ({ ...acc, [key]: { default: value } }),
 			{},
 		),
-		content: 'inline+',
+		// content: 'inline+',
 		group: 'inline',
 		inline: true,
-		defining: false,
 		atom: true,
-		selectable: false,
+		selectable: true,
 
 		parseDOM: [
 			{
-				tag: 'span.article', // Changed from figure
+				tag: 'span.article[data-id][data-text][data-name]', // Changed from figure
 				getAttrs: (dom: HTMLElement | string) => {
 					if (dom instanceof HTMLElement) {
 						return {
-							id: dom.getAttribute('id'),
+							id: dom.getAttribute('data-id'),
 							text: dom.getAttribute('data-text'),
 							name: dom.getAttribute('data-name'),
 						};
@@ -52,7 +51,16 @@
 		],
 		toDOM(node: PMNode) {
 			const { id, text, name } = node.attrs;
-			return ['span', { id, class: 'article', 'data-text': text, 'data-name': name }];
+			return [
+				'span',
+				{
+					'data-id': id,
+					class: 'article',
+					'data-text': text,
+					'data-name': 'contextChip',
+				},
+				name || 'article', // Add the text content as the third element
+			];
 		},
 	};
 </script>
@@ -86,7 +94,9 @@
 	}
 </script>
 
-<Popover.Root>
+<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.name}</ContextChip>
+
+<!-- <Popover.Root>
 	<Popover.Trigger>
 		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}
 			>{attrs.name}</ContextChip
@@ -118,4 +128,7 @@
 			</div>
 		</div>
 	</Popover.Content>
-</Popover.Root>
+</Popover.Root> -->
+
+<style lang="postcss">
+</style>
