@@ -917,6 +917,9 @@ importers:
       '@eurora/prosemirror-core':
         specifier: workspace:*
         version: link:../../packages/prosemirror/core
+      '@eurora/prosemirror-factory':
+        specifier: workspace:*
+        version: link:../../packages/prosemirror/factory
       '@eurora/prosemirror-view':
         specifier: workspace:*
         version: link:../../packages/prosemirror/view

@@ -19,6 +19,7 @@
 			const { schema } = state;
 			const nodes = schema.nodes;
 			const { $from: from } = state.selection;
+			console.log(nodes);
 			tr.insert(
 				from.pos,
 				nodes.transcript.createChecked(
