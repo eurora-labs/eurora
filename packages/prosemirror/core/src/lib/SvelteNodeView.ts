@@ -48,6 +48,8 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		editor: Editor,
 		component?: Component<SvelteNodeViewProps<A>>,
 	) {
+		view.editable = false;
+
 		this.node = node;
 		this.view = view;
 		this.decorations = decorations;
@@ -91,6 +93,9 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		// this._dom = dom as HTMLElement
 		this.contentDOM = contentDOM;
 		this._dom = document.createElement(this.node.type.spec.inline ? 'span' : 'div');
+		// this._dom.style.display = 'inline-flex';
+		// this._dom.setAttribute('contenteditable', 'false');
+
 		if (this.component) {
 			// Mount the component synchronously but don't wait for it to complete
 			// This allows init() to return immediately while the component mounts in the background
@@ -136,6 +141,19 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		this.render();
 	};
 
+	// stopEvent = (e: Event) => {
+	// 	// Allow keyboard events to reach the editor
+	// 	if (
+	// 		e.type === 'keydown' ||
+	// 		e.type === 'keypress' ||
+	// 		e.type === 'beforeinput' ||
+	// 		e.type === 'input'
+	// 	)
+	// 		return false;
+	// 	// Swallow pointer events inside the chip UI only
+	// 	return this.dom.contains(e.target as Node);
+	// };
+
 	deselectNode = () => {
 		this.selected = false;
 		this.render();
@@ -145,7 +163,9 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		this.mounted?.destroy();
 	};
 
-	ignoreMutation = (_mutation: ViewMutationRecord) => true;
+	ignoreMutation = (_mutation: ViewMutationRecord) => {
+		return this.dom.contains(_mutation.target);
+	};
 
 	static fromComponent<A extends Attrs>(
 		editor: Editor,

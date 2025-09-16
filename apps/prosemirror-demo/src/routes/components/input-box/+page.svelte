@@ -31,10 +31,11 @@
 			console.log(nodes);
 			tr.insert(
 				from.pos,
-				nodes['309f0906-d48c-4439-9751-7bcf915cdfc5'].createChecked(
-					{ id: 'article-1', name: 'article', text: 'Article 1' },
-					schema.text(' '),
-				),
+				nodes['309f0906-d48c-4439-9751-7bcf915cdfc5'].createChecked({
+					id: 'article-1',
+					name: 'article',
+					text: 'Article 1',
+				}),
 			);
 			dispatch?.(tr);
 		});

@@ -1,4 +1,7 @@
 <script lang="ts" module>
+	import type { ClassValue } from 'svelte/elements';
+	import type { Query } from '$lib/typings/index.js';
+
 	export interface EditorProps {
 		value?: string;
 		query?: Query;
@@ -13,14 +16,14 @@
 	import { Node as PMNode } from 'prosemirror-model';
 	import { DOMParser } from 'prosemirror-model';
 	import { EditorView } from 'prosemirror-view';
+	import type { Cmd } from '$lib/typings/index.js';
+	import { caretAfterChip } from '$lib/plugins/caretAfterChip';
 	import { onDestroy } from 'svelte';
-	import type { Query, Cmd } from '$lib/typings/index.js';
 	import type { SveltePMExtension } from '$lib/typings/extension.js';
 	import { createExtensions } from '$lib/createExtensions.js';
 	import { paragraphExtension } from '$lib/components/paragraph/extension.js';
 	import { type Commands, commands as defaultCommands } from '$lib/commands.js';
 	// import '$lib/Editor.css';
-	import type { ClassValue } from 'svelte/elements';
 
 	let editorRef: HTMLDivElement | null = $state(null);
 	let view: EditorView | null = null;
@@ -71,7 +74,8 @@
 			{
 				state: EditorState.create({
 					schema: created.schema,
-					plugins: [...created.plugins, placeholderPlugin(placeholder)],
+					// plugins: [...created.plugins, placeholderPlugin(placeholder)],
+					plugins: [...created.plugins, placeholderPlugin(placeholder), caretAfterChip],
 					doc: mainNode,
 				}),
 				nodeViews: created.nodeViews,
@@ -228,6 +232,10 @@
 ></div>
 
 <style lang="postcss">
+	:global(.context-chip) {
+		margin: 0;
+		@apply cursor-pointer;
+	}
 	:global(.ProseMirror-separator) {
 		display: none;
 	}
