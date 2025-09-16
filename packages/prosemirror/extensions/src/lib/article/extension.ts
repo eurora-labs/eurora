@@ -7,6 +7,7 @@ export const ID = '309f0906-d48c-4439-9751-7bcf915cdfc5';
 export function articleExtension(): SveltePMExtension {
 	return {
 		name: ID,
+
 		svelteNodes: {
 			[ID]: {
 				attrs: articleAttrs,
