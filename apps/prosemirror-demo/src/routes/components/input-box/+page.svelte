@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
+	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
+	import * as Card from '@eurora/ui/components/card/index';
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import {
 		Editor as ProsemirrorEditor,
@@ -11,7 +13,7 @@
 
 	registerCoreExtensions();
 	let searchQuery = $state({
-		text: 't',
+		text: '',
 		extensions: [
 			// extensionFactory.getExtension('9370B14D-B61C-4CE2-BDE7-B18684E8731A'),
 			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092'),
@@ -30,11 +32,18 @@
 			tr.insert(
 				from.pos,
 				nodes['309f0906-d48c-4439-9751-7bcf915cdfc5'].createChecked(
-					{ id: 'article-1', text: 'Article 1' },
-					schema.text('article'),
+					{ id: 'article-1', name: 'article', text: 'Article 1' },
+					schema.text(' '),
 				),
 			);
+			dispatch?.(tr);
 		});
+	}
+
+	function printQueryToConsole() {
+		if (!editorRef) return;
+
+		console.log(processQuery(editorRef));
 	}
 
 	// function addExerciseSheet() {
@@ -59,18 +68,23 @@
 <div class="flex flex-col">
 	<div class="w-full h-1/2 justify-center items-center">
 		<div class="launcher absolute top-1/4 left-1/2 w-[1100px] -translate-x-1/2">
-			<Launcher.Root class="rounded-lg border shadow-md">
+			<Launcher.Root class="rounded-lg border shadow-md min-h-[100px]">
 				<Launcher.Input placeholder="Search" bind:query={searchQuery} bind:editorRef />
 			</Launcher.Root>
 		</div>
 		<img class=" w-full" src="/sample_background.jpg" alt="Sample Background" />
 	</div>
 
-	<div class="w-full h-1/2 bg-white flex flex-row">
-		<div class="flex flex-col gap-4">
+	<div class="w-full h-1/2 bg-white flex flex-row gap-4">
+		<div class="flex flex-col gap-4 w-fit">
 			<h2 class="text-2xl font-bold">Context Chips Controls</h2>
 			<Button onclick={addArticleChip}>Add article</Button>
 			<Button>Add youtube</Button>
+		</div>
+		<div class="flex flex-col gap-4 w-fit">
+			<h2 class="text-2xl font-bold">Debugging Controls</h2>
+
+			<Button onclick={printQueryToConsole}>Print query to console</Button>
 		</div>
 	</div>
 </div>
