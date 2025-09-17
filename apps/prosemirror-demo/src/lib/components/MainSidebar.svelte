@@ -3,9 +3,10 @@
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import TextCursorInputIcon from '@lucide/svelte/icons/text-cursor-input';
 	import ListIcon from '@lucide/svelte/icons/list';
+	import { resolve } from '$app/paths';
 	const components = [
-		{ title: 'Input Box', url: '/components/input-box', icon: TextCursorInputIcon },
-		{ title: 'File List', url: '/components/launcher', icon: ListIcon },
+		{ title: 'Input Box', url: resolve('/components/input-box'), icon: TextCursorInputIcon },
+		{ title: 'File List', url: resolve('/components/launcher'), icon: ListIcon },
 	];
 </script>
 

@@ -233,7 +233,7 @@
 
 <style lang="postcss">
 	:global(.context-chip) {
-		margin: 0;
+		/*margin: 0;*/
 		@apply cursor-pointer;
 	}
 	:global(.ProseMirror-separator) {

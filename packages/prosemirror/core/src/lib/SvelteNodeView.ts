@@ -48,8 +48,6 @@ export class SvelteNodeView<A extends Attrs> implements NodeView {
 		editor: Editor,
 		component?: Component<SvelteNodeViewProps<A>>,
 	) {
-		view.editable = false;
-
 		this.node = node;
 		this.view = view;
 		this.decorations = decorations;
