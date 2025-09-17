@@ -247,7 +247,7 @@
 		width: 100%;
 		border-top: 0;
 		outline: none;
-		line-height: 100px;
+		/*line-height: 100px;*/
 		white-space: pre-wrap;
 		overflow-wrap: break-word;
 	}
@@ -256,7 +256,7 @@
 		position: absolute;
 		content: attr(data-placeholder);
 		color: rgba(0, 0, 0, 0.2);
-		line-height: 100px;
+		/*line-height: 100px;*/
 		pointer-events: none;
 	}
 </style>
