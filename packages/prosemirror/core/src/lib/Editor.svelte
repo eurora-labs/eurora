@@ -202,7 +202,7 @@
 
 	function placeholderPlugin(text: string) {
 		const update = (view: EditorView) => {
-			if (view.state.doc.textContent?.length > 0) {
+			if (view.state.doc.content.size > 2) {
 				editorRef?.removeAttribute('data-placeholder');
 			} else {
 				editorRef?.setAttribute('data-placeholder', text);
