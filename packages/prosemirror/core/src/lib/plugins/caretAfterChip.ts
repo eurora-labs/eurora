@@ -5,7 +5,6 @@ export const caretAfterChip = new Plugin({
 	props: {
 		decorations(state) {
 			const decos: Decoration[] = [];
-			console.log(state.doc.content.content[0].content.content.length);
 			state.doc.descendants((node, pos) => {
 				if (!node.isTextblock || node.childCount === 0) return;
 				const last = node.child(node.childCount - 1);
@@ -15,11 +14,10 @@ export const caretAfterChip = new Plugin({
 				)
 					return;
 				if (last.isInline && last.isAtom) {
-					// if (last.type.name !== 'text') {
 					const endPos = pos + node.nodeSize - 1; // block end
 					decos.push(
 						Decoration.widget(endPos, () => document.createTextNode('\u200B'), {
-							side: 0,
+							side: 1,
 						}),
 					);
 				}
