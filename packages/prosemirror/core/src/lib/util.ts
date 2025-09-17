@@ -26,14 +26,14 @@ export function processQuery(editorRef: Editor): QueryAssets {
 		// If it's a text node, add its text content to the query
 		if (node.type === 'text' && node.text) {
 			query.text += ' ' + node.text + ' ';
-		}
-		// If it's any other node with a type that looks like a UUID (not doc or paragraph)
+		} // If it's any other node with a type that looks like a UUID (not doc or paragraph)
 		// add it to the query as an identifier
 		// Note: The 'type' property is used as the node's ID as shown in the example JSON
 		else if (node.type && node.type !== 'doc' && node.type !== 'paragraph') {
 			// If the type looks like a UUID (has hyphens and is long), add it to the query
 			if (node.type.includes('-') || node.type.length > 10) {
 				query.assets.push(node.attrs?.id ?? '');
+				query.text += ' ' + node.attrs?.name + ' ';
 			}
 		}
 

@@ -12,7 +12,7 @@ export function executeCommand(editorRef: Editor, command: ContextChip) {
 			command.position ?? 0,
 			nodes[command.extension_id].createChecked(
 				{ id: command.id, name: command.name, ...command.attrs },
-				schema.text(command.name ?? ' '),
+				// schema.text(command.name ?? ' '),
 			),
 		);
 		dispatch?.(tr);
