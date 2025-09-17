@@ -27,13 +27,13 @@
 </script>
 
 <div
-	class={cn('items-top flex h-[100px] border-none px-3 w-full flex-row', className)}
+	class={cn('items-top flex min-h-[100px] border-none px-3 w-full flex-row', className)}
 	data-command-input-wrapper=""
 >
-	<div class="flex">
-		<SearchIcon class="opacity-30 shrink-0 text-black/80 mt-7" size={iconSize} />
+	<div class="flex items-center justify-center max-h-[100px]">
+		<SearchIcon class="opacity-30 shrink-0 text-black/80" size={iconSize} />
 	</div>
-	<div class="mr-2 h-[100px] w-2 shrink-0"></div>
+	<div class="mr-2 min-h-[100px] w-2 shrink-0"></div>
 	<CommandPrimitive.Input
 		class="custom-input flex w-full rounded-md border-none bg-transparent shadow-none outline-none focus:border-transparent focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
 		bind:ref

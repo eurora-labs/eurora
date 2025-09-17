@@ -1,14 +1,7 @@
 {
 	"name": "@eurora/prosemirror-view",
 	"version": "0.1.0",
-	"private": true,
 	"type": "module",
-	"files": [
-		"dist"
-	],
-	"sideEffects": [
-		"**/*.css"
-	],
 	"exports": {
 		".": {
 			"import": "./dist/index.js",
@@ -22,6 +15,9 @@
 			"import": "./dist/*.js",
 			"types": "./dist/*.d.ts"
 		},
+		"./*.css": {
+			"import": "./dist/*.css"
+		},
 		"./*.svelte": {
 			"svelte": "./dist/*.svelte",
 			"types": "./dist/*.svelte.d.ts"
@@ -30,8 +26,10 @@
 	"scripts": {
 		"dev": "vite dev",
 		"dev:package:svelte": "svelte-kit sync && svelte-package --watch",
+		"dev:package:styles": "postcss ./src/lib/app.pcss -o ./dist/app.css --watch",
 		"package": "pnpm run --sequential \"/^package:.*/\"",
 		"package:svelte": "svelte-kit sync && svelte-package",
+		"package:styles": "postcss ./src/lib/app.pcss -o ./dist/app.css",
 		"prepublishOnly": "pnpm run package",
 		"prepare": "svelte-kit sync",
 		"test": "vitest run --mode development",
@@ -69,6 +67,14 @@
 		"@lucide/svelte": "^0.542.0",
 		"clsx": "^2.1.1",
 		"tailwind-merge": "^3.3.1",
+		"tailwindcss": "catalog:",
+		"@tailwindcss/postcss": "catalog:",
+		"postcss": "catalog:",
+		"postcss-cli": "^11.0.0",
+		"postcss-import": "^16.1.1",
+		"postcss-minify": "^1.1.0",
+		"postcss-nesting": "^13.0.2",
+		"postcss-pxtorem": "^6.1.0",
 		"@storybook/addon-svelte-csf": "^5.0.8",
 		"storybook": "^8.6.12"
 	}
