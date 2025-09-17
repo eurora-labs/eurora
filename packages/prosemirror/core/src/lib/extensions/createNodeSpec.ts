@@ -7,28 +7,27 @@ import { getAttrsWithOutputSpec } from '$lib/extensions/getAttrsWithOutputSpec.j
 export async function createNodeSpec(pm_node: SveltePMNode<any>): Promise<NodeSpec> {
 	const { schema, component } = pm_node;
 	if (component && schema) {
-		const staticSpec = await createSpec(pm_node);
+		const div = document.createElement('div');
+		const comp = (await mount(component, {
+			target: div,
+			props: {
+				node: pm_node as any,
+				attrs: pm_node.attrs,
+				contentDOM: () => undefined,
+			},
+		})) as any;
+		// const staticSpec = await createSpec(pm_node);
 		schema.toDOM = (node: PMNode) => {
-			const div = document.createElement('div');
-			const comp = mount(component, {
-				target: div,
-				props: {
-					node,
-					attrs: node.attrs,
-					contentDOM: () => undefined,
-				},
-			}) as any;
-			if (!comp.ref) return staticSpec;
 			const spec = htmlToDOMOutputSpec(comp.ref);
 			return spec as unknown as DOMOutputSpec;
 		};
 		schema.parseDOM = [
 			...(schema.parseDOM || []),
 			{
-				tag: staticSpec[0],
+				tag: comp.ref.tagName.toLowerCase(),
 				getAttrs: (dom: HTMLElement | string) => {
 					if (dom instanceof HTMLElement) {
-						return getAttrsWithOutputSpec(staticSpec, dom, {
+						return getAttrsWithOutputSpec(comp.ref, dom, {
 							selector: [],
 						});
 					}

@@ -19,7 +19,7 @@
 		id: undefined,
 		transcript: undefined,
 		text: undefined,
-		name: undefined,
+		name: 'article',
 		currentFrame: undefined,
 	};
 
@@ -94,9 +94,9 @@
 	}
 </script>
 
-<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.name}</ContextChip>
+<!-- <ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}>{attrs.name}</ContextChip> -->
 
-<!-- <Popover.Root>
+<Popover.Root>
 	<Popover.Trigger>
 		<ContextChip bind:ref data-hole {...attrs} onkeydown={handleKeyDown}
 			>{attrs.name}</ContextChip
@@ -128,7 +128,7 @@
 			</div>
 		</div>
 	</Popover.Content>
-</Popover.Root> -->
+</Popover.Root>
 
 <style lang="postcss">
 </style>
