@@ -1,3 +1,5 @@
+import '@eurora/ui/main.css';
+import '$lib/app.css';
 import { Command as CommandPrimitive } from 'bits-ui';
 
 import Root from './command.svelte';
