@@ -21,11 +21,13 @@
 <script lang="ts">
 	export interface Props {
 		attrs: ParagraphAttrs;
-		ref?: HTMLParagraphElement;
+		ref: HTMLParagraphElement;
 	}
 
 	let { attrs, ref }: Props = $props();
-	export { ref };
+
+	// Export the ref for external access
+	export { attrs, ref };
 </script>
 
 <p data-indent={attrs.indent} data-hole bind:this={ref}></p>
