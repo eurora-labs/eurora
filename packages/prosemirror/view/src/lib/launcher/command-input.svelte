@@ -35,7 +35,7 @@
 	</div>
 	<div class="mr-2 min-h-[100px] w-2 shrink-0"></div>
 	<CommandPrimitive.Input
-		class="custom-input flex w-full rounded-md border-none bg-transparent shadow-none outline-none focus:border-transparent focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
+		class="custom-input flex w-full rounded-md border-none bg-transparent shadow-none outline-none focus:border-transparent focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 mt-[20px]"
 		bind:ref
 		bind:value
 		{...restProps}
