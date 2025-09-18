@@ -17,7 +17,6 @@
 	import { DOMParser } from 'prosemirror-model';
 	import { EditorView } from 'prosemirror-view';
 	import type { Cmd } from '$lib/typings/index.js';
-	import { caretAfterChip } from '$lib/plugins/caretAfterChip';
 	import { onDestroy } from 'svelte';
 	import type { SveltePMExtension } from '$lib/typings/extension.js';
 	import { createExtensions } from '$lib/createExtensions.js';
@@ -30,8 +29,6 @@
 	let currentExtensions: SveltePMExtension[] = [];
 	let commands: Commands = $state(defaultCommands);
 	let mainNode: PMNode | null = null;
-
-	export { view };
 
 	let {
 		value = $bindable(''),
@@ -74,8 +71,7 @@
 			{
 				state: EditorState.create({
 					schema: created.schema,
-					// plugins: [...created.plugins, placeholderPlugin(placeholder)],
-					plugins: [...created.plugins, placeholderPlugin(placeholder), caretAfterChip],
+					plugins: [...created.plugins, placeholderPlugin(placeholder)],
 					doc: mainNode,
 				}),
 				nodeViews: created.nodeViews,
@@ -217,6 +213,8 @@
 			},
 		});
 	}
+
+	export { view };
 </script>
 
 <div
@@ -233,7 +231,6 @@
 
 <style lang="postcss">
 	:global(.context-chip) {
-		/*margin: 0;*/
 		@apply cursor-pointer;
 	}
 	:global(.ProseMirror-separator) {

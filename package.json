@@ -22,6 +22,7 @@
 		"dev:prosemirror": "pnpm --filter @eurora/prosemirror-demo dev",
 		"build:prosemirror": "turbo run build --filter @eurora/prosemirror-demo...",
 		"build:prosemirror-extensions": "turbo run build --filter @eurora/prosemirror-extensions...",
+		"build:prosemirror-view": "turbo run build --filter @eurora/prosemirror-view...",
 		"tauri": "tauri",
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",
