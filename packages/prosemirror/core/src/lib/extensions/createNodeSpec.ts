@@ -4,31 +4,45 @@ import { mount } from 'svelte';
 import { htmlToDOMOutputSpec } from '$lib/extensions/htmlToDOMOutputSpec.js';
 import { getAttrsWithOutputSpec } from '$lib/extensions/getAttrsWithOutputSpec.js';
 
+function applyAttrsToSpec(spec: any[], attrs: Record<string, any>): any[] {
+	const clone = (v: any): any => {
+		if (Array.isArray(v)) return v.map(clone);
+		if (v && typeof v === 'object') {
+			const out: any = {};
+			for (const k of Object.keys(v)) {
+				out[k] = k in attrs ? String(attrs[k]) : v[k];
+			}
+			return out;
+		}
+		return v;
+	};
+	return clone(spec);
+}
+
 export async function createNodeSpec(pm_node: SveltePMNode<any>): Promise<NodeSpec> {
 	const { schema, component } = pm_node;
 	if (component && schema) {
-		const staticSpec = await createSpec(pm_node);
+		const div = document.createElement('div');
+		const comp = (await mount(component, {
+			target: div,
+			props: {
+				node: pm_node as any,
+				attrs: pm_node.attrs,
+				contentDOM: () => undefined,
+			},
+		})) as any;
+
+		const spec = htmlToDOMOutputSpec(comp.ref);
 		schema.toDOM = (node: PMNode) => {
-			const div = document.createElement('div');
-			const comp = mount(component, {
-				target: div,
-				props: {
-					node,
-					attrs: node.attrs,
-					contentDOM: () => undefined,
-				},
-			}) as any;
-			if (!comp.ref) return staticSpec;
-			const spec = htmlToDOMOutputSpec(comp.ref);
 			return spec as unknown as DOMOutputSpec;
 		};
 		schema.parseDOM = [
 			...(schema.parseDOM || []),
 			{
-				tag: staticSpec[0],
+				tag: comp.ref.tagName.toLowerCase(),
 				getAttrs: (dom: HTMLElement | string) => {
 					if (dom instanceof HTMLElement) {
-						return getAttrsWithOutputSpec(staticSpec, dom, {
+						return getAttrsWithOutputSpec(spec, dom, {
 							selector: [],
 						});
 					}

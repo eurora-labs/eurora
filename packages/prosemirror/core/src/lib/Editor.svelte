@@ -1,4 +1,7 @@
 <script lang="ts" module>
+	import type { ClassValue } from 'svelte/elements';
+	import type { Query } from '$lib/typings/index.js';
+
 	export interface EditorProps {
 		value?: string;
 		query?: Query;
@@ -13,22 +16,19 @@
 	import { Node as PMNode } from 'prosemirror-model';
 	import { DOMParser } from 'prosemirror-model';
 	import { EditorView } from 'prosemirror-view';
+	import type { Cmd } from '$lib/typings/index.js';
 	import { onDestroy } from 'svelte';
-	import type { Query, Cmd } from '$lib/typings/index.js';
 	import type { SveltePMExtension } from '$lib/typings/extension.js';
 	import { createExtensions } from '$lib/createExtensions.js';
 	import { paragraphExtension } from '$lib/components/paragraph/extension.js';
 	import { type Commands, commands as defaultCommands } from '$lib/commands.js';
 	// import '$lib/Editor.css';
-	import type { ClassValue } from 'svelte/elements';
 
 	let editorRef: HTMLDivElement | null = $state(null);
 	let view: EditorView | null = null;
 	let currentExtensions: SveltePMExtension[] = [];
 	let commands: Commands = $state(defaultCommands);
 	let mainNode: PMNode | null = null;
-
-	export { view };
 
 	let {
 		value = $bindable(''),
@@ -198,7 +198,7 @@
 
 	function placeholderPlugin(text: string) {
 		const update = (view: EditorView) => {
-			if (view.state.doc.textContent?.length > 0) {
+			if (view.state.doc.content.size > 2) {
 				editorRef?.removeAttribute('data-placeholder');
 			} else {
 				editorRef?.setAttribute('data-placeholder', text);
@@ -213,6 +213,8 @@
 			},
 		});
 	}
+
+	export { view };
 </script>
 
 <div
@@ -228,6 +230,9 @@
 ></div>
 
 <style lang="postcss">
+	:global(.context-chip) {
+		@apply cursor-pointer;
+	}
 	:global(.ProseMirror-separator) {
 		display: none;
 	}
@@ -239,7 +244,7 @@
 		width: 100%;
 		border-top: 0;
 		outline: none;
-		line-height: 100px;
+		/*line-height: 100px;*/
 		white-space: pre-wrap;
 		overflow-wrap: break-word;
 	}
@@ -248,7 +253,7 @@
 		position: absolute;
 		content: attr(data-placeholder);
 		color: rgba(0, 0, 0, 0.2);
-		line-height: 100px;
+		/*line-height: 100px;*/
 		pointer-events: none;
 	}
 </style>
