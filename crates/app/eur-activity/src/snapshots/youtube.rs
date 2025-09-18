@@ -1,12 +1,12 @@
 //! YouTube snapshot implementation
 
-use crate::error::ActivityError;
-use crate::types::SnapshotFunctionality;
 use eur_native_messaging::types::NativeYoutubeSnapshot;
 use eur_proto::shared::ProtoImageFormat;
 use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
 use image::DynamicImage;
 use serde::{Deserialize, Serialize};
+
+use crate::{error::ActivityError, types::SnapshotFunctionality};
 
 /// Helper function to safely load images from protocol buffer data
 fn load_image_from_proto(

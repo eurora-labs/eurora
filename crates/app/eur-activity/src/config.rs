@@ -1,8 +1,8 @@
 //! Configuration system for the refactored activity system
 
+use std::{collections::HashMap, time::Duration};
+
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::time::Duration;
 
 /// Global configuration for the activity system
 #[derive(Debug, Clone, Serialize, Deserialize)]
