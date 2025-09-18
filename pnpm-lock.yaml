@@ -1246,8 +1246,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.37
-        version: 2.0.0-next.37(svelte@5.38.7)
+        specifier: 2.0.0-next.38
+        version: 2.0.0-next.38(svelte@5.38.7)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.38.7)
@@ -1758,8 +1758,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.37
-        version: 2.0.0-next.37(svelte@5.38.7)
+        specifier: 2.0.0-next.38
+        version: 2.0.0-next.38(svelte@5.38.7)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.38.7)
@@ -1962,8 +1962,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.37
-        version: 2.0.0-next.37(svelte@5.38.7)
+        specifier: 2.0.0-next.38
+        version: 2.0.0-next.38(svelte@5.38.7)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.38.7)
@@ -5881,8 +5881,8 @@ packages:
     resolution: {integrity: sha512-7W0vV3rqv5tokqkBAFV1LbR7HPOWzXQDpDgEuib/aJ1jsZZx6x3c2mBI+TJhJzOhkGeaLbCKEHXEXLfirtG2JA==}
     engines: {node: '>=18'}
 
-  layerchart@2.0.0-next.37:
-    resolution: {integrity: sha512-PE16Hu3PA3AJ1B28LY68S1HqoiiEXfC2YNl4h5mdpjx5ZLwQSlP9sq68NxXYRcrzp/KPiytBVoDHpDHeJxnQCQ==}
+  layerchart@2.0.0-next.38:
+    resolution: {integrity: sha512-VnVIdklUqV9E5Q6KUeM+pmf2TtApB0AsJT1ih9muXP1R3qjZaqB3+YX8bU21LkL1SMFKglM+Jk79GrlwBK8wTw==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -7121,6 +7121,11 @@ packages:
 
   runed@0.29.2:
     resolution: {integrity: sha512-0cq6cA6sYGZwl/FvVqjx9YN+1xEBu9sDDyuWdDW1yWX7JF2wmvmVKfH+hVCZs+csW+P3ARH92MjI3H9QTagOQA==}
+    peerDependencies:
+      svelte: ^5.7.0
+
+  runed@0.31.1:
+    resolution: {integrity: sha512-v3czcTnO+EJjiPvD4dwIqfTdHLZ8oH0zJheKqAHh9QMViY7Qb29UlAMRpX7ZtHh7AFqV60KmfxaJ9QMy+L1igQ==}
     peerDependencies:
       svelte: ^5.7.0
 
@@ -12463,7 +12468,7 @@ snapshots:
     dependencies:
       package-json: 10.0.1
 
-  layerchart@2.0.0-next.37(svelte@5.38.7):
+  layerchart@2.0.0-next.38(svelte@5.38.7):
     dependencies:
       '@dagrejs/dagre': 1.1.5
       '@layerstack/svelte-actions': 1.0.1-next.14
@@ -12491,7 +12496,7 @@ snapshots:
       d3-time: 3.1.0
       lodash-es: 4.17.21
       memoize: 10.1.0
-      runed: 0.28.0(svelte@5.38.7)
+      runed: 0.31.1(svelte@5.38.7)
       svelte: 5.38.7
 
   levn@0.4.1:
@@ -13909,6 +13914,11 @@ snapshots:
       svelte: 5.38.7
 
   runed@0.29.2(svelte@5.38.7):
+    dependencies:
+      esm-env: 1.2.2
+      svelte: 5.38.7
+
+  runed@0.31.1(svelte@5.38.7):
     dependencies:
       esm-env: 1.2.2
       svelte: 5.38.7
