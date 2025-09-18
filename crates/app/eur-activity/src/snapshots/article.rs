@@ -1,9 +1,10 @@
 //! Article snapshot implementation
 
-use crate::{ActivityResult, types::SnapshotFunctionality};
 use eur_native_messaging::types::NativeArticleSnapshot;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
+
+use crate::{ActivityResult, types::SnapshotFunctionality};
 
 /// Article snapshot with highlighted content
 #[derive(Debug, Clone, Serialize, Deserialize)]

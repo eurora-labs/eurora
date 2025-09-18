@@ -1,11 +1,14 @@
 //! Default asset implementation for unsupported activity types
 
-use crate::ActivityResult;
-use crate::storage::SaveableAsset;
-use crate::types::{AssetFunctionality, ContextChip};
 use async_trait::async_trait;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    ActivityResult,
+    storage::SaveableAsset,
+    types::{AssetFunctionality, ContextChip},
+};
 
 /// Default asset for activities that don't have specific implementations
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

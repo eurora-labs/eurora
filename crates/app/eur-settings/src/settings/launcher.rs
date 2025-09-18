@@ -1,6 +1,7 @@
-use crate::hotkey::Hotkey;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+
+use crate::hotkey::Hotkey;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type, Default)]
 #[serde(rename_all = "camelCase")]

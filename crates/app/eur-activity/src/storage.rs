@@ -1,20 +1,16 @@
 //! Asset storage functionality for saving activity assets to disk
 
-use crate::{Activity, error::ActivityResult};
-use crate::{
-    ActivityAsset, ActivityError, ArticleAsset, AssetFunctionality, DefaultAsset, TwitterAsset,
-    YoutubeAsset,
-};
+use std::path::{Path, PathBuf};
+
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use eur_encrypt::{MainKey, encrypt_file_contents};
 use eur_fs::create_dirs_then_write;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use tokio::fs;
 use tracing::info;
+
+use crate::{Activity, ActivityAsset, ActivityError, AssetFunctionality, error::ActivityResult};
 
 /// Configuration for asset storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,8 +236,9 @@ fn sanitize_filename(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
+
+    use super::*;
 
     // Mock asset for testing
     struct MockAsset {
