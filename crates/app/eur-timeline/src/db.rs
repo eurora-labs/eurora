@@ -1,5 +1,6 @@
-use crate::{TimelineError, TimelineManager, TimelineResult};
 use eur_personal_db::Activity as DbActivity;
+
+use crate::{TimelineError, TimelineManager, TimelineResult};
 
 impl TimelineManager {
     pub async fn get_db_activity(&self) -> TimelineResult<DbActivity> {

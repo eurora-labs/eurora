@@ -1,5 +1,5 @@
-use eur_activity::{AssetFunctionality, snapshots};
-use eur_personal_db::{Asset, Conversation, NewAsset, PersonalDatabaseManager, UpdateConversation};
+use eur_activity::AssetFunctionality;
+use eur_personal_db::{Conversation, NewAsset, PersonalDatabaseManager, UpdateConversation};
 use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;

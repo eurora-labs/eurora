@@ -2,9 +2,6 @@
 pub use collector::{CollectorService, CollectorStats};
 pub use config::{CollectorConfig, FocusTrackingConfig, StorageConfig, TimelineConfig};
 pub use error::{TimelineError, TimelineResult};
-pub use manager::{TimelineManager, TimelineManagerBuilder, create_timeline};
-pub use storage::{StorageStats, TimelineStorage};
-
 // Re-export activity types for convenience
 pub use eur_activity::{
     Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStorage,
@@ -12,6 +9,8 @@ pub use eur_activity::{
     SaveableAsset, select_strategy_for_process,
 };
 pub use ferrous_llm_core::Message;
+pub use manager::{TimelineManager, TimelineManagerBuilder, create_timeline};
+pub use storage::{StorageStats, TimelineStorage};
 
 // Internal modules
 mod collector;

@@ -1,11 +1,11 @@
-use crate::shared_types::SharedAppSettings;
-use crate::util::convert_hotkey_to_shortcut;
 use eur_settings::{
     AppSettings, GeneralSettings, HoverSettings, LauncherSettings, TelemetrySettings,
 };
 use tauri::{Manager, Runtime};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tracing::info;
+
+use crate::{shared_types::SharedAppSettings, util::convert_hotkey_to_shortcut};
 
 #[taurpc::procedures(path = "settings")]
 pub trait SettingsApi {

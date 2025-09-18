@@ -1,14 +1,18 @@
 //! YouTube asset implementation
 
-use crate::ActivityResult;
-use crate::error::ActivityError;
-use crate::storage::SaveableAsset;
-use crate::types::{AssetFunctionality, ContextChip};
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use eur_native_messaging::NativeYoutubeAsset;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+use crate::{
+    ActivityResult,
+    error::ActivityError,
+    storage::SaveableAsset,
+    types::{AssetFunctionality, ContextChip},
+};
 
 /// Transcript line for YouTube videos
 #[derive(Debug, Clone, Serialize, Deserialize)]

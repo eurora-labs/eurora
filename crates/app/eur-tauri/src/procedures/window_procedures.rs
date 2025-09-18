@@ -1,6 +1,7 @@
-use crate::launcher::toggle_launcher_window as toggle_launcher;
 use tauri::{Manager, Runtime};
 use tracing::info;
+
+use crate::launcher::toggle_launcher_window as toggle_launcher;
 
 #[taurpc::procedures(path = "window")]
 pub trait WindowApi {

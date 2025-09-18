@@ -1,6 +1,7 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use eur_screen_position::ActiveMonitor;
 use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
-use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Emitter;
 use tracing::{error, info};
 

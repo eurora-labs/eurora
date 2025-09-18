@@ -1,5 +1,6 @@
-use eur_timeline::{TimelineConfig, TimelineManager};
 use std::time::Duration;
+
+use eur_timeline::{TimelineConfig, TimelineManager};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
