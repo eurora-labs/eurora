@@ -29,7 +29,7 @@
 		"jsdom": "^25.0.1",
 		"prettier": "^3.6.2",
 		"typescript": "^5.9.2",
-		"typescript-eslint": "^8.43.0",
+		"typescript-eslint": "^8.44.0",
 		"vite": "catalog:",
 		"vite-plugin-dts": "^4.5.3",
 		"vitest": "catalog:"
