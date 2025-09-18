@@ -1,7 +1,8 @@
 //! Configuration types for the timeline module
 
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
 
 /// Configuration for timeline storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
