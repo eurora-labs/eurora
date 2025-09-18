@@ -1,8 +1,9 @@
-use super::util::find_cursor_monitor;
-use crate::MonitorInfo;
 use enigo::{Enigo, Mouse, Settings};
 use tauri::PhysicalSize;
 use xcap::Monitor;
+
+use super::util::find_cursor_monitor;
+use crate::MonitorInfo;
 
 #[derive(Debug, Clone)]
 pub struct ImplActiveMonitor {
