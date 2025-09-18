@@ -3,7 +3,7 @@
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	export const contextChipVariants = tv({
-		base: 'context-chip inline-flex w-fit items-center gap-2 mx-2 p-2 text-[40px] leading-[40px] bg-transparent rounded-2xl backdrop-blur-sm text-black/70 [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+		base: 'context-chip inline-flex w-fit items-center gap-2 my-2 p-2 bg-transparent rounded-2xl backdrop-blur-sm text-black/70 [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
 		variants: {
 			variant: {
 				default: 'bg-white/30',
