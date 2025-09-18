@@ -4,14 +4,13 @@
 	import SiGoogledrive from '@icons-pack/svelte-simple-icons/icons/SiGoogledrive';
 
 	// import { LauncherNative as Launcher } from '@eurora/launcher';
-	import * as Launcher from '@eurora/ui/custom-components/launcher/index';
-	import { transcriptExtension } from '@eurora/ext-transcript/index';
+	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { Editor as ProsemirrorEditor } from '@eurora/prosemirror-core/index';
 	let editorRef: ProsemirrorEditor | undefined = $state(undefined);
 
 	let exampleInput = $state({
 		text: '',
-		extensions: [transcriptExtension()],
+		extensions: [],
 	});
 
 	function addExerciseSheet() {
