@@ -8,11 +8,14 @@ export function executeCommand(editorRef: Editor, command: ContextChip) {
 		const tr = state.tr;
 		const { schema } = state;
 		const nodes = schema.nodes;
+		console.log('position', command.position);
+		const position = Math.max(command.position ?? 1, 1);
 		tr.insert(
-			command.position ?? 0,
+			position,
+			// command.position ?? 0,
 			nodes[command.extension_id].createChecked(
 				{ id: command.id, name: command.name, ...command.attrs },
-				schema.text(command.name ?? ' '),
+				// schema.text(command.name ?? ' '),
 			),
 		);
 		dispatch?.(tr);

@@ -30,6 +30,7 @@
 	"devDependencies": {
 		"@eurora/eslint-config": "workspace:*",
 		"@eurora/prosemirror-core": "workspace:*",
+		"@eurora/prosemirror-view": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
