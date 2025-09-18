@@ -1,17 +1,18 @@
 //! Browser strategy implementation for the refactored activity system
 
-use crate::error::ActivityResult;
-use crate::types::{ActivityAsset, ActivitySnapshot};
-use crate::{ActivityError, ArticleAsset, TwitterAsset, YoutubeAsset};
-use crate::{ArticleSnapshot, TwitterSnapshot, YoutubeSnapshot};
-use eur_native_messaging::{
-    Channel, NativeArticleAsset, NativeMessage, TauriIpcClient, create_grpc_ipc_client,
-};
-use eur_proto::ipc::{self, MessageRequest};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
+use eur_proto::ipc::MessageRequest;
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
+
+use crate::{
+    ActivityError,
+    error::ActivityResult,
+    types::{ActivityAsset, ActivitySnapshot},
+};
 
 /// Browser strategy for collecting web browser activity data
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,11 +192,12 @@ impl BrowserStrategyFactory {
     }
 }
 
-use crate::registry::{
-    MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata,
-};
-use crate::strategies::ActivityStrategy;
 use async_trait::async_trait;
+
+use crate::{
+    registry::{MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata},
+    strategies::ActivityStrategy,
+};
 
 #[async_trait]
 impl StrategyFactory for BrowserStrategyFactory {
@@ -260,8 +262,9 @@ impl StrategyFactory for BrowserStrategyFactory {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ferrous_focus::IconData;
+
+    use super::*;
 
     #[test]
     fn test_supported_processes() {
