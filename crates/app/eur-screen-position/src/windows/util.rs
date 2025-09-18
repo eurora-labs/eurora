@@ -1,5 +1,6 @@
-use crate::{CursorMonitorResult, MonitorInfo};
 use xcap::Monitor;
+
+use crate::{CursorMonitorResult, MonitorInfo};
 
 /// Find the monitor that contains the given cursor position
 pub fn find_cursor_monitor(

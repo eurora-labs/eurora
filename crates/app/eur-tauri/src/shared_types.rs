@@ -1,11 +1,11 @@
-use crate::util::get_db_path;
 use anyhow::Result;
-use eur_settings::AppSettings;
-use tracing::info;
-
 use async_mutex::Mutex;
 use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use eur_prompt_kit::PromptKitService;
+use eur_settings::AppSettings;
+use tracing::info;
+
+use crate::util::get_db_path;
 pub type SharedPromptKitService = Mutex<Option<PromptKitService>>;
 pub type SharedAppSettings = Mutex<AppSettings>;
 pub type SharedCurrentConversation = Mutex<Option<Conversation>>;

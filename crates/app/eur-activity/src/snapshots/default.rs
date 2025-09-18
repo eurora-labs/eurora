@@ -1,8 +1,9 @@
 //! Default snapshot implementation for unsupported activity types
 
-use crate::types::SnapshotFunctionality;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
+
+use crate::types::SnapshotFunctionality;
 
 /// Default snapshot for activities that don't have specific implementations
 #[derive(Debug, Clone, Serialize, Deserialize)]
