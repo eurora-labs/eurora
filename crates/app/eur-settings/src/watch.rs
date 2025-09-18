@@ -1,13 +1,14 @@
-use crate::AppSettings;
-use anyhow::Result;
-use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
-use std::ops::{Deref, DerefMut};
-use std::path::Path;
 use std::{
-    path::PathBuf,
+    ops::{Deref, DerefMut},
+    path::{Path, PathBuf},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, mpsc},
     time::Duration,
 };
+
+use anyhow::Result;
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
+
+use crate::AppSettings;
 
 /// A monitor for [`Settings`] on disk which will keep its internal state in sync with
 /// what's on disk.

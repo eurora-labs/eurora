@@ -8,12 +8,10 @@ mod settings;
 mod watch;
 
 pub use hotkey::Hotkey;
-pub use settings::BackendSettings;
-pub use settings::BackendType;
-pub use settings::GeneralSettings;
-pub use settings::HoverSettings;
-pub use settings::LauncherSettings;
-pub use settings::TelemetrySettings;
+pub use settings::{
+    BackendSettings, BackendType, GeneralSettings, HoverSettings, LauncherSettings,
+    TelemetrySettings,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
 #[serde(rename_all = "camelCase")]
