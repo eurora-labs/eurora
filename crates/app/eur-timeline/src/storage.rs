@@ -1,15 +1,11 @@
 //! Timeline storage implementation
 
-use crate::Activity;
+use std::{collections::VecDeque, time::Duration};
+
 use chrono::{DateTime, Utc};
-use eur_fs::write;
-use std::collections::VecDeque;
-use std::path::PathBuf;
-use std::time::Duration;
 use tracing::{debug, info};
 
-use crate::config::StorageConfig;
-use crate::error::TimelineResult;
+use crate::{Activity, config::StorageConfig, error::TimelineResult};
 
 /// Timeline storage that manages activities with configurable retention
 pub struct TimelineStorage {
@@ -231,8 +227,9 @@ impl Default for TimelineStorage {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::time::Duration as StdDuration;
+
+    use super::*;
 
     fn create_test_activity(name: &str) -> Activity {
         Activity::new(

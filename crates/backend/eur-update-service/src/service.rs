@@ -1,17 +1,19 @@
 //! Core update service logic and S3 operations
 
+use std::time::Duration;
+
 use anyhow::{Context, Result};
 use aws_config::BehaviorVersion;
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::{Client as S3Client, presigning::PresigningConfig};
 use chrono::Utc;
 use semver::Version;
-use std::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
 
-use crate::error::UpdateServiceError;
-use crate::types::UpdateResponse;
-use crate::utils::{extract_version_from_key, parse_target_arch};
+use crate::{
+    error::UpdateServiceError,
+    types::UpdateResponse,
+    utils::{extract_version_from_key, parse_target_arch},
+};
 
 /// Application state containing the S3 client and configuration
 #[derive(Clone)]

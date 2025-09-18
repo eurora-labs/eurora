@@ -1,18 +1,28 @@
 //! Timeline collector service implementation
 
-use crate::{ActivityStrategy, select_strategy_for_process};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
+
 use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
-use tokio::sync::{Mutex, mpsc};
-use tokio::task::JoinHandle;
-use tokio::time;
+use tokio::{
+    sync::{Mutex, mpsc},
+    task::JoinHandle,
+    time,
+};
 use tracing::{debug, error, info, warn};
 
-use crate::config::CollectorConfig;
-use crate::error::{TimelineError, TimelineResult};
-use crate::storage::TimelineStorage;
+use crate::{
+    ActivityStrategy,
+    config::CollectorConfig,
+    error::{TimelineError, TimelineResult},
+    select_strategy_for_process,
+    storage::TimelineStorage,
+};
 
 /// Service responsible for collecting activities and managing the collection lifecycle
 pub struct CollectorService {
@@ -492,8 +502,9 @@ pub struct CollectorStats {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::time::Duration;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_collector_creation() {

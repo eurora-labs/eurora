@@ -1,16 +1,16 @@
 //! Default strategy implementation for unsupported applications
 
-use crate::error::ActivityResult;
-use crate::registry::{
-    MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata,
-};
-use crate::strategies::ActivityStrategy;
-use crate::types::{ActivityAsset, ActivitySnapshot};
-use crate::{DefaultAsset, DefaultSnapshot};
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
+
+use crate::{
+    DefaultAsset, DefaultSnapshot,
+    error::ActivityResult,
+    registry::{MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata},
+    strategies::ActivityStrategy,
+    types::{ActivityAsset, ActivitySnapshot},
+};
 
 /// Default strategy for applications that don't have specific implementations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,8 +102,9 @@ impl StrategyFactory for DefaultStrategyFactory {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ferrous_focus::IconData;
+
+    use super::*;
 
     #[test]
     fn test_default_strategy_creation() {

@@ -6,8 +6,10 @@ pub mod default;
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
 
-use crate::error::ActivityResult;
-use crate::types::{ActivityAsset, ActivitySnapshot};
+use crate::{
+    error::ActivityResult,
+    types::{ActivityAsset, ActivitySnapshot},
+};
 
 /// Enum containing all possible activity strategies
 #[derive(Debug, Clone)]

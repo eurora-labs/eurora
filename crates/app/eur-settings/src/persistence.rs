@@ -1,11 +1,15 @@
-use crate::AppSettings;
-use crate::json::{json_difference, merge_non_null_json_value};
-use crate::watch::SETTINGS_FILE;
+use std::path::Path;
+
 use anyhow::Result;
 use eur_fs::create_dirs_then_write;
 use serde_json::json;
 use serde_json_lenient::to_string_pretty;
-use std::path::Path;
+
+use crate::{
+    AppSettings,
+    json::{json_difference, merge_non_null_json_value},
+    watch::SETTINGS_FILE,
+};
 
 pub(crate) static DEFAULTS: &str = include_str!("../assets/defaults.jsonc");
 

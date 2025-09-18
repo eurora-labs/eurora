@@ -6,12 +6,13 @@
 //! - Save assets to disk
 //! - Retrieve saved asset information
 
+use std::path::PathBuf;
+
 use eur_activity::{
     Activity, ActivityAsset, ActivityStorage, ActivityStorageConfig, ArticleAsset,
     AssetFunctionality, DefaultAsset, TranscriptLine, TwitterAsset, TwitterContextType,
     TwitterTweet, YoutubeAsset, types::SaveFunctionality,
 };
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[tokio::main]

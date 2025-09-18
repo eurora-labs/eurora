@@ -1,5 +1,6 @@
-use crate::{CursorMonitorResult, MonitorInfo};
 use xcap::Monitor;
+
+use crate::{CursorMonitorResult, MonitorInfo};
 
 pub fn find_cursor_monitor(
     cursor_position: tauri::PhysicalPosition<f64>,

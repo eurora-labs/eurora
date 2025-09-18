@@ -1,11 +1,11 @@
 //! Twitter snapshot implementation
 
-use crate::types::SnapshotFunctionality;
-use crate::{ActivityResult, assets::twitter::TwitterTweet};
 use eur_native_messaging::types::NativeTwitterSnapshot;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::{ActivityResult, assets::twitter::TwitterTweet, types::SnapshotFunctionality};
 
 /// Type of Twitter interaction captured in the snapshot
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
