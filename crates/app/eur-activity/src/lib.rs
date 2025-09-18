@@ -14,44 +14,37 @@ pub mod strategies;
 pub mod types;
 
 // Re-export core types
-pub use error::{ActivityError, ActivityResult};
-pub use strategies::ActivityStrategy;
-pub use types::{
-    Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip, DisplayAsset,
-};
-
-// Re-export asset types
-pub use assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
+use std::sync::{Arc, OnceLock};
 
 // Re-export asset sub-types
 pub use assets::twitter::{TwitterContextType, TwitterTweet};
 pub use assets::youtube::TranscriptLine;
-
-// Re-export snapshot types
-pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSnapshot};
-
-// Re-export strategy types
-pub use strategies::{BrowserStrategy, DefaultStrategy};
-
+// Re-export asset types
+pub use assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
 // Re-export configuration types
 pub use config::{
     ActivityConfig, ActivityConfigBuilder, ApplicationConfig, GlobalConfig, PrivacyConfig,
     SnapshotFrequency, StrategyConfig,
 };
-
+pub use error::{ActivityError, ActivityResult};
+use ferrous_focus::IconData;
 // Re-export registry types
 pub use registry::{
     MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata,
     StrategyRegistry,
 };
-
+// Re-export snapshot types
+pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSnapshot};
 // Re-export storage types
 pub use storage::{ActivityStorage, ActivityStorageConfig, SaveableAsset, SavedAssetInfo};
-
-use ferrous_focus::IconData;
-use std::sync::{Arc, OnceLock};
+pub use strategies::ActivityStrategy;
+// Re-export strategy types
+pub use strategies::{BrowserStrategy, DefaultStrategy};
 use tokio::sync::Mutex;
 use tracing::info;
+pub use types::{
+    Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip, DisplayAsset,
+};
 
 /// Global strategy registry instance
 static GLOBAL_REGISTRY: OnceLock<Arc<Mutex<StrategyRegistry>>> = OnceLock::new();
@@ -113,9 +106,8 @@ pub async fn select_strategy_for_process(
 
 #[cfg(test)]
 mod tests {
-    use crate::types::SnapshotFunctionality;
-
     use super::*;
+    use crate::types::SnapshotFunctionality;
 
     #[test]
     fn test_activity_creation() {

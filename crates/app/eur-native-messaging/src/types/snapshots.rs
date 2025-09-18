@@ -1,6 +1,7 @@
-use crate::types::NativeTwitterTweet;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+
+use crate::types::NativeTwitterTweet;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
 pub struct NativeYoutubeSnapshot {
