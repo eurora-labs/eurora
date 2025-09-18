@@ -26,6 +26,7 @@ export interface ExtensionData {
 	sortedKeymaps: { [key: string]: { cmd: Cmd; priority: number }[] };
 	svelteNodes: { [name: string]: SveltePMNode<any> };
 }
+
 export interface SveltePMMark {
 	schema?: MarkSpec;
 	markView?: MarkViewConstructor;

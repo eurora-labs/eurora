@@ -6,6 +6,7 @@ import { keymap } from 'prosemirror-keymap';
 import { schema as defaultSchema } from 'prosemirror-schema-basic';
 import { addListNodes } from 'prosemirror-schema-list';
 import { type Command, Plugin } from 'prosemirror-state';
+import { caretAfterChip } from './plugins/caretAfterChip';
 
 export async function createExtensions(
 	editor: Editor,
@@ -92,6 +93,7 @@ export async function createExtensions(
 
 	const plugins = [
 		keymap(keymaps),
+		caretAfterChip,
 		...extensions.reduce(
 			(acc, ext) => [...acc, ...((ext.plugins && ext.plugins(editor, schema)) || [])],
 			[] as Plugin[],
