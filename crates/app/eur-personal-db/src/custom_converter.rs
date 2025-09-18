@@ -1,6 +1,7 @@
-use crate::{NewChatMessage, db::PersonalDatabaseManager, types::ChatMessage};
 use chrono::Utc;
 use ferrous_llm_core::{Message, MessageContent};
+
+use crate::{NewChatMessage, db::PersonalDatabaseManager, types::ChatMessage};
 
 impl PersonalDatabaseManager {
     pub async fn insert_chat_message_from_message(
