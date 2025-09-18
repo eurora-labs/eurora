@@ -1,16 +1,15 @@
 //! HTTP request handlers for the update service
 
+use std::sync::Arc;
+
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
 };
-use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
-use crate::error::error_to_http_response;
-use crate::service::AppState;
-use crate::types::UpdateParams;
+use crate::{error::error_to_http_response, service::AppState, types::UpdateParams};
 
 /// Handler for the update endpoint
 #[instrument(skip(state), fields(

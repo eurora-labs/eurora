@@ -3,9 +3,10 @@
 //! A Tauri-compatible update service that serves application updates from AWS S3.
 //! Supports multiple channels (nightly, release, beta) and cross-platform builds.
 
+use std::sync::Arc;
+
 use anyhow::{Context, Result};
 use axum::{Router, routing::get};
-use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
