@@ -1,13 +1,16 @@
 //! Strategy registry for dynamic activity strategy management
 
-use crate::error::{ActivityError, ActivityResult};
-use crate::strategies::ActivityStrategy;
+use std::{collections::HashMap, sync::Arc};
+
 use async_trait::async_trait;
 use ferrous_focus::IconData;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::Arc;
 use tracing::{debug, info, warn};
+
+use crate::{
+    error::{ActivityError, ActivityResult},
+    strategies::ActivityStrategy,
+};
 
 /// Score indicating how well a strategy matches a process
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]

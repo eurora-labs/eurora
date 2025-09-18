@@ -3,19 +3,22 @@
 //! This module contains the enum-based replacements for the previous trait object system,
 //! providing better performance, type safety, and cloneable activities.
 
-use crate::assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
-use crate::error::ActivityResult;
-use crate::snapshots::*;
-use crate::storage::{ActivityStorage, SaveableAsset, SavedAssetInfo};
+use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
 use eur_native_messaging::NativeMessage;
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use tracing::info;
 use uuid::Uuid;
+
+use crate::{
+    assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset},
+    error::ActivityResult,
+    snapshots::*,
+    storage::{ActivityStorage, SaveableAsset, SavedAssetInfo},
+};
 
 /// Context chip for UI integration
 #[taurpc::ipc_type]

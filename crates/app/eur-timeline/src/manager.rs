@@ -1,21 +1,20 @@
 //! High-level timeline manager implementation
 
-use crate::{
-    Activity, ActivityStorage, ActivityStorageConfig, ActivityStrategy, AssetFunctionality,
-    ContextChip, DisplayAsset, TimelineError,
-};
-use eur_activity::types::SnapshotFunctionality;
-use eur_activity::{ActivityAsset, SavedAssetInfo};
+use std::{path::PathBuf, sync::Arc};
+
+use eur_activity::{ActivityAsset, SavedAssetInfo, types::SnapshotFunctionality};
 use ferrous_llm_core::Message;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use crate::collector::{CollectorService, CollectorStats};
-use crate::config::TimelineConfig;
-use crate::error::TimelineResult;
-use crate::storage::{StorageStats, TimelineStorage};
+use crate::{
+    Activity, ActivityStorage, ActivityStorageConfig, ActivityStrategy, AssetFunctionality,
+    ContextChip, DisplayAsset, TimelineError,
+    collector::{CollectorService, CollectorStats},
+    config::TimelineConfig,
+    error::TimelineResult,
+    storage::{StorageStats, TimelineStorage},
+};
 
 /// Builder for creating TimelineManager instances
 pub struct TimelineManagerBuilder {
@@ -460,9 +459,10 @@ pub fn create_timeline(capacity: usize, interval_seconds: u64) -> TimelineResult
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
     use crate::config::TimelineConfig;
-    use std::time::Duration;
 
     fn create_test_activity(name: &str) -> Activity {
         crate::Activity::new(

@@ -31,8 +31,7 @@ use eur_tauri::{
     },
 };
 use eur_timeline::TimelineManager;
-use launcher::monitor_cursor_for_hover;
-use launcher::toggle_launcher_window;
+use launcher::{monitor_cursor_for_hover, toggle_launcher_window};
 use tauri::{
     AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
