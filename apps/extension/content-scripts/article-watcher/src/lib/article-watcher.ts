@@ -1,6 +1,10 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import {
+	createArticleAsset,
+	createArticleSnapshot,
+} from '@eurora/chrome-ext-shared/extensions/article/util';
+import { NativeResponse } from '@eurora/chrome-ext-shared/models';
 import { ArticleChromeMessage, type ArticleMessageType, type WatcherParams } from './types.js';
-import type { NativeArticleAsset, NativeArticleSnapshot } from '@eurora/chrome-ext-shared/bindings';
 import { Readability } from '@mozilla/readability';
 
 class ArticleWatcher extends Watcher<WatcherParams> {
@@ -49,45 +53,9 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 		response: (response?: any) => void,
 	) {
 		console.log('Generating article report for URL:', window.location.href);
-
-		try {
-			const clone = document.cloneNode(true) as Document;
-			const article = new Readability(clone).parse();
-
-			console.log('Parsed article:', article);
-
-			const reportData: NativeArticleAsset = {
-				content: article?.content || '',
-				text_content: article?.textContent || '',
-				title: article?.title || document.title,
-				site_name: article?.siteName || '',
-				language: article?.lang || '',
-				excerpt: article?.excerpt || '',
-				length: article?.length || 0,
-				selected_text: window.getSelection()?.toString() || '',
-			};
-
-			// Send response back to background script
-			response({ kind: 'NativeArticleAsset', data: reportData });
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			const contextualError = `Failed to generate article assets for ${window.location.href}: ${errorMessage}`;
-			console.error('Error generating article report:', {
-				url: window.location.href,
-				error: errorMessage,
-				stack: error instanceof Error ? error.stack : undefined,
-			});
-			response({
-				success: false,
-				error: contextualError,
-				context: {
-					url: window.location.href,
-					timestamp: new Date().toISOString(),
-				},
-			});
-		}
-
-		return true; // Important: indicates we'll send response asynchronously
+		const result = createArticleAsset(document);
+		response(result);
+		return result;
 	}
 
 	public handleGenerateSnapshot(
@@ -95,13 +63,10 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 		sender: chrome.runtime.MessageSender,
 		response: (response?: any) => void,
 	) {
-		const selectedText = window.getSelection()?.toString() || '';
-		const snapshot: NativeArticleSnapshot = {
-			highlighted_text: selectedText,
-		};
+		const result = createArticleSnapshot(window);
 
-		response({ kind: 'NativeArticleSnapshot', data: snapshot });
-		return true;
+		response(result);
+		return result;
 	}
 
 	/**

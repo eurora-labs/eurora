@@ -21,7 +21,7 @@ async function onMessageListener(message: { command: string }, sender: chrome.ru
 				})
 				.catch((error) => {
 					console.log('Error generating report', error);
-					sender.postMessage({ success: false, error: String(error) });
+					sender.postMessage(error);
 				});
 			return true; // Indicates we'll call sendResponse asynchronously
 		case 'GENERATE_SNAPSHOT':
@@ -115,18 +115,40 @@ async function handleGenerateReport() {
 			error?: string;
 			[key: string]: any;
 		};
+		const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' });
+		console.log('Async response:', response);
 
-		const response: Response = await new Promise((resolve, reject) =>
-			chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' }, (response) => {
-				if (chrome.runtime.lastError) {
-					reject({ error: chrome.runtime.lastError });
-				} else if (response?.error) {
-					reject({ error: response.error });
-				} else {
-					resolve(response);
-				}
-			}),
-		);
+		// const response: Response = await new Promise(
+		// 	(resolve, reject) => {
+		// 		chrome.tabs
+		// 			.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' })
+		// 			.then((response) => {
+		// 				console.log('Async response:', response);
+		// 				resolve(response);
+		// 			});
+		// 		// chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' }, (response) => {
+		// 		// 	console.log('Response:', response);
+		// 		// 	if (chrome.runtime.lastError) {
+		// 		// 		reject({ error: chrome.runtime.lastError });
+		// 		// 	} else if (response?.error) {
+		// 		// 		reject({ error: response.error });
+		// 		// 	} else {
+		// 		// 		resolve(response);
+		// 		// 	}
+		// 		// });
+		// 	},
+
+		// 	// chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' }, (response) => {
+		// 	// 	console.log('Response:', response);
+		// 	// 	if (chrome.runtime.lastError) {
+		// 	// 		reject({ error: chrome.runtime.lastError });
+		// 	// 	} else if (response?.error) {
+		// 	// 		reject({ error: response.error });
+		// 	// 	} else {
+		// 	// 		resolve(response);
+		// 	// 	}
+		// 	// }),
+		// );
 
 		return { success: true, ...response };
 	} catch (error) {
