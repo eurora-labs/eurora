@@ -36,38 +36,46 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 	) {
 		const { type } = obj;
 
+		let promise: Promise<any> | null = null;
+
 		switch (type) {
 			case 'NEW':
-				this.handleNew(obj, sender, response);
+				promise = this.handleNew(obj, sender);
 				break;
 			case 'PLAY':
-				this.handlePlay(obj, sender, response);
+				promise = this.handlePlay(obj, sender);
 				break;
 			case 'GENERATE_ASSETS':
-				this.handleGenerateAssets(obj, sender, response);
+				promise = this.handleGenerateAssets(obj, sender);
 				break;
 			case 'GENERATE_SNAPSHOT':
-				this.handleGenerateSnapshot(obj, sender, response);
+				promise = this.handleGenerateSnapshot(obj, sender);
 				break;
+			default:
+				response();
 		}
+
+		promise?.then((result) => {
+			response(result);
+		});
+
+		return true;
 	}
 
-	public handlePlay(
+	public async handlePlay(
 		obj: YoutubeChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
+	): Promise<any> {
 		const { value } = obj;
 		if (this.params.youtubePlayer) {
 			this.params.youtubePlayer.currentTime = value as number;
 		}
 	}
 
-	public handleNew(
+	public async handleNew(
 		obj: YoutubeChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
+	): Promise<any> {
 		const currentVideoId = getCurrentVideoId();
 		if (!currentVideoId) {
 			this.params.videoId = undefined;
@@ -76,24 +84,23 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		}
 		this.params.videoId = currentVideoId;
 
-		this.ensureTranscript(currentVideoId)
-			.then((transcript) => {
-				this.params.videoTranscript = transcript;
-			})
-			.catch((error) => {
-				console.error('Failed to get transcript:', error);
-				chrome.runtime.sendMessage({
-					type: 'SEND_TO_NATIVE',
-					payload: {
-						videoId: this.params.videoId,
-						error: error.message || 'Unknown error',
-						transcript: null,
-					},
-				});
+		try {
+			const transcript = await this.ensureTranscript(currentVideoId);
+			this.params.videoTranscript = transcript;
+		} catch (error) {
+			console.error('Failed to get transcript:', error);
+			chrome.runtime.sendMessage({
+				type: 'SEND_TO_NATIVE',
+				payload: {
+					videoId: this.params.videoId,
+					error: error.message || 'Unknown error',
+					transcript: null,
+				},
 			});
+		}
 	}
 
-	private generateVideoAsset(response: (response?: any) => void) {
+	private async generateVideoAsset(): Promise<any> {
 		try {
 			// Get current timestamp
 			const currentTime = this.getCurrentVideoTime();
@@ -107,21 +114,18 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 			};
 
 			if (reportData.transcript === '') {
-				this.ensureTranscript()
-					.then((transcript) => {
-						reportData.transcript = JSON.stringify(transcript);
-						response({ kind: 'NativeYoutubeAsset', data: reportData });
-					})
-					.catch((error) => {
-						response({
-							success: false,
-							error: `Failed to get transcript: ${error.message}`,
-						});
-					});
-				return true;
+				try {
+					const transcript = await this.ensureTranscript();
+					reportData.transcript = JSON.stringify(transcript);
+					return { kind: 'NativeYoutubeAsset', data: reportData };
+				} catch (error) {
+					return {
+						success: false,
+						error: `Failed to get transcript: ${error.message}`,
+					};
+				}
 			} else {
-				response({ kind: 'NativeYoutubeAsset', data: reportData });
-				return true;
+				return { kind: 'NativeYoutubeAsset', data: reportData };
 			}
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
@@ -133,7 +137,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				stack: error instanceof Error ? error.stack : undefined,
 			});
 
-			response({
+			return {
 				success: false,
 				error: contextualError,
 				context: {
@@ -141,27 +145,25 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 					videoId: this.params.videoId,
 					timestamp: new Date().toISOString(),
 				},
-			});
+			};
 		}
 	}
 
-	public handleGenerateAssets(
+	public async handleGenerateAssets(
 		obj: YoutubeChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
+	): Promise<any> {
 		if (window.location.href.includes('/watch?v=')) {
-			this.generateVideoAsset(response);
+			return await this.generateVideoAsset();
 		} else {
+			return null;
 		}
-		return true; // Important: indicates we'll send response asynchronously
 	}
 
-	public handleGenerateSnapshot(
+	public async handleGenerateSnapshot(
 		obj: YoutubeChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
+	): Promise<any> {
 		console.log('Generating snapshots for YouTube video');
 		const currentTime = this.getCurrentVideoTime();
 		const videoFrame = this.getCurrentVideoFrame();
@@ -174,8 +176,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 			// video_frame_format: videoFrame.format,
 		};
 
-		response({ kind: 'NativeYoutubeSnapshot', data: reportData });
-		return true;
+		return { kind: 'NativeYoutubeSnapshot', data: reportData };
 	}
 
 	getCurrentVideoFrame(): EurImage {
