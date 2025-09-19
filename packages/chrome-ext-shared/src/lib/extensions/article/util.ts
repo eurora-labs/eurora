@@ -1,5 +1,5 @@
 import { Readability } from '@mozilla/readability';
-import type { NativeArticleAsset, NativeArticleSnapshot } from '@eurora/chrome-ext-shared/bindings';
+import type { NativeArticleAsset, NativeArticleSnapshot } from '$lib/bindings.js';
 import type { NativeResponse } from '$lib/models';
 
 export function createArticleAsset(document: Document): NativeResponse {

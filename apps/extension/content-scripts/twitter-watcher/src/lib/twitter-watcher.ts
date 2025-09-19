@@ -52,11 +52,9 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 			case 'GENERATE_SNAPSHOT':
 				promise = this.handleGenerateSnapshot(obj, sender);
 				break;
-			case 'TEST':
-				this.handleTest(obj, sender, response);
-				break;
 			default:
 				response();
+				return false;
 		}
 
 		promise?.then((result) => {
@@ -84,16 +82,6 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 		});
 	}
 
-	public handleTest(
-		obj: TwitterChromeMessage,
-		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
-		const tweets = this.getTweetTexts();
-		console.log('Twitter test - found tweets:', tweets);
-		response({ tweets, count: tweets.length });
-	}
-
 	public async handleGenerateAssets(
 		obj: TwitterChromeMessage,
 		sender: chrome.runtime.MessageSender,
@@ -113,18 +101,16 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			const contextualError = `Failed to generate Twitter assets for ${window.location.href}: ${errorMessage}`;
+
 			console.error('Error generating Twitter report:', {
 				url: window.location.href,
 				error: errorMessage,
 				stack: error instanceof Error ? error.stack : undefined,
 			});
+
 			return {
-				success: false,
-				error: contextualError,
-				context: {
-					url: window.location.href,
-					timestamp: new Date().toISOString(),
-				},
+				kind: 'Error',
+				data: contextualError,
 			};
 		}
 	}
@@ -146,13 +132,15 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 			return { kind: 'NativeTwitterSnapshot', data: reportData };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
+
 			console.error('Error generating Twitter snapshot:', {
 				url: window.location.href,
 				error: errorMessage,
 			});
+
 			return {
-				success: false,
-				error: `Failed to generate Twitter snapshot: ${errorMessage}`,
+				kind: 'Error',
+				data: `Failed to generate Twitter snapshot: ${errorMessage}`,
 			};
 		}
 	}
