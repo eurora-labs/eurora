@@ -14,19 +14,16 @@ export abstract class Watcher<T> {
 		sender: chrome.runtime.MessageSender,
 		response: (response?: any) => void,
 	): void;
-	abstract handleNew(
-		obj: ChromeObj,
-		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	): void;
+
+	abstract handleNew(obj: ChromeObj, sender: chrome.runtime.MessageSender): Promise<void>;
+
 	abstract handleGenerateAssets(
 		obj: ChromeObj,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	): void;
+	): Promise<void>;
+
 	abstract handleGenerateSnapshot(
 		obj: ChromeObj,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	): void;
+	): Promise<void>;
 }
