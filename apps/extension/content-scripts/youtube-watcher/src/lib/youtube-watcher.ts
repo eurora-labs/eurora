@@ -2,6 +2,10 @@ import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { YoutubeChromeMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from './transcript/index.js';
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
+import {
+	createArticleAsset,
+	createArticleSnapshot,
+} from '@eurora/chrome-ext-shared/extensions/article/util';
 import type {
 	NativeYoutubeAsset,
 	NativeYoutubeSnapshot,
@@ -53,6 +57,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				break;
 			default:
 				response();
+				return false;
 		}
 
 		promise?.then((result) => {
@@ -120,8 +125,8 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 					return { kind: 'NativeYoutubeAsset', data: reportData };
 				} catch (error) {
 					return {
-						success: false,
-						error: `Failed to get transcript: ${error.message}`,
+						kind: 'Error',
+						data: `Failed to get transcript: ${error.message}`,
 					};
 				}
 			} else {
@@ -138,13 +143,8 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 			});
 
 			return {
-				success: false,
-				error: contextualError,
-				context: {
-					url: window.location.href,
-					videoId: this.params.videoId,
-					timestamp: new Date().toISOString(),
-				},
+				kind: 'Error',
+				data: `Failed to generate YouTube assets: ${contextualError}`,
 			};
 		}
 	}
@@ -156,7 +156,9 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		if (window.location.href.includes('/watch?v=')) {
 			return await this.generateVideoAsset();
 		} else {
-			return null;
+			const articleAsset = await createArticleAsset(document);
+			console.log('Generated article asset:', articleAsset);
+			return articleAsset;
 		}
 	}
 
@@ -187,11 +189,6 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		canvas.height = youtubePlayer.videoHeight;
 
 		canvas.getContext('2d')?.drawImage(youtubePlayer, 0, 0, canvas.width, canvas.height);
-
-		// const link = document.createElement('a');
-		// link.href = canvas.toDataURL('image/png');
-		// link.download = 'youtube-snapshot.png';
-		// link.click();
 
 		return {
 			dataBase64: canvas.toDataURL('image/png').split(',')[1],

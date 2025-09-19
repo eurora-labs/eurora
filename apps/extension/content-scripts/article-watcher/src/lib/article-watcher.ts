@@ -33,6 +33,7 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 				break;
 			default:
 				response();
+				return false;
 		}
 
 		promise?.then((result) => {
