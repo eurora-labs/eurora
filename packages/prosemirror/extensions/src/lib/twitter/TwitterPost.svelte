@@ -33,12 +33,10 @@
 			(acc, [key, value]) => ({ ...acc, [key]: { default: value } }),
 			{},
 		),
-		content: 'inline+',
 		group: 'inline',
 		inline: true,
-		defining: false,
 		atom: true,
-		selectable: false,
+		selectable: true,
 
 		parseDOM: [
 			{
