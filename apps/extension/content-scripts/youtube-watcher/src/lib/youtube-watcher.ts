@@ -2,7 +2,11 @@ import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { YoutubeChromeMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from './transcript/index.js';
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
-import type { NativeYoutubeAsset, NativeYoutubeSnapshot } from '@eurora/chrome-ext-shared/bindings';
+import type {
+	NativeYoutubeAsset,
+	NativeYoutubeSnapshot,
+	NativeArticleAsset,
+} from '@eurora/chrome-ext-shared/bindings';
 
 interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
@@ -89,11 +93,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 			});
 	}
 
-	public handleGenerateAssets(
-		obj: YoutubeChromeMessage,
-		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
+	private generateVideoAsset(response: (response?: any) => void) {
 		try {
 			// Get current timestamp
 			const currentTime = this.getCurrentVideoTime();
@@ -105,15 +105,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 					: '',
 				current_time: Math.round(currentTime),
 			};
-			// const reportData = create(ProtoNativeYoutubeStateSchema, {
-			// 	type: 'YOUTUBE_STATE',
-			// 	url: window.location.href,
-			// 	title: document.title,
-			// 	transcript: this.params.videoTranscript
-			// 		? JSON.stringify(this.params.videoTranscript)
-			// 		: '',
-			// 	currentTime: Math.round(currentTime),
-			// });
+
 			if (reportData.transcript === '') {
 				this.ensureTranscript()
 					.then((transcript) => {
@@ -140,6 +132,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				error: errorMessage,
 				stack: error instanceof Error ? error.stack : undefined,
 			});
+
 			response({
 				success: false,
 				error: contextualError,
@@ -150,7 +143,17 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				},
 			});
 		}
+	}
 
+	public handleGenerateAssets(
+		obj: YoutubeChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: any) => void,
+	) {
+		if (window.location.href.includes('/watch?v=')) {
+			this.generateVideoAsset(response);
+		} else {
+		}
 		return true; // Important: indicates we'll send response asynchronously
 	}
 
