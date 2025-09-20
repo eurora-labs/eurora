@@ -229,15 +229,23 @@
 			});
 		}
 	}
+
+	function triggerResizing(height: number) {
+		console.log('resized to ', height);
+		taurpc.window.resize_launcher_window(Math.ceil(height), 1).then(() => {
+			console.log('resized to ', height);
+		});
+	}
 </script>
 
-<div class="backdrop-custom relative h-full overflow-hidden">
+<div class="backdrop-custom relative overflow-hidden">
 	{#if promptKitServiceAvailable}
 		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0">
 			<Launcher.Input
 				placeholder="What can I help you with?"
 				bind:query={searchQuery}
 				bind:editorRef
+				onheightchange={triggerResizing}
 				onkeydown={handleKeydown}
 				class="min-h-[100px] h-fit w-full text-[40px]"
 			/>
@@ -297,7 +305,7 @@
 ></div> -->
 
 <div
-	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
+	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-full w-screen"
 	style="filter:url(#blur-bright)"
 	bind:this={backdropCustom2Ref}
 ></div>
