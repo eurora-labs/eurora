@@ -3,9 +3,7 @@ import {
 	createArticleAsset,
 	createArticleSnapshot,
 } from '@eurora/chrome-ext-shared/extensions/article/util';
-import { NativeResponse } from '@eurora/chrome-ext-shared/models';
 import { ArticleChromeMessage, type ArticleMessageType, type WatcherParams } from './types.js';
-import { Readability } from '@mozilla/readability';
 
 class ArticleWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
@@ -49,9 +47,8 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 	): Promise<any> {
 		console.log('Article Watcher: New article detected');
 		// Parse article on page load for caching
-		const clone = document.cloneNode(true) as Document;
-		const article = new Readability(clone).parse();
-		console.log('Parsed article:', article);
+		const result = createArticleAsset(document);
+		console.log('Parsed article:', result);
 	}
 
 	public async handleGenerateAssets(
@@ -79,9 +76,7 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 
 	// Parse article on page load
 	window.addEventListener('load', () => {
-		const clone = document.cloneNode(true) as Document;
-		const article = new Readability(clone).parse();
-		console.log('Parsed article on load:', article);
+		const result = createArticleAsset(document);
 	});
 
 	chrome.runtime.onMessage.addListener(watcher.listen.bind(watcher));
