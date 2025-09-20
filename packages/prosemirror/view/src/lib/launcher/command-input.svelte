@@ -36,7 +36,7 @@
 	</div>
 	<div class="mr-2 w-2 shrink-0"></div>
 	<div
-		class="flex flex-col justify-center items-center w-full h-full py-4"
+		class="flex flex-col justify-center items-center w-full h-full py-0"
 		style="min-height: inherit"
 	>
 		<CommandPrimitive.Input
