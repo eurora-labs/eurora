@@ -502,9 +502,6 @@ importers:
       '@eurora/typescript-config':
         specifier: workspace:*
         version: link:../../../../packages/typescript-config
-      '@mozilla/readability':
-        specifier: ^0.6.0
-        version: 0.6.0
       '@playwright/test':
         specifier: ^1.55.0
         version: 1.55.0
@@ -1182,6 +1179,9 @@ importers:
       '@lucide/svelte':
         specifier: ^0.544.0
         version: 0.544.0(svelte@5.39.2)
+      '@mozilla/readability':
+        specifier: ^0.6.0
+        version: 0.6.0
       '@playwright/test':
         specifier: ^1.55.0
         version: 1.55.0
