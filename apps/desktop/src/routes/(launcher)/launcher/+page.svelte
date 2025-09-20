@@ -229,6 +229,13 @@
 			});
 		}
 	}
+
+	function triggerResizing(height: number) {
+		console.log('resized to ', height);
+		taurpc.window.resize_launcher_window(Math.ceil(height), 1).then(() => {
+			console.log('resized to ', height);
+		});
+	}
 </script>
 
 <div class="backdrop-custom relative overflow-hidden">
@@ -238,6 +245,7 @@
 				placeholder="What can I help you with?"
 				bind:query={searchQuery}
 				bind:editorRef
+				onheightchange={triggerResizing}
 				onkeydown={handleKeydown}
 				class="min-h-[100px] h-fit w-full text-[40px]"
 			/>
@@ -276,7 +284,7 @@
 	<filter id="blur-bright" filterUnits="objectBoundingBox">
 		<feGaussianBlur
 			in="SourceGraphic"
-			stdDeviation="0"
+			stdDeviation="36"
 			edgeMode="duplicate"
 			result="blur"
 			color-interpolation-filters="sRGB"
