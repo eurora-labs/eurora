@@ -32,7 +32,7 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 				promise = this.handleGenerateSnapshot(obj, sender);
 				break;
 			default:
-				response();
+				response({ kind: 'Error', data: 'Invalid message type' });
 				return false;
 		}
 
