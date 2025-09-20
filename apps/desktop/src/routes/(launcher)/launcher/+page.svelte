@@ -231,7 +231,7 @@
 	}
 </script>
 
-<div class="backdrop-custom relative h-full overflow-hidden">
+<div class="backdrop-custom relative overflow-hidden">
 	{#if promptKitServiceAvailable}
 		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0">
 			<Launcher.Input
@@ -276,7 +276,7 @@
 	<filter id="blur-bright" filterUnits="objectBoundingBox">
 		<feGaussianBlur
 			in="SourceGraphic"
-			stdDeviation="36"
+			stdDeviation="0"
 			edgeMode="duplicate"
 			result="blur"
 			color-interpolation-filters="sRGB"
@@ -297,7 +297,7 @@
 ></div> -->
 
 <div
-	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
+	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-full w-screen"
 	style="filter:url(#blur-bright)"
 	bind:this={backdropCustom2Ref}
 ></div>
