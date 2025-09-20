@@ -38,7 +38,10 @@ impl WindowApi for WindowApiImpl {
         height: f64,
     ) -> Result<f64, String> {
         let window = app_handle.get_window("launcher").unwrap();
-        let current_size = window.inner_size().unwrap();
+
+        let sf = window.scale_factor();
+        info!("scale_factor: {:?}", sf);
+        let current_size = window.outer_size().unwrap();
         let scale_factor = (current_size.height as f64) / (height);
         Ok(scale_factor)
     }
