@@ -2,15 +2,8 @@ import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { YoutubeChromeMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from './transcript/index.js';
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
-import {
-	createArticleAsset,
-	createArticleSnapshot,
-} from '@eurora/chrome-ext-shared/extensions/article/util';
-import type {
-	NativeYoutubeAsset,
-	NativeYoutubeSnapshot,
-	NativeArticleAsset,
-} from '@eurora/chrome-ext-shared/bindings';
+import { createArticleAsset } from '@eurora/chrome-ext-shared/extensions/article/util';
+import type { NativeYoutubeAsset, NativeYoutubeSnapshot } from '@eurora/chrome-ext-shared/bindings';
 
 interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
