@@ -8,6 +8,7 @@
 		query?: Query;
 		value?: string;
 		class?: ClassValue;
+		onheightchange?: (height: number) => void;
 	}
 </script>
 
@@ -19,6 +20,7 @@
 		ref = $bindable(),
 		query = $bindable(),
 		value = $bindable(''),
+		onheightchange,
 		class: className,
 		...restProps
 	}: Props = $props();
@@ -37,6 +39,7 @@
 <Editor
 	bind:this={ref}
 	bind:value
+	{onheightchange}
 	class={cn(className, 'ProsemirrorEditor shadow-none')}
 	{...restProps}
 />
