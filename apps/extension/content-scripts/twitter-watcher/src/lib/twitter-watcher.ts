@@ -1,5 +1,5 @@
 import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
-import { TwitterChromeMessage, type TwitterMessageType, type WatcherParams } from './types.js';
+import type { TwitterChromeMessage, WatcherParams } from './types.js';
 
 import type {
 	NativeTwitterAsset,
@@ -40,27 +40,34 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 	) {
 		const { type } = obj;
 
+		let promise: Promise<any> | null = null;
+
 		switch (type) {
 			case 'NEW':
-				this.handleNew(obj, sender, response);
+				promise = this.handleNew(obj, sender);
 				break;
 			case 'GENERATE_ASSETS':
-				this.handleGenerateAssets(obj, sender, response);
+				promise = this.handleGenerateAssets(obj, sender);
 				break;
 			case 'GENERATE_SNAPSHOT':
-				this.handleGenerateSnapshot(obj, sender, response);
+				promise = this.handleGenerateSnapshot(obj, sender);
 				break;
-			case 'TEST':
-				this.handleTest(obj, sender, response);
-				break;
+			default:
+				response({ kind: 'Error', data: 'Invalid message type' });
+				return false;
 		}
+
+		promise?.then((result) => {
+			response(result);
+		});
+
+		return true;
 	}
 
-	public handleNew(
+	public async handleNew(
 		obj: TwitterChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
+	): Promise<any> {
 		// Update current URL and page info
 		this.params.currentUrl = window.location.href;
 		this.params.pageTitle = document.title;
@@ -75,21 +82,10 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 		});
 	}
 
-	public handleTest(
+	public async handleGenerateAssets(
 		obj: TwitterChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
-		const tweets = this.getTweetTexts();
-		console.log('Twitter test - found tweets:', tweets);
-		response({ tweets, count: tweets.length });
-	}
-
-	public handleGenerateAssets(
-		obj: TwitterChromeMessage,
-		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
+	): Promise<any> {
 		try {
 			// Get current tweet texts
 			const currentTweets = this.getTweetTexts();
@@ -101,34 +97,28 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 				timestamp: new Date().toISOString(),
 			};
 
-			response({ kind: 'NativeTwitterAsset', data: reportData });
-			return true;
+			return { kind: 'NativeTwitterAsset', data: reportData };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			const contextualError = `Failed to generate Twitter assets for ${window.location.href}: ${errorMessage}`;
+
 			console.error('Error generating Twitter report:', {
 				url: window.location.href,
 				error: errorMessage,
 				stack: error instanceof Error ? error.stack : undefined,
 			});
-			response({
-				success: false,
-				error: contextualError,
-				context: {
-					url: window.location.href,
-					timestamp: new Date().toISOString(),
-				},
-			});
-		}
 
-		return true; // Important: indicates we'll send response asynchronously
+			return {
+				kind: 'Error',
+				data: contextualError,
+			};
+		}
 	}
 
-	public handleGenerateSnapshot(
+	public async handleGenerateSnapshot(
 		obj: TwitterChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	) {
+	): Promise<any> {
 		console.log('Generating snapshot for Twitter page');
 
 		try {
@@ -139,22 +129,20 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 				timestamp: new Date().toISOString(),
 			};
 
-			response({ kind: 'NativeTwitterSnapshot', data: reportData });
-
-			return true;
+			return { kind: 'NativeTwitterSnapshot', data: reportData };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
+
 			console.error('Error generating Twitter snapshot:', {
 				url: window.location.href,
 				error: errorMessage,
 			});
-			response({
-				success: false,
-				error: `Failed to generate Twitter snapshot: ${errorMessage}`,
-			});
-		}
 
-		return true;
+			return {
+				kind: 'Error',
+				data: `Failed to generate Twitter snapshot: ${errorMessage}`,
+			};
+		}
 	}
 }
 
