@@ -1,8 +1,12 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    sync::atomic::{AtomicBool, Ordering},
+    time::Instant,
+};
 
+use crate::procedures::window_procedures::{LauncherInfo, TauRpcWindowApiEventTrigger};
 use eur_screen_position::ActiveMonitor;
 use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tracing::{error, info};
 
 // Shared state to track if launcher is visible
@@ -170,7 +174,8 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     let (capture_x, capture_y) =
         active_monitor.convert_absolute_position_to_relative(launcher_x, launcher_y);
     // Capture the screen region behind the launcher
-    match capture_focused_region_rgba(
+
+    let background_image = match capture_focused_region_rgba(
         monitor.id.clone(),
         capture_x as u32,
         capture_y as u32,
@@ -188,15 +193,21 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
             // Convert the image to base64
             if let Ok(base64_image) = image_to_base64(img) {
                 // Send the base64 image to the frontend
-                launcher
-                    .emit("background_image", base64_image)
-                    .map_err(|e| format!("Failed to emit background_image event: {}", e))?;
+                // launcher
+                //     .emit("background_image", base64_image)
+                //     .map_err(|e| format!("Failed to emit background_image event: {}", e))?;
+                Some(base64_image)
+            } else {
+                error!("Failed to convert image to base64");
+                None
             }
         }
         Err(e) => {
             error!("Failed to capture screen region: {}", e);
+            None
         }
-    }
+    };
+
     let duration = start_record.elapsed();
     info!("Capture of background area completed in: {:?}", duration);
 
@@ -207,6 +218,30 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
 
     // Emit an event to notify that the launcher has been opened
     // Include positioning information for proper background alignment
+
+    let launcher_info = LauncherInfo {
+        background_image,
+        monitor_id: monitor.id.clone(),
+        launcher_x: launcher_x,
+        launcher_y: launcher_y,
+        launcher_width: window_size.width,
+        launcher_height: window_size.height,
+        monitor_width: monitor.width,
+        monitor_height: monitor.height,
+    };
+
+    // Measure time
+    let app_clone = launcher.app_handle().clone();
+    let start_record = Instant::now();
+
+    TauRpcWindowApiEventTrigger::new(app_clone)
+        .launcher_opened(launcher_info)
+        .map_err(|e| e.to_string())?;
+
+    let duration = start_record.elapsed();
+    info!("taurpc event time: {:?}", duration);
+
+    let start_record = Instant::now();
     let launcher_info = serde_json::json!({
         "monitor_id": monitor.id.clone(),
         "launcher_x": launcher_x,
@@ -219,6 +254,8 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     launcher
         .emit("launcher_opened", launcher_info)
         .map_err(|e| format!("Failed to emit launcher_opened event: {}", e))?;
+    let duration = start_record.elapsed();
+    info!("native event time: {:?}", duration);
 
     launcher
         .set_focus()
