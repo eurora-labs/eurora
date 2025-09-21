@@ -9,6 +9,7 @@
 		type Message,
 		type Conversation,
 		type ContextChip,
+		type LauncherInfo,
 	} from '$lib/bindings/bindings.js';
 
 	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
@@ -52,15 +53,7 @@
 
 	let backgroundImage = $state<string | null>(null);
 	let currentMonitorId = $state<string>('');
-	let launcherInfo = $state<{
-		monitor_id: string;
-		launcher_x: number;
-		launcher_y: number;
-		launcher_width: number;
-		launcher_height: number;
-		monitor_width: number;
-		monitor_height: number;
-	} | null>(null);
+	let launcherInfo = $state<LauncherInfo | null>(null);
 	let chatRef = $state<Chat | null>(null);
 
 	// Listen for launcher closed event to clear messages and reset conversation
@@ -70,6 +63,29 @@
 		// Reset current conversation ID to null to default to NEW on next interaction
 		conversation = null;
 		console.log('Launcher closed: cleared messages and reset conversation');
+	});
+
+	taurpc.window.launcher_opened.on(async (info) => {
+		await isPromptKitServiceAvailable();
+		if (editorRef) {
+			clearQuery(editorRef);
+		}
+		// Reload activities when launcher is opened
+		loadActivities();
+
+		// Store the launcher information from the event payload
+		launcherInfo = info;
+		currentMonitorId = launcherInfo?.monitor_id || '';
+		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
+
+		backgroundImage = info.background_image;
+
+		if (backdropCustom2Ref) {
+			backdropCustom2Ref.style.backgroundImage = `url('${backgroundImage}')`;
+			backdropCustom2Ref.style.backgroundSize = 'cover';
+			backdropCustom2Ref.style.backgroundPosition = 'center';
+			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+		}
 	});
 
 	// Listen for launcher opened event to refresh activities

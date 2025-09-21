@@ -5,11 +5,11 @@
 
 use dotenv::dotenv;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
-mod launcher;
-mod util;
 use eur_encrypt::MainKey;
 use eur_native_messaging::create_grpc_ipc_client;
 use eur_settings::AppSettings;
+use eur_tauri::launcher::{monitor_cursor_for_hover, toggle_launcher_window};
+use eur_tauri::util;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
     procedures::{
@@ -31,7 +31,6 @@ use eur_tauri::{
     },
 };
 use eur_timeline::TimelineManager;
-use launcher::{monitor_cursor_for_hover, toggle_launcher_window};
 use tauri::{
     AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
