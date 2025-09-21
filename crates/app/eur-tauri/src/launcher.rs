@@ -5,7 +5,10 @@ use std::{
 
 use crate::procedures::window_procedures::{LauncherInfo, TauRpcWindowApiEventTrigger};
 use eur_screen_position::ActiveMonitor;
-use eur_vision::{capture_focused_region_rgba, get_all_monitors, image_to_base64};
+use eur_vision::{
+    capture_focused_region_rgba, capture_monitor, capture_monitor_by_id, get_all_monitors,
+    image_to_base64,
+};
 use tauri::{Emitter, Manager};
 use tracing::{error, info};
 
@@ -173,8 +176,21 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     // Convert absolute launcher position across all screens to relative position on monitor
     let (capture_x, capture_y) =
         active_monitor.convert_absolute_position_to_relative(launcher_x, launcher_y);
-    // Capture the screen region behind the launcher
 
+    let monitor_image_app = launcher.app_handle().clone();
+    let monitor_id = monitor.id.clone();
+    tauri::async_runtime::spawn(async move {
+        let monitor_image = capture_monitor_by_id(monitor_id.clone()).unwrap();
+        let img = image::DynamicImage::ImageRgba8(monitor_image).to_rgb8();
+        let base64 = image_to_base64(img).unwrap();
+
+        TauRpcWindowApiEventTrigger::new(monitor_image_app)
+            .background_image_changed(base64)
+            .map_err(|e| e.to_string())
+            .unwrap();
+    });
+
+    // Capture the screen region behind the launcher
     let background_image = match capture_focused_region_rgba(
         monitor.id.clone(),
         capture_x as u32,
@@ -222,12 +238,16 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     let launcher_info = LauncherInfo {
         background_image,
         monitor_id: monitor.id.clone(),
-        launcher_x: launcher_x,
-        launcher_y: launcher_y,
+        launcher_x,
+        launcher_y,
         launcher_width: window_size.width,
         launcher_height: window_size.height,
         monitor_width: monitor.width,
         monitor_height: monitor.height,
+        monitor_x: monitor.x,
+        monitor_y: monitor.y,
+        capture_x,
+        capture_y,
     };
 
     // Measure time
