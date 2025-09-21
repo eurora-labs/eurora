@@ -1,27 +1,26 @@
 <script lang="ts">
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import { scaleFactor } from './scaleFactor.svelte.js';
 	import { onMount } from 'svelte';
 	import { platform } from '@tauri-apps/plugin-os';
-	import { listen } from '@tauri-apps/api/event';
 
 	// Create TauRPC proxy
 	const taurpc = createTauRPCProxy();
 
 	let { children } = $props();
 	let mainRef = $state<HTMLElement | null>(null);
-	let scaleFactor = $state<number>(1.0);
 
 	function resizeWindow() {
 		if (!mainRef) return;
 		try {
 			// Use TauRPC resize_launcher_window
-			taurpc.window.resize_launcher_window(100, scaleFactor);
+			taurpc.window.resize_launcher_window(100, scaleFactor.value);
 		} catch (error) {
 			console.error('Failed to resize window:', error);
 		}
 	}
 
-	listen<any>('launcher_opened', (event) => {
+	taurpc.window.launcher_opened.on(async (info) => {
 		console.log(
 			'scroll height:',
 			mainRef?.clientHeight,
@@ -29,9 +28,9 @@
 			mainRef?.offsetHeight,
 		);
 		taurpc.window.get_scale_factor(mainRef?.scrollHeight || 100).then(async (result) => {
-			scaleFactor = result;
+			scaleFactor.value = result;
 			console.log('Scale factor:', scaleFactor);
-			taurpc.window.resize_launcher_window(100, scaleFactor).then(() => {
+			taurpc.window.resize_launcher_window(100, scaleFactor.value).then(() => {
 				console.log('Window resized');
 			});
 

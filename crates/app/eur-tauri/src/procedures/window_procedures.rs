@@ -13,6 +13,10 @@ pub struct LauncherInfo {
     pub launcher_height: u32,
     pub monitor_width: u32,
     pub monitor_height: u32,
+    pub monitor_x: i32,
+    pub monitor_y: i32,
+    pub capture_x: i32,
+    pub capture_y: i32,
 }
 
 #[taurpc::procedures(path = "window")]
