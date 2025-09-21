@@ -2,6 +2,7 @@
 	import 'katex/dist/katex.min.css';
 	import Katex from '$lib/components/katex.svelte';
 	import { listen } from '@tauri-apps/api/event';
+	import { scaleFactor } from './scaleFactor.svelte.js';
 	import {
 		createTauRPCProxy,
 		type ResponseChunk,
@@ -80,27 +81,36 @@
 
 		backgroundImage = info.background_image;
 
-		if (backdropCustom2Ref) {
-			backdropCustom2Ref.style.backgroundImage = `url('${backgroundImage}')`;
+		if (backdropCustom2Ref && launcherInfo) {
+			// For the initial relative image, we can use cover since it's already cropped to the launcher area
 			backdropCustom2Ref.style.backgroundSize = 'cover';
 			backdropCustom2Ref.style.backgroundPosition = 'center';
 			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+
+			backdropCustom2Ref.style.backgroundImage = `url('${backgroundImage}')`;
 		}
 	});
 
-	// Listen for launcher opened event to refresh activities
-	listen<any>('launcher_opened', async (event) => {
-		await isPromptKitServiceAvailable();
-		if (editorRef) {
-			clearQuery(editorRef);
-		}
-		// Reload activities when launcher is opened
-		loadActivities();
+	taurpc.window.background_image_changed.on(async (fullImageB64) => {
+		// Replace the small relative background image with full monitor image while preserving the coordinates
+		backgroundImage = fullImageB64;
+		const scale = scaleFactor.value;
 
-		// Store the launcher information from the event payload
-		launcherInfo = event.payload;
-		currentMonitorId = launcherInfo?.monitor_id || '';
-		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
+		if (backdropCustom2Ref && launcherInfo) {
+			// Preload the image to avoid white flash during switch
+			const img = new Image();
+			img.onload = () => {
+				console.log('Image size', img.width, img.height);
+				// Only switch once the image is fully loaded
+				if (backdropCustom2Ref && launcherInfo) {
+					backdropCustom2Ref.style.backgroundImage = `url('${fullImageB64}')`;
+					backdropCustom2Ref.style.backgroundSize = `${img.width / scale}px ${img.height / scale}px`;
+					backdropCustom2Ref.style.backgroundPosition = `${-launcherInfo.capture_x / scale}px ${-launcherInfo.capture_y / scale}px`;
+					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+				}
+			};
+			img.src = fullImageB64;
+		}
 	});
 
 	async function isPromptKitServiceAvailable() {
@@ -121,18 +131,6 @@
 			console.error('open_main_window failed', e);
 		}
 	}
-
-	// Listen for background image event
-	listen<string>('background_image', (event) => {
-		backgroundImage = event.payload;
-
-		if (backdropCustom2Ref) {
-			backdropCustom2Ref.style.backgroundImage = `url('${event.payload}')`;
-			backdropCustom2Ref.style.backgroundSize = 'cover';
-			backdropCustom2Ref.style.backgroundPosition = 'center';
-			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-		}
-	});
 
 	// Set up global keydown event listener for Escape key
 	function handleEscapeKey(event: KeyboardEvent) {
@@ -300,7 +298,7 @@
 	<filter id="blur-bright" filterUnits="objectBoundingBox">
 		<feGaussianBlur
 			in="SourceGraphic"
-			stdDeviation="36"
+			stdDeviation="0"
 			edgeMode="duplicate"
 			result="blur"
 			color-interpolation-filters="sRGB"
@@ -321,7 +319,7 @@
 ></div> -->
 
 <div
-	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-full w-screen"
+	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
 	style="filter:url(#blur-bright)"
 	bind:this={backdropCustom2Ref}
 ></div>
@@ -337,8 +335,6 @@
 
 	:global(.backdrop-custom-2) {
 		z-index: 1;
-		width: 100%;
-		height: 100%;
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
 		background-color: rgba(255, 255, 255, 0.2);
@@ -346,14 +342,12 @@
 	:global(body.linux-app .backdrop-custom) {
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
-		background: transparent;
 		background-color: transparent;
 	}
 
 	:global(body.linux-app .backdrop-custom-2) {
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
-		background: transparent;
 		background-color: transparent;
 	}
 

@@ -87,7 +87,7 @@ export type ImageSource =
  */
 { Url: string }
 
-export type LauncherInfo = { background_image: string | null; monitor_id: string; launcher_x: number; launcher_y: number; launcher_width: number; launcher_height: number; monitor_width: number; monitor_height: number }
+export type LauncherInfo = { background_image: string | null; monitor_id: string; launcher_x: number; launcher_y: number; launcher_width: number; launcher_height: number; monitor_width: number; monitor_height: number; monitor_x: number; monitor_y: number; capture_x: number; capture_y: number }
 
 export type LauncherSettings = { hotkey?: Hotkey }
 
