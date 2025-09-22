@@ -17,6 +17,7 @@ pub struct LauncherInfo {
     pub monitor_y: i32,
     pub capture_x: i32,
     pub capture_y: i32,
+    pub monitor_scale_factor: f64,
 }
 
 #[taurpc::procedures(path = "window")]
@@ -37,6 +38,7 @@ pub trait WindowApi {
 
     async fn resize_launcher_window<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
+        width: u32,
         height: u32,
         scale_factor: f64,
     ) -> Result<(), String>;
@@ -64,16 +66,22 @@ impl WindowApi for WindowApiImpl {
     ) -> Result<f64, String> {
         let window = app_handle.get_window("launcher").unwrap();
 
-        let sf = window.scale_factor();
-        info!("scale_factor: {:?}", sf);
-        let current_size = window.outer_size().unwrap();
-        let scale_factor = (current_size.height as f64) / (height);
-        Ok(scale_factor)
+        #[cfg(windows)]
+        {
+            Ok(window.scale_factor().unwrap_or(1.0))
+        }
+        #[cfg(not(windows))]
+        {
+            let current_size = window.inner_size().unwrap();
+            let scale_factor = (current_size.height as f64) / (height);
+            Ok(scale_factor)
+        }
     }
 
     async fn resize_launcher_window<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
+        width: u32,
         height: u32,
         scale_factor: f64,
     ) -> Result<(), String> {
@@ -82,11 +90,13 @@ impl WindowApi for WindowApiImpl {
             height, scale_factor
         );
         let window = app_handle.get_window("launcher").unwrap();
-        let new_height = height as f64 * scale_factor;
-        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
-            width: 1024,
-            height: new_height as u32,
-        }));
+        // let new_height = height as f64 * scale_factor;
+        // let new_width = width as f64 * scale_factor;
+
+        let _ = window.set_size(
+            tauri::Size::Physical(tauri::PhysicalSize { width, height })
+                .to_logical::<f64>(1.0 / scale_factor),
+        );
         Ok(())
     }
 

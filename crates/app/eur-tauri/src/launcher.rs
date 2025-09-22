@@ -253,6 +253,7 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
         monitor_y: monitor.y,
         capture_x,
         capture_y,
+        monitor_scale_factor: monitor.scale_factor,
     };
 
     // Measure time
