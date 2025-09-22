@@ -3,8 +3,33 @@ use tracing::info;
 
 use crate::launcher::toggle_launcher_window as toggle_launcher;
 
+#[taurpc::ipc_type]
+pub struct LauncherInfo {
+    pub background_image: Option<String>,
+    pub monitor_id: String,
+    pub launcher_x: i32,
+    pub launcher_y: i32,
+    pub launcher_width: u32,
+    pub launcher_height: u32,
+    pub monitor_width: u32,
+    pub monitor_height: u32,
+    pub monitor_x: i32,
+    pub monitor_y: i32,
+    pub capture_x: i32,
+    pub capture_y: i32,
+}
+
 #[taurpc::procedures(path = "window")]
 pub trait WindowApi {
+    #[taurpc(event)]
+    async fn launcher_opened(info: LauncherInfo);
+
+    #[taurpc(event)]
+    async fn launcher_closed();
+
+    #[taurpc(event)]
+    async fn background_image_changed(base64: String);
+
     async fn get_scale_factor<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         height: f64,
@@ -38,7 +63,10 @@ impl WindowApi for WindowApiImpl {
         height: f64,
     ) -> Result<f64, String> {
         let window = app_handle.get_window("launcher").unwrap();
-        let current_size = window.inner_size().unwrap();
+
+        let sf = window.scale_factor();
+        info!("scale_factor: {:?}", sf);
+        let current_size = window.outer_size().unwrap();
         let scale_factor = (current_size.height as f64) / (height);
         Ok(scale_factor)
     }
