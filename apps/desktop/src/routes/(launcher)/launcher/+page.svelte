@@ -85,6 +85,7 @@
 		}
 
 		const scale = scaleFactor.value;
+		console.log('Launcher opened: scale:', scale);
 		const img = new Image();
 		img.onload = () => {
 			if (backdropCustom2Ref && launcherInfo) {
@@ -93,9 +94,9 @@
 				const coverHeight = img.height / scale;
 
 				backdropCustom2Ref.style.backgroundImage = `url('${backgroundImage}')`;
-				backdropCustom2Ref.style.backgroundSize = `${coverWidth}px ${coverHeight}px`;
+				// backdropCustom2Ref.style.backgroundSize = `${Math.ceil(coverWidth)}px ${Math.ceil(coverHeight)}px`;
 				backdropCustom2Ref.style.backgroundPosition = '0px 0px';
-				// backdropCustom2Ref.style.backgroundSize = 'cover';
+				backdropCustom2Ref.style.backgroundSize = 'cover';
 				// backdropCustom2Ref.style.backgroundPosition = 'center';
 				backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
 			}
@@ -256,7 +257,7 @@
 
 	function triggerResizing(height: number) {
 		console.log('resized to ', height);
-		taurpc.window.resize_launcher_window(Math.ceil(height), scaleFactor.value).then(() => {
+		taurpc.window.resize_launcher_window(height, scaleFactor.value).then(() => {
 			console.log('resized to ', height);
 		});
 	}
