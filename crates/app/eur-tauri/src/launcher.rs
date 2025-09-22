@@ -116,9 +116,12 @@ pub fn toggle_launcher_window<R: tauri::Runtime>(
         launcher
             .hide()
             .map_err(|e| format!("Failed to hide launcher window: {e}"))?;
-        launcher
-            .emit("launcher_closed", ())
+
+        let app_clone = launcher.app_handle().clone();
+        TauRpcWindowApiEventTrigger::new(app_clone)
+            .launcher_closed()
             .map_err(|e| format!("Failed to emit launcher_closed event: {e}"))?;
+
         // Update the shared state to indicate launcher is hidden
         set_launcher_visible(false);
     } else {
@@ -180,14 +183,37 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     let monitor_image_app = launcher.app_handle().clone();
     let monitor_id = monitor.id.clone();
     tauri::async_runtime::spawn(async move {
-        let monitor_image = capture_monitor_by_id(monitor_id.clone()).unwrap();
-        let img = image::DynamicImage::ImageRgba8(monitor_image).to_rgb8();
-        let base64 = image_to_base64(img).unwrap();
+        let t0 = std::time::Instant::now();
+        match capture_monitor_by_id(&monitor_id)
+            .and_then(|m| Ok(image::DynamicImage::ImageRgba8(m).to_rgb8()))
+            .and_then(image_to_base64)
+        {
+            Ok(base64) => {
+                if let Err(e) = TauRpcWindowApiEventTrigger::new(monitor_image_app)
+                    .background_image_changed(base64)
+                    .map_err(|e| e.to_string())
+                {
+                    error!("Failed to emit background_image_changed: {}", e);
+                }
+            }
+            Err(e) => error!(
+                "Background capture failed for monitor {}: {}",
+                monitor_id, e
+            ),
+        }
+        let duration = t0.elapsed();
+        info!("Full background capture took {:?}", duration);
+        // let monitor_image = capture_monitor_by_id(monitor_id.clone()).unwrap();
+        // let img = image::DynamicImage::ImageRgba8(monitor_image).to_rgb8();
+        // let base64 = image_to_base64(img).unwrap();
 
-        TauRpcWindowApiEventTrigger::new(monitor_image_app)
-            .background_image_changed(base64)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        // match TauRpcWindowApiEventTrigger::new(monitor_image_app)
+        //     .background_image_changed(base64)
+        //     .map_err(|e| e.to_string())
+        // {
+        //     Ok(_) => {}
+        //     Err(e) => error!("Failed to change background image: {}", e),
+        // }
     });
 
     // Capture the screen region behind the launcher
