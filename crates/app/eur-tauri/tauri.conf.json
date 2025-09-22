@@ -5,7 +5,7 @@
 		"beforeDevCommand": "pnpm dev:internal-tauri",
 		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop build:launcher-window  -- --mode development",
 		"frontendDist": "../../../apps/desktop/build",
-		"devUrl": "http://localhost:1420"
+		"devUrl": "http://localhost:1421"
 	},
 	"bundle": {
 		"active": false,
