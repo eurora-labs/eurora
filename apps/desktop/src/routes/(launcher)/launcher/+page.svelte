@@ -11,6 +11,7 @@
 		type ContextChip,
 		type LauncherInfo,
 	} from '$lib/bindings/bindings.js';
+	import { platform as getPlatform } from '@tauri-apps/plugin-os';
 
 	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
 
@@ -35,6 +36,7 @@
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
 	let promptKitServiceAvailable = $state(false);
+	let platform = getPlatform();
 	registerCoreExtensions();
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
@@ -96,14 +98,16 @@
 			img.onload = () => {
 				if (backdropCustom2Ref && launcherInfo) {
 					// For the initial relative image, we can use cover since it's already cropped to the launcher area
-					const coverWidth = img.width / scale;
-					const coverHeight = img.height / scale;
 
-					backdropCustom2Ref.style.backgroundImage = `url('${backgroundImage}')`;
-					// backdropCustom2Ref.style.backgroundSize = `${Math.ceil(coverWidth)}px ${Math.ceil(coverHeight)}px`;
+					backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
 					backdropCustom2Ref.style.backgroundPosition = '0px 0px';
-					backdropCustom2Ref.style.backgroundSize = 'cover';
-					// backdropCustom2Ref.style.backgroundPosition = 'center';
+					if (platform === 'linux') {
+						backdropCustom2Ref.style.backgroundSize = 'cover';
+					} else {
+						const coverWidth = img.width / launcherInfo.monitor_scale_factor;
+						const coverHeight = img.height / launcherInfo.monitor_scale_factor;
+						backdropCustom2Ref.style.backgroundSize = `${coverWidth}px ${coverHeight}px`;
+					}
 					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
 				}
 			};
@@ -122,12 +126,26 @@
 			// Preload the image to avoid white flash during switch
 			const img = new Image();
 			img.onload = () => {
-				console.log('Image size', img.width, img.height);
 				// Only switch once the image is fully loaded
 				if (backdropCustom2Ref && launcherInfo) {
-					backdropCustom2Ref.style.backgroundImage = `url('${fullImageB64}')`;
-					backdropCustom2Ref.style.backgroundSize = `${img.width / scale}px ${img.height / scale}px`;
-					backdropCustom2Ref.style.backgroundPosition = `${-launcherInfo.capture_x / scale}px ${-launcherInfo.capture_y / scale}px`;
+					let backgroundWidth = img.width;
+					let backgroundHeight = img.height;
+					let backgroundX = launcherInfo.capture_x;
+					let backgroundY = launcherInfo.capture_y;
+					if (platform === 'linux') {
+						backgroundWidth = img.width / scale;
+						backgroundHeight = img.height / scale;
+						backgroundX = launcherInfo.capture_x / scale;
+						backgroundY = launcherInfo.capture_y / scale;
+					} else if (platform === 'windows') {
+						backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
+						backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
+						backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
+						backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
+					}
+					backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
+					backdropCustom2Ref.style.backgroundSize = `${backgroundWidth}px ${backgroundHeight}px`;
+					backdropCustom2Ref.style.backgroundPosition = `${-backgroundX}px ${-backgroundY}px`;
 					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
 				}
 			};
@@ -273,9 +291,11 @@
 
 	function triggerResizing(height: number) {
 		console.log('resized to ', height);
-		taurpc.window.resize_launcher_window(height, scaleFactor.value).then(() => {
-			console.log('resized to ', height);
-		});
+		taurpc.window
+			.resize_launcher_window(1024, Math.max(height, 100), scaleFactor.value)
+			.then(() => {
+				console.log('resized to ', height);
+			});
 	}
 </script>
 
@@ -356,6 +376,8 @@
 	@reference 'tailwindcss';
 	:global(.backdrop-custom) {
 		z-index: 2;
+		width: 100%;
+		height: 100%;
 		backdrop-filter: blur(36px);
 		-webkit-backdrop-filter: blur(36px);
 		background-color: rgba(255, 255, 255, 0.2);
@@ -379,11 +401,19 @@
 		background-color: transparent;
 	}
 
-	:global(body.windows-app .blur-bright) {
-		display: none;
+	:global(body.windows-app .backdrop-custom-2) {
+		filter: none !important;
 	}
 
-	:global(body.mac-app .blur-bright) {
-		display: none;
+	:global(body.macos-app .backdrop-custom-2) {
+		filter: none !important;
+	}
+
+	:global(body.windows-app .blur-bright) {
+		/* display: none; */
+	}
+
+	:global(body.macos-app .blur-bright) {
+		/* display: none; */
 	}
 </style>
