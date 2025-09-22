@@ -58,7 +58,7 @@
 	let chatRef = $state<Chat | null>(null);
 
 	// Listen for launcher closed event to clear messages and reset conversation
-	listen('launcher_closed', () => {
+	taurpc.window.launcher_closed.on(() => {
 		// Clear messages array
 		messages.splice(0, messages.length);
 		// Reset current conversation ID to null to default to NEW on next interaction
@@ -94,7 +94,7 @@
 
 				backdropCustom2Ref.style.backgroundImage = `url('${backgroundImage}')`;
 				backdropCustom2Ref.style.backgroundSize = `${coverWidth}px ${coverHeight}px`;
-				backdropCustom2Ref.style.backgroundPosition = '0px  0px';
+				backdropCustom2Ref.style.backgroundPosition = '0px 0px';
 				// backdropCustom2Ref.style.backgroundSize = 'cover';
 				// backdropCustom2Ref.style.backgroundPosition = 'center';
 				backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
@@ -256,7 +256,7 @@
 
 	function triggerResizing(height: number) {
 		console.log('resized to ', height);
-		taurpc.window.resize_launcher_window(Math.ceil(height), 1).then(() => {
+		taurpc.window.resize_launcher_window(Math.ceil(height), scaleFactor.value).then(() => {
 			console.log('resized to ', height);
 		});
 	}
@@ -309,7 +309,7 @@
 	<filter id="blur-bright" filterUnits="objectBoundingBox">
 		<feGaussianBlur
 			in="SourceGraphic"
-			stdDeviation="0"
+			stdDeviation="36"
 			edgeMode="duplicate"
 			result="blur"
 			color-interpolation-filters="sRGB"
