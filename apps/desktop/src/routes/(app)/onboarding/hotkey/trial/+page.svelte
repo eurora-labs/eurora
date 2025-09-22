@@ -7,7 +7,6 @@
 	import { goto } from '$app/navigation';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 
-	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
 
 	let taurpc = createTauRPCProxy();
