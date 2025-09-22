@@ -7,7 +7,6 @@
 	import { goto } from '$app/navigation';
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 
-	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
 
 	let taurpc = createTauRPCProxy();
@@ -29,19 +28,20 @@
 
 		// Listen for launcher_opened event
 		let unlistenLauncherOpened: (() => void) | undefined;
-		listen('launcher_opened', async () => {
-			launcherOpened = true;
-			// Skip countdown if launcher is opened
-			if (countdownInterval) {
-				clearInterval(countdownInterval);
-				countdownInterval = undefined;
-			}
-			countdown = 0;
-			buttonDisabled = false;
-		}).then((unsub) => {
-			unlistenLauncherOpened = unsub;
-		});
-
+		taurpc.window.launcher_opened
+			.on(async () => {
+				launcherOpened = true;
+				// Skip countdown if launcher is opened
+				if (countdownInterval) {
+					clearInterval(countdownInterval);
+					countdownInterval = undefined;
+				}
+				countdown = 0;
+				buttonDisabled = false;
+			})
+			.then((unsub) => {
+				unlistenLauncherOpened = unsub;
+			});
 		// Start countdown timer
 		countdownInterval = setInterval(() => {
 			countdown--;
