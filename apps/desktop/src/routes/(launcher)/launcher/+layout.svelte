@@ -10,6 +10,15 @@
 	let { children } = $props();
 	let mainRef = $state<HTMLElement | null>(null);
 
+	function resizeLauncherWindow() {
+		taurpc.window.get_scale_factor(mainRef?.clientHeight || 100).then(async (result) => {
+			scaleFactor.value = result;
+			taurpc.window.resize_launcher_window(1024, 100, scaleFactor.value).then(() => {
+				console.log('Window resized');
+			});
+		});
+	}
+
 	taurpc.window.launcher_opened.on(async () => {
 		console.log(
 			'scroll height:',
@@ -17,19 +26,12 @@
 			mainRef?.scrollHeight,
 			mainRef?.offsetHeight,
 		);
-		taurpc.window.get_scale_factor(mainRef?.clientHeight || 100).then(async (result) => {
-			scaleFactor.value = result;
-			console.log('Scale factor:', scaleFactor);
-			taurpc.window.resize_launcher_window(100, scaleFactor.value).then(() => {
-				console.log('Window resized');
-			});
-
-			// resizeObserver.observe(mainRef!);
-		});
+		// resizeLauncherWindow();
 	});
 
 	onMount(() => {
 		document.body.classList.add(`${platform()}-app`);
+		resizeLauncherWindow();
 
 		// resizeWindow();
 		// const resizeObserver = new ResizeObserver(resizeWindow);
