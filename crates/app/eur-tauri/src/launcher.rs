@@ -172,7 +172,6 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     //     ((monitor.width as i32 as f64) / 2.0) as i32 - (window_size.width as f64) as i32;
     // let capture_y =
     //     ((monitor.height as i32 as f64) / 4.0) as i32 - (window_size.height as f64) as i32;
-    let start_record = std::time::Instant::now();
 
     info!("launcher opened at: ({}, {})", launcher_x, launcher_y);
     info!("monitor_id: {}", monitor.id.clone());
@@ -183,7 +182,6 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     let monitor_image_app = launcher.app_handle().clone();
     let monitor_id = monitor.id.clone();
     tauri::async_runtime::spawn(async move {
-        let t0 = std::time::Instant::now();
         match capture_monitor_by_id(&monitor_id)
             .and_then(|m| Ok(image::DynamicImage::ImageRgba8(m).to_rgb8()))
             .and_then(image_to_base64)
@@ -201,19 +199,6 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
                 monitor_id, e
             ),
         }
-        let duration = t0.elapsed();
-        info!("Full background capture took {:?}", duration);
-        // let monitor_image = capture_monitor_by_id(monitor_id.clone()).unwrap();
-        // let img = image::DynamicImage::ImageRgba8(monitor_image).to_rgb8();
-        // let base64 = image_to_base64(img).unwrap();
-
-        // match TauRpcWindowApiEventTrigger::new(monitor_image_app)
-        //     .background_image_changed(base64)
-        //     .map_err(|e| e.to_string())
-        // {
-        //     Ok(_) => {}
-        //     Err(e) => error!("Failed to change background image: {}", e),
-        // }
     });
 
     // Capture the screen region behind the launcher
@@ -225,12 +210,9 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
         window_size.height * 2,
     ) {
         Ok(img) => {
-            let t0 = std::time::Instant::now();
             let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
 
             info!("Captured image size: {:?}", img.dimensions());
-            let duration = t0.elapsed();
-            info!("Capture of background area completed in: {:?}", duration);
 
             // Convert the image to base64
             if let Ok(base64_image) = image_to_base64(img) {
@@ -249,9 +231,6 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
             None
         }
     };
-
-    let duration = start_record.elapsed();
-    info!("Capture of background area completed in: {:?}", duration);
 
     // Only show the launcher if it was previously hidden
     launcher
@@ -278,30 +257,10 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
 
     // Measure time
     let app_clone = launcher.app_handle().clone();
-    let start_record = Instant::now();
 
     TauRpcWindowApiEventTrigger::new(app_clone)
         .launcher_opened(launcher_info)
         .map_err(|e| e.to_string())?;
-
-    let duration = start_record.elapsed();
-    info!("taurpc event time: {:?}", duration);
-
-    let start_record = Instant::now();
-    let launcher_info = serde_json::json!({
-        "monitor_id": monitor.id.clone(),
-        "launcher_x": launcher_x,
-        "launcher_y": launcher_y,
-        "launcher_width": window_size.width,
-        "launcher_height": window_size.height,
-        "monitor_width": monitor.width,
-        "monitor_height": monitor.height
-    });
-    launcher
-        .emit("launcher_opened", launcher_info)
-        .map_err(|e| format!("Failed to emit launcher_opened event: {}", e))?;
-    let duration = start_record.elapsed();
-    info!("native event time: {:?}", duration);
 
     launcher
         .set_focus()

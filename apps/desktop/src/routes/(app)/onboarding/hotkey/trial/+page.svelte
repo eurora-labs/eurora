@@ -29,19 +29,20 @@
 
 		// Listen for launcher_opened event
 		let unlistenLauncherOpened: (() => void) | undefined;
-		listen('launcher_opened', async () => {
-			launcherOpened = true;
-			// Skip countdown if launcher is opened
-			if (countdownInterval) {
-				clearInterval(countdownInterval);
-				countdownInterval = undefined;
-			}
-			countdown = 0;
-			buttonDisabled = false;
-		}).then((unsub) => {
-			unlistenLauncherOpened = unsub;
-		});
-
+		taurpc.window.launcher_opened
+			.on(async () => {
+				launcherOpened = true;
+				// Skip countdown if launcher is opened
+				if (countdownInterval) {
+					clearInterval(countdownInterval);
+					countdownInterval = undefined;
+				}
+				countdown = 0;
+				buttonDisabled = false;
+			})
+			.then((unsub) => {
+				unlistenLauncherOpened = unsub;
+			});
 		// Start countdown timer
 		countdownInterval = setInterval(() => {
 			countdown--;
