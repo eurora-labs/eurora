@@ -405,7 +405,7 @@
 		filter: none !important;
 	}
 
-	:global(body.mac-app .backdrop-custom-2) {
+	:global(body.macos-app .backdrop-custom-2) {
 		filter: none !important;
 	}
 
@@ -413,7 +413,7 @@
 		/* display: none; */
 	}
 
-	:global(body.mac-app .blur-bright) {
+	:global(body.macos-app .blur-bright) {
 		/* display: none; */
 	}
 </style>
