@@ -1,7 +1,7 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
 	import Katex from '$lib/components/katex.svelte';
-	import { listen } from '@tauri-apps/api/event';
+	import { scaleFactor } from './scaleFactor.svelte.js';
 	import {
 		createTauRPCProxy,
 		type ResponseChunk,
@@ -9,6 +9,7 @@
 		type Message,
 		type Conversation,
 		type ContextChip,
+		type LauncherInfo,
 	} from '$lib/bindings/bindings.js';
 
 	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
@@ -51,41 +52,90 @@
 	let conversation = $state<Conversation | null>(null);
 
 	let backgroundImage = $state<string | null>(null);
-	let currentMonitorId = $state<string>('');
-	let launcherInfo = $state<{
-		monitor_id: string;
-		launcher_x: number;
-		launcher_y: number;
-		launcher_width: number;
-		launcher_height: number;
-		monitor_width: number;
-		monitor_height: number;
-	} | null>(null);
+	let launcherInfo = $state<LauncherInfo | null>(null);
 	let chatRef = $state<Chat | null>(null);
 
+	let unlistenLauncherOpened: (() => void) | undefined;
+	let unlistenLauncherClosed: (() => void) | undefined;
+	let unlistenBackgroundImage: (() => void) | undefined;
+
 	// Listen for launcher closed event to clear messages and reset conversation
-	listen('launcher_closed', () => {
-		// Clear messages array
-		messages.splice(0, messages.length);
-		// Reset current conversation ID to null to default to NEW on next interaction
-		conversation = null;
-		console.log('Launcher closed: cleared messages and reset conversation');
-	});
+	taurpc.window.launcher_closed
+		.on(() => {
+			// Clear messages array
+			messages.splice(0, messages.length);
+			// Reset current conversation ID to null to default to NEW on next interaction
+			conversation = null;
+			console.log('Launcher closed: cleared messages and reset conversation');
+		})
+		.then((unlisten) => {
+			unlistenLauncherClosed = unlisten;
+		});
 
-	// Listen for launcher opened event to refresh activities
-	listen<any>('launcher_opened', async (event) => {
-		await isPromptKitServiceAvailable();
-		if (editorRef) {
-			clearQuery(editorRef);
-		}
-		// Reload activities when launcher is opened
-		loadActivities();
+	taurpc.window.launcher_opened
+		.on(async (info) => {
+			await isPromptKitServiceAvailable();
+			if (editorRef) {
+				clearQuery(editorRef);
+			}
+			// Reload activities when launcher is opened
+			loadActivities();
 
-		// Store the launcher information from the event payload
-		launcherInfo = event.payload;
-		currentMonitorId = launcherInfo?.monitor_id || '';
-		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
-	});
+			// Store the launcher information from the event payload
+			launcherInfo = info;
+			console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
+
+			backgroundImage = info.background_image;
+			if (!backgroundImage) {
+				return;
+			}
+
+			const scale = scaleFactor.value;
+			console.log('Launcher opened: scale:', scale);
+			const img = new Image();
+			img.onload = () => {
+				if (backdropCustom2Ref && launcherInfo) {
+					// For the initial relative image, we can use cover since it's already cropped to the launcher area
+					const coverWidth = img.width / scale;
+					const coverHeight = img.height / scale;
+
+					backdropCustom2Ref.style.backgroundImage = `url('${backgroundImage}')`;
+					// backdropCustom2Ref.style.backgroundSize = `${Math.ceil(coverWidth)}px ${Math.ceil(coverHeight)}px`;
+					backdropCustom2Ref.style.backgroundPosition = '0px 0px';
+					backdropCustom2Ref.style.backgroundSize = 'cover';
+					// backdropCustom2Ref.style.backgroundPosition = 'center';
+					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+				}
+			};
+			img.src = backgroundImage;
+		})
+		.then((unlisten) => {
+			unlistenLauncherOpened = unlisten;
+		});
+
+	taurpc.window.background_image_changed
+		.on(async (fullImageB64) => {
+			// Replace the small relative background image with full monitor image while preserving the coordinates
+			backgroundImage = fullImageB64;
+			const scale = scaleFactor.value;
+
+			// Preload the image to avoid white flash during switch
+			const img = new Image();
+			img.onload = () => {
+				console.log('Image size', img.width, img.height);
+				// Only switch once the image is fully loaded
+				if (backdropCustom2Ref && launcherInfo) {
+					backdropCustom2Ref.style.backgroundImage = `url('${fullImageB64}')`;
+					backdropCustom2Ref.style.backgroundSize = `${img.width / scale}px ${img.height / scale}px`;
+					backdropCustom2Ref.style.backgroundPosition = `${-launcherInfo.capture_x / scale}px ${-launcherInfo.capture_y / scale}px`;
+					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+				}
+			};
+			img.src = fullImageB64;
+		})
+		.then((unlisten) => {
+			unlistenBackgroundImage = unlisten;
+		});
 
 	async function isPromptKitServiceAvailable() {
 		try {
@@ -105,18 +155,6 @@
 			console.error('open_main_window failed', e);
 		}
 	}
-
-	// Listen for background image event
-	listen<string>('background_image', (event) => {
-		backgroundImage = event.payload;
-
-		if (backdropCustom2Ref) {
-			backdropCustom2Ref.style.backgroundImage = `url('${event.payload}')`;
-			backdropCustom2Ref.style.backgroundSize = 'cover';
-			backdropCustom2Ref.style.backgroundPosition = 'center';
-			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-		}
-	});
 
 	// Set up global keydown event listener for Escape key
 	function handleEscapeKey(event: KeyboardEvent) {
@@ -138,19 +176,22 @@
 		});
 		document.addEventListener('keydown', handleEscapeKey);
 
-		let unlisten: any;
+		let unlistenPromptServiceChange: (() => void) | undefined;
 		taurpc.prompt.prompt_service_change
 			.on((name) => {
 				promptKitServiceAvailable = name ? name.length > 0 : false;
 			})
 			.then((unlistenFn) => {
-				unlisten = unlistenFn;
+				unlistenPromptServiceChange = unlistenFn;
 			});
 
 		// Clean up event listener when component is unmounted
 		return () => {
 			document.removeEventListener('keydown', handleEscapeKey);
-			unlisten?.();
+			unlistenPromptServiceChange?.();
+			unlistenBackgroundImage?.();
+			unlistenLauncherOpened?.();
+			unlistenLauncherClosed?.();
 		};
 	});
 
@@ -229,15 +270,23 @@
 			});
 		}
 	}
+
+	function triggerResizing(height: number) {
+		console.log('resized to ', height);
+		taurpc.window.resize_launcher_window(height, scaleFactor.value).then(() => {
+			console.log('resized to ', height);
+		});
+	}
 </script>
 
-<div class="backdrop-custom relative h-full overflow-hidden">
+<div class="backdrop-custom relative overflow-hidden">
 	{#if promptKitServiceAvailable}
 		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0">
 			<Launcher.Input
 				placeholder="What can I help you with?"
 				bind:query={searchQuery}
 				bind:editorRef
+				onheightchange={triggerResizing}
 				onkeydown={handleKeydown}
 				class="min-h-[100px] h-fit w-full text-[40px]"
 			/>
@@ -268,6 +317,7 @@
 		</div>
 	{/if}
 </div>
+
 <svg
 	xmlns="http://www.w3.org/2000/svg"
 	style="position:absolute;width:0;height:0"
@@ -313,8 +363,6 @@
 
 	:global(.backdrop-custom-2) {
 		z-index: 1;
-		width: 100%;
-		height: 100%;
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
 		background-color: rgba(255, 255, 255, 0.2);
@@ -322,14 +370,12 @@
 	:global(body.linux-app .backdrop-custom) {
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
-		background: transparent;
 		background-color: transparent;
 	}
 
 	:global(body.linux-app .backdrop-custom-2) {
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
-		background: transparent;
 		background-color: transparent;
 	}
 

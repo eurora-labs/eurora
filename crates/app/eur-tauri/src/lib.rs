@@ -20,34 +20,9 @@
 pub mod launcher;
 pub mod procedures;
 pub mod shared_types;
-mod util;
+pub mod util;
 pub mod window;
 pub use window::{
     create as create_window, create_hover, create_launcher,
     state::{WindowState, event::ChangeForFrontend},
 };
-
-// pub mod conversations;
-
-// pub mod askpass;
-// pub mod config;
-// pub mod error;
-// pub mod forge;
-// pub mod github;
-// pub mod modes;
-// pub mod open;
-// pub mod projects;
-// pub mod remotes;
-// pub mod repo;
-// pub mod secret;
-// pub mod undo;
-// pub mod users;
-// pub mod virtual_branches;
-
-// pub mod settings;
-// pub mod stack;
-// pub mod zip;
-
-// pub mod diff;
-// pub mod env;
-// pub mod workspace;
