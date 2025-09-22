@@ -80,15 +80,27 @@
 		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
 
 		backgroundImage = info.background_image;
-
-		if (backdropCustom2Ref && launcherInfo) {
-			// For the initial relative image, we can use cover since it's already cropped to the launcher area
-			backdropCustom2Ref.style.backgroundSize = 'cover';
-			backdropCustom2Ref.style.backgroundPosition = 'center';
-			backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-
-			backdropCustom2Ref.style.backgroundImage = `url('${backgroundImage}')`;
+		if (!backgroundImage) {
+			return;
 		}
+
+		const scale = scaleFactor.value;
+		const img = new Image();
+		img.onload = () => {
+			if (backdropCustom2Ref && launcherInfo) {
+				// For the initial relative image, we can use cover since it's already cropped to the launcher area
+				const coverWidth = img.width / scale;
+				const coverHeight = img.height / scale;
+
+				backdropCustom2Ref.style.backgroundImage = `url('${backgroundImage}')`;
+				backdropCustom2Ref.style.backgroundSize = `${coverWidth}px ${coverHeight}px`;
+				backdropCustom2Ref.style.backgroundPosition = '0px  0px';
+				// backdropCustom2Ref.style.backgroundSize = 'cover';
+				// backdropCustom2Ref.style.backgroundPosition = 'center';
+				backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+			}
+		};
+		img.src = backgroundImage;
 	});
 
 	taurpc.window.background_image_changed.on(async (fullImageB64) => {
@@ -96,21 +108,19 @@
 		backgroundImage = fullImageB64;
 		const scale = scaleFactor.value;
 
-		if (backdropCustom2Ref && launcherInfo) {
-			// Preload the image to avoid white flash during switch
-			const img = new Image();
-			img.onload = () => {
-				console.log('Image size', img.width, img.height);
-				// Only switch once the image is fully loaded
-				if (backdropCustom2Ref && launcherInfo) {
-					backdropCustom2Ref.style.backgroundImage = `url('${fullImageB64}')`;
-					backdropCustom2Ref.style.backgroundSize = `${img.width / scale}px ${img.height / scale}px`;
-					backdropCustom2Ref.style.backgroundPosition = `${-launcherInfo.capture_x / scale}px ${-launcherInfo.capture_y / scale}px`;
-					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-				}
-			};
-			img.src = fullImageB64;
-		}
+		// Preload the image to avoid white flash during switch
+		const img = new Image();
+		img.onload = () => {
+			console.log('Image size', img.width, img.height);
+			// Only switch once the image is fully loaded
+			if (backdropCustom2Ref && launcherInfo) {
+				backdropCustom2Ref.style.backgroundImage = `url('${fullImageB64}')`;
+				backdropCustom2Ref.style.backgroundSize = `${img.width / scale}px ${img.height / scale}px`;
+				backdropCustom2Ref.style.backgroundPosition = `${-launcherInfo.capture_x / scale}px ${-launcherInfo.capture_y / scale}px`;
+				backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+			}
+		};
+		img.src = fullImageB64;
 	});
 
 	async function isPromptKitServiceAvailable() {
@@ -290,6 +300,7 @@
 		</div>
 	{/if}
 </div>
+
 <svg
 	xmlns="http://www.w3.org/2000/svg"
 	style="position:absolute;width:0;height:0"
