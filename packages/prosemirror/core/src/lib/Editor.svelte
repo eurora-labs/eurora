@@ -8,6 +8,7 @@
 		placeholder?: string;
 		class?: ClassValue;
 		onkeydown?: (event: KeyboardEvent) => void;
+		onheightchange?: (height: number) => void;
 	}
 </script>
 
@@ -29,12 +30,14 @@
 	let currentExtensions: SveltePMExtension[] = [];
 	let commands: Commands = $state(defaultCommands);
 	let mainNode: PMNode | null = null;
+	let resizeObserver: ResizeObserver | null = null;
 
 	let {
 		value = $bindable(''),
 		query,
 		placeholder = 'Type something',
 		onkeydown,
+		onheightchange,
 		class: className,
 	}: EditorProps = $props();
 
@@ -192,8 +195,30 @@
 		commands.focus()(view.state, view.dispatch, view);
 	}
 
+	// Set up resize observer when editorRef becomes available
+	$effect(() => {
+		if (editorRef && onheightchange) {
+			// Clean up existing observer if any
+			resizeObserver?.disconnect();
+
+			resizeObserver = new ResizeObserver((entries) => {
+				for (const entry of entries) {
+					const height = entry.contentRect.height;
+					onheightchange(height);
+				}
+			});
+			resizeObserver.observe(editorRef);
+		}
+
+		// Cleanup function
+		return () => {
+			resizeObserver?.disconnect();
+		};
+	});
+
 	onDestroy(() => {
 		view?.destroy();
+		resizeObserver?.disconnect();
 	});
 
 	function placeholderPlugin(text: string) {

@@ -14,7 +14,7 @@ pub struct MonitorApiImpl;
 #[taurpc::resolvers]
 impl MonitorApi for MonitorApiImpl {
     async fn capture_monitor(self, monitor_id: String) -> Result<String, String> {
-        let image = capture_monitor_by_id(monitor_id)
+        let image = capture_monitor_by_id(&monitor_id)
             .map_err(|e| format!("Failed to capture monitor: {}", e))?;
         let image = image::DynamicImage::ImageRgba8(image).to_rgb8();
 
