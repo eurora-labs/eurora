@@ -10,17 +10,7 @@
 	let { children } = $props();
 	let mainRef = $state<HTMLElement | null>(null);
 
-	function resizeWindow() {
-		if (!mainRef) return;
-		try {
-			// Use TauRPC resize_launcher_window
-			taurpc.window.resize_launcher_window(100, scaleFactor.value);
-		} catch (error) {
-			console.error('Failed to resize window:', error);
-		}
-	}
-
-	taurpc.window.launcher_opened.on(async (info) => {
+	taurpc.window.launcher_opened.on(async () => {
 		console.log(
 			'scroll height:',
 			mainRef?.clientHeight,

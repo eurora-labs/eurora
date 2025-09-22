@@ -133,7 +133,7 @@ pub fn get_all_monitors() -> Result<Vec<Monitor>> {
     Ok(Monitor::all()?)
 }
 
-pub fn capture_monitor_by_id(monitor_id: String) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+pub fn capture_monitor_by_id(monitor_id: &String) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
     let monitors = Monitor::all()?;
     if monitors.is_empty() {
         return Err(anyhow!("No monitors found"));
