@@ -87,6 +87,8 @@ export type ImageSource =
  */
 { Url: string }
 
+export type LauncherInfo = { background_image: string | null; monitor_id: string; launcher_x: number; launcher_y: number; launcher_width: number; launcher_height: number; monitor_width: number; monitor_height: number; monitor_x: number; monitor_y: number; capture_x: number; capture_y: number }
+
 export type LauncherSettings = { hotkey?: Hotkey }
 
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
@@ -198,7 +200,7 @@ tool_call_id: string | null;
  */
 text: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["conversation","channel","query"],"switch_conversation":["conversation_id"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'personal_db.conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"]}', 'personal_db.message':'{"get":["conversation_id","limit","offset"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_hover_settings":[],"get_launcher_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_hover_settings":["hover_settings"],"set_launcher_settings":["launcher_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"get_scale_factor":["height"],"hide_hover_window":[],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"],"show_hover_window":[]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["conversation","channel","query"],"switch_conversation":["conversation_id"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'personal_db.conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"]}', 'personal_db.message':'{"get":["conversation_id","limit","offset"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_hover_settings":[],"get_launcher_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_hover_settings":["hover_settings"],"set_launcher_settings":["launcher_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}', 'window':'{"background_image_changed":["base64"],"get_scale_factor":["height"],"hide_hover_window":[],"launcher_closed":[],"launcher_opened":["info"],"open_launcher_window":[],"open_main_window":[],"resize_launcher_window":["height","scale_factor"],"show_hover_window":[]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
 "chat": {current_conversation_changed: (conversation: Conversation) => Promise<void>, 
@@ -230,8 +232,11 @@ send_key_to_launcher: (key: string) => Promise<null>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>},
 "user": {set_launcher_hotkey: (key: string, modifiers: string[]) => Promise<null>},
-"window": {get_scale_factor: (height: number) => Promise<number>, 
+"window": {background_image_changed: (base64: string) => Promise<void>, 
+get_scale_factor: (height: number) => Promise<number>, 
 hide_hover_window: () => Promise<null>, 
+launcher_closed: () => Promise<void>, 
+launcher_opened: (info: LauncherInfo) => Promise<void>, 
 open_launcher_window: () => Promise<null>, 
 open_main_window: () => Promise<null>, 
 resize_launcher_window: (height: number, scaleFactor: number) => Promise<null>, 
