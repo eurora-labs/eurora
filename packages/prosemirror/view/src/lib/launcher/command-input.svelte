@@ -6,6 +6,7 @@
 		editorRef?: ProsemirrorEditor;
 		iconSize?: number;
 		height?: string;
+		onheightchange?: (height: number) => void;
 	}
 </script>
 
@@ -20,6 +21,7 @@
 		value = $bindable(''),
 		height = $bindable('100px'),
 		query = $bindable(undefined),
+		onheightchange,
 		editorRef = $bindable(),
 		iconSize = $bindable(40),
 		...restProps
@@ -36,7 +38,7 @@
 	</div>
 	<div class="mr-2 w-2 shrink-0"></div>
 	<div
-		class="flex flex-col justify-center items-center w-full h-full py-4"
+		class="flex flex-col justify-center items-center w-full h-full py-0"
 		style="min-height: inherit"
 	>
 		<CommandPrimitive.Input
@@ -46,7 +48,7 @@
 			{...restProps}
 		>
 			{#snippet child({ props })}
-				<InputArea bind:ref={editorRef} bind:value bind:query {...props} />
+				<InputArea bind:ref={editorRef} bind:value bind:query {onheightchange} {...props} />
 			{/snippet}
 		</CommandPrimitive.Input>
 	</div>
