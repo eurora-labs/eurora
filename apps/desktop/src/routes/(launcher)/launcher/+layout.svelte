@@ -17,7 +17,7 @@
 			mainRef?.scrollHeight,
 			mainRef?.offsetHeight,
 		);
-		taurpc.window.get_scale_factor(mainRef?.scrollHeight || 100).then(async (result) => {
+		taurpc.window.get_scale_factor(mainRef?.clientHeight || 100).then(async (result) => {
 			scaleFactor.value = result;
 			console.log('Scale factor:', scaleFactor);
 			taurpc.window.resize_launcher_window(100, scaleFactor.value).then(() => {
