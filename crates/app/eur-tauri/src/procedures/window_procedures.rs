@@ -25,6 +25,9 @@ pub trait WindowApi {
     async fn launcher_opened(info: LauncherInfo);
 
     #[taurpc(event)]
+    async fn launcher_closed();
+
+    #[taurpc(event)]
     async fn background_image_changed(base64: String);
 
     async fn get_scale_factor<R: Runtime>(
