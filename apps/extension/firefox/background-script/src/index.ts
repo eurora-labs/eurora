@@ -31,7 +31,7 @@ export async function getCurrentTab() {
 
 function onMessageListener(message: any, sender: any) {
 	console.log('Received from native app:', message);
-	switch (message.type) {
+	switch (message.command) {
 		case 'GENERATE_ASSETS':
 			handleTabMessage('GENERATE_ASSETS')
 				.then((response) => {
@@ -55,7 +55,7 @@ function onMessageListener(message: any, sender: any) {
 				});
 			return true; // Indicates we'll call sendResponse asynchronously
 		default:
-			throw new Error(`Unknown message type: ${message.type}`);
+			throw new Error(`Unknown message type: ${message.command}`);
 	}
 }
 
@@ -74,36 +74,30 @@ function onDisconnectListener() {
 }
 
 async function handleTabMessage(messageType: string) {
-	// Get the current active tab
-	const activeTab = await getCurrentTab();
+	try {
+		// Get the current active tab
+		const activeTab = await getCurrentTab();
 
-	if (!activeTab || !activeTab.id) {
-		return { success: false, error: 'No active tab found', tab: activeTab };
+		if (!activeTab || !activeTab.id) {
+			return { success: false, error: 'No active tab found' };
+		}
+
+		type Response = {
+			error?: string;
+			[key: string]: any;
+		};
+
+		const response = await browser.tabs.sendMessage(activeTab.id, { type: messageType });
+		console.log('Async response:', response);
+
+		return { success: true, ...response };
+	} catch (error) {
+		console.error('Error handling tab message:', error);
+		return {
+			success: false,
+			error: String(error),
+		};
 	}
-
-	type Response = {
-		error?: string;
-		[key: string]: any;
-	};
-
-	const response: Response = await new Promise((resolve, reject) =>
-		browser.tabs.sendMessage(
-			activeTab.id,
-			{ type: messageType },
-			// @ts-expect-error
-			(response: any) => {
-				if (browser.runtime.lastError) {
-					reject({ error: browser.runtime.lastError });
-				} else if (response?.error) {
-					reject({ error: response.error });
-				} else {
-					resolve(response);
-				}
-			},
-		),
-	);
-
-	return { success: true, ...response };
 }
 
 console.log('Extension background services finished');
