@@ -296,11 +296,13 @@
 
 	function triggerResizing(height: number) {
 		console.log('resized to ', height);
-		taurpc.window
-			.resize_launcher_window(1024, Math.max(height, 500), scaleFactor.value)
-			.then(() => {
-				console.log('resized to ', height);
-			});
+		let scale = scaleFactor.value;
+		if (platform === 'windows') {
+			scale = 1;
+		}
+		taurpc.window.resize_launcher_window(1024, Math.max(height, 500), scale).then(() => {
+			console.log('resized to ', height);
+		});
 	}
 </script>
 
