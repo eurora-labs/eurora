@@ -380,7 +380,7 @@
 ></div>
 
 <style lang="postcss">
-	/*@reference 'tailwindcss';*/
+	@reference 'tailwindcss';
 	:global(.backdrop-custom) {
 		z-index: 2;
 		width: 100%;
