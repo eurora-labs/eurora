@@ -133,20 +133,24 @@
 					let backgroundX = launcherInfo.capture_x;
 					let backgroundY = launcherInfo.capture_y;
 					if (platform === 'linux') {
-						backgroundWidth = img.width / scale;
-						backgroundHeight = img.height / scale;
-						backgroundX = launcherInfo.capture_x / scale;
-						backgroundY = launcherInfo.capture_y / scale;
+						// backgroundWidth = img.width / scale;
+						// backgroundHeight = img.height / scale;
+						// backgroundX = launcherInfo.capture_x / scale;
+						// backgroundY = launcherInfo.capture_y / scale;
+						backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
+						backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
+						backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
+						backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
 					} else if (platform === 'windows') {
 						backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
 						backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
 						backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
 						backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
 					}
-					backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
 					backdropCustom2Ref.style.backgroundSize = `${backgroundWidth}px ${backgroundHeight}px`;
 					backdropCustom2Ref.style.backgroundPosition = `${-backgroundX}px ${-backgroundY}px`;
 					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+					backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
 				}
 			};
 			img.src = fullImageB64;
@@ -234,6 +238,7 @@
 	async function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && !event.shiftKey) {
 			// await taurpc.window.resize_launcher_window(100, 1.0);
+			await taurpc.window.resize_launcher_window(1024, 500, scaleFactor.value);
 
 			try {
 				const query = processQuery(editorRef!);
@@ -291,11 +296,13 @@
 
 	function triggerResizing(height: number) {
 		console.log('resized to ', height);
-		taurpc.window
-			.resize_launcher_window(1024, Math.max(height, 100), scaleFactor.value)
-			.then(() => {
-				console.log('resized to ', height);
-			});
+		let scale = scaleFactor.value;
+		if (platform === 'windows') {
+			scale = 1;
+		}
+		taurpc.window.resize_launcher_window(1024, Math.max(height, 500), scale).then(() => {
+			console.log('resized to ', height);
+		});
 	}
 </script>
 
@@ -373,14 +380,22 @@
 ></div>
 
 <style lang="postcss">
-	@reference 'tailwindcss';
+	/*@reference 'tailwindcss';*/
 	:global(.backdrop-custom) {
 		z-index: 2;
 		width: 100%;
 		height: 100%;
+		background-color: rgba(255, 255, 255, 0.2);
+	}
+
+	:global(body.windows-app .backdrop-custom) {
 		backdrop-filter: blur(36px);
 		-webkit-backdrop-filter: blur(36px);
-		background-color: rgba(255, 255, 255, 0.2);
+	}
+
+	:global(body.macos-app .backdrop-custom) {
+		backdrop-filter: blur(36px);
+		-webkit-backdrop-filter: blur(36px);
 	}
 
 	:global(.backdrop-custom-2) {
@@ -389,6 +404,7 @@
 		-webkit-backdrop-filter: none;
 		background-color: rgba(255, 255, 255, 0.2);
 	}
+
 	:global(body.linux-app .backdrop-custom) {
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
