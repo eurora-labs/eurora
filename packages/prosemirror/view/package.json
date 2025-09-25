@@ -49,6 +49,7 @@
 		"@sveltejs/package": "^2.5.3",
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/ui": "workspace:*",
+		"autoprefixer": "^10.4.21",
 		"vite": "catalog:",
 		"vitest": "catalog:",
 		"prosemirror-commands": "^1.5.2",

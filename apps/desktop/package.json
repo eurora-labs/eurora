@@ -34,6 +34,7 @@
 		"@sveltejs/kit": "catalog:svelte",
 		"@sveltejs/vite-plugin-svelte": "catalog:svelte",
 		"@tailwindcss/postcss": "catalog:",
+		"tailwindcss": "catalog:",
 		"@tauri-apps/api": "^2.8.0",
 		"@tauri-apps/plugin-dialog": "^2.4.0",
 		"@tauri-apps/plugin-fs": "^2.4.2",
