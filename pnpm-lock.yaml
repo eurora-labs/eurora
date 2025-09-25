@@ -288,6 +288,9 @@ importers:
       svelte-sonner:
         specifier: ^1.0.5
         version: 1.0.5(svelte@5.39.2)
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.1.13
       taurpc:
         specifier: ^1.8.1
         version: 1.8.1
@@ -1577,6 +1580,9 @@ importers:
       '@tailwindcss/postcss':
         specifier: 'catalog:'
         version: 4.1.13
+      autoprefixer:
+        specifier: ^10.4.21
+        version: 10.4.21(postcss@8.5.6)
       bits-ui:
         specifier: ^2.9.9
         version: 2.9.9(@internationalized/date@3.9.0)(svelte@5.39.2)
