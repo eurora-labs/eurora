@@ -43,8 +43,3 @@
 <article bind:this={ref} class={cn(messageVariants({ variant }), className)} {...restProps}>
 	{@render children?.()}
 </article>
-
-<style lang="postcss">
-	@reference 'tailwindcss';
-	/* Apply solid background for Linux desktop app */
-</style>
