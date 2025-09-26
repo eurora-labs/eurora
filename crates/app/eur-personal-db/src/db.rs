@@ -11,7 +11,7 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions},
     types::Uuid,
 };
-use tracing::{debug, info};
+use tracing::{error, info};
 
 use crate::{
     ChatMessageAsset, NewAsset, NewChatMessage, NewChatMessageAsset, NewConversation,
@@ -25,12 +25,12 @@ pub struct PersonalDatabaseManager {
 
 impl PersonalDatabaseManager {
     pub async fn new(database_path: &str) -> Result<Self, sqlx::Error> {
-        debug!(
+        info!(
             "Initializing PersonalDatabaseManager with database path: {}",
             database_path
         );
         let connection_string = format!("sqlite:{}", database_path);
-        debug!("Initializing database connection");
+        info!("Initializing database connection");
 
         unsafe {
             sqlite3_auto_extension(Some(std::mem::transmute::<
@@ -60,12 +60,27 @@ impl PersonalDatabaseManager {
                 .pragma("cipher_kdf_algorithm", "PBKDF2_HMAC_SHA512");
         }
 
-        let pool = SqlitePoolOptions::new()
+        let pool = match SqlitePoolOptions::new()
             .max_connections(50)
             .min_connections(3)
             .acquire_timeout(Duration::from_secs(10))
-            .connect_with(opts)
-            .await?;
+            .connect_with(opts.clone())
+            .await
+        {
+            Ok(pool) => pool,
+            Err(e) => {
+                // Delete the file and try again
+                let _ = std::fs::remove_file(&database_path);
+                error!("Failed to connect to database: {}", e);
+
+                SqlitePoolOptions::new()
+                    .max_connections(50)
+                    .min_connections(3)
+                    .acquire_timeout(Duration::from_secs(10))
+                    .connect_with(opts)
+                    .await?
+            }
+        };
 
         let db_manager = PersonalDatabaseManager { pool };
 
