@@ -61,103 +61,104 @@
 	let unlistenLauncherClosed: (() => void) | undefined;
 	let unlistenBackgroundImage: (() => void) | undefined;
 
+	function onLauncherClosed() {
+		// Clear messages array
+		messages.splice(0, messages.length);
+		// Reset current conversation ID to null to default to NEW on next interaction
+		conversation = null;
+		console.log('Launcher closed: cleared messages and reset conversation');
+	}
+
+	async function onLauncherOpened(info: LauncherInfo) {
+		triggerResizing(100);
+		await isPromptKitServiceAvailable();
+		if (editorRef) {
+			clearQuery(editorRef);
+		}
+		// Reload activities when launcher is opened
+		loadActivities();
+
+		// Store the launcher information from the event payload
+		launcherInfo = info;
+		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
+
+		backgroundImage = info.background_image;
+		if (!backgroundImage) {
+			return;
+		}
+
+		const scale = scaleFactor.value;
+		console.log('Launcher opened: scale:', scale);
+		const img = new Image();
+		img.onload = () => {
+			if (backdropCustom2Ref && launcherInfo) {
+				// For the initial relative image, we can use cover since it's already cropped to the launcher area
+
+				backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
+				backdropCustom2Ref.style.backgroundPosition = '0px 0px';
+				if (platform === 'linux') {
+					backdropCustom2Ref.style.backgroundSize = 'cover';
+				} else {
+					const coverWidth = img.width / launcherInfo.monitor_scale_factor;
+					const coverHeight = img.height / launcherInfo.monitor_scale_factor;
+					backdropCustom2Ref.style.backgroundSize = `${coverWidth}px ${coverHeight}px`;
+				}
+				backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+			}
+		};
+		img.src = backgroundImage;
+	}
+
+	async function onBackgroundImageChanged(imageBase64: string) {
+		// Replace the small relative background image with full monitor image while preserving the coordinates
+		backgroundImage = imageBase64;
+		// const scale = scaleFactor.value;
+
+		// Preload the image to avoid white flash during switch
+		const img = new Image();
+		img.onload = () => {
+			// Only switch once the image is fully loaded
+			if (backdropCustom2Ref && launcherInfo) {
+				let backgroundWidth = img.width;
+				let backgroundHeight = img.height;
+				let backgroundX = launcherInfo.capture_x;
+				let backgroundY = launcherInfo.capture_y;
+				if (platform === 'linux') {
+					// backgroundWidth = img.width / scale;
+					// backgroundHeight = img.height / scale;
+					// backgroundX = launcherInfo.capture_x / scale;
+					// backgroundY = launcherInfo.capture_y / scale;
+					backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
+					backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
+					backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
+					backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
+				} else if (platform === 'windows') {
+					backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
+					backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
+					backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
+					backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
+				}
+				backdropCustom2Ref.style.backgroundSize = `${backgroundWidth}px ${backgroundHeight}px`;
+				backdropCustom2Ref.style.backgroundPosition = `${-backgroundX}px ${-backgroundY}px`;
+				backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+				backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
+			}
+		};
+		img.src = imageBase64;
+	}
+
 	// Listen for launcher closed event to clear messages and reset conversation
-	taurpc.window.launcher_closed
-		.on(() => {
-			// Clear messages array
-			messages.splice(0, messages.length);
-			// Reset current conversation ID to null to default to NEW on next interaction
-			conversation = null;
-			console.log('Launcher closed: cleared messages and reset conversation');
-		})
-		.then((unlisten) => {
-			unlistenLauncherClosed = unlisten;
-		});
+	taurpc.window.launcher_closed.on(onLauncherClosed).then((unlisten) => {
+		unlistenLauncherClosed = unlisten;
+	});
 
-	taurpc.window.launcher_opened
-		.on(async (info) => {
-			await isPromptKitServiceAvailable();
-			if (editorRef) {
-				clearQuery(editorRef);
-			}
-			// Reload activities when launcher is opened
-			loadActivities();
+	taurpc.window.launcher_opened.on(onLauncherOpened).then((unlisten) => {
+		unlistenLauncherOpened = unlisten;
+	});
 
-			// Store the launcher information from the event payload
-			launcherInfo = info;
-			console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
-
-			backgroundImage = info.background_image;
-			if (!backgroundImage) {
-				return;
-			}
-
-			const scale = scaleFactor.value;
-			console.log('Launcher opened: scale:', scale);
-			const img = new Image();
-			img.onload = () => {
-				if (backdropCustom2Ref && launcherInfo) {
-					// For the initial relative image, we can use cover since it's already cropped to the launcher area
-
-					backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
-					backdropCustom2Ref.style.backgroundPosition = '0px 0px';
-					if (platform === 'linux') {
-						backdropCustom2Ref.style.backgroundSize = 'cover';
-					} else {
-						const coverWidth = img.width / launcherInfo.monitor_scale_factor;
-						const coverHeight = img.height / launcherInfo.monitor_scale_factor;
-						backdropCustom2Ref.style.backgroundSize = `${coverWidth}px ${coverHeight}px`;
-					}
-					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-				}
-			};
-			img.src = backgroundImage;
-		})
-		.then((unlisten) => {
-			unlistenLauncherOpened = unlisten;
-		});
-
-	taurpc.window.background_image_changed
-		.on(async (fullImageB64) => {
-			// Replace the small relative background image with full monitor image while preserving the coordinates
-			backgroundImage = fullImageB64;
-			const scale = scaleFactor.value;
-
-			// Preload the image to avoid white flash during switch
-			const img = new Image();
-			img.onload = () => {
-				// Only switch once the image is fully loaded
-				if (backdropCustom2Ref && launcherInfo) {
-					let backgroundWidth = img.width;
-					let backgroundHeight = img.height;
-					let backgroundX = launcherInfo.capture_x;
-					let backgroundY = launcherInfo.capture_y;
-					if (platform === 'linux') {
-						// backgroundWidth = img.width / scale;
-						// backgroundHeight = img.height / scale;
-						// backgroundX = launcherInfo.capture_x / scale;
-						// backgroundY = launcherInfo.capture_y / scale;
-						backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
-						backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
-						backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
-						backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
-					} else if (platform === 'windows') {
-						backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
-						backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
-						backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
-						backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
-					}
-					backdropCustom2Ref.style.backgroundSize = `${backgroundWidth}px ${backgroundHeight}px`;
-					backdropCustom2Ref.style.backgroundPosition = `${-backgroundX}px ${-backgroundY}px`;
-					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-					backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
-				}
-			};
-			img.src = fullImageB64;
-		})
-		.then((unlisten) => {
-			unlistenBackgroundImage = unlisten;
-		});
+	taurpc.window.background_image_changed.on(onBackgroundImageChanged).then((unlisten) => {
+		unlistenBackgroundImage = unlisten;
+	});
 
 	async function isPromptKitServiceAvailable() {
 		try {
@@ -256,6 +257,7 @@
 
 	async function askQuestion(query: QueryAssets): Promise<void> {
 		console.log('askQuestion', query);
+		triggerResizing(500);
 		try {
 			// Convert QueryAssets to Query type expected by TauRPC
 			const tauRpcQuery: Query = {
@@ -295,12 +297,11 @@
 	}
 
 	function triggerResizing(height: number) {
-		console.log('resized to ', height);
 		let scale = scaleFactor.value;
 		if (platform === 'windows') {
 			scale = 1;
 		}
-		taurpc.window.resize_launcher_window(1024, Math.max(height, 500), scale).then(() => {
+		taurpc.window.resize_launcher_window(1024, height, scale).then(() => {
 			console.log('resized to ', height);
 		});
 	}
