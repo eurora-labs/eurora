@@ -36,7 +36,10 @@
 	let editorRef: ProsemirrorEditor | undefined = $state();
 	let promptKitServiceAvailable = $state(false);
 	let platform = getPlatform();
+	let resizeObserver: ResizeObserver | null = null;
+	let mainRef: HTMLElement | null = $state(null);
 	registerCoreExtensions();
+
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
 		text: '',
@@ -159,6 +162,25 @@
 		unlistenBackgroundImage = unlisten;
 	});
 
+	$effect(() => {
+		if (mainRef) {
+			// Clean up existing observer if any
+			resizeObserver?.disconnect();
+
+			resizeObserver = new ResizeObserver((entries) => {
+				for (const entry of entries) {
+					triggerResizing(entry.contentRect.height);
+				}
+			});
+			resizeObserver.observe(mainRef);
+		}
+
+		// Cleanup function
+		return () => {
+			resizeObserver?.disconnect();
+		};
+	});
+
 	async function isPromptKitServiceAvailable() {
 		try {
 			const serviceName = await taurpc.prompt.get_service_name();
@@ -238,7 +260,7 @@
 	async function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && !event.shiftKey) {
 			// await taurpc.window.resize_launcher_window(100, 1.0);
-			triggerResizing(500);
+			// triggerResizing(500);
 			// await taurpc.window.resize_launcher_window(1024, Math.round(500), scaleFactor.value);
 
 			try {
@@ -257,7 +279,7 @@
 
 	async function askQuestion(query: QueryAssets): Promise<void> {
 		console.log('askQuestion', query);
-		triggerResizing(500);
+		// triggerResizing(500);
 		try {
 			// Convert QueryAssets to Query type expected by TauRPC
 			const tauRpcQuery: Query = {
@@ -308,48 +330,47 @@
 	}
 </script>
 
-<div class="backdrop-custom relative overflow-hidden">
-	{#if promptKitServiceAvailable}
-		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0">
-			<Launcher.Input
-				placeholder="What can I help you with?"
-				bind:query={searchQuery}
-				bind:editorRef
-				onheightchange={triggerResizing}
-				onkeydown={handleKeydown}
-				class="min-h-[100px] h-fit w-full text-[40px]"
-			/>
-		</Launcher.Root>
-
-		{#if messages.length > 0}
-			<Chat.Root
-				bind:this={chatRef}
-				class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4"
+<main bind:this={mainRef} class="h-fit">
+	<div class="backdrop-custom relative">
+		{#if promptKitServiceAvailable}
+			<Launcher.Root
+				class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 min-h-[100px]"
 			>
-				{#each messages as message}
-					{#if typeof message.content === 'string'}
-						{#if message.content.length > 0}
-							<Chat.Message
-								variant={message.role === 'user' ? 'default' : 'assistant'}
-								finishRendering={() => {}}
-							>
-								<Chat.MessageContent>
-									<Katex math={message.content} finishRendering={() => {}} />
-								</Chat.MessageContent>
-							</Chat.Message>
-						{/if}
-					{/if}
-				{/each}
-			</Chat.Root>
-		{/if}
-	{:else}
-		<div class="flex justify-center items-center h-full flex-col gap-4">
-			<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
-			<Button onclick={openMainWindow}>Initialize Now</Button>
-		</div>
-	{/if}
-</div>
+				<Launcher.Input
+					placeholder="What can I help you with?"
+					bind:query={searchQuery}
+					bind:editorRef
+					onkeydown={handleKeydown}
+					class="min-h-[100px] h-fit w-full text-[40px]"
+				/>
+			</Launcher.Root>
 
+			{#if messages.length > 0}
+				<Chat.Root bind:this={chatRef} class="w-full h-full flex flex-col gap-4">
+					{#each messages as message}
+						{#if typeof message.content === 'string'}
+							{#if message.content.length > 0}
+								<Chat.Message
+									variant={message.role === 'user' ? 'default' : 'assistant'}
+									finishRendering={() => {}}
+								>
+									<Chat.MessageContent>
+										<Katex math={message.content} finishRendering={() => {}} />
+									</Chat.MessageContent>
+								</Chat.Message>
+							{/if}
+						{/if}
+					{/each}
+				</Chat.Root>
+			{/if}
+		{:else}
+			<div class="flex justify-center items-center h-full flex-col gap-4">
+				<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
+				<Button onclick={openMainWindow}>Initialize Now</Button>
+			</div>
+		{/if}
+	</div>
+</main>
 <svg
 	xmlns="http://www.w3.org/2000/svg"
 	style="position:absolute;width:0;height:0"
