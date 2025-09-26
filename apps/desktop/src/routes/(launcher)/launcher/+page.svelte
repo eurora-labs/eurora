@@ -13,10 +13,9 @@
 	} from '$lib/bindings/bindings.js';
 	import { platform as getPlatform } from '@tauri-apps/plugin-os';
 
-	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
+	import * as Chat from '@eurora/ui/custom-components/chat/index';
 
 	import { onMount } from 'svelte';
-	import { Chat } from '@eurora/ui/custom-components/chat/index';
 	import { executeCommand } from '$lib/commands.js';
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
 
@@ -55,7 +54,7 @@
 
 	let backgroundImage = $state<string | null>(null);
 	let launcherInfo = $state<LauncherInfo | null>(null);
-	let chatRef = $state<Chat | null>(null);
+	let chatRef = $state<Chat.Root | null>(null);
 
 	let unlistenLauncherOpened: (() => void) | undefined;
 	let unlistenLauncherClosed: (() => void) | undefined;
@@ -70,7 +69,7 @@
 	}
 
 	async function onLauncherOpened(info: LauncherInfo) {
-		triggerResizing(100);
+		// triggerResizing(100);
 		await isPromptKitServiceAvailable();
 		if (editorRef) {
 			clearQuery(editorRef);
@@ -239,7 +238,8 @@
 	async function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && !event.shiftKey) {
 			// await taurpc.window.resize_launcher_window(100, 1.0);
-			await taurpc.window.resize_launcher_window(1024, 500, scaleFactor.value);
+			triggerResizing(500);
+			// await taurpc.window.resize_launcher_window(1024, Math.round(500), scaleFactor.value);
 
 			try {
 				const query = processQuery(editorRef!);
@@ -301,7 +301,8 @@
 		if (platform === 'windows') {
 			scale = 1;
 		}
-		taurpc.window.resize_launcher_window(1024, height, scale).then(() => {
+		console.log('triggerResizing', height, scale);
+		taurpc.window.resize_launcher_window(1024, Math.round(height), scale).then(() => {
 			console.log('resized to ', height);
 		});
 	}
@@ -321,22 +322,25 @@
 		</Launcher.Root>
 
 		{#if messages.length > 0}
-			<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
+			<Chat.Root
+				bind:this={chatRef}
+				class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4"
+			>
 				{#each messages as message}
 					{#if typeof message.content === 'string'}
 						{#if message.content.length > 0}
-							<MessageComponent.Root
+							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
-								<MessageComponent.Content>
+								<Chat.MessageContent>
 									<Katex math={message.content} finishRendering={() => {}} />
-								</MessageComponent.Content>
-							</MessageComponent.Root>
+								</Chat.MessageContent>
+							</Chat.Message>
 						{/if}
 					{/if}
 				{/each}
-			</Chat>
+			</Chat.Root>
 		{/if}
 	{:else}
 		<div class="flex justify-center items-center h-full flex-col gap-4">
