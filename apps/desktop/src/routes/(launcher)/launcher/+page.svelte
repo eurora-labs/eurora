@@ -149,19 +149,6 @@
 		img.src = imageBase64;
 	}
 
-	// Listen for launcher closed event to clear messages and reset conversation
-	taurpc.window.launcher_closed.on(onLauncherClosed).then((unlisten) => {
-		unlistenLauncherClosed = unlisten;
-	});
-
-	taurpc.window.launcher_opened.on(onLauncherOpened).then((unlisten) => {
-		unlistenLauncherOpened = unlisten;
-	});
-
-	taurpc.window.background_image_changed.on(onBackgroundImageChanged).then((unlisten) => {
-		unlistenBackgroundImage = unlisten;
-	});
-
 	$effect(() => {
 		if (mainRef) {
 			// Clean up existing observer if any
@@ -219,6 +206,19 @@
 			promptKitServiceAvailable = available;
 		});
 		document.addEventListener('keydown', handleEscapeKey);
+
+		// Listen for launcher closed event to clear messages and reset conversation
+		taurpc.window.launcher_closed.on(onLauncherClosed).then((unlisten) => {
+			unlistenLauncherClosed = unlisten;
+		});
+
+		taurpc.window.launcher_opened.on(onLauncherOpened).then((unlisten) => {
+			unlistenLauncherOpened = unlisten;
+		});
+
+		taurpc.window.background_image_changed.on(onBackgroundImageChanged).then((unlisten) => {
+			unlistenBackgroundImage = unlisten;
+		});
 
 		let unlistenPromptServiceChange: (() => void) | undefined;
 		taurpc.prompt.prompt_service_change
