@@ -10,8 +10,7 @@
 
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
-	import { Chat } from '@eurora/ui/custom-components/chat/index';
-	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
+	import * as Chat from '@eurora/ui/custom-components/chat/index';
 	import Katex from '$lib/components/katex.svelte';
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
 	// import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
@@ -24,9 +23,10 @@
 
 	let conversation = $state<Conversation | null>(null);
 	let messages = $state<Message[]>([]);
+	let status = $state<string>('');
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
-	let chatRef = $state<Chat | null>(null);
+	let chatRef = $state<Chat.Root | null>(null);
 
 	registerCoreExtensions();
 	let searchQuery = $state({
@@ -190,22 +190,25 @@
 		<ScrollArea
 			class="w-full max-h-[calc(80vh-100px)] px-6 flex flex-col justify-end items-center gap-4"
 		>
-			<Chat bind:this={chatRef} class="w-full h-full flex flex-col gap-4 overflow-hidden">
+			<Chat.Root
+				bind:this={chatRef}
+				class="w-full h-full flex flex-col gap-4 overflow-hidden"
+			>
 				{#each messages as message}
 					{#if typeof message.content === 'string'}
 						{#if message.content.length > 0}
-							<MessageComponent.Root
+							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
-								<MessageComponent.Content>
+								<Chat.MessageContent>
 									<Katex math={message.content} finishRendering={() => {}} />
-								</MessageComponent.Content>
-							</MessageComponent.Root>
+								</Chat.MessageContent>
+							</Chat.Message>
 						{/if}
 					{/if}
 				{/each}
-			</Chat>
+			</Chat.Root>
 		</ScrollArea>
 	{/if}
 
