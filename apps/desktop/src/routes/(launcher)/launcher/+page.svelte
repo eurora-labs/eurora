@@ -13,10 +13,9 @@
 	} from '$lib/bindings/bindings.js';
 	import { platform as getPlatform } from '@tauri-apps/plugin-os';
 
-	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
+	import * as Chat from '@eurora/ui/custom-components/chat/index';
 
 	import { onMount } from 'svelte';
-	import { Chat } from '@eurora/ui/custom-components/chat/index';
 	import { executeCommand } from '$lib/commands.js';
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
 
@@ -37,7 +36,10 @@
 	let editorRef: ProsemirrorEditor | undefined = $state();
 	let promptKitServiceAvailable = $state(false);
 	let platform = getPlatform();
+	let resizeObserver: ResizeObserver | null = null;
+	let mainRef: HTMLElement | null = $state(null);
 	registerCoreExtensions();
+
 	// Query object for the Launcher.Input component
 	let searchQuery = $state({
 		text: '',
@@ -55,109 +57,116 @@
 
 	let backgroundImage = $state<string | null>(null);
 	let launcherInfo = $state<LauncherInfo | null>(null);
-	let chatRef = $state<Chat | null>(null);
+	let chatRef = $state<Chat.Root | null>(null);
 
 	let unlistenLauncherOpened: (() => void) | undefined;
 	let unlistenLauncherClosed: (() => void) | undefined;
 	let unlistenBackgroundImage: (() => void) | undefined;
 
-	// Listen for launcher closed event to clear messages and reset conversation
-	taurpc.window.launcher_closed
-		.on(() => {
-			// Clear messages array
-			messages.splice(0, messages.length);
-			// Reset current conversation ID to null to default to NEW on next interaction
-			conversation = null;
-			console.log('Launcher closed: cleared messages and reset conversation');
-		})
-		.then((unlisten) => {
-			unlistenLauncherClosed = unlisten;
-		});
+	function onLauncherClosed() {
+		// Clear messages array
+		messages.splice(0, messages.length);
+		// Reset current conversation ID to null to default to NEW on next interaction
+		conversation = null;
+		console.log('Launcher closed: cleared messages and reset conversation');
+	}
 
-	taurpc.window.launcher_opened
-		.on(async (info) => {
-			await isPromptKitServiceAvailable();
-			if (editorRef) {
-				clearQuery(editorRef);
-			}
-			// Reload activities when launcher is opened
-			loadActivities();
+	async function onLauncherOpened(info: LauncherInfo) {
+		// triggerResizing(100);
+		await isPromptKitServiceAvailable();
+		if (editorRef) {
+			clearQuery(editorRef);
+		}
+		// Reload activities when launcher is opened
+		loadActivities();
 
-			// Store the launcher information from the event payload
-			launcherInfo = info;
-			console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
+		// Store the launcher information from the event payload
+		launcherInfo = info;
+		console.log('Launcher opened: refreshed activities, launcher info:', launcherInfo);
 
-			backgroundImage = info.background_image;
-			if (!backgroundImage) {
-				return;
-			}
+		backgroundImage = info.background_image;
+		if (!backgroundImage) {
+			return;
+		}
 
-			const scale = scaleFactor.value;
-			console.log('Launcher opened: scale:', scale);
-			const img = new Image();
-			img.onload = () => {
-				if (backdropCustom2Ref && launcherInfo) {
-					// For the initial relative image, we can use cover since it's already cropped to the launcher area
+		const scale = scaleFactor.value;
+		console.log('Launcher opened: scale:', scale);
+		const img = new Image();
+		img.onload = () => {
+			if (backdropCustom2Ref && launcherInfo) {
+				// For the initial relative image, we can use cover since it's already cropped to the launcher area
 
-					backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
-					backdropCustom2Ref.style.backgroundPosition = '0px 0px';
-					if (platform === 'linux') {
-						backdropCustom2Ref.style.backgroundSize = 'cover';
-					} else {
-						const coverWidth = img.width / launcherInfo.monitor_scale_factor;
-						const coverHeight = img.height / launcherInfo.monitor_scale_factor;
-						backdropCustom2Ref.style.backgroundSize = `${coverWidth}px ${coverHeight}px`;
-					}
-					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+				backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
+				backdropCustom2Ref.style.backgroundPosition = '0px 0px';
+				if (platform === 'linux') {
+					backdropCustom2Ref.style.backgroundSize = 'cover';
+				} else {
+					const coverWidth = img.width / launcherInfo.monitor_scale_factor;
+					const coverHeight = img.height / launcherInfo.monitor_scale_factor;
+					backdropCustom2Ref.style.backgroundSize = `${coverWidth}px ${coverHeight}px`;
 				}
-			};
-			img.src = backgroundImage;
-		})
-		.then((unlisten) => {
-			unlistenLauncherOpened = unlisten;
-		});
+				backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+			}
+		};
+		img.src = backgroundImage;
+	}
 
-	taurpc.window.background_image_changed
-		.on(async (fullImageB64) => {
-			// Replace the small relative background image with full monitor image while preserving the coordinates
-			backgroundImage = fullImageB64;
-			const scale = scaleFactor.value;
+	async function onBackgroundImageChanged(imageBase64: string) {
+		// Replace the small relative background image with full monitor image while preserving the coordinates
+		backgroundImage = imageBase64;
+		// const scale = scaleFactor.value;
 
-			// Preload the image to avoid white flash during switch
-			const img = new Image();
-			img.onload = () => {
-				// Only switch once the image is fully loaded
-				if (backdropCustom2Ref && launcherInfo) {
-					let backgroundWidth = img.width;
-					let backgroundHeight = img.height;
-					let backgroundX = launcherInfo.capture_x;
-					let backgroundY = launcherInfo.capture_y;
-					if (platform === 'linux') {
-						// backgroundWidth = img.width / scale;
-						// backgroundHeight = img.height / scale;
-						// backgroundX = launcherInfo.capture_x / scale;
-						// backgroundY = launcherInfo.capture_y / scale;
-						backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
-						backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
-						backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
-						backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
-					} else if (platform === 'windows') {
-						backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
-						backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
-						backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
-						backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
-					}
-					backdropCustom2Ref.style.backgroundSize = `${backgroundWidth}px ${backgroundHeight}px`;
-					backdropCustom2Ref.style.backgroundPosition = `${-backgroundX}px ${-backgroundY}px`;
-					backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
-					backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
+		// Preload the image to avoid white flash during switch
+		const img = new Image();
+		img.onload = () => {
+			// Only switch once the image is fully loaded
+			if (backdropCustom2Ref && launcherInfo) {
+				let backgroundWidth = img.width;
+				let backgroundHeight = img.height;
+				let backgroundX = launcherInfo.capture_x;
+				let backgroundY = launcherInfo.capture_y;
+				if (platform === 'linux') {
+					// backgroundWidth = img.width / scale;
+					// backgroundHeight = img.height / scale;
+					// backgroundX = launcherInfo.capture_x / scale;
+					// backgroundY = launcherInfo.capture_y / scale;
+					backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
+					backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
+					backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
+					backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
+				} else if (platform === 'windows') {
+					backgroundWidth = img.width / launcherInfo.monitor_scale_factor;
+					backgroundHeight = img.height / launcherInfo.monitor_scale_factor;
+					backgroundX = launcherInfo.capture_x / launcherInfo.monitor_scale_factor;
+					backgroundY = launcherInfo.capture_y / launcherInfo.monitor_scale_factor;
 				}
-			};
-			img.src = fullImageB64;
-		})
-		.then((unlisten) => {
-			unlistenBackgroundImage = unlisten;
-		});
+				backdropCustom2Ref.style.backgroundSize = `${backgroundWidth}px ${backgroundHeight}px`;
+				backdropCustom2Ref.style.backgroundPosition = `${-backgroundX}px ${-backgroundY}px`;
+				backdropCustom2Ref.style.backgroundRepeat = 'no-repeat';
+				backdropCustom2Ref.style.backgroundImage = `url('${img.src}')`;
+			}
+		};
+		img.src = imageBase64;
+	}
+
+	$effect(() => {
+		if (mainRef) {
+			// Clean up existing observer if any
+			resizeObserver?.disconnect();
+
+			resizeObserver = new ResizeObserver((entries) => {
+				for (const entry of entries) {
+					triggerResizing(entry.contentRect.height);
+				}
+			});
+			resizeObserver.observe(mainRef);
+		}
+
+		// Cleanup function
+		return () => {
+			resizeObserver?.disconnect();
+		};
+	});
 
 	async function isPromptKitServiceAvailable() {
 		try {
@@ -197,6 +206,19 @@
 			promptKitServiceAvailable = available;
 		});
 		document.addEventListener('keydown', handleEscapeKey);
+
+		// Listen for launcher closed event to clear messages and reset conversation
+		taurpc.window.launcher_closed.on(onLauncherClosed).then((unlisten) => {
+			unlistenLauncherClosed = unlisten;
+		});
+
+		taurpc.window.launcher_opened.on(onLauncherOpened).then((unlisten) => {
+			unlistenLauncherOpened = unlisten;
+		});
+
+		taurpc.window.background_image_changed.on(onBackgroundImageChanged).then((unlisten) => {
+			unlistenBackgroundImage = unlisten;
+		});
 
 		let unlistenPromptServiceChange: (() => void) | undefined;
 		taurpc.prompt.prompt_service_change
@@ -238,7 +260,8 @@
 	async function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && !event.shiftKey) {
 			// await taurpc.window.resize_launcher_window(100, 1.0);
-			await taurpc.window.resize_launcher_window(1024, 500, scaleFactor.value);
+			// triggerResizing(500);
+			// await taurpc.window.resize_launcher_window(1024, Math.round(500), scaleFactor.value);
 
 			try {
 				const query = processQuery(editorRef!);
@@ -256,6 +279,7 @@
 
 	async function askQuestion(query: QueryAssets): Promise<void> {
 		console.log('askQuestion', query);
+		// triggerResizing(500);
 		try {
 			// Convert QueryAssets to Query type expected by TauRPC
 			const tauRpcQuery: Query = {
@@ -295,56 +319,58 @@
 	}
 
 	function triggerResizing(height: number) {
-		console.log('resized to ', height);
 		let scale = scaleFactor.value;
 		if (platform === 'windows') {
 			scale = 1;
 		}
-		taurpc.window.resize_launcher_window(1024, Math.max(height, 500), scale).then(() => {
+		console.log('triggerResizing', height, scale);
+		taurpc.window.resize_launcher_window(1024, Math.round(height), scale).then(() => {
 			console.log('resized to ', height);
 		});
 	}
 </script>
 
-<div class="backdrop-custom relative overflow-hidden">
-	{#if promptKitServiceAvailable}
-		<Launcher.Root class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0">
-			<Launcher.Input
-				placeholder="What can I help you with?"
-				bind:query={searchQuery}
-				bind:editorRef
-				onheightchange={triggerResizing}
-				onkeydown={handleKeydown}
-				class="min-h-[100px] h-fit w-full text-[40px]"
-			/>
-		</Launcher.Root>
+<main bind:this={mainRef} class="h-fit">
+	<div class="backdrop-custom relative">
+		{#if promptKitServiceAvailable}
+			<Launcher.Root
+				class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 min-h-[100px]"
+			>
+				<Launcher.Input
+					placeholder="What can I help you with?"
+					bind:query={searchQuery}
+					bind:editorRef
+					onkeydown={handleKeydown}
+					class="min-h-[100px] h-fit w-full text-[40px]"
+				/>
+			</Launcher.Root>
 
-		{#if messages.length > 0}
-			<Chat bind:this={chatRef} class="w-full max-h-[calc(100vh-100px)] flex flex-col gap-4">
-				{#each messages as message}
-					{#if typeof message.content === 'string'}
-						{#if message.content.length > 0}
-							<MessageComponent.Root
-								variant={message.role === 'user' ? 'default' : 'assistant'}
-								finishRendering={() => {}}
-							>
-								<MessageComponent.Content>
-									<Katex math={message.content} finishRendering={() => {}} />
-								</MessageComponent.Content>
-							</MessageComponent.Root>
+			{#if messages.length > 0}
+				<Chat.Root bind:this={chatRef} class="w-full h-full flex flex-col gap-4">
+					{#each messages as message}
+						{#if typeof message.content === 'string'}
+							{#if message.content.length > 0}
+								<Chat.Message
+									variant={message.role === 'user' ? 'default' : 'assistant'}
+									finishRendering={() => {}}
+								>
+									<Chat.MessageContent>
+										<Katex math={message.content} finishRendering={() => {}} />
+									</Chat.MessageContent>
+								</Chat.Message>
+							{/if}
 						{/if}
-					{/if}
-				{/each}
-			</Chat>
+					{/each}
+				</Chat.Root>
+			{/if}
+		{:else}
+			<div class="flex justify-center items-center h-full flex-col gap-4">
+				<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
+				<Button onclick={openMainWindow}>Initialize Now</Button>
+			</div>
 		{/if}
-	{:else}
-		<div class="flex justify-center items-center h-full flex-col gap-4">
-			<h1 class="text-2xl font-bold">Eurora is not initialized</h1>
-			<Button onclick={openMainWindow}>Initialize Now</Button>
-		</div>
-	{/if}
-</div>
-
+	</div>
+</main>
 <svg
 	xmlns="http://www.w3.org/2000/svg"
 	style="position:absolute;width:0;height:0"
