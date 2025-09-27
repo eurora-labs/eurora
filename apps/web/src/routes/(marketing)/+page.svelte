@@ -141,7 +141,7 @@
 					</Button>
 				{/snippet} -->
 				<!-- {@render downloadButtonSnippet()} -->
-				<Button size="lg" class="w-full md:w-auto p-8 shadow-lg" variant="secondary"
+				<Button size="lg" class=" md:w-auto p-8 shadow-lg" variant="secondary"
 					>Learn More</Button
 				>
 			</div>
