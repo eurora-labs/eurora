@@ -66,7 +66,7 @@
 </script>
 
 <div class={cn('', className)}>
-	<Launcher.Root class="h-[100px]">
+	<Launcher.Root class="h-[100px] py-4">
 		<Launcher.Input
 			{placeholder}
 			bind:query={searchQuery}
