@@ -13,8 +13,7 @@
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { processQuery, clearQuery } from '@eurora/prosemirror-core/util';
 
-	import { Chat } from '@eurora/ui/custom-components/chat/index';
-	import * as MessageComponent from '@eurora/ui/custom-components/message/index';
+	import * as Chat from '@eurora/ui/custom-components/chat/index';
 	import { cn } from '@eurora/ui/utils';
 	import { onMount } from 'svelte';
 	let messages: Message[] = $state([
@@ -77,16 +76,16 @@
 			disabled={placeholder.length > 0}
 		/>
 	</Launcher.Root>
-	<Chat class="w-full min-h-[265px]">
+	<Chat.Root class="w-full min-h-[265px]">
 		{#each messages as message}
-			<MessageComponent.Root
+			<Chat.Message
 				variant={message.role === 'user' ? 'default' : 'assistant'}
 				finishRendering={() => {}}
 			>
-				<MessageComponent.Content>
+				<Chat.MessageContent>
 					{message.content}
-				</MessageComponent.Content>
-			</MessageComponent.Root>
+				</Chat.MessageContent>
+			</Chat.Message>
 		{/each}
-	</Chat>
+	</Chat.Root>
 </div>
