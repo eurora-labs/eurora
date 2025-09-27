@@ -213,11 +213,11 @@
 	{/if}
 
 	<Launcher.Root
-		class="h-fit rounded-[36px] shadow-none flex flex-col p-0 m-0 w-[70%] bg-gray-200"
+		class="h-fit rounded-[36px] shadow-none flex flex-col p-4 m-0 w-[70%] bg-gray-200"
 	>
 		<Launcher.Input
 			placeholder="What can I help you with?"
-			class="min-h-[40px] h-fit w-full text-black placeholder:text-white text-[24px]"
+			class="min-h-[100px] h-fit w-full text-[24px]"
 			bind:query={searchQuery}
 			bind:editorRef
 			onkeydown={handleKeydown}
