@@ -38,13 +38,14 @@ use tauri::{
     tray::TrayIconBuilder,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_log::{Target, TargetKind, fern};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{debug, error};
 use tracing_subscriber::Layer;
+use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
@@ -73,18 +74,6 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
 fn main() {
     dotenv().ok();
 
-    // #[cfg(not(debug_assertions))]
-    // {
-    let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
-        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
-
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
-        .with(sentry::integrations::tracing::layer().with_filter(filter))
-        .try_init()
-        .unwrap();
-
     let _guard = sentry::init((
         "https://a0c23c10925999f104c7fd07fd8e3871@o4508907847352320.ingest.de.sentry.io/4510097240424528",
         sentry::ClientOptions {
@@ -96,6 +85,17 @@ fn main() {
             ..Default::default()
         },
     ));
+
+    let sentry_logger = sentry::integrations::log::SentryLogger::new()
+        .filter(|_md| sentry::integrations::log::LogFilter::Log);
+
+    // let mut writer = std::io::Cursor::new(Vec::<u8>::new());
+    let writer = Box::new(sentry_logger) as Box<dyn log::Log>;
+    let dispatcher = fern::Dispatch::new()
+        .level(log::LevelFilter::Trace)
+        .chain(std::io::stdout())
+        .chain(writer);
+    let custom_target = Target::new(TargetKind::Dispatch(dispatcher));
 
     // Regular application startup
     let tauri_context = generate_context!();
@@ -335,12 +335,13 @@ fn main() {
                 // .plugin(
                 //     tauri_plugin_sentry::init(&sentry_client)
                 // )
-                // .plugin(
-                //     tauri_plugin_log::Builder::new()
-                //             .filter(|metadata| metadata.target().starts_with("eur_") || metadata.level() == log::Level::Warn)
-                //             .level(log::LevelFilter::debug)
-                //             .build()
-                // )
+                .plugin(
+                    tauri_plugin_log::Builder::new()
+                            .filter(|metadata| metadata.target().starts_with("eur_") || metadata.target().starts_with("webview") || metadata.level() == log::Level::Warn)
+                            .level(log::LevelFilter::Info)
+                            .target(custom_target)
+                            .build()
+                )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
                 .on_window_event(|window, event| match event {
