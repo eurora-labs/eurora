@@ -40,7 +40,15 @@ use tauri::{
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
+use tonic::service::LayerExt;
 use tracing::{error, info};
+use tracing_subscriber::Layer;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{
+    filter::{EnvFilter, LevelFilter},
+    fmt,
+};
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
@@ -69,17 +77,29 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
 fn main() {
     dotenv().ok();
 
-    #[cfg(not(debug_assertions))]
-    {
-        let _guard = sentry::init((
-            "https://c274bba2ddbc19e4c2c34cedc1779588@o4508907847352320.ingest.de.sentry.io/4509796610605136",
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                send_default_pii: false,
-                ..Default::default()
-            },
-        ));
-    }
+    // #[cfg(not(debug_assertions))]
+    // {
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
+        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
+        .with(sentry::integrations::tracing::layer().with_filter(filter))
+        .try_init()
+        .unwrap();
+
+    let _guard = sentry::init((
+        "https://a0c23c10925999f104c7fd07fd8e3871@o4508907847352320.ingest.de.sentry.io/4510097240424528",
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            traces_sample_rate: 0.0,
+            enable_logs: true,
+            send_default_pii: true, // during closed beta all metrics are non-anonymous
+            debug: true,
+            ..Default::default()
+        },
+    ));
 
     // Regular application startup
     let tauri_context = generate_context!();
@@ -316,12 +336,15 @@ fn main() {
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
-                .plugin(
-                    tauri_plugin_log::Builder::new()
-                            .filter(|metadata| metadata.target().starts_with("eur_") || metadata.level() == log::Level::Warn)
-                            .level(log::LevelFilter::Info)
-                            .build()
-                )
+                // .plugin(
+                //     tauri_plugin_sentry::init(&sentry_client)
+                // )
+                // .plugin(
+                //     tauri_plugin_log::Builder::new()
+                //             .filter(|metadata| metadata.target().starts_with("eur_") || metadata.level() == log::Level::Warn)
+                //             .level(log::LevelFilter::Info)
+                //             .build()
+                // )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
                 .on_window_event(|window, event| match event {
