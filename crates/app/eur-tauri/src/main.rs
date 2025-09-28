@@ -40,15 +40,11 @@ use tauri::{
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
-use tonic::service::LayerExt;
-use tracing::{error, info};
+use tracing::{debug, error};
 use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{
-    filter::{EnvFilter, LevelFilter},
-    fmt,
-};
+use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
@@ -59,15 +55,15 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
             .download_and_install(
                 |chunk_length, content_length| {
                     downloaded += chunk_length;
-                    info!("downloaded {downloaded} from {content_length:?}");
+                    debug!("downloaded {downloaded} from {content_length:?}");
                 },
                 || {
-                    info!("download finished");
+                    debug!("download finished");
                 },
             )
             .await?;
 
-        info!("update installed");
+        debug!("update installed");
         app.restart();
     }
 
@@ -104,14 +100,14 @@ fn main() {
     // Regular application startup
     let tauri_context = generate_context!();
 
-    info!("Starting Tauri application...");
+    debug!("Starting Tauri application...");
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
         .block_on(async {
-            info!("Setting tokio runtime");
+            debug!("Setting tokio runtime");
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let builder = tauri::Builder::default()
@@ -137,7 +133,7 @@ fn main() {
                         } else {
                             let service: SharedPromptKitService = async_mutex::Mutex::new(None);
                             handle.manage(service);
-                            info!("No backend available");
+                            debug!("No backend available");
                         }
                     });
 
@@ -162,7 +158,7 @@ fn main() {
                         // Enable autostart
                         let _ = autostart_manager.enable();
                         // Check enable state
-                        info!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
+                        debug!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
                     }
 
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
@@ -198,7 +194,7 @@ fn main() {
 
                     let main_window_handle = app_handle.clone();
                     main_window.on_window_event(move |event| {
-                        info!("Window event: {:?}", event);
+                        debug!("Window event: {:?}", event);
                         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                             let main_window = main_window_handle.get_window("main").expect("Failed to get main window");
                             main_window.hide().expect("Failed to hide main window");
@@ -210,7 +206,7 @@ fn main() {
                             if !*focused && minimized {
                                 main_window.hide().expect("Failed to hide main window");
                             }
-                            info!("Window focused: {}", focused);
+                            debug!("Window focused: {}", focused);
                         }
                     });
 
@@ -270,7 +266,7 @@ fn main() {
                         if let Err(e) = timeline.start().await {
                             error!("Failed to start timeline collection: {}", e);
                         } else {
-                            info!("Timeline collection started successfully");
+                            debug!("Timeline collection started successfully");
                         }
                     });
 
@@ -296,7 +292,7 @@ fn main() {
                         if let Err(e) = app_handle_user.global_shortcut().register(launcher_shortcut) {
                             error!("Failed to register initial launcher shortcut: {}", e);
                         } else {
-                            info!("Successfully registered initial launcher shortcut: {:?}", launcher_shortcut);
+                            debug!("Successfully registered initial launcher shortcut: {:?}", launcher_shortcut);
                         }
                     });
 
@@ -314,7 +310,7 @@ fn main() {
                         match create_shared_database_manager(&db_app_handle).await {
                             Ok(db) => {
                                 db_app_handle.manage(db);
-                                info!("Personal database manager initialized");
+                                debug!("Personal database manager initialized");
                             }
                             Err(e) => error!("Failed to initialize personal database manager: {}", e),
                         }
@@ -327,7 +323,7 @@ fn main() {
                         match create_grpc_ipc_client().await {
                             Ok(ipc_client) => {
                                 ipc_handle.manage(ipc_client.clone());
-                                info!("gRPC IPC client initialized");
+                                debug!("gRPC IPC client initialized");
                             }
                             Err(e) => error!("Failed to initialize gRPC IPC client: {}", e),
                         }
@@ -342,7 +338,7 @@ fn main() {
                 // .plugin(
                 //     tauri_plugin_log::Builder::new()
                 //             .filter(|metadata| metadata.target().starts_with("eur_") || metadata.level() == log::Level::Warn)
-                //             .level(log::LevelFilter::Info)
+                //             .level(log::LevelFilter::debug)
                 //             .build()
                 // )
                 .plugin(tauri_plugin_shell::init())

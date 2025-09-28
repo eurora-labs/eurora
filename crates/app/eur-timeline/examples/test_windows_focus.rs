@@ -3,19 +3,20 @@
 //! Run with: cargo run --example test_windows_focus
 
 use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
-use tracing::info;
+use tracing::debug;
+
 fn main() -> anyhow::Result<()> {
-    info!("Starting Windows focus tracker test...");
-    info!("Switch between different applications to see focus events.");
-    info!("Press Ctrl+C to exit.");
+    debug!("Starting Windows focus tracker test...");
+    debug!("Switch between different applications to see focus events.");
+    debug!("Press Ctrl+C to exit.");
 
     let tracker = FocusTracker::new();
 
     tracker.track_focus(|event: FocusedWindow| -> FerrousFocusResult<()> {
-        info!("Focus changed:");
-        info!("  Process: {}", event.process_name.unwrap());
-        info!("  Title: {}", event.window_title.unwrap());
-        info!(
+        debug!("Focus changed:");
+        debug!("  Process: {}", event.process_name.unwrap());
+        debug!("  Title: {}", event.window_title.unwrap());
+        debug!(
             "  Icon: {}",
             if event.icon.is_some() {
                 "Icon available"
@@ -23,7 +24,7 @@ fn main() -> anyhow::Result<()> {
                 "No icon"
             }
         );
-        info!("  ---");
+        debug!("  ---");
         Ok(())
     })?;
 

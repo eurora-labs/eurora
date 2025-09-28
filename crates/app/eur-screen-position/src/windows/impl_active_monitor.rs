@@ -1,6 +1,6 @@
 use enigo::{Enigo, Mouse, Settings};
 use tauri::PhysicalSize;
-use tracing::info;
+use tracing::debug;
 use xcap::Monitor;
 
 use super::util::find_cursor_monitor;

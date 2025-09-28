@@ -5,7 +5,7 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use ferrous_focus::IconData;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use crate::{
     error::{ActivityError, ActivityResult},
@@ -114,7 +114,7 @@ impl StrategyRegistry {
     /// Register a strategy factory
     pub fn register_factory(&mut self, factory: Arc<dyn StrategyFactory>) {
         let metadata = factory.get_metadata();
-        info!(
+        debug!(
             "Registering strategy factory: {} ({})",
             metadata.name, metadata.id
         );
@@ -176,7 +176,7 @@ impl StrategyRegistry {
 
         match best_match {
             Some((strategy_id, score)) => {
-                info!(
+                debug!(
                     "Selected strategy {} with score {:.2} for process {}",
                     strategy_id, score.0, context.process_name
                 );

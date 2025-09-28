@@ -11,7 +11,7 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions},
     types::Uuid,
 };
-use tracing::{error, info};
+use tracing::{debug, error};
 
 use crate::{
     ChatMessageAsset, NewAsset, NewChatMessage, NewChatMessageAsset, NewConversation,
@@ -25,12 +25,12 @@ pub struct PersonalDatabaseManager {
 
 impl PersonalDatabaseManager {
     pub async fn new(database_path: &str) -> Result<Self, sqlx::Error> {
-        info!(
+        debug!(
             "Initializing PersonalDatabaseManager with database path: {}",
             database_path
         );
         let connection_string = format!("sqlite:{}", database_path);
-        info!("Initializing database connection");
+        debug!("Initializing database connection");
 
         unsafe {
             sqlite3_auto_extension(Some(std::mem::transmute::<
@@ -314,8 +314,8 @@ impl PersonalDatabaseManager {
         // Use future to wait in parallel
         // let (conversation, messages) = try_join!(conversation, messages)?;
 
-        info!("Conversation: {:?}", conversation);
-        // info!("Messages: {:?}", messages);
+        debug!("Conversation: {:?}", conversation);
+        // debug!("Messages: {:?}", messages);
 
         Ok((conversation, messages))
         // Ok((conversation, vec![]))
