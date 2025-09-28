@@ -14,7 +14,7 @@ use tokio::{
     task::JoinHandle,
     time,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     ActivityStrategy,
@@ -47,7 +47,7 @@ pub struct CollectorService {
 impl CollectorService {
     /// Create a new collector service
     pub fn new(storage: Arc<Mutex<TimelineStorage>>, config: CollectorConfig) -> Self {
-        info!(
+        debug!(
             "Creating collector service with interval: {:?}",
             config.collection_interval
         );
@@ -69,7 +69,7 @@ impl CollectorService {
         storage: Arc<Mutex<TimelineStorage>>,
         timeline_config: crate::config::TimelineConfig,
     ) -> Self {
-        info!(
+        debug!(
             "Creating collector service with interval: {:?}",
             timeline_config.collector.collection_interval
         );
@@ -92,7 +92,7 @@ impl CollectorService {
             return Err(TimelineError::AlreadyRunning);
         }
 
-        info!("Starting timeline collection service");
+        debug!("Starting timeline collection service");
 
         if self.focus_config.enabled {
             self.start_with_focus_tracking().await?;
@@ -110,7 +110,7 @@ impl CollectorService {
             return Err(TimelineError::NotRunning);
         }
 
-        info!("Stopping timeline collection service");
+        debug!("Stopping timeline collection service");
 
         // Stop the current task
         if let Some(task) = self.current_task.take() {
@@ -159,13 +159,13 @@ impl CollectorService {
         // Clear focus sender
         self.focus_sender = None;
 
-        info!("Timeline collection service stopped");
+        debug!("Timeline collection service stopped");
         Ok(())
     }
 
     /// Restart the collection service
     pub async fn restart(&mut self) -> TimelineResult<()> {
-        info!("Restarting timeline collection service");
+        debug!("Restarting timeline collection service");
 
         if self.is_running() {
             self.stop().await?;
@@ -219,19 +219,19 @@ impl CollectorService {
 
     /// Update collector configuration
     pub fn update_config(&mut self, config: CollectorConfig) {
-        info!("Updating collector configuration");
+        debug!("Updating collector configuration");
         self.config = config;
     }
 
     /// Update focus tracking configuration
     pub fn update_focus_config(&mut self, focus_config: crate::config::FocusTrackingConfig) {
-        info!("Updating focus tracking configuration");
+        debug!("Updating focus tracking configuration");
         self.focus_config = focus_config;
     }
 
     /// Update configuration from timeline config
     pub fn update_from_timeline_config(&mut self, timeline_config: crate::config::TimelineConfig) {
-        info!("Updating collector from timeline configuration");
+        debug!("Updating collector from timeline configuration");
         self.config = timeline_config.collector;
         self.focus_config = timeline_config.focus_tracking;
     }
@@ -263,7 +263,7 @@ impl CollectorService {
             let tracker = FocusTracker::new();
 
             while !shutdown_signal_clone.load(Ordering::Relaxed) {
-                info!("Starting focus tracker...");
+                debug!("Starting focus tracker...");
 
                 let tx_clone = focus_tx.clone();
                 let shutdown_check = Arc::clone(&shutdown_signal_clone);
@@ -285,7 +285,7 @@ impl CollectorService {
                             let eurora_process = "eur-tauri";
 
                             if process_name != eurora_process {
-                                info!("▶ {}: {}", process_name, window_title);
+                                debug!("▶ {}: {}", process_name, window_title);
                                 let _ = tx_clone.send(window);
                             }
                         }
@@ -400,7 +400,7 @@ impl CollectorService {
 
     /// Start collection without focus tracking (manual mode)
     async fn start_without_focus_tracking(&mut self) -> TimelineResult<()> {
-        info!("Starting collection without focus tracking");
+        debug!("Starting collection without focus tracking");
 
         // Create shutdown signal for the cleanup task
         let shutdown_signal = Arc::new(AtomicBool::new(false));
