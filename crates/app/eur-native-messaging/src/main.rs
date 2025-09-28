@@ -3,15 +3,14 @@ use std::{env, fs::File, net::ToSocketAddrs, process};
 use anyhow::{Result, anyhow};
 // Import the PORT constant from lib.rs
 use eur_native_messaging::PORT;
+use eur_native_messaging::server;
 use tonic::transport::Server;
-use tracing::info;
+use tracing::{error, info};
+use tracing_subscriber::prelude::*;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
 };
-
-mod server;
-mod types;
 
 /// Find processes by name and return their PIDs
 fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
@@ -179,6 +178,38 @@ fn generate_typescript_definitions() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
+        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+    #[cfg(debug_assertions)]
+    {
+        // Write only to file
+        fmt()
+            .with_env_filter(filter.clone())
+            .with_writer(File::create("eur-native-messaging.log")?)
+            .init();
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
+            .with(sentry::integrations::tracing::layer().with_filter(filter))
+            .try_init()
+            .unwrap();
+
+        let _guard = sentry::init((
+            "https://ff55ae34aa53740318b8f1beace59031@o4508907847352320.ingest.de.sentry.io/4510096917725264",
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                traces_sample_rate: 0.0,
+                enable_logs: true,
+                send_default_pii: true, // during closed beta all metrics are non-anonymous
+                debug: true,
+                ..Default::default()
+            },
+        ));
+    }
+
     // Check for command line arguments
     let args: Vec<String> = env::args().collect();
 
@@ -189,16 +220,6 @@ async fn main() -> Result<()> {
 
     // Ensure only one instance is running
     ensure_single_instance()?;
-
-    let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
-        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
-
-    // Write only to file
-    fmt()
-        .with_env_filter(filter)
-        .with_writer(File::create("eur-native-messaging.log")?)
-        .init();
 
     // Create the gRPC server
     let (grpc_server, _) = server::TauriIpcServer::new();
