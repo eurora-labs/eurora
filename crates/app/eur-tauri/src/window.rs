@@ -1,5 +1,6 @@
 use tauri::AppHandle;
-use tracing::info;
+use tracing::debug;
+
 pub(crate) mod state {
 
     use std::{collections::BTreeMap, sync::Arc};
@@ -87,7 +88,7 @@ pub fn create_launcher(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
-    info!("creating window '{label}' created at '{window_relative_url}'");
+    debug!("creating window '{label}' created at '{window_relative_url}'");
 
     let window = tauri::WebviewWindowBuilder::new(
         handle,
@@ -116,7 +117,7 @@ pub fn create_hover(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
-    info!("creating window '{label}' created at '{window_relative_url}'");
+    debug!("creating window '{label}' created at '{window_relative_url}'");
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,
@@ -145,7 +146,7 @@ pub fn create(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
-    info!("creating window '{label}' created at '{window_relative_url}'");
+    debug!("creating window '{label}' created at '{window_relative_url}'");
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,
@@ -198,7 +199,7 @@ pub fn create_hover(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
-    info!("creating window '{label}' created at '{window_relative_url}'");
+    debug!("creating window '{label}' created at '{window_relative_url}'");
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,

@@ -12,7 +12,7 @@ use ferrous_llm::{
 };
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
-use tracing::info;
+use tracing::debug;
 
 /// Extract and validate JWT token from request metadata
 pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
@@ -76,7 +76,7 @@ impl ProtoChatService for PromptService {
     async fn chat(&self, request: Request<ProtoChatRequest>) -> ChatResult<ProtoChatResponse> {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
-        info!("Received send_prompt request");
+        debug!("Received send_prompt request");
         // Return a single response
         Ok(Response::new(ProtoChatResponse {
             content: "Hello, world!".to_string(),
@@ -114,7 +114,7 @@ impl ProtoChatService for PromptService {
     ) -> ChatResult<Self::ChatStreamStream> {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
-        info!("Received chat_stream request");
+        debug!("Received chat_stream request");
         let request_inner = request.into_inner();
 
         let messages = request_inner
