@@ -5,7 +5,7 @@ use anyhow::{Result, anyhow};
 use eur_native_messaging::PORT;
 use eur_native_messaging::server;
 use tonic::transport::Server;
-use tracing::info;
+use tracing::debug;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
@@ -37,7 +37,7 @@ fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
                 }
             }
             Err(e) => {
-                info!("Failed to run pgrep: {}", e);
+                debug!("Failed to run pgrep: {}", e);
                 // Fallback: try using ps
                 let output = Command::new("ps").args(["aux"]).output();
 
@@ -94,7 +94,7 @@ fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
                 }
             }
             Err(e) => {
-                info!("Failed to run tasklist: {}", e);
+                debug!("Failed to run tasklist: {}", e);
             }
         }
     }
@@ -144,16 +144,16 @@ fn ensure_single_instance() -> Result<()> {
 
     // Kill all existing instances
     for pid in existing_pids {
-        info!("Found existing instance with PID {}. Killing it...", pid);
+        debug!("Found existing instance with PID {}. Killing it...", pid);
         if let Err(e) = kill_process(pid) {
-            info!("Failed to kill process {}: {}", pid, e);
+            debug!("Failed to kill process {}: {}", pid, e);
             // Continue trying to kill other processes even if one fails
         }
     }
 
     // Register a shutdown handler for clean exit
     ctrlc::set_handler(move || {
-        info!("Received shutdown signal. Exiting...");
+        debug!("Received shutdown signal. Exiting...");
         process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");

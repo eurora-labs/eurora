@@ -21,7 +21,7 @@ pub async fn check_update_handler(
     State(state): State<Arc<AppState>>,
     Path(params): Path<UpdateParams>,
 ) -> Response {
-    info!(
+    debug!(
         "Processing update request: channel={}, target_arch={}, current_version={}",
         params.channel, params.target_arch, params.current_version
     );
@@ -39,7 +39,7 @@ pub async fn check_update_handler(
         .await
     {
         Ok(Some(update)) => {
-            info!("Update available: version {}", update.version);
+            debug!("Update available: version {}", update.version);
             debug!(
                 "Update response: signature_length={}, notes_length={}, url_length={}",
                 update.signature.len(),
@@ -49,7 +49,7 @@ pub async fn check_update_handler(
             (StatusCode::OK, Json(update)).into_response()
         }
         Ok(None) => {
-            info!("No update available");
+            debug!("No update available");
             // Return 204 No Content with empty body as per RFC 7231
             // This is the correct way to indicate "no update available" to Tauri updater
             StatusCode::NO_CONTENT.into_response()

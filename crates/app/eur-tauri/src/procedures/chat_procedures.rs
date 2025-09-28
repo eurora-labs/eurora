@@ -4,7 +4,7 @@ use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
-use tracing::{error, info};
+use tracing::{debug, error};
 
 use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
 
@@ -164,10 +164,10 @@ impl ChatApi for ChatApiImpl {
             })
             .map_err(|e| format!("Failed to send initial response: {e}"))?;
 
-        info!("Sending chat stream");
+        debug!("Sending chat stream");
         match client.chat_stream(messages).await {
             Ok(mut stream) => {
-                info!("Starting to consume stream...");
+                debug!("Starting to consume stream...");
 
                 // Add timeout for stream processing
                 let timeout_duration = std::time::Duration::from_secs(300); // 5 minutes
@@ -199,7 +199,7 @@ impl ChatApi for ChatApiImpl {
                 // Apply timeout to stream processing
                 match tokio::time::timeout(timeout_duration, stream_future).await {
                     Ok(Ok(())) => {
-                        info!("Stream completed successfully");
+                        debug!("Stream completed successfully");
                     }
                     Ok(Err(e)) => {
                         return Err(e);
