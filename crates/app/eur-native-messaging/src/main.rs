@@ -5,8 +5,7 @@ use anyhow::{Result, anyhow};
 use eur_native_messaging::PORT;
 use eur_native_messaging::server;
 use tonic::transport::Server;
-use tracing::{error, info};
-use tracing_subscriber::prelude::*;
+use tracing::info;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
@@ -178,9 +177,18 @@ fn generate_typescript_definitions() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Check for command line arguments
+    let args: Vec<String> = env::args().collect();
+
+    // Handle the generate_specta argument
+    if args.len() > 1 && args[1] == "--generate_specta" {
+        return generate_typescript_definitions();
+    }
+
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
         .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+
     #[cfg(debug_assertions)]
     {
         // Write only to file
@@ -189,6 +197,7 @@ async fn main() -> Result<()> {
             .with_writer(File::create("eur-native-messaging.log")?)
             .init();
     }
+
     #[cfg(not(debug_assertions))]
     {
         tracing_subscriber::registry()
@@ -208,14 +217,6 @@ async fn main() -> Result<()> {
                 ..Default::default()
             },
         ));
-    }
-
-    // Check for command line arguments
-    let args: Vec<String> = env::args().collect();
-
-    // Handle the generate_specta argument
-    if args.len() > 1 && args[1] == "--generate_specta" {
-        return generate_typescript_definitions();
     }
 
     // Ensure only one instance is running
