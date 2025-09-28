@@ -62,6 +62,7 @@ impl BrowserStrategy {
             "brave.exe",
             "opera.exe",
             "vivaldi.exe",
+            "librewolf.exe",
         ];
 
         #[cfg(target_os = "macos")]
@@ -73,6 +74,7 @@ impl BrowserStrategy {
             "Opera",
             "Vivaldi",
             "Safari",
+            "LibreWolf",
         ];
 
         #[cfg(target_os = "linux")]
