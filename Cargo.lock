@@ -1397,7 +1397,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad8646f98db542e39fc66e68a20b2144f6a732636df7c2354e74645faaa433ce"
 dependencies = [
  "borsh-derive",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
 ]
 
 [[package]]
@@ -1682,12 +1682,6 @@ checksum = "2fd1289c04a9ea8cb22300a459a72a385d7c73d3259e2ed7dcb2af674838cfa9"
 
 [[package]]
 name = "cfg_aliases"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
-
-[[package]]
-name = "cfg_aliases"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
@@ -1958,30 +1952,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "crash-context"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "031ed29858d90cfdf27fe49fae28028a1f20466db97962fa2f4ea34809aeebf3"
-dependencies = [
- "cfg-if",
- "libc",
- "mach2",
-]
-
-[[package]]
-name = "crash-handler"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2066907075af649bcb8bcb1b9b986329b243677e6918b2d920aa64b0aac5ace3"
-dependencies = [
- "cfg-if",
- "crash-context",
- "libc",
- "mach2",
- "parking_lot",
 ]
 
 [[package]]
@@ -3053,7 +3023,7 @@ dependencies = [
  "futures",
  "image",
  "prost",
- "sentry 0.43.0",
+ "sentry",
  "tokio",
  "tonic",
  "tonic-health",
@@ -3080,7 +3050,7 @@ dependencies = [
  "log",
  "once_cell",
  "prost",
- "sentry 0.43.0",
+ "sentry",
  "serde",
  "serde_json",
  "specta",
@@ -3316,7 +3286,7 @@ dependencies = [
  "parking_lot",
  "pollster",
  "reqwest",
- "sentry 0.43.0",
+ "sentry",
  "serde",
  "serde_json",
  "specta",
@@ -3331,7 +3301,6 @@ dependencies = [
  "tauri-plugin-log",
  "tauri-plugin-os",
  "tauri-plugin-process",
- "tauri-plugin-sentry",
  "tauri-plugin-shell",
  "tauri-plugin-single-instance",
  "tauri-plugin-store",
@@ -4330,17 +4299,6 @@ dependencies = [
  "glib-sys",
  "libc",
  "system-deps",
-]
-
-[[package]]
-name = "goblin"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b363a30c165f666402fe6a3024d3bec7ebc898f96a4a23bd1c99f8dbf3f4f47"
-dependencies = [
- "log",
- "plain",
- "scroll",
 ]
 
 [[package]]
@@ -5800,15 +5758,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
 
 [[package]]
-name = "mach2"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d640282b302c0bb0a2a8e0233ead9035e3bed871f0b7e81fe4a1ec829765db44"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5938,75 +5887,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 
 [[package]]
-name = "minidump-common"
-version = "0.21.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c4d14bcca0fd3ed165a03000480aaa364c6860c34e900cb2dafdf3b95340e77"
-dependencies = [
- "bitflags 2.9.4",
- "debugid",
- "num-derive",
- "num-traits",
- "range-map",
- "scroll",
- "smart-default",
-]
-
-[[package]]
-name = "minidump-writer"
-version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2abcd9c8a1e6e1e9d56ce3627851f39a17ea83e17c96bc510f29d7e43d78a7d"
-dependencies = [
- "bitflags 2.9.4",
- "byteorder",
- "cfg-if",
- "crash-context",
- "goblin",
- "libc",
- "log",
- "mach2",
- "memmap2",
- "memoffset 0.9.1",
- "minidump-common",
- "nix 0.28.0",
- "procfs-core",
- "scroll",
- "tempfile",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "minidumper"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b4ebc9d1f8847ec1d078f78b35ed598e0ebefa1f242d5f83cd8d7f03960a7d1"
-dependencies = [
- "cfg-if",
- "crash-context",
- "libc",
- "log",
- "minidump-writer",
- "parking_lot",
- "polling",
- "scroll",
- "thiserror 1.0.69",
- "uds",
-]
-
-[[package]]
-name = "minidumper-child"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7c4f23f835dbe67e44ddf884d3802ff549ca5948bf60e9fd70e9a13c96324d1"
-dependencies = [
- "crash-handler",
- "minidumper",
- "thiserror 1.0.69",
- "uuid",
-]
-
-[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6086,7 +5966,7 @@ dependencies = [
  "arrayvec",
  "bit-set",
  "bitflags 2.9.4",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "codespan-reporting",
  "half",
  "hashbrown 0.15.5",
@@ -6189,25 +6069,13 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
-dependencies = [
- "bitflags 2.9.4",
- "cfg-if",
- "cfg_aliases 0.1.1",
- "libc",
-]
-
-[[package]]
-name = "nix"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
 dependencies = [
  "bitflags 2.9.4",
  "cfg-if",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "libc",
  "memoffset 0.9.1",
 ]
@@ -6220,7 +6088,7 @@ checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
 dependencies = [
  "bitflags 2.9.4",
  "cfg-if",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "libc",
  "memoffset 0.9.1",
 ]
@@ -7400,12 +7268,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
-name = "plain"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
-
-[[package]]
 name = "plist"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7617,16 +7479,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "procfs-core"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d3554923a69f4ce04c4a754260c338f505ce22642d3830e049a399fc2059a29"
-dependencies = [
- "bitflags 2.9.4",
- "hex",
-]
-
-[[package]]
 name = "profiling"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7813,7 +7665,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e20a958963c291dc322d98411f541009df2ced7b5a4f2bd52337638cfccf20"
 dependencies = [
  "bytes",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "pin-project-lite",
  "quinn-proto",
  "quinn-udp",
@@ -7853,7 +7705,7 @@ version = "0.5.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "addec6a0dcad8a8d96a771f815f0eaf55f9d1805756410b39f5fa81332574cbd"
 dependencies = [
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "libc",
  "once_cell",
  "socket2 0.6.0",
@@ -7997,15 +7849,6 @@ name = "range-alloc"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d6831663a5098ea164f89cff59c6284e95f4e3c76ce9848d4529f5ccca9bde"
-
-[[package]]
-name = "range-map"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12a5a2d6c7039059af621472a4389be1215a816df61aa4d531cfe85264aee95f"
-dependencies = [
- "num-traits",
-]
 
 [[package]]
 name = "rav1e"
@@ -8665,26 +8508,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
-name = "scroll"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ab8598aa408498679922eff7fa985c25d58a90771bd6be794434c5277eab1a6"
-dependencies = [
- "scroll_derive",
-]
-
-[[package]]
-name = "scroll_derive"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1783eabc414609e28a5ba76aee5ddd52199f7107a0b24c2e9746a1ecc34a683d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.106",
-]
-
-[[package]]
 name = "scrypt"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8824,15 +8647,6 @@ dependencies = [
 
 [[package]]
 name = "sentry"
-version = "0.42.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "989425268ab5c011e06400187eed6c298272f8ef913e49fcadc3fda788b45030"
-dependencies = [
- "sentry-core 0.42.0",
-]
-
-[[package]]
-name = "sentry"
 version = "0.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc02afbba55340d6394968cb621384dbb9a0ad72d1b45e3e403099702a8bcf61"
@@ -8843,7 +8657,7 @@ dependencies = [
  "sentry-actix",
  "sentry-backtrace",
  "sentry-contexts",
- "sentry-core 0.43.0",
+ "sentry-core",
  "sentry-debug-images",
  "sentry-log",
  "sentry-panic",
@@ -8862,7 +8676,7 @@ dependencies = [
  "actix-web",
  "bytes",
  "futures-util",
- "sentry-core 0.43.0",
+ "sentry-core",
 ]
 
 [[package]]
@@ -8873,7 +8687,7 @@ checksum = "0f288792b92dfb3e8887554d2d11418863d5fabcd1cfad6756a8f88a5b963b76"
 dependencies = [
  "backtrace",
  "regex",
- "sentry-core 0.43.0",
+ "sentry-core",
 ]
 
 [[package]]
@@ -8886,21 +8700,8 @@ dependencies = [
  "libc",
  "os_info",
  "rustc_version",
- "sentry-core 0.43.0",
+ "sentry-core",
  "uname",
-]
-
-[[package]]
-name = "sentry-core"
-version = "0.42.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "deaa38b94e70820ff3f1f9db3c8b0aef053b667be130f618e615e0ff2492cbcc"
-dependencies = [
- "rand 0.9.2",
- "sentry-types 0.42.0",
- "serde",
- "serde_json",
- "url",
 ]
 
 [[package]]
@@ -8910,7 +8711,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67600a47b5aa005cb701454d56a289135a80654eebf1c1d9f076c3817a249bb8"
 dependencies = [
  "rand 0.9.2",
- "sentry-types 0.43.0",
+ "sentry-types",
  "serde",
  "serde_json",
  "url",
@@ -8923,7 +8724,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb27e7e12008f0c80446089efe050f3333a333aafc9eb16fe9800b7a183cf20c"
 dependencies = [
  "findshlibs",
- "sentry-core 0.43.0",
+ "sentry-core",
 ]
 
 [[package]]
@@ -8933,7 +8734,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a64cf5a3590616f928b93a06ca4862d1fac19aea02a8a5f683de6c5730c4402"
 dependencies = [
  "log",
- "sentry-core 0.43.0",
+ "sentry-core",
 ]
 
 [[package]]
@@ -8943,18 +8744,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce0bae293ecf6afaaa00dc63de3cc89b49ef774f06b9cf18dfd9c652009d3461"
 dependencies = [
  "sentry-backtrace",
- "sentry-core 0.43.0",
-]
-
-[[package]]
-name = "sentry-rust-minidump"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63964525bf74b16233dbcfb307e11485ebd8ff8f87f6ae212b07ca7937cd2db1"
-dependencies = [
- "minidumper-child",
- "sentry 0.42.0",
- "thiserror 2.0.16",
+ "sentry-core",
 ]
 
 [[package]]
@@ -8965,26 +8755,9 @@ checksum = "5c044617771f460a3c2ca7cf8f516c3341ba886ca38d53cb550997d8bf636a3c"
 dependencies = [
  "bitflags 2.9.4",
  "sentry-backtrace",
- "sentry-core 0.43.0",
+ "sentry-core",
  "tracing-core",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "sentry-types"
-version = "0.42.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e477f4d4db08ddb4ab553717a8d3a511bc9e81dde0c808c680feacbb8105c412"
-dependencies = [
- "debugid",
- "hex",
- "rand 0.9.2",
- "serde",
- "serde_json",
- "thiserror 2.0.16",
- "time",
- "url",
- "uuid",
 ]
 
 [[package]]
@@ -9385,17 +9158,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "smart-default"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0eb01866308440fc64d6c44d9e86c5cc17adfe33c4d6eed55da9145044d0ffc1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.106",
-]
-
-[[package]]
 name = "socket2"
 version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9422,7 +9184,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18051cdd562e792cad055119e0cdb2cfc137e44e3987532e0f9659a77931bb08"
 dependencies = [
  "bytemuck",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "core-graphics 0.24.0",
  "foreign-types 0.5.0",
  "js-sys",
@@ -10416,22 +10178,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-plugin-sentry"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7432b519b6d2d027082a940783c61ba9b684b38d8df7558cd5f924d87009b295"
-dependencies = [
- "base64 0.22.1",
- "schemars 0.8.22",
- "sentry 0.42.0",
- "sentry-rust-minidump",
- "serde",
- "tauri",
- "tauri-plugin",
- "thiserror 2.0.16",
-]
-
-[[package]]
 name = "tauri-plugin-shell"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11339,15 +11085,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
-name = "uds"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "885c31f06fce836457fe3ef09a59f83fe8db95d270b11cd78f40a4666c4d1661"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "uds_windows"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12007,7 +11744,7 @@ checksum = "ec8fb398f119472be4d80bc3647339f56eb63b2a331f6a3d16e25d8144197dd9"
 dependencies = [
  "arrayvec",
  "bitflags 2.9.4",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "document-features",
  "hashbrown 0.15.5",
  "js-sys",
@@ -12037,7 +11774,7 @@ dependencies = [
  "bit-set",
  "bit-vec",
  "bitflags 2.9.4",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "document-features",
  "hashbrown 0.15.5",
  "indexmap 2.11.4",
@@ -12099,7 +11836,7 @@ dependencies = [
  "block",
  "bytemuck",
  "cfg-if",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "core-graphics-types 0.1.3",
  "glow",
  "glutin_wgl_sys",

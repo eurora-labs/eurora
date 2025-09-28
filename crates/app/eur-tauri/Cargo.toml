@@ -55,8 +55,8 @@ dirs = "6.0.0"
 
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
-sentry = { workspace = true, features = ["logs", "tracing"] }
-tauri-plugin-sentry = "0.5"
+sentry = { workspace = true, features = ["log", "logs", "tracing"] }
+# tauri-plugin-sentry = "0.5"
 
 eur-proto = { workspace = true }
 eur-timeline = { workspace = true }
