@@ -6,7 +6,7 @@ use oauth2::{
     basic::BasicClient,
 };
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::debug;
 
 /// Google OAuth configuration
 #[derive(Debug, Clone)]
@@ -48,7 +48,7 @@ impl GoogleOAuthClient {
     /// Generate the authorization URL for Google OAuth
     /// Returns (authorization_url, csrf_state)
     pub fn get_authorization_url(&self) -> Result<(String, String)> {
-        info!("Generating Google OAuth authorization URL");
+        debug!("Generating Google OAuth authorization URL");
 
         let google_client_id = ClientId::new(self.config.client_id.clone());
         let google_client_secret = ClientSecret::new(self.config.client_secret.clone());
@@ -82,7 +82,7 @@ impl GoogleOAuthClient {
             .add_scope(Scope::new("profile".to_string()))
             .url();
 
-        info!("Generated authorization URL: {}", authorize_url);
+        debug!("Generated authorization URL: {}", authorize_url);
 
         Ok((authorize_url.to_string(), csrf_state.secret().clone()))
     }
@@ -90,7 +90,7 @@ impl GoogleOAuthClient {
     /// Generate the authorization URL for Google OAuth with a custom state
     /// Returns the authorization_url
     pub fn get_authorization_url_with_state(&self, state: &str) -> Result<String> {
-        info!("Generating Google OAuth authorization URL with custom state");
+        debug!("Generating Google OAuth authorization URL with custom state");
 
         let google_client_id = ClientId::new(self.config.client_id.clone());
         let google_client_secret = ClientSecret::new(self.config.client_secret.clone());
@@ -124,7 +124,7 @@ impl GoogleOAuthClient {
             .add_scope(Scope::new("profile".to_string()))
             .url();
 
-        info!(
+        debug!(
             "Generated authorization URL with custom state: {}",
             authorize_url
         );

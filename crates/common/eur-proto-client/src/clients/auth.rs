@@ -6,7 +6,7 @@ pub use eur_proto::proto_auth_service::{
     proto_auth_service_client::ProtoAuthServiceClient,
 };
 use tonic::transport::Channel;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 use crate::get_secure_channel;
 
@@ -32,7 +32,7 @@ impl AuthClient {
 
         let client = ProtoAuthServiceClient::new(channel);
 
-        info!("Connected to auth service at {}", self.base_url);
+        debug!("Connected to auth service at {}", self.base_url);
         Ok(client)
     }
 

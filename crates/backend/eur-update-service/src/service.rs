@@ -26,7 +26,7 @@ impl AppState {
     /// Create a new AppState with S3 client
     #[instrument(skip_all, fields(bucket = %bucket_name))]
     pub async fn new(bucket_name: String) -> Result<Self> {
-        info!("Initializing S3 client for bucket: {}", bucket_name);
+        debug!("Initializing S3 client for bucket: {}", bucket_name);
 
         let config = aws_config::defaults(BehaviorVersion::latest())
             .region("us-west-2")
@@ -34,7 +34,7 @@ impl AppState {
             .await;
         let s3_client = S3Client::new(&config);
 
-        info!("S3 client initialized successfully");
+        debug!("S3 client initialized successfully");
         Ok(Self {
             s3_client,
             bucket_name,
@@ -111,7 +111,7 @@ impl AppState {
                         if version > current_ver
                             && latest_version.as_ref().is_none_or(|v| version > *v)
                         {
-                            info!(
+                            debug!(
                                 "Found newer version: {} (previous latest: {:?})",
                                 version, latest_version
                             );
@@ -127,13 +127,13 @@ impl AppState {
             }
         }
 
-        info!(
+        debug!(
             "Processed {} valid versions for {}/{}",
             processed_versions, target, arch
         );
 
         if let (Some(latest_ver), Some(latest_ver_str)) = (latest_version, latest_version_str) {
-            info!(
+            debug!(
                 "Latest version found: {} (current: {})",
                 latest_ver, current_ver
             );
@@ -144,7 +144,7 @@ impl AppState {
             debug!("Update response built successfully");
             Ok(Some(update_response))
         } else {
-            info!(
+            debug!(
                 "No newer version found for {}/{}/{}",
                 channel, target_arch, current_version
             );
@@ -173,7 +173,7 @@ impl AppState {
             directory_prefix
         );
         let file_key = self.find_download_file(&directory_prefix, target).await?;
-        info!("Found download file: {}", file_key);
+        debug!("Found download file: {}", file_key);
 
         // Get signature file content based on the actual release file name
         let signature_key = format!("{}.sig", file_key);
@@ -225,7 +225,7 @@ impl AppState {
                 notes
             }
             Err(e) => {
-                info!("Release notes not found at {}: {}", notes_key, e);
+                debug!("Release notes not found at {}: {}", notes_key, e);
                 format!("Update to version {}", version)
             }
         };
@@ -238,7 +238,7 @@ impl AppState {
             notes,
         };
 
-        info!("Update response built successfully for version {}", version);
+        debug!("Update response built successfully for version {}", version);
         Ok(response)
     }
 
@@ -325,7 +325,7 @@ impl AppState {
                 // Check if file matches expected extensions
                 for ext in &expected_extensions {
                     if filename.ends_with(ext) {
-                        info!(
+                        debug!(
                             "Found matching download file: {} (extension: {})",
                             filename, ext
                         );
