@@ -4,7 +4,7 @@ use eur_screen_position::ActiveMonitor;
 use eur_settings::Hotkey;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
-use tracing::info;
+use tracing::debug;
 
 /// Convert string modifiers to Tauri Modifiers
 #[allow(unused)]
@@ -141,12 +141,12 @@ pub fn get_launcher_shortcut(app_handle: &tauri::AppHandle) -> Shortcut {
         && !user.hotkeys.open_launcher.key.is_empty()
         && let Some(shortcut) = user_hotkey_to_shortcut(&user.hotkeys.open_launcher)
     {
-        info!("Using custom launcher shortcut: {:?}", shortcut);
+        debug!("Using custom launcher shortcut: {:?}", shortcut);
         return shortcut;
     }
 
     let default = get_default_shortcut();
-    info!("Using default launcher shortcut: {:?}", default);
+    debug!("Using default launcher shortcut: {:?}", default);
     default
 }
 
@@ -166,7 +166,7 @@ pub fn position_hover_window(hover_window: &tauri::WebviewWindow) {
 }
 
 pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
-    info!("Converting hotkey to shortcut: {:?}", hotkey.clone());
+    debug!("Converting hotkey to shortcut: {:?}", hotkey.clone());
     let key_code = Code::from_str(&hotkey.key).unwrap_or(Code::Space);
     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
     Shortcut::new(modifiers, key_code)

@@ -2,7 +2,7 @@ use std::{fs, path::Path, time::Instant};
 
 use anyhow::Result;
 use eur_vision::{capture_all_monitors, capture_monitor};
-use tracing::info;
+use tracing::debug;
 // Different capture methods to demonstrate and benchmark
 enum CaptureMethod {
     Basic,       // Basic capture using capture_monitor
@@ -22,44 +22,44 @@ fn main() -> Result<()> {
     for method in methods {
         match method {
             CaptureMethod::Basic => {
-                info!("Running basic capture method...");
+                debug!("Running basic capture method...");
                 let start = Instant::now();
 
                 // Perform basic capture
                 let image = capture_monitor()?;
 
                 let duration = start.elapsed();
-                info!("Basic capture completed in: {:?}", duration);
+                debug!("Basic capture completed in: {:?}", duration);
 
                 // Save the captured image
                 let filename = screenshot_dir.join("basic_capture.png");
                 image.save(&filename)?;
-                info!("Image saved to: {}", filename.display());
+                debug!("Image saved to: {}", filename.display());
             }
 
             CaptureMethod::AllMonitors => {
-                info!("Running multi-monitor capture method...");
+                debug!("Running multi-monitor capture method...");
                 let start = Instant::now();
 
                 // Capture all monitors
                 let images = capture_all_monitors()?;
 
                 let duration = start.elapsed();
-                info!("Multi-monitor capture completed in: {:?}", duration);
-                info!("Number of monitors captured: {}", images.len());
+                debug!("Multi-monitor capture completed in: {:?}", duration);
+                debug!("Number of monitors captured: {}", images.len());
 
                 // Save each captured image
                 for (i, image) in images.iter().enumerate() {
                     let filename = screenshot_dir.join(format!("monitor_{}.png", i));
                     image.save(&filename)?;
-                    info!("Monitor {} image saved to: {}", i, filename.display());
+                    debug!("Monitor {} image saved to: {}", i, filename.display());
                 }
             }
         }
 
-        info!("-----------------------------------");
+        debug!("-----------------------------------");
     }
 
-    info!("All capture methods completed successfully!");
+    debug!("All capture methods completed successfully!");
     Ok(())
 }

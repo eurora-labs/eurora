@@ -15,7 +15,7 @@ use eur_update_service::init_update_service;
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
-use tracing::{Level, error, info};
+use tracing::{Level, debug, error};
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
@@ -66,8 +66,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth_service = AuthService::new(db_manager, Some(jwt_config.clone()));
     let prompt_service = PromptService::new(Some(jwt_config.clone()));
 
-    info!("Starting gRPC server at {}", grpc_addr);
-    info!("Starting HTTP server at {}", http_addr);
+    debug!("Starting gRPC server at {}", grpc_addr);
+    debug!("Starting HTTP server at {}", http_addr);
 
     let cors = CorsLayer::permissive();
 
@@ -88,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to install CTRL+C signal handler");
-        info!("Shutting down gracefully...");
+        debug!("Shutting down gracefully...");
     };
 
     // Start both servers concurrently

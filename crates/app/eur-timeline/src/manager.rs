@@ -5,7 +5,7 @@ use std::{path::PathBuf, sync::Arc};
 use eur_activity::{ActivityAsset, SavedAssetInfo, types::SnapshotFunctionality};
 use ferrous_llm_core::Message;
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::debug;
 
 use crate::{
     Activity, ActivityStorage, ActivityStorageConfig, ActivityStrategy, AssetFunctionality,
@@ -83,7 +83,7 @@ impl TimelineManagerBuilder {
         // Validate configuration
         timeline_config.validate()?;
 
-        info!(
+        debug!(
             "Creating timeline manager with config: {:?}",
             timeline_config
         );
@@ -148,19 +148,19 @@ impl TimelineManager {
 
     /// Start the timeline manager (begins activity collection)
     pub async fn start(&mut self) -> TimelineResult<()> {
-        info!("Starting timeline manager");
+        debug!("Starting timeline manager");
         self.collector.start().await
     }
 
     /// Stop the timeline manager (stops activity collection)
     pub async fn stop(&mut self) -> TimelineResult<()> {
-        info!("Stopping timeline manager");
+        debug!("Stopping timeline manager");
         self.collector.stop().await
     }
 
     /// Restart the timeline manager
     pub async fn restart(&mut self) -> TimelineResult<()> {
-        info!("Restarting timeline manager");
+        debug!("Restarting timeline manager");
         self.collector.restart().await
     }
 

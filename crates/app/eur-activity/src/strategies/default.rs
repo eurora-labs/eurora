@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::{
     DefaultAsset, DefaultSnapshot,
@@ -23,7 +23,7 @@ pub struct DefaultStrategy {
 impl DefaultStrategy {
     /// Create a new default strategy
     pub fn new(name: String, icon: String, process_name: String) -> ActivityResult<Self> {
-        info!("Creating DefaultStrategy for process: {}", process_name);
+        debug!("Creating DefaultStrategy for process: {}", process_name);
 
         Ok(Self {
             name,

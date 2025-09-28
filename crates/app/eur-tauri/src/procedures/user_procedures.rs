@@ -1,6 +1,6 @@
 use tauri::{Manager, Runtime};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 use crate::util::*;
 
@@ -57,7 +57,7 @@ impl UserApi for UserApiImpl {
                 && let Some(old_shortcut) = user_hotkey_to_shortcut(&user.hotkeys.open_launcher)
             {
                 match app_handle.global_shortcut().unregister(old_shortcut) {
-                    Ok(_) => info!(
+                    Ok(_) => debug!(
                         "Successfully unregistered old custom shortcut: {:?}",
                         old_shortcut
                     ),
@@ -68,13 +68,13 @@ impl UserApi for UserApiImpl {
             // Also try to unregister the default shortcut in case it's still registered
             let default_shortcut = crate::util::get_default_shortcut();
             match app_handle.global_shortcut().unregister(default_shortcut) {
-                Ok(_) => info!(
+                Ok(_) => debug!(
                     "Successfully unregistered default shortcut: {:?}",
                     default_shortcut
                 ),
                 Err(e) => {
                     // This is expected if the default shortcut wasn't registered or was already replaced
-                    info!(
+                    debug!(
                         "Default shortcut was not registered or already unregistered: {}",
                         e
                     );
@@ -91,7 +91,7 @@ impl UserApi for UserApiImpl {
             user.hotkeys.open_launcher = new_hotkey;
             user_controller.set_user(&user).map_err(|e| e.to_string())?;
 
-            info!(
+            debug!(
                 "Launcher hotkey updated successfully to: {:?}",
                 new_shortcut
             );
