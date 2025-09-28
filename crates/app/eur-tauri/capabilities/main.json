@@ -19,7 +19,6 @@
 		"store:default",
 		"updater:default",
 		"http:allow-fetch",
-		"sentry:default",
 		{
 			"identifier": "http:default",
 			"allow": [
