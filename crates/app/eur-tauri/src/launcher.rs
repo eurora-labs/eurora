@@ -1,15 +1,12 @@
-use std::{
-    sync::atomic::{AtomicBool, Ordering},
-    time::Instant,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::procedures::window_procedures::{LauncherInfo, TauRpcWindowApiEventTrigger};
 use eur_screen_position::ActiveMonitor;
 use eur_vision::{
-    capture_focused_region_rgba, capture_monitor, capture_monitor_by_id, get_all_monitors,
+    capture_focused_region_rgba, capture_monitor_by_id, get_all_monitors,
     image_to_base64,
 };
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 use tracing::{error, info};
 
 // Shared state to track if launcher is visible
