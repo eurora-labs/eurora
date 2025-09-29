@@ -23,7 +23,7 @@ use oauth2::TokenResponse as OAuth2TokenResponse;
 use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
 use tonic::{Request, Response, Status};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 pub mod oauth;
 
@@ -95,6 +95,7 @@ pub struct AuthService {
 impl AuthService {
     /// Create a new AuthService instance
     pub fn new(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Self {
+        info!("Creating new AuthService instance");
         let desktop_login_url = std::env::var("DESKTOP_LOGIN_URL").unwrap_or_else(|e| {
             error!("DESKTOP_LOGIN_URL environment variable not set: {}", e);
             "http://localhost:5173/login".to_string()
@@ -654,12 +655,8 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<LoginRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
+        info!("Login request received");
         let req = request.into_inner();
-
-        debug!("Login request received");
-        // debug!("Request: {:#?}", request);
-
-        // return Err(Status::unimplemented("Login not implemented"));
 
         // Extract credentials from the request
         let credential = req.credential.ok_or_else(|| {
@@ -689,9 +686,9 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<RegisterRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
-        let req = request.into_inner();
+        info!("Register request received");
 
-        debug!("Register request received for user: {}", req.username);
+        let req = request.into_inner();
 
         // Call the existing register_user method
         let response = match self
@@ -715,11 +712,10 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<RefreshTokenRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
+        info!("Refresh token request received");
         authenticate_request_refresh_token(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
         let req = request.into_inner();
-
-        debug!("Refresh token request received");
 
         // Call the existing refresh_access_token method
         let response = match self.refresh_access_token(&req.refresh_token).await {
@@ -742,7 +738,7 @@ impl ProtoAuthService for AuthService {
     ) -> Result<Response<ThirdPartyAuthUrlResponse>, Status> {
         let req = request.into_inner();
 
-        debug!(
+        info!(
             "Third-party auth URL request received for provider: {:?}",
             req.provider
         );
@@ -825,7 +821,7 @@ impl ProtoAuthService for AuthService {
         &self,
         request: Request<LoginByLoginTokenRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
-        debug!("Login by login token request received");
+        info!("Login by login token request received");
 
         let req = request.into_inner();
         let token = req.token;
