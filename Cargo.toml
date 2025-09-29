@@ -68,33 +68,38 @@ enum_dispatch = "0.3.13"
 strum = "0.27.2"
 strum_macros = "0.27.2"
 
-eur-eurora-provider = { path = "crates/common/eur-eurora-provider" }
+# App
 eur-native-messaging = { path = "crates/app/eur-native-messaging" }
 eur-secret = { path = "crates/app/eur-secret" }
 eur-user = { path = "crates/app/eur-user" }
-eur-auth = { path = "crates/common/eur-auth" }
 eur-tauri = { path = "crates/app/eur-tauri" }
-eur-proto = { path = "crates/proto/eur-proto" }
 eur-activity = { path = "crates/app/eur-activity" }
 eur-personal-db = { path = "crates/app/eur-personal-db" }
-eur-proto-client = { path = "crates/common/eur-proto-client" }
-eur-prompt-kit = { path = "crates/common/eur-prompt-kit" }
-eur-util = { path = "crates/common/eur-util" }
 eur-storage = { path = "crates/app/eur-storage" }
 eur-settings = { path = "crates/app/eur-settings" }
-eur-fs = { path = "crates/common/eur-fs" }
-eur-client-grpc = { path = "crates/proto/eur-client-grpc" }
 eur-screen-position = { path = "crates/app/eur-screen-position" }
 eur-vision = { path = "crates/app/eur-vision" }
 eur-timeline = { path = "crates/app/eur-timeline" }
 eur-encrypt = { path = "crates/app/eur-encrypt" }
 
+# Backend
 eur-prompt-service = { path = "crates/backend/eur-prompt-service" }
 eur-auth-service = { path = "crates/backend/eur-auth-service" }
 eur-ocr-service = { path = "crates/backend/eur-ocr-service" }
 eur-remote-db = { path = "crates/backend/eur-remote-db" }
 eur-monolith = { path = "crates/backend/eur-monolith" }
 eur-update-service = { path = "crates/backend/eur-update-service" }
+
+# Common
+eur-auth = { path = "crates/common/eur-auth" }
+eur-ocr = { path = "crates/common/eur-ocr" }
+eur-eurora-provider = { path = "crates/common/eur-eurora-provider" }
+eur-proto = { path = "crates/proto/eur-proto" }
+eur-proto-client = { path = "crates/common/eur-proto-client" }
+eur-prompt-kit = { path = "crates/common/eur-prompt-kit" }
+eur-util = { path = "crates/common/eur-util" }
+eur-fs = { path = "crates/common/eur-fs" }
+eur-client-grpc = { path = "crates/proto/eur-client-grpc" }
 
 [profile.release]
 codegen-units = 1 # Compile crates one after another so the compiler can optimize better
