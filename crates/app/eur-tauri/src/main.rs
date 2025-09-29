@@ -43,9 +43,6 @@ use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{debug, error};
 use tracing_subscriber::Layer;
-use tracing_subscriber::filter::{EnvFilter, LevelFilter};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
