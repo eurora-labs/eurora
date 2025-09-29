@@ -15,11 +15,11 @@ use eur_update_service::init_update_service;
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
-use tracing::{debug, error};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing::{debug, error, info};
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -82,8 +82,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth_service = AuthService::new(db_manager, Some(jwt_config.clone()));
     let prompt_service = PromptService::new(Some(jwt_config.clone()));
 
-    debug!("Starting gRPC server at {}", grpc_addr);
-    debug!("Starting HTTP server at {}", http_addr);
+    info!("Starting gRPC server at {}", grpc_addr);
+    info!("Starting HTTP server at {}", http_addr);
 
     let cors = CorsLayer::permissive();
 
