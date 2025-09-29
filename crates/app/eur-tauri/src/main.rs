@@ -68,6 +68,17 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     Ok(())
 }
 
+async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
+    let posthog_key = std::env::var("PH_PROJECT_KEY").unwrap_or_default();
+    if !posthog_key.is_empty() {
+        return posthog_rs::init_global(posthog_key.as_str()).await;
+    } else {
+        return Err(posthog_rs::Error::Connection(
+            "Posthog key not found".to_string(),
+        ));
+    }
+}
+
 fn main() {
     dotenv().ok();
 
@@ -132,6 +143,12 @@ fn main() {
                             handle.manage(service);
                             debug!("No backend available");
                         }
+                    });
+
+                    tauri::async_runtime::spawn(async move {
+                        initialize_posthog().await.map_err(|e| {
+                            error!("Failed to initialize posthog: {}", e);
+                        }).unwrap();
                     });
 
                     // If no main key is available, generate a new one

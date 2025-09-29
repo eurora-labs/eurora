@@ -54,6 +54,11 @@ impl ChatApi for ChatApiImpl {
         let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
 
+        let event = posthog_rs::Event::new_anon("send_query");
+        tauri::async_runtime::spawn(async move {
+            posthog_rs::capture(event).await.unwrap();
+        });
+
         let mut messages: Vec<Message> = Vec::new();
 
         // Add previous messages from this conversation
