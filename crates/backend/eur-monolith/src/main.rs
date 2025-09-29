@@ -16,7 +16,13 @@ use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
 use tracing::{Level, debug, error};
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{FmtSubscriber, Layer};
+use tracing_subscriber::{
+    filter::{EnvFilter, LevelFilter},
+    fmt,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,7 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sentry_dsn,
         sentry::ClientOptions {
             release: sentry::release_name!(),
-            send_default_pii: true,
+            traces_sample_rate: 0.0,
+            enable_logs: true,
+            send_default_pii: true, // during closed beta all metrics are non-anonymous
+            debug: true,
             ..Default::default()
         },
     ));
@@ -39,11 +48,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_serving::<ProtoAuthServiceServer<AuthService>>()
         .await;
 
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
+        .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+
     // Initialize tracing
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
+        .with(sentry::integrations::tracing::layer().with_filter(filter))
+        .try_init()
+        .unwrap();
+
+    // let subscriber = FmtSubscriber::builder()
+    //     .with_max_level(Level::INFO)
+    //     .finish();
+    // tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
     let database_url = std::env::var("REMOTE_DATABASE_URL")
         .expect("REMOTE_DATABASE_URL environment variable must be set");
