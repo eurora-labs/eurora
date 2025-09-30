@@ -112,7 +112,7 @@ impl DefaultSnapshot {
 
 impl SnapshotFunctionality for DefaultSnapshot {
     /// Construct a message for LLM interaction
-    fn construct_message(&self) -> Message {
+    fn construct_messages(&self) -> Vec<Message> {
         let mut content = format!("Current application state: {}", self.state);
 
         if !self.metadata.is_empty() {
@@ -122,10 +122,10 @@ impl SnapshotFunctionality for DefaultSnapshot {
             }
         }
 
-        Message {
+        vec![Message {
             role: Role::User,
             content: MessageContent::Text(content),
-        }
+        }]
     }
 
     fn get_updated_at(&self) -> u64 {
@@ -282,7 +282,7 @@ mod tests {
         snapshot.add_metadata("version".to_string(), "1.0.0".to_string());
         snapshot.add_metadata("mode".to_string(), "debug".to_string());
 
-        let message = snapshot.construct_message();
+        let message = snapshot.construct_messages()[0].clone();
 
         match message.content {
             MessageContent::Text(text) => {
@@ -298,7 +298,7 @@ mod tests {
     #[test]
     fn test_message_construction_no_metadata() {
         let snapshot = DefaultSnapshot::new("Simple state".to_string());
-        let message = snapshot.construct_message();
+        let message = snapshot.construct_messages()[0].clone();
 
         match message.content {
             MessageContent::Text(text) => {
