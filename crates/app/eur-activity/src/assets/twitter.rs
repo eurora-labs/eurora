@@ -88,7 +88,7 @@ impl AssetFunctionality for TwitterAsset {
     }
 
     /// Construct a message for LLM interaction
-    fn construct_message(&self) -> Message {
+    fn construct_messages(&self) -> Vec<Message> {
         let max_tweets = 20usize;
         let tweet_texts: Vec<String> = self
             .tweets
@@ -120,10 +120,10 @@ impl AssetFunctionality for TwitterAsset {
             ));
         }
 
-        Message {
+        vec![Message {
             role: Role::User,
             content: MessageContent::Text(text),
-        }
+        }]
     }
 
     /// Get context chip for UI integration
@@ -444,7 +444,8 @@ mod tests {
             vec![],
             TwitterContextType::Timeline,
         );
-        let msg = AssetFunctionality::construct_message(&asset);
+        let msg = AssetFunctionality::construct_messages(&asset);
+        let msg = msg[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
         assert!(matches!(msg.content, MessageContent::Text(_)));
         assert!(chip.is_some());
