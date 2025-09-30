@@ -56,7 +56,9 @@ impl ChatApi for ChatApiImpl {
 
         let event = posthog_rs::Event::new_anon("send_query");
         tauri::async_runtime::spawn(async move {
-            posthog_rs::capture(event).await.unwrap();
+            let _ = posthog_rs::capture(event).await.map_err(|e| {
+                error!("Failed to capture posthog event: {}", e);
+            });
         });
 
         let mut messages: Vec<Message> = Vec::new();
