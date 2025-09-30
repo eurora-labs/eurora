@@ -180,7 +180,7 @@ impl YoutubeSnapshot {
 
 impl SnapshotFunctionality for YoutubeSnapshot {
     /// Construct a message for LLM interaction
-    fn construct_message(&self) -> Message {
+    fn construct_messages(&self) -> Vec<Message> {
         let mut content_parts = vec![ContentPart::Text {
             text: format!(
                 "This is a frame from a YouTube video at {}s{}{}",
@@ -206,10 +206,10 @@ impl SnapshotFunctionality for YoutubeSnapshot {
             });
         }
 
-        Message {
+        vec![Message {
             role: Role::User,
             content: MessageContent::Multimodal(content_parts),
-        }
+        }]
     }
 
     fn get_updated_at(&self) -> u64 {
