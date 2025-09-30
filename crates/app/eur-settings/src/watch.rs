@@ -7,6 +7,7 @@ use std::{
 
 use anyhow::Result;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
+use tracing::debug;
 
 use crate::AppSettings;
 
@@ -126,7 +127,7 @@ impl SettingsWithDiskSync {
                             continue;
                         };
                         if let Ok(update) = AppSettings::load(&config_path) {
-                            tracing::info!("settings.json modified; refreshing settings");
+                            debug!("settings.json modified; refreshing settings");
                             *last_seen_settings = update.clone();
                             send_event(update)?;
                         }
