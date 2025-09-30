@@ -99,7 +99,7 @@ impl AssetFunctionality for DefaultAsset {
     }
 
     /// Construct a message for LLM interaction
-    fn construct_message(&self) -> Message {
+    fn construct_messages(&self) -> Vec<Message> {
         let mut content = format!("I am working with an application called '{}'", self.name);
 
         if let Some(description) = &self.description {
@@ -115,10 +115,10 @@ impl AssetFunctionality for DefaultAsset {
 
         content.push_str(" and have a question about it.");
 
-        Message {
+        vec![Message {
             role: Role::User,
             content: MessageContent::Text(content),
-        }
+        }]
     }
 
     /// Get context chip for UI integration (returns None for default assets)
@@ -226,7 +226,8 @@ mod tests {
         .with_metadata("version".to_string(), "1.0.0".to_string())
         .with_metadata("status".to_string(), "active".to_string());
 
-        let message = asset.construct_message();
+        let message = asset.construct_messages();
+        let message = message[0].clone();
 
         match message.content {
             MessageContent::Text(text) => {
@@ -267,7 +268,8 @@ mod tests {
         )
         .with_metadata("version".to_string(), "1.0.0".to_string())
         .with_metadata("status".to_string(), "active".to_string());
-        let msg = AssetFunctionality::construct_message(&asset);
+        let msg = AssetFunctionality::construct_messages(&asset);
+        let msg = msg[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
         assert!(matches!(msg.content, MessageContent::Text(_)));
         assert!(chip.is_none());
