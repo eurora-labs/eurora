@@ -42,7 +42,6 @@ use tauri_plugin_log::{Target, TargetKind, fern};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{debug, error};
-use tracing_subscriber::Layer;
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
@@ -100,7 +99,7 @@ fn main() {
     // let mut writer = std::io::Cursor::new(Vec::<u8>::new());
     let writer = Box::new(sentry_logger) as Box<dyn log::Log>;
     let dispatcher = fern::Dispatch::new()
-        .level(log::LevelFilter::Trace)
+        .level(log::LevelFilter::Info)
         .chain(std::io::stdout())
         .chain(writer);
     let custom_target = Target::new(TargetKind::Dispatch(dispatcher));
@@ -146,9 +145,9 @@ fn main() {
                     });
 
                     tauri::async_runtime::spawn(async move {
-                        initialize_posthog().await.map_err(|e| {
+                        let _ = initialize_posthog().await.map_err(|e| {
                             error!("Failed to initialize posthog: {}", e);
-                        }).unwrap();
+                        });
                     });
 
                     // If no main key is available, generate a new one
@@ -352,7 +351,7 @@ fn main() {
                 .plugin(
                     tauri_plugin_log::Builder::new()
                             .filter(|metadata| metadata.target().starts_with("eur_") || metadata.target().starts_with("webview") || metadata.level() == log::Level::Warn)
-                            .level(log::LevelFilter::Info)
+                            // .level(log::LevelFilter::Info)
                             .target(custom_target)
                             .build()
                 )
