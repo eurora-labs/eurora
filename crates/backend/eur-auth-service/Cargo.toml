@@ -1,15 +1,16 @@
 
 [package]
 name = "eur-auth-service"
-version = "0.0.1"
+version = "0.0.0"
 edition = "2024"
 authors = ["Eurora <eurora@company.com>"]
 publish = false
 
 [dependencies]
-eur-proto = { path = "../../proto/eur-proto" }
-eur-remote-db = { path = "../eur-remote-db" }
+eur-proto = { workspace = true }
+eur-remote-db = { workspace = true }
 eur-auth = { workspace = true }
+
 anyhow = { workspace = true }
 tonic = { workspace = true }
 prost = { workspace = true }

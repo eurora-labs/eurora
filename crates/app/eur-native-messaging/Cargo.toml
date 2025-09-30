@@ -19,10 +19,10 @@ tokio-stream = { workspace = true }
 base64 = { workspace = true }
 ctrlc = "3.4.7"
 h2 = "0.4.12"
-sentry = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+sentry = { workspace = true, features = ["logs", "tracing"]}
 specta = { workspace = true, features = ["derive", "function", "export", "serde", "serde_json"] }
 specta-typescript = { version = "0.0.9" }
 enum_dispatch = { workspace = true }

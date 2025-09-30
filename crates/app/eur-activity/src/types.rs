@@ -10,7 +10,7 @@ use enum_dispatch::enum_dispatch;
 use eur_native_messaging::NativeMessage;
 use ferrous_llm_core::Message;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
@@ -198,7 +198,7 @@ impl Activity {
     pub async fn serialize_assets(&self) -> ActivityResult<Vec<Vec<u8>>> {
         let mut serialized_assets = Vec::new();
 
-        info!("Serializing {} assets", &self.assets.len());
+        debug!("Serializing {} assets", &self.assets.len());
         for asset in &self.assets {
             serialized_assets.push(asset.serialize_content().await?);
         }

@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 // use image::{ImageBuffer, Rgb, Rgba};
 use base64::{Engine as _, engine::general_purpose};
 use image::{ImageBuffer, Rgb, Rgba};
-use tracing::info;
+use tracing::debug;
 use xcap::Monitor;
 
 // use eur_ocr::{self};
@@ -70,7 +70,7 @@ pub fn capture_monitor_region(
     width: u32,
     height: u32,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
-    info!("Capturing monitor region");
+    debug!("Capturing monitor region");
     // let monitor_width = monitor.width().unwrap();
     // let monitor_height = monitor.height().unwrap();
 
@@ -199,7 +199,7 @@ pub fn capture_region_rgba(
     // // TODO: remove this code
     // let tess = eur_ocr::TesseractOcr {};
     // let result_text = tess.recognize(&image::DynamicImage::ImageRgb8(image.clone()));
-    // info!("Recognized text: {}", result_text);
+    // debug!("Recognized text: {}", result_text);
 
     Ok(image)
 }
@@ -234,7 +234,7 @@ pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
 //     let rgb = image::DynamicImage::ImageRgba8(image).to_rgb8();
 //     // let rgb = rgba_to_rgb(image);
 //     let duration = start.elapsed();
-//     info!("Conversion to RGB completed in: {:?}", duration);
+//     debug!("Conversion to RGB completed in: {:?}", duration);
 
 //     rgb.write_to(&mut cursor, image::ImageFormat::Jpeg)
 //         .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
