@@ -7,6 +7,7 @@ use ferrous_llm::{
     openai::{OpenAIConfig, OpenAIProvider},
 };
 use tokio_stream::{Stream, StreamExt};
+use tracing::info;
 
 use crate::PromptKitError;
 
@@ -118,6 +119,7 @@ impl PromptKitService {
         PromptKitError,
     > {
         if let LLMProvider::Ollama(provider) = &self.provider {
+            info!("Starting Ollama chat stream");
             let request = ChatRequest {
                 messages,
                 parameters: Default::default(),
