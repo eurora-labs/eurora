@@ -78,8 +78,8 @@ impl ChatApi for ChatApiImpl {
             match timeline.load_assets_from_disk(&previous_assets).await {
                 Ok(recon_assets) => {
                     for asset in recon_assets {
-                        let message = asset.construct_message();
-                        messages.push(message);
+                        let message = asset.construct_messages();
+                        messages.extend(message);
                     }
                 }
                 Err(e) => {

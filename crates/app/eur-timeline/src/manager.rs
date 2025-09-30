@@ -306,7 +306,8 @@ impl TimelineManager {
                 .assets
                 .iter()
                 .filter(|asset| ids.contains(&asset.get_id().to_string()))
-                .map(|asset| asset.construct_message())
+                .map(|asset| asset.construct_messages())
+                .flatten()
                 .collect()
         } else {
             Vec::new()
@@ -320,7 +321,8 @@ impl TimelineManager {
             activity
                 .assets
                 .iter()
-                .map(|asset| asset.construct_message())
+                .map(|asset| asset.construct_messages())
+                .flatten()
                 .collect()
         } else {
             Vec::new()
@@ -334,7 +336,7 @@ impl TimelineManager {
             if let Some(snapshot) = activity.snapshots.last()
                 && ids.contains(&snapshot.get_id().to_string())
             {
-                vec![snapshot.construct_message()]
+                snapshot.construct_messages()
             } else {
                 Vec::new()
             }
@@ -348,7 +350,7 @@ impl TimelineManager {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             if let Some(snapshot) = activity.snapshots.last() {
-                vec![snapshot.construct_message()]
+                snapshot.construct_messages()
             } else {
                 Vec::new()
             }

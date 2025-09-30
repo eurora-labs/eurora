@@ -164,7 +164,7 @@ impl TwitterSnapshot {
 
 impl SnapshotFunctionality for TwitterSnapshot {
     /// Construct a message for LLM interaction
-    fn construct_message(&self) -> Message {
+    fn construct_messages(&self) -> Vec<Message> {
         let mut content = String::new();
 
         // Add context about the page/interaction
@@ -203,10 +203,10 @@ impl SnapshotFunctionality for TwitterSnapshot {
 
         content.push_str(&tweet_texts.join("\n\n"));
 
-        Message {
+        vec![Message {
             role: Role::User,
             content: MessageContent::Text(content),
-        }
+        }]
     }
 
     fn get_updated_at(&self) -> u64 {
