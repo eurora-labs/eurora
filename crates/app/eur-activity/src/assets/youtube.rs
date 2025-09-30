@@ -92,8 +92,8 @@ impl AssetFunctionality for YoutubeAsset {
     }
 
     /// Construct a message for LLM interaction
-    fn construct_message(&self) -> Message {
-        Message {
+    fn construct_messages(&self) -> Vec<Message> {
+        vec![Message {
             role: Role::User,
             content: MessageContent::Text(format!(
                 "I am watching a YouTube video titled '{}' and have a question about it. \
@@ -105,7 +105,7 @@ impl AssetFunctionality for YoutubeAsset {
                     .collect::<Vec<_>>()
                     .join("\n")
             )),
-        }
+        }]
     }
 
     /// Get context chip for UI integration
@@ -264,7 +264,8 @@ mod tests {
             vec![],
             0.0,
         );
-        let msg = AssetFunctionality::construct_message(&asset);
+        let msg = AssetFunctionality::construct_messages(&asset);
+        let msg = msg[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
         assert!(matches!(msg.content, MessageContent::Text(_)));
         assert!(chip.is_some());
