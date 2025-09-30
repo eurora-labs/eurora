@@ -25,7 +25,7 @@ eur-secret = { workspace = true }
 eur-prompt-kit = { workspace = true }
 backtrace = { version = "0.3.75", optional = true }
 reqwest = { version = "0.12.23", features = ["json", "native-tls"] }
-serde.workspace = true
+serde = { workspace = true }
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
 tauri = { version = "^2.7.0", features = ["unstable", "tray-icon"] }
 tauri-plugin-dialog = "2.3.2"
@@ -41,19 +41,23 @@ tauri-plugin-updater = "2.9.0"
 tauri-plugin-window-state = "2.4.0"
 eur-vision = { workspace = true }
 eur-screen-position = { workspace = true }
-image.workspace = true
-parking_lot.workspace = true
-log = "^0.4"
+image = { workspace = true }
+parking_lot = { workspace = true }
+log = { workspace = true }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["rt-multi-thread", "parking_lot"] }
 tokio-stream = { workspace = true }
-tracing.workspace = true
 tracing-appender = "0.2.3"
-tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
 tracing-forest = { version = "0.2.0" }
 open = "5"
 url = "2.5.4"
 dirs = "6.0.0"
+posthog-rs = { workspace = true }
+
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+sentry = { workspace = true, features = ["log", "logs", "tracing"] }
+
 eur-proto = { workspace = true }
 eur-timeline = { workspace = true }
 eur-client-grpc = { workspace = true }
@@ -64,14 +68,13 @@ eur-proto-client = { workspace = true }
 eur-user = { workspace = true }
 eur-eurora-provider = { workspace = true }
 eur-encrypt = { workspace = true }
+eur-activity = { workspace = true }
 
 chrono = { workspace = true }
 defer = "0.2.1"
 futures = { workspace = true }
 tonic = { workspace = true }
 async-mutex = "1.4.1"
-sentry = { workspace = true }
-eur-activity = { workspace = true }
 lazy_static = "1.4.0"
 pollster = "0.4"
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
@@ -83,7 +86,7 @@ tauri-specta = { version = "2.0.0-rc.21", features = [
 taurpc = { version = "0.5.1" }
 base64 = "0.22.1"
 dotenv = "0.15.0"
-uuid.workspace = true
+uuid = { workspace = true }
 ferrous-llm-core = { workspace = true, features = ["specta"] }
 async_from = { workspace = true }
 

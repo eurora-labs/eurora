@@ -21,7 +21,7 @@ pub async fn create_shared_database_manager(
     // PersonalDatabaseManager::new(&db_path)
     //     .await
     //     .map_err(|e| {
-    //         info!("Failed to create database manager: {}", e);
+    //         debug!("Failed to create database manager: {}", e);
     //         e
     //     })
     //     .unwrap()

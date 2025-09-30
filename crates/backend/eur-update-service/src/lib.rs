@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use axum::{Router, routing::get};
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::info;
+use tracing::debug;
 
 pub mod error;
 pub mod handlers;
@@ -37,7 +37,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 
 /// Initialize the update service and return the router
 pub async fn init_update_service(bucket_name: String) -> Result<Router> {
-    info!("Initializing update service with bucket: {}", bucket_name);
+    debug!("Initializing update service with bucket: {}", bucket_name);
 
     // Create application state
     let state = Arc::new(
