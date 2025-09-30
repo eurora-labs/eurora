@@ -105,7 +105,7 @@ impl AssetFunctionality for ArticleAsset {
     }
 
     /// Construct a message for LLM interaction
-    fn construct_message(&self) -> Message {
+    fn construct_messages(&self) -> Vec<Message> {
         let mut content = format!(
             "I am reading an article titled '{}' and have a question about it.",
             self.title
@@ -120,10 +120,10 @@ impl AssetFunctionality for ArticleAsset {
             self.content
         ));
 
-        Message {
+        vec![Message {
             role: Role::User,
             content: MessageContent::Text(content),
-        }
+        }]
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
@@ -302,7 +302,8 @@ mod tests {
             Some("Test Author".to_string()),
             Some("2024-01-01".to_string()),
         );
-        let msg = AssetFunctionality::construct_message(&asset);
+        let msg = AssetFunctionality::construct_messages(&asset);
+        let msg = msg[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
         assert!(matches!(msg.content, MessageContent::Text(_)));
         assert!(chip.is_some());
