@@ -1,7 +1,7 @@
 use eur_activity::ContextChip;
 use eur_timeline::TimelineManager;
 use tauri::{Emitter, Manager, Runtime};
-use tracing::info;
+use tracing::debug;
 
 #[taurpc::procedures(path = "system")]
 pub trait SystemApi {
@@ -29,19 +29,19 @@ impl SystemApi for SystemApiImpl {
     ) -> Result<String, String> {
         let address = server_address.unwrap_or_else(|| "0.0.0.0:50051".to_string());
 
-        info!("Checking connection to gRPC server: {}", address);
+        debug!("Checking connection to gRPC server: {}", address);
 
         // Try to establish a basic TCP connection to check if the server is listening
         match tokio::net::TcpStream::connect(address.replace("http://", "").replace("https://", ""))
             .await
         {
             Ok(_) => {
-                info!("TCP connection successful");
+                debug!("TCP connection successful");
                 Ok("Server is reachable".to_string())
             }
             Err(e) => {
                 let error_msg = format!("Failed to connect to server: {}", e);
-                info!("{}", error_msg);
+                debug!("{}", error_msg);
                 Err(error_msg)
             }
         }
