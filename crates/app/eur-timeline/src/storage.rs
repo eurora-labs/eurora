@@ -3,7 +3,7 @@
 use std::{collections::VecDeque, time::Duration};
 
 use chrono::{DateTime, Utc};
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::{Activity, config::StorageConfig, error::TimelineResult};
 
@@ -21,7 +21,7 @@ pub struct TimelineStorage {
 impl TimelineStorage {
     /// Create a new timeline storage with the given configuration
     pub fn new(config: StorageConfig) -> Self {
-        info!(
+        debug!(
             "Creating timeline storage with max_activities: {}, max_age: {:?}",
             config.max_activities, config.max_age
         );
@@ -127,7 +127,7 @@ impl TimelineStorage {
 
         let removed_count = initial_count - self.activities.len();
         if removed_count > 0 {
-            info!("Cleaned up {} old activities", removed_count);
+            debug!("Cleaned up {} old activities", removed_count);
         }
 
         self.last_cleanup = now;
@@ -142,7 +142,7 @@ impl TimelineStorage {
     pub fn clear(&mut self) {
         let count = self.activities.len();
         self.activities.clear();
-        info!("Cleared {} activities from storage", count);
+        debug!("Cleared {} activities from storage", count);
     }
 
     /// Get storage statistics
@@ -165,7 +165,7 @@ impl TimelineStorage {
 
     /// Update storage configuration
     pub fn update_config(&mut self, config: StorageConfig) -> TimelineResult<()> {
-        info!("Updating storage configuration");
+        debug!("Updating storage configuration");
 
         // If capacity decreased, remove excess activities
         if config.max_activities < self.config.max_activities {

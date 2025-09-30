@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, Streaming};
-use tracing::info;
+use tracing::debug;
 
 use crate::types::NativeMessage;
 
@@ -89,7 +89,7 @@ impl TauriIpcServer {
                 },
                 Some(native_message) = native_rx.recv() => {
                     // Process incoming native messages (if any)
-                    info!("Received native message: {:?}", native_message);
+                    debug!("Received native message: {:?}", native_message);
                 }
                 else => break,
             }
@@ -139,36 +139,36 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
     type GetAssetsStreamingStream = ResponseStream;
 
     async fn get_assets(&self, _req: Request<MessageRequest>) -> IpcResult<MessageResponse> {
-        info!("Received get_assets request");
+        debug!("Received get_assets request");
 
         match self.send_native_message("GENERATE_ASSETS").await {
             Ok(native_asset) => match self.native_message_to_response(native_asset) {
                 Ok(response) => Ok(Response::new(response)),
                 Err(e) => {
-                    info!("Error converting asset to response: {}", e);
+                    debug!("Error converting asset to response: {}", e);
                     Err(Status::internal(format!("Conversion error: {}", e)))
                 }
             },
             Err(e) => {
-                info!("Error in native messaging: {}", e);
+                debug!("Error in native messaging: {}", e);
                 Err(Status::internal(format!("Native messaging error: {}", e)))
             }
         }
     }
 
     async fn get_snapshots(&self, _req: Request<MessageRequest>) -> IpcResult<MessageResponse> {
-        info!("Received get_snapshots request");
+        debug!("Received get_snapshots request");
 
         match self.send_native_message("GENERATE_SNAPSHOTS").await {
             Ok(native_asset) => match self.native_message_to_response(native_asset) {
                 Ok(response) => Ok(Response::new(response)),
                 Err(e) => {
-                    info!("Error converting asset to response: {}", e);
+                    debug!("Error converting asset to response: {}", e);
                     Err(Status::internal(format!("Conversion error: {}", e)))
                 }
             },
             Err(e) => {
-                info!("Error in native messaging: {}", e);
+                debug!("Error in native messaging: {}", e);
                 Err(Status::internal(format!("Native messaging error: {}", e)))
             }
         }
@@ -186,19 +186,19 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
             while let Some(request) = in_stream.next().await {
                 match request {
                     Ok(_) => {
-                        info!("Received streaming assets request");
+                        debug!("Received streaming assets request");
 
                         match server_clone.send_native_message("GENERATE_ASSETS").await {
                             Ok(native_asset) => {
                                 match server_clone.native_message_to_response(native_asset) {
                                     Ok(response) => {
                                         if tx.send(Ok(response)).await.is_err() {
-                                            info!("Client disconnected");
+                                            debug!("Client disconnected");
                                             break;
                                         }
                                     }
                                     Err(e) => {
-                                        info!("Error converting asset: {}", e);
+                                        debug!("Error converting asset: {}", e);
                                         if tx
                                             .send(Err(Status::internal(format!(
                                                 "Conversion error: {}",
@@ -213,7 +213,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                                 }
                             }
                             Err(e) => {
-                                info!("Error in native messaging: {}", e);
+                                debug!("Error in native messaging: {}", e);
                                 if tx
                                     .send(Err(Status::internal(format!(
                                         "Native messaging error: {}",
@@ -228,7 +228,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                         }
                     }
                     Err(err) => {
-                        info!("Error in streaming request: {}", err);
+                        debug!("Error in streaming request: {}", err);
                         if tx
                             .send(Err(Status::internal(format!("Stream error: {}", err))))
                             .await
@@ -239,7 +239,7 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
                     }
                 }
             }
-            info!("Streaming connection closed");
+            debug!("Streaming connection closed");
         });
 
         let out_stream = ReceiverStream::new(rx);

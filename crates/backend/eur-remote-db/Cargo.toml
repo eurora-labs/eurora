@@ -2,13 +2,13 @@
 
 [package]
 name = "eur-remote-db"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 authors = ["Eurora <eurora@company.com>"]
 description = "Eurora Remote DB"
 
 [dependencies]
-anyhow.workspace = true
+anyhow = { workspace = true }
 sqlx = { version = "0.8.6", features = [
     "runtime-tokio",
     "tls-native-tls",
