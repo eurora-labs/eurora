@@ -2,8 +2,9 @@ use std::{fs, path::Path, time::Instant};
 
 use anyhow::{Result, anyhow};
 use eur_vision::capture_monitor_region;
-use tracing::info;
+use tracing::debug;
 use xcap::Monitor;
+
 fn main() -> Result<()> {
     // Create screenshots directory if it doesn't exist
     let screenshot_dir = Path::new("examples/screenshots");
@@ -11,7 +12,7 @@ fn main() -> Result<()> {
         fs::create_dir_all(screenshot_dir)?;
     }
 
-    info!("Running region capture...");
+    debug!("Running region capture...");
     let start = Instant::now();
 
     let monitor = Monitor::all()?
@@ -26,8 +27,8 @@ fn main() -> Result<()> {
     let image = capture_monitor_region(monitor, start_x as u32, 0, width as u32, height as u32)?;
     let duration = start.elapsed();
 
-    info!("Region capture completed in: {:?}", duration);
-    info!(
+    debug!("Region capture completed in: {:?}", duration);
+    debug!(
         "Captured image dimensions: {}x{}",
         image.width(),
         image.height()
@@ -36,10 +37,10 @@ fn main() -> Result<()> {
     // Save the captured image
     let filename = screenshot_dir.join("region_capture.png");
     image.save(&filename)?;
-    info!("Region image saved to: {}", filename.display());
+    debug!("Region image saved to: {}", filename.display());
 
-    info!("-----------------------------------");
-    info!("Region capture completed successfully!");
+    debug!("-----------------------------------");
+    debug!("Region capture completed successfully!");
 
     Ok(())
 }

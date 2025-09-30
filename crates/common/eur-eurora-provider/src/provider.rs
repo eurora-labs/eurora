@@ -11,7 +11,7 @@ use tonic::{
 };
 use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
 use tower::{ServiceBuilder, layer::Layer};
-use tracing::{error, info};
+use tracing::{debug, error};
 
 use crate::{
     config::EuroraConfig,
@@ -39,7 +39,7 @@ impl AsyncInterceptor for AuthInterceptor {
 
     fn call(&mut self, mut request: Request<()>) -> Self::Future {
         let auth = self.auth.clone();
-        info!("AuthInterceptor called");
+        debug!("AuthInterceptor called");
         Box::pin(async move {
             let access_token = auth.get_or_refresh_access_token().await.map_err(|e| {
                 Status::unauthenticated(format!("Failed to retrieve access token: {}", e))
@@ -204,7 +204,7 @@ impl StreamingProvider for EuroraStreamingProvider {
         &self,
         request: ferrous_llm_core::types::ChatRequest,
     ) -> Result<Self::Stream, Self::Error> {
-        info!("Sending chat stream");
+        debug!("Sending chat stream");
         let proto_request = request.into();
         let mut client = self.inner.client.clone();
 

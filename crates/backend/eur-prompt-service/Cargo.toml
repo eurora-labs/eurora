@@ -1,13 +1,15 @@
 [package]
 name = "eur-prompt-service"
-version = "0.0.1"
+version = "0.0.0"
 edition = "2024"
 authors = ["Eurora <eurora@company.com>"]
 publish = false
 
 [dependencies]
-# eur-proto = { path = "../../proto/eur-proto" }
-eur-auth = { path = "../../common/eur-auth" }
+eur-auth = { workspace = true }
+eur-ocr = { workspace = true }
+eur-eurora-provider = { workspace = true }
+
 anyhow = { workspace = true }
 tonic = { workspace = true }
 prost = { workspace = true }
@@ -17,12 +19,10 @@ tracing-subscriber = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
 tokio-stream = { workspace = true }
 image = { workspace = true }
-eur-ocr = { path = "../../common/eur-ocr" }
 futures = "0.3"
 chrono = { workspace = true }
 ferrous-llm = { workspace = true, features = ["openai"] }
 async-trait = "0.1.89"
-eur-eurora-provider = { workspace = true }
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }
