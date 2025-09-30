@@ -3,11 +3,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::procedures::window_procedures::{LauncherInfo, TauRpcWindowApiEventTrigger};
 use eur_screen_position::ActiveMonitor;
 use eur_vision::{
-    capture_focused_region_rgba, capture_monitor_by_id, get_all_monitors,
-    image_to_base64,
+    capture_focused_region_rgba, capture_monitor_by_id, get_all_monitors, image_to_base64,
 };
 use tauri::Manager;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 // Shared state to track if launcher is visible
 static LAUNCHER_VISIBLE: AtomicBool = AtomicBool::new(false);
@@ -170,8 +169,8 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     // let capture_y =
     //     ((monitor.height as i32 as f64) / 4.0) as i32 - (window_size.height as f64) as i32;
 
-    info!("launcher opened at: ({}, {})", launcher_x, launcher_y);
-    info!("monitor_id: {}", monitor.id.clone());
+    debug!("launcher opened at: ({}, {})", launcher_x, launcher_y);
+    debug!("monitor_id: {}", monitor.id.clone());
     // Convert absolute launcher position across all screens to relative position on monitor
     let (capture_x, capture_y) =
         active_monitor.convert_absolute_position_to_relative(launcher_x, launcher_y);
@@ -209,7 +208,7 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
         Ok(img) => {
             let img = image::DynamicImage::ImageRgba8(img.clone()).to_rgb8();
 
-            info!("Captured image size: {:?}", img.dimensions());
+            debug!("Captured image size: {:?}", img.dimensions());
 
             // Convert the image to base64
             if let Ok(base64_image) = image_to_base64(img) {
@@ -279,7 +278,7 @@ pub fn position_hover_window(hover_window: &tauri::WebviewWindow) {
         // Calculate hover position using consolidated function
         let (hover_x, hover_y) = calculate_hover_position(monitor, window_size);
 
-        info!(
+        debug!(
             "Positioning hover window at: ({}, {}) on monitor {}x{}",
             hover_x, hover_y, monitor.width, monitor.height
         );
@@ -334,7 +333,7 @@ pub async fn monitor_cursor_for_hover(hover_window: tauri::WebviewWindow) {
 
         //         // If cursor moved to a different monitor, reposition hover window immediately
         //         if monitor.id != last_monitor_id {
-        //             info!(
+        //             debug!(
         //                 "Cursor moved to monitor: {} (immediate repositioning)",
         //                 monitor.id
         //             );
@@ -357,7 +356,7 @@ pub async fn monitor_cursor_for_hover(hover_window: tauri::WebviewWindow) {
         //             // let (hover_x, hover_y) =
         //             //     active_monitor.calculate_position_for_percentage(window_size, 0.75, 0.75);
 
-        //             info!(
+        //             debug!(
         //                 "Repositioning hover window to: ({}, {}) on monitor {}x{}",
         //                 hover_x, hover_y, monitor.width, monitor.height
         //             );

@@ -1,5 +1,5 @@
 use tauri::{Manager, Runtime};
-use tracing::info;
+use tracing::debug;
 
 use crate::launcher::toggle_launcher_window as toggle_launcher;
 
@@ -85,7 +85,7 @@ impl WindowApi for WindowApiImpl {
         height: u32,
         scale_factor: f64,
     ) -> Result<(), String> {
-        info!(
+        debug!(
             "resize_launcher_window: height: {}, scale_factor: {}",
             height, scale_factor
         );
