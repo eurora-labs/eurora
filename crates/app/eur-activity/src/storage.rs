@@ -8,7 +8,7 @@ use eur_encrypt::{MainKey, encrypt_file_contents};
 use eur_fs::create_dirs_then_write;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
-use tracing::info;
+use tracing::debug;
 
 use crate::{Activity, ActivityAsset, ActivityError, AssetFunctionality, error::ActivityResult};
 
@@ -146,7 +146,7 @@ impl ActivityStorage {
         let file_path = self.generate_asset_path(asset, None)?;
         let absolute_path = self.config.base_dir.join(&file_path);
         let final_path = self.config.base_dir.join(&absolute_path);
-        info!("Saving asset to {}", final_path.display());
+        debug!("Saving asset to {}", final_path.display());
         create_dirs_then_write(&final_path, &bytes)?;
 
         Ok(SavedAssetInfo {

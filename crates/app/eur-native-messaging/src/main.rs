@@ -3,15 +3,13 @@ use std::{env, fs::File, net::ToSocketAddrs, process};
 use anyhow::{Result, anyhow};
 // Import the PORT constant from lib.rs
 use eur_native_messaging::PORT;
+use eur_native_messaging::server;
 use tonic::transport::Server;
-use tracing::info;
+use tracing::debug;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
 };
-
-mod server;
-mod types;
 
 /// Find processes by name and return their PIDs
 fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
@@ -39,7 +37,7 @@ fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
                 }
             }
             Err(e) => {
-                info!("Failed to run pgrep: {}", e);
+                debug!("Failed to run pgrep: {}", e);
                 // Fallback: try using ps
                 let output = Command::new("ps").args(["aux"]).output();
 
@@ -96,7 +94,7 @@ fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
                 }
             }
             Err(e) => {
-                info!("Failed to run tasklist: {}", e);
+                debug!("Failed to run tasklist: {}", e);
             }
         }
     }
@@ -146,16 +144,16 @@ fn ensure_single_instance() -> Result<()> {
 
     // Kill all existing instances
     for pid in existing_pids {
-        info!("Found existing instance with PID {}. Killing it...", pid);
+        debug!("Found existing instance with PID {}. Killing it...", pid);
         if let Err(e) = kill_process(pid) {
-            info!("Failed to kill process {}: {}", pid, e);
+            debug!("Failed to kill process {}: {}", pid, e);
             // Continue trying to kill other processes even if one fails
         }
     }
 
     // Register a shutdown handler for clean exit
     ctrlc::set_handler(move || {
-        info!("Received shutdown signal. Exiting...");
+        debug!("Received shutdown signal. Exiting...");
         process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
@@ -187,18 +185,42 @@ async fn main() -> Result<()> {
         return generate_typescript_definitions();
     }
 
-    // Ensure only one instance is running
-    ensure_single_instance()?;
-
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
         .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
 
-    // Write only to file
-    fmt()
-        .with_env_filter(filter)
-        .with_writer(File::create("eur-native-messaging.log")?)
-        .init();
+    #[cfg(debug_assertions)]
+    {
+        // Write only to file
+        fmt()
+            .with_env_filter(filter.clone())
+            .with_writer(File::create("eur-native-messaging.log")?)
+            .init();
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
+            .with(sentry::integrations::tracing::layer().with_filter(filter))
+            .try_init()
+            .unwrap();
+
+        let _guard = sentry::init((
+            "https://ff55ae34aa53740318b8f1beace59031@o4508907847352320.ingest.de.sentry.io/4510096917725264",
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                traces_sample_rate: 0.0,
+                enable_logs: true,
+                send_default_pii: true, // during closed beta all metrics are non-anonymous
+                debug: true,
+                ..Default::default()
+            },
+        ));
+    }
+
+    // Ensure only one instance is running
+    ensure_single_instance()?;
 
     // Create the gRPC server
     let (grpc_server, _) = server::TauriIpcServer::new();

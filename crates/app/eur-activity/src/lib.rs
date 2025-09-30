@@ -41,7 +41,7 @@ pub use strategies::ActivityStrategy;
 // Re-export strategy types
 pub use strategies::{BrowserStrategy, DefaultStrategy};
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::debug;
 pub use types::{
     Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip, DisplayAsset,
 };
@@ -63,7 +63,7 @@ pub fn initialize_registry() -> Arc<Mutex<StrategyRegistry>> {
                 crate::strategies::default::DefaultStrategyFactory::new(),
             ));
 
-            info!(
+            debug!(
                 "Initialized global strategy registry with {} strategies",
                 registry.get_strategies().len()
             );
@@ -94,7 +94,7 @@ pub async fn select_strategy_for_process(
     display_name: String,
     icon: IconData,
 ) -> ActivityResult<ActivityStrategy> {
-    info!("Selecting strategy for process: {}", process_name);
+    debug!("Selecting strategy for process: {}", process_name);
 
     let registry = get_registry();
     let mut registry_guard = registry.lock().await;

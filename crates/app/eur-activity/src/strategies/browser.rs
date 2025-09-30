@@ -6,7 +6,7 @@ use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_i
 use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use crate::{
     ActivityError,
@@ -27,12 +27,12 @@ pub struct BrowserStrategy {
 impl BrowserStrategy {
     /// Create a new browser strategy
     pub async fn new(name: String, icon: String, process_name: String) -> ActivityResult<Self> {
-        info!("Creating BrowserStrategy for process: {}", process_name);
+        debug!("Creating BrowserStrategy for process: {}", process_name);
 
         // Try to create the IPC client
         let client = match create_grpc_ipc_client().await {
             Ok(client) => {
-                info!("Successfully created IPC client for browser strategy");
+                debug!("Successfully created IPC client for browser strategy");
                 Some(Arc::new(Mutex::new(client)))
             }
             Err(e) => {
@@ -105,7 +105,7 @@ impl BrowserStrategy {
 
         match client_guard.get_assets(request).await {
             Ok(response) => {
-                info!("Received assets response from browser extension");
+                debug!("Received assets response from browser extension");
                 let mut assets: Vec<ActivityAsset> = Vec::new();
 
                 let resp = response.into_inner();
@@ -120,7 +120,7 @@ impl BrowserStrategy {
 
                 assets.push(asset);
 
-                info!("Retrieved {} assets from browser", assets.len());
+                debug!("Retrieved {} assets from browser", assets.len());
                 Ok(assets)
             }
             Err(e) => {
@@ -169,7 +169,7 @@ impl BrowserStrategy {
         //             }
         //         }
 
-        //         info!("Retrieved {} snapshots from browser", snapshots.len());
+        //         debug!("Retrieved {} snapshots from browser", snapshots.len());
         //         Ok(snapshots)
         //     }
         //     Err(e) => {

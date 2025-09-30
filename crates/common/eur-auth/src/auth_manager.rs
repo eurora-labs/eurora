@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow};
 use chrono::{DateTime, Duration, Utc};
 use eur_proto_client::auth::AuthClient;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 use crate::{
     JwtConfig, token_storage::TokenStorage, validate_access_token, validate_refresh_token,
@@ -80,7 +80,7 @@ impl AuthManager {
 
         // Try to restore user session from stored tokens
         if let Err(e) = manager.restore_session().await {
-            info!("No valid session to restore: {}", e);
+            debug!("No valid session to restore: {}", e);
         }
 
         Ok(manager)
@@ -112,7 +112,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = Some(user_info.clone());
 
-        info!("User logged in successfully: {}", user_info.username);
+        debug!("User logged in successfully: {}", user_info.username);
         Ok(user_info)
     }
 
@@ -147,7 +147,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = Some(user_info.clone());
 
-        info!("User registered successfully: {}", user_info.username);
+        debug!("User registered successfully: {}", user_info.username);
         Ok(user_info)
     }
 
@@ -158,7 +158,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = None;
 
-        info!("User logged out successfully");
+        debug!("User logged out successfully");
         Ok(())
     }
 
@@ -232,7 +232,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = Some(user_info);
 
-        info!("Access token refreshed successfully");
+        debug!("Access token refreshed successfully");
         Ok(())
     }
 
@@ -250,7 +250,7 @@ impl AuthManager {
                 let mut user_guard = self.current_user.write().await;
                 *user_guard = Some(user_info.clone());
 
-                info!("Session restored for user: {}", user_info.username);
+                debug!("Session restored for user: {}", user_info.username);
                 return Ok(());
             }
         }
@@ -293,7 +293,7 @@ impl AuthManager {
         let mut user_guard = self.current_user.write().await;
         *user_guard = Some(user_info.clone());
 
-        info!("User logged in successfully: {}", user_info.username);
+        debug!("User logged in successfully: {}", user_info.username);
         Ok(user_info)
     }
 }

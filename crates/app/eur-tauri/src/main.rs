@@ -38,9 +38,10 @@ use tauri::{
     tray::TrayIconBuilder,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_log::{Target, TargetKind, fern};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
@@ -51,47 +52,69 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
             .download_and_install(
                 |chunk_length, content_length| {
                     downloaded += chunk_length;
-                    info!("downloaded {downloaded} from {content_length:?}");
+                    debug!("downloaded {downloaded} from {content_length:?}");
                 },
                 || {
-                    info!("download finished");
+                    debug!("download finished");
                 },
             )
             .await?;
 
-        info!("update installed");
+        debug!("update installed");
         app.restart();
     }
 
     Ok(())
 }
 
+async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
+    let posthog_key = std::env::var("PH_PROJECT_KEY").unwrap_or_default();
+    if !posthog_key.is_empty() {
+        return posthog_rs::init_global(posthog_key.as_str()).await;
+    } else {
+        return Err(posthog_rs::Error::Connection(
+            "Posthog key not found".to_string(),
+        ));
+    }
+}
+
 fn main() {
     dotenv().ok();
 
-    #[cfg(not(debug_assertions))]
-    {
-        let _guard = sentry::init((
-            "https://c274bba2ddbc19e4c2c34cedc1779588@o4508907847352320.ingest.de.sentry.io/4509796610605136",
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                send_default_pii: false,
-                ..Default::default()
-            },
-        ));
-    }
+    let _guard = sentry::init((
+        "https://a0c23c10925999f104c7fd07fd8e3871@o4508907847352320.ingest.de.sentry.io/4510097240424528",
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            traces_sample_rate: 0.0,
+            enable_logs: true,
+            send_default_pii: true, // during closed beta all metrics are non-anonymous
+            debug: true,
+            ..Default::default()
+        },
+    ));
+
+    let sentry_logger = sentry::integrations::log::SentryLogger::new()
+        .filter(|_md| sentry::integrations::log::LogFilter::Log);
+
+    // let mut writer = std::io::Cursor::new(Vec::<u8>::new());
+    let writer = Box::new(sentry_logger) as Box<dyn log::Log>;
+    let dispatcher = fern::Dispatch::new()
+        .level(log::LevelFilter::Info)
+        .chain(std::io::stdout())
+        .chain(writer);
+    let custom_target = Target::new(TargetKind::Dispatch(dispatcher));
 
     // Regular application startup
     let tauri_context = generate_context!();
 
-    info!("Starting Tauri application...");
+    debug!("Starting Tauri application...");
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
         .block_on(async {
-            info!("Setting tokio runtime");
+            debug!("Setting tokio runtime");
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let builder = tauri::Builder::default()
@@ -117,8 +140,14 @@ fn main() {
                         } else {
                             let service: SharedPromptKitService = async_mutex::Mutex::new(None);
                             handle.manage(service);
-                            info!("No backend available");
+                            debug!("No backend available");
                         }
+                    });
+
+                    tauri::async_runtime::spawn(async move {
+                        let _ = initialize_posthog().await.map_err(|e| {
+                            error!("Failed to initialize posthog: {}", e);
+                        });
                     });
 
                     // If no main key is available, generate a new one
@@ -142,7 +171,7 @@ fn main() {
                         // Enable autostart
                         let _ = autostart_manager.enable();
                         // Check enable state
-                        info!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
+                        debug!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
                     }
 
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
@@ -178,7 +207,7 @@ fn main() {
 
                     let main_window_handle = app_handle.clone();
                     main_window.on_window_event(move |event| {
-                        info!("Window event: {:?}", event);
+                        debug!("Window event: {:?}", event);
                         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                             let main_window = main_window_handle.get_window("main").expect("Failed to get main window");
                             main_window.hide().expect("Failed to hide main window");
@@ -190,7 +219,7 @@ fn main() {
                             if !*focused && minimized {
                                 main_window.hide().expect("Failed to hide main window");
                             }
-                            info!("Window focused: {}", focused);
+                            debug!("Window focused: {}", focused);
                         }
                     });
 
@@ -250,7 +279,7 @@ fn main() {
                         if let Err(e) = timeline.start().await {
                             error!("Failed to start timeline collection: {}", e);
                         } else {
-                            info!("Timeline collection started successfully");
+                            debug!("Timeline collection started successfully");
                         }
                     });
 
@@ -276,7 +305,7 @@ fn main() {
                         if let Err(e) = app_handle_user.global_shortcut().register(launcher_shortcut) {
                             error!("Failed to register initial launcher shortcut: {}", e);
                         } else {
-                            info!("Successfully registered initial launcher shortcut: {:?}", launcher_shortcut);
+                            debug!("Successfully registered initial launcher shortcut: {:?}", launcher_shortcut);
                         }
                     });
 
@@ -294,7 +323,7 @@ fn main() {
                         match create_shared_database_manager(&db_app_handle).await {
                             Ok(db) => {
                                 db_app_handle.manage(db);
-                                info!("Personal database manager initialized");
+                                debug!("Personal database manager initialized");
                             }
                             Err(e) => error!("Failed to initialize personal database manager: {}", e),
                         }
@@ -307,7 +336,7 @@ fn main() {
                         match create_grpc_ipc_client().await {
                             Ok(ipc_client) => {
                                 ipc_handle.manage(ipc_client.clone());
-                                info!("gRPC IPC client initialized");
+                                debug!("gRPC IPC client initialized");
                             }
                             Err(e) => error!("Failed to initialize gRPC IPC client: {}", e),
                         }
@@ -316,10 +345,14 @@ fn main() {
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
+                // .plugin(
+                //     tauri_plugin_sentry::init(&sentry_client)
+                // )
                 .plugin(
                     tauri_plugin_log::Builder::new()
-                            .filter(|metadata| metadata.target().starts_with("eur_") || metadata.level() == log::Level::Warn)
-                            .level(log::LevelFilter::Info)
+                            .filter(|metadata| metadata.target().starts_with("eur_") || metadata.target().starts_with("webview") || metadata.level() == log::Level::Warn)
+                            // .level(log::LevelFilter::Info)
+                            .target(custom_target)
                             .build()
                 )
                 .plugin(tauri_plugin_shell::init())
