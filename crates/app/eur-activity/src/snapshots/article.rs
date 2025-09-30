@@ -98,7 +98,7 @@ impl ArticleSnapshot {
 
 impl SnapshotFunctionality for ArticleSnapshot {
     /// Construct a message for LLM interaction
-    fn construct_message(&self) -> Message {
+    fn construct_messages(&self) -> Vec<Message> {
         let mut content = String::new();
 
         if let Some(title) = &self.page_title {
@@ -120,10 +120,10 @@ impl SnapshotFunctionality for ArticleSnapshot {
             content.push_str(&format!(" (from: {})", url));
         }
 
-        Message {
+        vec![Message {
             role: Role::User,
             content: MessageContent::Text(content),
-        }
+        }]
     }
 
     fn get_updated_at(&self) -> u64 {
@@ -242,7 +242,7 @@ mod tests {
             Some("Test Article".to_string()),
         );
 
-        let message = snapshot.construct_message();
+        let message = snapshot.construct_messages()[0].clone();
 
         match message.content {
             MessageContent::Text(text) => {
