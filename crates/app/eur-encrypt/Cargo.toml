@@ -12,7 +12,7 @@ rand = { workspace = true }
 thiserror = { workspace = true }
 base64 = { workspace = true }
 tracing = { workspace = true }
-zeroize = { version = "1.8.1", features = ["derive"] }
+zeroize = { version = "1.8.2", features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
