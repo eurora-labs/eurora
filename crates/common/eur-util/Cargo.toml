@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 eur-proto = { path = "../../proto/eur-proto" }
-regex = "1.11.2"
+regex = "1.11.3"
 once_cell = "1.11.1"
