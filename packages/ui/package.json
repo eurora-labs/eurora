@@ -8,7 +8,7 @@
 		"check": "svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "pnpm check --watch",
 		"dev:package:svelte": "svelte-kit sync && svelte-package --watch",
-		"dev:package:styles": "postcss ./src/styles/main.pcss -o ./dist/styles/main.css --watch",
+		"dev:package:styles": "node ./scripts/watch-styles.js",
 		"package": "pnpm run --sequential \"/^package:.*/\"",
 		"package:svelte": "svelte-kit sync && svelte-package",
 		"package:styles": "postcss ./src/styles/main.pcss -o ./dist/styles/main.css",
