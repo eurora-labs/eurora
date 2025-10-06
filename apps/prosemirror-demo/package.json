@@ -15,11 +15,9 @@
 		"test:unit": "vitest"
 	},
 	"devDependencies": {
-		"@eurora/eslint-config": "workspace:*",
 		"@eurora/prosemirror-core": "workspace:*",
 		"@eurora/prosemirror-factory": "workspace:*",
 		"@eurora/prosemirror-view": "workspace:*",
-		"@eurora/typescript-config": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@tailwindcss/vite": "^4.1.13",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
