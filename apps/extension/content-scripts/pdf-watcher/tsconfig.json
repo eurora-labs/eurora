@@ -1,5 +1,4 @@
 {
-	"extends": ["@eurora/typescript-config/svelte"],
 	"compilerOptions": {
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
