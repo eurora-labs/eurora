@@ -13,6 +13,7 @@ pub struct NativeYoutubeAsset {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
 pub struct NativeArticleAsset {
+    pub url: String,
     pub content: String,
     pub text_content: String,
     pub selected_text: Option<String>,
