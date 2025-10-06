@@ -4,6 +4,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:watch": "pnpm run --parallel \"/^dev:package:.*/\"",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "pnpm check --watch",
 		"dev:package:svelte": "svelte-kit sync && svelte-package --watch",
