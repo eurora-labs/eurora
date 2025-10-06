@@ -16,8 +16,6 @@
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
 		"@eslint/js": "^9.36.0",
-		"@eurora/eslint-config": "workspace:*",
-		"@eurora/typescript-config": "workspace:*",
 		"@playwright/test": "^1.55.1",
 		"@testing-library/jest-dom": "^6.9.0",
 		"@types/firefox-webext-browser": "^120.0.5",

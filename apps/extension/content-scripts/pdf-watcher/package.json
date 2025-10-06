@@ -24,8 +24,6 @@
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
 		"@eslint/js": "^9.36.0",
-		"@eurora/eslint-config": "workspace:*",
-		"@eurora/typescript-config": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/chrome-ext-shared": "workspace:*",
 		"@mozilla/readability": "^0.6.0",
