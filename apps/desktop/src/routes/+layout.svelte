@@ -10,11 +10,11 @@
 	initDependencies();
 
 	onMount(() => {
-		setMode('light');
+		setMode('dark');
 	});
 </script>
 
-<ModeWatcher defaultMode="light" track={false} />
+<ModeWatcher defaultMode="dark" track={false} />
 
 <main class="p-0 m-0 bg-inherit">
 	{@render children?.()}
