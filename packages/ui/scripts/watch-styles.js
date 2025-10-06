@@ -59,7 +59,7 @@ watch(join(projectRoot, 'src', 'styles'), { recursive: true }, (eventType, filen
 });
 
 // Watch dist directory for deletion/recreation
-console.log('[watch-styles] Watching dist/styles/ for deletion...');
+console.log('[watch-styles] Watching dist/styles/...');
 const distDir = join(projectRoot, 'dist');
 
 // Check periodically if the styles file exists, rebuild if missing
