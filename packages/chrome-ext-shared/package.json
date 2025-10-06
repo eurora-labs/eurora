@@ -19,8 +19,6 @@
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
 		"@eslint/js": "^9.36.0",
-		"@eurora/eslint-config": "workspace:*",
-		"@eurora/typescript-config": "workspace:*",
 		"@mozilla/readability": "^0.6.0",
 		"@internationalized/date": "^3.9.0",
 		"@lucide/svelte": "^0.544.0",
