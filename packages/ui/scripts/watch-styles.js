@@ -23,7 +23,7 @@ function buildStyles() {
 
 	const build = spawn(
 		'pnpm',
-		['exec', 'postcss', './src/styles/main.pcss', '-o', './dist/styles/main.css'],
+		['exec', 'postcss', './src/styles/main.css', '-o', './dist/styles/main.css'],
 		{
 			cwd: projectRoot,
 			stdio: 'inherit',
@@ -52,7 +52,7 @@ buildStyles();
 // Watch source files
 console.log('[watch-styles] Watching src/styles/ for changes...');
 watch(join(projectRoot, 'src', 'styles'), { recursive: true }, (eventType, filename) => {
-	if (filename && (filename.endsWith('.css') || filename.endsWith('.pcss'))) {
+	if (filename && filename.endsWith('.css')) {
 		console.log(`[watch-styles] Detected change in ${filename}`);
 		buildStyles();
 	}
