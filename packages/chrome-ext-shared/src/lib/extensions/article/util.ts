@@ -16,6 +16,7 @@ export function createArticleAsset(document: Document): NativeResponse {
 			excerpt: article?.excerpt || '',
 			length: article?.length || 0,
 			selected_text: window.getSelection()?.toString() || '',
+			url: window.location.href,
 		};
 
 		return { kind: 'NativeArticleAsset', data: reportData };
