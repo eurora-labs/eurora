@@ -110,9 +110,12 @@ impl AssetFunctionality for YoutubeAsset {
 
     /// Get context chip for UI integration
     fn get_context_chip(&self) -> Option<ContextChip> {
+        let title = self.title.clone();
+        let title = title.chars().take(9).collect::<String>();
+
         Some(ContextChip {
             id: self.id.clone(),
-            name: "video".to_string(),
+            name: title,
             extension_id: "7c7b59bb-d44d-431a-9f4d-64240172e092".to_string(),
             attrs: HashMap::new(),
             icon: None,
