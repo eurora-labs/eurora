@@ -42,6 +42,7 @@ tempfile = "3.23.0"
 enum_dispatch = {workspace = true}
 dirs = { workspace = true }
 rand = { workspace = true }
+url = { version = "2.5.7" }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }

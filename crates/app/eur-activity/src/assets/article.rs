@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use eur_native_messaging::NativeArticleAsset;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::{
     ActivityResult,
@@ -53,7 +54,7 @@ impl ArticleAsset {
         let word_count = asset.content.split_whitespace().count();
         Ok(ArticleAsset {
             id: uuid::Uuid::new_v4().to_string(),
-            url: "".to_string(),
+            url: asset.url,
             title: if asset.title.is_empty() {
                 "Article".to_string()
             } else {
@@ -127,9 +128,17 @@ impl AssetFunctionality for ArticleAsset {
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
+        // info!("Getting context chip for article: {:?}", &self.url);
+        let parsed_url = url::Url::parse(&self.url).ok()?;
+        let domain = parsed_url.host_str().unwrap_or_default().to_string();
+        // Take title between - and :
+        // let title = self.title.clone();
+        // let title = title.split('-').nth(1)?.trim().to_string();
+        // let title = title.split(':').nth(0)?.trim().to_string();
         Some(ContextChip {
             id: self.id.clone(),
-            name: "article".to_string(),
+            // name: "article".to_string(),
+            name: domain,
             extension_id: "309f0906-d48c-4439-9751-7bcf915cdfc5".to_string(),
             attrs: HashMap::new(),
             icon: None,
