@@ -46,9 +46,6 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 		sender: chrome.runtime.MessageSender,
 	): Promise<any> {
 		console.log('Article Watcher: New article detected');
-		// Parse article on page load for caching
-		const result = createArticleAsset(document);
-		console.log('Parsed article:', result);
 	}
 
 	public async handleGenerateAssets(
@@ -73,11 +70,6 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 	console.log('Article Watcher content script loaded');
 
 	const watcher = new ArticleWatcher({});
-
-	// Parse article on page load
-	window.addEventListener('load', () => {
-		const result = createArticleAsset(document);
-	});
 
 	chrome.runtime.onMessage.addListener(watcher.listen.bind(watcher));
 })();
