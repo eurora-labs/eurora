@@ -71,7 +71,7 @@
 {/if}
 
 <style lang="postcss">
-	/*@reference 'tailwindcss';*/
+	@reference 'tailwindcss';
 	/* Apply solid background for Linux desktop app */
 	:global(body.linux-app .context-chip) {
 		@apply bg-black/20 backdrop-blur-none blur-none;
