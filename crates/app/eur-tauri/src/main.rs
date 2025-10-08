@@ -68,7 +68,7 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
 }
 
 async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
-    let posthog_key = std::env::var("PH_PROJECT_KEY").unwrap_or_default();
+    let posthog_key = std::env::var("POSTHOG_API_KEY").unwrap_or_default();
     if !posthog_key.is_empty() {
         return posthog_rs::init_global(posthog_key.as_str()).await;
     } else {
@@ -122,6 +122,15 @@ fn main() {
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
                     let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
+                    if started_by_autostart {
+                        let event = posthog_rs::Event::new_anon("start_app_by_autostart");
+
+                        tauri::async_runtime::spawn(async move {
+                            let _ = posthog_rs::capture(event).await.map_err(|e| {
+                                error!("Failed to capture posthog event: {}", e);
+                            });
+                        });
+                    }
 
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
                     tauri_app.manage(async_mutex::Mutex::new(app_settings.clone()));
