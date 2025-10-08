@@ -121,6 +121,14 @@ pub fn toggle_launcher_window<R: tauri::Runtime>(
         // Update the shared state to indicate launcher is hidden
         set_launcher_visible(false);
     } else {
+        let event = posthog_rs::Event::new_anon("launcher_opened");
+
+        tauri::async_runtime::spawn(async move {
+            let _ = posthog_rs::capture(event).await.map_err(|e| {
+                error!("Failed to capture posthog event: {}", e);
+            });
+        });
+
         // Open and position the launcher window
         open_launcher_window(launcher)?;
     }
