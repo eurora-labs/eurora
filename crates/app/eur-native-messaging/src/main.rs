@@ -6,6 +6,7 @@ use eur_native_messaging::PORT;
 use eur_native_messaging::server;
 use tonic::transport::Server;
 use tracing::debug;
+use tracing_subscriber::prelude::*;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
