@@ -25,6 +25,8 @@ on:
 jobs:
     build-and-deploy:
         runs-on: ubuntu-latest
+        permissions:
+            contents: write
         environment:
             name: firefox-addons
 
@@ -34,9 +36,7 @@ jobs:
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
-
-            - name: Pull Git LFS files
-              run: git lfs pull
+                  lfs: true
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
