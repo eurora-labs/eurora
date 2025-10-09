@@ -45,8 +45,7 @@ jobs:
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
-            - name: Pull Git LFS files
-              run: git lfs pull
+                  lfs: true
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
@@ -149,9 +148,7 @@ jobs:
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
-
-            - name: Pull Git LFS files
-              run: git lfs pull
+                  lfs: true
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
