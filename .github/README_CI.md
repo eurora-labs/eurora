@@ -21,6 +21,28 @@ The workflow performs the following steps:
 5. Creates a git tag for the release
 6. Notifies the Eurora API of the new release (if API token is provided)
 
+### Deploy Firefox Extension
+
+The `deploy-firefox-extension.yml` workflow automates the build and deployment of the Firefox extension to the Firefox Add-ons store. See [FIREFOX_EXTENSION_DEPLOYMENT.md](FIREFOX_EXTENSION_DEPLOYMENT.md) for detailed documentation.
+
+**Triggers:**
+
+- **Manually**: Actions tab → Deploy Firefox Extension → Run workflow (choose channel and version)
+- **Git tags**: Push tags matching `extension/v*.*.*` (e.g., `extension/v0.1.0`)
+
+**Key features:**
+
+- Builds extension from source using `pnpm build`
+- Automatically updates manifest version
+- Replaces dev extension ID with production ID
+- Signs and submits to Firefox Add-ons store
+- Creates GitHub releases for tagged versions
+
+**Required secrets:**
+
+- `FIREFOX_API_KEY`: Firefox Add-ons API key (JWT issuer)
+- `FIREFOX_API_SECRET`: Firefox Add-ons API secret (JWT secret)
+
 ### Nightly Build
 
 The `nightly-build.yml` workflow is a simple trigger for the Publish workflow with the "nightly" channel. It runs:
@@ -49,6 +71,8 @@ This action sets up the Node.js environment for the workflows, including:
 
 For full functionality, the following secrets should be configured in your GitHub repository:
 
+### Desktop App (Publish workflow)
+
 - `GITHUB_TOKEN`: For GitHub API access (automatically provided by GitHub)
 - `TAURI_PRIVATE_KEY`: For signing Tauri updates
 - `TAURI_KEY_PASSWORD`: Password for the Tauri private key
@@ -65,5 +89,10 @@ For full functionality, the following secrets should be configured in your GitHu
 - `SENTRY_AUTH_TOKEN`: Sentry auth token for error reporting
 - `SENTRY_CRONS`: Sentry cron monitoring URL
 - `BOT_AUTH_TOKEN`: Auth token for the Eurora API
+
+### Firefox Extension (Deploy Firefox Extension workflow)
+
+- `FIREFOX_API_KEY`: Firefox Add-ons API key (JWT issuer) - [Get credentials](https://addons.mozilla.org/developers/addon/api/key/)
+- `FIREFOX_API_SECRET`: Firefox Add-ons API secret (JWT secret)
 
 Note: Many of these secrets are optional. The workflows will skip steps that require missing secrets.
