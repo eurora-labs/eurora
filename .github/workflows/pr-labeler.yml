@@ -11,9 +11,10 @@ jobs:
             pull-requests: write
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   repository: 'eurora-labs/eurora'
-            - uses: actions/labeler@v6
+                  persist-credentials: false
+            - uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6
               with:
                   configuration-path: '.github/pr-labeler.yml'

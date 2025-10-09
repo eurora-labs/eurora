@@ -16,12 +16,15 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+              with:
+                  persist-credentials: false
               if: ${{ github.event_name != 'workflow_dispatch' }}
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               if: ${{ github.event_name == 'workflow_dispatch' }}
               with:
                   ref: ${{ github.event.inputs.sha }}
+                  persist-credentials: false
             - name: Install Tauri OS dependencies
               run: |
                   sudo apt update && sudo apt install -y \
@@ -34,8 +37,8 @@ jobs:
                     xvfb
             - name: Setup rust-toolchain stable
               id: rust-toolchain
-              uses: dtolnay/rust-toolchain@stable
-            - uses: actions/cache@v4
+              uses: dtolnay/rust-toolchain@5d458579430fc14a04a08a1e7d3694f545e91ce6 # stable
+            - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
               with:
                   path: |
                       ~/.cargo/bin/
@@ -49,7 +52,7 @@ jobs:
               uses: ./.github/actions/init-env-node
 
             - name: Install Protoc
-              uses: arduino/setup-protoc@v3
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
 
             - name: Compile Protobuf
               run: pnpm proto:typescript
@@ -71,7 +74,7 @@ jobs:
             - name: WebdriverIO
               run: xvfb-run pnpm test:e2e
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
               if: failure()
               with:
                   name: WebdriverIO Artifacts
