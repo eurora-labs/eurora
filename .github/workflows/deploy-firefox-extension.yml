@@ -52,12 +52,16 @@ jobs:
             - name: Extract version from input or tag
               id: version
               shell: bash
+              env:
+                  EVENT_NAME: ${{ github.event_name }}
+                  GITHUB_REF: ${{ github.ref }}
+                  INPUT_VERSION: ${{ github.event.inputs.version }}
               run: |
-                  if [ "${{ github.event_name }}" == "push" ]; then
+                  if [ "$EVENT_NAME" == "push" ]; then
                     # Extract version from tag (e.g., extension/v0.1.0 -> 0.1.0)
                     VERSION="${GITHUB_REF#refs/tags/extension/v}"
                   else
-                    VERSION="${{ github.event.inputs.version }}"
+                    VERSION="$INPUT_VERSION"
                   fi
                   if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}([-\+][0-9A-Za-z\.-]+)?$ ]]; then
                     echo "Invalid version: $VERSION" >&2
@@ -68,8 +72,9 @@ jobs:
 
             - name: Update manifest version
               shell: bash
+              env:
+                  VERSION: ${{ steps.version.outputs.version }}
               run: |
-                  VERSION="${{ steps.version.outputs.version }}"
                   # Update version in Firefox manifest safely using jq
                   tmp=$(mktemp)
                   jq --arg v "$VERSION" '.version = $v' extensions/firefox/manifest.json > "$tmp"
