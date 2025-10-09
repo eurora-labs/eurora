@@ -39,9 +39,7 @@ jobs:
               uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   persist-credentials: false
-
-            - name: Pull Git LFS files
-              run: git lfs pull
+                  lfs: true
 
             # - name: Install pnpm
             #   uses: pnpm/action-setup@v4
