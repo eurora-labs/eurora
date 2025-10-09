@@ -168,7 +168,7 @@ fn main() {
                     });
 
 
-                    #[cfg(desktop)]
+                    // #[cfg(all(desktop, not(debug_assertions)))]
                     if app_settings.general.autostart && !started_by_autostart {
                         use tauri_plugin_autostart::MacosLauncher;
                         use tauri_plugin_autostart::ManagerExt;
@@ -178,9 +178,11 @@ fn main() {
                         // Get the autostart manager
                         let autostart_manager = tauri_app.autolaunch();
                         // Enable autostart
-                        let _ = autostart_manager.enable();
-                        // Check enable state
-                        debug!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
+                        if !autostart_manager.is_enabled().unwrap_or(false) {
+                            let _ = autostart_manager.enable();
+                            // Check enable state
+                            debug!("Autostart enabled");
+                        }
                     }
 
                     let main_window = create_window(tauri_app.handle(), "main", "".into())
