@@ -31,14 +31,16 @@ jobs:
     build:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+              with:
+                  persist-credentials: false
 
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@5d458579430fc14a04a08a1e7d3694f545e91ce6 # stable
               with:
                   toolchain: nightly
                   components: rustfmt, clippy
 
-            - uses: Swatinem/rust-cache@v2
+            - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
               with:
                   workspaces: 'crates/backend/eur-monolith'
 
@@ -61,7 +63,7 @@ jobs:
             - name: Build monolith
               run: cargo build --release --package eur-monolith
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
               with:
                   name: eur-monolith-binary
                   path: target/release/eur-monolith
@@ -72,10 +74,12 @@ jobs:
         needs: build
         steps:
             - name: Checkout
-              uses: actions/checkout@v5
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+              with:
+                  persist-credentials: false
 
             - name: Download build artifact
-              uses: actions/download-artifact@v5
+              uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
               with:
                   name: eur-monolith-binary
                   path: ./target/release/
@@ -99,10 +103,10 @@ jobs:
                   EOF
 
             - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+              uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
             - name: Log in to Container Registry
-              uses: docker/login-action@v3
+              uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
               with:
                   registry: ${{ env.REGISTRY }}
                   username: ${{ github.actor }}
@@ -110,7 +114,7 @@ jobs:
 
             - name: Extract metadata
               id: meta
-              uses: docker/metadata-action@v5
+              uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5
               with:
                   images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
                   tags: |
@@ -118,7 +122,7 @@ jobs:
                       type=raw,value=latest,enable={{is_default_branch}}
 
             - name: Build and push Docker image to GHCR
-              uses: docker/build-push-action@v6
+              uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
               with:
                   context: .
                   push: true
@@ -131,14 +135,14 @@ jobs:
                   cache-to: type=gha,mode=max
 
             - name: Configure AWS credentials
-              uses: aws-actions/configure-aws-credentials@v5
+              uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 # v5
               with:
                   role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecr-full-access
                   aws-region: ${{ secrets.AWS_REGION }}
 
             - name: Login to Amazon ECR
               id: ecr-login
-              uses: aws-actions/amazon-ecr-login@v2
+              uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2
             - name: Tag and push image to ECR
               run: |
                   IMAGE_SHA=${{ github.sha }}
