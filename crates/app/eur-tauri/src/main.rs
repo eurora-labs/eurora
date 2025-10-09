@@ -68,9 +68,9 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
 }
 
 async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
-    let posthog_key = std::env::var("POSTHOG_API_KEY").unwrap_or_default();
-    if !posthog_key.is_empty() {
-        return posthog_rs::init_global(posthog_key.as_str()).await;
+    let posthog_key = option_env!("POSTHOG_API_KEY");
+    if posthog_key.is_some() {
+        return posthog_rs::init_global(posthog_key.unwrap()).await;
     } else {
         return Err(posthog_rs::Error::Connection(
             "Posthog key not found".to_string(),
@@ -168,7 +168,7 @@ fn main() {
                     });
 
 
-                    #[cfg(desktop)]
+                    // #[cfg(all(desktop, not(debug_assertions)))]
                     if app_settings.general.autostart && !started_by_autostart {
                         use tauri_plugin_autostart::MacosLauncher;
                         use tauri_plugin_autostart::ManagerExt;
@@ -178,9 +178,12 @@ fn main() {
                         // Get the autostart manager
                         let autostart_manager = tauri_app.autolaunch();
                         // Enable autostart
-                        let _ = autostart_manager.enable();
-                        // Check enable state
-                        debug!("Autostart enabled: {}", autostart_manager.is_enabled().unwrap());
+                        if !autostart_manager.is_enabled().unwrap_or(false) {
+                            match autostart_manager.enable() {
+                                Ok(_) => debug!("Autostart enabled"),
+                                Err(e) => error!("Failed to enable autostart: {}", e),
+                            }
+                        }
                     }
 
                     let main_window = create_window(tauri_app.handle(), "main", "".into())

@@ -1,11 +1,11 @@
 use std::{env, fs::File, net::ToSocketAddrs, process};
 
 use anyhow::{Result, anyhow};
-// Import the PORT constant from lib.rs
 use eur_native_messaging::PORT;
 use eur_native_messaging::server;
 use tonic::transport::Server;
 use tracing::debug;
+// Need this import to succeed in prod builds
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
