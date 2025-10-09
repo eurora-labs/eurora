@@ -179,9 +179,10 @@ fn main() {
                         let autostart_manager = tauri_app.autolaunch();
                         // Enable autostart
                         if !autostart_manager.is_enabled().unwrap_or(false) {
-                            let _ = autostart_manager.enable();
-                            // Check enable state
-                            debug!("Autostart enabled");
+                            match autostart_manager.enable() {
+                                Ok(_) => debug!("Autostart enabled"),
+                                Err(e) => error!("Failed to enable autostart: {}", e),
+                            }
                         }
                     }
 
