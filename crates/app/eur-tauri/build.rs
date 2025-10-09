@@ -28,5 +28,18 @@ fn main() {
         );
     }
 
+    // Needed for the key to be available in production
+    #[cfg(not(debug_assertions))]
+    {
+        match std::env::var("POSTHOG_API_KEY") {
+            Ok(key) => {
+                println!("POSTHOG_API_KEY found");
+            }
+            Err(_) => {
+                println!("POSTHOG_API_KEY missing");
+            }
+        };
+    }
+
     tauri_build::build();
 }
