@@ -41,11 +41,11 @@ jobs:
               if: ${{ github.event_name == 'schedule' }}
               shell: bash
               run: curl "${{ secrets.SENTRY_CRONS }}?status=in_progress"
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
-            - name: Pull Git LFS files
-              run: git lfs pull
+                  persist-credentials: false
+                  lfs: true
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
@@ -72,7 +72,7 @@ jobs:
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
             - name: Install Protoc
-              uses: arduino/setup-protoc@v3
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
               with:
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -82,13 +82,13 @@ jobs:
               run: pnpm build:desktop -- --mode ${{ env.vitemode }}
               env:
                   SENTRY_RELEASE: ${{ env.version }}
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
               name: Upload pnpm-store contents
               with:
                   name: pnpm-store
                   path: /home/runner/setup-pnpm/node_modules/.bin/store/v3
                   retention-days: 7
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
               name: Upload SvelteKit build output
               with:
                   name: sveltekit-build
@@ -123,7 +123,7 @@ jobs:
               run: which perl && perl -V
             - name: Setup perl
               if: runner.os == 'Windows'
-              uses: shogo82148/actions-setup-perl@v1
+              uses: shogo82148/actions-setup-perl@5796a908661aa68fc0a5b8f55c6791af2376d72e # v1
               with:
                   perl-version: '5.38'
                   distribution: strawberry
@@ -144,12 +144,11 @@ jobs:
                   echo "PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
                   echo "OPENSSL_SRC_PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Pull Git LFS files
-              run: git lfs pull
+                  persist-credentials: false
+                  lfs: true
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
@@ -204,14 +203,14 @@ jobs:
                     libpipewire-0.3-dev;
 
             - name: Install Protoc
-              uses: arduino/setup-protoc@v3
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
               with:
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Compile Protobuf
               run: pnpm proto:typescript
 
-            - uses: actions/download-artifact@v5
+            - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
               with:
                   name: sveltekit-build
                   path: ./apps/desktop/build/
@@ -236,7 +235,7 @@ jobs:
                   POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
 
             - name: Upload Artifacts
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
               with:
                   name: '${{ env.channel }}-${{ matrix.platform }}-${{ github.run_number }}'
                   path: release/
@@ -257,11 +256,12 @@ jobs:
                     - ubuntu-24.04 # [linux, x64]
                     - windows-latest # [windows, x64]
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
             - name: Download artifacts
-              uses: actions/download-artifact@v5
+              uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
               with:
                   name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}-${{ github.run_number }}'
                   path: release
@@ -277,7 +277,7 @@ jobs:
                   mkdir -p release-s3
                   rsync -avE --prune-empty-dirs --include-from='.github/workflows/publish.include.txt' --exclude='*' release/ release-s3/
                   bash scripts/normalize_spaces.sh ./release-s3
-            - uses: shallwefootball/s3-upload-action@master
+            - uses: shallwefootball/s3-upload-action@0d261a6f15b3b2e209dfebdecace4b100c04f95b # master
               name: Upload To S3
               id: S3
               with:
@@ -303,9 +303,10 @@ jobs:
         needs: [publish-tauri, build-tauri]
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
             - name: Create git tag
               shell: bash
               env:
