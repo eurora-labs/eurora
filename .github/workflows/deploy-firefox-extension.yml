@@ -30,9 +30,10 @@ jobs:
 
         steps:
             - name: Checkout code
-              uses: actions/checkout@v5
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
 
             - name: Pull Git LFS files
               run: git lfs pull
@@ -41,7 +42,7 @@ jobs:
               uses: ./.github/actions/init-env-node
 
             - name: Install Protoc
-              uses: arduino/setup-protoc@v3
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
               with:
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -95,7 +96,7 @@ jobs:
                   ls -lh firefox-extension.zip
 
             - name: Upload artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
               with:
                   name: firefox-extension-${{ steps.version.outputs.version }}
                   path: firefox-extension.zip
@@ -142,7 +143,7 @@ jobs:
 
             - name: Create GitHub Release
               if: github.event_name == 'push'
-              uses: softprops/action-gh-release@v1
+              uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
               with:
                   files: firefox-extension.zip
                   body: |
