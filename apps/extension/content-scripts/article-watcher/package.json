@@ -3,14 +3,6 @@
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
-	"module": "index.ts",
-	"main": "index.ts",
-	"exports": {
-		".": {
-			"types": "./index.ts",
-			"svelte": "./index.ts"
-		}
-	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -19,7 +11,11 @@
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
 		"test:unit": "vitest",
-		"test": "npm run test:unit -- --run"
+		"test": "npm run test:unit -- --run",
+		"test:e2e": "playwright test",
+		"test:e2e:ui": "playwright test --ui",
+		"test:e2e:debug": "playwright test --debug",
+		"test:e2e:report": "playwright show-report"
 	},
 	"devDependencies": {
 		"rollup-plugin-copy": "^3.5.0",

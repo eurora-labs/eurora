@@ -23,7 +23,7 @@ export default defineConfig({
 		lib: {
 			// Could also be a dictionary or array of multiple entry points.
 			entry: 'src/index.ts',
-			name: 'article-watcher',
+			name: 'content-script',
 			fileName: 'index',
 			// Change this to the formats you want to support.
 			// Don't forget to update your package.json as well.
@@ -34,8 +34,8 @@ export default defineConfig({
 			external: [],
 			output: {
 				entryFileNames: 'main.js',
-				chunkFileNames: 'main-[name].js',
-				assetFileNames: 'assets/[name].[ext]',
+				chunkFileNames: 'chunks/[name]-[hash].js',
+				assetFileNames: 'assets/[name]-[hash].[ext]',
 			},
 			plugins: [
 				// @ts-expect-error - rollup-plugin-copy types are incompatible with Rollup 4
@@ -43,11 +43,11 @@ export default defineConfig({
 					targets: [
 						{
 							src: 'dist/**/*',
-							dest: '../../../../extensions/chromium/content-scripts/article-watcher',
+							dest: '../../../extensions/chromium/scripts/content',
 						},
 						{
 							src: 'dist/**/*',
-							dest: '../../../../extensions/firefox/content-scripts/article-watcher',
+							dest: '../../../extensions/firefox/scripts/content',
 						},
 					],
 					hook: 'closeBundle',
@@ -55,6 +55,10 @@ export default defineConfig({
 				}),
 			],
 		},
+		target: 'es2022',
+		minify: 'esbuild',
+		modulePreload: false,
+		sourcemap: false,
 	},
 	test: {
 		watch: false,

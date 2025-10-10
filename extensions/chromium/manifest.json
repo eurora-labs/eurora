@@ -13,6 +13,12 @@
 	"content_scripts": [
 		{
 			"all_frames": false,
+			"js": ["content-scripts/script/main.js"],
+			"matches": ["<all_urls>"],
+			"run_at": "document_start"
+		},
+		{
+			"all_frames": false,
 			"js": ["content-scripts/youtube-watcher/main.js"],
 			"matches": ["https://*.youtube.com/*"],
 			"run_at": "document_start"
@@ -46,6 +52,7 @@
 				"scripts/background/*",
 				"scripts/content/assets/*",
 				"pages/popup/**/*",
+				"bootstrap.js",
 
 				"http:/*",
 				"https:/*",
