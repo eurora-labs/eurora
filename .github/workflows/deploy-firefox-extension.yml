@@ -81,8 +81,8 @@ jobs:
                   mv "$tmp" extensions/firefox/manifest.json
                   echo "Updated manifest.json version to $VERSION"
 
-            - name: Build extensions
-              run: pnpm build
+            - name: Build everything for firefox
+              run: pnpm build:firefox
               env:
                   NODE_ENV: production
 

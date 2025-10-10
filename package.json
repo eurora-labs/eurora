@@ -31,6 +31,7 @@
 		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
 		"proto:rust": "cargo build -p eur-proto",
 		"run:firefox": "web-ext run --source-dir ./extensions/firefox/ --devtools",
+		"build:firefox": "turbo run build --filter=@firefox/background-script... --filter={./apps/extension/content-scripts/*}...",
 		"prettier": "prettier --check",
 		"format": "prettier --write .",
 		"rustfmt": "cargo +nightly fmt -- --config-path rustfmt-nightly.toml",
@@ -66,7 +67,7 @@
 		"turbo": "^2.5.8",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.18.0",
+	"packageManager": "pnpm@10.18.2",
 	"engines": {
 		"node": ">=20.11"
 	},
