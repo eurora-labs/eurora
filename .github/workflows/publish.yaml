@@ -1,4 +1,9 @@
 name: 'Publish'
+
+permissions:
+    contents: read # Required for checkout
+    actions: read # Required for downloading artifacts
+
 on:
     schedule:
         # every day at 3am
@@ -49,15 +54,26 @@ jobs:
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
+              env:
+                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
                   VITEMODE=nightly
-                  if [[ "${{ github.event.inputs.channel }}" == "release" ]]; then
+                  if [[ "$INPUT_CHANNEL" == "release" ]]; then
                     VITEMODE=production
                   fi
 
-                  echo "vitemode=$VITEMODE" >> $GITHUB_ENV
-                  echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
-                  echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
+                  {
+                    echo "vitemode<<EOF"
+                    echo "$VITEMODE"
+                    echo "EOF"
+                    echo "channel<<EOF"
+                    echo "$INPUT_CHANNEL"
+                    echo "EOF"
+                    echo "bump<<EOF"
+                    echo "$INPUT_BUMP"
+                    echo "EOF"
+                  } >> $GITHUB_ENV
             - name: Calculate next version
               shell: bash
               run: |
@@ -67,7 +83,11 @@ jobs:
                     CURRENT_VERSION=$(grep -o '"version": *"[^"]*"' apps/desktop/package.json | cut -d'"' -f4)
                   fi
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
-                  echo "version=$NEXT_VERSION" >> $GITHUB_ENV
+                  {
+                    echo "version<<EOF"
+                    echo "$NEXT_VERSION"
+                    echo "EOF"
+                  } >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
@@ -156,9 +176,18 @@ jobs:
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
+              env:
+                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
-                  echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
-                  echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
+                  {
+                    echo "channel<<EOF"
+                    echo "$INPUT_CHANNEL"
+                    echo "EOF"
+                    echo "bump<<EOF"
+                    echo "$INPUT_BUMP"
+                    echo "EOF"
+                  } >> $GITHUB_ENV
 
             - name: Calculate next version
               shell: bash
@@ -169,7 +198,11 @@ jobs:
                     CURRENT_VERSION=$(grep -o '"version": *"[^"]*"' apps/desktop/package.json | cut -d'"' -f4)
                   fi
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
-                  echo "version=$NEXT_VERSION" >> $GITHUB_ENV
+                  {
+                    echo "version<<EOF"
+                    echo "$NEXT_VERSION"
+                    echo "EOF"
+                  } >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
 
             #   - name: Import GPG key
@@ -269,7 +302,11 @@ jobs:
               shell: bash
               run: |
                   VERSION="$(cat release/version)"
-                  echo "version=$VERSION" >> $GITHUB_ENV
+                  {
+                    echo "version<<EOF"
+                    echo "$VERSION"
+                    echo "EOF"
+                  } >> $GITHUB_ENV
             - name: Prepare S3 payload
               shell: bash
               run: |
@@ -302,11 +339,13 @@ jobs:
     create-git-tag:
         needs: [publish-tauri, build-tauri]
         runs-on: ubuntu-latest
+        permissions:
+            contents: write # Required for creating and pushing git tags
         steps:
             - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
-                  persist-credentials: false
+                  persist-credentials: true
             - name: Create git tag
               shell: bash
               env:
