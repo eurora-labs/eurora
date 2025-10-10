@@ -1,0 +1,42 @@
+
+{
+	"name": "@browser-ext/content-script",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"format": "prettier --write .",
+		"lint": "prettier --check . && eslint .",
+		"test:unit": "vitest",
+		"test": "npm run test:unit -- --run",
+		"test:e2e": "playwright test",
+		"test:e2e:ui": "playwright test --ui",
+		"test:e2e:debug": "playwright test --debug",
+		"test:e2e:report": "playwright show-report"
+	},
+	"devDependencies": {
+		"rollup-plugin-copy": "^3.5.0",
+		"@eslint/compat": "^1.4.0",
+		"@eslint/js": "^9.37.0",
+		"@eurora/shared": "workspace:*",
+		"@eurora/chrome-ext-shared": "workspace:*",
+		"@playwright/test": "^1.56.0",
+		"@testing-library/jest-dom": "^6.9.1",
+		"@types/chrome": "^0.1.22",
+		"eslint": "^9.37.0",
+		"eslint-config-prettier": "^10.1.8",
+		"globals": "^15.15.0",
+		"jsdom": "^25.0.1",
+		"prettier": "^3.6.2",
+		"rxjs": "^7.8.2",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.46.0",
+		"vite": "catalog:",
+		"vite-plugin-dts": "^4.5.3",
+		"vitest": "catalog:"
+	}
+}

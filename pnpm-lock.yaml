@@ -470,6 +470,66 @@ importers:
         specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.5.2)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
 
+  apps/extension/content-script:
+    devDependencies:
+      '@eslint/compat':
+        specifier: ^1.4.0
+        version: 1.4.0(eslint@9.37.0(jiti@2.6.1))
+      '@eslint/js':
+        specifier: ^9.37.0
+        version: 9.37.0
+      '@eurora/chrome-ext-shared':
+        specifier: workspace:*
+        version: link:../../../packages/chrome-ext-shared
+      '@eurora/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
+      '@playwright/test':
+        specifier: ^1.56.0
+        version: 1.56.0
+      '@testing-library/jest-dom':
+        specifier: ^6.9.1
+        version: 6.9.1
+      '@types/chrome':
+        specifier: ^0.1.22
+        version: 0.1.22
+      eslint:
+        specifier: ^9.37.0
+        version: 9.37.0(jiti@2.6.1)
+      eslint-config-prettier:
+        specifier: ^10.1.8
+        version: 10.1.8(eslint@9.37.0(jiti@2.6.1))
+      globals:
+        specifier: ^15.15.0
+        version: 15.15.0
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
+      prettier:
+        specifier: ^3.6.2
+        version: 3.6.2
+      rollup-plugin-copy:
+        specifier: ^3.5.0
+        version: 3.5.0
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      typescript-eslint:
+        specifier: ^8.46.0
+        version: 8.46.0(eslint@9.37.0(jiti@2.6.1))(typescript@5.9.3)
+      vite:
+        specifier: 'catalog:'
+        version: 6.3.6(@types/node@24.5.2)(jiti@2.6.1)(lightningcss@1.30.1)(yaml@2.8.0)
+      vite-plugin-dts:
+        specifier: ^4.5.3
+        version: 4.5.4(@types/node@24.5.2)(rollup@4.52.4)(typescript@5.9.3)(vite@6.3.6(@types/node@24.5.2)(jiti@2.6.1)(lightningcss@1.30.1)(yaml@2.8.0))
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.5.2)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.1)(yaml@2.8.0)
+
   apps/extension/content-scripts/article-watcher:
     devDependencies:
       '@eslint/compat':
