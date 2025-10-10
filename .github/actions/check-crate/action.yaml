@@ -8,7 +8,7 @@ runs:
     using: 'composite'
     steps:
         - name: Rust Cache
-          uses: Swatinem/rust-cache@v2.7.3
+          uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # v2.7.3
           with:
               shared-key: unix-rust-testing-v2
               key: ${{ inputs.features }}
