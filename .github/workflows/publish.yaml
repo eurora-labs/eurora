@@ -1,4 +1,9 @@
 name: 'Publish'
+
+permissions:
+    contents: write # Required for checkout and creating git tags
+    actions: read # Required for downloading artifacts
+
 on:
     schedule:
         # every day at 3am
