@@ -38,7 +38,7 @@ export default defineConfig({
 				assetFileNames: 'assets/[name].[ext]',
 			},
 			plugins: [
-				// @ts-expect-error
+				// @ts-expect-error - rollup-plugin-copy types are incompatible with Rollup 4
 				copy({
 					targets: [
 						{

@@ -3,7 +3,7 @@ import {
 	createArticleAsset,
 	createArticleSnapshot,
 } from '@eurora/chrome-ext-shared/extensions/article/util';
-import { ArticleChromeMessage, type ArticleMessageType, type WatcherParams } from './types.js';
+import { ArticleChromeMessage, type WatcherParams } from './types.js';
 
 class ArticleWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
@@ -13,11 +13,11 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 	public listen(
 		obj: ArticleChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
+		response: (response?: unknown) => void,
 	) {
 		const { type } = obj;
 
-		let promise: Promise<any> | null = null;
+		let promise: Promise<unknown> | null = null;
 
 		switch (type) {
 			case 'NEW':
@@ -42,27 +42,25 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleNew(
-		obj: ArticleChromeMessage,
-		sender: chrome.runtime.MessageSender,
-	): Promise<any> {
+		_obj: ArticleChromeMessage,
+		_sender: chrome.runtime.MessageSender,
+	): Promise<void> {
 		console.log('Article Watcher: New article detected');
 	}
 
 	public async handleGenerateAssets(
-		obj: ArticleChromeMessage,
-		sender: chrome.runtime.MessageSender,
-	): Promise<any> {
+		_obj: ArticleChromeMessage,
+		_sender: chrome.runtime.MessageSender,
+	): Promise<void> {
 		console.log('Generating article report for URL:', window.location.href);
-		const result = createArticleAsset(document);
-		return result;
+		createArticleAsset(document);
 	}
 
 	public async handleGenerateSnapshot(
-		obj: ArticleChromeMessage,
-		sender: chrome.runtime.MessageSender,
-	): Promise<any> {
-		const result = createArticleSnapshot(window);
-		return result;
+		_obj: ArticleChromeMessage,
+		_sender: chrome.runtime.MessageSender,
+	): Promise<void> {
+		createArticleSnapshot(window);
 	}
 }
 
