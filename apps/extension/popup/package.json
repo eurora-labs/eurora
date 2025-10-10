@@ -1,6 +1,6 @@
 {
-	"name": "@chrome/popup",
-	"version": "0.1.0",
+	"name": "@browser-ext/popup",
+	"version": "0.0.0",
 	"private": true,
 	"type": "module",
 	"module": "index.ts",

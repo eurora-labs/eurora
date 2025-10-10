@@ -1,7 +1,7 @@
 {
-	"name": "@eurora/extension-pdf-watcher",
+	"name": "@browser-ext/pdf-watcher",
 	"private": true,
-	"version": "0.1.0",
+	"version": "0.0.0",
 	"type": "module",
 	"module": "index.ts",
 	"main": "index.ts",
