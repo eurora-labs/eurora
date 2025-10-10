@@ -1,7 +1,7 @@
 name: 'Publish'
 
 permissions:
-    contents: write # Required for checkout and creating git tags
+    contents: read # Required for checkout
     actions: read # Required for downloading artifacts
 
 on:
@@ -339,6 +339,8 @@ jobs:
     create-git-tag:
         needs: [publish-tauri, build-tauri]
         runs-on: ubuntu-latest
+        permissions:
+            contents: write # Required for creating and pushing git tags
         steps:
             - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
