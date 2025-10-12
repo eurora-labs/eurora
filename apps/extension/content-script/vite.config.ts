@@ -2,11 +2,11 @@
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 import * as path from 'path';
-import copy from 'rollup-plugin-copy';
-import { readdirSync } from 'fs';
+import { readdirSync, cpSync } from 'fs';
 
 const rootDir = path.resolve(__dirname);
-const outDir = path.resolve(__dirname, '../../../extensions/chromium/scripts/content');
+const chromiumOutDir = path.resolve(__dirname, '../../../extensions/chromium/scripts/content');
+const firefoxOutDir = path.resolve(__dirname, '../../../extensions/firefox/scripts/content');
 const sitesDir = path.resolve(__dirname, 'src/sites');
 
 function listSiteEntries() {
@@ -50,12 +50,23 @@ function RegistryPlugin() {
 	};
 }
 
+function CopyToFirefoxPlugin() {
+	return {
+		name: 'copy-to-firefox',
+		closeBundle() {
+			// Copy all files from chromium output to firefox output
+			cpSync(chromiumOutDir, firefoxOutDir, { recursive: true });
+			console.log(`✓ Copied content scripts to firefox extension folder`);
+		},
+	};
+}
+
 const siteEntries = listSiteEntries();
 
 export default defineConfig({
 	root: __dirname,
 	build: {
-		outDir,
+		outDir: chromiumOutDir,
 		emptyOutDir: true,
 		// lib: false,
 		rollupOptions: {
@@ -86,5 +97,5 @@ export default defineConfig({
 		sourcemap: false,
 		cssCodeSplit: true,
 	},
-	plugins: [RegistryPlugin()],
+	plugins: [RegistryPlugin(), CopyToFirefoxPlugin()],
 });

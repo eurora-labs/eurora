@@ -6,6 +6,7 @@ let nativePort: chrome.runtime.Port | null = null;
 const messageQueue: any[] = [];
 
 async function connect() {
+	console.log('Connecting to native messaging app');
 	nativePort = chrome.runtime.connectNative('com.eurora.app');
 	nativePort.onMessage.addListener(onMessageListener);
 	nativePort.onDisconnect.addListener(onDisconnectListener);
