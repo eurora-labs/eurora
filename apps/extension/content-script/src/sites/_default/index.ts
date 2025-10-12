@@ -1,5 +1,7 @@
-import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
-import { NativeResponse } from '@eurora/chrome-ext-shared/models';
+import {
+	Watcher,
+	type WatcherResponse,
+} from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import {
 	createArticleAsset,
 	createArticleSnapshot,
@@ -14,11 +16,11 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 	public listen(
 		obj: ArticleChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: unknown) => void,
+		response: (response?: WatcherResponse) => void,
 	) {
 		const { type } = obj;
 
-		let promise: Promise<unknown> | null = null;
+		let promise: Promise<WatcherResponse>;
 
 		switch (type) {
 			case 'NEW':
@@ -35,7 +37,7 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 				return false;
 		}
 
-		promise?.then((result) => {
+		promise.then((result) => {
 			response(result);
 		});
 
@@ -45,22 +47,21 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 	public async handleNew(
 		_obj: ArticleChromeMessage,
 		_sender: chrome.runtime.MessageSender,
-	): Promise<void> {
+	): Promise<WatcherResponse> {
 		console.log('Article Watcher: New article detected');
 	}
 
 	public async handleGenerateAssets(
 		_obj: ArticleChromeMessage,
 		_sender: chrome.runtime.MessageSender,
-	): Promise<NativeResponse> {
-		console.log('Generating article report for URL:', window.location.href);
+	): Promise<WatcherResponse> {
 		return createArticleAsset(document);
 	}
 
 	public async handleGenerateSnapshot(
 		_obj: ArticleChromeMessage,
 		_sender: chrome.runtime.MessageSender,
-	): Promise<NativeResponse> {
+	): Promise<WatcherResponse> {
 		return createArticleSnapshot(window);
 	}
 }

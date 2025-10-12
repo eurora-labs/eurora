@@ -1,5 +1,7 @@
-import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
-import { NativeResponse } from '@eurora/chrome-ext-shared/models';
+import {
+	Watcher,
+	type WatcherResponse,
+} from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { YoutubeChromeMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from './transcript/index.js';
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
@@ -30,11 +32,10 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 	public listen(
 		obj: YoutubeChromeMessage,
 		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
+		response: (response?: WatcherResponse) => void,
 	) {
 		const { type } = obj;
-
-		let promise: Promise<any> | null = null;
+		let promise: Promise<WatcherResponse>;
 
 		switch (type) {
 			case 'NEW':
@@ -54,7 +55,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 				return false;
 		}
 
-		promise?.then((result) => {
+		promise.then((result) => {
 			response(result);
 		});
 
@@ -74,7 +75,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 	public async handleNew(
 		obj: YoutubeChromeMessage,
 		sender: chrome.runtime.MessageSender,
-	): Promise<any> {
+	): Promise<WatcherResponse> {
 		const currentVideoId = getCurrentVideoId();
 		if (!currentVideoId) {
 			this.params.videoId = undefined;
@@ -146,12 +147,11 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 	public async handleGenerateAssets(
 		obj: YoutubeChromeMessage,
 		sender: chrome.runtime.MessageSender,
-	): Promise<NativeResponse> {
+	): Promise<WatcherResponse> {
 		if (window.location.href.includes('/watch?v=')) {
 			return await this.generateVideoAsset();
 		} else {
 			const articleAsset = await createArticleAsset(document);
-			console.log('Generated article asset:', articleAsset);
 			return articleAsset;
 		}
 	}
@@ -159,8 +159,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 	public async handleGenerateSnapshot(
 		obj: YoutubeChromeMessage,
 		sender: chrome.runtime.MessageSender,
-	): Promise<NativeResponse> {
-		console.log('Generating snapshots for YouTube video');
+	): Promise<WatcherResponse> {
 		const currentTime = this.getCurrentVideoTime();
 		const videoFrame = this.getCurrentVideoFrame();
 
