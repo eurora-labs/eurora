@@ -6,7 +6,7 @@ import copy from 'rollup-plugin-copy';
 import { readdirSync } from 'fs';
 
 const rootDir = path.resolve(__dirname);
-const outDir = path.resolve(__dirname, '../../../../extensions/chromium/scripts/content');
+const outDir = path.resolve(__dirname, '../../../extensions/chromium/scripts/content');
 const sitesDir = path.resolve(__dirname, 'src/sites');
 
 function listSiteEntries() {
@@ -59,7 +59,7 @@ export default defineConfig({
 		emptyOutDir: false,
 		rollupOptions: {
 			input: Object.fromEntries([
-				['bootstrap', path.resolve(rootDir)],
+				['bootstrap', path.resolve(rootDir, 'src/bootstrap.ts')],
 				...siteEntries.map((e) => [e.name, e.path]),
 			]),
 			output: {
