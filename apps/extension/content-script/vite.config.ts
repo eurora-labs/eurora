@@ -23,7 +23,7 @@ function listSiteEntries() {
 function patternsFor(id: string): string[] {
 	if (id === '_default') return [];
 	if (id.includes('*')) return [id];
-	return [id, `*.${id}`, `www.${id}.com`];
+	return [id, `*.${id}`];
 }
 
 function RegistryPlugin() {
