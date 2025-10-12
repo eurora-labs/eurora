@@ -1,5 +1,5 @@
 {
-	"name": "@chromium/background-script",
+	"name": "@eurora/browser-shared",
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
@@ -13,8 +13,18 @@
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run"
 	},
+	"exports": {
+		"./*": {
+			"import": "./dist/*.js",
+			"types": "./dist/*.d.ts"
+		}
+	},
+	"files": [
+		"./dist/*.js",
+		"./dist/*.d.ts",
+		"!./dist/*.test.*"
+	],
 	"devDependencies": {
-		"@eurora/browser-shared": "workspace:*",
 		"@eslint/compat": "^1.4.0",
 		"@eslint/js": "^9.37.0",
 		"@playwright/test": "^1.56.0",
@@ -30,9 +40,5 @@
 		"vite": "catalog:",
 		"vite-plugin-dts": "^4.5.3",
 		"vitest": "catalog:"
-	},
-	"dependencies": {
-		"@sentry/browser": "^9.46.0",
-		"@sentry/vite-plugin": "^3.6.1"
 	}
 }

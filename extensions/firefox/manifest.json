@@ -9,31 +9,6 @@
 		"type": "module"
 	},
 	"content_security_policy": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
-	"content_scripts": [
-		{
-			"all_frames": false,
-			"js": ["content-scripts/youtube-watcher/main.js"],
-			"matches": ["https://*.youtube.com/*"],
-			"run_at": "document_start"
-		},
-		{
-			"all_frames": false,
-			"js": ["content-scripts/twitter-watcher/main.js"],
-			"matches": ["https://x.com/*", "https://twitter.com/*"],
-			"run_at": "document_start"
-		},
-		{
-			"all_frames": false,
-			"js": ["content-scripts/article-watcher/main.js"],
-			"matches": ["<all_urls>"],
-			"exclude_matches": [
-				"https://*.youtube.com/*",
-				"https://x.com/*",
-				"https://twitter.com/*"
-			],
-			"run_at": "document_start"
-		}
-	],
 	"browser_action": {
 		"default_icon": "icons/icon-128x128.png",
 		"default_popup": "pages/popup/index.html",
@@ -41,7 +16,7 @@
 	},
 	"web_accessible_resources": [
 		"scripts/background/*",
-		"scripts/content/assets/*",
+		"scripts/content/*",
 		"pages/popup/*",
 
 		"http:/*",
@@ -68,6 +43,6 @@
 		"128": "icons/icon-128x128.png"
 	},
 	"incognito": "split",
-	"permissions": ["nativeMessaging", "tabs", "storage"],
+	"permissions": ["nativeMessaging", "tabs", "storage", "<all_urls>"],
 	"host_permissions": ["<all_urls>"]
 }
