@@ -91,8 +91,8 @@ async function handleGenerateSnapshot() {
 async function sendMessageWithRetry(
 	tabId: number,
 	message: any,
-	maxRetries: number = 3,
-	delayMs: number = 500,
+	maxRetries: number = 5,
+	delayMs: number = 100,
 ): Promise<any> {
 	for (let attempt = 0; attempt < maxRetries; attempt++) {
 		try {
@@ -131,7 +131,6 @@ async function handleGenerateReport() {
 		const response = await sendMessageWithRetry(activeTab.id, {
 			type: 'GENERATE_ASSETS',
 		});
-		console.log('Async response:', response);
 
 		return { success: true, ...response };
 	} catch (error) {
