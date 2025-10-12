@@ -12,6 +12,7 @@ async function loadRegistry(): Promise<Entry[]> {
 
 function matchSite(host: string, entries: Entry[]): Entry | null {
 	// Precompute maps once per activation for O(1) exact / suffix
+	console.log('matchSite', { host, entries });
 	const exact = new Map<string, Entry>();
 	const suffix: [string, Entry][] = [];
 	for (const e of entries) {
@@ -34,6 +35,8 @@ chrome.webNavigation.onCommitted.addListener(async ({ tabId, url, frameId }) => 
 		const u = new URL(url);
 		const entries = await loadRegistry();
 		const site = matchSite(u.hostname, entries);
+		console.log('url', u);
+		console.log('site', site);
 
 		await chrome.scripting.executeScript({
 			target: { tabId, frameIds: [0] },

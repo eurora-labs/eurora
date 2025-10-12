@@ -1,4 +1,5 @@
-export function mainDefault() {
+console.log('Default site features loaded');
+export function main() {
 	// Minimal, zero-conf features that are safe on any site.
 	// Keep <3–5 KB, no polling, no network.
 	// Example: keyboard helpers, simple DOM overlay toggled via action icon.

@@ -14,7 +14,7 @@ function listSiteEntries() {
 		.filter((entry) => entry.isDirectory())
 		.map((d) => d.name)
 		.map((name) => ({
-			name: `sites/${name}/index`,
+			name: name,
 			path: path.resolve(sitesDir, `${name}/index.ts`),
 			id: name,
 		}));
@@ -23,7 +23,7 @@ function listSiteEntries() {
 function patternsFor(id: string): string[] {
 	if (id === '_default') return [];
 	if (id.includes('*')) return [id];
-	return [id, `*.${id}`];
+	return [id, `*.${id}`, `www.${id}.com`];
 }
 
 function RegistryPlugin() {
@@ -33,7 +33,7 @@ function RegistryPlugin() {
 			const entries = listSiteEntries()
 				.filter((e) => e.id !== '_default')
 				.map((e) => {
-					const key = `${e.name}.js`;
+					const key = `sites/${e.name}/index.js`;
 					return {
 						id: e.id,
 						chunk: key,
@@ -56,17 +56,29 @@ export default defineConfig({
 	root: __dirname,
 	build: {
 		outDir,
-		emptyOutDir: false,
+		emptyOutDir: true,
+		// lib: false,
 		rollupOptions: {
 			input: Object.fromEntries([
 				['bootstrap', path.resolve(rootDir, 'src/bootstrap.ts')],
 				...siteEntries.map((e) => [e.name, e.path]),
 			]),
 			output: {
-				entryFileNames: (chunk: any) => `${chunk.name}.js`,
+				format: 'es',
+				entryFileNames: (chunk: any) => {
+					// bootstrap stays at root, site entries go into sites/[name]/
+					if (chunk.name === 'bootstrap') {
+						return 'bootstrap.js';
+					}
+					return `sites/${chunk.name}/index.js`;
+				},
 				chunkFileNames: 'chunks/[name]-[hash].js',
 				assetFileNames: 'assets/[name]-[hash][extname]',
+				preserveModules: false,
+				exports: 'named',
 			},
+			preserveEntrySignatures: 'exports-only',
+			treeshake: false,
 		},
 		target: 'es2022',
 		minify: 'esbuild',

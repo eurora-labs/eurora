@@ -10,37 +10,7 @@
 	"content_security_policy": {
 		"extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
 	},
-	"content_scripts": [
-		{
-			"all_frames": false,
-			"js": ["content-scripts/script/main.js"],
-			"matches": ["<all_urls>"],
-			"run_at": "document_start"
-		},
-		{
-			"all_frames": false,
-			"js": ["content-scripts/youtube-watcher/main.js"],
-			"matches": ["https://*.youtube.com/*"],
-			"run_at": "document_start"
-		},
-		{
-			"all_frames": false,
-			"js": ["content-scripts/twitter-watcher/main.js"],
-			"matches": ["https://x.com/*", "https://twitter.com/*"],
-			"run_at": "document_start"
-		},
-		{
-			"all_frames": false,
-			"js": ["content-scripts/article-watcher/main.js"],
-			"matches": ["<all_urls>"],
-			"exclude_matches": [
-				"https://*.youtube.com/*",
-				"https://x.com/*",
-				"https://twitter.com/*"
-			],
-			"run_at": "document_start"
-		}
-	],
+	"content_scripts": [],
 	"action": {
 		"default_icon": "icons/icon-128x128.png",
 		"default_popup": "pages/popup/index.html",
@@ -50,7 +20,7 @@
 		{
 			"resources": [
 				"scripts/background/*",
-				"scripts/content/assets/*",
+				"scripts/content/*",
 				"pages/popup/**/*",
 				"bootstrap.js",
 
@@ -77,6 +47,13 @@
 		"128": "icons/icon-128x128.png"
 	},
 	"incognito": "split",
-	"permissions": ["nativeMessaging", "tabs", "storage"],
+	"permissions": [
+		"nativeMessaging",
+		"tabs",
+		"storage",
+		"scripting",
+		"declarativeNetRequestWithHostAccess",
+		"webNavigation"
+	],
 	"host_permissions": ["<all_urls>"]
 }
