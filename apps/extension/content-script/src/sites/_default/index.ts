@@ -1,12 +1,72 @@
-console.log('Default site features loaded');
+import { Watcher } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import { NativeResponse } from '@eurora/chrome-ext-shared/models';
+import {
+	createArticleAsset,
+	createArticleSnapshot,
+} from '@eurora/chrome-ext-shared/extensions/article/util';
+import { ArticleChromeMessage, type WatcherParams } from './types.js';
+
+class ArticleWatcher extends Watcher<WatcherParams> {
+	constructor(params: WatcherParams) {
+		super(params);
+	}
+
+	public listen(
+		obj: ArticleChromeMessage,
+		sender: chrome.runtime.MessageSender,
+		response: (response?: unknown) => void,
+	) {
+		const { type } = obj;
+
+		let promise: Promise<unknown> | null = null;
+
+		switch (type) {
+			case 'NEW':
+				promise = this.handleNew(obj, sender);
+				break;
+			case 'GENERATE_ASSETS':
+				promise = this.handleGenerateAssets(obj, sender);
+				break;
+			case 'GENERATE_SNAPSHOT':
+				promise = this.handleGenerateSnapshot(obj, sender);
+				break;
+			default:
+				response({ kind: 'Error', data: 'Invalid message type' });
+				return false;
+		}
+
+		promise?.then((result) => {
+			response(result);
+		});
+
+		return true;
+	}
+
+	public async handleNew(
+		_obj: ArticleChromeMessage,
+		_sender: chrome.runtime.MessageSender,
+	): Promise<void> {
+		console.log('Article Watcher: New article detected');
+	}
+
+	public async handleGenerateAssets(
+		_obj: ArticleChromeMessage,
+		_sender: chrome.runtime.MessageSender,
+	): Promise<NativeResponse> {
+		console.log('Generating article report for URL:', window.location.href);
+		return createArticleAsset(document);
+	}
+
+	public async handleGenerateSnapshot(
+		_obj: ArticleChromeMessage,
+		_sender: chrome.runtime.MessageSender,
+	): Promise<NativeResponse> {
+		return createArticleSnapshot(window);
+	}
+}
+
 export function main() {
-	// Minimal, zero-conf features that are safe on any site.
-	// Keep <3–5 KB, no polling, no network.
-	// Example: keyboard helpers, simple DOM overlay toggled via action icon.
-	console.log('Default site features loaded');
-	alert('Hello, world from main default!');
-	// const badge = document.createElement('div');
-	// badge.className = 'ext-default-pill';
-	// badge.textContent = 'Toolkit';
-	// document.documentElement.appendChild(badge);
+	const watcher = new ArticleWatcher({});
+
+	chrome.runtime.onMessage.addListener(watcher.listen.bind(watcher));
 }
