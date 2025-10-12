@@ -71,22 +71,9 @@ async function handleGenerateSnapshot() {
 			return { success: false, error: 'No active tab found' };
 		}
 
-		type Response = {
-			error?: string;
-			[key: string]: any;
-		};
-
-		const response: Response = await new Promise((resolve, reject) =>
-			chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_SNAPSHOT' }, (response) => {
-				if (chrome.runtime.lastError) {
-					reject({ error: chrome.runtime.lastError });
-				} else if (response?.error) {
-					reject({ error: response.error });
-				} else {
-					resolve(response);
-				}
-			}),
-		);
+		const response = await sendMessageWithRetry(activeTab.id, {
+			type: 'GENERATE_SNAPSHOT',
+		});
 
 		return { success: true, ...response };
 	} catch (error) {
@@ -95,6 +82,35 @@ async function handleGenerateSnapshot() {
 			success: false,
 			error: String(error),
 		};
+	}
+}
+
+/**
+ * Sends a message to a tab with retry logic to handle content script initialization delays
+ */
+async function sendMessageWithRetry(
+	tabId: number,
+	message: any,
+	maxRetries: number = 3,
+	delayMs: number = 500,
+): Promise<any> {
+	for (let attempt = 0; attempt < maxRetries; attempt++) {
+		try {
+			const response = await chrome.tabs.sendMessage(tabId, message);
+			return response;
+		} catch (error) {
+			const isLastAttempt = attempt === maxRetries - 1;
+			const isConnectionError =
+				error?.message?.includes('Receiving end does not exist') ||
+				chrome.runtime.lastError?.message?.includes('Receiving end does not exist');
+
+			if (isConnectionError && !isLastAttempt) {
+				console.log(`Content script not ready, retrying (${attempt + 1}/${maxRetries})...`);
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+				continue;
+			}
+			throw error;
+		}
 	}
 }
 
@@ -109,54 +125,21 @@ async function handleGenerateReport() {
 		const activeTab = await getCurrentTab();
 
 		if (!activeTab || !activeTab.url) {
-			return { success: false, error: 'No active tab found' };
+			return { success: false, data: 'No active tab found', kind: 'Error' };
 		}
 
-		type Response = {
-			error?: string;
-			[key: string]: any;
-		};
-		const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' });
+		const response = await sendMessageWithRetry(activeTab.id, {
+			type: 'GENERATE_ASSETS',
+		});
 		console.log('Async response:', response);
-
-		// const response: Response = await new Promise(
-		// 	(resolve, reject) => {
-		// 		chrome.tabs
-		// 			.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' })
-		// 			.then((response) => {
-		// 				console.log('Async response:', response);
-		// 				resolve(response);
-		// 			});
-		// 		// chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' }, (response) => {
-		// 		// 	console.log('Response:', response);
-		// 		// 	if (chrome.runtime.lastError) {
-		// 		// 		reject({ error: chrome.runtime.lastError });
-		// 		// 	} else if (response?.error) {
-		// 		// 		reject({ error: response.error });
-		// 		// 	} else {
-		// 		// 		resolve(response);
-		// 		// 	}
-		// 		// });
-		// 	},
-
-		// 	// chrome.tabs.sendMessage(activeTab.id, { type: 'GENERATE_ASSETS' }, (response) => {
-		// 	// 	console.log('Response:', response);
-		// 	// 	if (chrome.runtime.lastError) {
-		// 	// 		reject({ error: chrome.runtime.lastError });
-		// 	// 	} else if (response?.error) {
-		// 	// 		reject({ error: response.error });
-		// 	// 	} else {
-		// 	// 		resolve(response);
-		// 	// 	}
-		// 	// }),
-		// );
 
 		return { success: true, ...response };
 	} catch (error) {
 		console.error('Error generating report:', error);
 		return {
+			kind: 'Error',
 			success: false,
-			error: String(error),
+			data: String(error),
 		};
 	}
 }

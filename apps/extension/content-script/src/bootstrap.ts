@@ -1,6 +1,7 @@
 let loaded = false;
-chrome.runtime.onMessage.addListener(async (msg) => {
-	if (loaded || msg?.type !== 'SITE_LOAD') return;
+
+chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+	if (loaded || msg?.type !== 'SITE_LOAD') return false;
 	loaded = true;
 
 	const imp = (p: string) => import(chrome.runtime.getURL(p));
@@ -8,7 +9,9 @@ chrome.runtime.onMessage.addListener(async (msg) => {
 		try {
 			const def = await imp(msg.defaultChunk);
 			def?.mainDefault?.();
-		} catch {}
+		} catch (error) {
+			console.error('Error loading default script:', error);
+		}
 	};
 
 	try {
@@ -17,7 +20,12 @@ chrome.runtime.onMessage.addListener(async (msg) => {
 			(typeof mod.canHandle === 'function' ? !!mod.canHandle(document) : true) &&
 			(typeof mod.main === 'function' ? (mod.main() ?? true) : true);
 		if (!ok) await runDefault();
-	} catch {
+	} catch (error) {
+		console.error('Error loading site script:', error);
 		await runDefault();
 	}
+
+	// Notify that the script is loaded and ready
+	sendResponse({ loaded: true });
+	return true;
 });
