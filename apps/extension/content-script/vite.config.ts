@@ -3,80 +3,76 @@ import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 import * as path from 'path';
 import copy from 'rollup-plugin-copy';
+import { readdirSync } from 'fs';
+
+const rootDir = path.resolve(__dirname);
+const outDir = path.resolve(__dirname, '../../../../extensions/chromium/scripts/content');
+const sitesDir = path.resolve(__dirname, 'src/sites');
+
+function listSiteEntries() {
+	return readdirSync(sitesDir, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory())
+		.map((d) => d.name)
+		.map((name) => ({
+			name: `sites/${name}/index`,
+			path: path.resolve(sitesDir, `${name}/index.ts`),
+			id: name,
+		}));
+}
+
+function patternsFor(id: string): string[] {
+	if (id === '_default') return [];
+	if (id.includes('*')) return [id];
+	return [id, `*.${id}`];
+}
+
+function RegistryPlugin() {
+	return {
+		name: 'emit-site-registry',
+		generateBundle(_: any, bundle: any) {
+			const entries = listSiteEntries()
+				.filter((e) => e.id !== '_default')
+				.map((e) => {
+					const key = `${e.name}.js`;
+					return {
+						id: e.id,
+						chunk: key,
+						patterns: patternsFor(e.id),
+					};
+				});
+			const registry = JSON.stringify(entries, null, 2);
+			this.emitFile({
+				type: 'asset',
+				fileName: 'registry.json',
+				source: registry,
+			});
+		},
+	};
+}
+
+const siteEntries = listSiteEntries();
 
 export default defineConfig({
 	root: __dirname,
-	plugins: [
-		dts({
-			entryRoot: 'src',
-			tsconfigPath: path.join(__dirname, 'tsconfig.json'),
-		}),
-	],
-	// Configuration for building your library.
-	// See: https://vitejs.dev/guide/build.html#library-mode
 	build: {
-		emptyOutDir: true,
-		reportCompressedSize: true,
-		commonjsOptions: {
-			transformMixedEsModules: true,
-		},
-		lib: {
-			// Could also be a dictionary or array of multiple entry points.
-			entry: 'src/index.ts',
-			name: 'content-script',
-			fileName: 'index',
-			// Change this to the formats you want to support.
-			// Don't forget to update your package.json as well.
-			formats: ['es'],
-		},
+		outDir,
+		emptyOutDir: false,
 		rollupOptions: {
-			// External packages that should not be bundled into your library.
-			external: [],
+			input: Object.fromEntries([
+				['bootstrap', path.resolve(rootDir)],
+				...siteEntries.map((e) => [e.name, e.path]),
+			]),
 			output: {
-				entryFileNames: 'main.js',
+				entryFileNames: (chunk: any) => `${chunk.name}.js`,
 				chunkFileNames: 'chunks/[name]-[hash].js',
-				assetFileNames: 'assets/[name]-[hash].[ext]',
+				assetFileNames: 'assets/[name]-[hash][extname]',
 			},
-			plugins: [
-				// @ts-expect-error - rollup-plugin-copy types are incompatible with Rollup 4
-				copy({
-					targets: [
-						{
-							src: 'dist/**/*',
-							dest: '../../../extensions/chromium/scripts/content',
-						},
-						{
-							src: 'dist/**/*',
-							dest: '../../../extensions/firefox/scripts/content',
-						},
-					],
-					hook: 'closeBundle',
-					overwrite: true,
-				}),
-			],
 		},
 		target: 'es2022',
 		minify: 'esbuild',
 		modulePreload: false,
 		sourcemap: false,
+		cssCodeSplit: true,
 	},
-	test: {
-		watch: false,
-		globals: true,
-		environment: 'node',
-		include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-		reporters: ['default'],
-		coverage: {
-			reportsDirectory: '../../../coverage/apps/content-scripts/article-watcher',
-			provider: 'v8',
-		},
-	},
-	resolve: {
-		alias: {
-			'@eurora/chrome-ext-shared/*': path.resolve(
-				__dirname,
-				'../../../../packages/chrome-ext-shared/src/lib/*',
-			),
-		},
-	},
+	plugins: [RegistryPlugin()],
 });
