@@ -1,5 +1,7 @@
 // Native Messaging Service Worker - centralized handler for all native messaging
 // Keep track of the native port connection
+import { getCurrentTab } from '@eurora/browser-shared/tabs';
+
 let nativePort: chrome.runtime.Port | null = null;
 
 // Store queued messages if connection isn't ready
@@ -60,8 +62,6 @@ connect();
 
 console.log('Native messaging service worker registered');
 
-import { getCurrentTab } from '../utils/tabs.ts';
-
 async function handleGenerateSnapshot() {
 	try {
 		// Get the current active tab
@@ -92,7 +92,7 @@ async function sendMessageWithRetry(
 	tabId: number,
 	message: any,
 	maxRetries: number = 5,
-	delayMs: number = 100,
+	delayMs: number = 500,
 ): Promise<any> {
 	for (let attempt = 0; attempt < maxRetries; attempt++) {
 		try {
