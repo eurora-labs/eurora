@@ -1,6 +1,6 @@
 {
 	"name": "@eurora/prosemirror-view",
-	"version": "0.1.0",
+	"version": "0.0.0",
 	"type": "module",
 	"exports": {
 		".": {
@@ -26,8 +26,10 @@
 	"scripts": {
 		"dev": "vite dev",
 		"dev:package:svelte": "svelte-kit sync && svelte-package --watch",
+		"dev:package:styles": "postcss ./src/lib/app.css -o ./dist/app.css --watch",
 		"package": "pnpm run --sequential \"/^package:.*/\"",
 		"package:svelte": "svelte-kit sync && svelte-package",
+		"package:styles": "postcss ./src/lib/app.css -o ./dist/app.css",
 		"prepublishOnly": "pnpm run package",
 		"prepare": "svelte-kit sync",
 		"test": "vitest run --mode development",
