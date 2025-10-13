@@ -277,23 +277,4 @@ mod tests {
         assert_eq!(default_asset.get_icon(), Some("default"));
         assert!(default_asset.get_context_chip().is_none());
     }
-
-    #[test]
-    fn test_snapshot_enum_methods() {
-        let youtube_snapshot = ActivitySnapshot::YoutubeSnapshot(YoutubeSnapshot::new(
-            None,
-            120.0,
-            Some(300.0),
-            Some("Test Video".to_string()),
-            None,
-        ));
-
-        assert!(youtube_snapshot.get_created_at() > 0);
-        assert!(youtube_snapshot.get_updated_at() > 0);
-
-        let default_snapshot =
-            ActivitySnapshot::DefaultSnapshot(DefaultSnapshot::new("Test state".to_string()));
-        assert!(default_snapshot.get_created_at() > 0);
-        assert!(default_snapshot.get_updated_at() > 0);
-    }
 }

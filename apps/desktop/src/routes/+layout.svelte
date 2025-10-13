@@ -1,9 +1,9 @@
 <script lang="ts">
 	import '@eurora/ui/main.css';
-	import '../app.pcss';
+	import '../app.css';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
-	import { initDependencies } from '$lib/bootstrap/deps';
+	import { initDependencies } from '$lib/bootstrap/deps.js';
 
 	let { children } = $props();
 
