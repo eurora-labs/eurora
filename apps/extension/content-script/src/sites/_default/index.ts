@@ -2,11 +2,14 @@ import {
 	Watcher,
 	type WatcherResponse,
 } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import browser from 'webextension-polyfill';
 import {
 	createArticleAsset,
 	createArticleSnapshot,
 } from '@eurora/chrome-ext-shared/extensions/article/util';
 import { ArticleChromeMessage, type WatcherParams } from './types.js';
+
+console.log('Article Watcher: Top of the file');
 
 class ArticleWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
@@ -15,9 +18,10 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 
 	public listen(
 		obj: ArticleChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
 	) {
+		console.log('Article Watcher: listen: ', obj);
 		const { type } = obj;
 
 		let promise: Promise<WatcherResponse>;
@@ -46,21 +50,21 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 
 	public async handleNew(
 		_obj: ArticleChromeMessage,
-		_sender: chrome.runtime.MessageSender,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		console.log('Article Watcher: New article detected');
 	}
 
 	public async handleGenerateAssets(
 		_obj: ArticleChromeMessage,
-		_sender: chrome.runtime.MessageSender,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		return createArticleAsset(document);
 	}
 
 	public async handleGenerateSnapshot(
 		_obj: ArticleChromeMessage,
-		_sender: chrome.runtime.MessageSender,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		return createArticleSnapshot(window);
 	}
@@ -69,5 +73,5 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 export function main() {
 	const watcher = new ArticleWatcher({});
 
-	chrome.runtime.onMessage.addListener(watcher.listen.bind(watcher));
+	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
 }

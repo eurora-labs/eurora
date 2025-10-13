@@ -1,4 +1,4 @@
-import { MessageType, ChromeObj } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import { MessageType, BrowserObj } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 
 export type ArticleMessageType = MessageType;
 
@@ -7,6 +7,6 @@ export interface WatcherParams {
 	// Article watcher doesn't need specific parameters for now
 }
 
-export interface ArticleChromeMessage extends Omit<ChromeObj, 'type'> {
+export interface ArticleChromeMessage extends Omit<BrowserObj, 'type'> {
 	type: ArticleMessageType;
 }

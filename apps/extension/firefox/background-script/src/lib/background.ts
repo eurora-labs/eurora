@@ -1,3 +1,4 @@
+import { getCurrentTab } from '@eurora/browser-shared/tabs';
 console.log('Extension background services started');
 
 let port: browser.runtime.Port | null = null;
@@ -13,20 +14,6 @@ function connect() {
 	}
 	port.onDisconnect.addListener(onDisconnectListener);
 	port.onMessage.addListener(onMessageListener as any);
-}
-
-export async function getCurrentTab() {
-	try {
-		const tabInfo = await browser.tabs.query({
-			currentWindow: true,
-			active: true,
-		});
-
-		return tabInfo[0];
-	} catch (error) {
-		console.error('Error getting current tab:', error);
-		return null;
-	}
 }
 
 function onMessageListener(message: any, sender: any) {
@@ -77,15 +64,11 @@ async function handleTabMessage(messageType: string) {
 	try {
 		// Get the current active tab
 		const activeTab = await getCurrentTab();
+		console.log('Active tab:', activeTab);
 
 		if (!activeTab || !activeTab.id) {
-			return { success: false, error: 'No active tab found' };
+			return { kind: 'Error', data: 'No active tab found' };
 		}
-
-		type Response = {
-			error?: string;
-			[key: string]: any;
-		};
 
 		const response = await browser.tabs.sendMessage(activeTab.id, { type: messageType });
 		console.log('Async response:', response);

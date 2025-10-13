@@ -1,6 +1,18 @@
 let loaded = false;
+// @ts-ignore
+const browserAny: typeof browser = typeof browser !== 'undefined' ? browser : (chrome as any);
 
-chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+browserAny.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+	listener(msg, sender, sendResponse).then((result) => console.log(result));
+	return true;
+});
+
+// chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+// 	listener(msg, sender, sendResponse).then((result) => console.log(result));
+// 	return true;
+// });
+
+async function listener(msg, sender, sendResponse) {
 	if (loaded || msg?.type !== 'SITE_LOAD') return false;
 	loaded = true;
 
@@ -27,5 +39,4 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
 
 	// Notify that the script is loaded and ready
 	sendResponse({ loaded: true });
-	return true;
-});
+}

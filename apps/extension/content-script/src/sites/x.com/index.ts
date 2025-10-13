@@ -2,6 +2,7 @@ import {
 	Watcher,
 	type WatcherResponse,
 } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import browser from 'webextension-polyfill';
 import type { TwitterChromeMessage, WatcherParams } from './types.js';
 
 import type {
@@ -38,7 +39,7 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 
 	public listen(
 		obj: TwitterChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
 	) {
 		const { type } = obj;
@@ -68,7 +69,7 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 
 	public async handleNew(
 		obj: TwitterChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		// Update current URL and page info
 		this.params.currentUrl = window.location.href;
@@ -86,7 +87,7 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 
 	public async handleGenerateAssets(
 		obj: TwitterChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
 			// Get current tweet texts
@@ -119,7 +120,7 @@ class TwitterWatcher extends Watcher<WatcherParams> {
 
 	public async handleGenerateSnapshot(
 		obj: TwitterChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
 			const currentTweets = this.getTweetTexts();
@@ -153,5 +154,5 @@ export function main() {
 		tweets: [],
 	});
 
-	chrome.runtime.onMessage.addListener(watcher.listen.bind(watcher));
+	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
 }

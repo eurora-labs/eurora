@@ -1,4 +1,4 @@
-import { MessageType, ChromeObj } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import { MessageType, BrowserObj } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 
 type CustomMessageType = 'PLAY';
 export type YoutubeMessageType = MessageType | CustomMessageType;
@@ -11,6 +11,6 @@ export interface WatcherParams {
 	youtubePlayer: HTMLVideoElement | null;
 }
 
-export interface YoutubeChromeMessage extends Omit<ChromeObj, 'type'> {
+export interface YoutubeChromeMessage extends Omit<BrowserObj, 'type'> {
 	type: YoutubeMessageType;
 }

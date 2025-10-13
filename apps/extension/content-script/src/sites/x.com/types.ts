@@ -1,4 +1,4 @@
-import { MessageType, ChromeObj } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import { MessageType, BrowserObj } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 import { NativeTwitterTweet } from '@eurora/chrome-ext-shared/bindings';
 
 export type TwitterMessageType = MessageType;
@@ -9,6 +9,6 @@ export interface WatcherParams {
 	tweets: NativeTwitterTweet[];
 }
 
-export interface TwitterChromeMessage extends Omit<ChromeObj, 'type'> {
+export interface TwitterChromeMessage extends Omit<BrowserObj, 'type'> {
 	type: TwitterMessageType;
 }

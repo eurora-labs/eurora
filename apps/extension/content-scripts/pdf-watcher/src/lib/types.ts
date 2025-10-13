@@ -1,4 +1,4 @@
-import { MessageType, ChromeObj } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import { MessageType, BrowserObj } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
 
 export type PdfMessageType = MessageType;
 
@@ -7,6 +7,6 @@ export interface WatcherParams {
 	pdfViewerApplication?: any;
 }
 
-export interface PdfChromeMessage extends Omit<ChromeObj, 'type'> {
+export interface PdfChromeMessage extends Omit<BrowserObj, 'type'> {
 	type: PdfMessageType;
 }

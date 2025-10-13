@@ -2,6 +2,7 @@ import {
 	Watcher,
 	type WatcherResponse,
 } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import browser from 'webextension-polyfill';
 import { YoutubeChromeMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from './transcript/index.js';
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
@@ -31,7 +32,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 
 	public listen(
 		obj: YoutubeChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
 	) {
 		const { type } = obj;
@@ -64,7 +65,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 
 	public async handlePlay(
 		obj: YoutubeChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 	): Promise<any> {
 		const { value } = obj;
 		if (this.params.youtubePlayer) {
@@ -74,7 +75,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 
 	public async handleNew(
 		obj: YoutubeChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		const currentVideoId = getCurrentVideoId();
 		if (!currentVideoId) {
@@ -89,7 +90,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 			this.params.videoTranscript = transcript;
 		} catch (error) {
 			console.error('Failed to get transcript:', error);
-			chrome.runtime.sendMessage({
+			browser.runtime.sendMessage({
 				type: 'SEND_TO_NATIVE',
 				payload: {
 					videoId: this.params.videoId,
@@ -146,7 +147,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 
 	public async handleGenerateAssets(
 		obj: YoutubeChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		if (window.location.href.includes('/watch?v=')) {
 			return await this.generateVideoAsset();
@@ -158,7 +159,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 
 	public async handleGenerateSnapshot(
 		obj: YoutubeChromeMessage,
-		sender: chrome.runtime.MessageSender,
+		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		const currentTime = this.getCurrentVideoTime();
 		const videoFrame = this.getCurrentVideoFrame();
@@ -229,5 +230,5 @@ export function main() {
 		youtubePlayer: null,
 	});
 
-	chrome.runtime.onMessage.addListener(watcher.listen.bind(watcher));
+	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
 }
