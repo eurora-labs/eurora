@@ -788,6 +788,9 @@ importers:
       '@eslint/js':
         specifier: ^9.37.0
         version: 9.37.0
+      '@eurora/browser-shared':
+        specifier: workspace:*
+        version: link:../../../../packages/browser-shared
       '@playwright/test':
         specifier: ^1.56.0
         version: 1.56.0
