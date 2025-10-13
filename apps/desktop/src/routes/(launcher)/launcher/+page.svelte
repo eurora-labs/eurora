@@ -331,7 +331,7 @@
 </script>
 
 <main bind:this={mainRef} class="h-fit">
-	<div class="backdrop-custom relative">
+	<div class="relative z-3">
 		{#if promptKitServiceAvailable}
 			<Launcher.Root
 				class="h-fit rounded-lg border-none shadow-none flex flex-col p-0 m-0 min-h-[100px]"
@@ -394,11 +394,7 @@
 	</filter>
 </svg>
 
-<!-- <div
-	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
-	bind:this={backdropCustom2Ref}
-></div> -->
-
+<div class="backdrop-custom fixed top-[0px] left-[0px] h-screen w-screen"></div>
 <div
 	class="backdrop-custom-2 fixed top-[0px] left-[0px] h-screen w-screen"
 	style="filter:url(#blur-bright)"
@@ -406,7 +402,6 @@
 ></div>
 
 <style lang="postcss">
-	/*@reference 'tailwindcss';*/
 	:global(.backdrop-custom) {
 		z-index: 2;
 		width: 100%;
