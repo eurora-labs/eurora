@@ -27,7 +27,7 @@
 		"@sveltejs/kit": "catalog:svelte",
 		"@sveltejs/package": "^2.5.4",
 		"@sveltejs/vite-plugin-svelte": "catalog:svelte",
-		"@types/chrome": "^0.1.22",
+		"@types/chrome": "^0.1.24",
 		"@tailwindcss/container-queries": "^0.1.1",
 		"@tailwindcss/forms": "^0.5.10",
 		"@tailwindcss/postcss": "catalog:",
@@ -67,7 +67,7 @@
 		"tailwindcss": "catalog:",
 		"tw-animate-css": "^1.4.0",
 		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.46.0",
+		"typescript-eslint": "^8.46.1",
 		"vaul-svelte": "1.0.0-next.7",
 		"vite": "catalog:",
 		"vitest": "catalog:"

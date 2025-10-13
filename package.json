@@ -41,7 +41,7 @@
 		"test:e2e": "pnpm --filter @eurora/desktop run test:e2e"
 	},
 	"devDependencies": {
-		"@bufbuild/buf": "^1.57.2",
+		"@bufbuild/buf": "^1.58.0",
 		"@bufbuild/protobuf": "^2.9.0",
 		"@bufbuild/protoc-gen-es": "^2.9.0",
 		"@commitlint/cli": "^19.8.1",
