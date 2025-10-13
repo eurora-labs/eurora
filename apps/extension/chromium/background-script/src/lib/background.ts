@@ -1,3 +1,5 @@
+import browser from 'webextension-polyfill';
+
 // Background script for tab tracking and content script initialization
 // import {
 // 	ContentScriptContext,
@@ -16,23 +18,21 @@
 // contentScriptContext.registerStrategy(new ArticleStrategy(), true);
 
 // Listen for tab updates
-chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
+browser.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
 	if (changeInfo.status === 'complete' && tab.url) {
-		chrome.tabs.sendMessage(
-			tabId,
-			{
+		browser.tabs
+			.sendMessage(tabId, {
 				type: 'NEW',
 				value: tab.url,
-			},
-			(response) => {
+			})
+			.then((response) => {
 				console.log('Received response from content script:', response);
-			},
-		);
+			});
 	}
 });
 
 // Lifecycle handlers
-chrome.runtime.onInstalled.addListener((details) => {
+browser.runtime.onInstalled.addListener((details) => {
 	console.log('Extension installed or updated:', details.reason);
 });
 

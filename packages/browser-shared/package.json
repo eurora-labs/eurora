@@ -1,5 +1,5 @@
 {
-	"name": "@firefox/background-script",
+	"name": "@eurora/browser-shared",
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
@@ -13,17 +13,25 @@
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run"
 	},
+	"exports": {
+		"./*": {
+			"import": "./dist/*.js",
+			"types": "./dist/*.d.ts"
+		}
+	},
+	"files": [
+		"./dist/*.js",
+		"./dist/*.d.ts",
+		"!./dist/*.test.*"
+	],
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
 		"@eslint/js": "^9.37.0",
 		"@playwright/test": "^1.56.0",
 		"@testing-library/jest-dom": "^6.9.1",
-		"@types/firefox-webext-browser": "^120.0.5",
+		"@types/chrome": "^0.1.22",
 		"eslint": "^9.37.0",
 		"eslint-config-prettier": "^10.1.8",
-		"@eurora/browser-shared": "workspace:*",
-		"webextension-polyfill": "^0.12.0",
-		"@types/webextension-polyfill": "^0.12.4",
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
 		"prettier": "^3.6.2",
@@ -32,9 +40,5 @@
 		"vite": "catalog:",
 		"vite-plugin-dts": "^4.5.3",
 		"vitest": "catalog:"
-	},
-	"dependencies": {
-		"@sentry/browser": "^9.46.0",
-		"@sentry/vite-plugin": "^3.6.1"
 	}
 }

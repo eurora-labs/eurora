@@ -2,9 +2,9 @@
 	"compilerOptions": {
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
-		"target": "es6",
+		"target": "ES2022",
 		"lib": ["es6", "DOM"],
-		"types": ["chrome", "vite/client", "webextension-polyfill"],
+		"types": ["chrome", "vite/client"],
 		"strict": false,
 		"noPropertyAccessFromIndexSignature": true,
 		"allowImportingTsExtensions": true,
