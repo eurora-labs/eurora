@@ -6,24 +6,43 @@ This package contains the content scripts for the browser extension with a compr
 
 The testing infrastructure uses:
 
-- **Vitest** - Fast unit test framework
-- **jsdom** - DOM environment for testing
+- **Vitest** - Fast unit test framework for unit tests
+- **Playwright** - End-to-end testing framework
+- **jsdom** - DOM environment for unit testing
 - **@testing-library/jest-dom** - Additional DOM matchers
 
 ## Running Tests
 
 ```bash
 # Run tests once
-npm test
+pnpm test
 
 # Run tests in watch mode
-npm run test:unit
+pnpm run test:unit
 
 # Run with coverage
-npm run test:unit -- --coverage
+pnpm run test:unit -- --coverage
+```
+
+### End-to-End Tests
+
+```bash
+# Run e2e tests
+pnpm run test:e2e
+
+# Run e2e tests in UI mode
+pnpm run test:e2e:ui
+
+# Run e2e tests in debug mode
+pnpm run test:e2e:debug
+
+# Show test report
+pnpm run test:e2e:report
 ```
 
 ## Test Structure
+
+### Unit Tests
 
 Tests are organized alongside the source code:
 
@@ -41,7 +60,19 @@ src/
 │           └── index.test.ts # YouTube site handler tests
 ```
 
+### End-to-End Tests
+
+```
+e2e/
+├── fixtures/
+│   └── extension.ts          # Extension fixture for loading browser extension
+├── basic.spec.ts             # Basic browser tests
+└── extension.spec.ts         # Extension-specific tests
+```
+
 ## Test Configuration
+
+### Unit Test Configuration
 
 - **vitest.config.ts** - Main Vitest configuration
 - **src/**tests**/setup.ts** - Global test setup including:
@@ -49,9 +80,14 @@ src/
     - Canvas API mocks for jsdom
     - DOM environment setup
 
+### E2E Test Configuration
+
+- **playwright.config.ts** - Playwright configuration
+- **e2e/fixtures/extension.ts** - Custom fixture for loading the extension in tests
+
 ## Writing Tests
 
-### Basic Test Example
+### Unit Test Example
 
 ```typescript
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -78,12 +114,44 @@ import browser from 'webextension-polyfill';
 browser.runtime.sendMessage({ type: 'TEST' });
 ```
 
+### E2E Test Example
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('My Feature', () => {
+	test('should work correctly', async ({ page }) => {
+		await page.goto('https://example.com');
+		await expect(page).toHaveTitle(/Example/);
+	});
+});
+```
+
+### E2E Test with Extension
+
+```typescript
+import { test, expect } from './fixtures/extension.js';
+
+test.describe('Extension Feature', () => {
+	test('should load extension', async ({ context, extensionId }) => {
+		expect(extensionId).toBeTruthy();
+
+		const page = await context.newPage();
+		await page.goto('https://example.com');
+		// Test extension functionality
+		await page.close();
+	});
+});
+```
+
 ## Coverage
+
+### Unit Test Coverage
 
 Generate coverage reports with:
 
 ```bash
-npm run test:unit -- --coverage
+pnpm run test:unit -- --coverage
 ```
 
 Coverage reports are generated in the `coverage/` directory.
