@@ -24,6 +24,7 @@ class YoutubeWatcher extends Watcher<WatcherParams> {
 		if (!videoId) {
 			videoId = this.params.videoId;
 		}
+
 		this.params.videoTranscript = (
 			await this.youtubeTranscriptApi.fetch(videoId, ['en'])
 		).snippets;
@@ -218,7 +219,7 @@ function getCurrentVideoId() {
 	if (window.location.search?.includes('v=')) {
 		return window.location.search.split('v=')[1].split('&')[0];
 	}
-	return null;
+	return undefined;
 }
 
 export function main() {

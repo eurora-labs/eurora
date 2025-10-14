@@ -4,7 +4,7 @@
 		"moduleResolution": "NodeNext",
 		"target": "ES6",
 		"lib": ["es6", "DOM"],
-		"types": ["chrome", "vite/client"],
+		"types": ["chrome", "vite/client", "webextension-polyfill"],
 		"strict": false,
 		"noPropertyAccessFromIndexSignature": true,
 		"allowImportingTsExtensions": true,

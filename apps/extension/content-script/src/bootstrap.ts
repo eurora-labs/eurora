@@ -2,14 +2,16 @@ let loaded = false;
 // @ts-ignore
 const browserAny: typeof browser = typeof browser !== 'undefined' ? browser : (chrome as any);
 
-browserAny.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-	listener(msg, sender, sendResponse)
-		.then((result) => console.log(result))
-		.catch((error) => console.error('Error in listener:', error));
-	return true;
-});
+browserAny.runtime.onMessage.addListener(
+	(msg: any, sender: any, sendResponse: (response?: any) => void) => {
+		listener(msg, sender, sendResponse)
+			.then((result) => console.log(result))
+			.catch((error) => console.error('Error in listener:', error));
+		return true;
+	},
+);
 
-async function listener(msg, sender, sendResponse) {
+async function listener(msg: any, sender: any, sendResponse: (response?: any) => void) {
 	if (loaded || msg?.type !== 'SITE_LOAD') return false;
 	loaded = true;
 

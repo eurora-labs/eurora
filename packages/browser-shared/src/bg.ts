@@ -18,25 +18,33 @@ export async function webNavigationListener(tabId: number, url: string, frameId:
 
 		const defaultChunk = 'scripts/content/sites/_default/index.js';
 		if (!site) {
-			await browser.tabs.sendMessage(tabId, {
-				type: 'SITE_LOAD',
-				siteId: 'default',
-				chunk: defaultChunk,
-				defaultChunk,
-			});
+			await browser.tabs
+				.sendMessage(tabId, {
+					type: 'SITE_LOAD',
+					siteId: 'default',
+					chunk: defaultChunk,
+					defaultChunk,
+				})
+				.catch((error) => {
+					console.error('Failed to send SITE_LOAD message:', error);
+				});
 			return;
 		}
 
 		// Optional: request origin permission only for known sites that need fetch
 		// await chrome.permissions.request({ origins: [u.origin + '/*'] }).catch(() => {});
 
-		await browser.tabs.sendMessage(tabId, {
-			type: 'SITE_LOAD',
-			siteId: site.id,
-			// chunk paths are already content-side relative inside dist
-			chunk: `scripts/content/${site.chunk}`,
-			defaultChunk,
-		});
+		await browser.tabs
+			.sendMessage(tabId, {
+				type: 'SITE_LOAD',
+				siteId: site.id,
+				// chunk paths are already content-side relative inside dist
+				chunk: `scripts/content/${site.chunk}`,
+				defaultChunk,
+			})
+			.catch((error) => {
+				console.error('Failed to send SITE_LOAD message:', error);
+			});
 	} catch (error) {
 		if (url?.startsWith('http')) {
 			console.error('BG injection error: ', error);
