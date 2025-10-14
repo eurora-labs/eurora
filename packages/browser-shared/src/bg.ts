@@ -13,6 +13,7 @@ export async function webNavigationListener(tabId: number, url: string, frameId:
 			target: { tabId, frameIds: [0] },
 			world: 'ISOLATED',
 			files: ['scripts/content/bootstrap.js'],
+			injectImmediately: true,
 		});
 
 		const defaultChunk = 'scripts/content/sites/_default/index.js';
@@ -37,6 +38,8 @@ export async function webNavigationListener(tabId: number, url: string, frameId:
 			defaultChunk,
 		});
 	} catch (error) {
-		console.error('BG injection error: ', error);
+		if (url?.startsWith('http')) {
+			console.error('BG injection error: ', error);
+		}
 	}
 }

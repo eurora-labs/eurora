@@ -3,20 +3,17 @@ let loaded = false;
 const browserAny: typeof browser = typeof browser !== 'undefined' ? browser : (chrome as any);
 
 browserAny.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-	listener(msg, sender, sendResponse).then((result) => console.log(result));
+	listener(msg, sender, sendResponse)
+		.then((result) => console.log(result))
+		.catch((error) => console.error('Error in listener:', error));
 	return true;
 });
-
-// chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-// 	listener(msg, sender, sendResponse).then((result) => console.log(result));
-// 	return true;
-// });
 
 async function listener(msg, sender, sendResponse) {
 	if (loaded || msg?.type !== 'SITE_LOAD') return false;
 	loaded = true;
 
-	const imp = (p: string) => import(chrome.runtime.getURL(p));
+	const imp = (p: string) => import(browserAny.runtime.getURL(p));
 	const runDefault = async () => {
 		try {
 			const def = await imp(msg.defaultChunk);

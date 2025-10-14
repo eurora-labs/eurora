@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
-		"target": "ES2022",
+		"target": "ES6",
 		"lib": ["es6", "DOM"],
 		"types": ["chrome", "vite/client"],
 		"strict": false,

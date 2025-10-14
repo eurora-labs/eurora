@@ -7,7 +7,7 @@ export async function getCurrentTab(): Promise<browser.Tabs.Tab | null> {
 			currentWindow: true,
 		});
 
-		return tab;
+		return tab ?? null;
 	} catch (error) {
 		console.error('Error getting current tab:', error);
 		return null;

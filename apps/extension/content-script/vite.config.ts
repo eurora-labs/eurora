@@ -68,6 +68,10 @@ export default defineConfig({
 	build: {
 		outDir: chromiumOutDir,
 		emptyOutDir: true,
+		lib: {
+			entry: path.resolve(__dirname, 'src/index.ts'),
+			formats: ['es'],
+		},
 		// lib: false,
 		rollupOptions: {
 			input: Object.fromEntries([
