@@ -23,6 +23,7 @@ export default defineConfig({
 				match: 'src/match.ts',
 				registry: 'src/registry.ts',
 				tabs: 'src/tabs.ts',
+				bg: 'src/bg.ts',
 			},
 			formats: ['es'],
 		},
