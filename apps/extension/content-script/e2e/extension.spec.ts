@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Extension Content Script Tests', () => {
-	test.skip('Extension loading tests', () => {
+	test('Extension loading tests', () => {
 		// These tests require the extension to be built first
 		// Run: npm run build
 		// Then uncomment the tests below and use the extension fixture

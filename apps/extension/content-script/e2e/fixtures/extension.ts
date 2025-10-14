@@ -14,7 +14,7 @@ export const test = base.extend<{
 }>({
 	// Override context to load extension
 	context: async ({}, use) => {
-		const pathToExtension = path.join(__dirname, '../../../extensions/chromium');
+		const pathToExtension = path.join(__dirname, '../../../../../extensions/chromium');
 		const context = await chromium.launchPersistentContext('', {
 			headless: false,
 			args: [

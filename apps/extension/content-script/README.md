@@ -26,6 +26,16 @@ pnpm run test:unit -- --coverage
 
 ### End-to-End Tests
 
+The E2E test suite provides comprehensive testing of the content script system including bootstrap mechanism, registry system, site handlers, and message routing.
+
+**Important**: Build the extension before running E2E tests:
+
+```bash
+pnpm run build
+```
+
+Then run E2E tests:
+
 ```bash
 # Run e2e tests
 pnpm run test:e2e
@@ -39,6 +49,19 @@ pnpm run test:e2e:debug
 # Show test report
 pnpm run test:e2e:report
 ```
+
+**Documentation**:
+
+- [E2E Test Guide](./e2e/README.md) - Comprehensive guide to E2E testing
+- [Test Plan](./e2e/TEST_PLAN.md) - Detailed test plan and coverage
+
+**Test Files**:
+
+- `e2e/bootstrap.e2e.spec.ts` - Bootstrap mechanism tests
+- `e2e/registry.e2e.spec.ts` - Registry and domain matching tests
+- `e2e/site-handlers.e2e.spec.ts` - Site handler functionality tests
+- `e2e/message-routing.e2e.spec.ts` - Message routing tests
+- `e2e/utils/test-helpers.ts` - Reusable test utilities
 
 ## Test Structure
 
