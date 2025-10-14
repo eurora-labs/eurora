@@ -6,6 +6,7 @@ export default defineConfig({
 	plugins: [
 		dts({
 			entryRoot: 'src',
+			outDir: 'dist',
 			tsconfigPath: path.join(__dirname, 'tsconfig.json'),
 		}),
 	],
@@ -19,18 +20,16 @@ export default defineConfig({
 		sourcemap: true,
 
 		lib: {
-			entry: {
-				match: 'src/match.ts',
-				registry: 'src/registry.ts',
-				tabs: 'src/tabs.ts',
-				bg: 'src/bg.ts',
-			},
+			entry: path.resolve(__dirname, 'src/index.ts'),
 			formats: ['es'],
 		},
 
 		rollupOptions: {
 			external: [],
 			output: {
+				format: 'es',
+				preserveModules: true,
+				preserveModulesRoot: 'src',
 				entryFileNames: '[name].js',
 				chunkFileNames: 'chunks/[name]-[hash].js',
 				assetFileNames: 'assets/[name].[ext]',
