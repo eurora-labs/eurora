@@ -16,7 +16,7 @@ export const test = base.extend<{
 	context: async ({}, use) => {
 		const pathToExtension = path.join(__dirname, '../../../../../extensions/chromium');
 		const context = await chromium.launchPersistentContext('', {
-			headless: false,
+			channel: 'chromium',
 			args: [
 				`--disable-extensions-except=${pathToExtension}`,
 				`--load-extension=${pathToExtension}`,
@@ -28,10 +28,11 @@ export const test = base.extend<{
 
 	// Get extension ID for testing
 	extensionId: async ({ context }, use) => {
-		let [background] = context.serviceWorkers();
-		if (!background) background = await context.waitForEvent('serviceworker');
+		// for manifest v3:
+		let [serviceWorker] = context.serviceWorkers();
+		if (!serviceWorker) serviceWorker = await context.waitForEvent('serviceworker');
 
-		const extensionId = background.url().split('/')[2];
+		const extensionId = serviceWorker.url().split('/')[2];
 		await use(extensionId);
 	},
 });
