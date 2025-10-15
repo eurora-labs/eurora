@@ -9,9 +9,7 @@ import {
 } from '@eurora/chrome-ext-shared/extensions/article/util';
 import { ArticleChromeMessage, type WatcherParams } from './types.js';
 
-console.log('Article Watcher: Top of the file');
-
-class ArticleWatcher extends Watcher<WatcherParams> {
+export class ArticleWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
 		super(params);
 	}
@@ -21,7 +19,6 @@ class ArticleWatcher extends Watcher<WatcherParams> {
 		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
 	) {
-		console.log('Article Watcher: listen: ', obj);
 		const { type } = obj;
 
 		let promise: Promise<WatcherResponse>;

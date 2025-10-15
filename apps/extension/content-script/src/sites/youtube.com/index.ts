@@ -13,7 +13,7 @@ interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
 }
 
-class YoutubeWatcher extends Watcher<WatcherParams> {
+export class YoutubeWatcher extends Watcher<WatcherParams> {
 	private youtubeTranscriptApi: YouTubeTranscriptApi;
 	constructor(params: WatcherParams) {
 		super(params);

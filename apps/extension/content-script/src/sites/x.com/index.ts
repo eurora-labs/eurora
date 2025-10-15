@@ -11,7 +11,7 @@ import type {
 	NativeTwitterTweet,
 } from '@eurora/chrome-ext-shared/bindings';
 
-class TwitterWatcher extends Watcher<WatcherParams> {
+export class TwitterWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
 		super(params);
 	}
