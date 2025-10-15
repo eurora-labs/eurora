@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './util/fixtures.ts';
+import { waitForBootstrap, waitForSiteMounted } from './util/helpers.ts';
 
 test.describe('Content Script Basic Tests', () => {
 	test('should load a basic webpage', async ({ page }) => {
@@ -38,5 +39,11 @@ test.describe('Content Script Basic Tests', () => {
 
 		const url = await page.evaluate(() => window.location.href);
 		expect(url).toContain('example.com');
+	});
+
+	test('bootstrap + mount', async ({ page }) => {
+		await page.goto('https://example.com');
+		await waitForBootstrap(page);
+		await waitForSiteMounted(page, 'default');
 	});
 });

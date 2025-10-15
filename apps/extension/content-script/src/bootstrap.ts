@@ -14,6 +14,7 @@ browserAny.runtime.onMessage.addListener(
 async function listener(msg: any, sender: any, sendResponse: (response?: any) => void) {
 	if (loaded || msg?.type !== 'SITE_LOAD') return false;
 	loaded = true;
+	document.documentElement.setAttribute('eurora-ext-ready', '1');
 
 	const imp = (p: string) => import(browserAny.runtime.getURL(p));
 	const runDefault = async () => {
@@ -30,6 +31,11 @@ async function listener(msg: any, sender: any, sendResponse: (response?: any) =>
 		const ok =
 			(typeof mod.canHandle === 'function' ? !!mod.canHandle(document) : true) &&
 			(typeof mod.main === 'function' ? (mod.main() ?? true) : true);
+
+		if (ok) {
+			document.documentElement.setAttribute('eurora-ext-site', msg.siteId);
+			document.documentElement.setAttribute('eurora-ext-mounted', '1');
+		}
 		if (!ok) await runDefault();
 	} catch (error) {
 		console.error('Error loading site script:', error);
