@@ -6,5 +6,6 @@
 // import './lib/pdfjs/telemetry.ts';
 import './lib/service-worker/native-messaging-worker.ts';
 import './lib/background.ts';
+import './bg.ts';
 
 console.log('Extension background services loaded');
