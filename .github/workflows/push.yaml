@@ -219,6 +219,11 @@ jobs:
             - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   persist-credentials: false
+                  lfs: true
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Rust Cache
               uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
               with:
