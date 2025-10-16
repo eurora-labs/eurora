@@ -1,14 +1,15 @@
-<script>
+<script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { loadStripe } from '@stripe/stripe-js';
 	import { PUBLIC_STRIPE_KEY } from '$env/static/public';
 	import { Elements, PaymentElement, LinkAuthenticationElement, Address } from 'svelte-stripe';
+	import type { Stripe, StripeError, StripeElements } from '@stripe/stripe-js';
 
-	let stripe = null;
-	let clientSecret = null;
-	let error = null;
-	let elements;
+	let stripe: Stripe | null = null;
+	let clientSecret: string | null = null;
+	let error: StripeError | null = null;
+	let elements: StripeElements;
 	let processing = false;
 
 	onMount(async () => {
@@ -33,20 +34,24 @@
 
 	async function submit() {
 		// avoid processing duplicates
-		if (processing) return;
+		if (!stripe || processing || !elements || !clientSecret) return;
 
 		processing = true;
 
 		// confirm payment with stripe
 		const result = await stripe.confirmPayment({
 			elements,
+			clientSecret,
+			confirmParams: {
+				return_url: 'https://eurora.ai/order/1234',
+			},
 			redirect: 'if_required',
 		});
 
 		// log results, for debugging
 		console.log({ result });
 
-		if (result.error) {
+		if (result?.error) {
 			// payment failed, notify user
 			error = result.error;
 			processing = false;
