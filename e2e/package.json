@@ -1,6 +1,7 @@
 {
 	"name": "@eurora/e2e",
 	"type": "module",
+	"private": true,
 	"devDependencies": {
 		"@playwright/test": "1.47.0",
 		"@types/node": "^24.3.0",
