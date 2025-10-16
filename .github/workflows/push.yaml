@@ -7,6 +7,7 @@ on:
 
 env:
     RUST_BACKTRACE: full
+    PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
 
 permissions:
     id-token: write
@@ -105,6 +106,12 @@ jobs:
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
             - run: pnpm test
 
     rust-lint:
