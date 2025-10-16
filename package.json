@@ -38,7 +38,8 @@
 		"test": "turbo run test --no-daemon",
 		"test:watch": "pnpm --filter @eurora/desktop run test:watch",
 		"test:e2e:web": "turbo run test:e2e:web",
-		"test:e2e": "pnpm --filter @eurora/desktop run test:e2e"
+		"test:e2e:desktop": "pnpm --filter @eurora/desktop run test:e2e",
+		"test:e2e": "pnpm --filter={./apps/extension/*} run test:e2e"
 	},
 	"devDependencies": {
 		"@bufbuild/buf": "^1.57.2",
