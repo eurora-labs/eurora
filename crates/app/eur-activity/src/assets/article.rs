@@ -295,7 +295,7 @@ mod tests {
 
         let chip = asset.get_context_chip().unwrap();
         assert_eq!(chip.id, "test-id");
-        assert_eq!(chip.name, "article");
+        assert_eq!(chip.name, "example.com");
         assert_eq!(chip.extension_id, "309f0906-d48c-4439-9751-7bcf915cdfc5");
     }
 
