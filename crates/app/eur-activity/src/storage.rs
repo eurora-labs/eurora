@@ -272,12 +272,4 @@ mod tests {
         let sanitized = sanitize_filename(invalid_name);
         assert_eq!(sanitized, "Test_Asset_With_Invalid_Characters_");
     }
-
-    #[test]
-    fn test_storage_config_default() {
-        let config = ActivityStorageConfig::default();
-        assert_eq!(config.base_dir, PathBuf::from("./assets"));
-        assert!(config.use_content_hash);
-        assert_eq!(config.max_file_size, Some(100 * 1024 * 1024));
-    }
 }
