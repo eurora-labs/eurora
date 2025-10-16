@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use eur_native_messaging::NativeArticleAsset;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
-use tracing::info;
 
 use crate::{
     ActivityResult,
