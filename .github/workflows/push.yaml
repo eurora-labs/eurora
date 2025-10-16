@@ -119,8 +119,12 @@ jobs:
         needs: changes
         if: ${{ needs.changes.outputs.rust == 'true' }}
         runs-on: ubuntu-latest
+
         container:
             image: ghcr.io/eurora-labs/ci-base-image:latest
+            credentials:
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
         env:
             CARGO_TERM_COLOR: always
         steps:
