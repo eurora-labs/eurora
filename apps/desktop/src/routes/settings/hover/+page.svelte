@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Switch } from '@eurora/ui/components/switch/index';
 	import { Label } from '@eurora/ui/components/label/index';
-	import { createTauRPCProxy, type HoverSettings } from '$lib/bindings/bindings';
+	import { createTauRPCProxy, type HoverSettings } from '$lib/bindings/bindings.js';
 	import { onMount } from 'svelte';
 
 	const taurpc = createTauRPCProxy();

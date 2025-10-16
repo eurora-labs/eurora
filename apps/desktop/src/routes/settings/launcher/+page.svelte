@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Label } from '@eurora/ui/components/label/index';
-	import type { LauncherSettings, Hotkey } from '$lib/bindings/bindings';
+	import type { LauncherSettings, Hotkey } from '$lib/bindings/bindings.js';
 	import { default as HotkeyComponent } from '$lib/components/Hotkey.svelte';
-	import { createTauRPCProxy } from '$lib/bindings/bindings';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import { onMount } from 'svelte';
 
 	const taurpc = createTauRPCProxy();

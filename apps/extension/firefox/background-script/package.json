@@ -21,6 +21,7 @@
 		"@types/firefox-webext-browser": "^120.0.5",
 		"eslint": "^9.37.0",
 		"eslint-config-prettier": "^10.1.8",
+		"@eurora/browser-shared": "workspace:*",
 		"webextension-polyfill": "^0.12.0",
 		"@types/webextension-polyfill": "^0.12.4",
 		"globals": "^15.15.0",

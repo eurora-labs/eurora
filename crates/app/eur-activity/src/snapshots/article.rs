@@ -160,7 +160,7 @@ mod tests {
             Some("Test Article".to_string()),
         );
 
-        assert_eq!(snapshot.highlight, Some("Important text".to_string()));
+        assert_eq!(snapshot.highlight, Some("Highlighted text".to_string()));
         assert!(snapshot.created_at > 0);
         assert_eq!(snapshot.created_at, snapshot.updated_at);
         assert!(snapshot.has_content());
@@ -194,7 +194,10 @@ mod tests {
             Some("https://example.com/article".to_string()),
             Some("Test Article".to_string()),
         );
-        assert_eq!(with_highlight.get_primary_content(), Some("Highlight text"));
+        assert_eq!(
+            with_highlight.get_primary_content(),
+            Some("Highlighted text")
+        );
 
         let with_selection =
             ArticleSnapshot::new(None, None, Some("Selection".to_string()), None, None);

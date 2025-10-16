@@ -1,38 +1,30 @@
-// Background script for tab tracking and content script initialization
-// import {
-// 	ContentScriptContext,
-// 	YouTubeStrategy,
-// 	ArticleStrategy,
-// 	PdfStrategy
-// } from './strategies/index.js';
-
-// Create and configure the content script context
-// const contentScriptContext = new ContentScriptContext();
-
-// // Register all available strategies
-// contentScriptContext.registerStrategy(new YouTubeStrategy());
-// contentScriptContext.registerStrategy(new PdfStrategy());
-// // Register the article strategy as the default strategy
-// contentScriptContext.registerStrategy(new ArticleStrategy(), true);
+import browser from 'webextension-polyfill';
 
 // Listen for tab updates
-chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
+browser.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
 	if (changeInfo.status === 'complete' && tab.url) {
-		chrome.tabs.sendMessage(
-			tabId,
-			{
+		browser.tabs
+			.sendMessage(tabId, {
 				type: 'NEW',
 				value: tab.url,
-			},
-			(response) => {
+			})
+			.then((response) => {
 				console.log('Received response from content script:', response);
-			},
-		);
+			})
+			.catch((error) => {
+				if (
+					error instanceof Error &&
+					error.message.includes('Could not establish connection')
+				) {
+					return;
+				}
+				console.log('Failed to relay NEW message to tab: ', tabId, error);
+			});
 	}
 });
 
 // Lifecycle handlers
-chrome.runtime.onInstalled.addListener((details) => {
+browser.runtime.onInstalled.addListener((details) => {
 	console.log('Extension installed or updated:', details.reason);
 });
 
