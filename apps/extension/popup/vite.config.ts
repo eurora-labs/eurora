@@ -1,29 +1,25 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import copy from 'rollup-plugin-copy';
+import { readdirSync, cpSync } from 'fs';
+import path from 'path';
 
-// import copyBuild from '@eurora/shared/util/copy-plugin';
+const chromiumOutDir = path.resolve(__dirname, '../../../extensions/chromium/pages/popup');
+const firefoxOutDir = path.resolve(__dirname, '../../../extensions/firefox/pages/popup');
+
+function CopyToFirefoxPlugin() {
+	return {
+		name: 'copy-to-firefox',
+		closeBundle() {
+			// Copy all files from chromium output to firefox output
+			cpSync(chromiumOutDir, firefoxOutDir, { recursive: true });
+			console.log(`✓ Copied content scripts to firefox extension folder`);
+		},
+	};
+}
 
 export default defineConfig({
-	plugins: [
-		sveltekit(),
-		// copyBuild([
-		// 	'../../../extensions/chromium/pages/popup',
-		// 	'../../../extensions/firefox/pages/popup',
-		// ]),
-	],
+	plugins: [sveltekit(), CopyToFirefoxPlugin()],
 	build: {
-		rollupOptions: {
-			plugins: [
-				copy({
-					targets: [
-						{ src: 'build/**/*', dest: '../../../extensions/chromium/pages/popup' },
-						{ src: 'build/**/*', dest: '../../../extensions/firefox/pages/popup' },
-					],
-					hook: 'closeBundle', // run after Vite writes output
-					overwrite: true,
-				}),
-			],
-		},
+		outDir: chromiumOutDir,
 	},
 });

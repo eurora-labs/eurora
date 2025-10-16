@@ -206,7 +206,7 @@ mod tests {
                 ActivityAsset::YoutubeAsset(YoutubeAsset::new(
                     "yt1".to_string(),
                     "https://youtube.com/watch?v=test".to_string(),
-                    "Test Video".to_string(),
+                    "Test V".to_string(),
                     vec![],
                     0.0,
                 )),
@@ -216,7 +216,7 @@ mod tests {
 
         let context_chips = activity.get_context_chips();
         assert_eq!(context_chips.len(), 1); // Only YouTube asset provides a context chip
-        assert_eq!(context_chips[0].name, "video");
+        assert_eq!(context_chips[0].name, "Test V");
     }
 
     #[tokio::test]
