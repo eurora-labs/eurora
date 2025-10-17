@@ -1,6 +1,6 @@
 let loaded = false;
 // @ts-ignore
-const browserAny: typeof browser = typeof browser !== 'undefined' ? browser : (chrome as any);
+const browserAny = typeof browser !== 'undefined' ? browser : (chrome as typeof browser);
 
 browserAny.runtime.onMessage.addListener(
 	(msg: any, sender: any, sendResponse: (response?: any) => void) => {
@@ -28,9 +28,13 @@ async function listener(msg: any, sender: any, sendResponse: (response?: any) =>
 
 	try {
 		const mod = await imp(msg.chunk);
-		const ok =
-			(typeof mod.canHandle === 'function' ? !!mod.canHandle(document) : true) &&
-			(typeof mod.main === 'function' ? (mod.main() ?? true) : true);
+		// For now this is unused but could be useful for some future websites
+		const canHandle = typeof mod.canHandle === 'function' ? mod.canHandle(document) : true;
+
+		// Execute the main function if present
+		const mainResult = typeof mod.main === 'function' ? mod.main() : true;
+
+		const ok = canHandle && (mainResult ?? true);
 
 		if (ok) {
 			document.documentElement.setAttribute('eurora-ext-site', msg.siteId);
