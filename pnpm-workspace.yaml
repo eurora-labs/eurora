@@ -10,6 +10,7 @@ packages:
     - packages/prosemirror/*
     - crates/*
     - backend/*
+    - e2e
 
 catalog:
     '@tailwindcss/postcss': ^4.1.14

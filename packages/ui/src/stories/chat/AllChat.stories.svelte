@@ -1,12 +1,11 @@
 <script module lang="ts">
-	import { Chat } from '$lib/custom-components/chat/index.js';
-	import * as Message from '$lib/custom-components/message/index.js';
+	import * as Chat from '$lib/custom-components/chat/index.js';
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { SiGithub, SiStackoverflow, SiReddit } from '@icons-pack/svelte-simple-icons';
 
 	const { Story } = defineMeta({
 		title: 'Components / Chat',
-		component: Chat,
+		component: Chat.Root,
 		parameters: {
 			docs: {
 				description: {
@@ -376,25 +375,25 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Short Conversation (3-4 messages)
 					</h2>
-					<Chat class="h-[500px]">
+					<Chat.Root class="h-[500px]">
 						{#each shortConversationMessages as message}
-							<Message.Root
+							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
-								<Message.Content>{message.content}</Message.Content>
+								<Chat.MessageContent>{message.content}</Chat.MessageContent>
 								{#if message.sources && message.sources.length > 0}
-									<Message.Footer>
-										<Message.Source>
+									<Chat.MessageFooter>
+										<Chat.MessageSource>
 											{#each message.sources as source}
 												{@html source}
 											{/each}
-										</Message.Source>
-									</Message.Footer>
+										</Chat.MessageSource>
+									</Chat.MessageFooter>
 								{/if}
-							</Message.Root>
+							</Chat.Message>
 						{/each}
-					</Chat>
+					</Chat.Root>
 				</div>
 			</div>
 		{/snippet}
@@ -409,25 +408,25 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Medium Conversation (8-10 messages)
 					</h2>
-					<Chat class="h-[500px]">
+					<Chat.Root class="h-[500px]">
 						{#each mediumConversationMessages as message}
-							<Message.Root
+							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
-								<Message.Content>{message.content}</Message.Content>
+								<Chat.MessageContent>{message.content}</Chat.MessageContent>
 								{#if message.sources && message.sources.length > 0}
-									<Message.Footer>
-										<Message.Source>
+									<Chat.MessageFooter>
+										<Chat.MessageSource>
 											{#each message.sources as source}
 												{@html source}
 											{/each}
-										</Message.Source>
-									</Message.Footer>
+										</Chat.MessageSource>
+									</Chat.MessageFooter>
 								{/if}
-							</Message.Root>
+							</Chat.Message>
 						{/each}
-					</Chat>
+					</Chat.Root>
 				</div>
 			</div>
 		{/snippet}
@@ -442,25 +441,25 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Long Conversation (15+ messages with scrolling)
 					</h2>
-					<Chat class="h-[500px]">
+					<Chat.Root class="h-[500px]">
 						{#each longConversationMessages as message}
-							<Message.Root
+							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
-								<Message.Content>{message.content}</Message.Content>
+								<Chat.MessageContent>{message.content}</Chat.MessageContent>
 								{#if message.sources && message.sources.length > 0}
-									<Message.Footer>
-										<Message.Source>
+									<Chat.MessageFooter>
+										<Chat.MessageSource>
 											{#each message.sources as source}
 												{@html source}
 											{/each}
-										</Message.Source>
-									</Message.Footer>
+										</Chat.MessageSource>
+									</Chat.MessageFooter>
 								{/if}
-							</Message.Root>
+							</Chat.Message>
 						{/each}
-					</Chat>
+					</Chat.Root>
 				</div>
 			</div>
 		{/snippet}
@@ -475,25 +474,25 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Mixed Content with Various Sources
 					</h2>
-					<Chat class="h-[500px]">
+					<Chat.Root class="h-[500px]">
 						{#each mixedContentMessages as message}
-							<Message.Root
+							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
-								<Message.Content>{message.content}</Message.Content>
+								<Chat.MessageContent>{message.content}</Chat.MessageContent>
 								{#if message.sources && message.sources.length > 0}
-									<Message.Footer>
-										<Message.Source>
+									<Chat.MessageFooter>
+										<Chat.MessageSource>
 											{#each message.sources as source}
 												{@html source}
 											{/each}
-										</Message.Source>
-									</Message.Footer>
+										</Chat.MessageSource>
+									</Chat.MessageFooter>
 								{/if}
-							</Message.Root>
+							</Chat.Message>
 						{/each}
-					</Chat>
+					</Chat.Root>
 				</div>
 			</div>
 		{/snippet}
@@ -508,25 +507,25 @@ function handleScroll() {
 					<h2 class="text-lg font-semibold mb-4 text-white">
 						Interactive Chat with Auto-scroll
 					</h2>
-					<Chat class="h-[500px]">
+					<Chat.Root class="h-[500px]">
 						{#each interactiveMessages as message}
-							<Message.Root
+							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
 							>
-								<Message.Content>{message.content}</Message.Content>
+								<Chat.MessageContent>{message.content}</Chat.MessageContent>
 								{#if message.sources && message.sources.length > 0}
-									<Message.Footer>
-										<Message.Source>
+									<Chat.MessageFooter>
+										<Chat.MessageSource>
 											{#each message.sources as source}
 												{@html source}
 											{/each}
-										</Message.Source>
-									</Message.Footer>
+										</Chat.MessageSource>
+									</Chat.MessageFooter>
 								{/if}
-							</Message.Root>
+							</Chat.Message>
 						{/each}
-					</Chat>
+					</Chat.Root>
 				</div>
 			</div>
 		{/snippet}

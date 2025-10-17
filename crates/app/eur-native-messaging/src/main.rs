@@ -6,6 +6,7 @@ use eur_native_messaging::server;
 use tonic::transport::Server;
 use tracing::debug;
 // Need this import to succeed in prod builds
+#[allow(unused_imports)]
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},

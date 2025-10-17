@@ -1,7 +1,5 @@
 use eur_personal_db::PersonalDatabaseManager;
 use ferrous_llm_core::Message;
-use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use tauri::{Manager, Runtime};
 
 #[taurpc::procedures(path = "personal_db.message")]
@@ -23,8 +21,8 @@ impl MessageApi for MessageApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         conversation_id: String,
-        limit: Option<u32>,
-        offset: Option<u32>,
+        _limit: Option<u32>,
+        _offset: Option<u32>,
     ) -> Result<Vec<Message>, String> {
         let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 

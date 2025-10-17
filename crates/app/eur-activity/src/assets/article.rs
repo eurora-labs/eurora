@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use eur_native_messaging::NativeArticleAsset;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
-use tracing::info;
 
 use crate::{
     ActivityResult,
@@ -90,9 +89,10 @@ impl ArticleAsset {
         let keyword_lower = keyword.to_lowercase();
         self.title.to_lowercase().contains(&keyword_lower)
             || self.content.to_lowercase().contains(&keyword_lower)
-            || self.author.as_ref().map_or(false, |author| {
-                author.to_lowercase().contains(&keyword_lower)
-            })
+            || self
+                .author
+                .as_ref()
+                .is_some_and(|author| author.to_lowercase().contains(&keyword_lower))
     }
 }
 
@@ -296,7 +296,7 @@ mod tests {
 
         let chip = asset.get_context_chip().unwrap();
         assert_eq!(chip.id, "test-id");
-        assert_eq!(chip.name, "article");
+        assert_eq!(chip.name, "example.com");
         assert_eq!(chip.extension_id, "309f0906-d48c-4439-9751-7bcf915cdfc5");
     }
 

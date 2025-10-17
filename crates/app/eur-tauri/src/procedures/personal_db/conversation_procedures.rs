@@ -1,7 +1,5 @@
 use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use ferrous_llm_core::Message;
-use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use tauri::{Manager, Runtime};
 
 use crate::shared_types::SharedCurrentConversation;

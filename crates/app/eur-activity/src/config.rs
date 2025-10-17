@@ -134,7 +134,7 @@ impl Default for ApplicationConfig {
 }
 
 /// Main configuration structure for the activity system
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ActivityConfig {
     /// Global configuration
     pub global: GlobalConfig,
@@ -142,16 +142,6 @@ pub struct ActivityConfig {
     pub strategies: HashMap<String, StrategyConfig>,
     /// Application-specific configurations
     pub applications: HashMap<String, ApplicationConfig>,
-}
-
-impl Default for ActivityConfig {
-    fn default() -> Self {
-        Self {
-            global: GlobalConfig::default(),
-            strategies: HashMap::new(),
-            applications: HashMap::new(),
-        }
-    }
 }
 
 /// Builder for creating activity configurations
@@ -271,16 +261,16 @@ impl ActivityConfig {
         }
 
         self.get_application_config(app_name)
-            .map_or(true, |config| config.enabled)
+            .is_none_or(|config| config.enabled)
     }
 
     /// Get effective collection interval for an application
     pub fn get_collection_interval(&self, app_name: &str, strategy_id: &str) -> Duration {
         // Check application-specific override first
-        if let Some(app_config) = self.get_application_config(app_name) {
-            if let Some(interval) = app_config.collection_interval_override {
-                return interval;
-            }
+        if let Some(app_config) = self.get_application_config(app_name)
+            && let Some(interval) = app_config.collection_interval_override
+        {
+            return interval;
         }
 
         // Check strategy-specific configuration
@@ -336,13 +326,13 @@ impl ActivityConfig {
         }
         // Validate application overrides
         for (name, app) in &self.applications {
-            if let Some(d) = app.collection_interval_override {
-                if d.is_zero() {
-                    return Err(format!(
-                        "application '{}' collection_interval_override must be greater than 0",
-                        name
-                    ));
-                }
+            if let Some(d) = app.collection_interval_override
+                && d.is_zero()
+            {
+                return Err(format!(
+                    "application '{}' collection_interval_override must be greater than 0",
+                    name
+                ));
             }
         }
 
@@ -514,10 +504,7 @@ mod tests {
 
     #[test]
     fn test_snapshot_frequency() {
-        let never = SnapshotFrequency::Never;
         let interval = SnapshotFrequency::Interval(Duration::from_secs(10));
-        let on_event = SnapshotFrequency::OnEvent(vec!["click".to_string(), "scroll".to_string()]);
-        let on_change = SnapshotFrequency::OnChange;
 
         // Just test that they can be created and serialized
         let serialized = serde_json::to_string(&interval).unwrap();

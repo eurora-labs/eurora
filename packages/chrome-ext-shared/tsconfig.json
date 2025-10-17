@@ -3,9 +3,9 @@
 	"compilerOptions": {
 		"target": "ES2022",
 		"lib": ["dom", "dom.iterable", "ES2022"],
-		"types": ["chrome", "vite/client"],
+		"types": ["chrome", "vite/client", "webextension-polyfill"],
 		"allowJs": true,
-		"checkJs": false,
+		"checkJs": true,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
 		"resolveJsonModule": true,
