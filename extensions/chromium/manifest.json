@@ -18,21 +18,7 @@
 	},
 	"web_accessible_resources": [
 		{
-			"resources": [
-				"scripts/background/*",
-				"scripts/content/*",
-				"pages/popup/**/*",
-				"bootstrap.js",
-
-				"http:/*",
-				"https:/*",
-				"file:/*",
-				"chrome-extension:/*",
-				"blob:*",
-				"data:*",
-				"filesystem:/*",
-				"drive:*"
-			],
+			"resources": ["scripts/background/*", "scripts/content/*", "pages/popup/**/*"],
 			"matches": ["<all_urls>"],
 			"extension_ids": ["*"]
 		}

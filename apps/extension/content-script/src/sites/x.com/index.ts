@@ -41,7 +41,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		obj: TwitterChromeMessage,
 		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
-	) {
+	): boolean {
 		const { type } = obj;
 		let promise: Promise<WatcherResponse>;
 

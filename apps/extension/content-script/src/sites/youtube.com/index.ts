@@ -35,7 +35,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		obj: YoutubeChromeMessage,
 		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
-	) {
+	): boolean {
 		const { type } = obj;
 		let promise: Promise<WatcherResponse>;
 

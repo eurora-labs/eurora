@@ -23,8 +23,11 @@ export const test = base.extend<{
 				`--load-extension=${pathToExtension}`,
 			],
 		});
-		await use(context);
-		await context.close();
+		try {
+			await use(context);
+		} finally {
+			await context.close();
+		}
 	},
 
 	// Get extension ID for testing
