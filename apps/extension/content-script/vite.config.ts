@@ -1,6 +1,5 @@
 /// <reference types='vitest' />
 import { defineConfig } from 'vite';
-import dts from 'vite-plugin-dts';
 import * as path from 'path';
 import { readdirSync, cpSync } from 'fs';
 
