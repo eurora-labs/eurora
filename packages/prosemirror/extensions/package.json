@@ -36,13 +36,13 @@
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
 		"svelte-preprocess": "^6.0.3",
-		"svelte2tsx": "^0.7.44",
+		"svelte2tsx": "^0.7.45",
 		"@sveltejs/vite-plugin-svelte": "catalog:svelte",
 		"vite": "catalog:",
 		"vitest": "catalog:"
 	},
 	"dependencies": {
 		"prosemirror-model": "^1.25.3",
-		"prosemirror-view": "^1.41.2"
+		"prosemirror-view": "^1.41.3"
 	}
 }
