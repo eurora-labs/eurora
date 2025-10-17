@@ -1,0 +1,9 @@
+[package]
+name = "eur-ocr"
+version = "0.0.0"
+edition = "2024"
+authors.workspace = true
+
+[dependencies]
+image = { workspace = true }
+rusty-tesseract = "1.1.10"

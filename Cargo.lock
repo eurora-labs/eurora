@@ -2947,7 +2947,7 @@ dependencies = [
 
 [[package]]
 name = "eur-auth"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3134,7 +3134,7 @@ dependencies = [
 
 [[package]]
 name = "eur-ocr"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "image",
  "rusty-tesseract",
@@ -3161,7 +3161,7 @@ dependencies = [
 
 [[package]]
 name = "eur-personal-db"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3227,7 +3227,7 @@ dependencies = [
 
 [[package]]
 name = "eur-proto"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "prost",
@@ -3282,7 +3282,7 @@ dependencies = [
 
 [[package]]
 name = "eur-secret"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "keyring",
@@ -3444,7 +3444,7 @@ dependencies = [
 
 [[package]]
 name = "eur-user"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3465,7 +3465,7 @@ dependencies = [
 
 [[package]]
 name = "eur-util"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "eur-proto",
  "once_cell",
@@ -3474,7 +3474,7 @@ dependencies = [
 
 [[package]]
 name = "eur-vision"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
