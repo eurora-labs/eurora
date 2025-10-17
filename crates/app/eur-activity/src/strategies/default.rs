@@ -70,6 +70,12 @@ impl DefaultStrategyFactory {
     }
 }
 
+impl Default for DefaultStrategyFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl StrategyFactory for DefaultStrategyFactory {
     async fn create_strategy(&self, context: &ProcessContext) -> ActivityResult<ActivityStrategy> {

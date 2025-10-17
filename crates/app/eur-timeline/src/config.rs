@@ -71,7 +71,7 @@ impl Default for FocusTrackingConfig {
 }
 
 /// Main timeline configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TimelineConfig {
     /// Storage configuration
     pub storage: StorageConfig,
@@ -81,19 +81,15 @@ pub struct TimelineConfig {
     pub focus_tracking: FocusTrackingConfig,
 }
 
-impl Default for TimelineConfig {
-    fn default() -> Self {
-        Self {
-            storage: StorageConfig::default(),
-            collector: CollectorConfig::default(),
-            focus_tracking: FocusTrackingConfig::default(),
-        }
-    }
-}
-
 /// Builder for timeline configuration
 pub struct TimelineConfigBuilder {
     config: TimelineConfig,
+}
+
+impl Default for TimelineConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TimelineConfigBuilder {
