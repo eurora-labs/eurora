@@ -37,18 +37,6 @@ impl ImplActiveMonitor {
         (x, y)
     }
 
-    /// Get all available monitors
-    pub fn get_all_monitors() -> Result<Vec<MonitorInfo>, String> {
-        let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
-
-        let monitor_infos = monitors
-            .into_iter()
-            .map(|monitor| MonitorInfo::from(&monitor))
-            .collect();
-
-        Ok(monitor_infos)
-    }
-
     pub fn get_primary_monitor() -> Option<MonitorInfo> {
         let monitors = Monitor::all().ok()?;
 
