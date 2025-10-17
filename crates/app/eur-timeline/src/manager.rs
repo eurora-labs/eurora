@@ -260,7 +260,7 @@ impl TimelineManager {
     /// Save the assets to disk by ids
     pub async fn save_assets_to_disk_by_ids(
         &self,
-        ids: &Vec<String>,
+        ids: &[String],
     ) -> TimelineResult<Vec<SavedAssetInfo>> {
         let activity = {
             let storage = self.storage.lock().await;
@@ -299,15 +299,14 @@ impl TimelineManager {
     }
 
     /// Construct messages from current activity by ids
-    pub async fn construct_asset_messages_by_ids(&self, ids: &Vec<String>) -> Vec<Message> {
+    pub async fn construct_asset_messages_by_ids(&self, ids: &[String]) -> Vec<Message> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             activity
                 .assets
                 .iter()
                 .filter(|asset| ids.contains(&asset.get_id().to_string()))
-                .map(|asset| asset.construct_messages())
-                .flatten()
+                .flat_map(|asset| asset.construct_messages())
                 .collect()
         } else {
             Vec::new()
@@ -321,8 +320,7 @@ impl TimelineManager {
             activity
                 .assets
                 .iter()
-                .map(|asset| asset.construct_messages())
-                .flatten()
+                .flat_map(|asset| asset.construct_messages())
                 .collect()
         } else {
             Vec::new()
@@ -330,7 +328,7 @@ impl TimelineManager {
     }
 
     /// Construct messages from current activity snapshots by ids
-    pub async fn construct_snapshot_messages_by_ids(&self, ids: &Vec<String>) -> Vec<Message> {
+    pub async fn construct_snapshot_messages_by_ids(&self, ids: &[String]) -> Vec<Message> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             if let Some(snapshot) = activity.snapshots.last()
@@ -461,6 +459,7 @@ pub fn create_timeline(capacity: usize, interval_seconds: u64) -> TimelineResult
 
 #[cfg(test)]
 mod tests {
+    use keyring::{mock, set_default_credential_builder};
     use std::time::Duration;
 
     use super::*;
@@ -477,6 +476,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_manager_creation() {
+        set_default_credential_builder(mock::default_credential_builder());
         let manager = TimelineManager::new();
         assert!(!manager.is_running());
         assert!(manager.is_empty().await);
@@ -484,6 +484,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_manager_with_config() {
+        set_default_credential_builder(mock::default_credential_builder());
         let config = TimelineConfig::builder()
             .max_activities(100)
             .collection_interval(Duration::from_secs(5))
@@ -498,6 +499,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_pattern() {
+        set_default_credential_builder(mock::default_credential_builder());
         let manager = TimelineManager::builder()
             .with_max_activities(200)
             .with_collection_interval(Duration::from_secs(10))
@@ -516,6 +518,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_with_timeline_config() {
+        set_default_credential_builder(mock::default_credential_builder());
         let timeline_config = TimelineConfig::builder()
             .max_activities(150)
             .collection_interval(Duration::from_secs(3))
@@ -538,6 +541,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_enable_focus_tracking() {
+        set_default_credential_builder(mock::default_credential_builder());
         let manager = TimelineManager::builder()
             .enable_focus_tracking()
             .build()
@@ -548,6 +552,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_default() {
+        set_default_credential_builder(mock::default_credential_builder());
         let manager1 = TimelineManager::builder()
             .build()
             .expect("Failed to build timeline manager");
@@ -565,6 +570,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_activity() {
+        set_default_credential_builder(mock::default_credential_builder());
         let manager = TimelineManager::new();
         let activity = create_test_activity("Test Activity");
 
@@ -595,6 +601,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_clear_activities() {
+        set_default_credential_builder(mock::default_credential_builder());
         let manager = TimelineManager::new();
 
         manager
@@ -614,6 +621,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_manager_lifecycle() {
+        set_default_credential_builder(mock::default_credential_builder());
         let config = TimelineConfig::builder()
             .disable_focus_tracking()
             .collection_interval(Duration::from_millis(100))
@@ -633,6 +641,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_convenience_functions() {
+        set_default_credential_builder(mock::default_credential_builder());
         let manager1 = TimelineManager::new();
         assert!(!manager1.is_running());
 
@@ -646,6 +655,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_stats() {
+        set_default_credential_builder(mock::default_credential_builder());
         let manager = TimelineManager::new();
         manager.add_activity(create_test_activity("Test")).await;
 
