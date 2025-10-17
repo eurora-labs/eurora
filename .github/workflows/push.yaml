@@ -162,6 +162,7 @@ jobs:
             - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   persist-credentials: false
+                  lfs: true
             - name: Install Protoc
               uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
               with:
