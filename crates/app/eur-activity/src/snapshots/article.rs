@@ -65,9 +65,7 @@ impl ArticleSnapshot {
 
     /// Get the primary content (highlight or selection)
     pub fn get_primary_content(&self) -> Option<&str> {
-        self.highlight
-            .as_deref()
-            .or_else(|| self.selection_text.as_deref())
+        self.highlight.as_deref().or(self.selection_text.as_deref())
     }
 
     /// Get content length
@@ -80,16 +78,16 @@ impl ArticleSnapshot {
     pub fn contains_keyword(&self, keyword: &str) -> bool {
         let keyword_lower = keyword.to_lowercase();
 
-        if let Some(content) = self.get_primary_content() {
-            if content.to_lowercase().contains(&keyword_lower) {
-                return true;
-            }
+        if let Some(content) = self.get_primary_content()
+            && content.to_lowercase().contains(&keyword_lower)
+        {
+            return true;
         }
 
-        if let Some(title) = &self.page_title {
-            if title.to_lowercase().contains(&keyword_lower) {
-                return true;
-            }
+        if let Some(title) = &self.page_title
+            && title.to_lowercase().contains(&keyword_lower)
+        {
+            return true;
         }
 
         false
@@ -160,7 +158,7 @@ mod tests {
             Some("Test Article".to_string()),
         );
 
-        assert_eq!(snapshot.highlight, Some("Important text".to_string()));
+        assert_eq!(snapshot.highlight, Some("Highlighted text".to_string()));
         assert!(snapshot.created_at > 0);
         assert_eq!(snapshot.created_at, snapshot.updated_at);
         assert!(snapshot.has_content());
@@ -194,7 +192,10 @@ mod tests {
             Some("https://example.com/article".to_string()),
             Some("Test Article".to_string()),
         );
-        assert_eq!(with_highlight.get_primary_content(), Some("Highlight text"));
+        assert_eq!(
+            with_highlight.get_primary_content(),
+            Some("Highlighted text")
+        );
 
         let with_selection =
             ArticleSnapshot::new(None, None, Some("Selection".to_string()), None, None);

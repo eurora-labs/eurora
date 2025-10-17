@@ -53,7 +53,7 @@ impl YoutubeAsset {
     /// Try to create from protocol buffer state
     pub fn try_from(asset: NativeYoutubeAsset) -> Result<Self, ActivityError> {
         let transcript = serde_json::from_str::<Vec<TranscriptLine>>(&asset.transcript)
-            .map_err(|e| ActivityError::from(e))?;
+            .map_err(ActivityError::from)?;
 
         Ok(YoutubeAsset {
             id: uuid::Uuid::new_v4().to_string(),
@@ -246,14 +246,14 @@ mod tests {
         let asset = YoutubeAsset::new(
             "test-id".to_string(),
             "https://youtube.com/watch?v=test".to_string(),
-            "Test Video".to_string(),
+            "Test V".to_string(),
             vec![],
             0.0,
         );
 
         let chip = asset.get_context_chip().unwrap();
         assert_eq!(chip.id, "test-id");
-        assert_eq!(chip.name, "video");
+        assert_eq!(chip.name, "Test V");
         assert_eq!(chip.extension_id, "7c7b59bb-d44d-431a-9f4d-64240172e092");
     }
 

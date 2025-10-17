@@ -49,7 +49,6 @@ use eur_secret::{self, Sensitive, secret};
 use hkdf::Hkdf;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use sha2::Sha256;
 use tracing::error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};

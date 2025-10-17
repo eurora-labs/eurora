@@ -135,10 +135,10 @@ impl ChatApi for ChatApiImpl {
             for info in infos {
                 let relative = info.file_path.to_string_lossy().into_owned();
                 let absolute = info.absolute_path.to_string_lossy().into_owned();
-                let id = match info.file_path.file_name() {
-                    Some(name) => Some(name.to_string_lossy().into_owned()),
-                    None => None,
-                };
+                let id = info
+                    .file_path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned());
                 personal_db
                     .insert_asset(&NewAsset {
                         id,
