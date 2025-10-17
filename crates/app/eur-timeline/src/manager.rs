@@ -260,7 +260,7 @@ impl TimelineManager {
     /// Save the assets to disk by ids
     pub async fn save_assets_to_disk_by_ids(
         &self,
-        ids: &Vec<String>,
+        ids: &[String],
     ) -> TimelineResult<Vec<SavedAssetInfo>> {
         let activity = {
             let storage = self.storage.lock().await;
@@ -299,15 +299,14 @@ impl TimelineManager {
     }
 
     /// Construct messages from current activity by ids
-    pub async fn construct_asset_messages_by_ids(&self, ids: &Vec<String>) -> Vec<Message> {
+    pub async fn construct_asset_messages_by_ids(&self, ids: &[String]) -> Vec<Message> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             activity
                 .assets
                 .iter()
                 .filter(|asset| ids.contains(&asset.get_id().to_string()))
-                .map(|asset| asset.construct_messages())
-                .flatten()
+                .flat_map(|asset| asset.construct_messages())
                 .collect()
         } else {
             Vec::new()
@@ -321,8 +320,7 @@ impl TimelineManager {
             activity
                 .assets
                 .iter()
-                .map(|asset| asset.construct_messages())
-                .flatten()
+                .flat_map(|asset| asset.construct_messages())
                 .collect()
         } else {
             Vec::new()
@@ -330,7 +328,7 @@ impl TimelineManager {
     }
 
     /// Construct messages from current activity snapshots by ids
-    pub async fn construct_snapshot_messages_by_ids(&self, ids: &Vec<String>) -> Vec<Message> {
+    pub async fn construct_snapshot_messages_by_ids(&self, ids: &[String]) -> Vec<Message> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             if let Some(snapshot) = activity.snapshots.last()

@@ -27,8 +27,8 @@ pub struct AuthManager {
     jwt_config: JwtConfig,
 }
 
-pub const ACCESS_TOKEN_HANDLE: &'static str = "AUTH_ACCESS_TOKEN";
-pub const REFRESH_TOKEN_HANDLE: &'static str = "AUTH_REFRESH_TOKEN";
+pub const ACCESS_TOKEN_HANDLE: &str = "AUTH_ACCESS_TOKEN";
+pub const REFRESH_TOKEN_HANDLE: &str = "AUTH_REFRESH_TOKEN";
 
 impl AuthManager {
     pub async fn new() -> Result<Self> {
