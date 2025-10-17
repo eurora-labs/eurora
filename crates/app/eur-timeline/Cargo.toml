@@ -9,6 +9,7 @@ description = "Timeline storage for capturing system state over time"
 eur-proto = { workspace = true }
 eur-native-messaging = { workspace = true }
 eur-activity = { workspace = true }
+keyring = { workspace = true }
 eur-fs = { workspace = true }
 eur-personal-db = { workspace = true }
 image.workspace = true

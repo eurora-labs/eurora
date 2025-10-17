@@ -439,6 +439,7 @@ impl CollectorService {
     }
 
     /// Handle restart with exponential backoff
+    #[allow(dead_code)]
     async fn handle_restart_with_backoff(&mut self) -> TimelineResult<()> {
         if !self.config.auto_restart_on_error {
             return Err(TimelineError::Collection(
