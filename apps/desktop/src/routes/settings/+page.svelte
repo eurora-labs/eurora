@@ -3,7 +3,7 @@
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Switch } from '@eurora/ui/components/switch/index';
 	import * as Card from '@eurora/ui/components/card/index';
-	import { createTauRPCProxy, type GeneralSettings } from '$lib/bindings/bindings';
+	import { createTauRPCProxy, type GeneralSettings } from '$lib/bindings/bindings.js';
 	import { onMount } from 'svelte';
 
 	import FirstPartyLogin from '$lib/components/FirstPartyLogin.svelte';
