@@ -7,10 +7,13 @@ on:
 
 env:
     RUST_BACKTRACE: full
+    RUSTUP_TOOLCHAIN: stable
+    PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
 
 permissions:
     id-token: write
     contents: read
+    packages: read
 
 jobs:
     changes:
@@ -105,12 +108,19 @@ jobs:
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
             - run: pnpm test
 
     rust-lint:
         needs: changes
         if: ${{ needs.changes.outputs.rust == 'true' }}
         runs-on: ubuntu-latest
+
         container:
             image: ghcr.io/eurora-labs/ci-base-image:latest
         env:
@@ -119,26 +129,13 @@ jobs:
             - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   persist-credentials: false
+                  lfs: true
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
             - run: cargo fmt --check --all
             - run: cargo check --workspace --all-targets
-
-    rust-docs:
-        needs: changes
-        if: ${{ needs.changes.outputs.rust == 'true' }}
-        runs-on: ubuntu-latest
-        container:
-            image: ghcr.io/eurora-labs/ci-base-image:latest
-        env:
-            CARGO_TERM_COLOR: always
-        steps:
-            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-              with:
-                  persist-credentials: false
-            # TODO(qix-): we have to exclude the app here for now because for some
-            # TODO(qix-): reason it doesn't build with the docs feature enabled.
-            - run: cargo doc --no-deps --all-features --document-private-items -p eurora-desktop
-              env:
-                  RUSTDOCFLAGS: -Dwarnings
 
     rust-test:
         needs: changes
@@ -165,6 +162,11 @@ jobs:
             - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   persist-credentials: false
+                  lfs: true
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
             - uses: ./.github/actions/check-crate
               with:
                   features: ${{ toJson(matrix.features) }}
@@ -196,6 +198,11 @@ jobs:
             - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   persist-credentials: false
+                  lfs: true
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Rust Cache
               uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
               with:

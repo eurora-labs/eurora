@@ -70,7 +70,7 @@ impl PersonalDatabaseManager {
             Ok(pool) => pool,
             Err(e) => {
                 // Delete the file and try again
-                let _ = std::fs::remove_file(&database_path);
+                let _ = std::fs::remove_file(database_path);
                 error!("Failed to connect to database: {}", e);
 
                 SqlitePoolOptions::new()
@@ -138,12 +138,11 @@ impl PersonalDatabaseManager {
         new_conversation: NewConversation,
     ) -> Result<Conversation, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
-        let created_at: DateTime<Utc>;
-        if new_conversation.created_at.is_some() {
-            created_at = new_conversation.created_at.unwrap();
+        let created_at: DateTime<Utc> = if new_conversation.created_at.is_some() {
+            new_conversation.created_at.unwrap()
         } else {
-            created_at = Utc::now();
-        }
+            Utc::now()
+        };
         let updated_at = created_at;
 
         sqlx::query(
@@ -193,16 +192,16 @@ impl PersonalDatabaseManager {
 
         let created_at: DateTime<Utc>;
         if let Some(created) = &na.created_at {
-            created_at = created.clone();
+            created_at = *created;
         } else {
             created_at = Utc::now();
         }
 
         let updated_at: DateTime<Utc>;
         if let Some(updated) = &na.updated_at {
-            updated_at = updated.clone();
+            updated_at = *updated;
         } else {
-            updated_at = created_at.clone();
+            updated_at = created_at;
         }
 
         sqlx::query(
@@ -215,8 +214,8 @@ impl PersonalDatabaseManager {
         .bind(na.activity_id.clone())
         .bind(na.relative_path.clone())
         .bind(na.absolute_path.clone())
-        .bind(created_at.clone())
-        .bind(updated_at.clone())
+        .bind(created_at)
+        .bind(updated_at)
         .execute(&self.pool)
         .await?;
 
@@ -233,8 +232,8 @@ impl PersonalDatabaseManager {
             activity_id: na.activity_id.clone(),
             relative_path: na.relative_path.clone(),
             absolute_path: na.absolute_path.clone(),
-            created_at: created_at.clone(),
-            updated_at: updated_at.clone(),
+            created_at,
+            updated_at,
         })
     }
 
@@ -251,7 +250,7 @@ impl PersonalDatabaseManager {
         )
         .bind(ncma.chat_message_id.clone())
         .bind(ncma.asset_id.clone())
-        .bind(created_at.clone())
+        .bind(created_at)
         .execute(&self.pool)
         .await?;
 
@@ -305,8 +304,8 @@ impl PersonalDatabaseManager {
         &self,
         conversation_id: &str,
     ) -> Result<(Conversation, Vec<ChatMessage>), sqlx::Error> {
-        let conversation = self.get_conversation(&conversation_id).await?;
-        let messages = self.get_chat_messages(&conversation_id).await?;
+        let conversation = self.get_conversation(conversation_id).await?;
+        let messages = self.get_chat_messages(conversation_id).await?;
 
         // let conversation = self.get_conversation(conversation_id).await?;
         // let messages = self.get_chat_messages(conversation_id);
@@ -340,7 +339,7 @@ impl PersonalDatabaseManager {
             updated_at = Utc::now();
         }
 
-        let result = sqlx::query(
+        let _result = sqlx::query(
             r#"
             INSERT INTO chat_message (id, conversation_id, role, content, has_assets, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -350,7 +349,7 @@ impl PersonalDatabaseManager {
         .bind(&new_message.conversation_id)
         .bind(&new_message.role)
         .bind(&new_message.content)
-        .bind(&new_message.has_assets)
+        .bind(new_message.has_assets)
         .bind(created_at)
         .bind(updated_at)
         .execute(&self.pool)
@@ -419,8 +418,8 @@ impl PersonalDatabaseManager {
         .bind(activity_id)
         .bind(asset.relative_path.clone())
         .bind(asset.absolute_path.clone())
-        .bind(asset.created_at.clone())
-        .bind(asset.updated_at.clone())
+        .bind(asset.created_at)
+        .bind(asset.updated_at)
         .execute(&self.pool)
         .await?;
 

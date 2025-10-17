@@ -1,6 +1,11 @@
+import browser from 'webextension-polyfill';
+import type { NativeResponse } from '$lib/models';
+
 export type MessageType = 'NEW' | 'GENERATE_ASSETS' | 'GENERATE_SNAPSHOT';
 
-export type ChromeObj = { type: MessageType; [key: string]: unknown };
+export type BrowserObj = { type: MessageType; [key: string]: unknown };
+
+export type WatcherResponse = NativeResponse | void;
 
 export abstract class Watcher<T> {
 	public params: T;
@@ -10,20 +15,23 @@ export abstract class Watcher<T> {
 	}
 
 	abstract listen(
-		obj: ChromeObj,
-		sender: chrome.runtime.MessageSender,
-		response: (response?: any) => void,
-	): void;
+		obj: BrowserObj,
+		sender: browser.Runtime.MessageSender,
+		response: (response?: WatcherResponse) => void,
+	): boolean;
 
-	abstract handleNew(obj: ChromeObj, sender: chrome.runtime.MessageSender): Promise<void>;
+	abstract handleNew(
+		obj: BrowserObj,
+		sender: browser.Runtime.MessageSender,
+	): Promise<WatcherResponse>;
 
 	abstract handleGenerateAssets(
-		obj: ChromeObj,
-		sender: chrome.runtime.MessageSender,
-	): Promise<void>;
+		obj: BrowserObj,
+		sender: browser.Runtime.MessageSender,
+	): Promise<WatcherResponse>;
 
 	abstract handleGenerateSnapshot(
-		obj: ChromeObj,
-		sender: chrome.runtime.MessageSender,
-	): Promise<void>;
+		obj: BrowserObj,
+		sender: browser.Runtime.MessageSender,
+	): Promise<WatcherResponse>;
 }
