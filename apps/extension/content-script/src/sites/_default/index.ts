@@ -18,7 +18,7 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 		obj: ArticleChromeMessage,
 		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
-	) {
+	): boolean {
 		const { type } = obj;
 
 		let promise: Promise<WatcherResponse>;
@@ -38,9 +38,15 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 				return false;
 		}
 
-		promise.then((result) => {
-			response(result);
-		});
+		promise
+			.then((result) => {
+				response(result);
+			})
+			.catch((error) => {
+				const message = error instanceof Error ? error.message : String(error);
+				console.error('Article watcher failed', { error });
+				response({ kind: 'Error', data: message });
+			});
 
 		return true;
 	}

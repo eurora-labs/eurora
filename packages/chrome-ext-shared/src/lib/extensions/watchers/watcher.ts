@@ -18,7 +18,7 @@ export abstract class Watcher<T> {
 		obj: BrowserObj,
 		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
-	): void;
+	): boolean;
 
 	abstract handleNew(
 		obj: BrowserObj,
