@@ -107,7 +107,6 @@ pub async fn select_strategy_for_process(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::SnapshotFunctionality;
 
     #[test]
     fn test_activity_creation() {

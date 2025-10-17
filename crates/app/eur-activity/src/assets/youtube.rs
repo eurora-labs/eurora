@@ -53,7 +53,7 @@ impl YoutubeAsset {
     /// Try to create from protocol buffer state
     pub fn try_from(asset: NativeYoutubeAsset) -> Result<Self, ActivityError> {
         let transcript = serde_json::from_str::<Vec<TranscriptLine>>(&asset.transcript)
-            .map_err(|e| ActivityError::from(e))?;
+            .map_err(ActivityError::from)?;
 
         Ok(YoutubeAsset {
             id: uuid::Uuid::new_v4().to_string(),

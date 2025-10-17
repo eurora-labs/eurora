@@ -30,6 +30,7 @@ pub(crate) struct SettingsEnforceSaveToDisk<'a> {
 }
 
 impl SettingsEnforceSaveToDisk<'_> {
+    #[allow(dead_code)]
     pub fn save(&mut self) -> Result<()> {
         // Mark as completed first so failure to save will not make us complain about not saving.
         self.saved = true;
@@ -68,6 +69,7 @@ impl SettingsWithDiskSync {
     ///
     /// * `config_dir` contains the application settings file.
     /// * `subscriber` receives any change to it.
+    #[allow(dead_code)]
     pub fn new(config_dir: impl AsRef<Path>) -> Result<Self> {
         let config_path = config_dir.as_ref().join(SETTINGS_FILE);
         let app_settings = AppSettings::load(&config_path)?;
@@ -80,6 +82,7 @@ impl SettingsWithDiskSync {
     }
 
     /// Return a reference to the most recently loaded [`Settings`].
+    #[allow(dead_code)]
     pub fn get(&self) -> Result<RwLockReadGuard<'_, AppSettings>> {
         self.snapshot
             .read()
@@ -87,6 +90,7 @@ impl SettingsWithDiskSync {
     }
 
     /// Allow changes only from within this crate to implement all possible settings updates [here](crate::api).
+    #[allow(dead_code)]
     pub(crate) fn get_mut_enforce_save(&self) -> Result<SettingsEnforceSaveToDisk<'_>> {
         self.snapshot
             .write()
@@ -99,11 +103,13 @@ impl SettingsWithDiskSync {
     }
 
     /// The path from which application settings will be read from disk.
+    #[allow(dead_code)]
     pub fn config_path(&self) -> &Path {
         &self.config_path
     }
 
     /// Start watching [`Self::config_path()`] for changes and inform
+    #[allow(dead_code)]
     pub fn watch_in_background(
         &mut self,
         send_event: impl Fn(AppSettings) -> Result<()> + Send + Sync + 'static,

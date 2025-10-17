@@ -238,21 +238,21 @@ impl AuthManager {
 
     /// Try to restore session from stored tokens
     async fn restore_session(&self) -> Result<()> {
-        if let Some(access_token) = self.token_storage.get_access_token().await? {
-            if let Ok(claims) = validate_access_token(&access_token, &self.jwt_config) {
-                let user_info = UserInfo {
-                    id: claims.sub,
-                    username: claims.username,
-                    email: claims.email,
-                    display_name: None, // Not stored in JWT
-                };
+        if let Some(access_token) = self.token_storage.get_access_token().await?
+            && let Ok(claims) = validate_access_token(&access_token, &self.jwt_config)
+        {
+            let user_info = UserInfo {
+                id: claims.sub,
+                username: claims.username,
+                email: claims.email,
+                display_name: None, // Not stored in JWT
+            };
 
-                let mut user_guard = self.current_user.write().await;
-                *user_guard = Some(user_info.clone());
+            let mut user_guard = self.current_user.write().await;
+            *user_guard = Some(user_info.clone());
 
-                debug!("Session restored for user: {}", user_info.username);
-                return Ok(());
-            }
+            debug!("Session restored for user: {}", user_info.username);
+            return Ok(());
         }
 
         Err(anyhow!("No valid session to restore"))

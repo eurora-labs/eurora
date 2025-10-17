@@ -242,7 +242,7 @@ impl TwitterAsset {
                 tweet
                     .author
                     .as_ref()
-                    .map_or(false, |a| a.eq_ignore_ascii_case(author))
+                    .is_some_and(|a| a.eq_ignore_ascii_case(author))
             })
             .collect()
     }

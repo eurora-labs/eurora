@@ -65,9 +65,7 @@ impl ArticleSnapshot {
 
     /// Get the primary content (highlight or selection)
     pub fn get_primary_content(&self) -> Option<&str> {
-        self.highlight
-            .as_deref()
-            .or_else(|| self.selection_text.as_deref())
+        self.highlight.as_deref().or(self.selection_text.as_deref())
     }
 
     /// Get content length
@@ -80,16 +78,16 @@ impl ArticleSnapshot {
     pub fn contains_keyword(&self, keyword: &str) -> bool {
         let keyword_lower = keyword.to_lowercase();
 
-        if let Some(content) = self.get_primary_content() {
-            if content.to_lowercase().contains(&keyword_lower) {
-                return true;
-            }
+        if let Some(content) = self.get_primary_content()
+            && content.to_lowercase().contains(&keyword_lower)
+        {
+            return true;
         }
 
-        if let Some(title) = &self.page_title {
-            if title.to_lowercase().contains(&keyword_lower) {
-                return true;
-            }
+        if let Some(title) = &self.page_title
+            && title.to_lowercase().contains(&keyword_lower)
+        {
+            return true;
         }
 
         false

@@ -1,35 +1,34 @@
 //! YouTube snapshot implementation
 
 use eur_native_messaging::types::NativeYoutubeSnapshot;
-use eur_proto::shared::ProtoImageFormat;
 use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
 use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 
 use crate::{error::ActivityError, types::SnapshotFunctionality};
 
-/// Helper function to safely load images from protocol buffer data
-fn load_image_from_proto(
-    proto_image: eur_proto::shared::ProtoImage,
-) -> Result<DynamicImage, ActivityError> {
-    let format = ProtoImageFormat::try_from(proto_image.format)
-        .map_err(|_| ActivityError::ProtocolBuffer("Invalid image format".to_string()))?;
+// /// Helper function to safely load images from protocol buffer data
+// fn load_image_from_proto(
+//     proto_image: eur_proto::shared::ProtoImage,
+// ) -> Result<DynamicImage, ActivityError> {
+//     let format = ProtoImageFormat::try_from(proto_image.format)
+//         .map_err(|_| ActivityError::ProtocolBuffer("Invalid image format".to_string()))?;
 
-    let image = match format {
-        ProtoImageFormat::Png => {
-            image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::Png)?
-        }
-        ProtoImageFormat::Jpeg => {
-            image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::Jpeg)?
-        }
-        ProtoImageFormat::Webp => {
-            image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::WebP)?
-        }
-        _ => image::load_from_memory(&proto_image.data)?,
-    };
+//     let image = match format {
+//         ProtoImageFormat::Png => {
+//             image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::Png)?
+//         }
+//         ProtoImageFormat::Jpeg => {
+//             image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::Jpeg)?
+//         }
+//         ProtoImageFormat::Webp => {
+//             image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::WebP)?
+//         }
+//         _ => image::load_from_memory(&proto_image.data)?,
+//     };
 
-    Ok(image)
-}
+//     Ok(image)
+// }
 
 /// YouTube video snapshot with frame capture
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,12 +123,12 @@ impl YoutubeSnapshot {
     /// Get the video frame as a DynamicImage
     pub fn get_video_frame(&mut self) -> Option<&DynamicImage> {
         // If we don't have the runtime image but have serialized data, deserialize it
-        if self.video_frame_image.is_none() && self.video_frame.is_some() {
-            if let Some(bytes) = &self.video_frame {
-                if let Ok(img) = image::load_from_memory(bytes) {
-                    self.video_frame_image = Some(img);
-                }
-            }
+        if self.video_frame_image.is_none()
+            && self.video_frame.is_some()
+            && let Some(bytes) = &self.video_frame
+            && let Ok(img) = image::load_from_memory(bytes)
+        {
+            self.video_frame_image = Some(img);
         }
 
         self.video_frame_image.as_ref()
@@ -139,7 +138,7 @@ impl YoutubeSnapshot {
     pub fn get_progress_percentage(&self) -> Option<f32> {
         self.video_duration.map(|duration| {
             if duration > 0.0 {
-                (self.current_time / duration).min(1.0).max(0.0)
+                (self.current_time / duration).clamp(0.0, 1.0)
             } else {
                 0.0
             }
@@ -230,9 +229,4 @@ impl From<NativeYoutubeSnapshot> for YoutubeSnapshot {
         Self::try_from(snapshot)
             .expect("Failed to convert NativeYoutubeSnapshot to YoutubeSnapshot")
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 }

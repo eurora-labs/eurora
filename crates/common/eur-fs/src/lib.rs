@@ -93,8 +93,7 @@ pub fn create_dirs_then_write<P: AsRef<Path>>(
         )
     })?;
 
-    let temp_path = create_temp_file_path(parent_dir)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let temp_path = create_temp_file_path(parent_dir).map_err(std::io::Error::other)?;
 
     // Write to temporary file
     fs::write(&temp_path, contents.as_ref())?;

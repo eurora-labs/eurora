@@ -32,7 +32,7 @@ impl Default for ActivityStorageConfig {
             base_dir: dirs::data_dir().unwrap_or_else(|| PathBuf::from("./assets")),
             use_content_hash: true,
             max_file_size: Some(100 * 1024 * 1024), // 100MB default limit
-            main_key: main_key,
+            main_key,
         }
     }
 }
@@ -104,7 +104,7 @@ impl ActivityStorage {
     pub async fn save_assets_to_disk_by_ids(
         &self,
         activity: &Activity,
-        ids: &Vec<String>,
+        ids: &[String],
     ) -> ActivityResult<Vec<SavedAssetInfo>> {
         let mut saved_assets = Vec::new();
 
@@ -140,7 +140,7 @@ impl ActivityStorage {
 
         bytes = encrypt_file_contents(&self.config.main_key, &bytes, asset.get_asset_type())
             .await
-            .map_err(|e| ActivityError::Encryption(e))?;
+            .map_err(ActivityError::Encryption)?;
 
         // Make a placeholder filepath
         let file_path = self.generate_asset_path(asset, None)?;
@@ -170,12 +170,11 @@ impl ActivityStorage {
 
         let filename = if let Some(hash) = content_hash {
             // Use content hash for deduplication
-            format!("{}", &hash[..16])
+            hash[..16].to_string()
         } else {
             // Use sanitized unique ID + sanitized display name
-            let sanitized_name = sanitize_filename(&asset.get_display_name());
-            let sanitized_id = sanitize_filename(&asset.get_unique_id());
-            format!("{}", sanitized_id)
+            // let _sanitized_name = sanitize_filename(&asset.get_display_name());
+            sanitize_filename(&asset.get_unique_id()).to_string()
         };
 
         path.push(filename);
@@ -189,10 +188,7 @@ impl ActivityStorage {
 
     /// Check if an asset exists in storage
     pub async fn asset_exists(&self, file_path: &Path) -> bool {
-        match fs::try_exists(self.config.base_dir.join(file_path)).await {
-            Ok(v) => v,
-            Err(_) => false,
-        }
+        (fs::try_exists(self.config.base_dir.join(file_path)).await).unwrap_or_default()
     }
 
     /// Get the absolute path for a relative asset path
@@ -236,11 +232,10 @@ fn sanitize_filename(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use tempfile::TempDir;
-
     use super::*;
 
     // Mock asset for testing
+    #[allow(dead_code)]
     struct MockAsset {
         id: String,
         name: String,
