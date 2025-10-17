@@ -226,7 +226,6 @@ impl Default for StrategyRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ActivityAsset, ActivitySnapshot};
 
     struct MockStrategyFactory {
         metadata: StrategyMetadata,

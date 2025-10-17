@@ -7,7 +7,7 @@ use aws_config::BehaviorVersion;
 use aws_sdk_s3::{Client as S3Client, presigning::PresigningConfig};
 use chrono::Utc;
 use semver::Version;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, instrument, warn};
 
 use crate::{
     error::UpdateServiceError,

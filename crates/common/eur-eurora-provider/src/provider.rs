@@ -10,6 +10,7 @@ use tonic::{
     transport::{Channel, ClientTlsConfig, Endpoint},
 };
 use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
+#[allow(unused_imports)]
 use tower::{ServiceBuilder, layer::Layer};
 use tracing::{debug, error};
 
@@ -18,10 +19,6 @@ use crate::{
     error::EuroraError,
     proto::chat::{proto_chat_service_client::ProtoChatServiceClient, *},
 };
-
-async fn auth_interceptor(request: Request<()>) -> Result<Request<()>, Status> {
-    Ok(request)
-}
 
 #[derive(Clone)]
 struct AuthInterceptor {
