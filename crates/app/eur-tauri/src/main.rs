@@ -69,13 +69,12 @@ async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
 
 async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
     let posthog_key = option_env!("POSTHOG_API_KEY");
-    if posthog_key.is_some() {
-        return posthog_rs::init_global(posthog_key.unwrap()).await;
-    } else {
-        return Err(posthog_rs::Error::Connection(
-            "Posthog key not found".to_string(),
-        ));
+    if let Some(key) = posthog_key {
+        return posthog_rs::init_global(key).await;
     }
+    Err(posthog_rs::Error::Connection(
+        "Posthog key not found".to_string(),
+    ))
 }
 
 fn main() {
@@ -447,7 +446,7 @@ fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
             let Some(launcher) = app.get_window(&launcher_label) else {
                 return;
             };
-            toggle_launcher_window(&launcher);
+            let _ = toggle_launcher_window(&launcher);
         })
         .build()
 }
