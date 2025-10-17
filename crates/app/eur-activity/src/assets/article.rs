@@ -89,9 +89,10 @@ impl ArticleAsset {
         let keyword_lower = keyword.to_lowercase();
         self.title.to_lowercase().contains(&keyword_lower)
             || self.content.to_lowercase().contains(&keyword_lower)
-            || self.author.as_ref().map_or(false, |author| {
-                author.to_lowercase().contains(&keyword_lower)
-            })
+            || self
+                .author
+                .as_ref()
+                .is_some_and(|author| author.to_lowercase().contains(&keyword_lower))
     }
 }
 

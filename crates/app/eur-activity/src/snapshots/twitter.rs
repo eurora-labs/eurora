@@ -130,7 +130,7 @@ impl TwitterSnapshot {
                 tweet
                     .author
                     .as_ref()
-                    .map_or(false, |a| a.eq_ignore_ascii_case(author))
+                    .is_some_and(|a| a.eq_ignore_ascii_case(author))
             })
             .collect()
     }
@@ -226,18 +226,5 @@ impl From<NativeTwitterSnapshot> for TwitterSnapshot {
     fn from(snapshot: NativeTwitterSnapshot) -> Self {
         Self::try_from(snapshot)
             .expect("Failed to convert NativeTwitterSnapshot to TwitterSnapshot")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn create_test_tweet(text: &str, author: Option<&str>) -> TwitterTweet {
-        TwitterTweet::new(
-            text.to_string(),
-            author.map(|a| a.to_string()),
-            Some("2024-01-01T00:00:00Z".to_string()),
-        )
     }
 }
