@@ -9,6 +9,11 @@ on:
                 required: false
                 description: Target SHA
 
+env:
+    RUST_BACKTRACE: full
+    RUSTUP_TOOLCHAIN: stable
+    PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
+
 jobs:
     test:
         name: Run Tests
