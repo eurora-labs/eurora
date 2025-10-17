@@ -194,6 +194,12 @@ impl BrowserStrategyFactory {
     }
 }
 
+impl Default for BrowserStrategyFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 use async_trait::async_trait;
 
 use crate::{
