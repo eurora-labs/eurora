@@ -187,7 +187,7 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     let monitor_id = monitor.id.clone();
     tauri::async_runtime::spawn(async move {
         match capture_monitor_by_id(&monitor_id)
-            .and_then(|m| Ok(image::DynamicImage::ImageRgba8(m).to_rgb8()))
+            .map(|m| image::DynamicImage::ImageRgba8(m).to_rgb8())
             .and_then(image_to_base64)
         {
             Ok(base64) => {
@@ -304,9 +304,9 @@ pub fn position_hover_window(hover_window: &tauri::WebviewWindow) {
 
 /// Monitor cursor position and reposition hover window when cursor moves to different screen
 pub async fn monitor_cursor_for_hover(hover_window: tauri::WebviewWindow) {
-    let last_monitor_id = String::new();
-    let last_cursor_x = 0.0;
-    let last_cursor_y = 0.0;
+    let _last_monitor_id = String::new();
+    let _last_cursor_x = 0.0;
+    let _last_cursor_y = 0.0;
 
     loop {
         // Very fast polling for maximum responsiveness - check every 16ms (~60fps)
