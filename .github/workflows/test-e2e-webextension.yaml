@@ -37,7 +37,7 @@ jobs:
                       ~/.cache/ms-playwright
                   key: ${{ runner.os }}-playwright-${{ steps.get_playwright_version.outputs.playwright-version }}
             # - if: steps.playwright-cache.outputs.cache-hit != 'true'
-            - id: Install deps
+            - id: install_deps
               run: cd apps/extensnion/content-script && pnpm exec playwright install --with-deps
 
             - name: Run Playwright tests
