@@ -36,12 +36,11 @@ jobs:
                   path: |
                       ~/.cache/ms-playwright
                   key: ${{ runner.os }}-playwright-${{ steps.get_playwright_version.outputs.playwright-version }}
-            # - if: steps.playwright-cache.outputs.cache-hit != 'true'
-            - id: install_deps
+            - if: steps.playwright-cache.outputs.cache-hit != 'true'
               run: cd apps/extension/content-script && pnpm exec playwright install --with-deps
 
             - name: Run Playwright tests
-              run: pnpm test:e2e:extension
+              run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test:e2e:extension
             - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
               if: ${{ !cancelled() }}
               with:
