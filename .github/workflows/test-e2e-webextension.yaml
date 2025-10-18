@@ -38,7 +38,7 @@ jobs:
                   key: ${{ runner.os }}-playwright-${{ steps.get_playwright_version.outputs.playwright-version }}
             # - if: steps.playwright-cache.outputs.cache-hit != 'true'
             - id: install_deps
-              run: cd apps/extensnion/content-script && pnpm exec playwright install --with-deps
+              run: cd apps/extension/content-script && pnpm exec playwright install --with-deps
 
             - name: Run Playwright tests
               run: pnpm test:e2e:extension
