@@ -5,6 +5,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
+		"package": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"format": "prettier --write .",
@@ -13,9 +14,13 @@
 		"test": "npm run test:unit -- --run"
 	},
 	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
 		"./*": {
-			"import": "./dist/*.js",
-			"types": "./dist/*.d.ts"
+			"types": "./dist/*.d.ts",
+			"import": "./dist/*.js"
 		}
 	},
 	"files": [
