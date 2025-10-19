@@ -1,0 +1,74 @@
+name: E2E Blackbox Tests
+env:
+    RUST_BACKTRACE: full
+    RUSTUP_TOOLCHAIN: stable
+    PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches: [main]
+        paths-ignore:
+            - 'apps/web/**'
+    workflow_dispatch:
+        inputs:
+            sha:
+                type: string
+                required: false
+                description: Target SHA
+
+jobs:
+    test:
+        name: e2e-blackbox
+        runs-on: ubuntu-latest
+        container:
+            image: ghcr.io/eurora-labs/ci-base-image:latest
+        env:
+            CARGO_TERM_COLOR: always
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  persist-credentials: false
+                  lfs: true
+              if: ${{ github.event_name != 'workflow_dispatch' }}
+              name: Checkout
+            - uses: actions/checkout@v5
+              name: Checkout (specific commit from manual dispatch)
+              if: ${{ github.event_name == 'workflow_dispatch' }}
+              with:
+                  persist-credentials: false
+                  lfs: true
+                  ref: ${{ github.event.inputs.sha }}
+            - name: Rust Cache
+              uses: Swatinem/rust-cache@v2.8.1
+              with:
+                  shared-key: e2e-blackbox-rust-binaries
+                  save-if: ${{ github.ref == 'refs/heads/main' }}
+            - name: Setup node environment
+              uses: ./.github/actions/init-env-node
+            - name: Build SvelteKit
+              run: pnpm build:desktop -- --mode development
+            - name: Build Tauri
+              run: pnpm build:test
+            - name: Install tauri-driver
+              if: ${{ github.ref != 'refs/heads/main' }}
+              run: |
+                  if [ ! -e "$HOME/.cargo/bin/tauri-driver" ]; then
+                    cargo install tauri-driver
+                  fi
+
+            # Run it through `xvfb-run` to have a fake display server which allows our
+            # application to run headless without any changes to the code
+            - name: WebdriverIO
+              if: ${{ github.ref != 'refs/heads/main' }}
+              run: xvfb-run pnpm test:e2e:blackbox
+
+            - uses: actions/upload-artifact@v4
+              if: failure()
+              with:
+                  name: WebdriverIO Artifacts
+                  overwrite: true
+                  path: |
+                      ./e2e/blackbox/videos
+                      ~/.config/com.eurora.app*/logs
