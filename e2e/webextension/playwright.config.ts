@@ -1,10 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
+ * Web Extension E2E Testing Configuration
+ * Tests the complete browser extension including:
+ * - Content scripts
+ * - Background scripts (service worker)
+ * - Popup window
+ *
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-	testDir: './e2e',
+	testDir: './tests',
 
 	/* Run tests in files in parallel */
 	fullyParallel: true,
@@ -19,7 +25,7 @@ export default defineConfig({
 	workers: process.env['CI'] ? 1 : undefined,
 
 	/* Reporter to use. See https://playwright.dev/docs/test-reporters */
-	reporter: 'html',
+	reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
 
 	/* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
 	use: {
@@ -28,13 +34,20 @@ export default defineConfig({
 
 		/* Screenshot on failure */
 		screenshot: 'only-on-failure',
+
+		/* Video on first retry */
+		video: 'retain-on-failure',
 	},
 
 	/* Configure projects for major browsers */
 	projects: [
 		{
 			name: 'chromium',
-			use: { ...devices['Desktop Chrome'] },
+			use: {
+				...devices['Desktop Chrome'],
+				// Extension tests run with chromium channel to support extensions
+				channel: 'chromium',
+			},
 		},
 
 		{
