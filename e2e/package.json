@@ -4,6 +4,7 @@
 	"private": true,
 	"devDependencies": {
 		"@playwright/test": "1.56.1",
+		"@types/chrome": "^0.1.24",
 		"@types/node": "^24.8.1",
 		"@wdio/cli": "^9.18.4",
 		"@wdio/globals": "^9.17.0",
@@ -18,9 +19,11 @@
 		"test:e2e:not-tauri": "wdio run ./web/wdio.web.conf.ts",
 		"test:e2e:blackbox": "wdio run ./blackbox/wdio.blackbox.conf.ts",
 		"test:e2e:playwright": "pnpm exec playwright test --config ./playwright/playwright.config.ts --tsconfig ./playwright/tsconfig.json",
-		"test:e2e:playwright:open": "pnpm exec playwright test --config ./playwright/playwright.config.ts --tsconfig ./playwright/tsconfig.json --ui"
+		"test:e2e:playwright:open": "pnpm exec playwright test --config ./playwright/playwright.config.ts --tsconfig ./playwright/tsconfig.json --ui",
+		"test:e2e:webextension": "pnpm exec playwright test --config ./webextension/playwright.config.ts --tsconfig ./webextension/tsconfig.json"
 	},
 	"dependencies": {
+		"@eurora/chrome-ext-shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"get-port": "^7.1.0",
 		"tmp-promise": "^3.0.3"
