@@ -1,6 +1,6 @@
 import { WatcherResponse } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
-import { test, expect } from '../util/fixtures.ts';
-import { waitForBootstrap, waitForSiteMounted } from '../util/helpers.ts';
+import { test, expect } from '../utils/fixtures.ts';
+import { waitForBootstrap, waitForSiteMounted } from '../utils/helpers.ts';
 
 test.describe('Youtube Watcher Tests', () => {
 	test('should extract English subtitles from a video', async ({ page, sw }) => {
@@ -18,6 +18,10 @@ test.describe('Youtube Watcher Tests', () => {
 		});
 
 		expect(response).toBeDefined();
+		if (response === undefined) {
+			throw new Error('Response is undefined');
+		}
+
 		expect(response.kind).toEqual('NativeYoutubeAsset');
 		expect(response.data).toBeDefined();
 		expect(Array.isArray(JSON.parse(response.data.transcript))).toEqual(true);
@@ -37,6 +41,12 @@ test.describe('Youtube Watcher Tests', () => {
 				);
 			});
 		});
+
+		expect(response).toBeDefined();
+		if (response === undefined) {
+			throw new Error('Response is undefined');
+		}
+
 		expect(response.kind).toEqual('NativeYoutubeSnapshot');
 		expect(response.data).toBeDefined();
 		expect(response.data.video_frame_base64).toBeDefined();
