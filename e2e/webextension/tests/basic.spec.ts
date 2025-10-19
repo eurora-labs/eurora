@@ -1,5 +1,5 @@
-import { test, expect } from './util/fixtures.ts';
-import { waitForBootstrap, waitForSiteMounted } from './util/helpers.ts';
+import { test, expect } from './utils/fixtures.ts';
+import { waitForBootstrap, waitForSiteMounted } from './utils/helpers.ts';
 
 test.describe('Content Script Basic Tests', () => {
 	test('should load a basic webpage', async ({ page }) => {
