@@ -15,7 +15,7 @@
 		"dev:ui": "pnpm --filter @eurora/ui storybook",
 		"check": "turbo run check --no-daemon",
 		"build:ui": "turbo run build --filter @eurora/ui...",
-		"build:webextension": "turbo run build --filter={./apps/extension/*}...",
+		"build:webextension": "turbo run build --filter={./apps/extension/**/*}...",
 		"dev:web": "pnpm --filter @eurora/web dev",
 		"dev:web:watch": "pnpm --filter @eurora/ui package && concurrently \"pnpm --filter @eurora/ui dev:watch\" \"pnpm --filter @eurora/web dev\" --names \"ui,web\" --prefix-colors \"blue,green\"",
 		"build:web": "turbo run build --filter @eurora/web...",
