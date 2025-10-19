@@ -17,6 +17,7 @@
 	"devDependencies": {
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
+		"rollup-plugin-copy": "^3.5.0",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"sveltekit-adapter-chrome-extension": "^2.0.0",
