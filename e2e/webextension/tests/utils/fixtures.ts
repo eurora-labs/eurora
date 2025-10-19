@@ -7,15 +7,22 @@ const __dirname = path.dirname(__filename);
 
 /**
  * Extension fixture for loading the browser extension in tests
+ *
+ * This fixture provides:
+ * - context: A persistent browser context with the extension loaded
+ * - extensionId: The ID of the loaded extension
+ * - sw: The service worker (background script) of the extension
  */
 export const test = base.extend<{
 	context: BrowserContext;
 	extensionId: string;
 	sw: Worker;
 }>({
-	// Override context to load extension
+	// Override context to load the complete extension (content scripts, background, popup)
 	context: async ({}, use) => {
-		const pathToExtension = path.join(__dirname, '../../../../../extensions/chromium');
+		// Path to the built extension directory
+		const pathToExtension = path.join(__dirname, '../../../../extensions/chromium');
+
 		const context = await chromium.launchPersistentContext('', {
 			channel: 'chromium',
 			args: [
@@ -23,6 +30,7 @@ export const test = base.extend<{
 				`--load-extension=${pathToExtension}`,
 			],
 		});
+
 		try {
 			await use(context);
 		} finally {
@@ -30,18 +38,24 @@ export const test = base.extend<{
 		}
 	},
 
-	// Get extension ID for testing
+	// Get extension ID from the service worker URL
 	extensionId: async ({ context }, use) => {
-		// for manifest v3:
+		// For manifest v3: Get the service worker
 		let [serviceWorker] = context.serviceWorkers();
-		if (!serviceWorker) serviceWorker = await context.waitForEvent('serviceworker');
+		if (!serviceWorker) {
+			serviceWorker = await context.waitForEvent('serviceworker');
+		}
 
 		const extensionId = serviceWorker.url().split('/')[2];
 		await use(extensionId);
 	},
+
+	// Provide direct access to the service worker for testing background script functionality
 	sw: async ({ context }, use) => {
 		let [serviceWorker] = context.serviceWorkers();
-		if (!serviceWorker) serviceWorker = await context.waitForEvent('serviceworker');
+		if (!serviceWorker) {
+			serviceWorker = await context.waitForEvent('serviceworker');
+		}
 		await use(serviceWorker);
 	},
 });
