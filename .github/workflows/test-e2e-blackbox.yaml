@@ -27,13 +27,13 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               with:
                   persist-credentials: false
                   lfs: true
               if: ${{ github.event_name != 'workflow_dispatch' }}
               name: Checkout
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
               name: Checkout (specific commit from manual dispatch)
               if: ${{ github.event_name == 'workflow_dispatch' }}
               with:
@@ -41,7 +41,7 @@ jobs:
                   lfs: true
                   ref: ${{ github.event.inputs.sha }}
             - name: Rust Cache
-              uses: Swatinem/rust-cache@v2.8.1
+              uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
               with:
                   shared-key: e2e-blackbox-rust-binaries
                   save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -72,7 +72,7 @@ jobs:
               if: ${{ github.ref != 'refs/heads/main' }}
               run: xvfb-run pnpm test:e2e:blackbox
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
               if: failure()
               with:
                   name: WebdriverIO Artifacts
