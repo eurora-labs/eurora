@@ -55,6 +55,7 @@ function CopyToFirefoxPlugin() {
 		closeBundle() {
 			// Ensure the firefox output directory exists
 			mkdirSync(firefoxOutDir, { recursive: true });
+			mkdirSync(chromiumOutDir, { recursive: true });
 			// Copy all files from chromium output to firefox output
 			cpSync(chromiumOutDir, firefoxOutDir, { recursive: true });
 			console.log(`✓ Copied content scripts to firefox extension folder`);
