@@ -20,10 +20,7 @@
 		"test:e2e:blackbox": "wdio run ./blackbox/wdio.blackbox.conf.ts",
 		"test:e2e:playwright": "pnpm exec playwright test --config ./playwright/playwright.config.ts --tsconfig ./playwright/tsconfig.json",
 		"test:e2e:playwright:open": "pnpm exec playwright test --config ./playwright/playwright.config.ts --tsconfig ./playwright/tsconfig.json --ui",
-		"test:e2e:webextension": "playwright test --config ./webextension/playwright.config.ts",
-		"test:e2e:webextension:ui": "playwright test --config ./webextension/playwright.config.ts --ui",
-		"test:e2e:webextension:debug": "playwright test --config ./webextension/playwright.config.ts --debug",
-		"test:e2e:webextension:report": "playwright show-report ./webextension/playwright-report"
+		"test:e2e:webextension": "pnpm exec playwright test --config ./webextension/playwright.config.ts --tsconfig ./webextension/tsconfig.json"
 	},
 	"dependencies": {
 		"@eurora/chrome-ext-shared": "workspace:*",
