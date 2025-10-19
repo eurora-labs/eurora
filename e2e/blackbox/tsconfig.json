@@ -15,5 +15,5 @@
 		"noUnusedParameters": true,
 		"noFallthroughCasesInSwitch": true
 	},
-	"include": ["./**/*.ts", "./**/*.js", "./**/*.svelte", "./util.ts"]
+	"include": ["./**/*.ts", "./**/*.js", "./utils.ts"]
 }
