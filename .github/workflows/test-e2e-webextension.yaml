@@ -9,6 +9,9 @@ on:
                 required: false
                 description: Target SHA
 
+env:
+    PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
+
 jobs:
     test:
         name: Run Extension E2E Tests
@@ -41,7 +44,8 @@ jobs:
               run: cd e2e && pnpm exec playwright install --with-deps
 
             - name: Build extension
-              run: pnpm build:webextension
+              run: pnpm build
+              # run: pnpm build:webextension
 
             - name: Run Playwright tests for extensions
               run: pnpm exec turbo run test:e2e:webextension
