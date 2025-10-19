@@ -2,10 +2,16 @@ import { TestRecorder } from './record.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Frameworks } from '@wdio/types';
 
 const videoRecorder = new TestRecorder();
 let tauriDriver: ChildProcess;
+
+// Get the absolute path to the Tauri binary
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const tauriBinaryPath = path.resolve(__dirname, '../../target/debug/eur-tauri');
 
 export const config = {
 	hostname: '127.0.0.1',
@@ -16,7 +22,7 @@ export const config = {
 	capabilities: [
 		{
 			'tauri:options': {
-				application: '../target/debug/gitbutler-tauri',
+				application: tauriBinaryPath,
 			},
 		},
 	],
@@ -39,7 +45,7 @@ export const config = {
 	connectionRetryCount: 0,
 
 	beforeTest: async function (test: Frameworks.Test) {
-		const videoPath = path.join(import.meta.dirname, '/e2e/videos');
+		const videoPath = path.join(import.meta.dirname, 'videos');
 		videoRecorder.start(test, videoPath);
 	},
 
