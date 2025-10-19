@@ -1,7 +1,7 @@
 /// <reference types='vitest' />
 import { defineConfig } from 'vite';
 import * as path from 'path';
-import { readdirSync, cpSync } from 'fs';
+import { readdirSync, cpSync, mkdirSync } from 'fs';
 
 const rootDir = path.resolve(__dirname);
 const chromiumOutDir = path.resolve(__dirname, '../../../extensions/chromium/scripts/content');
@@ -53,6 +53,8 @@ function CopyToFirefoxPlugin() {
 	return {
 		name: 'copy-to-firefox',
 		closeBundle() {
+			// Ensure the firefox output directory exists
+			mkdirSync(firefoxOutDir, { recursive: true });
 			// Copy all files from chromium output to firefox output
 			cpSync(chromiumOutDir, firefoxOutDir, { recursive: true });
 			console.log(`✓ Copied content scripts to firefox extension folder`);
