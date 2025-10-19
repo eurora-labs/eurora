@@ -1,10 +1,8 @@
-
-
 [package]
 name = "eur-remote-db"
 version = "0.0.0"
 edition = "2024"
-authors = ["Eurora <eurora@company.com>"]
+authors.workspace = true
 description = "Eurora Remote DB"
 
 [dependencies]

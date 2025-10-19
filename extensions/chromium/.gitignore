@@ -1,1 +1,8 @@
 *.zip
+
+pages/*
+!pages/.gitkeep
+
+scripts/*
+!scripts/.gitkeep
+

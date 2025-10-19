@@ -493,9 +493,6 @@ importers:
       '@eurora/shared':
         specifier: workspace:*
         version: link:../../../packages/shared
-      '@playwright/test':
-        specifier: ^1.56.1
-        version: 1.56.1
       '@testing-library/jest-dom':
         specifier: ^6.9.1
         version: 6.9.1
@@ -665,6 +662,9 @@ importers:
       prettier-plugin-svelte:
         specifier: ^3.3.3
         version: 3.4.0(prettier@3.6.2)(svelte@5.40.2)
+      rollup-plugin-copy:
+        specifier: ^3.5.0
+        version: 3.5.0
       svelte:
         specifier: catalog:svelte
         version: 5.40.2
@@ -930,6 +930,9 @@ importers:
 
   e2e:
     dependencies:
+      '@eurora/chrome-ext-shared':
+        specifier: workspace:*
+        version: link:../packages/chrome-ext-shared
       '@eurora/ui':
         specifier: workspace:*
         version: link:../packages/ui
@@ -943,6 +946,9 @@ importers:
       '@playwright/test':
         specifier: 1.56.1
         version: 1.56.1
+      '@types/chrome':
+        specifier: ^0.1.24
+        version: 0.1.24
       '@types/node':
         specifier: ^24.8.1
         version: 24.8.1
