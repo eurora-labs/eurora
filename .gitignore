@@ -274,31 +274,11 @@ reports/*
 
 .venv
 
-extensions/**/pages/*
-!extensions/**/pages/.gitkeep
-
-extensions/**/scripts/*
-!extensions/**/scripts/.gitkeep
-
-extensions/**/content-scripts/*
-!extensions/**/content-scripts/.gitkeep
-
 vitest.config.*.timestamp*
 
-extensions/**/katex/*
-!extensions/**/katex/.gitkeep
-
-# 
-
-extensions/**/pdfjs/viewer/*
 
 *.pdf
 
-extensions/**/pdfjs/viewer/package.json
-extensions/**/content/*
-extensions/**/options/*
-extensions/**/pdfjs/*
-extensions/**/contentstyle.css
 
 *.sqlite
 
