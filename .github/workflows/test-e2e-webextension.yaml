@@ -44,7 +44,7 @@ jobs:
               run: cd e2e && pnpm exec playwright install --with-deps
 
             - name: Build extension
-              run: pnpm build
+              run: pnpm install && pnpm build
               # run: pnpm build:webextension
 
             - name: Run Playwright tests for extensions
