@@ -1,8 +1,8 @@
 import { WatcherResponse } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
-import { test, expect } from '../util/fixtures.ts';
-import { waitForBootstrap, waitForSiteMounted } from '../util/helpers.ts';
+import { test, expect } from '../utils/fixtures.ts';
+import { waitForBootstrap, waitForSiteMounted } from '../utils/helpers.ts';
 
-test.describe('Article Watcher Tests', () => {
+test.describe('Default Site Watcher Tests', () => {
 	test('should extract article from page', async ({ page, sw }) => {
 		await page.goto('https://example.com');
 		await waitForBootstrap(page);
@@ -17,19 +17,23 @@ test.describe('Article Watcher Tests', () => {
 			});
 		});
 
+		if (response === undefined) {
+			throw new Error('Response is undefined');
+		}
+
 		expect(response).toBeDefined();
 		expect(response.kind).toEqual('NativeArticleAsset');
 		expect(response.data.title).toBeDefined();
 		expect(response.data.text_content).toBeDefined();
 		expect(response.data.text_content).toContain('This domain is for use in');
 	});
+
 	test('should extract selected text from page', async ({ page, sw }) => {
 		await page.goto('https://example.com');
 		await waitForBootstrap(page);
 		await waitForSiteMounted(page, 'default');
 
 		// Initialize selection and range
-
 		const selectedText = await page.evaluate(() => {
 			const p = document.querySelector('p');
 
@@ -56,6 +60,11 @@ test.describe('Article Watcher Tests', () => {
 		});
 
 		expect(response).toBeDefined();
+
+		if (response === undefined) {
+			throw new Error('Response is undefined');
+		}
+
 		expect(response.kind).toEqual('NativeArticleSnapshot');
 		expect(response.data).toBeDefined();
 		expect(response.data.highlighted_text).toEqual(selectedText);
