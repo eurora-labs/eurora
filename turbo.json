@@ -33,7 +33,7 @@
 			"env": ["PLAYWRIGHT_BROWSERS_PATH"],
 			"dependsOn": ["package"]
 		},
-		"test:e2e:extension": {
+		"test:e2e:webextension": {
 			"env": ["PLAYWRIGHT_BROWSERS_PATH"],
 			"dependsOn": ["package"]
 		},
