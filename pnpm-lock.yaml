@@ -662,6 +662,9 @@ importers:
       prettier-plugin-svelte:
         specifier: ^3.3.3
         version: 3.4.0(prettier@3.6.2)(svelte@5.40.2)
+      rollup-plugin-copy:
+        specifier: ^3.5.0
+        version: 3.5.0
       svelte:
         specifier: catalog:svelte
         version: 5.40.2
