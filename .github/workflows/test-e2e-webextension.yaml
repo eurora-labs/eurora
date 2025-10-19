@@ -36,11 +36,13 @@ jobs:
                   path: |
                       ~/.cache/ms-playwright
                   key: ${{ runner.os }}-playwright-${{ steps.get_playwright_version.outputs.playwright-version }}
-            # - if: steps.playwright-cache.outputs.cache-hit != 'true'
-            - name: Install Playwright
+            - if: steps.playwright-cache.outputs.cache-hit != 'true'
               run: cd e2e && pnpm exec playwright install --with-deps
 
-            - name: Build Playwright tests for extensions
+            - name: Build extension
+              run: pnpm build:webextension
+
+            - name: Run Playwright tests for extensions
               run: pnpm exec turbo run test:e2e:webextension
             - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
               if: ${{ !cancelled() }}
