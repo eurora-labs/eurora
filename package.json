@@ -40,7 +40,7 @@
 		"test": "turbo run test --no-daemon",
 		"test:watch": "pnpm --filter @eurora/desktop run test:watch",
 		"test:e2e:web": "turbo run test:e2e:web",
-		"test:e2e:desktop": "pnpm --filter @eurora/desktop run test:e2e",
+		"test:e2e:blackbox": "pnpm --filter @eurora/e2e run test:e2e:blackbox",
 		"test:e2e:webextension": "turbo run test:e2e:webextension"
 	},
 	"devDependencies": {
