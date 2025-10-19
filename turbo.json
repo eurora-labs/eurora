@@ -33,6 +33,10 @@
 			"env": ["PLAYWRIGHT_BROWSERS_PATH"],
 			"dependsOn": ["package"]
 		},
+		"test:e2e:extension": {
+			"env": ["PLAYWRIGHT_BROWSERS_PATH"],
+			"dependsOn": ["package"]
+		},
 		"//#globallint": {
 			"dependsOn": ["@eurora/ui#package"]
 		}
