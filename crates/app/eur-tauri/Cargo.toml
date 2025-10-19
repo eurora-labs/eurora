@@ -23,6 +23,7 @@ tauri-plugin-stronghold = "2.0.0"
 anyhow = { workspace = true }
 eur-secret = { workspace = true }
 eur-prompt-kit = { workspace = true }
+keyring = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
 reqwest = { version = "0.12.23", features = ["json", "native-tls"] }
 serde = { workspace = true }
@@ -114,3 +115,6 @@ devtools = ["tauri/devtools"]
 custom-protocol = ["tauri/custom-protocol"]
 
 error-context = ["dep:backtrace"]
+
+# Use mock keyring for testing (e2e tests, CI environments without system keyring)
+mock-keyring = []
