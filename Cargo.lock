@@ -3345,6 +3345,7 @@ dependencies = [
  "ferrous-llm-core",
  "futures",
  "image",
+ "keyring",
  "lazy_static",
  "log",
  "open",
