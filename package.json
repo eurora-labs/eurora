@@ -16,6 +16,7 @@
 		"check": "turbo run check --no-daemon",
 		"build:ui": "turbo run build --filter @eurora/ui...",
 		"build:webextension": "turbo run build --filter={./apps/extension/**/*}...",
+		"build:test": "pnpm exec tauri build --config crates/app/eur-tauri/tauri.conf.test.json --features mock-keyring -- --profile dev",
 		"dev:web": "pnpm --filter @eurora/web dev",
 		"dev:web:watch": "pnpm --filter @eurora/ui package && concurrently \"pnpm --filter @eurora/ui dev:watch\" \"pnpm --filter @eurora/web dev\" --names \"ui,web\" --prefix-colors \"blue,green\"",
 		"build:web": "turbo run build --filter @eurora/web...",
@@ -39,7 +40,7 @@
 		"test": "turbo run test --no-daemon",
 		"test:watch": "pnpm --filter @eurora/desktop run test:watch",
 		"test:e2e:web": "turbo run test:e2e:web",
-		"test:e2e:desktop": "pnpm --filter @eurora/desktop run test:e2e",
+		"test:e2e:blackbox": "pnpm --filter @eurora/e2e run test:e2e:blackbox",
 		"test:e2e:webextension": "turbo run test:e2e:webextension"
 	},
 	"devDependencies": {
