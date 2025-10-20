@@ -5,7 +5,7 @@
 	import { SiGithub, SiStackoverflow, SiReddit } from '@icons-pack/svelte-simple-icons';
 
 	const { Story } = defineMeta({
-		title: 'Components / Chat',
+		title: 'Components / Timeline',
 		component: Root,
 		parameters: {
 			docs: {
@@ -368,7 +368,7 @@ function handleScroll() {
 	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
 </script>
 
-<Story name="Short Conversation">
+<Story name="Basic Timeline">
 	<StorybookContainer class="p-0">
 		{#snippet children()}
 			<div class="h-[600px] w-full">
@@ -378,138 +378,6 @@ function handleScroll() {
 					</h2>
 					<Chat.Root class="h-[500px]">
 						{#each shortConversationMessages as message}
-							<Chat.Message
-								variant={message.role === 'user' ? 'default' : 'assistant'}
-								finishRendering={() => {}}
-							>
-								<Chat.MessageContent>{message.content}</Chat.MessageContent>
-								{#if message.sources && message.sources.length > 0}
-									<Chat.MessageFooter>
-										<Chat.MessageSource>
-											{#each message.sources as source}
-												{@html source}
-											{/each}
-										</Chat.MessageSource>
-									</Chat.MessageFooter>
-								{/if}
-							</Chat.Message>
-						{/each}
-					</Chat.Root>
-				</div>
-			</div>
-		{/snippet}
-	</StorybookContainer>
-</Story>
-
-<Story name="Medium Conversation">
-	<StorybookContainer class="p-0">
-		{#snippet children()}
-			<div class="h-[600px] w-full">
-				<div class="h-full p-6">
-					<h2 class="text-lg font-semibold mb-4 text-white">
-						Medium Conversation (8-10 messages)
-					</h2>
-					<Chat.Root class="h-[500px]">
-						{#each mediumConversationMessages as message}
-							<Chat.Message
-								variant={message.role === 'user' ? 'default' : 'assistant'}
-								finishRendering={() => {}}
-							>
-								<Chat.MessageContent>{message.content}</Chat.MessageContent>
-								{#if message.sources && message.sources.length > 0}
-									<Chat.MessageFooter>
-										<Chat.MessageSource>
-											{#each message.sources as source}
-												{@html source}
-											{/each}
-										</Chat.MessageSource>
-									</Chat.MessageFooter>
-								{/if}
-							</Chat.Message>
-						{/each}
-					</Chat.Root>
-				</div>
-			</div>
-		{/snippet}
-	</StorybookContainer>
-</Story>
-
-<Story name="Long Conversation with Scrolling">
-	<StorybookContainer class="p-0">
-		{#snippet children()}
-			<div class="h-[600px] w-full">
-				<div class="h-full p-6">
-					<h2 class="text-lg font-semibold mb-4 text-white">
-						Long Conversation (15+ messages with scrolling)
-					</h2>
-					<Chat.Root class="h-[500px]">
-						{#each longConversationMessages as message}
-							<Chat.Message
-								variant={message.role === 'user' ? 'default' : 'assistant'}
-								finishRendering={() => {}}
-							>
-								<Chat.MessageContent>{message.content}</Chat.MessageContent>
-								{#if message.sources && message.sources.length > 0}
-									<Chat.MessageFooter>
-										<Chat.MessageSource>
-											{#each message.sources as source}
-												{@html source}
-											{/each}
-										</Chat.MessageSource>
-									</Chat.MessageFooter>
-								{/if}
-							</Chat.Message>
-						{/each}
-					</Chat.Root>
-				</div>
-			</div>
-		{/snippet}
-	</StorybookContainer>
-</Story>
-
-<Story name="Mixed Content with Sources">
-	<StorybookContainer class="p-0">
-		{#snippet children()}
-			<div class="h-[600px] w-full">
-				<div class="h-full p-6">
-					<h2 class="text-lg font-semibold mb-4 text-white">
-						Mixed Content with Various Sources
-					</h2>
-					<Chat.Root class="h-[500px]">
-						{#each mixedContentMessages as message}
-							<Chat.Message
-								variant={message.role === 'user' ? 'default' : 'assistant'}
-								finishRendering={() => {}}
-							>
-								<Chat.MessageContent>{message.content}</Chat.MessageContent>
-								{#if message.sources && message.sources.length > 0}
-									<Chat.MessageFooter>
-										<Chat.MessageSource>
-											{#each message.sources as source}
-												{@html source}
-											{/each}
-										</Chat.MessageSource>
-									</Chat.MessageFooter>
-								{/if}
-							</Chat.Message>
-						{/each}
-					</Chat.Root>
-				</div>
-			</div>
-		{/snippet}
-	</StorybookContainer>
-</Story>
-
-<Story name="Interactive Chat Behavior">
-	<StorybookContainer class="p-0">
-		{#snippet children()}
-			<div class="h-[600px] w-full">
-				<div class="h-full p-6">
-					<h2 class="text-lg font-semibold mb-4 text-white">
-						Interactive Chat with Auto-scroll
-					</h2>
-					<Chat.Root class="h-[500px]">
-						{#each interactiveMessages as message}
 							<Chat.Message
 								variant={message.role === 'user' ? 'default' : 'assistant'}
 								finishRendering={() => {}}
