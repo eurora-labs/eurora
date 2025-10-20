@@ -1,18 +1,18 @@
 
-# Container for running E2E tests on MacOS
+# Container for running E2E tests on Linux
 #
-# 1. docker build --tag gitbutler/e2e:latest
-# 2. docker run --name e2e-agent --detach -p 2222:22 -v $GITBUTLER_REPO:/root/gitbutler \
-#     -v /tmp/e2e-pnpm-store:/tmp/pnpm-store gitbutler/e2e:latest
+# 1. docker build --tag eurora/e2e:latest -f e2e/blackbox/Dockerfile .
+# 2. docker run --name e2e-agent --detach -p 2222:22 -v $EURORA_REPO:/root/eurora \
+#     -v /tmp/e2e-pnpm-store:/tmp/pnpm-store eurora/e2e:latest
 # 3. docker cp -a ~/.ssh/id_ed25519.pub e2e-agent:/root/.ssh/authorized_keys
 # 4. Ensure correct folder permissions in container /root/.ssh folder
 # 5. ssh -p 2222 -Y root@localhost
 # The rest is run inside the container in your SSH session:
-# 6. cd /root/gitbutler
+# 6. cd /root/eurora
 # 7. pnpm install && cargo build
-# 8. cargo build -p gitbutler-git && cargo build -p gitbutler-cli
-# 9. pnpm build:test
-# 10. pnpm test:e2e:blackbox
+# 8. cargo build -p eur-tauri
+# 9. pnpm build:desktop -- --mode development
+# 10. cd e2e/blackbox && pnpm test:e2e:blackbox
 
 FROM ubuntu:24.04
 
@@ -56,7 +56,7 @@ RUN apt install -y \
 RUN apt install -y openssh-server && \
     # Needed for recording test execution.
     apt install -y ffmpeg && \
-    # Install gitbutler dependencies
+    # Install Eurora dependencies
     apt install -y cmake && \
     # Clean up
     apt -y autoremove && apt -y clean

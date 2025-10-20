@@ -2,7 +2,7 @@ import { WatcherResponse } from '@eurora/chrome-ext-shared/extensions/watchers/w
 import { test, expect } from '../utils/fixtures.ts';
 import { waitForBootstrap, waitForSiteMounted } from '../utils/helpers.ts';
 
-test.describe('Youtube Watcher Tests', () => {
+test.describe('Youtube Watcher Tests', { tag: '@youtube' }, () => {
 	test('should extract English subtitles from a video', async ({ page, sw }) => {
 		await page.goto('https://www.youtube.com/watch?v=CXKoCMVqM9s&t=1289s');
 		await waitForBootstrap(page);
