@@ -51,6 +51,6 @@
 	});
 </script>
 
-<main bind:this={mainRef} class="h-screen bg-transparent">
+<main bind:this={mainRef} class="h-full bg-transparent">
 	{@render children?.()}
 </main>
