@@ -80,6 +80,13 @@ async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
 fn main() {
     dotenv().ok();
 
+    // Initialize mock keyring for e2e tests and CI environments
+    #[cfg(feature = "mock-keyring")]
+    {
+        use keyring::{mock, set_default_credential_builder};
+        set_default_credential_builder(mock::default_credential_builder());
+    }
+
     let _guard = sentry::init((
         "https://a0c23c10925999f104c7fd07fd8e3871@o4508907847352320.ingest.de.sentry.io/4510097240424528",
         sentry::ClientOptions {
