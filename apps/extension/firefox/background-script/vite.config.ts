@@ -1,4 +1,3 @@
-// import { sentryVitePlugin } from '@sentry/vite-plugin';
 /// <reference types='vitest' />
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
@@ -68,5 +67,4 @@ export default defineConfig({
 	// 		provider: 'v8'
 	// 	}
 	// },
-	resolve: {},
 });
