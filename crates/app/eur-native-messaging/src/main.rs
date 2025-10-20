@@ -191,35 +191,11 @@ async fn main() -> Result<()> {
         .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
         .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
 
-    #[cfg(debug_assertions)]
-    {
-        // Write only to file
-        fmt()
-            .with_env_filter(filter.clone())
-            .with_writer(File::create("eur-native-messaging.log")?)
-            .init();
-    }
-
-    #[cfg(not(debug_assertions))]
-    {
-        tracing_subscriber::registry()
-            .with(tracing_subscriber::fmt::layer().with_filter(filter.clone()))
-            .with(sentry::integrations::tracing::layer().with_filter(filter))
-            .try_init()
-            .unwrap();
-
-        let _guard = sentry::init((
-            "https://ff55ae34aa53740318b8f1beace59031@o4508907847352320.ingest.de.sentry.io/4510096917725264",
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                traces_sample_rate: 0.0,
-                enable_logs: true,
-                send_default_pii: true, // during closed beta all metrics are non-anonymous
-                debug: true,
-                ..Default::default()
-            },
-        ));
-    }
+    // Write only to file
+    fmt()
+        .with_env_filter(filter.clone())
+        .with_writer(File::create("eur-native-messaging.log")?)
+        .init();
 
     // Ensure only one instance is running
     ensure_single_instance()?;
