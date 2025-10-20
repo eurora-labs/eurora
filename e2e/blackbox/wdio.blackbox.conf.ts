@@ -22,7 +22,7 @@ export const config = {
 	capabilities: [
 		{
 			'tauri:options': {
-				application: tauriBinaryPath,
+				application: '../target/debug/eur-tauri',
 			},
 		},
 	],
