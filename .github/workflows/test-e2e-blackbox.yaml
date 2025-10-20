@@ -40,6 +40,9 @@ jobs:
                   persist-credentials: false
                   lfs: true
                   ref: ${{ github.event.inputs.sha }}
+            - name: Install Webdriver dependencies
+              run: apt update && apt install -y webkit2gtk-driver ffmpeg xvfb
+              if: ${{ github.ref != 'refs/heads/main' }}
             - name: Rust Cache
               uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
               with:
