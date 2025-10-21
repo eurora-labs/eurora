@@ -1,5 +1,5 @@
 // Re-export main types for easy access
-pub use collector::{CollectorService, CollectorStats};
+pub use collector::{CollectorService, CollectorStats, FocusChangeEvent};
 pub use config::{CollectorConfig, FocusTrackingConfig, StorageConfig, TimelineConfig};
 pub use error::{TimelineError, TimelineResult};
 // Re-export activity types for convenience
