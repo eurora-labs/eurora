@@ -7,6 +7,7 @@
 pub mod assets;
 pub mod config;
 pub mod error;
+pub mod processes;
 pub mod registry;
 pub mod snapshots;
 pub mod storage;
