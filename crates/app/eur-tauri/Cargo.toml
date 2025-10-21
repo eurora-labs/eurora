@@ -54,6 +54,7 @@ open = "5"
 url = "2.5.4"
 dirs = "6.0.0"
 posthog-rs = { workspace = true }
+color-thief = "0.2.2"
 
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
