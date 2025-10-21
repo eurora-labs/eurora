@@ -2,6 +2,7 @@
 
 pub mod browser;
 pub mod default;
+pub mod processes;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;

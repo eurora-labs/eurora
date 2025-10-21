@@ -4,7 +4,7 @@
 	import Menubar from '$lib/components/Menubar.svelte';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import Timeline from '$lib/components/Timeline.svelte';
+	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 
 	let { children } = $props();
 	onMount(() => {
@@ -20,6 +20,11 @@
 	<main class="flex flex-col h-[calc(100vh-70px)] w-full">
 		<div class="flex-1">{@render children?.()}</div>
 
-		<div class="flex"><Timeline /></div>
+		<div class="flex">
+			<Timeline.Root>
+				<Timeline.Item>Test</Timeline.Item>
+				<Timeline.Item>Test</Timeline.Item>
+			</Timeline.Root>
+		</div>
 	</main>
 </Sidebar.Provider>
