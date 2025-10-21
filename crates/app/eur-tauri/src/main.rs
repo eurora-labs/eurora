@@ -7,6 +7,7 @@ use dotenv::dotenv;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_encrypt::MainKey;
 use eur_native_messaging::create_grpc_ipc_client;
+use eur_personal_db::{Activity, PersonalDatabaseManager};
 use eur_settings::AppSettings;
 use eur_tauri::launcher::{monitor_cursor_for_hover, toggle_launcher_window};
 use eur_tauri::util;
@@ -31,8 +32,6 @@ use eur_tauri::{
     },
 };
 use eur_timeline::TimelineManager;
-use eur_personal_db::{PersonalDatabaseManager, Activity};
-use uuid::Uuid;
 use tauri::{
     AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -44,6 +43,7 @@ use tauri_plugin_log::{Target, TargetKind, fern};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tracing::{debug, error};
+use uuid::Uuid;
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
@@ -304,7 +304,7 @@ fn main() {
                         if let Some(db_manager) = db_manager {
                             db_app_handle.manage(db_manager);
                             let timeline_mutex = db_app_handle.state::<async_mutex::Mutex<TimelineManager>>();
-                        
+
                             // Subscribe to focus change events before starting timeline
                             let mut focus_receiver = {
                                 let timeline = timeline_mutex.lock().await;
@@ -319,11 +319,11 @@ fn main() {
                                         focus_event.process_name,
                                         focus_event.window_title
                                     );
-                                    
+
                                     if let Some(icon) = &focus_event.icon {
                                         println!("   Icon: {}", icon);
                                     }
-                                    
+
                                     println!("   Timestamp: {}", focus_event.timestamp);
                                     debug!("Focus change event: {:?}", focus_event);
 
@@ -332,7 +332,7 @@ fn main() {
                                         let _ = db_manager.update_activity_end_time(&last_activity.id, focus_event.timestamp).await;
                                         debug!("Closed previous activity: {}", last_activity.name);
                                     }
-                                    
+
                                     // Create new activity for the focus change
                                     let activity = Activity {
                                         id: Uuid::new_v4().to_string(),
@@ -342,7 +342,7 @@ fn main() {
                                         started_at: focus_event.timestamp.to_rfc3339(),
                                         ended_at: None,
                                     };
-                                    
+
                                     match db_manager.insert_activity(&activity).await {
                                         Ok(_) => {
                                             println!("✅ Inserted activity: {} ({})", activity.name, activity.process_name);
@@ -354,17 +354,17 @@ fn main() {
                                     }
                                 }
                             });
-                            
+
                             let mut timeline = timeline_mutex.lock().await;
                             if let Err(e) = timeline.start().await {
                                 error!("Failed to start timeline collection: {}", e);
                             } else {
                                 debug!("Timeline collection started successfully");
                             }
-                                
+
                             }
                     });
-    
+
 
                     let launcher_label = launcher_window.label().to_string();
                     app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
@@ -401,7 +401,7 @@ fn main() {
                     //     db_app_handle.manage(db);
                     // });
                     // Initialize conversation storage
-                 
+
 
 
                     // Initialize IPC client
