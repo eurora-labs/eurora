@@ -31,6 +31,8 @@ use eur_tauri::{
     },
 };
 use eur_timeline::TimelineManager;
+use eur_personal_db::{PersonalDatabaseManager, Activity};
+use uuid::Uuid;
 use tauri::{
     AppHandle, Manager, Wry, generate_context,
     menu::{Menu, MenuItem},
@@ -288,18 +290,81 @@ fn main() {
                     })
                         .build().expect("Failed to create timeline");
                     app_handle.manage(async_mutex::Mutex::new(timeline));
-
-                    // Start timeline collection
-                    let timeline_handle = app_handle.clone();
+                    let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let timeline_mutex = timeline_handle.state::<async_mutex::Mutex<TimelineManager>>();
-                        let mut timeline = timeline_mutex.lock().await;
-                        if let Err(e) = timeline.start().await {
-                            error!("Failed to start timeline collection: {}", e);
-                        } else {
-                            debug!("Timeline collection started successfully");
-                        }
+                        let db_manager = match create_shared_database_manager(&db_app_handle).await {
+                            Ok(db) => {
+                                Some(db)
+                            }
+                            Err(e) => {
+                                error!("Failed to initialize personal database manager: {}", e);
+                                None
+                            }
+                        };
+                        if let Some(db_manager) = db_manager {
+                            db_app_handle.manage(db_manager);
+                            let timeline_mutex = db_app_handle.state::<async_mutex::Mutex<TimelineManager>>();
+                        
+                            // Subscribe to focus change events before starting timeline
+                            let mut focus_receiver = {
+                                let timeline = timeline_mutex.lock().await;
+                                timeline.subscribe_to_focus_events()
+                            };
+
+                            let focus_timeline_handle = db_app_handle.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let db_manager = focus_timeline_handle.state::<PersonalDatabaseManager>().inner();
+                                while let Ok(focus_event) = focus_receiver.recv().await {
+                                    println!("🎯 Focus changed to: {} - {}",
+                                        focus_event.process_name,
+                                        focus_event.window_title
+                                    );
+                                    
+                                    if let Some(icon) = &focus_event.icon {
+                                        println!("   Icon: {}", icon);
+                                    }
+                                    
+                                    println!("   Timestamp: {}", focus_event.timestamp);
+                                    debug!("Focus change event: {:?}", focus_event);
+
+                                    // Close previous active activity if exists
+                                    if let Ok(Some(last_activity)) = db_manager.get_last_active_activity().await {
+                                        let _ = db_manager.update_activity_end_time(&last_activity.id, focus_event.timestamp).await;
+                                        debug!("Closed previous activity: {}", last_activity.name);
+                                    }
+                                    
+                                    // Create new activity for the focus change
+                                    let activity = Activity {
+                                        id: Uuid::new_v4().to_string(),
+                                        name: focus_event.window_title.clone(),
+                                        icon_path: focus_event.icon.clone(),
+                                        process_name: focus_event.process_name.clone(),
+                                        started_at: focus_event.timestamp.to_rfc3339(),
+                                        ended_at: None,
+                                    };
+                                    
+                                    match db_manager.insert_activity(&activity).await {
+                                        Ok(_) => {
+                                            println!("✅ Inserted activity: {} ({})", activity.name, activity.process_name);
+                                            debug!("Activity inserted with ID: {}", activity.id);
+                                        }
+                                        Err(e) => {
+                                            error!("Failed to insert activity: {}", e);
+                                        }
+                                    }
+                                }
+                            });
+                            
+                            let mut timeline = timeline_mutex.lock().await;
+                            if let Err(e) = timeline.start().await {
+                                error!("Failed to start timeline collection: {}", e);
+                            } else {
+                                debug!("Timeline collection started successfully");
+                            }
+                                
+                            }
                     });
+    
 
                     let launcher_label = launcher_window.label().to_string();
                     app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
@@ -336,16 +401,7 @@ fn main() {
                     //     db_app_handle.manage(db);
                     // });
                     // Initialize conversation storage
-                    let db_app_handle = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        match create_shared_database_manager(&db_app_handle).await {
-                            Ok(db) => {
-                                db_app_handle.manage(db);
-                                debug!("Personal database manager initialized");
-                            }
-                            Err(e) => error!("Failed to initialize personal database manager: {}", e),
-                        }
-                    });
+                 
 
 
                     // Initialize IPC client
