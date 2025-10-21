@@ -10,7 +10,7 @@ use tracing::debug;
 use crate::{
     Activity, ActivityStorage, ActivityStorageConfig, ActivityStrategy, AssetFunctionality,
     ContextChip, DisplayAsset, TimelineError,
-    collector::{CollectorService, CollectorStats},
+    collector::{CollectorService, CollectorStats, FocusChangeEvent},
     config::TimelineConfig,
     error::TimelineResult,
     storage::{StorageStats, TimelineStorage},
@@ -401,6 +401,11 @@ impl TimelineManager {
     /// Get collector statistics
     pub fn get_collector_stats(&self) -> CollectorStats {
         self.collector.get_stats()
+    }
+
+    /// Subscribe to focus change events
+    pub fn subscribe_to_focus_events(&self) -> tokio::sync::broadcast::Receiver<FocusChangeEvent> {
+        self.collector.subscribe_to_focus_events()
     }
 
     /// Update storage configuration
