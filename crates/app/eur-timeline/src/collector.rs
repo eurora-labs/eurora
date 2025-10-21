@@ -8,6 +8,7 @@ use std::{
     time::Duration,
 };
 
+use eur_activity::processes::{Eurora, ProcessFunctionality};
 use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
 use tokio::{
     sync::{Mutex, mpsc},
@@ -279,12 +280,7 @@ impl CollectorService {
                             && let Some(window_title) = &window.window_title
                         {
                             // Filter out ignored processes
-                            #[cfg(target_os = "windows")]
-                            let eurora_process = "eur-tauri.exe";
-                            #[cfg(not(target_os = "windows"))]
-                            let eurora_process = "eur-tauri";
-
-                            if process_name != eurora_process {
+                            if process_name != Eurora.get_name() {
                                 debug!("▶ {}: {}", process_name, window_title);
                                 let _ = tx_clone.send(window);
                             }
