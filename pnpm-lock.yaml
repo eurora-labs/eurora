@@ -1118,8 +1118,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.41
-        version: 2.0.0-next.41(svelte@5.41.1)
+        specifier: 2.0.0-next.42
+        version: 2.0.0-next.42(svelte@5.41.1)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.41.1)
@@ -1594,8 +1594,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.41
-        version: 2.0.0-next.41(svelte@5.41.1)
+        specifier: 2.0.0-next.42
+        version: 2.0.0-next.42(svelte@5.41.1)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.41.1)
@@ -1790,8 +1790,8 @@ importers:
         specifier: ^25.0.1
         version: 25.0.1
       layerchart:
-        specifier: 2.0.0-next.41
-        version: 2.0.0-next.41(svelte@5.41.1)
+        specifier: 2.0.0-next.42
+        version: 2.0.0-next.42(svelte@5.41.1)
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.41.1)
@@ -4950,8 +4950,8 @@ packages:
     resolution: {integrity: sha512-ndfJ/JxxMd3nw31uyKoY2naivF+r29V+Lc0svZxe1JvvIRmi8hUsrMvdOwgS1o6uBHmiz91geQ0ylPP0aj1VUA==}
     engines: {node: '>=12'}
 
-  d3-tricontour@1.0.2:
-    resolution: {integrity: sha512-HIRxHzHagPtUPNabjOlfcyismJYIsc+Xlq4mlsts4e8eAcwyq9Tgk/sYdyhlBpQ0MHwVquc/8j+e29YjXnmxeA==}
+  d3-tricontour@1.1.0:
+    resolution: {integrity: sha512-G7gHKj89n2owmkGb6WX6ixcnQ0Kf/0wpa9VIh9DGdbHu8wdrlaHU4ir3/bFNERl8N8nn4G7e7qbtBG8N9caihQ==}
     engines: {node: '>=12'}
 
   dargs@8.1.0:
@@ -6478,8 +6478,8 @@ packages:
     resolution: {integrity: sha512-7W0vV3rqv5tokqkBAFV1LbR7HPOWzXQDpDgEuib/aJ1jsZZx6x3c2mBI+TJhJzOhkGeaLbCKEHXEXLfirtG2JA==}
     engines: {node: '>=18'}
 
-  layerchart@2.0.0-next.41:
-    resolution: {integrity: sha512-0TKf5TPJoNRJMKrWncWTdPtJa6ojxXdpH3sT3uMIJ/A9r9cWRbr0nq8s7dNtNwBeOBM4HxFMndOyZnZ35D2rEA==}
+  layerchart@2.0.0-next.42:
+    resolution: {integrity: sha512-vLMHaLaU5Glf7OG56cZiD/1Dt6qvYHxc9gbNTq2ypjs+3iGLekx//wvkvCAmx8mH/t6kx1fbmxwKpf+RrFkyew==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -12546,7 +12546,7 @@ snapshots:
       d3-array: 3.2.4
       d3-delaunay: 6.0.4
       d3-geo: 3.1.1
-      d3-tricontour: 1.0.2
+      d3-tricontour: 1.1.0
 
   d3-geo@3.1.1:
     dependencies:
@@ -12606,7 +12606,7 @@ snapshots:
 
   d3-timer@3.0.1: {}
 
-  d3-tricontour@1.0.2:
+  d3-tricontour@1.1.0:
     dependencies:
       d3-delaunay: 6.0.4
       d3-scale: 4.0.2
@@ -14344,7 +14344,7 @@ snapshots:
     dependencies:
       package-json: 10.0.1
 
-  layerchart@2.0.0-next.41(svelte@5.41.1):
+  layerchart@2.0.0-next.42(svelte@5.41.1):
     dependencies:
       '@dagrejs/dagre': 1.1.5
       '@layerstack/svelte-actions': 1.0.1-next.14
