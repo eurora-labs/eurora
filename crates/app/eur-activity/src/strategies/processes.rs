@@ -2,17 +2,26 @@ use crate::utils::os_pick;
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
-#[enum_dispatch(ProcessFunctionality)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SupportedProcesses {
-    Librewolf,
-    Chrome,
-    Firefox,
-}
+// #[enum_dispatch(ProcessFunctionality)]
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub enum SupportedProcesses {
+//     Librewolf,
+//     Chrome,
+//     Firefox,
+// }
 
 #[enum_dispatch]
 pub trait ProcessFunctionality {
     fn get_name(&self) -> &str;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Eurora;
+
+impl ProcessFunctionality for Eurora {
+    fn get_name(&self) -> &str {
+        os_pick("eur-tauri.exe", "eur-tauri", "eur-tauri")
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
