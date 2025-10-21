@@ -63,7 +63,7 @@
 		"prosemirror-example-setup": "^1.1.2",
 		"prosemirror-dropcursor": "^1.8.2",
 		"prosemirror-gapcursor": "^1.4.0",
-		"bits-ui": "^2.11.8",
+		"bits-ui": "^2.14.0",
 		"@lucide/svelte": "^0.546.0",
 		"clsx": "^2.1.1",
 		"tailwind-merge": "^3.3.1",
