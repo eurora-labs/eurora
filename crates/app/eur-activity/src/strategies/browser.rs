@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+pub use super::processes::*;
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
@@ -54,41 +55,7 @@ impl BrowserStrategy {
 
     /// Get list of supported browser processes
     pub fn get_supported_processes() -> Vec<&'static str> {
-        #[cfg(target_os = "windows")]
-        let processes = vec![
-            "firefox.exe",
-            "chrome.exe",
-            "msedge.exe",
-            "brave.exe",
-            "opera.exe",
-            "vivaldi.exe",
-            "librewolf.exe",
-        ];
-
-        #[cfg(target_os = "macos")]
-        let processes = vec![
-            "Firefox",
-            "Google Chrome",
-            "Microsoft Edge",
-            "Brave Browser",
-            "Opera",
-            "Vivaldi",
-            "Safari",
-            "LibreWolf",
-        ];
-
-        #[cfg(target_os = "linux")]
-        let processes = vec![
-            "firefox",
-            "chrome",
-            "chromium",
-            "brave",
-            "opera",
-            "vivaldi",
-            "librewolf",
-        ];
-
-        processes
+        vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
     }
 
     /// Retrieve assets from the browser
