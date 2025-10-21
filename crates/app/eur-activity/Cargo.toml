@@ -43,6 +43,7 @@ enum_dispatch = {workspace = true}
 dirs = { workspace = true }
 rand = { workspace = true }
 url = { version = "2.5.7" }
+cfg-if = { workspace = true }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }
