@@ -14,6 +14,8 @@ pub mod strategies;
 pub mod types;
 mod utils;
 
+pub use strategies::processes;
+
 // Re-export core types
 use std::sync::{Arc, OnceLock};
 
