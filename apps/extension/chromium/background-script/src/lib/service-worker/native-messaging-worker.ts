@@ -1,6 +1,6 @@
 // Native Messaging Service Worker - centralized handler for all native messaging
 // Keep track of the native port connection
-import { getCurrentTab } from '@eurora/browser-shared/tabs';
+import { handleGenerateAssets, handleGenerateSnapshot } from '@eurora/browser-shared/messaging';
 
 let nativePort: chrome.runtime.Port | null = null;
 
@@ -17,7 +17,7 @@ async function connect() {
 async function onMessageListener(message: { command: string }, sender: chrome.runtime.Port) {
 	switch (message.command) {
 		case 'GENERATE_ASSETS':
-			handleGenerateReport()
+			handleGenerateAssets()
 				.then((response) => {
 					console.log('Sending GENERATE_REPORT_RESPONSE message', response);
 					sender.postMessage(response);
@@ -61,84 +61,3 @@ function onDisconnectListener() {
 connect();
 
 console.log('Native messaging service worker registered');
-
-async function handleGenerateSnapshot() {
-	try {
-		// Get the current active tab
-		const activeTab = await getCurrentTab();
-
-		if (!activeTab || !activeTab.url) {
-			return { success: false, error: 'No active tab found' };
-		}
-
-		const response = await sendMessageWithRetry(activeTab.id, {
-			type: 'GENERATE_SNAPSHOT',
-		});
-
-		return { success: true, ...response };
-	} catch (error) {
-		console.error('Error generating snapshot:', error);
-		return {
-			success: false,
-			error: String(error),
-		};
-	}
-}
-
-/**
- * Sends a message to a tab with retry logic to handle content script initialization delays
- */
-async function sendMessageWithRetry(
-	tabId: number,
-	message: any,
-	maxRetries: number = 5,
-	delayMs: number = 500,
-): Promise<any> {
-	for (let attempt = 0; attempt < maxRetries; attempt++) {
-		try {
-			const response = await chrome.tabs.sendMessage(tabId, message);
-			return response;
-		} catch (error) {
-			const isLastAttempt = attempt === maxRetries - 1;
-			const isConnectionError =
-				error?.message?.includes('Receiving end does not exist') ||
-				chrome.runtime.lastError?.message?.includes('Receiving end does not exist');
-
-			if (isConnectionError && !isLastAttempt) {
-				console.log(`Content script not ready, retrying (${attempt + 1}/${maxRetries})...`);
-				await new Promise((resolve) => setTimeout(resolve, delayMs));
-				continue;
-			}
-			throw error;
-		}
-	}
-}
-
-/**
- * Handles the GENERATE_REPORT message by getting the current active tab,
- * checking if it's a YouTube video or article page, and requesting a report
- * from the appropriate watcher
- */
-async function handleGenerateReport() {
-	try {
-		// Get the current active tab
-		const activeTab = await getCurrentTab();
-
-		if (!activeTab || !activeTab.url) {
-			return { success: false, data: 'No active tab found', kind: 'Error' };
-		}
-
-		const response = await sendMessageWithRetry(activeTab.id, {
-			type: 'GENERATE_ASSETS',
-		});
-
-		return { success: true, ...response };
-	} catch (error) {
-		console.error('Error generating report:', error);
-		return {
-			kind: 'Error',
-			success: false,
-			data: String(error),
-		};
-	}
-}

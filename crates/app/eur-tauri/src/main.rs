@@ -315,16 +315,16 @@ fn main() {
                             tauri::async_runtime::spawn(async move {
                                 let db_manager = focus_timeline_handle.state::<PersonalDatabaseManager>().inner();
                                 while let Ok(focus_event) = focus_receiver.recv().await {
-                                    println!("🎯 Focus changed to: {} - {}",
+                                    debug!("Focus changed to: {} - {}",
                                         focus_event.process_name,
                                         focus_event.window_title
                                     );
 
                                     if let Some(icon) = &focus_event.icon {
-                                        println!("   Icon: {}", icon);
+                                        debug!("   Icon: {}", icon);
                                     }
 
-                                    println!("   Timestamp: {}", focus_event.timestamp);
+                                    debug!("   Timestamp: {}", focus_event.timestamp);
                                     debug!("Focus change event: {:?}", focus_event);
 
                                     // Close previous active activity if exists
