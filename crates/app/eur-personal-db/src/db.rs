@@ -385,6 +385,27 @@ impl PersonalDatabaseManager {
         Ok(messages)
     }
 
+    pub async fn list_activities(
+        &self,
+        limit: u16,
+        offset: u16,
+    ) -> Result<Vec<Activity>, sqlx::Error> {
+        let activities = sqlx::query_as(
+            r#"
+            SELECT id, name, icon_path, process_name, started_at, ended_at
+            FROM activity
+            ORDER BY started_at DESC
+            LIMIT $1,$2
+            "#,
+        )
+        .bind(offset)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(activities)
+    }
+
     pub async fn insert_activity(&self, activity: &Activity) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
