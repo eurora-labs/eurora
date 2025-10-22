@@ -5,12 +5,20 @@
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
+	import { inject } from '@eurora/shared/context';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+
+	let taurpcService = inject(TAURPC_SERVICE);
+	let timelineItems: string[] = $state([]);
 
 	let { children } = $props();
 	onMount(() => {
 		if (document) {
 			document.body.classList.add(`${platform()}-app`);
 		}
+		taurpcService.timeline.list().then((items) => {
+			timelineItems = items;
+		});
 	});
 </script>
 
@@ -22,8 +30,9 @@
 
 		<div class="flex">
 			<Timeline.Root>
-				<Timeline.Item>Test</Timeline.Item>
-				<Timeline.Item>Test</Timeline.Item>
+				{#each timelineItems as item}
+					<Timeline.Item>{item}</Timeline.Item>
+				{/each}
 			</Timeline.Root>
 		</div>
 	</main>
