@@ -24,6 +24,7 @@ use eur_tauri::{
         settings_procedures::{SettingsApi, SettingsApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
+        timeline_procedures::{TimelineApi, TimelineApiImpl},
         user_procedures::{UserApi, UserApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
@@ -478,6 +479,7 @@ fn main() {
                         .bigint(specta_typescript::BigIntExportBehavior::BigInt),
                 )
                 .merge(AuthApiImpl.into_handler())
+                .merge(TimelineApiImpl.into_handler())
                 .merge(ConversationApiImpl.into_handler())
                 .merge(SettingsApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
