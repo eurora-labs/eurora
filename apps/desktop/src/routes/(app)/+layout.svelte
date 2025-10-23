@@ -16,8 +16,12 @@
 		if (document) {
 			document.body.classList.add(`${platform()}-app`);
 		}
-		taurpcService.timeline.list().then((items) => {
-			timelineItems = items;
+		// taurpcService.timeline.list().then((items) => {
+		// 	timelineItems = items;
+		// });
+
+		taurpcService.timeline.new_app_event.on((app) => {
+			timelineItems.push(app);
 		});
 	});
 </script>
@@ -25,15 +29,16 @@
 <Menubar />
 <Sidebar.Provider open={false}>
 	<MainSidebar />
-	<main class="flex flex-col h-[calc(100vh-70px)] w-full">
-		<div class="flex-1">{@render children?.()}</div>
-
-		<div class="flex">
-			<Timeline.Root>
-				{#each timelineItems as item}
-					<Timeline.Item>{item}</Timeline.Item>
-				{/each}
-			</Timeline.Root>
+	<Sidebar.Inset>
+		<div class="flex flex-col h-[calc(100vh-70px)]">
+			<div class="flex-1">{@render children?.()}</div>
+			<div class="flex mb-4">
+				<Timeline.Root class="w-1 flex-1">
+					{#each timelineItems as item}
+						<Timeline.Item>{item}</Timeline.Item>
+					{/each}
+				</Timeline.Root>
+			</div>
 		</div>
-	</main>
+	</Sidebar.Inset>
 </Sidebar.Provider>
