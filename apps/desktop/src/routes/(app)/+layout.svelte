@@ -7,9 +7,10 @@
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import { inject } from '@eurora/shared/context';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 
 	let taurpcService = inject(TAURPC_SERVICE);
-	let timelineItems: string[] = $state([]);
+	let timelineItems: TimelineAppEvent[] = $state([]);
 
 	let { children } = $props();
 	onMount(() => {
@@ -21,7 +22,7 @@
 		// });
 
 		taurpcService.timeline.new_app_event.on((e) => {
-			timelineItems.push(e.name);
+			timelineItems.push(e);
 		});
 	});
 </script>
@@ -35,7 +36,7 @@
 			<div class="flex mb-4">
 				<Timeline.Root class="w-1 flex-1">
 					{#each timelineItems as item}
-						<Timeline.Item>{item}</Timeline.Item>
+						<Timeline.Item color={item.color}>{item.name}</Timeline.Item>
 					{/each}
 				</Timeline.Root>
 			</div>
