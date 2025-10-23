@@ -12,8 +12,12 @@
 	let scrollAreaRef = $state<HTMLDivElement>();
 </script>
 
-<ScrollArea ref={scrollAreaRef} orientation="horizontal" class="w-1/2 {className}">
-	<div class="flex flex-row gap-2">
+<ScrollArea
+	ref={scrollAreaRef}
+	orientation="horizontal"
+	class="w-full whitespace-nowrap {className}"
+>
+	<div class="flex flex-row w-max gap-2">
 		{@render children?.()}
 	</div>
 </ScrollArea>
