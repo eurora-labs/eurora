@@ -23,9 +23,7 @@
 		class="absolute w-full h-[15px] rounded-2xl top-1/2 -translate-y-1/2 border-solid border-1"
 		style="background-color: {color}; border-color: {borderColor};"
 	></div>
-	<div
-		class="relative z-10 flex items-center justify-center w-fit h-full text-sm text-center p-0 m-0"
-	>
+	<div class="relative z-10 flex items-center justify-center w-fit text-sm text-center p-0 m-0">
 		{@render children?.()}
 	</div>
 </div>

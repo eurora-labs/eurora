@@ -24,7 +24,7 @@ use eur_tauri::{
         settings_procedures::{SettingsApi, SettingsApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
-        timeline_procedures::{TimelineApi, TimelineApiImpl},
+        timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
         user_procedures::{UserApi, UserApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
@@ -318,8 +318,10 @@ fn main() {
                                 while let Ok(focus_event) = focus_receiver.recv().await {
                                     debug!("Focus changed to: {} - {}",
                                         focus_event.process_name,
-                                        focus_event.window_title
+                                        focus_event.window_title.clone()
                                     );
+                                    let _ = TauRpcTimelineApiEventTrigger::new(focus_timeline_handle.clone())
+                                        .new_app_event(focus_event.window_title.clone());
 
                                     if let Some(icon) = &focus_event.icon {
                                         debug!("   Icon: {}", icon);
