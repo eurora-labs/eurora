@@ -20,8 +20,8 @@
 		// 	timelineItems = items;
 		// });
 
-		taurpcService.timeline.new_app_event.on((app) => {
-			timelineItems.push(app);
+		taurpcService.timeline.new_app_event.on((e) => {
+			timelineItems.push(e.name);
 		});
 	});
 </script>
