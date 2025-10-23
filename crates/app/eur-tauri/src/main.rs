@@ -10,7 +10,7 @@ use eur_native_messaging::create_grpc_ipc_client;
 use eur_personal_db::{Activity, PersonalDatabaseManager};
 use eur_settings::AppSettings;
 use eur_tauri::launcher::{monitor_cursor_for_hover, toggle_launcher_window};
-use eur_tauri::procedures::timeline_procedures::AppEvent;
+use eur_tauri::procedures::timeline_procedures::TimelineAppEvent;
 use eur_tauri::util;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
@@ -322,9 +322,9 @@ fn main() {
                                         focus_event.window_title.clone()
                                     );
                                     let _ = TauRpcTimelineApiEventTrigger::new(focus_timeline_handle.clone())
-                                        .new_app_event( AppEvent {
+                                        .new_app_event( TimelineAppEvent {
                                             name: focus_event.window_title.clone(),
-                                            color: "".to_string(),
+                                            color: None,
                                             icon_base64: None
                                         });
 
