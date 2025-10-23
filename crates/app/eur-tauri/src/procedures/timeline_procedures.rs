@@ -1,10 +1,17 @@
 use eur_personal_db::PersonalDatabaseManager;
 use tauri::{Manager, Runtime};
 
+#[taurpc::ipc_type]
+pub struct AppEvent {
+    pub name: String,
+    pub color: String,
+    pub icon_base64: Option<String>,
+}
+
 #[taurpc::procedures(path = "timeline")]
 pub trait TimelineApi {
     #[taurpc(event)]
-    async fn new_app_event(name: String);
+    async fn new_app_event(event: AppEvent);
 
     async fn list<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Vec<String>, String>;
 }
