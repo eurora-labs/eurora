@@ -4,8 +4,6 @@ import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurp
 type TAURI_CHANNEL<T> = (response: T) => void
 
 
-export type AppEvent = { name: string; color: string; icon_base64: string | null }
-
 export type AppSettings = { 
 /**
  * General settings
@@ -168,6 +166,8 @@ nonAnonymousMetrics: boolean;
  */
 distinctId: string | null }
 
+export type TimelineAppEvent = { name: string; color: string | null; icon_base64: string | null }
+
 /**
  * A tool/function call made by the AI.
  */
@@ -234,7 +234,7 @@ send_key_to_launcher: (key: string) => Promise<null>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>},
 "timeline": {list: () => Promise<string[]>, 
-new_app_event: (event: AppEvent) => Promise<void>},
+new_app_event: (event: TimelineAppEvent) => Promise<void>},
 "user": {set_launcher_hotkey: (key: string, modifiers: string[]) => Promise<null>},
 "window": {background_image_changed: (base64: string) => Promise<void>, 
 get_scale_factor: (height: number) => Promise<number>, 
