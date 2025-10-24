@@ -321,6 +321,10 @@ fn main() {
                                         focus_event.process_name,
                                         focus_event.window_title.clone()
                                     );
+
+                                    debug!("The icon is: {:?}", focus_event.icon);
+
+
                                     let _ = TauRpcTimelineApiEventTrigger::new(focus_timeline_handle.clone())
                                         .new_app_event( TimelineAppEvent {
                                             name: focus_event.window_title.clone(),
@@ -328,12 +332,11 @@ fn main() {
                                             icon_base64: None
                                         });
 
-                                    if let Some(icon) = &focus_event.icon {
-                                        debug!("   Icon: {}", icon);
+                                    if let Some(_icon) = &focus_event.icon {
+                                        debug!("Icon present");
                                     }
 
-                                    debug!("   Timestamp: {}", focus_event.timestamp);
-                                    debug!("Focus change event: {:?}", focus_event);
+                                    debug!("Timestamp: {}", focus_event.timestamp);
 
                                     // Close previous active activity if exists
                                     if let Ok(Some(last_activity)) = db_manager.get_last_active_activity().await {
@@ -353,7 +356,7 @@ fn main() {
 
                                     match db_manager.insert_activity(&activity).await {
                                         Ok(_) => {
-                                            println!("✅ Inserted activity: {} ({})", activity.name, activity.process_name);
+                                            debug!("Inserted activity: {} ({})", activity.name, activity.process_name);
                                             debug!("Activity inserted with ID: {}", activity.id);
                                         }
                                         Err(e) => {
