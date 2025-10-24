@@ -30,7 +30,7 @@ uuid = { workspace = true }
 taurpc = { version = "0.5.1" }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
-ferrous-focus = { version = "0.2.5" }
+ferrous-focus = { version = "0.3.1" }
 tracing = { workspace = true }
 ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
 base64 = { workspace = true }
