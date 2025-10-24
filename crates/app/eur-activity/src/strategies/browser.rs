@@ -237,7 +237,6 @@ impl StrategyFactory for BrowserStrategyFactory {
 
 #[cfg(test)]
 mod tests {
-    use ferrous_focus::IconData;
 
     use super::*;
 
@@ -317,7 +316,7 @@ mod tests {
         let context = ProcessContext::new(
             "firefox".to_string(),
             "Firefox Browser".to_string(),
-            IconData::default(),
+            image::RgbaImage::new(16, 16),
         );
 
         let result = factory.create_strategy(&context).await;
