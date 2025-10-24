@@ -1,6 +1,6 @@
 <script lang="ts" module>
 	export interface TimelineItemProps {
-		color?: string;
+		color?: string | null;
 		children?: any;
 	}
 </script>
@@ -13,7 +13,7 @@
 		if (color == 'white') {
 			borderColor = 'black';
 		} else {
-			borderColor = color;
+			borderColor = color ?? 'black';
 		}
 	});
 </script>
