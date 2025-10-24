@@ -3,7 +3,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use ferrous_focus::IconData;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -34,12 +33,12 @@ pub struct ProcessContext {
     pub process_name: String,
     pub display_name: String,
     pub window_title: Option<String>,
-    pub icon: IconData,
+    pub icon: image::RgbaImage,
     pub executable_path: Option<std::path::PathBuf>,
 }
 
 impl ProcessContext {
-    pub fn new(process_name: String, display_name: String, icon: IconData) -> Self {
+    pub fn new(process_name: String, display_name: String, icon: image::RgbaImage) -> Self {
         Self {
             process_name,
             display_name,
@@ -314,7 +313,7 @@ mod tests {
         let context = ProcessContext::new(
             "firefox".to_string(),
             "Firefox Browser".to_string(),
-            IconData::default(),
+            image::RgbaImage::new(100, 100),
         );
 
         let strategy = registry.select_strategy(&context).await.unwrap();
@@ -334,7 +333,7 @@ mod tests {
         let context = ProcessContext::new(
             "unknown_app".to_string(),
             "Unknown App".to_string(),
-            IconData::default(),
+            image::RgbaImage::new(100, 100),
         );
 
         let result = registry.select_strategy(&context).await;
@@ -354,7 +353,7 @@ mod tests {
         let context = ProcessContext::new(
             "firefox".to_string(),
             "Firefox Browser".to_string(),
-            IconData::default(),
+            image::RgbaImage::new(100, 100),
         );
 
         // First call should cache the result
