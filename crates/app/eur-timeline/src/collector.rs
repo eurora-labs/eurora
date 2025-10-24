@@ -1,5 +1,9 @@
 //! Timeline collector service implementation
 
+use anyhow::{Result, anyhow};
+use base64::{Engine as _, engine::general_purpose};
+use chrono::{DateTime, Utc};
+use image::{ImageBuffer, Rgb, Rgba};
 use std::{
     sync::{
         Arc,
@@ -36,7 +40,20 @@ pub struct FocusChangeEvent {
     /// The icon of the application (if available)
     pub icon: Option<String>,
     /// Timestamp when the focus change occurred
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: DateTime<Utc>,
+}
+
+pub fn image_to_base64(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<String> {
+    let mut buffer = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut buffer);
+
+    image
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
+
+    let base64 = general_purpose::STANDARD.encode(&buffer);
+    // let base64 = base64::encode(&buffer);
+    Ok(format!("data:image/png;base64,{}", base64))
 }
 
 impl FocusChangeEvent {
@@ -324,11 +341,16 @@ impl CollectorService {
                             if process_name != Eurora.get_name() {
                                 debug!("▶ {}: {}", process_name, window_title);
 
+                                let icon_base64 = match window.icon.clone() {
+                                    Some(icon) => Some(image_to_base64(icon).unwrap_or_default()),
+                                    None => None,
+                                };
+
                                 // Emit focus change event
                                 let focus_event = FocusChangeEvent::new(
                                     process_name.clone(),
                                     window_title.clone(),
-                                    None,
+                                    icon_base64.clone(),
                                 );
 
                                 // Broadcast the focus change event (ignore errors if no listeners)
