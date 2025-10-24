@@ -108,8 +108,6 @@ impl StrategyFactory for DefaultStrategyFactory {
 
 #[cfg(test)]
 mod tests {
-    use ferrous_focus::IconData;
-
     use super::*;
 
     #[test]
@@ -220,7 +218,7 @@ mod tests {
         let context = ProcessContext::new(
             "unknown_app".to_string(),
             "Unknown Application".to_string(),
-            IconData::default(),
+            image::RgbaImage::new(16, 16),
         );
 
         let result = factory.create_strategy(&context).await;
