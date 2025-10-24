@@ -19,6 +19,7 @@ use crate::{
     types::{Activity, Asset, ChatMessage, Conversation},
 };
 
+#[derive(Debug, Clone)]
 pub struct PersonalDatabaseManager {
     pub pool: SqlitePool,
 }
@@ -384,6 +385,27 @@ impl PersonalDatabaseManager {
         Ok(messages)
     }
 
+    pub async fn list_activities(
+        &self,
+        limit: u16,
+        offset: u16,
+    ) -> Result<Vec<Activity>, sqlx::Error> {
+        let activities = sqlx::query_as(
+            r#"
+            SELECT id, name, icon_path, process_name, started_at, ended_at
+            FROM activity
+            ORDER BY started_at DESC
+            LIMIT $1,$2
+            "#,
+        )
+        .bind(offset)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(activities)
+    }
+
     pub async fn insert_activity(&self, activity: &Activity) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
@@ -401,6 +423,42 @@ impl PersonalDatabaseManager {
         .await?;
 
         Ok(())
+    }
+
+    pub async fn update_activity_end_time(
+        &self,
+        activity_id: &str,
+        ended_at: DateTime<Utc>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE activity
+            SET ended_at = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(ended_at.to_rfc3339())
+        .bind(activity_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_last_active_activity(&self) -> Result<Option<Activity>, sqlx::Error> {
+        let activity = sqlx::query_as(
+            r#"
+            SELECT id, name, icon_path, process_name, started_at, ended_at
+            FROM activity
+            WHERE ended_at IS NULL
+            ORDER BY started_at DESC
+            LIMIT 1
+            "#,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(activity)
     }
 
     pub async fn insert_activity_asset(

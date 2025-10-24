@@ -1,5 +1,9 @@
 //! Timeline collector service implementation
 
+use anyhow::{Result, anyhow};
+use base64::{Engine as _, engine::general_purpose};
+use chrono::{DateTime, Utc};
+use image::{ImageBuffer, Rgba};
 use std::{
     sync::{
         Arc,
@@ -8,9 +12,11 @@ use std::{
     time::Duration,
 };
 
+use eur_activity::processes::{Eurora, ProcessFunctionality};
 use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
+use serde::{Deserialize, Serialize};
 use tokio::{
-    sync::{Mutex, mpsc},
+    sync::{Mutex, broadcast, mpsc},
     task::JoinHandle,
     time,
 };
@@ -23,6 +29,44 @@ use crate::{
     select_strategy_for_process,
     storage::TimelineStorage,
 };
+
+/// Event emitted when focus changes to a new application
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FocusChangeEvent {
+    /// The name of the process that received focus
+    pub process_name: String,
+    /// The title of the window that received focus
+    pub window_title: String,
+    /// The icon of the application (if available)
+    pub icon: Option<String>,
+    /// Timestamp when the focus change occurred
+    pub timestamp: DateTime<Utc>,
+}
+
+pub fn image_to_base64(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<String> {
+    let mut buffer = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut buffer);
+
+    image
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
+
+    let base64 = general_purpose::STANDARD.encode(&buffer);
+    // let base64 = base64::encode(&buffer);
+    Ok(format!("data:image/png;base64,{}", base64))
+}
+
+impl FocusChangeEvent {
+    /// Create a new focus change event
+    pub fn new(process_name: String, window_title: String, icon: Option<String>) -> Self {
+        Self {
+            process_name,
+            window_title,
+            icon,
+            timestamp: chrono::Utc::now(),
+        }
+    }
+}
 
 /// Service responsible for collecting activities and managing the collection lifecycle
 pub struct CollectorService {
@@ -42,6 +86,8 @@ pub struct CollectorService {
     focus_shutdown_signal: Option<Arc<AtomicBool>>,
     /// Restart attempt counter
     restart_attempts: u32,
+    /// Broadcast channel for focus change events
+    focus_event_tx: broadcast::Sender<FocusChangeEvent>,
 }
 
 impl CollectorService {
@@ -52,6 +98,8 @@ impl CollectorService {
             config.collection_interval
         );
 
+        let (focus_event_tx, _) = broadcast::channel(100);
+
         Self {
             storage,
             current_task: None,
@@ -61,6 +109,7 @@ impl CollectorService {
             focus_thread_handle: None,
             focus_shutdown_signal: None,
             restart_attempts: 0,
+            focus_event_tx,
         }
     }
 
@@ -74,6 +123,8 @@ impl CollectorService {
             timeline_config.collector.collection_interval
         );
 
+        let (focus_event_tx, _) = broadcast::channel(100);
+
         Self {
             storage,
             current_task: None,
@@ -83,6 +134,7 @@ impl CollectorService {
             focus_thread_handle: None,
             focus_shutdown_signal: None,
             restart_attempts: 0,
+            focus_event_tx,
         }
     }
 
@@ -246,6 +298,11 @@ impl CollectorService {
         }
     }
 
+    /// Subscribe to focus change events
+    pub fn subscribe_to_focus_events(&self) -> broadcast::Receiver<FocusChangeEvent> {
+        self.focus_event_tx.subscribe()
+    }
+
     /// Start collection with focus tracking
     async fn start_with_focus_tracking(&mut self) -> TimelineResult<()> {
         let (tx, mut rx) = mpsc::unbounded_channel::<FocusedWindow>();
@@ -259,6 +316,7 @@ impl CollectorService {
         let focus_tx = tx.clone();
         let shutdown_signal_clone = Arc::clone(&shutdown_signal);
 
+        let focus_event_tx_clone = self.focus_event_tx.clone();
         let thread_handle = std::thread::spawn(move || {
             let tracker = FocusTracker::new();
 
@@ -267,6 +325,7 @@ impl CollectorService {
 
                 let tx_clone = focus_tx.clone();
                 let shutdown_check = Arc::clone(&shutdown_signal_clone);
+                let focus_event_tx_inner = focus_event_tx_clone.clone();
 
                 let result =
                     tracker.track_focus(|window: FocusedWindow| -> FerrousFocusResult<()> {
@@ -279,13 +338,24 @@ impl CollectorService {
                             && let Some(window_title) = &window.window_title
                         {
                             // Filter out ignored processes
-                            #[cfg(target_os = "windows")]
-                            let eurora_process = "eur-tauri.exe";
-                            #[cfg(not(target_os = "windows"))]
-                            let eurora_process = "eur-tauri";
-
-                            if process_name != eurora_process {
+                            if process_name != Eurora.get_name() {
                                 debug!("▶ {}: {}", process_name, window_title);
+
+                                let icon_base64 = window
+                                    .icon
+                                    .clone()
+                                    .map(|icon| image_to_base64(icon).unwrap_or_default());
+
+                                // Emit focus change event
+                                let focus_event = FocusChangeEvent::new(
+                                    process_name.clone(),
+                                    window_title.clone(),
+                                    icon_base64.clone(),
+                                );
+
+                                // Broadcast the focus change event (ignore errors if no listeners)
+                                let _ = focus_event_tx_inner.send(focus_event);
+
                                 let _ = tx_clone.send(window);
                             }
                         }

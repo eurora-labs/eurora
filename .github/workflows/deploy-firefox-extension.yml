@@ -20,7 +20,7 @@ on:
     # Trigger on tags matching extension release pattern
     push:
         tags:
-            - 'extension/v*.*.*'
+            - 'firefox/v*.*.*'
 
 jobs:
     build-and-deploy:
@@ -58,8 +58,8 @@ jobs:
                   INPUT_VERSION: ${{ github.event.inputs.version }}
               run: |
                   if [ "$EVENT_NAME" == "push" ]; then
-                    # Extract version from tag (e.g., extension/v0.1.0 -> 0.1.0)
-                    VERSION="${GITHUB_REF#refs/tags/extension/v}"
+                    # Extract version from tag (e.g., firefox/v0.1.0 -> 0.1.0)
+                    VERSION="${GITHUB_REF#refs/tags/firefox/v}"
                   else
                     VERSION="$INPUT_VERSION"
                   fi
@@ -68,7 +68,7 @@ jobs:
                     exit 1
                   fi
                   printf "version=%s\n" "$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "Extension version: $VERSION"
+                  echo "Firefox version: $VERSION"
 
             - name: Update manifest version
               shell: bash
@@ -92,7 +92,7 @@ jobs:
               run: |
                   # Replace dev ID with production ID in manifest
                   sed -i 's/"id": "dev@eurora-labs.com"/"id": "{271903fe-1905-4636-b47f-6f0873dc97f8}"/' extensions/firefox/manifest.json
-                  echo "Replaced extension ID with production ID"
+                  echo "Replaced Firefox ID with production ID"
 
                   # Verify the change
                   grep '"id":' extensions/firefox/manifest.json
@@ -125,7 +125,7 @@ jobs:
               run: |
                   cd extensions/firefox
 
-                  # Sign and submit the extension
+                  # Sign and submit the Firefox extension
                   web-ext sign \
                     --channel=listed \
                     --api-key="$WEB_EXT_API_KEY" \

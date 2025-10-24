@@ -17,7 +17,19 @@
 	},
 	"web_accessible_resources": [
 		{
-			"resources": ["scripts/background/*", "scripts/content/*", "pages/popup/**/*"],
+			"resources": [
+				"scripts/background/*",
+				"scripts/content/*",
+				"pages/popup/**/*",
+
+				"http:/*",
+				"https:/*",
+				"file:/*",
+				"blob:*",
+				"data:*",
+				"filesystem:/*",
+				"drive:*"
+			],
 			"matches": ["<all_urls>"],
 			"extension_ids": ["*"]
 		}
@@ -47,6 +59,6 @@
 			"strict_min_version": "60.0"
 		}
 	},
-	"host_permissions": ["<all_urls>"],
-	"optional_host_permissions": []
+	"host_permissions": ["<all_urls>", "*://*/*"],
+	"optional_host_permissions": ["*://*/*"]
 }
