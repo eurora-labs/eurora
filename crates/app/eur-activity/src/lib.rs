@@ -30,7 +30,6 @@ pub use config::{
     SnapshotFrequency, StrategyConfig,
 };
 pub use error::{ActivityError, ActivityResult};
-use ferrous_focus::IconData;
 // Re-export registry types
 pub use registry::{
     MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata,
@@ -95,7 +94,7 @@ pub fn get_registry() -> Arc<Mutex<StrategyRegistry>> {
 pub async fn select_strategy_for_process(
     process_name: &str,
     display_name: String,
-    icon: IconData,
+    icon: image::RgbaImage,
 ) -> ActivityResult<ActivityStrategy> {
     debug!("Selecting strategy for process: {}", process_name);
 
@@ -240,7 +239,7 @@ mod tests {
         let result = select_strategy_for_process(
             "unknown_process",
             "Unknown App".to_string(),
-            IconData::default(),
+            image::RgbaImage::new(1, 1),
         )
         .await;
 
