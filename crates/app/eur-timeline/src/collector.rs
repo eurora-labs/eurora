@@ -3,7 +3,7 @@
 use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
-use image::{ImageBuffer, Rgb, Rgba};
+use image::{ImageBuffer, Rgba};
 use std::{
     sync::{
         Arc,
@@ -341,10 +341,10 @@ impl CollectorService {
                             if process_name != Eurora.get_name() {
                                 debug!("▶ {}: {}", process_name, window_title);
 
-                                let icon_base64 = match window.icon.clone() {
-                                    Some(icon) => Some(image_to_base64(icon).unwrap_or_default()),
-                                    None => None,
-                                };
+                                let icon_base64 = window
+                                    .icon
+                                    .clone()
+                                    .map(|icon| image_to_base64(icon).unwrap_or_default());
 
                                 // Emit focus change event
                                 let focus_event = FocusChangeEvent::new(
