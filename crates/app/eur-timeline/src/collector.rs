@@ -13,7 +13,9 @@ use std::{
 };
 
 use eur_activity::processes::{Eurora, ProcessFunctionality};
-use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
+use ferrous_focus::{
+    FerrousFocusResult, FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig,
+};
 use tokio::{
     sync::{Mutex, broadcast, mpsc},
     task::JoinHandle,
@@ -317,7 +319,9 @@ impl CollectorService {
 
         let focus_event_tx_clone = self.focus_event_tx.clone();
         let thread_handle = std::thread::spawn(move || {
-            let tracker = FocusTracker::new();
+            let config =
+                FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
+            let tracker = FocusTracker::with_config(config);
 
             while !shutdown_signal_clone.load(Ordering::Relaxed) {
                 debug!("Starting focus tracker...");
