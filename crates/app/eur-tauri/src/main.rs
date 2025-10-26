@@ -322,19 +322,21 @@ fn main() {
                                         focus_event.window_title.clone()
                                     );
 
-                                    debug!("The icon is: {:?}", focus_event.icon);
+                                    let mut primary_icon_color = None;
+                                    let mut icon_base64 = None;
 
+                                    if let Some(icon) = focus_event.icon.as_ref() {
+                                        primary_icon_color = color_thief::get_palette(&icon.to_vec(), color_thief::ColorFormat::Rgba, 10, 10).ok().map(|c| format!("#{r:02X}{g:02X}{b:02X}", r = c[0].r, g = c[0].g, b = c[0].b));
+                                        icon_base64 = eur_vision::rgba_to_base64(&icon).ok();
+                                    }
 
                                     let _ = TauRpcTimelineApiEventTrigger::new(focus_timeline_handle.clone())
                                         .new_app_event( TimelineAppEvent {
                                             name: focus_event.window_title.clone(),
-                                            color: None,
-                                            icon_base64: None
+                                            color: primary_icon_color,
+                                            icon_base64
                                         });
 
-                                    if let Some(_icon) = &focus_event.icon {
-                                        debug!("Icon present");
-                                    }
 
                                     debug!("Timestamp: {}", focus_event.timestamp);
 
@@ -348,7 +350,7 @@ fn main() {
                                     let activity = Activity {
                                         id: Uuid::new_v4().to_string(),
                                         name: focus_event.window_title.clone(),
-                                        icon_path: focus_event.icon.clone(),
+                                        icon_path: None,
                                         process_name: focus_event.process_name.clone(),
                                         started_at: focus_event.timestamp.to_rfc3339(),
                                         ended_at: None,
