@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::procedures::window_procedures::{LauncherInfo, TauRpcWindowApiEventTrigger};
 use eur_screen_position::ActiveMonitor;
 use eur_vision::{
-    capture_focused_region_rgba, capture_monitor_by_id, get_all_monitors, image_to_base64,
+    capture_focused_region_rgba, capture_monitor_by_id, get_all_monitors, rgb_to_base64,
 };
 use tauri::Manager;
 use tracing::{debug, error};
@@ -188,7 +188,7 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
     tauri::async_runtime::spawn(async move {
         match capture_monitor_by_id(&monitor_id)
             .map(|m| image::DynamicImage::ImageRgba8(m).to_rgb8())
-            .and_then(image_to_base64)
+            .and_then(rgb_to_base64)
         {
             Ok(base64) => {
                 if let Err(e) = TauRpcWindowApiEventTrigger::new(monitor_image_app)
@@ -219,7 +219,7 @@ pub fn open_launcher_window<R: tauri::Runtime>(launcher: &tauri::Window<R>) -> R
             debug!("Captured image size: {:?}", img.dimensions());
 
             // Convert the image to base64
-            if let Ok(base64_image) = image_to_base64(img) {
+            if let Ok(base64_image) = rgb_to_base64(img) {
                 // Send the base64 image to the frontend
                 // launcher
                 //     .emit("background_image", base64_image)

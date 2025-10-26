@@ -14,7 +14,6 @@ use std::{
 
 use eur_activity::processes::{Eurora, ProcessFunctionality};
 use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
-use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{Mutex, broadcast, mpsc},
     task::JoinHandle,
@@ -31,14 +30,14 @@ use crate::{
 };
 
 /// Event emitted when focus changes to a new application
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FocusChangeEvent {
+#[derive(Debug, Clone)]
+pub struct FocusedWindowEvent {
     /// The name of the process that received focus
     pub process_name: String,
     /// The title of the window that received focus
     pub window_title: String,
     /// The icon of the application (if available)
-    pub icon: Option<String>,
+    pub icon: Option<image::RgbaImage>,
     /// Timestamp when the focus change occurred
     pub timestamp: DateTime<Utc>,
 }
@@ -56,9 +55,9 @@ pub fn image_to_base64(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<String> 
     Ok(format!("data:image/png;base64,{}", base64))
 }
 
-impl FocusChangeEvent {
+impl FocusedWindowEvent {
     /// Create a new focus change event
-    pub fn new(process_name: String, window_title: String, icon: Option<String>) -> Self {
+    pub fn new(process_name: String, window_title: String, icon: Option<image::RgbaImage>) -> Self {
         Self {
             process_name,
             window_title,
@@ -87,7 +86,7 @@ pub struct CollectorService {
     /// Restart attempt counter
     restart_attempts: u32,
     /// Broadcast channel for focus change events
-    focus_event_tx: broadcast::Sender<FocusChangeEvent>,
+    focus_event_tx: broadcast::Sender<FocusedWindowEvent>,
 }
 
 impl CollectorService {
@@ -299,7 +298,7 @@ impl CollectorService {
     }
 
     /// Subscribe to focus change events
-    pub fn subscribe_to_focus_events(&self) -> broadcast::Receiver<FocusChangeEvent> {
+    pub fn subscribe_to_focus_events(&self) -> broadcast::Receiver<FocusedWindowEvent> {
         self.focus_event_tx.subscribe()
     }
 
@@ -341,16 +340,11 @@ impl CollectorService {
                             if process_name != Eurora.get_name() {
                                 debug!("▶ {}: {}", process_name, window_title);
 
-                                let icon_base64 = window
-                                    .icon
-                                    .clone()
-                                    .map(|icon| image_to_base64(icon).unwrap_or_default());
-
                                 // Emit focus change event
-                                let focus_event = FocusChangeEvent::new(
+                                let focus_event = FocusedWindowEvent::new(
                                     process_name.clone(),
                                     window_title.clone(),
-                                    icon_base64.clone(),
+                                    window.icon.clone(),
                                 );
 
                                 // Broadcast the focus change event (ignore errors if no listeners)
