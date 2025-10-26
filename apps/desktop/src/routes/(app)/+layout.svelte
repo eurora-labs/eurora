@@ -36,7 +36,11 @@
 			<div class="flex mb-4">
 				<Timeline.Root class="w-1 flex-1">
 					{#each timelineItems as item}
-						<Timeline.Item color={item.color}>{item.name}</Timeline.Item>
+						<Timeline.Item
+							color={item.color}
+							name={item.name}
+							icon={item.icon_base64}
+						/>
 					{/each}
 				</Timeline.Root>
 			</div>
