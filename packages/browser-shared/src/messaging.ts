@@ -30,7 +30,7 @@ export async function sendMessageWithRetry(
 	}
 }
 
-export async function handleGenerateAssets() {
+export async function handleMessage(messageType: string) {
 	try {
 		// Get the current active tab
 		const activeTab = await getCurrentTab();
@@ -40,39 +40,16 @@ export async function handleGenerateAssets() {
 		}
 
 		const response = await sendMessageWithRetry(activeTab.id, {
-			type: 'GENERATE_ASSETS',
+			type: messageType,
 		});
 
 		return { success: true, ...response };
 	} catch (error) {
-		console.error('Error generating report:', error);
+		console.error('Error handling native message of type: ', messageType, error);
 		return {
 			kind: 'Error',
 			success: false,
 			data: String(error),
-		};
-	}
-}
-
-export async function handleGenerateSnapshot() {
-	try {
-		// Get the current active tab
-		const activeTab = await getCurrentTab();
-
-		if (!activeTab || !activeTab.id) {
-			return { success: false, error: 'No active tab found' };
-		}
-
-		const response = await sendMessageWithRetry(activeTab.id, {
-			type: 'GENERATE_SNAPSHOT',
-		});
-
-		return { success: true, ...response };
-	} catch (error) {
-		console.error('Error generating snapshot:', error);
-		return {
-			success: false,
-			error: String(error),
 		};
 	}
 }
