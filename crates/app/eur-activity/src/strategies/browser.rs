@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
+pub use super::ActivityStrategyFunctionality;
 pub use super::processes::*;
+use async_trait::async_trait;
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
@@ -26,6 +28,11 @@ pub struct BrowserStrategy {
 }
 
 impl BrowserStrategy {
+    /// Get list of supported browser processes
+    fn get_supported_processes() -> Vec<&'static str> {
+        vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
+    }
+
     /// Create a new browser strategy
     pub async fn new(name: String, icon: String, process_name: String) -> ActivityResult<Self> {
         debug!("Creating BrowserStrategy for process: {}", process_name);
@@ -52,14 +59,12 @@ impl BrowserStrategy {
             client,
         })
     }
+}
 
-    /// Get list of supported browser processes
-    pub fn get_supported_processes() -> Vec<&'static str> {
-        vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
-    }
-
+#[async_trait]
+impl ActivityStrategyFunctionality for BrowserStrategy {
     /// Retrieve assets from the browser
-    pub async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
+    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
         let Some(client) = &self.client else {
@@ -98,7 +103,7 @@ impl BrowserStrategy {
     }
 
     /// Retrieve snapshots from the browser
-    pub async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
+    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
         Ok(vec![])
         // debug!("Retrieving snapshots for browser strategy");
 
@@ -147,8 +152,20 @@ impl BrowserStrategy {
     }
 
     /// Gather current state as string
-    pub fn gather_state(&self) -> String {
+    fn gather_state(&self) -> String {
         format!("Browser: {} ({})", self.name, self.process_name)
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn get_icon(&self) -> &str {
+        &self.icon
+    }
+
+    fn get_process_name(&self) -> &str {
+        &self.process_name
     }
 }
 
@@ -167,8 +184,6 @@ impl Default for BrowserStrategyFactory {
     }
 }
 
-use async_trait::async_trait;
-
 use crate::{
     registry::{MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata},
     strategies::ActivityStrategy,
@@ -184,7 +199,7 @@ impl StrategyFactory for BrowserStrategyFactory {
         )
         .await?;
 
-        Ok(ActivityStrategy::Browser(strategy))
+        Ok(ActivityStrategy::BrowserStrategy(strategy))
     }
 
     fn supports_process(&self, process_name: &str, _window_title: Option<&str>) -> MatchScore {
@@ -237,8 +252,8 @@ impl StrategyFactory for BrowserStrategyFactory {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+    use crate::strategies::ActivityStrategyFunctionality;
 
     #[test]
     fn test_supported_processes() {

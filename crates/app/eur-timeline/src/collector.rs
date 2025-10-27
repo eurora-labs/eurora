@@ -1,9 +1,6 @@
 //! Timeline collector service implementation
 
-use anyhow::{Result, anyhow};
-use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
-use image::{ImageBuffer, Rgba};
 use std::{
     sync::{
         Arc,
@@ -13,6 +10,7 @@ use std::{
 };
 
 use eur_activity::processes::{Eurora, ProcessFunctionality};
+use eur_activity::strategies::ActivityStrategyFunctionality;
 use ferrous_focus::{
     FerrousFocusResult, FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig,
 };
