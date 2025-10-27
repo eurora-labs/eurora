@@ -3,7 +3,6 @@
 	import Katex from '$lib/components/katex.svelte';
 	import { scaleFactor } from './scaleFactor.svelte.js';
 	import {
-		createTauRPCProxy,
 		type ResponseChunk,
 		type Query,
 		type Message,
@@ -28,9 +27,11 @@
 	// Import the extension factory instead of individual extensions
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
 	import Button from '@eurora/ui/components/button/button.svelte';
+	import { inject } from '@eurora/shared/context';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 
 	// Create TauRPC proxy
-	const taurpc = createTauRPCProxy();
+	const taurpc = inject(TAURPC_SERVICE);
 	// Define a type for Conversation based on what we know from main.rs
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
@@ -78,7 +79,7 @@
 			clearQuery(editorRef);
 		}
 		// Reload activities when launcher is opened
-		loadActivities();
+		await loadActivities();
 
 		// Store the launcher information from the event payload
 		launcherInfo = info;
@@ -323,6 +324,7 @@
 		if (platform === 'windows') {
 			scale = 1;
 		}
+
 		console.log('triggerResizing', height, scale);
 		taurpc.window.resize_launcher_window(1024, Math.round(height), scale).then(() => {
 			console.log('resized to ', height);
