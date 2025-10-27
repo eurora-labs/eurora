@@ -25,7 +25,7 @@ humantime-serde = { workspace = true }
 anyhow = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true, features = ["server", "tls-native-roots", "channel", "router"] }
-async-trait = "0.1.89"
+async-trait = { workspace = true }
 uuid = { workspace = true }
 taurpc = { version = "0.5.1" }
 specta = { workspace = true, features = ["derive", "function"] }
@@ -39,7 +39,7 @@ regex = "1.11.3"
 sha2 = "0.10.8"
 hex = "0.4.3"
 tempfile = "3.23.0"
-enum_dispatch = {workspace = true}
+enum_dispatch = { workspace = true }
 dirs = { workspace = true }
 rand = { workspace = true }
 url = { version = "2.5.7" }
