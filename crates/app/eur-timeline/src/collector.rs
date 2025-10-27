@@ -44,19 +44,6 @@ pub struct FocusedWindowEvent {
     pub timestamp: DateTime<Utc>,
 }
 
-pub fn image_to_base64(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<String> {
-    let mut buffer = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut buffer);
-
-    image
-        .write_to(&mut cursor, image::ImageFormat::Png)
-        .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
-
-    let base64 = general_purpose::STANDARD.encode(&buffer);
-    // let base64 = base64::encode(&buffer);
-    Ok(format!("data:image/png;base64,{}", base64))
-}
-
 impl FocusedWindowEvent {
     /// Create a new focus change event
     pub fn new(process_name: String, window_title: String, icon: Option<image::RgbaImage>) -> Self {
