@@ -1,3 +1,4 @@
+use eur_activity::ContextChip;
 use eur_personal_db::PersonalDatabaseManager;
 use tauri::{Manager, Runtime};
 
@@ -12,6 +13,9 @@ pub struct TimelineAppEvent {
 pub trait TimelineApi {
     #[taurpc(event)]
     async fn new_app_event(event: TimelineAppEvent);
+
+    #[taurpc(event)]
+    async fn new_assets_event(chips: Vec<ContextChip>);
 
     async fn list<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Vec<String>, String>;
 }
