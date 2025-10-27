@@ -225,6 +225,7 @@ impl Default for StrategyRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::strategies::ActivityStrategyFunctionality;
 
     struct MockStrategyFactory {
         metadata: StrategyMetadata,
@@ -259,7 +260,7 @@ mod tests {
                 "mock-icon".to_string(),
                 context.process_name.clone(),
             )?;
-            Ok(ActivityStrategy::Default(strategy))
+            Ok(ActivityStrategy::DefaultStrategy(strategy))
         }
 
         fn supports_process(&self, process_name: &str, _window_title: Option<&str>) -> MatchScore {
