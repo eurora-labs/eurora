@@ -326,8 +326,8 @@ fn main() {
                                     let mut icon_base64 = None;
 
                                     if let Some(icon) = focus_event.icon.as_ref() {
-                                        primary_icon_color = color_thief::get_palette(&icon.to_vec(), color_thief::ColorFormat::Rgba, 10, 10).ok().map(|c| format!("#{r:02X}{g:02X}{b:02X}", r = c[0].r, g = c[0].g, b = c[0].b));
-                                        icon_base64 = eur_vision::rgba_to_base64(&icon).ok();
+                                        primary_icon_color = color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 10, 10).ok().map(|c| format!("#{r:02X}{g:02X}{b:02X}", r = c[0].r, g = c[0].g, b = c[0].b));
+                                        icon_base64 = eur_vision::rgba_to_base64(icon).ok();
                                     }
 
                                     let _ = TauRpcTimelineApiEventTrigger::new(focus_timeline_handle.clone())
