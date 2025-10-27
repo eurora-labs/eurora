@@ -1,4 +1,6 @@
 //! Strategy implementations for different activity types
+use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
 
 pub mod browser;
 pub mod default;
@@ -13,58 +15,20 @@ use crate::{
 };
 
 /// Enum containing all possible activity strategies
+#[enum_dispatch(ActivityStrategyFunctionality)]
 #[derive(Debug, Clone)]
 pub enum ActivityStrategy {
-    Browser(BrowserStrategy),
-    Default(DefaultStrategy),
+    BrowserStrategy,
+    DefaultStrategy,
 }
 
-impl ActivityStrategy {
-    /// Retrieve assets associated with this activity
-    pub async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        match self {
-            ActivityStrategy::Browser(strategy) => strategy.retrieve_assets().await,
-            ActivityStrategy::Default(strategy) => strategy.retrieve_assets().await,
-        }
-    }
-
-    /// Retrieve snapshots associated with this activity
-    pub async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        match self {
-            ActivityStrategy::Browser(strategy) => strategy.retrieve_snapshots().await,
-            ActivityStrategy::Default(strategy) => strategy.retrieve_snapshots().await,
-        }
-    }
-
-    /// Gather the current state of the activity
-    pub fn gather_state(&self) -> String {
-        match self {
-            ActivityStrategy::Browser(strategy) => strategy.gather_state(),
-            ActivityStrategy::Default(strategy) => strategy.gather_state(),
-        }
-    }
-
-    /// Get name of the activity
-    pub fn get_name(&self) -> &str {
-        match self {
-            ActivityStrategy::Browser(strategy) => &strategy.name,
-            ActivityStrategy::Default(strategy) => &strategy.name,
-        }
-    }
-
-    /// Get icon of the activity
-    pub fn get_icon(&self) -> &str {
-        match self {
-            ActivityStrategy::Browser(strategy) => &strategy.icon,
-            ActivityStrategy::Default(strategy) => &strategy.icon,
-        }
-    }
-
-    /// Get process name of the activity
-    pub fn get_process_name(&self) -> &str {
-        match self {
-            ActivityStrategy::Browser(strategy) => &strategy.process_name,
-            ActivityStrategy::Default(strategy) => &strategy.process_name,
-        }
-    }
+#[async_trait]
+#[enum_dispatch]
+pub trait ActivityStrategyFunctionality {
+    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>>;
+    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
+    fn gather_state(&self) -> String;
+    fn get_name(&self) -> &str;
+    fn get_icon(&self) -> &str;
+    fn get_process_name(&self) -> &str;
 }
