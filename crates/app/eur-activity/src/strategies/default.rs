@@ -8,7 +8,7 @@ use crate::{
     DefaultAsset, DefaultSnapshot,
     error::ActivityResult,
     registry::{MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata},
-    strategies::ActivityStrategy,
+    strategies::{ActivityStrategy, ActivityStrategyFunctionality},
     types::{ActivityAsset, ActivitySnapshot},
 };
 
@@ -61,6 +61,33 @@ impl DefaultStrategy {
     }
 }
 
+#[async_trait]
+impl ActivityStrategyFunctionality for DefaultStrategy {
+    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
+        self.retrieve_assets().await
+    }
+
+    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
+        self.retrieve_snapshots().await
+    }
+
+    fn gather_state(&self) -> String {
+        self.gather_state()
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn get_icon(&self) -> &str {
+        &self.icon
+    }
+
+    fn get_process_name(&self) -> &str {
+        &self.process_name
+    }
+}
+
 /// Default strategy factory for creating default strategy instances
 pub struct DefaultStrategyFactory;
 
@@ -85,7 +112,7 @@ impl StrategyFactory for DefaultStrategyFactory {
             context.process_name.clone(),
         )?;
 
-        Ok(ActivityStrategy::Default(strategy))
+        Ok(ActivityStrategy::DefaultStrategy(strategy))
     }
 
     fn supports_process(&self, _process_name: &str, _window_title: Option<&str>) -> MatchScore {
@@ -109,6 +136,7 @@ impl StrategyFactory for DefaultStrategyFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::strategies::ActivityStrategyFunctionality;
 
     #[test]
     fn test_default_strategy_creation() {
