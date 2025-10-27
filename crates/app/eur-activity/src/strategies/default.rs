@@ -31,9 +31,11 @@ impl DefaultStrategy {
             process_name,
         })
     }
+}
 
-    /// Retrieve assets (creates a simple default asset)
-    pub async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
+#[async_trait]
+impl ActivityStrategyFunctionality for DefaultStrategy {
+    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for default strategy");
 
         let asset = DefaultAsset::simple(self.name.clone())
@@ -43,8 +45,7 @@ impl DefaultStrategy {
         Ok(vec![ActivityAsset::DefaultAsset(asset)])
     }
 
-    /// Retrieve snapshots (creates a simple state snapshot)
-    pub async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
+    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
         debug!("Retrieving snapshots for default strategy");
 
         let snapshot = DefaultSnapshot::new(format!(
@@ -55,24 +56,12 @@ impl DefaultStrategy {
         Ok(vec![ActivitySnapshot::DefaultSnapshot(snapshot)])
     }
 
-    /// Gather current state as string
-    pub fn gather_state(&self) -> String {
-        format!("Default: {} ({})", self.name, self.process_name)
-    }
-}
-
-#[async_trait]
-impl ActivityStrategyFunctionality for DefaultStrategy {
-    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        self.retrieve_assets().await
-    }
-
-    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        self.retrieve_snapshots().await
+    async fn get_metadata(&mut self) -> Option<String> {
+        None
     }
 
     fn gather_state(&self) -> String {
-        self.gather_state()
+        format!("Default: {} ({})", self.name, self.process_name)
     }
 
     fn get_name(&self) -> &str {

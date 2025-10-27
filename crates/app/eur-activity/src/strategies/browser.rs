@@ -151,6 +151,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         // }
     }
 
+    async fn get_metadata(&mut self) -> Option<String> {
+        None
+    }
+
     /// Gather current state as string
     fn gather_state(&self) -> String {
         format!("Browser: {} ({})", self.name, self.process_name)
