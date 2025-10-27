@@ -27,6 +27,9 @@ pub enum ActivityStrategy {
 pub trait ActivityStrategyFunctionality {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>>;
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
+
+    async fn get_metadata(&mut self) -> Option<String>;
+
     fn gather_state(&self) -> String;
     fn get_name(&self) -> &str;
     fn get_icon(&self) -> &str;

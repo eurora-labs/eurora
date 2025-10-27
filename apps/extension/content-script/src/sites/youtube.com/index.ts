@@ -52,6 +52,9 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 			case 'GENERATE_SNAPSHOT':
 				promise = this.handleGenerateSnapshot(obj, sender);
 				break;
+			case 'GET_METADATA':
+				promise = this.getMetadata();
+				break;
 			default:
 				response({ kind: 'Error', data: 'Invalid message type' });
 				return false;
@@ -72,6 +75,15 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		if (this.params.youtubePlayer) {
 			this.params.youtubePlayer.currentTime = value as number;
 		}
+	}
+
+	public async getMetadata(): Promise<WatcherResponse> {
+		return {
+			kind: 'NativeArticleMetadata',
+			data: {
+				title: document.title,
+			},
+		};
 	}
 
 	public async handleNew(
