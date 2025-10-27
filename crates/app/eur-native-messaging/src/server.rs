@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use eur_proto::ipc::{MessageRequest, MessageResponse};
+use eur_proto::ipc::{MessageRequest, MessageResponse, tauri_ipc_server::TauriIpc};
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
@@ -135,7 +135,7 @@ impl TauriIpcServer {
 }
 
 #[tonic::async_trait]
-impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
+impl TauriIpc for TauriIpcServer {
     type GetAssetsStreamingStream = ResponseStream;
 
     async fn get_assets(&self, _req: Request<MessageRequest>) -> IpcResult<MessageResponse> {
@@ -246,6 +246,24 @@ impl eur_proto::ipc::tauri_ipc_server::TauriIpc for TauriIpcServer {
         Ok(Response::new(
             Box::pin(out_stream) as Self::GetAssetsStreamingStream
         ))
+    }
+
+    async fn get_metadata(&self, _req: Request<MessageRequest>) -> IpcResult<MessageResponse> {
+        debug!("Received get_metadata request");
+
+        match self.send_native_message("GET_METADATA").await {
+            Ok(native_asset) => match self.native_message_to_response(native_asset) {
+                Ok(response) => Ok(Response::new(response)),
+                Err(e) => {
+                    debug!("Error converting asset to response: {}", e);
+                    Err(Status::internal(format!("Conversion error: {}", e)))
+                }
+            },
+            Err(e) => {
+                debug!("Error in native messaging: {}", e);
+                Err(Status::internal(format!("Native messaging error: {}", e)))
+            }
+        }
     }
 }
 
