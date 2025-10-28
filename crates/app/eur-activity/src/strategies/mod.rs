@@ -15,6 +15,11 @@ use crate::{
     types::{ActivityAsset, ActivitySnapshot},
 };
 
+#[derive(Debug, Clone, Default)]
+pub struct StrategyMetadata {
+    pub icon_base64: Option<String>,
+}
+
 /// Enum containing all possible activity strategies
 #[enum_dispatch(ActivityStrategyFunctionality)]
 #[derive(Debug, Clone)]
@@ -28,7 +33,8 @@ pub enum ActivityStrategy {
 pub trait ActivityStrategyFunctionality {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>>;
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
-    async fn get_metadata(&mut self) -> Option<String>;
+    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
+
     fn gather_state(&self) -> String;
     fn get_name(&self) -> &str;
     fn get_icon(&self) -> &str;
