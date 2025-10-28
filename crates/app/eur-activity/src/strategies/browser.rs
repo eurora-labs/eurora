@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tracing::{debug, warn};
 
+use crate::strategies::StrategyMetadata;
 use crate::{
     ActivityError,
     error::ActivityResult,
@@ -163,8 +164,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         // }
     }
 
-    async fn get_metadata(&mut self) -> Option<String> {
-        None
+    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
+        Ok(StrategyMetadata::default())
     }
 
     /// Gather current state as string
