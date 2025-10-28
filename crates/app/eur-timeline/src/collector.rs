@@ -9,8 +9,11 @@ use std::{
     time::Duration,
 };
 
-use eur_activity::processes::{Eurora, ProcessFunctionality};
 use eur_activity::strategies::ActivityStrategyFunctionality;
+use eur_activity::{
+    processes::{Eurora, ProcessFunctionality},
+    select_strategy_for_process_with_image,
+};
 use ferrous_focus::{
     FerrousFocusResult, FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig,
 };
@@ -390,7 +393,13 @@ impl CollectorService {
                         let display_name = format!("{}: {}", process_name, window_title);
                         let icon = event.icon.unwrap_or_default();
 
-                        match select_strategy_for_process(&process_name, display_name, icon).await {
+                        match select_strategy_for_process_with_image(
+                            &process_name,
+                            display_name,
+                            icon,
+                        )
+                        .await
+                        {
                             Ok(mut strategy) => {
                                 // Collect initial activity
                                 if let Ok(assets) = strategy.retrieve_assets().await {
