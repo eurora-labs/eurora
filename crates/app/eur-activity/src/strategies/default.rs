@@ -7,7 +7,9 @@ use tracing::debug;
 use crate::{
     DefaultAsset, DefaultSnapshot,
     error::ActivityResult,
-    strategies::{ActivityStrategy, ActivityStrategyFunctionality, StrategySupport},
+    strategies::{
+        ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
+    },
     types::{ActivityAsset, ActivitySnapshot},
 };
 
@@ -73,8 +75,8 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         Ok(vec![ActivitySnapshot::DefaultSnapshot(snapshot)])
     }
 
-    async fn get_metadata(&mut self) -> Option<String> {
-        None
+    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
+        Ok(StrategyMetadata::default())
     }
 
     fn gather_state(&self) -> String {
