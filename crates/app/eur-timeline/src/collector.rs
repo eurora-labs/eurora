@@ -132,11 +132,7 @@ impl CollectorService {
 
         debug!("Starting timeline collection service");
 
-        if self.focus_config.enabled {
-            self.start_with_focus_tracking().await?;
-        } else {
-            self.start_without_focus_tracking().await?;
-        }
+        self.start_with_focus_tracking().await?;
 
         self.restart_attempts = 0;
         Ok(())
@@ -278,7 +274,6 @@ impl CollectorService {
     pub fn get_stats(&self) -> CollectorStats {
         CollectorStats {
             is_running: self.is_running(),
-            focus_tracking_enabled: self.focus_config.enabled,
             collection_interval: self.config.collection_interval,
             restart_attempts: self.restart_attempts,
         }
@@ -451,46 +446,6 @@ impl CollectorService {
         Ok(())
     }
 
-    /// Start collection without focus tracking (manual mode)
-    async fn start_without_focus_tracking(&mut self) -> TimelineResult<()> {
-        debug!("Starting collection without focus tracking");
-
-        // Create shutdown signal for the cleanup task
-        let shutdown_signal = Arc::new(AtomicBool::new(false));
-
-        // For now, just create a placeholder task that does periodic cleanup
-        let storage = Arc::clone(&self.storage);
-        let cleanup_interval = Duration::from_secs(300); // 5 minutes
-
-        self.current_task = Some(tokio::spawn(async move {
-            let mut interval = time::interval(cleanup_interval);
-
-            while !shutdown_signal.load(Ordering::Relaxed) {
-                tokio::select! {
-                    _ = interval.tick() => {
-                        // Perform periodic cleanup
-                        {
-                            let mut storage = storage.lock().await;
-                            if storage.needs_cleanup() {
-                                storage.force_cleanup();
-                            }
-                        }
-                    }
-                    _ = tokio::time::sleep(Duration::from_millis(100)) => {
-                        // Check shutdown signal more frequently
-                        if shutdown_signal.load(Ordering::Relaxed) {
-                            break;
-                        }
-                    }
-                }
-            }
-
-            debug!("Cleanup task shutting down gracefully");
-        }));
-
-        Ok(())
-    }
-
     /// Handle restart with exponential backoff
     #[allow(dead_code)]
     async fn handle_restart_with_backoff(&mut self) -> TimelineResult<()> {
@@ -546,8 +501,6 @@ impl Drop for CollectorService {
 pub struct CollectorStats {
     /// Whether the collector is currently running
     pub is_running: bool,
-    /// Whether focus tracking is enabled
-    pub focus_tracking_enabled: bool,
     /// Collection interval
     pub collection_interval: Duration,
     /// Number of restart attempts
@@ -578,7 +531,6 @@ mod tests {
                 ..Default::default()
             },
             focus_tracking: crate::config::FocusTrackingConfig {
-                enabled: false, // Disable focus tracking for tests
                 ..Default::default()
             },
             ..Default::default()
@@ -611,7 +563,6 @@ mod tests {
                 ..Default::default()
             },
             focus_tracking: crate::config::FocusTrackingConfig {
-                enabled: false, // Disable focus tracking for tests
                 ..Default::default()
             },
             ..Default::default()
