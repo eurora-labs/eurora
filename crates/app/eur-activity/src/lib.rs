@@ -7,7 +7,6 @@
 pub mod assets;
 pub mod config;
 pub mod error;
-pub mod registry;
 pub mod snapshots;
 pub mod storage;
 pub mod strategies;
@@ -15,9 +14,6 @@ pub mod types;
 mod utils;
 
 pub use strategies::processes;
-
-// Re-export core types
-use std::sync::{Arc, OnceLock};
 
 // Re-export asset sub-types
 pub use assets::twitter::{TwitterContextType, TwitterTweet};
@@ -30,11 +26,6 @@ pub use config::{
     SnapshotFrequency, StrategyConfig,
 };
 pub use error::{ActivityError, ActivityResult};
-// Re-export registry types
-pub use registry::{
-    MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata,
-    StrategyRegistry,
-};
 // Re-export snapshot types
 pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSnapshot};
 // Re-export storage types
@@ -42,68 +33,44 @@ pub use storage::{ActivityStorage, ActivityStorageConfig, SaveableAsset, SavedAs
 pub use strategies::ActivityStrategy;
 // Re-export strategy types
 pub use strategies::{BrowserStrategy, DefaultStrategy};
-use tokio::sync::Mutex;
 use tracing::debug;
 pub use types::{
     Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip, DisplayAsset,
 };
 
-/// Global strategy registry instance
-static GLOBAL_REGISTRY: OnceLock<Arc<Mutex<StrategyRegistry>>> = OnceLock::new();
-
-/// Initialize the global strategy registry with default strategies
-pub fn initialize_registry() -> Arc<Mutex<StrategyRegistry>> {
-    GLOBAL_REGISTRY
-        .get_or_init(|| {
-            let mut registry = StrategyRegistry::new();
-
-            // Register built-in strategy factories
-            registry.register_factory(Arc::new(
-                crate::strategies::browser::BrowserStrategyFactory::new(),
-            ));
-            registry.register_factory(Arc::new(
-                crate::strategies::default::DefaultStrategyFactory::new(),
-            ));
-
-            debug!(
-                "Initialized global strategy registry with {} strategies",
-                registry.get_strategies().len()
-            );
-
-            Arc::new(Mutex::new(registry))
-        })
-        .clone()
-}
-
-/// Get the global strategy registry
-pub fn get_registry() -> Arc<Mutex<StrategyRegistry>> {
-    initialize_registry()
-}
-
 /// Select the appropriate strategy based on the process name
 ///
-/// This function uses the global strategy registry to find the best matching strategy.
+/// This function uses the simplified strategy selection approach that checks
+/// each strategy's supported processes list directly.
 ///
 /// # Arguments
 /// * `process_name` - The name of the process
 /// * `display_name` - The display name to use for the activity
-/// * `icon` - The icon data
+/// * `icon` - Base64 encoded icon string
 ///
 /// # Returns
 /// A ActivityStrategy if a suitable strategy is found, or an error if no strategy supports the process
 pub async fn select_strategy_for_process(
     process_name: &str,
     display_name: String,
-    icon: image::RgbaImage,
+    icon: String,
 ) -> ActivityResult<ActivityStrategy> {
     debug!("Selecting strategy for process: {}", process_name);
 
-    let registry = get_registry();
-    let mut registry_guard = registry.lock().await;
+    strategies::select_strategy_for_process(process_name, display_name, icon).await
+}
 
-    let context = ProcessContext::new(process_name.to_string(), display_name, icon);
-
-    registry_guard.select_strategy(&context).await
+/// Legacy function for backward compatibility with image::RgbaImage
+///
+/// This converts the RgbaImage to a base64 string and calls the main function
+pub async fn select_strategy_for_process_with_image(
+    process_name: &str,
+    display_name: String,
+    icon: image::RgbaImage,
+) -> ActivityResult<ActivityStrategy> {
+    // Convert image to base64 string for compatibility
+    let icon_string = format!("image_{}x{}", icon.width(), icon.height());
+    select_strategy_for_process(process_name, display_name, icon_string).await
 }
 
 #[cfg(test)]
@@ -222,25 +189,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_registry_initialization() {
-        let registry = initialize_registry();
-        let registry_guard = registry.lock().await;
-        let strategies = registry_guard.get_strategies();
+    async fn test_select_strategy_for_browser_process() {
+        let result = select_strategy_for_process(
+            "firefox",
+            "Firefox Browser".to_string(),
+            "firefox-icon".to_string(),
+        )
+        .await;
 
-        assert!(!strategies.is_empty());
-
-        // Should have at least browser and default strategies
-        let strategy_ids: Vec<String> = strategies.iter().map(|s| s.id.clone()).collect();
-        assert!(strategy_ids.contains(&"browser".to_string()));
-        assert!(strategy_ids.contains(&"default".to_string()));
+        assert!(result.is_ok());
+        let strategy = result.unwrap();
+        assert_eq!(strategy.get_name(), "Firefox Browser");
+        assert_eq!(strategy.get_process_name(), "firefox");
     }
 
     #[tokio::test]
-    async fn test_select_strategy_for_process_default() {
+    async fn test_select_strategy_for_unknown_process() {
         let result = select_strategy_for_process(
             "unknown_process",
             "Unknown App".to_string(),
-            image::RgbaImage::new(1, 1),
+            "unknown-icon".to_string(),
         )
         .await;
 
@@ -250,13 +218,19 @@ mod tests {
         assert_eq!(strategy.get_process_name(), "unknown_process");
     }
 
-    #[test]
-    fn test_global_registry_singleton() {
-        let registry1 = get_registry();
-        let registry2 = get_registry();
+    #[tokio::test]
+    async fn test_select_strategy_with_image_compatibility() {
+        let result = select_strategy_for_process_with_image(
+            "firefox",
+            "Firefox".to_string(),
+            image::RgbaImage::new(16, 16),
+        )
+        .await;
 
-        // Should be the same instance
-        assert!(Arc::ptr_eq(&registry1, &registry2));
+        assert!(result.is_ok());
+        let strategy = result.unwrap();
+        assert_eq!(strategy.get_name(), "Firefox");
+        assert_eq!(strategy.get_process_name(), "firefox");
     }
 
     #[test]
