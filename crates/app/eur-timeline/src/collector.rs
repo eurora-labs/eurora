@@ -28,7 +28,6 @@ use crate::{
     ActivityStrategy,
     config::CollectorConfig,
     error::{TimelineError, TimelineResult},
-    select_strategy_for_process,
     storage::TimelineStorage,
 };
 
@@ -69,8 +68,8 @@ pub struct CollectorService {
     focus_config: crate::config::FocusTrackingConfig,
     /// Channel for focus events
     focus_sender: Option<mpsc::UnboundedSender<FocusedWindow>>,
-    /// Focus tracking thread handle
-    focus_thread_handle: Option<std::thread::JoinHandle<()>>,
+    /// Focus tracking task handle
+    focus_thread_handle: Option<JoinHandle<()>>,
     /// Shutdown signal for focus thread
     focus_shutdown_signal: Option<Arc<AtomicBool>>,
     /// Restart attempt counter
@@ -173,21 +172,20 @@ impl CollectorService {
             shutdown_signal.store(true, Ordering::Relaxed);
 
             if let Some(thread_handle) = self.focus_thread_handle.take() {
-                // Give the thread a moment to see the shutdown signal
+                // Give the task a moment to see the shutdown signal
                 tokio::time::sleep(Duration::from_millis(100)).await;
 
-                // Join the thread with a timeout
-                let join_result = tokio::task::spawn_blocking(move || thread_handle.join()).await;
-
-                match join_result {
-                    Ok(Ok(())) => {
-                        debug!("Focus tracking thread stopped gracefully");
+                // Abort the blocking task and wait for it to finish
+                thread_handle.abort();
+                match thread_handle.await {
+                    Ok(()) => {
+                        debug!("Focus tracking task stopped gracefully");
                     }
-                    Ok(Err(_)) => {
-                        warn!("Focus tracking thread panicked during shutdown");
+                    Err(e) if e.is_cancelled() => {
+                        debug!("Focus tracking task was cancelled");
                     }
-                    Err(_) => {
-                        warn!("Timeout waiting for focus tracking thread to stop");
+                    Err(e) => {
+                        warn!("Focus tracking task ended with error: {}", e);
                     }
                 }
             }
@@ -301,7 +299,7 @@ impl CollectorService {
         let shutdown_signal_clone = Arc::clone(&shutdown_signal);
 
         let focus_event_tx_clone = self.focus_event_tx.clone();
-        let thread_handle = std::thread::spawn(move || {
+        let thread_handle = tokio::task::spawn_blocking(move || {
             let config =
                 FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
             let tracker = FocusTracker::with_config(config);
@@ -496,11 +494,9 @@ impl Drop for CollectorService {
             shutdown_signal.store(true, Ordering::Relaxed);
         }
 
-        // Join focus thread if it exists
+        // Cancel focus task if it exists (non-blocking in Drop)
         if let Some(thread_handle) = self.focus_thread_handle.take() {
-            // Give it a brief moment to see the shutdown signal
-            std::thread::sleep(Duration::from_millis(50));
-            let _ = thread_handle.join();
+            thread_handle.abort();
         }
     }
 }
