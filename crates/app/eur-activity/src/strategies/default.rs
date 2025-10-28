@@ -7,8 +7,7 @@ use tracing::debug;
 use crate::{
     DefaultAsset, DefaultSnapshot,
     error::ActivityResult,
-    registry::{MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata},
-    strategies::{ActivityStrategy, ActivityStrategyFunctionality},
+    strategies::{ActivityStrategy, ActivityStrategyFunctionality, StrategySupport},
     types::{ActivityAsset, ActivitySnapshot},
 };
 
@@ -30,6 +29,24 @@ impl DefaultStrategy {
             icon,
             process_name,
         })
+    }
+}
+
+#[async_trait]
+impl StrategySupport for DefaultStrategy {
+    fn get_supported_processes() -> Vec<&'static str> {
+        // Default strategy doesn't explicitly support any processes
+        // It will be used as fallback for any unsupported process
+        vec![]
+    }
+
+    async fn create_strategy(
+        process_name: String,
+        display_name: String,
+        icon: String,
+    ) -> ActivityResult<ActivityStrategy> {
+        let strategy = Self::new(display_name, icon, process_name)?;
+        Ok(ActivityStrategy::DefaultStrategy(strategy))
     }
 }
 
@@ -74,51 +91,6 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
 
     fn get_process_name(&self) -> &str {
         &self.process_name
-    }
-}
-
-/// Default strategy factory for creating default strategy instances
-pub struct DefaultStrategyFactory;
-
-impl DefaultStrategyFactory {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for DefaultStrategyFactory {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[async_trait]
-impl StrategyFactory for DefaultStrategyFactory {
-    async fn create_strategy(&self, context: &ProcessContext) -> ActivityResult<ActivityStrategy> {
-        let strategy = DefaultStrategy::new(
-            context.display_name.clone(),
-            "default-icon".to_string(),
-            context.process_name.clone(),
-        )?;
-
-        Ok(ActivityStrategy::DefaultStrategy(strategy))
-    }
-
-    fn supports_process(&self, _process_name: &str, _window_title: Option<&str>) -> MatchScore {
-        // Default strategy supports all processes but with the lowest priority
-        MatchScore::LOW
-    }
-
-    fn get_metadata(&self) -> StrategyMetadata {
-        StrategyMetadata {
-            id: "default".to_string(),
-            name: "Default Strategy".to_string(),
-            version: "2.0.0".to_string(),
-            description: "Fallback strategy for applications without specific implementations"
-                .to_string(),
-            supported_processes: vec!["*".to_string()], // Supports all processes
-            category: StrategyCategory::Default,
-        }
     }
 }
 
@@ -202,47 +174,24 @@ mod tests {
     }
 
     #[test]
-    fn test_factory_process_matching() {
-        let factory = DefaultStrategyFactory::new();
-
-        // Default strategy should match any process with low priority
-        assert_eq!(
-            factory.supports_process("any_process", None),
-            MatchScore::LOW
-        );
-        assert_eq!(
-            factory.supports_process("unknown_app", None),
-            MatchScore::LOW
-        );
-        assert_eq!(factory.supports_process("", None), MatchScore::LOW);
-    }
-
-    #[test]
-    fn test_factory_metadata() {
-        let factory = DefaultStrategyFactory::new();
-        let metadata = factory.get_metadata();
-
-        assert_eq!(metadata.id, "default");
-        assert_eq!(metadata.name, "Default Strategy");
-        assert_eq!(metadata.version, "2.0.0");
-        assert_eq!(metadata.category, StrategyCategory::Default);
-        assert_eq!(metadata.supported_processes, vec!["*".to_string()]);
+    fn test_supported_processes() {
+        let processes = DefaultStrategy::get_supported_processes();
+        // Default strategy doesn't explicitly support any processes
+        assert!(processes.is_empty());
     }
 
     #[tokio::test]
-    async fn test_factory_strategy_creation() {
-        let factory = DefaultStrategyFactory::new();
-        let context = ProcessContext::new(
-            "unknown_app".to_string(),
-            "Unknown Application".to_string(),
-            image::RgbaImage::new(16, 16),
-        );
+    async fn test_strategy_support_creation() {
+        let result = DefaultStrategy::create_strategy(
+            "test_process".to_string(),
+            "Test Application".to_string(),
+            "test-icon".to_string(),
+        )
+        .await;
 
-        let result = factory.create_strategy(&context).await;
         assert!(result.is_ok());
-
         let strategy = result.unwrap();
-        assert_eq!(strategy.get_name(), "Unknown Application");
-        assert_eq!(strategy.get_process_name(), "unknown_app");
+        assert_eq!(strategy.get_name(), "Test Application");
+        assert_eq!(strategy.get_process_name(), "test_process");
     }
 }
