@@ -1,6 +1,7 @@
 // Native Messaging Service Worker - centralized handler for all native messaging
 // Keep track of the native port connection
 import { handleMessage } from '@eurora/browser-shared/messaging';
+import { getCurrentTabIcon } from '@eurora/browser-shared/tabs';
 
 let nativePort: chrome.runtime.Port | null = null;
 
@@ -12,15 +13,38 @@ async function connect() {
 }
 
 async function onMessageListener(message: { command: string }, sender: chrome.runtime.Port) {
-	handleMessage(message.command)
-		.then((response) => {
-			console.log('Finished responding to type: ', message.command);
-			sender.postMessage(response);
-		})
-		.catch((error) => {
-			console.error('Error responding to message', error);
-			sender.postMessage({ success: false, error: String(error) });
-		});
+	switch (message.command) {
+		case 'GET_METADATA':
+			try {
+				const iconBase64 = await getCurrentTabIcon();
+				sender.postMessage({
+					kind: 'NativeMetadata',
+					data: {
+						icon_base64: iconBase64,
+					},
+				});
+			} catch (error) {
+				console.error('Error getting tab icon:', error);
+				sender.postMessage({
+					kind: 'NativeMetadata',
+					data: {
+						icon_base64: undefined,
+					},
+				});
+			}
+			break;
+		default:
+			handleMessage(message.command)
+				.then((response) => {
+					console.log('Finished responding to type: ', message.command);
+					sender.postMessage(response);
+				})
+				.catch((error) => {
+					console.error('Error responding to message', error);
+					sender.postMessage({ success: false, error: String(error) });
+				});
+			break;
+	}
 }
 
 function onDisconnectListener() {
