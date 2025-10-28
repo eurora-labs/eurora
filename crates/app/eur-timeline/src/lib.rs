@@ -36,7 +36,6 @@ mod tests {
         let config = TimelineConfig::builder()
             .max_activities(100)
             .collection_interval(std::time::Duration::from_secs(5))
-            .disable_focus_tracking()
             .build();
 
         assert!(config.validate().is_ok());
