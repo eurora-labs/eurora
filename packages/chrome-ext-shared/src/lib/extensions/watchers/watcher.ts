@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import type { NativeResponse } from '$lib/models';
 
-export type MessageType = 'NEW' | 'GENERATE_ASSETS' | 'GENERATE_SNAPSHOT' | 'GET_METADATA';
+export type MessageType = 'NEW' | 'GENERATE_ASSETS' | 'GENERATE_SNAPSHOT';
 
 export type BrowserObj = { type: MessageType; [key: string]: unknown };
 
