@@ -33,9 +33,6 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 			case 'GENERATE_SNAPSHOT':
 				promise = this.handleGenerateSnapshot(obj, sender);
 				break;
-			case 'GET_METADATA':
-				promise = this.getMetadata();
-				break;
 			default:
 				response({ kind: 'Error', data: 'Invalid message type' });
 				return false;
@@ -52,15 +49,6 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 			});
 
 		return true;
-	}
-
-	public async getMetadata(): Promise<WatcherResponse> {
-		return {
-			kind: 'NativeArticleMetadata',
-			data: {
-				title: document.title,
-			},
-		};
 	}
 
 	public async handleNew(
