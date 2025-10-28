@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 pub use super::ActivityStrategyFunctionality;
 pub use super::processes::*;
+pub use super::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::MessageRequest;
@@ -28,11 +29,6 @@ pub struct BrowserStrategy {
 }
 
 impl BrowserStrategy {
-    /// Get list of supported browser processes
-    fn get_supported_processes() -> Vec<&'static str> {
-        vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
-    }
-
     /// Create a new browser strategy
     pub async fn new(name: String, icon: String, process_name: String) -> ActivityResult<Self> {
         debug!("Creating BrowserStrategy for process: {}", process_name);
@@ -58,6 +54,22 @@ impl BrowserStrategy {
             process_name,
             client,
         })
+    }
+}
+
+#[async_trait]
+impl StrategySupport for BrowserStrategy {
+    fn get_supported_processes() -> Vec<&'static str> {
+        vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
+    }
+
+    async fn create_strategy(
+        process_name: String,
+        display_name: String,
+        icon: String,
+    ) -> ActivityResult<ActivityStrategy> {
+        let strategy = Self::new(display_name, icon, process_name).await?;
+        Ok(ActivityStrategy::BrowserStrategy(strategy))
     }
 }
 
@@ -173,87 +185,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     }
 }
 
-/// Browser strategy factory for creating browser strategy instances
-pub struct BrowserStrategyFactory;
-
-impl BrowserStrategyFactory {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for BrowserStrategyFactory {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-use crate::{
-    registry::{MatchScore, ProcessContext, StrategyCategory, StrategyFactory, StrategyMetadata},
-    strategies::ActivityStrategy,
-};
-
-#[async_trait]
-impl StrategyFactory for BrowserStrategyFactory {
-    async fn create_strategy(&self, context: &ProcessContext) -> ActivityResult<ActivityStrategy> {
-        let strategy = BrowserStrategy::new(
-            context.display_name.clone(),
-            "browser-icon".to_string(),
-            context.process_name.clone(),
-        )
-        .await?;
-
-        Ok(ActivityStrategy::BrowserStrategy(strategy))
-    }
-
-    fn supports_process(&self, process_name: &str, _window_title: Option<&str>) -> MatchScore {
-        let supported_processes = BrowserStrategy::get_supported_processes();
-
-        for supported in &supported_processes {
-            if process_name.eq_ignore_ascii_case(supported) {
-                return MatchScore::PERFECT;
-            }
-
-            // Check for partial matches (e.g., "firefox" matches "firefox.exe")
-            if supported
-                .to_lowercase()
-                .contains(&process_name.to_lowercase())
-                || process_name
-                    .to_lowercase()
-                    .contains(&supported.to_lowercase())
-            {
-                return MatchScore::HIGH;
-            }
-        }
-
-        // Check for common browser keywords
-        let browser_keywords = [
-            "firefox", "chrome", "edge", "brave", "opera", "vivaldi", "safari",
-        ];
-        for keyword in &browser_keywords {
-            if process_name.to_lowercase().contains(keyword) {
-                return MatchScore::MEDIUM;
-            }
-        }
-
-        MatchScore::NO_MATCH
-    }
-
-    fn get_metadata(&self) -> StrategyMetadata {
-        StrategyMetadata {
-            id: "browser".to_string(),
-            name: "Browser Strategy".to_string(),
-            version: "2.0.0".to_string(),
-            description: "Collects activity data from web browsers including YouTube, articles, and social media".to_string(),
-            supported_processes: BrowserStrategy::get_supported_processes()
-                .into_iter()
-                .map(|s| s.to_string())
-                .collect(),
-            category: StrategyCategory::Browser,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,43 +203,6 @@ mod tests {
 
         #[cfg(target_os = "macos")]
         assert!(processes.contains(&"Firefox"));
-    }
-
-    #[test]
-    fn test_factory_process_matching() {
-        let factory = BrowserStrategyFactory::new();
-
-        // Test perfect matches
-        assert_eq!(
-            factory.supports_process("firefox", None),
-            MatchScore::PERFECT
-        );
-        assert_eq!(
-            factory.supports_process("chrome", None),
-            MatchScore::PERFECT
-        );
-
-        // Test partial matches
-        assert!(factory.supports_process("firefox-dev", None).is_match());
-        assert!(factory.supports_process("google-chrome", None).is_match());
-
-        // Test no match
-        assert_eq!(
-            factory.supports_process("notepad", None),
-            MatchScore::NO_MATCH
-        );
-    }
-
-    #[test]
-    fn test_factory_metadata() {
-        let factory = BrowserStrategyFactory::new();
-        let metadata = factory.get_metadata();
-
-        assert_eq!(metadata.id, "browser");
-        assert_eq!(metadata.name, "Browser Strategy");
-        assert_eq!(metadata.version, "2.0.0");
-        assert_eq!(metadata.category, StrategyCategory::Browser);
-        assert!(!metadata.supported_processes.is_empty());
     }
 
     #[tokio::test]
@@ -330,17 +224,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_factory_strategy_creation() {
-        let factory = BrowserStrategyFactory::new();
-        let context = ProcessContext::new(
+    async fn test_strategy_support_creation() {
+        let result = BrowserStrategy::create_strategy(
             "firefox".to_string(),
             "Firefox Browser".to_string(),
-            image::RgbaImage::new(16, 16),
-        );
+            "firefox-icon".to_string(),
+        )
+        .await;
 
-        let result = factory.create_strategy(&context).await;
         assert!(result.is_ok());
-
         let strategy = result.unwrap();
         assert_eq!(strategy.get_name(), "Firefox Browser");
         assert_eq!(strategy.get_process_name(), "firefox");
