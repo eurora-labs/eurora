@@ -59,22 +59,6 @@ impl TimelineManagerBuilder {
         self
     }
 
-    /// Disable focus tracking
-    pub fn disable_focus_tracking(mut self) -> Self {
-        let mut config = self.timeline_config.unwrap_or_default();
-        config.focus_tracking.enabled = false;
-        self.timeline_config = Some(config);
-        self
-    }
-
-    /// Enable focus tracking
-    pub fn enable_focus_tracking(mut self) -> Self {
-        let mut config = self.timeline_config.unwrap_or_default();
-        config.focus_tracking.enabled = true;
-        self.timeline_config = Some(config);
-        self
-    }
-
     /// Build the TimelineManager
     pub fn build(self) -> TimelineResult<TimelineManager> {
         let timeline_config = self.timeline_config.unwrap_or_default();
@@ -495,7 +479,6 @@ mod tests {
         let config = TimelineConfig::builder()
             .max_activities(100)
             .collection_interval(Duration::from_secs(5))
-            .disable_focus_tracking()
             .build();
 
         let manager =
@@ -510,7 +493,6 @@ mod tests {
         let manager = TimelineManager::builder()
             .with_max_activities(200)
             .with_collection_interval(Duration::from_secs(10))
-            .disable_focus_tracking()
             .build()
             .expect("Failed to build timeline manager");
 
@@ -520,7 +502,6 @@ mod tests {
             manager.get_config().collector.collection_interval,
             Duration::from_secs(10)
         );
-        assert!(!manager.get_config().focus_tracking.enabled);
     }
 
     #[tokio::test]
@@ -544,17 +525,6 @@ mod tests {
             manager.get_config().collector.collection_interval,
             Duration::from_secs(3)
         );
-    }
-
-    #[tokio::test]
-    async fn test_builder_enable_focus_tracking() {
-        set_default_credential_builder(mock::default_credential_builder());
-        let manager = TimelineManager::builder()
-            .enable_focus_tracking()
-            .build()
-            .expect("Failed to build timeline manager");
-
-        assert!(manager.get_config().focus_tracking.enabled);
     }
 
     #[tokio::test]
@@ -590,22 +560,6 @@ mod tests {
         assert_eq!(current.name, "Test Activity");
     }
 
-    // #[tokio::test]
-    // async fn test_get_recent_activities() {
-    //     let manager = TimelineManager::new();
-
-    //     for i in 1..=5 {
-    //         let activity = create_test_activity(&format!("Activity {}", i));
-    //         manager.add_activity(activity).await;
-    //     }
-
-    //     let recent = manager.get_recent_activities(3).await;
-    //     assert_eq!(recent.len(), 3);
-    //     assert_eq!(recent[0].name, "Activity 5"); // Most recent first
-    //     assert_eq!(recent[1].name, "Activity 4");
-    //     assert_eq!(recent[2].name, "Activity 3");
-    // }
-
     #[tokio::test]
     async fn test_clear_activities() {
         set_default_credential_builder(mock::default_credential_builder());
@@ -630,7 +584,6 @@ mod tests {
     async fn test_manager_lifecycle() {
         set_default_credential_builder(mock::default_credential_builder());
         let config = TimelineConfig::builder()
-            .disable_focus_tracking()
             .collection_interval(Duration::from_millis(100))
             .build();
 

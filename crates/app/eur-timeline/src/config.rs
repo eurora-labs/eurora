@@ -52,20 +52,14 @@ impl Default for CollectorConfig {
 /// Configuration for focus tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FocusTrackingConfig {
-    /// Whether to track focus changes
-    pub enabled: bool,
     /// Processes to ignore (e.g., the app itself)
     pub ignored_processes: Vec<String>,
-    /// Minimum time a window must be focused before tracking
-    pub min_focus_duration: Duration,
 }
 
 impl Default for FocusTrackingConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
             ignored_processes: vec!["eur-tauri".to_string(), "eur-tauri.exe".to_string()],
-            min_focus_duration: Duration::from_millis(500),
         }
     }
 }
@@ -118,18 +112,6 @@ impl TimelineConfigBuilder {
         self
     }
 
-    /// Disable focus tracking
-    pub fn disable_focus_tracking(mut self) -> Self {
-        self.config.focus_tracking.enabled = false;
-        self
-    }
-
-    /// Enable focus tracking
-    pub fn enable_focus_tracking(mut self) -> Self {
-        self.config.focus_tracking.enabled = true;
-        self
-    }
-
     /// Disable automatic cleanup
     pub fn disable_auto_cleanup(mut self) -> Self {
         self.config.storage.auto_cleanup = false;
@@ -148,12 +130,6 @@ impl TimelineConfigBuilder {
             .focus_tracking
             .ignored_processes
             .push(process_name);
-        self
-    }
-
-    /// Set minimum focus duration
-    pub fn min_focus_duration(mut self, duration: Duration) -> Self {
-        self.config.focus_tracking.min_focus_duration = duration;
         self
     }
 
@@ -203,7 +179,6 @@ mod tests {
         assert!(config.validate().is_ok());
         assert_eq!(config.storage.max_activities, 1000);
         assert_eq!(config.collector.collection_interval, Duration::from_secs(3));
-        assert!(config.focus_tracking.enabled);
     }
 
     #[test]
@@ -211,13 +186,11 @@ mod tests {
         let config = TimelineConfig::builder()
             .max_activities(500)
             .collection_interval(Duration::from_secs(5))
-            .disable_focus_tracking()
             .build();
 
         assert!(config.validate().is_ok());
         assert_eq!(config.storage.max_activities, 500);
         assert_eq!(config.collector.collection_interval, Duration::from_secs(5));
-        assert!(!config.focus_tracking.enabled);
     }
 
     #[test]
