@@ -25,5 +25,5 @@ pub enum NativeMessage {
     NativeArticleSnapshot,
     NativeTwitterSnapshot,
 
-    NativeArticleMetadata,
+    NativeMetadata,
 }
