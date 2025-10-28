@@ -22,7 +22,7 @@
 		"@eurora/shared": "workspace:*",
 		"@eurora/chrome-ext-shared": "workspace:*",
 		"@testing-library/jest-dom": "^6.9.1",
-		"@types/chrome": "^0.1.24",
+		"@types/chrome": "^0.1.27",
 		"eslint": "^9.38.0",
 		"eslint-config-prettier": "^10.1.8",
 		"globals": "^15.15.0",
