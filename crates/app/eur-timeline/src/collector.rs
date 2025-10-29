@@ -9,16 +9,16 @@ use std::{
     time::Duration,
 };
 
-use eur_activity::strategies::ActivityStrategyFunctionality;
+use eur_activity::processes::{Eurora, ProcessFunctionality};
 use eur_activity::{
-    processes::{Eurora, ProcessFunctionality},
-    select_strategy_for_process_with_image,
+    DefaultStrategy,
+    strategies::{ActivityStrategyFunctionality, select_strategy_for_process},
 };
 use ferrous_focus::{
     FerrousFocusResult, FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig,
 };
 use tokio::{
-    sync::{Mutex, broadcast, mpsc},
+    sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,
     time,
 };
@@ -237,7 +237,7 @@ impl CollectorService {
         // Create activity
         let activity = crate::Activity::new(
             strategy.get_name().to_string(),
-            strategy.get_icon().to_string(),
+            "".to_string(),
             strategy.get_process_name().to_string(),
             assets,
         );
@@ -283,6 +283,33 @@ impl CollectorService {
     /// Subscribe to focus change events
     pub fn subscribe_to_focus_events(&self) -> broadcast::Receiver<FocusedWindowEvent> {
         self.focus_event_tx.subscribe()
+    }
+
+    /// Alternative start implementation
+    async fn start_alternative(&mut self) -> TimelineResult<()> {
+        let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
+            DefaultStrategy::new("test".to_string(), "process_name".to_string()).unwrap(),
+        )));
+        let strategy_clone = Arc::clone(&strategy);
+        tokio::spawn(async move {
+            let config =
+                FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
+            let tracker = FocusTracker::with_config(config);
+            let mut prev_focus: Option<(Option<String>, Option<String>)> = None;
+            tracker.track_focus(|window: FocusedWindow| -> FerrousFocusResult<()> {
+                let new_focus = Some((window.process_name, window.window_title));
+                if new_focus != prev_focus {
+                    // select_strategy_for_process(ne).await;
+                }
+                prev_focus = new_focus;
+                Ok(())
+            })
+        });
+
+        let strategy_clone = Arc::clone(&strategy);
+        self.current_task = Some(tokio::spawn(async move {}));
+
+        Ok(())
     }
 
     /// Start collection with focus tracking
@@ -391,19 +418,13 @@ impl CollectorService {
                         let display_name = format!("{}: {}", process_name, window_title);
                         let icon = event.icon.unwrap_or_default();
 
-                        match select_strategy_for_process_with_image(
-                            &process_name,
-                            display_name,
-                            icon,
-                        )
-                        .await
-                        {
+                        match select_strategy_for_process(&process_name, display_name).await {
                             Ok(mut strategy) => {
                                 // Collect initial activity
                                 if let Ok(assets) = strategy.retrieve_assets().await {
                                     let activity = crate::Activity::new(
                                         strategy.get_name().to_string(),
-                                        strategy.get_icon().to_string(),
+                                        "".to_string(),
                                         strategy.get_process_name().to_string(),
                                         assets,
                                     );
