@@ -14,6 +14,7 @@ pub mod types;
 mod utils;
 
 pub use strategies::processes;
+pub use strategies::select_strategy_for_process;
 
 // Re-export asset sub-types
 pub use assets::twitter::{TwitterContextType, TwitterTweet};
@@ -33,50 +34,13 @@ pub use storage::{ActivityStorage, ActivityStorageConfig, SaveableAsset, SavedAs
 pub use strategies::ActivityStrategy;
 // Re-export strategy types
 pub use strategies::{BrowserStrategy, DefaultStrategy};
-use tracing::debug;
 pub use types::{
     Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip, DisplayAsset,
 };
 
-/// Select the appropriate strategy based on the process name
-///
-/// This function uses the simplified strategy selection approach that checks
-/// each strategy's supported processes list directly.
-///
-/// # Arguments
-/// * `process_name` - The name of the process
-/// * `display_name` - The display name to use for the activity
-/// * `icon` - Base64 encoded icon string
-///
-/// # Returns
-/// A ActivityStrategy if a suitable strategy is found, or an error if no strategy supports the process
-pub async fn select_strategy_for_process(
-    process_name: &str,
-    display_name: String,
-    icon: String,
-) -> ActivityResult<ActivityStrategy> {
-    debug!("Selecting strategy for process: {}", process_name);
-
-    strategies::select_strategy_for_process(process_name, display_name, icon).await
-}
-
-/// Legacy function for backward compatibility with image::RgbaImage
-///
-/// This converts the RgbaImage to a base64 string and calls the main function
-pub async fn select_strategy_for_process_with_image(
-    process_name: &str,
-    display_name: String,
-    icon: image::RgbaImage,
-) -> ActivityResult<ActivityStrategy> {
-    // Convert image to base64 string for compatibility
-    let icon_string = format!("image_{}x{}", icon.width(), icon.height());
-    select_strategy_for_process(process_name, display_name, icon_string).await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::strategies::ActivityStrategyFunctionality;
 
     #[test]
     fn test_activity_creation() {
@@ -186,51 +150,6 @@ mod tests {
         let context_chips = activity.get_context_chips();
         assert_eq!(context_chips.len(), 1); // Only YouTube asset provides a context chip
         assert_eq!(context_chips[0].name, "Test V");
-    }
-
-    #[tokio::test]
-    async fn test_select_strategy_for_browser_process() {
-        let result = select_strategy_for_process(
-            "firefox",
-            "Firefox Browser".to_string(),
-            "firefox-icon".to_string(),
-        )
-        .await;
-
-        assert!(result.is_ok());
-        let strategy = result.unwrap();
-        assert_eq!(strategy.get_name(), "Firefox Browser");
-        assert_eq!(strategy.get_process_name(), "firefox");
-    }
-
-    #[tokio::test]
-    async fn test_select_strategy_for_unknown_process() {
-        let result = select_strategy_for_process(
-            "unknown_process",
-            "Unknown App".to_string(),
-            "unknown-icon".to_string(),
-        )
-        .await;
-
-        assert!(result.is_ok());
-        let strategy = result.unwrap();
-        assert_eq!(strategy.get_name(), "Unknown App");
-        assert_eq!(strategy.get_process_name(), "unknown_process");
-    }
-
-    #[tokio::test]
-    async fn test_select_strategy_with_image_compatibility() {
-        let result = select_strategy_for_process_with_image(
-            "firefox",
-            "Firefox".to_string(),
-            image::RgbaImage::new(16, 16),
-        )
-        .await;
-
-        assert!(result.is_ok());
-        let strategy = result.unwrap();
-        assert_eq!(strategy.get_name(), "Firefox");
-        assert_eq!(strategy.get_process_name(), "firefox");
     }
 
     #[test]
