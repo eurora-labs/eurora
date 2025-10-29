@@ -1,6 +1,7 @@
 use eur_activity::ContextChip;
 use eur_timeline::TimelineManager;
 use tauri::{Manager, Runtime};
+use tokio::sync::Mutex;
 
 #[taurpc::procedures(path = "context_chip")]
 pub trait ContextChipApi {
@@ -16,7 +17,7 @@ impl ContextChipApi for ContextChipApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String> {
-        let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
+        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
 
         // Get all activities from the timeline

@@ -76,7 +76,6 @@ chrono = { workspace = true }
 defer = "0.2.1"
 futures = { workspace = true }
 tonic = { workspace = true }
-async-mutex = "1.4.1"
 lazy_static = "1.4.0"
 pollster = "0.4"
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
