@@ -1,6 +1,7 @@
 use eur_activity::ContextChip;
 use eur_timeline::TimelineManager;
 use tauri::{Emitter, Manager, Runtime};
+use tokio::sync::Mutex;
 use tracing::debug;
 
 #[taurpc::procedures(path = "system")]
@@ -51,7 +52,7 @@ impl SystemApi for SystemApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String> {
-        let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
+        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
 
         // Get all activities from the timeline
