@@ -23,7 +23,6 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserStrategy {
     pub name: String,
-    pub icon: String,
     pub process_name: String,
     #[serde(skip)]
     client: Option<Arc<Mutex<TauriIpcClient<Channel>>>>,
@@ -31,7 +30,7 @@ pub struct BrowserStrategy {
 
 impl BrowserStrategy {
     /// Create a new browser strategy
-    pub async fn new(name: String, icon: String, process_name: String) -> ActivityResult<Self> {
+    pub async fn new(name: String, process_name: String) -> ActivityResult<Self> {
         debug!("Creating BrowserStrategy for process: {}", process_name);
 
         // Try to create the IPC client
@@ -51,7 +50,6 @@ impl BrowserStrategy {
 
         Ok(Self {
             name,
-            icon,
             process_name,
             client,
         })
@@ -67,9 +65,8 @@ impl StrategySupport for BrowserStrategy {
     async fn create_strategy(
         process_name: String,
         display_name: String,
-        icon: String,
     ) -> ActivityResult<ActivityStrategy> {
-        let strategy = Self::new(display_name, icon, process_name).await?;
+        let strategy = Self::new(display_name, process_name).await?;
         Ok(ActivityStrategy::BrowserStrategy(strategy))
     }
 }
@@ -177,10 +174,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         &self.name
     }
 
-    fn get_icon(&self) -> &str {
-        &self.icon
-    }
-
     fn get_process_name(&self) -> &str {
         &self.process_name
     }
@@ -208,30 +201,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_browser_strategy_creation() {
-        let strategy = BrowserStrategy::new(
-            "Firefox".to_string(),
-            "firefox-icon".to_string(),
-            "firefox".to_string(),
-        )
-        .await;
+        let strategy = BrowserStrategy::new("Firefox".to_string(), "firefox".to_string()).await;
 
         // Should succeed even if IPC client creation fails
         assert!(strategy.is_ok());
 
         let strategy = strategy.unwrap();
         assert_eq!(strategy.name, "Firefox");
-        assert_eq!(strategy.icon, "firefox-icon");
         assert_eq!(strategy.process_name, "firefox");
     }
 
     #[tokio::test]
     async fn test_strategy_support_creation() {
-        let result = BrowserStrategy::create_strategy(
-            "firefox".to_string(),
-            "Firefox Browser".to_string(),
-            "firefox-icon".to_string(),
-        )
-        .await;
+        let result =
+            BrowserStrategy::create_strategy("firefox".to_string(), "Firefox Browser".to_string())
+                .await;
 
         assert!(result.is_ok());
         let strategy = result.unwrap();
@@ -243,7 +227,6 @@ mod tests {
     fn test_gather_state() {
         let strategy = BrowserStrategy {
             name: "Firefox".to_string(),
-            icon: "firefox-icon".to_string(),
             process_name: "firefox".to_string(),
             client: None,
         };

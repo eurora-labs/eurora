@@ -17,20 +17,15 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefaultStrategy {
     pub name: String,
-    pub icon: String,
     pub process_name: String,
 }
 
 impl DefaultStrategy {
     /// Create a new default strategy
-    pub fn new(name: String, icon: String, process_name: String) -> ActivityResult<Self> {
+    pub fn new(name: String, process_name: String) -> ActivityResult<Self> {
         debug!("Creating DefaultStrategy for process: {}", process_name);
 
-        Ok(Self {
-            name,
-            icon,
-            process_name,
-        })
+        Ok(Self { name, process_name })
     }
 }
 
@@ -45,9 +40,8 @@ impl StrategySupport for DefaultStrategy {
     async fn create_strategy(
         process_name: String,
         display_name: String,
-        icon: String,
     ) -> ActivityResult<ActivityStrategy> {
-        let strategy = Self::new(display_name, icon, process_name)?;
+        let strategy = Self::new(display_name, process_name)?;
         Ok(ActivityStrategy::DefaultStrategy(strategy))
     }
 }
@@ -87,10 +81,6 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         &self.name
     }
 
-    fn get_icon(&self) -> &str {
-        &self.icon
-    }
-
     fn get_process_name(&self) -> &str {
         &self.process_name
     }
@@ -103,27 +93,18 @@ mod tests {
 
     #[test]
     fn test_default_strategy_creation() {
-        let strategy = DefaultStrategy::new(
-            "Test App".to_string(),
-            "test-icon".to_string(),
-            "test_process".to_string(),
-        );
+        let strategy = DefaultStrategy::new("Test App".to_string(), "test_process".to_string());
 
         assert!(strategy.is_ok());
         let strategy = strategy.unwrap();
         assert_eq!(strategy.name, "Test App");
-        assert_eq!(strategy.icon, "test-icon");
         assert_eq!(strategy.process_name, "test_process");
     }
 
     #[tokio::test]
     async fn test_retrieve_assets() {
-        let mut strategy = DefaultStrategy::new(
-            "Test App".to_string(),
-            "test-icon".to_string(),
-            "test_process".to_string(),
-        )
-        .unwrap();
+        let mut strategy =
+            DefaultStrategy::new("Test App".to_string(), "test_process".to_string()).unwrap();
 
         let assets = strategy.retrieve_assets().await.unwrap();
         assert_eq!(assets.len(), 1);
@@ -143,12 +124,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retrieve_snapshots() {
-        let mut strategy = DefaultStrategy::new(
-            "Test App".to_string(),
-            "test-icon".to_string(),
-            "test_process".to_string(),
-        )
-        .unwrap();
+        let mut strategy =
+            DefaultStrategy::new("Test App".to_string(), "test_process".to_string()).unwrap();
 
         let snapshots = strategy.retrieve_snapshots().await.unwrap();
         assert_eq!(snapshots.len(), 1);
@@ -164,12 +141,8 @@ mod tests {
 
     #[test]
     fn test_gather_state() {
-        let strategy = DefaultStrategy::new(
-            "Test App".to_string(),
-            "test-icon".to_string(),
-            "test_process".to_string(),
-        )
-        .unwrap();
+        let strategy =
+            DefaultStrategy::new("Test App".to_string(), "test_process".to_string()).unwrap();
 
         let state = strategy.gather_state();
         assert_eq!(state, "Default: Test App (test_process)");
@@ -187,7 +160,6 @@ mod tests {
         let result = DefaultStrategy::create_strategy(
             "test_process".to_string(),
             "Test Application".to_string(),
-            "test-icon".to_string(),
         )
         .await;
 
