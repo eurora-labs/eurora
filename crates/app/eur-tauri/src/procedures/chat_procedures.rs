@@ -4,6 +4,7 @@ use eur_timeline::TimelineManager;
 use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
+use tokio::sync::Mutex;
 use tracing::{debug, error};
 
 use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
@@ -51,7 +52,7 @@ impl ChatApi for ChatApiImpl {
     ) -> Result<String, String> {
         let personal_db: &PersonalDatabaseManager =
             app_handle.state::<PersonalDatabaseManager>().inner();
-        let timeline_state: tauri::State<async_mutex::Mutex<TimelineManager>> = app_handle.state();
+        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
 
         let event = posthog_rs::Event::new_anon("send_query");

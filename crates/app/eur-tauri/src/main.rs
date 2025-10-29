@@ -44,6 +44,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_log::{Target, TargetKind, fern};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
+use tokio::sync::Mutex;
 use tracing::{debug, error};
 use uuid::Uuid;
 
@@ -143,21 +144,21 @@ fn main() {
                     }
 
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
-                    tauri_app.manage(async_mutex::Mutex::new(app_settings.clone()));
+                    tauri_app.manage(Mutex::new(app_settings.clone()));
 
                     // Ensure state exists immediately
-                    tauri_app.manage::<SharedPromptKitService>(async_mutex::Mutex::new(None));
+                    tauri_app.manage::<SharedPromptKitService>(Mutex::new(None));
 
                     // Ensure empty current conversation exists
-                    tauri_app.manage::<SharedCurrentConversation>(async_mutex::Mutex::new(None));
+                    tauri_app.manage::<SharedCurrentConversation>(Mutex::new(None));
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
                         if let Ok(prompt_kit_service) = app_settings.backend.initialize().await {
-                            let service: SharedPromptKitService = async_mutex::Mutex::new(Some(prompt_kit_service));
+                            let service: SharedPromptKitService = Mutex::new(Some(prompt_kit_service));
                             handle.manage(service);
                         } else {
-                            let service: SharedPromptKitService = async_mutex::Mutex::new(None);
+                            let service: SharedPromptKitService = Mutex::new(None);
                             handle.manage(service);
                             debug!("No backend available");
                         }
@@ -291,7 +292,7 @@ fn main() {
                         main_key: main_key.clone()
                     })
                         .build().expect("Failed to create timeline");
-                    app_handle.manage(async_mutex::Mutex::new(timeline));
+                    app_handle.manage(Mutex::new(timeline));
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         let db_manager = match create_shared_database_manager(&db_app_handle).await {
@@ -305,7 +306,7 @@ fn main() {
                         };
                         if let Some(db_manager) = db_manager {
                             db_app_handle.manage(db_manager);
-                            let timeline_mutex = db_app_handle.state::<async_mutex::Mutex<TimelineManager>>();
+                            let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
 
                             // Subscribe to focus change events before starting timeline
                             let mut focus_receiver = {
