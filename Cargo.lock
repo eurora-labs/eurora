@@ -3627,8 +3627,7 @@ dependencies = [
 [[package]]
 name = "ferrous-focus"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e68ccec6256cd4a917556524c7c57d9e57b50f9d95846af4725d8d11d009235"
+source = "git+https://github.com/eurora-labs/ferrous-focus.git?branch=feature%2Fasync-track-focus#bf5e7371e3c7b6ff01c9eb721b78213fe46ff193"
 dependencies = [
  "accessibility-sys",
  "base64 0.22.1",
@@ -3642,6 +3641,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-foundation 0.3.1",
  "thiserror 2.0.17",
+ "tokio",
  "tracing",
  "windows-sys 0.61.1",
  "x11rb",

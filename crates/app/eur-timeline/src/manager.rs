@@ -341,11 +341,6 @@ impl TimelineManager {
         }
     }
 
-    /// Manually collect an activity using the provided strategy
-    pub async fn collect_activity(&self, strategy: ActivityStrategy) -> TimelineResult<()> {
-        self.collector.collect_once(strategy).await
-    }
-
     /// Add an activity directly to the timeline
     pub async fn add_activity(&self, activity: Activity) {
         let mut storage = self.storage.lock().await;
