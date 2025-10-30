@@ -257,6 +257,7 @@ impl CollectorService {
             DefaultStrategy::default(),
         )));
         let strategy_clone = Arc::clone(&strategy);
+        let focus_event_tx = self.focus_event_tx.clone();
         tokio::spawn(async move {
             let config =
                 FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
@@ -267,6 +268,7 @@ impl CollectorService {
                 .track_focus_async(move |window: FocusedWindow| {
                     let prev_focus_inner = Arc::clone(&prev_focus);
                     let strategy_for_update = Arc::clone(&strategy_inner);
+                    let focus_event_tx_inner = focus_event_tx.clone();
                     async move {
                         if let Some(process_name) = window.process_name {
                             let new_focus =
@@ -276,8 +278,20 @@ impl CollectorService {
                             let mut prev = prev_focus_inner.lock().await;
                             if new_focus != *prev {
                                 // Initialize strategy only when focus changes
-                                if let Ok(new_strategy) = ActivityStrategy::new(&process_name).await
+                                if let Ok(mut new_strategy) =
+                                    ActivityStrategy::new(&process_name).await
                                 {
+                                    let icon = match new_strategy.get_icon().await {
+                                        Some(icon) => Some(icon),
+                                        None => window.icon,
+                                    };
+                                    let window = FocusedWindowEvent::new(
+                                        process_name.clone(),
+                                        window.window_title.clone().unwrap_or_default(),
+                                        icon,
+                                    );
+                                    let _ = focus_event_tx_inner.send(window);
+
                                     let mut strategy_write = strategy_for_update.write().await;
                                     *strategy_write = new_strategy;
                                 }
