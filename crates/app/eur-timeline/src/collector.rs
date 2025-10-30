@@ -262,9 +262,11 @@ impl CollectorService {
                 FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
             let tracker = FocusTracker::with_config(config);
             let prev_focus = Arc::new(Mutex::new(None::<(String, Option<String>)>));
+            let strategy_inner = Arc::clone(&strategy_clone);
             let _ = tracker
                 .track_focus_async(move |window: FocusedWindow| {
                     let prev_focus_inner = Arc::clone(&prev_focus);
+                    let strategy_for_update = Arc::clone(&strategy_inner);
                     async move {
                         if let Some(process_name) = window.process_name {
                             let new_focus =
@@ -274,7 +276,11 @@ impl CollectorService {
                             let mut prev = prev_focus_inner.lock().await;
                             if new_focus != *prev {
                                 // Initialize strategy only when focus changes
-                                let _strategy = ActivityStrategy::new(&process_name).await;
+                                if let Ok(new_strategy) = ActivityStrategy::new(&process_name).await
+                                {
+                                    let mut strategy_write = strategy_for_update.write().await;
+                                    *strategy_write = new_strategy;
+                                }
                                 *prev = new_focus;
                             }
                         }
@@ -284,8 +290,34 @@ impl CollectorService {
                 .await;
         });
 
-        let strategy_clone = Arc::clone(&strategy);
-        self.current_task = Some(tokio::spawn(async move {}));
+        let storage = Arc::clone(&self.storage);
+        self.current_task = Some(tokio::spawn(async move {
+            let strategy_inner = Arc::clone(&strategy);
+            let mut interval = time::interval(Duration::from_secs(3));
+
+            loop {
+                interval.tick().await;
+
+                let mut strategy_write = strategy_inner.write().await;
+                match strategy_write.retrieve_snapshots().await {
+                    Ok(snapshots) => {
+                        if !snapshots.is_empty() {
+                            let mut storage = storage.lock().await;
+                            if let Some(current_activity) =
+                                storage.get_all_activities_mut().back_mut()
+                            {
+                                for snapshot in snapshots {
+                                    current_activity.snapshots.push(snapshot);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        debug!("Failed to retrieve snapshots: {:?}", e);
+                    }
+                }
+            }
+        }));
 
         Ok(())
     }
