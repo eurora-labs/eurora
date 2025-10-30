@@ -14,7 +14,6 @@ pub mod types;
 mod utils;
 
 pub use strategies::processes;
-pub use strategies::select_strategy_for_process;
 
 // Re-export asset sub-types
 pub use assets::twitter::{TwitterContextType, TwitterTweet};
