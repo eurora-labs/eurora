@@ -22,17 +22,13 @@ use crate::{
 /// Browser strategy for collecting web browser activity data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserStrategy {
-    pub name: String,
-    pub process_name: String,
     #[serde(skip)]
     client: Option<Arc<Mutex<TauriIpcClient<Channel>>>>,
 }
 
 impl BrowserStrategy {
     /// Create a new browser strategy
-    pub async fn new(name: String, process_name: String) -> ActivityResult<Self> {
-        debug!("Creating BrowserStrategy for process: {}", process_name);
-
+    pub async fn new() -> ActivityResult<Self> {
         // Try to create the IPC client
         let client = match create_grpc_ipc_client().await {
             Ok(client) => {
@@ -48,11 +44,7 @@ impl BrowserStrategy {
             }
         };
 
-        Ok(Self {
-            name,
-            process_name,
-            client,
-        })
+        Ok(Self { client })
     }
 }
 
@@ -60,14 +52,6 @@ impl BrowserStrategy {
 impl StrategySupport for BrowserStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
         vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
-    }
-
-    async fn create_strategy(
-        process_name: String,
-        display_name: String,
-    ) -> ActivityResult<ActivityStrategy> {
-        let strategy = Self::new(display_name, process_name).await?;
-        Ok(ActivityStrategy::BrowserStrategy(strategy))
     }
 }
 
@@ -164,25 +148,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata::default())
     }
-
-    /// Gather current state as string
-    fn gather_state(&self) -> String {
-        format!("Browser: {} ({})", self.name, self.process_name)
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    fn get_process_name(&self) -> &str {
-        &self.process_name
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::strategies::ActivityStrategyFunctionality;
 
     #[test]
     fn test_supported_processes() {
@@ -197,41 +167,5 @@ mod tests {
 
         #[cfg(target_os = "macos")]
         assert!(processes.contains(&"Firefox"));
-    }
-
-    #[tokio::test]
-    async fn test_browser_strategy_creation() {
-        let strategy = BrowserStrategy::new("Firefox".to_string(), "firefox".to_string()).await;
-
-        // Should succeed even if IPC client creation fails
-        assert!(strategy.is_ok());
-
-        let strategy = strategy.unwrap();
-        assert_eq!(strategy.name, "Firefox");
-        assert_eq!(strategy.process_name, "firefox");
-    }
-
-    #[tokio::test]
-    async fn test_strategy_support_creation() {
-        let result =
-            BrowserStrategy::create_strategy("firefox".to_string(), "Firefox Browser".to_string())
-                .await;
-
-        assert!(result.is_ok());
-        let strategy = result.unwrap();
-        assert_eq!(strategy.get_name(), "Firefox Browser");
-        assert_eq!(strategy.get_process_name(), "firefox");
-    }
-
-    #[test]
-    fn test_gather_state() {
-        let strategy = BrowserStrategy {
-            name: "Firefox".to_string(),
-            process_name: "firefox".to_string(),
-            client: None,
-        };
-
-        let state = strategy.gather_state();
-        assert_eq!(state, "Browser: Firefox (firefox)");
     }
 }
