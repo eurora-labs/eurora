@@ -10,10 +10,7 @@ use std::{
 };
 
 use eur_activity::processes::{Eurora, ProcessFunctionality};
-use eur_activity::{
-    DefaultStrategy,
-    strategies::{ActivityStrategyFunctionality, select_strategy_for_process},
-};
+use eur_activity::{DefaultStrategy, strategies::ActivityStrategyFunctionality};
 use ferrous_focus::{
     FerrousFocusResult, FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig,
 };
@@ -221,37 +218,6 @@ impl CollectorService {
             .is_some_and(|task| !task.is_finished())
     }
 
-    /// Collect activity once using the provided strategy
-    pub async fn collect_once(&self, mut strategy: ActivityStrategy) -> TimelineResult<()> {
-        debug!(
-            "Collecting activity once for strategy: {}",
-            strategy.get_name()
-        );
-
-        // Retrieve initial assets
-        let assets = strategy
-            .retrieve_assets()
-            .await
-            .map_err(|e| TimelineError::Collection(format!("Failed to retrieve assets: {}", e)))?;
-
-        // Create activity
-        let activity = crate::Activity::new(
-            strategy.get_name().to_string(),
-            "".to_string(),
-            strategy.get_process_name().to_string(),
-            assets,
-        );
-
-        // Store the activity
-        {
-            let mut storage = self.storage.lock().await;
-            storage.add_activity(activity);
-        }
-
-        debug!("Successfully collected activity: {}", strategy.get_name());
-        Ok(())
-    }
-
     /// Update collector configuration
     pub fn update_config(&mut self, config: CollectorConfig) {
         debug!("Updating collector configuration");
@@ -288,22 +254,26 @@ impl CollectorService {
     /// Alternative start implementation
     async fn start_alternative(&mut self) -> TimelineResult<()> {
         let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
-            DefaultStrategy::new("test".to_string(), "process_name".to_string()).unwrap(),
+            DefaultStrategy::default(),
         )));
         let strategy_clone = Arc::clone(&strategy);
         tokio::spawn(async move {
             let config =
                 FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
             let tracker = FocusTracker::with_config(config);
-            let mut prev_focus: Option<(Option<String>, Option<String>)> = None;
-            tracker.track_focus(|window: FocusedWindow| -> FerrousFocusResult<()> {
-                let new_focus = Some((window.process_name, window.window_title));
-                if new_focus != prev_focus {
-                    // select_strategy_for_process(ne).await;
-                }
-                prev_focus = new_focus;
-                Ok(())
-            })
+            let mut prev_focus: Option<(String, Option<String>)> = None;
+            let _ = tracker
+                .track_focus_async(|window: FocusedWindow| async move {
+                    if let Some(process_name) = window.process_name {
+                        let new_focus = Some((process_name.clone(), window.window_title));
+                        let strategy = ActivityStrategy::new(&process_name).await;
+                        // if new_focus != prev_focus.clone() {
+                        // }
+                        // prev_focus = new_focus;
+                    }
+                    Ok(())
+                })
+                .await;
         });
 
         let strategy_clone = Arc::clone(&strategy);
@@ -418,14 +388,20 @@ impl CollectorService {
                         let display_name = format!("{}: {}", process_name, window_title);
                         let icon = event.icon.unwrap_or_default();
 
-                        match select_strategy_for_process(&process_name, display_name).await {
+                        match ActivityStrategy::new(&process_name).await {
                             Ok(mut strategy) => {
                                 // Collect initial activity
                                 if let Ok(assets) = strategy.retrieve_assets().await {
+                                    // let activity = crate::Activity::new(
+                                    //     strategy.get_name().to_string(),
+                                    //     "".to_string(),
+                                    //     strategy.get_process_name().to_string(),
+                                    //     assets,
+                                    // );
                                     let activity = crate::Activity::new(
-                                        strategy.get_name().to_string(),
                                         "".to_string(),
-                                        strategy.get_process_name().to_string(),
+                                        "".to_string(),
+                                        "".to_string(),
                                         assets,
                                     );
 

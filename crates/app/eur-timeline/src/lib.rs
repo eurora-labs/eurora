@@ -6,7 +6,7 @@ pub use error::{TimelineError, TimelineResult};
 pub use eur_activity::{
     Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStorage,
     ActivityStorageConfig, ActivityStrategy, AssetFunctionality, ContextChip, DisplayAsset,
-    SaveableAsset, select_strategy_for_process,
+    SaveableAsset,
 };
 pub use ferrous_llm_core::Message;
 pub use manager::{TimelineManager, TimelineManagerBuilder, create_timeline};
