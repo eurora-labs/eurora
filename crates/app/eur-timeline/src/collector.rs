@@ -261,17 +261,25 @@ impl CollectorService {
             let config =
                 FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
             let tracker = FocusTracker::with_config(config);
-            let mut prev_focus: Option<(String, Option<String>)> = None;
+            let prev_focus = Arc::new(Mutex::new(None::<(String, Option<String>)>));
             let _ = tracker
-                .track_focus_async(|window: FocusedWindow| async move {
-                    if let Some(process_name) = window.process_name {
-                        let new_focus = Some((process_name.clone(), window.window_title));
-                        let strategy = ActivityStrategy::new(&process_name).await;
-                        // if new_focus != prev_focus.clone() {
-                        // }
-                        // prev_focus = new_focus;
+                .track_focus_async(move |window: FocusedWindow| {
+                    let prev_focus_inner = Arc::clone(&prev_focus);
+                    async move {
+                        if let Some(process_name) = window.process_name {
+                            let new_focus =
+                                Some((process_name.clone(), window.window_title.clone()));
+
+                            // Check if focus changed
+                            let mut prev = prev_focus_inner.lock().await;
+                            if new_focus != *prev {
+                                // Initialize strategy only when focus changes
+                                let _strategy = ActivityStrategy::new(&process_name).await;
+                                *prev = new_focus;
+                            }
+                        }
+                        Ok(())
                     }
-                    Ok(())
                 })
                 .await;
         });
