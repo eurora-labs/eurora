@@ -42,6 +42,10 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata::default())
     }
+
+    async fn get_icon(&mut self) -> Option<image::RgbaImage> {
+        None
+    }
 }
 
 #[cfg(test)]
