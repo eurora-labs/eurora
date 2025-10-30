@@ -34,6 +34,8 @@ pub trait ActivityStrategyFunctionality {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>>;
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
+
+    async fn get_icon(&mut self) -> Option<image::RgbaImage>;
 }
 
 impl ActivityStrategy {
