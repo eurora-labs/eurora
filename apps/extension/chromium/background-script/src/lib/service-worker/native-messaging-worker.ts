@@ -1,11 +1,9 @@
 // Native Messaging Service Worker - centralized handler for all native messaging
 // Keep track of the native port connection
-import { getCurrentTab } from '@eurora/browser-shared/tabs';
+import { handleMessage } from '@eurora/browser-shared/messaging';
+import { getCurrentTabIcon } from '@eurora/browser-shared/tabs';
 
 let nativePort: chrome.runtime.Port | null = null;
-
-// Store queued messages if connection isn't ready
-const messageQueue: any[] = [];
 
 async function connect() {
 	console.log('Connecting to native messaging app');
@@ -16,32 +14,36 @@ async function connect() {
 
 async function onMessageListener(message: { command: string }, sender: chrome.runtime.Port) {
 	switch (message.command) {
-		case 'GENERATE_ASSETS':
-			handleGenerateReport()
-				.then((response) => {
-					console.log('Sending GENERATE_REPORT_RESPONSE message', response);
-					sender.postMessage(response);
-				})
-				.catch((error) => {
-					console.log('Error generating report', error);
-					sender.postMessage(error);
+		case 'GET_METADATA':
+			try {
+				const iconBase64 = await getCurrentTabIcon();
+				sender.postMessage({
+					kind: 'NativeMetadata',
+					data: {
+						icon_base64: iconBase64,
+					},
 				});
-			return true; // Indicates we'll call sendResponse asynchronously
-		case 'GENERATE_SNAPSHOT':
-			handleGenerateSnapshot()
+			} catch (error) {
+				console.error('Error getting tab icon:', error);
+				sender.postMessage({
+					kind: 'NativeMetadata',
+					data: {
+						icon_base64: undefined,
+					},
+				});
+			}
+			break;
+		default:
+			handleMessage(message.command)
 				.then((response) => {
-					console.log('Sending GENERATE_SNAPSHOT_RESPONSE message', response);
+					console.log('Finished responding to type: ', message.command);
 					sender.postMessage(response);
 				})
 				.catch((error) => {
-					console.log('Error generating snapshot', error);
+					console.error('Error responding to message', error);
 					sender.postMessage({ success: false, error: String(error) });
 				});
-			return true; // Indicates we'll call sendResponse asynchronously
-		default:
-			console.log('Unknown message type:', message);
-			sender.postMessage({ success: false, error: 'Unknown message type' });
-			return false;
+			break;
 	}
 }
 
@@ -61,84 +63,3 @@ function onDisconnectListener() {
 connect();
 
 console.log('Native messaging service worker registered');
-
-async function handleGenerateSnapshot() {
-	try {
-		// Get the current active tab
-		const activeTab = await getCurrentTab();
-
-		if (!activeTab || !activeTab.url) {
-			return { success: false, error: 'No active tab found' };
-		}
-
-		const response = await sendMessageWithRetry(activeTab.id, {
-			type: 'GENERATE_SNAPSHOT',
-		});
-
-		return { success: true, ...response };
-	} catch (error) {
-		console.error('Error generating snapshot:', error);
-		return {
-			success: false,
-			error: String(error),
-		};
-	}
-}
-
-/**
- * Sends a message to a tab with retry logic to handle content script initialization delays
- */
-async function sendMessageWithRetry(
-	tabId: number,
-	message: any,
-	maxRetries: number = 5,
-	delayMs: number = 500,
-): Promise<any> {
-	for (let attempt = 0; attempt < maxRetries; attempt++) {
-		try {
-			const response = await chrome.tabs.sendMessage(tabId, message);
-			return response;
-		} catch (error) {
-			const isLastAttempt = attempt === maxRetries - 1;
-			const isConnectionError =
-				error?.message?.includes('Receiving end does not exist') ||
-				chrome.runtime.lastError?.message?.includes('Receiving end does not exist');
-
-			if (isConnectionError && !isLastAttempt) {
-				console.log(`Content script not ready, retrying (${attempt + 1}/${maxRetries})...`);
-				await new Promise((resolve) => setTimeout(resolve, delayMs));
-				continue;
-			}
-			throw error;
-		}
-	}
-}
-
-/**
- * Handles the GENERATE_REPORT message by getting the current active tab,
- * checking if it's a YouTube video or article page, and requesting a report
- * from the appropriate watcher
- */
-async function handleGenerateReport() {
-	try {
-		// Get the current active tab
-		const activeTab = await getCurrentTab();
-
-		if (!activeTab || !activeTab.url) {
-			return { success: false, data: 'No active tab found', kind: 'Error' };
-		}
-
-		const response = await sendMessageWithRetry(activeTab.id, {
-			type: 'GENERATE_ASSETS',
-		});
-
-		return { success: true, ...response };
-	} catch (error) {
-		console.error('Error generating report:', error);
-		return {
-			kind: 'Error',
-			success: false,
-			data: String(error),
-		};
-	}
-}

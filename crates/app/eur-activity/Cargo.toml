@@ -25,12 +25,12 @@ humantime-serde = { workspace = true }
 anyhow = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true, features = ["server", "tls-native-roots", "channel", "router"] }
-async-trait = "0.1.89"
+async-trait = { workspace = true }
 uuid = { workspace = true }
 taurpc = { version = "0.5.1" }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
-ferrous-focus = { version = "0.2.5" }
+ferrous-focus = { workspace = true, features = ["async"] }
 tracing = { workspace = true }
 ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
 base64 = { workspace = true }
@@ -39,10 +39,11 @@ regex = "1.11.3"
 sha2 = "0.10.8"
 hex = "0.4.3"
 tempfile = "3.23.0"
-enum_dispatch = {workspace = true}
+enum_dispatch = { workspace = true }
 dirs = { workspace = true }
 rand = { workspace = true }
 url = { version = "2.5.7" }
+cfg-if = { workspace = true }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }

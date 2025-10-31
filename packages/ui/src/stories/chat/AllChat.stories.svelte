@@ -1,11 +1,12 @@
 <script module lang="ts">
 	import * as Chat from '$lib/custom-components/chat/index.js';
+	import { Root } from '$lib/custom-components/chat/index.js';
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { SiGithub, SiStackoverflow, SiReddit } from '@icons-pack/svelte-simple-icons';
 
 	const { Story } = defineMeta({
 		title: 'Components / Chat',
-		component: Chat.Root,
+		component: Root,
 		parameters: {
 			docs: {
 				description: {
