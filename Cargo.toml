@@ -14,7 +14,7 @@ authors = ["Andre Roelofs andre@eurora-labs.com"]
 [workspace.dependencies]
 ferrous-llm-core = { version = "0.6.1" }
 ferrous-llm = { version = "0.6.1" }
-ferrous-focus = { version = "0.4.0" }
+ferrous-focus = { version = "0.4.1" }
 
 syn = "2.0" # collapse 2.0.101, 1.0.109, 1.0.109(build)
 toml_edit = "0.23.3" # collapse 0.22, 0.20, 0.19
