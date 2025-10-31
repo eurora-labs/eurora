@@ -131,7 +131,8 @@ impl CollectorService {
 
         debug!("Starting timeline collection service");
 
-        self.start_with_focus_tracking().await?;
+        self.start_alternative().await?;
+        // self.start_with_focus_tracking().await?;
 
         self.restart_attempts = 0;
         Ok(())
@@ -258,6 +259,8 @@ impl CollectorService {
         )));
         let strategy_clone = Arc::clone(&strategy);
         let focus_event_tx = self.focus_event_tx.clone();
+        let storage_for_focus = Arc::clone(&self.storage);
+
         tokio::spawn(async move {
             let config =
                 FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
@@ -269,8 +272,11 @@ impl CollectorService {
                     let prev_focus_inner = Arc::clone(&prev_focus);
                     let strategy_for_update = Arc::clone(&strategy_inner);
                     let focus_event_tx_inner = focus_event_tx.clone();
+                    let storage_inner = Arc::clone(&storage_for_focus);
                     async move {
-                        if let Some(process_name) = window.process_name {
+                        if let Some(process_name) = window.process_name
+                            && process_name != Eurora.get_name()
+                        {
                             let new_focus =
                                 Some((process_name.clone(), window.window_title.clone()));
 
@@ -281,16 +287,33 @@ impl CollectorService {
                                 if let Ok(mut new_strategy) =
                                     ActivityStrategy::new(&process_name).await
                                 {
+                                    // Retrieve initial assets and create activity
+                                    if let Ok(assets) = new_strategy.retrieve_assets().await {
+                                        let activity = crate::Activity::new(
+                                            "".to_string(),
+                                            "".to_string(),
+                                            "".to_string(),
+                                            assets,
+                                        );
+
+                                        // Add activity to storage BEFORE emitting event
+                                        {
+                                            let mut storage = storage_inner.lock().await;
+                                            storage.add_activity(activity);
+                                        }
+                                    }
+
+                                    // Get icon and emit focus change event
                                     let icon = match new_strategy.get_icon().await {
                                         Some(icon) => Some(icon),
                                         None => window.icon,
                                     };
-                                    let window = FocusedWindowEvent::new(
+                                    let focus_event = FocusedWindowEvent::new(
                                         process_name.clone(),
                                         window.window_title.clone().unwrap_or_default(),
                                         icon,
                                     );
-                                    let _ = focus_event_tx_inner.send(window);
+                                    let _ = focus_event_tx_inner.send(focus_event);
 
                                     let mut strategy_write = strategy_for_update.write().await;
                                     *strategy_write = new_strategy;
