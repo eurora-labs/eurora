@@ -3,10 +3,12 @@ use serde::{Deserialize, Serialize};
 use strum_macros::AsRefStr;
 
 mod assets;
+mod metadata;
 mod shared;
 mod snapshots;
 
 pub use assets::*;
+pub use metadata::*;
 pub use shared::*;
 pub use snapshots::*;
 
@@ -22,4 +24,6 @@ pub enum NativeMessage {
     NativeYoutubeSnapshot,
     NativeArticleSnapshot,
     NativeTwitterSnapshot,
+
+    NativeMetadata,
 }
