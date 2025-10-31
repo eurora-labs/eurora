@@ -5,10 +5,9 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-    DefaultAsset, DefaultSnapshot,
     error::ActivityResult,
     strategies::{
-        ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
+        ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
     },
     types::{ActivityAsset, ActivitySnapshot},
 };
