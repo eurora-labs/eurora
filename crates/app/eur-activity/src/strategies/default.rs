@@ -6,9 +6,7 @@ use tracing::debug;
 
 use crate::{
     error::ActivityResult,
-    strategies::{
-        ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
-    },
+    strategies::{ActivityStrategyFunctionality, StrategyMetadata, StrategySupport},
     types::{ActivityAsset, ActivitySnapshot},
 };
 
