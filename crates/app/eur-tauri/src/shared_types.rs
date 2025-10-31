@@ -1,8 +1,8 @@
 use anyhow::Result;
-use async_mutex::Mutex;
 use eur_personal_db::{Conversation, PersonalDatabaseManager};
 use eur_prompt_kit::PromptKitService;
 use eur_settings::AppSettings;
+use tokio::sync::Mutex;
 use tracing::error;
 
 use crate::util::get_db_path;

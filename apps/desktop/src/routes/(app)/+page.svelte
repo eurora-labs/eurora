@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import {
-		createTauRPCProxy,
 		type ResponseChunk,
 		type Query,
+		// type ContextChip,
 		type Message,
 		type Conversation,
 	} from '$lib/bindings/bindings.js';
@@ -13,8 +13,11 @@
 	import * as Chat from '@eurora/ui/custom-components/chat/index';
 	import Katex from '$lib/components/katex.svelte';
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
+	// import { executeCommand } from '$lib/commands.js';
 	// import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
 	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
+	import { inject } from '@eurora/shared/context';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 
 	import {
 		Editor as ProsemirrorEditor,
@@ -24,6 +27,7 @@
 	let conversation = $state<Conversation | null>(null);
 	let messages = $state<Message[]>([]);
 	let status = $state<string>('');
+	let taurpc = inject(TAURPC_SERVICE);
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
 	let chatRef = $state<Chat.Root | null>(null);
@@ -38,8 +42,6 @@
 			extensionFactory.getExtension('2c434895-d32c-485f-8525-c4394863b83a'),
 		] as SveltePMExtension[],
 	});
-
-	const taurpc = createTauRPCProxy();
 
 	onMount(() => {
 		document.addEventListener('keydown', handleEscapeKey);
@@ -63,7 +65,32 @@
 				console.log('messages: ', messages);
 			});
 		});
+
+		// taurpc.timeline.new_app_event.on(async (e) => {
+		// 	const intervalID = setInterval(async () => {
+		// 		const success = await loadActivities();
+		// 		if (success) {
+		// 			clearInterval(intervalID);
+		// 		}
+		// 	}, 1000);
+		// });
 	});
+
+	// // Function to load activities from the backend
+	// async function loadActivities(): Promise<boolean> {
+	// 	try {
+	// 		// Note: list_activities is not yet available in TauRPC, fallback to invoke for now
+	// 		const result: ContextChip[] = await taurpc.context_chip.get();
+	// 		if (!editorRef) return false;
+	// 		result.forEach((command) => {
+	// 			executeCommand(editorRef!, command);
+	// 		});
+	// 		return true;
+	// 	} catch (error) {
+	// 		console.error('Failed to load activities:', error);
+	// 		return false;
+	// 	}
+	// }
 
 	function handleEscapeKey(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
