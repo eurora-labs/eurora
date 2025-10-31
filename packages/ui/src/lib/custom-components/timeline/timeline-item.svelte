@@ -1,14 +1,12 @@
 <script lang="ts" module>
 	export interface TimelineItemProps {
-		name: string;
-		icon?: string | null;
-
 		color?: string | null;
+		children?: any;
 	}
 </script>
 
 <script lang="ts">
-	let { color = 'white', icon, name }: TimelineItemProps = $props();
+	let { color = 'white', children }: TimelineItemProps = $props();
 
 	let borderColor = $state('white');
 	$effect(() => {
@@ -27,6 +25,7 @@
 		style="background-color: {color}; border-color: {borderColor};"
 	></div>
 	<div class="relative z-10 flex items-center justify-center w-fit text-sm text-center p-0 m-0">
-		{#if icon}<img src={icon} alt={name} class="w-4 h-4" />{:else}{name}{/if}
+		{@render children?.()}
+		<!-- {#if icon}<img src={icon} alt={name} class="w-4 h-4" />{:else}{name}{/if} -->
 	</div>
 </div>
