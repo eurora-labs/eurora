@@ -46,7 +46,7 @@ impl ActivityStrategy {
             ));
         }
 
-        Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy::default()))
+        Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy))
     }
 }
 
