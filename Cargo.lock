@@ -3626,8 +3626,9 @@ dependencies = [
 
 [[package]]
 name = "ferrous-focus"
-version = "0.3.1"
-source = "git+https://github.com/eurora-labs/ferrous-focus.git?branch=feature%2Fasync-track-focus#bf5e7371e3c7b6ff01c9eb721b78213fe46ff193"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c56af34c61b40078972b87cfa665144677e7cb6f7a26200112625e1a0c1ac489"
 dependencies = [
  "accessibility-sys",
  "base64 0.22.1",
