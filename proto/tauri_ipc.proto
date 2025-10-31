@@ -5,6 +5,7 @@ service TauriIPC {
     rpc GetAssets(MessageRequest) returns (MessageResponse) {}
     rpc GetAssetsStreaming(stream MessageRequest) returns (stream MessageResponse) {}
     rpc GetSnapshots(MessageRequest) returns (MessageResponse) {}
+    rpc GetMetadata(MessageRequest) returns (MessageResponse) {}
 }
 
 message MessageRequest {}

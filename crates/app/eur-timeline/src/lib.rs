@@ -1,12 +1,12 @@
 // Re-export main types for easy access
-pub use collector::{CollectorService, CollectorStats};
+pub use collector::{CollectorService, CollectorStats, FocusedWindowEvent};
 pub use config::{CollectorConfig, FocusTrackingConfig, StorageConfig, TimelineConfig};
 pub use error::{TimelineError, TimelineResult};
 // Re-export activity types for convenience
 pub use eur_activity::{
     Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStorage,
     ActivityStorageConfig, ActivityStrategy, AssetFunctionality, ContextChip, DisplayAsset,
-    SaveableAsset, select_strategy_for_process,
+    SaveableAsset,
 };
 pub use ferrous_llm_core::Message;
 pub use manager::{TimelineManager, TimelineManagerBuilder, create_timeline};
@@ -36,7 +36,6 @@ mod tests {
         let config = TimelineConfig::builder()
             .max_activities(100)
             .collection_interval(std::time::Duration::from_secs(5))
-            .disable_focus_tracking()
             .build();
 
         assert!(config.validate().is_ok());
