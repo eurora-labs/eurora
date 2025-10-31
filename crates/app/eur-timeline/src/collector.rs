@@ -129,7 +129,7 @@ impl CollectorService {
 
         debug!("Starting timeline collection service");
 
-        self.start_alternative().await?;
+        self.start_focus_tracking().await?;
         // self.start_with_focus_tracking().await?;
 
         self.restart_attempts = 0;
@@ -251,9 +251,9 @@ impl CollectorService {
     }
 
     /// Alternative start implementation
-    async fn start_alternative(&mut self) -> TimelineResult<()> {
+    async fn start_focus_tracking(&mut self) -> TimelineResult<()> {
         let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
-            DefaultStrategy::default(),
+            DefaultStrategy,
         )));
         let strategy_clone = Arc::clone(&strategy);
         let focus_event_tx = self.focus_event_tx.clone();
@@ -288,9 +288,9 @@ impl CollectorService {
                                     // Retrieve initial assets and create activity
                                     if let Ok(assets) = new_strategy.retrieve_assets().await {
                                         let activity = crate::Activity::new(
-                                            "".to_string(),
-                                            "".to_string(),
-                                            "".to_string(),
+                                            window.window_title.clone().unwrap_or_default(),
+                                            "".to_string(), // For now ignore the icon, later save it to disk and provide path
+                                            process_name.clone(),
                                             assets,
                                         );
 
