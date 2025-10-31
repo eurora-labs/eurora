@@ -4,7 +4,7 @@
 	import FirstPartyLogin from '$lib/components/FirstPartyLogin.svelte';
 </script>
 
-<div class="relative flex h-screen w-full flex-col">
+<div class="relative flex h-full w-full flex-col">
 	<div class="relative z-10 flex h-full flex-col">
 		<!-- Title in middle top -->
 		<div class="flex justify-center pt-16 pb-0">

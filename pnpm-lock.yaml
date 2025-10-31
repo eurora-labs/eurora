@@ -141,6 +141,9 @@ importers:
       '@eurora/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@gitbutler/svelte-comment-injector':
+        specifier: ^1.0.0
+        version: 1.0.0
       '@icons-pack/svelte-simple-icons':
         specifier: ^5.0.0
         version: 5.0.0(@sveltejs/kit@2.48.0(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.42.2)(vite@6.4.1(@types/node@24.9.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0)))(svelte@5.42.2)(vite@6.4.1(@types/node@24.9.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)(yaml@2.8.0)))(svelte@5.42.2)
@@ -2478,6 +2481,9 @@ packages:
   '@gcornut/valibot-json-schema@0.42.0':
     resolution: {integrity: sha512-4Et4AN6wmqeA0PfU5Clkv/IS27wiefsWf6TemAZrb75uzkClYEFavim7SboeKwbll9Nbsn2Iv0LT/HS5H7orZg==}
     hasBin: true
+
+  '@gitbutler/svelte-comment-injector@1.0.0':
+    resolution: {integrity: sha512-etgizFaoKMF4eyPC0ZmSVE27YvfFDKbk3voiqkX1+SnSD8gfUCxz9DKqcRBvdLZae4gpwAfSQAKg6oNEiyjxXQ==}
 
   '@hapi/hoek@9.3.0':
     resolution: {integrity: sha512-/c6rf4UJlmHlC9b5BaNvzAcFv7HZ2QHaV0D4/HNlBdvFnvQq8RI4kYdhyPCl7Xj+oWvTWQ8ujhqS53LIgAe6KQ==}
@@ -9850,6 +9856,8 @@ snapshots:
       - esbuild
       - typescript
     optional: true
+
+  '@gitbutler/svelte-comment-injector@1.0.0': {}
 
   '@hapi/hoek@9.3.0':
     optional: true
