@@ -8,9 +8,9 @@ use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::{
-    Activity, ActivityStorage, ActivityStorageConfig, ActivityStrategy, AssetFunctionality,
-    ContextChip, DisplayAsset, TimelineError,
-    collector::{CollectorService, CollectorStats},
+    Activity, ActivityStorage, ActivityStorageConfig, AssetFunctionality, ContextChip,
+    DisplayAsset, TimelineError,
+    collector::{CollectorService, CollectorStats, FocusedWindowEvent},
     config::TimelineConfig,
     error::TimelineResult,
     storage::{StorageStats, TimelineStorage},
@@ -55,22 +55,6 @@ impl TimelineManagerBuilder {
     pub fn with_collection_interval(mut self, interval: std::time::Duration) -> Self {
         let mut config = self.timeline_config.unwrap_or_default();
         config.collector.collection_interval = interval;
-        self.timeline_config = Some(config);
-        self
-    }
-
-    /// Disable focus tracking
-    pub fn disable_focus_tracking(mut self) -> Self {
-        let mut config = self.timeline_config.unwrap_or_default();
-        config.focus_tracking.enabled = false;
-        self.timeline_config = Some(config);
-        self
-    }
-
-    /// Enable focus tracking
-    pub fn enable_focus_tracking(mut self) -> Self {
-        let mut config = self.timeline_config.unwrap_or_default();
-        config.focus_tracking.enabled = true;
         self.timeline_config = Some(config);
         self
     }
@@ -357,11 +341,6 @@ impl TimelineManager {
         }
     }
 
-    /// Manually collect an activity using the provided strategy
-    pub async fn collect_activity(&self, strategy: ActivityStrategy) -> TimelineResult<()> {
-        self.collector.collect_once(strategy).await
-    }
-
     /// Add an activity directly to the timeline
     pub async fn add_activity(&self, activity: Activity) {
         let mut storage = self.storage.lock().await;
@@ -401,6 +380,13 @@ impl TimelineManager {
     /// Get collector statistics
     pub fn get_collector_stats(&self) -> CollectorStats {
         self.collector.get_stats()
+    }
+
+    /// Subscribe to focus change events
+    pub fn subscribe_to_focus_events(
+        &self,
+    ) -> tokio::sync::broadcast::Receiver<FocusedWindowEvent> {
+        self.collector.subscribe_to_focus_events()
     }
 
     /// Update storage configuration
@@ -488,7 +474,6 @@ mod tests {
         let config = TimelineConfig::builder()
             .max_activities(100)
             .collection_interval(Duration::from_secs(5))
-            .disable_focus_tracking()
             .build();
 
         let manager =
@@ -503,7 +488,6 @@ mod tests {
         let manager = TimelineManager::builder()
             .with_max_activities(200)
             .with_collection_interval(Duration::from_secs(10))
-            .disable_focus_tracking()
             .build()
             .expect("Failed to build timeline manager");
 
@@ -513,7 +497,6 @@ mod tests {
             manager.get_config().collector.collection_interval,
             Duration::from_secs(10)
         );
-        assert!(!manager.get_config().focus_tracking.enabled);
     }
 
     #[tokio::test]
@@ -537,17 +520,6 @@ mod tests {
             manager.get_config().collector.collection_interval,
             Duration::from_secs(3)
         );
-    }
-
-    #[tokio::test]
-    async fn test_builder_enable_focus_tracking() {
-        set_default_credential_builder(mock::default_credential_builder());
-        let manager = TimelineManager::builder()
-            .enable_focus_tracking()
-            .build()
-            .expect("Failed to build timeline manager");
-
-        assert!(manager.get_config().focus_tracking.enabled);
     }
 
     #[tokio::test]
@@ -583,22 +555,6 @@ mod tests {
         assert_eq!(current.name, "Test Activity");
     }
 
-    // #[tokio::test]
-    // async fn test_get_recent_activities() {
-    //     let manager = TimelineManager::new();
-
-    //     for i in 1..=5 {
-    //         let activity = create_test_activity(&format!("Activity {}", i));
-    //         manager.add_activity(activity).await;
-    //     }
-
-    //     let recent = manager.get_recent_activities(3).await;
-    //     assert_eq!(recent.len(), 3);
-    //     assert_eq!(recent[0].name, "Activity 5"); // Most recent first
-    //     assert_eq!(recent[1].name, "Activity 4");
-    //     assert_eq!(recent[2].name, "Activity 3");
-    // }
-
     #[tokio::test]
     async fn test_clear_activities() {
         set_default_credential_builder(mock::default_credential_builder());
@@ -623,7 +579,6 @@ mod tests {
     async fn test_manager_lifecycle() {
         set_default_credential_builder(mock::default_credential_builder());
         let config = TimelineConfig::builder()
-            .disable_focus_tracking()
             .collection_interval(Duration::from_millis(100))
             .build();
 

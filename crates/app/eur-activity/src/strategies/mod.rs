@@ -1,7 +1,11 @@
-//! Strategy implementations for different activity types
+//! Simplified strategy implementations for different activity types
+
+use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
 
 pub mod browser;
 pub mod default;
+pub mod processes;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
@@ -11,59 +15,56 @@ use crate::{
     types::{ActivityAsset, ActivitySnapshot},
 };
 
+#[derive(Debug, Clone, Default)]
+pub struct StrategyMetadata {
+    pub icon_base64: Option<String>,
+}
+
 /// Enum containing all possible activity strategies
+#[enum_dispatch(ActivityStrategyFunctionality)]
 #[derive(Debug, Clone)]
 pub enum ActivityStrategy {
-    Browser(BrowserStrategy),
-    Default(DefaultStrategy),
+    BrowserStrategy,
+    DefaultStrategy,
+}
+
+#[async_trait]
+#[enum_dispatch]
+pub trait ActivityStrategyFunctionality {
+    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>>;
+    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
+    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
+
+    async fn get_icon(&mut self) -> Option<image::RgbaImage>;
 }
 
 impl ActivityStrategy {
-    /// Retrieve assets associated with this activity
-    pub async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        match self {
-            ActivityStrategy::Browser(strategy) => strategy.retrieve_assets().await,
-            ActivityStrategy::Default(strategy) => strategy.retrieve_assets().await,
+    pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
+        if BrowserStrategy::get_supported_processes().contains(&process_name) {
+            return Ok(ActivityStrategy::BrowserStrategy(
+                BrowserStrategy::new().await?,
+            ));
         }
-    }
 
-    /// Retrieve snapshots associated with this activity
-    pub async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        match self {
-            ActivityStrategy::Browser(strategy) => strategy.retrieve_snapshots().await,
-            ActivityStrategy::Default(strategy) => strategy.retrieve_snapshots().await,
-        }
+        Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy))
     }
+}
 
-    /// Gather the current state of the activity
-    pub fn gather_state(&self) -> String {
-        match self {
-            ActivityStrategy::Browser(strategy) => strategy.gather_state(),
-            ActivityStrategy::Default(strategy) => strategy.gather_state(),
-        }
-    }
+/// Trait for strategies to declare which processes they support
+#[async_trait]
+pub trait StrategySupport {
+    /// Returns list of exact process names this strategy supports
+    fn get_supported_processes() -> Vec<&'static str>;
+}
 
-    /// Get name of the activity
-    pub fn get_name(&self) -> &str {
-        match self {
-            ActivityStrategy::Browser(strategy) => &strategy.name,
-            ActivityStrategy::Default(strategy) => &strategy.name,
-        }
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    /// Get icon of the activity
-    pub fn get_icon(&self) -> &str {
-        match self {
-            ActivityStrategy::Browser(strategy) => &strategy.icon,
-            ActivityStrategy::Default(strategy) => &strategy.icon,
-        }
-    }
-
-    /// Get process name of the activity
-    pub fn get_process_name(&self) -> &str {
-        match self {
-            ActivityStrategy::Browser(strategy) => &strategy.process_name,
-            ActivityStrategy::Default(strategy) => &strategy.process_name,
-        }
+    #[test]
+    fn test_browser_supported_processes() {
+        let processes = BrowserStrategy::get_supported_processes();
+        assert!(!processes.is_empty());
+        // Should contain browser process names based on OS
     }
 }

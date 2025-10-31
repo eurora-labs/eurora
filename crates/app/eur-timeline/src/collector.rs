@@ -1,5 +1,6 @@
 //! Timeline collector service implementation
 
+use chrono::{DateTime, Utc};
 use std::{
     sync::{
         Arc,
@@ -8,21 +9,47 @@ use std::{
     time::Duration,
 };
 
-use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
+use eur_activity::processes::{Eurora, ProcessFunctionality};
+use eur_activity::{DefaultStrategy, strategies::ActivityStrategyFunctionality};
+use ferrous_focus::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use tokio::{
-    sync::{Mutex, mpsc},
+    sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,
     time,
 };
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 use crate::{
     ActivityStrategy,
     config::CollectorConfig,
     error::{TimelineError, TimelineResult},
-    select_strategy_for_process,
     storage::TimelineStorage,
 };
+
+/// Event emitted when focus changes to a new application
+#[derive(Debug, Clone)]
+pub struct FocusedWindowEvent {
+    /// The name of the process that received focus
+    pub process_name: String,
+    /// The title of the window that received focus
+    pub window_title: String,
+    /// The icon of the application (if available)
+    pub icon: Option<image::RgbaImage>,
+    /// Timestamp when the focus change occurred
+    pub timestamp: DateTime<Utc>,
+}
+
+impl FocusedWindowEvent {
+    /// Create a new focus change event
+    pub fn new(process_name: String, window_title: String, icon: Option<image::RgbaImage>) -> Self {
+        Self {
+            process_name,
+            window_title,
+            icon,
+            timestamp: chrono::Utc::now(),
+        }
+    }
+}
 
 /// Service responsible for collecting activities and managing the collection lifecycle
 pub struct CollectorService {
@@ -36,12 +63,14 @@ pub struct CollectorService {
     focus_config: crate::config::FocusTrackingConfig,
     /// Channel for focus events
     focus_sender: Option<mpsc::UnboundedSender<FocusedWindow>>,
-    /// Focus tracking thread handle
-    focus_thread_handle: Option<std::thread::JoinHandle<()>>,
+    /// Focus tracking task handle
+    focus_thread_handle: Option<JoinHandle<()>>,
     /// Shutdown signal for focus thread
     focus_shutdown_signal: Option<Arc<AtomicBool>>,
     /// Restart attempt counter
     restart_attempts: u32,
+    /// Broadcast channel for focus change events
+    focus_event_tx: broadcast::Sender<FocusedWindowEvent>,
 }
 
 impl CollectorService {
@@ -52,6 +81,8 @@ impl CollectorService {
             config.collection_interval
         );
 
+        let (focus_event_tx, _) = broadcast::channel(100);
+
         Self {
             storage,
             current_task: None,
@@ -61,6 +92,7 @@ impl CollectorService {
             focus_thread_handle: None,
             focus_shutdown_signal: None,
             restart_attempts: 0,
+            focus_event_tx,
         }
     }
 
@@ -74,6 +106,8 @@ impl CollectorService {
             timeline_config.collector.collection_interval
         );
 
+        let (focus_event_tx, _) = broadcast::channel(100);
+
         Self {
             storage,
             current_task: None,
@@ -83,6 +117,7 @@ impl CollectorService {
             focus_thread_handle: None,
             focus_shutdown_signal: None,
             restart_attempts: 0,
+            focus_event_tx,
         }
     }
 
@@ -94,11 +129,8 @@ impl CollectorService {
 
         debug!("Starting timeline collection service");
 
-        if self.focus_config.enabled {
-            self.start_with_focus_tracking().await?;
-        } else {
-            self.start_without_focus_tracking().await?;
-        }
+        self.start_focus_tracking().await?;
+        // self.start_with_focus_tracking().await?;
 
         self.restart_attempts = 0;
         Ok(())
@@ -136,21 +168,20 @@ impl CollectorService {
             shutdown_signal.store(true, Ordering::Relaxed);
 
             if let Some(thread_handle) = self.focus_thread_handle.take() {
-                // Give the thread a moment to see the shutdown signal
+                // Give the task a moment to see the shutdown signal
                 tokio::time::sleep(Duration::from_millis(100)).await;
 
-                // Join the thread with a timeout
-                let join_result = tokio::task::spawn_blocking(move || thread_handle.join()).await;
-
-                match join_result {
-                    Ok(Ok(())) => {
-                        debug!("Focus tracking thread stopped gracefully");
+                // Abort the blocking task and wait for it to finish
+                thread_handle.abort();
+                match thread_handle.await {
+                    Ok(()) => {
+                        debug!("Focus tracking task stopped gracefully");
                     }
-                    Ok(Err(_)) => {
-                        warn!("Focus tracking thread panicked during shutdown");
+                    Err(e) if e.is_cancelled() => {
+                        debug!("Focus tracking task was cancelled");
                     }
-                    Err(_) => {
-                        warn!("Timeout waiting for focus tracking thread to stop");
+                    Err(e) => {
+                        warn!("Focus tracking task ended with error: {}", e);
                     }
                 }
             }
@@ -186,37 +217,6 @@ impl CollectorService {
             .is_some_and(|task| !task.is_finished())
     }
 
-    /// Collect activity once using the provided strategy
-    pub async fn collect_once(&self, mut strategy: ActivityStrategy) -> TimelineResult<()> {
-        debug!(
-            "Collecting activity once for strategy: {}",
-            strategy.get_name()
-        );
-
-        // Retrieve initial assets
-        let assets = strategy
-            .retrieve_assets()
-            .await
-            .map_err(|e| TimelineError::Collection(format!("Failed to retrieve assets: {}", e)))?;
-
-        // Create activity
-        let activity = crate::Activity::new(
-            strategy.get_name().to_string(),
-            strategy.get_icon().to_string(),
-            strategy.get_process_name().to_string(),
-            assets,
-        );
-
-        // Store the activity
-        {
-            let mut storage = self.storage.lock().await;
-            storage.add_activity(activity);
-        }
-
-        debug!("Successfully collected activity: {}", strategy.get_name());
-        Ok(())
-    }
-
     /// Update collector configuration
     pub fn update_config(&mut self, config: CollectorConfig) {
         debug!("Updating collector configuration");
@@ -240,199 +240,119 @@ impl CollectorService {
     pub fn get_stats(&self) -> CollectorStats {
         CollectorStats {
             is_running: self.is_running(),
-            focus_tracking_enabled: self.focus_config.enabled,
             collection_interval: self.config.collection_interval,
             restart_attempts: self.restart_attempts,
         }
     }
 
-    /// Start collection with focus tracking
-    async fn start_with_focus_tracking(&mut self) -> TimelineResult<()> {
-        let (tx, mut rx) = mpsc::unbounded_channel::<FocusedWindow>();
-        self.focus_sender = Some(tx.clone());
+    /// Subscribe to focus change events
+    pub fn subscribe_to_focus_events(&self) -> broadcast::Receiver<FocusedWindowEvent> {
+        self.focus_event_tx.subscribe()
+    }
 
-        // Create shutdown signal
-        let shutdown_signal = Arc::new(AtomicBool::new(false));
-        self.focus_shutdown_signal = Some(Arc::clone(&shutdown_signal));
+    /// Alternative start implementation
+    async fn start_focus_tracking(&mut self) -> TimelineResult<()> {
+        let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
+            DefaultStrategy,
+        )));
+        let strategy_clone = Arc::clone(&strategy);
+        let focus_event_tx = self.focus_event_tx.clone();
+        let storage_for_focus = Arc::clone(&self.storage);
 
-        // Start focus tracking thread
-        let focus_tx = tx.clone();
-        let shutdown_signal_clone = Arc::clone(&shutdown_signal);
-
-        let thread_handle = std::thread::spawn(move || {
-            let tracker = FocusTracker::new();
-
-            while !shutdown_signal_clone.load(Ordering::Relaxed) {
-                debug!("Starting focus tracker...");
-
-                let tx_clone = focus_tx.clone();
-                let shutdown_check = Arc::clone(&shutdown_signal_clone);
-
-                let result =
-                    tracker.track_focus(|window: FocusedWindow| -> FerrousFocusResult<()> {
-                        // Check shutdown signal before processing
-                        if shutdown_check.load(Ordering::Relaxed) {
-                            return Ok(());
-                        }
-
-                        if let Some(process_name) = &window.process_name
-                            && let Some(window_title) = &window.window_title
+        self.focus_thread_handle = Some(tokio::spawn(async move {
+            let config =
+                FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
+            let tracker = FocusTracker::with_config(config);
+            let prev_focus = Arc::new(Mutex::new(None::<(String, Option<String>)>));
+            let strategy_inner = Arc::clone(&strategy_clone);
+            let _ = tracker
+                .track_focus_async(move |window: FocusedWindow| {
+                    let prev_focus_inner = Arc::clone(&prev_focus);
+                    let strategy_for_update = Arc::clone(&strategy_inner);
+                    let focus_event_tx_inner = focus_event_tx.clone();
+                    let storage_inner = Arc::clone(&storage_for_focus);
+                    async move {
+                        if let Some(process_name) = window.process_name
+                            && process_name != Eurora.get_name()
                         {
-                            // Filter out ignored processes
-                            #[cfg(target_os = "windows")]
-                            let eurora_process = "eur-tauri.exe";
-                            #[cfg(not(target_os = "windows"))]
-                            let eurora_process = "eur-tauri";
+                            let new_focus =
+                                Some((process_name.clone(), window.window_title.clone()));
 
-                            if process_name != eurora_process {
-                                debug!("▶ {}: {}", process_name, window_title);
-                                let _ = tx_clone.send(window);
+                            // Check if focus changed
+                            let mut prev = prev_focus_inner.lock().await;
+                            if new_focus != *prev {
+                                // Initialize strategy only when focus changes
+                                if let Ok(mut new_strategy) =
+                                    ActivityStrategy::new(&process_name).await
+                                {
+                                    // Retrieve initial assets and create activity
+                                    if let Ok(assets) = new_strategy.retrieve_assets().await {
+                                        let activity = crate::Activity::new(
+                                            window.window_title.clone().unwrap_or_default(),
+                                            "".to_string(), // For now ignore the icon, later save it to disk and provide path
+                                            process_name.clone(),
+                                            assets,
+                                        );
+
+                                        // Add activity to storage BEFORE emitting event
+                                        {
+                                            let mut storage = storage_inner.lock().await;
+                                            storage.add_activity(activity);
+                                        }
+                                    }
+
+                                    // Get icon and emit focus change event
+                                    let icon = match new_strategy.get_icon().await {
+                                        Some(icon) => Some(icon),
+                                        None => window.icon,
+                                    };
+                                    let focus_event = FocusedWindowEvent::new(
+                                        process_name.clone(),
+                                        window.window_title.clone().unwrap_or_default(),
+                                        icon,
+                                    );
+                                    let _ = focus_event_tx_inner.send(focus_event);
+
+                                    let mut strategy_write = strategy_for_update.write().await;
+                                    *strategy_write = new_strategy;
+                                }
+                                *prev = new_focus;
                             }
                         }
                         Ok(())
-                    });
+                    }
+                })
+                .await;
+        }));
 
-                match result {
-                    Ok(_) => {
-                        if !shutdown_signal_clone.load(Ordering::Relaxed) {
-                            warn!("Focus tracker ended unexpectedly, restarting...");
+        let storage = Arc::clone(&self.storage);
+        let config = self.config.clone();
+        self.current_task = Some(tokio::spawn(async move {
+            let strategy_inner = Arc::clone(&strategy);
+            let mut interval = time::interval(config.collection_interval);
+
+            loop {
+                interval.tick().await;
+
+                let mut strategy_write = strategy_inner.write().await;
+                match strategy_write.retrieve_snapshots().await {
+                    Ok(snapshots) => {
+                        if !snapshots.is_empty() {
+                            let mut storage = storage.lock().await;
+                            if let Some(current_activity) =
+                                storage.get_all_activities_mut().back_mut()
+                            {
+                                for snapshot in snapshots {
+                                    current_activity.snapshots.push(snapshot);
+                                }
+                            }
                         }
                     }
                     Err(e) => {
-                        if !shutdown_signal_clone.load(Ordering::Relaxed) {
-                            error!("Focus tracker crashed with error: {:?}", e);
-                            warn!("Restarting focus tracker in 1 second...");
-                        }
-                    }
-                }
-
-                // Only sleep if we're not shutting down
-                if !shutdown_signal_clone.load(Ordering::Relaxed) {
-                    std::thread::sleep(std::time::Duration::from_secs(1));
-                }
-            }
-
-            debug!("Focus tracking thread shutting down gracefully");
-        });
-
-        self.focus_thread_handle = Some(thread_handle);
-
-        // Start collection task
-        let storage = Arc::clone(&self.storage);
-        let config = self.config.clone();
-
-        self.current_task = Some(tokio::spawn(async move {
-            let mut current_collection_task: Option<JoinHandle<()>> = None;
-
-            while let Some(event) = rx.recv().await {
-                // Stop previous collection task
-                if let Some(task) = current_collection_task.take() {
-                    task.abort();
-                }
-
-                // Start new collection task for this focus event
-                let storage_clone = Arc::clone(&storage);
-                let collection_interval = config.collection_interval;
-                let shutdown_signal_clone = Arc::clone(&shutdown_signal);
-
-                current_collection_task = Some(tokio::spawn(async move {
-                    if let Some(process_name) = event.process_name
-                        && let Some(window_title) = event.window_title
-                    {
-                        let display_name = format!("{}: {}", process_name, window_title);
-                        let icon = event.icon.unwrap_or_default();
-
-                        match select_strategy_for_process(&process_name, display_name, icon).await {
-                            Ok(mut strategy) => {
-                                // Collect initial activity
-                                if let Ok(assets) = strategy.retrieve_assets().await {
-                                    let activity = crate::Activity::new(
-                                        strategy.get_name().to_string(),
-                                        strategy.get_icon().to_string(),
-                                        strategy.get_process_name().to_string(),
-                                        assets,
-                                    );
-
-                                    {
-                                        let mut storage = storage_clone.lock().await;
-                                        storage.add_activity(activity);
-                                    }
-                                }
-
-                                // Start periodic snapshot collection
-                                let mut interval = time::interval(collection_interval);
-                                while !shutdown_signal_clone.load(Ordering::Relaxed) {
-                                    interval.tick().await;
-
-                                    match strategy.retrieve_snapshots().await {
-                                        Ok(snapshots) => {
-                                            if !snapshots.is_empty() {
-                                                let mut storage = storage_clone.lock().await;
-                                                if let Some(current_activity) =
-                                                    storage.get_all_activities_mut().back_mut()
-                                                {
-                                                    for snapshot in snapshots {
-                                                        current_activity.snapshots.push(snapshot);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            debug!("Failed to retrieve snapshots: {:?}", e);
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                warn!(
-                                    "Failed to create strategy for process {}: {}",
-                                    process_name, e
-                                );
-                            }
-                        }
-                    }
-                }));
-            }
-        }));
-
-        Ok(())
-    }
-
-    /// Start collection without focus tracking (manual mode)
-    async fn start_without_focus_tracking(&mut self) -> TimelineResult<()> {
-        debug!("Starting collection without focus tracking");
-
-        // Create shutdown signal for the cleanup task
-        let shutdown_signal = Arc::new(AtomicBool::new(false));
-
-        // For now, just create a placeholder task that does periodic cleanup
-        let storage = Arc::clone(&self.storage);
-        let cleanup_interval = Duration::from_secs(300); // 5 minutes
-
-        self.current_task = Some(tokio::spawn(async move {
-            let mut interval = time::interval(cleanup_interval);
-
-            while !shutdown_signal.load(Ordering::Relaxed) {
-                tokio::select! {
-                    _ = interval.tick() => {
-                        // Perform periodic cleanup
-                        {
-                            let mut storage = storage.lock().await;
-                            if storage.needs_cleanup() {
-                                storage.force_cleanup();
-                            }
-                        }
-                    }
-                    _ = tokio::time::sleep(Duration::from_millis(100)) => {
-                        // Check shutdown signal more frequently
-                        if shutdown_signal.load(Ordering::Relaxed) {
-                            break;
-                        }
+                        debug!("Failed to retrieve snapshots: {:?}", e);
                     }
                 }
             }
-
-            debug!("Cleanup task shutting down gracefully");
         }));
 
         Ok(())
@@ -479,11 +399,9 @@ impl Drop for CollectorService {
             shutdown_signal.store(true, Ordering::Relaxed);
         }
 
-        // Join focus thread if it exists
+        // Cancel focus task if it exists (non-blocking in Drop)
         if let Some(thread_handle) = self.focus_thread_handle.take() {
-            // Give it a brief moment to see the shutdown signal
-            std::thread::sleep(Duration::from_millis(50));
-            let _ = thread_handle.join();
+            thread_handle.abort();
         }
     }
 }
@@ -493,8 +411,6 @@ impl Drop for CollectorService {
 pub struct CollectorStats {
     /// Whether the collector is currently running
     pub is_running: bool,
-    /// Whether focus tracking is enabled
-    pub focus_tracking_enabled: bool,
     /// Collection interval
     pub collection_interval: Duration,
     /// Number of restart attempts
@@ -525,7 +441,6 @@ mod tests {
                 ..Default::default()
             },
             focus_tracking: crate::config::FocusTrackingConfig {
-                enabled: false, // Disable focus tracking for tests
                 ..Default::default()
             },
             ..Default::default()
@@ -558,7 +473,6 @@ mod tests {
                 ..Default::default()
             },
             focus_tracking: crate::config::FocusTrackingConfig {
-                enabled: false, // Disable focus tracking for tests
                 ..Default::default()
             },
             ..Default::default()

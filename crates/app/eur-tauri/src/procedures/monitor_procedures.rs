@@ -1,4 +1,4 @@
-use eur_vision::{capture_monitor_by_id, image_to_base64};
+use eur_vision::{capture_monitor_by_id, rgb_to_base64};
 
 #[taurpc::procedures(
     path = "monitor",
@@ -18,6 +18,6 @@ impl MonitorApi for MonitorApiImpl {
             .map_err(|e| format!("Failed to capture monitor: {}", e))?;
         let image = image::DynamicImage::ImageRgba8(image).to_rgb8();
 
-        image_to_base64(image).map_err(|e| format!("Failed to encode image: {}", e))
+        rgb_to_base64(image).map_err(|e| format!("Failed to encode image: {}", e))
     }
 }
