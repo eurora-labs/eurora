@@ -54,6 +54,7 @@ open = "5"
 url = "2.5.4"
 dirs = "6.0.0"
 posthog-rs = { workspace = true }
+color-thief = "0.2.2"
 
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
@@ -75,7 +76,6 @@ chrono = { workspace = true }
 defer = "0.2.1"
 futures = { workspace = true }
 tonic = { workspace = true }
-async-mutex = "1.4.1"
 lazy_static = "1.4.0"
 pollster = "0.4"
 specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
