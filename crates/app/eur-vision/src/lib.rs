@@ -204,16 +204,7 @@ pub fn capture_region_rgba(
     Ok(image)
 }
 
-/// Converts an ImageBuffer to a base64 encoded PNG string
-///
-/// # Arguments
-///
-/// * `image` - The ImageBuffer to convert
-///
-/// # Returns
-///
-/// A base64 encoded PNG string
-pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
+pub fn rgb_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
     let mut buffer = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut buffer);
 
@@ -222,8 +213,19 @@ pub fn image_to_base64(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<String> {
         .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
 
     let base64 = general_purpose::STANDARD.encode(&buffer);
-    // let base64 = base64::encode(&buffer);
     Ok(format!("data:image/jpeg;base64,{}", base64))
+}
+
+pub fn rgba_to_base64(image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<String> {
+    let mut buffer = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut buffer);
+
+    image
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| anyhow!("Failed to encode image: {}", e))?;
+
+    let base64 = general_purpose::STANDARD.encode(&buffer);
+    Ok(format!("data:image/png;base64,{}", base64))
 }
 
 // pub fn image_to_base64(image: ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<String> {

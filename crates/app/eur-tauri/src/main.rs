@@ -7,8 +7,10 @@ use dotenv::dotenv;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_encrypt::MainKey;
 use eur_native_messaging::create_grpc_ipc_client;
+use eur_personal_db::{Activity, PersonalDatabaseManager};
 use eur_settings::AppSettings;
 use eur_tauri::launcher::{monitor_cursor_for_hover, toggle_launcher_window};
+use eur_tauri::procedures::timeline_procedures::TimelineAppEvent;
 use eur_tauri::util;
 use eur_tauri::{
     WindowState, create_hover, create_launcher, create_window,
@@ -23,6 +25,7 @@ use eur_tauri::{
         settings_procedures::{SettingsApi, SettingsApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
+        timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
         user_procedures::{UserApi, UserApiImpl},
         window_procedures::{WindowApi, WindowApiImpl},
     },
@@ -41,7 +44,9 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_log::{Target, TargetKind, fern};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
+use tokio::sync::Mutex;
 use tracing::{debug, error};
+use uuid::Uuid;
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
@@ -139,21 +144,21 @@ fn main() {
                     }
 
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
-                    tauri_app.manage(async_mutex::Mutex::new(app_settings.clone()));
+                    tauri_app.manage(Mutex::new(app_settings.clone()));
 
                     // Ensure state exists immediately
-                    tauri_app.manage::<SharedPromptKitService>(async_mutex::Mutex::new(None));
+                    tauri_app.manage::<SharedPromptKitService>(Mutex::new(None));
 
                     // Ensure empty current conversation exists
-                    tauri_app.manage::<SharedCurrentConversation>(async_mutex::Mutex::new(None));
+                    tauri_app.manage::<SharedCurrentConversation>(Mutex::new(None));
 
                     let handle = tauri_app.handle().clone();
                     tauri::async_runtime::spawn(async move {
                         if let Ok(prompt_kit_service) = app_settings.backend.initialize().await {
-                            let service: SharedPromptKitService = async_mutex::Mutex::new(Some(prompt_kit_service));
+                            let service: SharedPromptKitService = Mutex::new(Some(prompt_kit_service));
                             handle.manage(service);
                         } else {
-                            let service: SharedPromptKitService = async_mutex::Mutex::new(None);
+                            let service: SharedPromptKitService = Mutex::new(None);
                             handle.manage(service);
                             debug!("No backend available");
                         }
@@ -287,19 +292,93 @@ fn main() {
                         main_key: main_key.clone()
                     })
                         .build().expect("Failed to create timeline");
-                    app_handle.manage(async_mutex::Mutex::new(timeline));
-
-                    // Start timeline collection
-                    let timeline_handle = app_handle.clone();
+                    app_handle.manage(Mutex::new(timeline));
+                    let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let timeline_mutex = timeline_handle.state::<async_mutex::Mutex<TimelineManager>>();
-                        let mut timeline = timeline_mutex.lock().await;
-                        if let Err(e) = timeline.start().await {
-                            error!("Failed to start timeline collection: {}", e);
-                        } else {
-                            debug!("Timeline collection started successfully");
-                        }
+                        let db_manager = match create_shared_database_manager(&db_app_handle).await {
+                            Ok(db) => {
+                                Some(db)
+                            }
+                            Err(e) => {
+                                error!("Failed to initialize personal database manager: {}", e);
+                                None
+                            }
+                        };
+                        if let Some(db_manager) = db_manager {
+                            db_app_handle.manage(db_manager);
+                            let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
+
+                            // Subscribe to focus change events before starting timeline
+                            let mut focus_receiver = {
+                                let timeline = timeline_mutex.lock().await;
+                                timeline.subscribe_to_focus_events()
+                            };
+
+                            let focus_timeline_handle = db_app_handle.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let db_manager = focus_timeline_handle.state::<PersonalDatabaseManager>().inner();
+                                while let Ok(focus_event) = focus_receiver.recv().await {
+                                    debug!("Focus changed to: {} - {}",
+                                        focus_event.process_name,
+                                        focus_event.window_title.clone()
+                                    );
+
+                                    let mut primary_icon_color = None;
+                                    let mut icon_base64 = None;
+
+                                    if let Some(icon) = focus_event.icon.as_ref() {
+                                        primary_icon_color = color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 10, 10).ok().map(|c| format!("#{r:02X}{g:02X}{b:02X}", r = c[0].r, g = c[0].g, b = c[0].b));
+                                        icon_base64 = eur_vision::rgba_to_base64(icon).ok();
+                                    }
+
+                                    let _ = TauRpcTimelineApiEventTrigger::new(focus_timeline_handle.clone())
+                                        .new_app_event( TimelineAppEvent {
+                                            name: focus_event.window_title.clone(),
+                                            color: primary_icon_color,
+                                            icon_base64
+                                        });
+
+
+                                    debug!("Timestamp: {}", focus_event.timestamp);
+
+                                    // Close previous active activity if exists
+                                    if let Ok(Some(last_activity)) = db_manager.get_last_active_activity().await {
+                                        let _ = db_manager.update_activity_end_time(&last_activity.id, focus_event.timestamp).await;
+                                        debug!("Closed previous activity: {}", last_activity.name);
+                                    }
+
+                                    // Create new activity for the focus change
+                                    let activity = Activity {
+                                        id: Uuid::new_v4().to_string(),
+                                        name: focus_event.window_title.clone(),
+                                        icon_path: None,
+                                        process_name: focus_event.process_name.clone(),
+                                        started_at: focus_event.timestamp.to_rfc3339(),
+                                        ended_at: None,
+                                    };
+
+                                    match db_manager.insert_activity(&activity).await {
+                                        Ok(_) => {
+                                            debug!("Inserted activity: {} ({})", activity.name, activity.process_name);
+                                            debug!("Activity inserted with ID: {}", activity.id);
+                                        }
+                                        Err(e) => {
+                                            error!("Failed to insert activity: {}", e);
+                                        }
+                                    }
+                                }
+                            });
+
+                            let mut timeline = timeline_mutex.lock().await;
+                            if let Err(e) = timeline.start().await {
+                                error!("Failed to start timeline collection: {}", e);
+                            } else {
+                                debug!("Timeline collection started successfully");
+                            }
+
+                            }
                     });
+
 
                     let launcher_label = launcher_window.label().to_string();
                     app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
@@ -336,16 +415,7 @@ fn main() {
                     //     db_app_handle.manage(db);
                     // });
                     // Initialize conversation storage
-                    let db_app_handle = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        match create_shared_database_manager(&db_app_handle).await {
-                            Ok(db) => {
-                                db_app_handle.manage(db);
-                                debug!("Personal database manager initialized");
-                            }
-                            Err(e) => error!("Failed to initialize personal database manager: {}", e),
-                        }
-                    });
+
 
 
                     // Initialize IPC client
@@ -422,6 +492,7 @@ fn main() {
                         .bigint(specta_typescript::BigIntExportBehavior::BigInt),
                 )
                 .merge(AuthApiImpl.into_handler())
+                .merge(TimelineApiImpl.into_handler())
                 .merge(ConversationApiImpl.into_handler())
                 .merge(SettingsApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())

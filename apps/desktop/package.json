@@ -1,7 +1,7 @@
 {
 	"name": "@eurora/desktop",
 	"private": true,
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite --clearScreen false",
@@ -24,6 +24,7 @@
 		"@eurora/prosemirror-view": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
+		"@gitbutler/svelte-comment-injector": "^1.0.0",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"@lucide/svelte": "^0.548.0",
 		"@playwright/test": "^1.56.1",
