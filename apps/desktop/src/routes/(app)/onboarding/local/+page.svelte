@@ -9,7 +9,7 @@
 	}
 </script>
 
-<div class="w-full h-screen mx-auto p-6 flex flex-col">
+<div class="w-full h-full mx-auto p-6 flex flex-col">
 	<h1 class="text-2xl font-bold mb-8">Third Party Configuration</h1>
 
 	<div class="grid grid-cols-2 lg:grid-cols-2 gap-6 flex-1">
