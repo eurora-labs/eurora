@@ -243,7 +243,7 @@ jobs:
             - name: Compile Protobuf
               run: pnpm proto:typescript
 
-            - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v5
+            - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
               with:
                   name: sveltekit-build
                   path: ./apps/desktop/build/
@@ -294,7 +294,7 @@ jobs:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
             - name: Download artifacts
-              uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v5
+              uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
               with:
                   name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}-${{ github.run_number }}'
                   path: release
