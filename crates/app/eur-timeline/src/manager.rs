@@ -8,8 +8,8 @@ use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::{
-    Activity, ActivityStorage, ActivityStorageConfig, ActivityStrategy, AssetFunctionality,
-    ContextChip, DisplayAsset, TimelineError,
+    Activity, ActivityStorage, ActivityStorageConfig, AssetFunctionality, ContextChip,
+    DisplayAsset, TimelineError,
     collector::{CollectorService, CollectorStats, FocusedWindowEvent},
     config::TimelineConfig,
     error::TimelineResult,
