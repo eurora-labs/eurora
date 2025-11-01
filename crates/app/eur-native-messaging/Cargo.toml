@@ -18,7 +18,7 @@ prost = { workspace = true }
 futures = { workspace = true }
 tokio-stream = { workspace = true }
 base64 = { workspace = true }
-ctrlc = "3.4.7"
+ctrlc = "3.5.1"
 h2 = "0.4.12"
 thiserror = { workspace = true }
 tracing = { workspace = true }
