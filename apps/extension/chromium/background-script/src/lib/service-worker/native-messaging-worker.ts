@@ -1,7 +1,7 @@
 // Native Messaging Service Worker - centralized handler for all native messaging
 // Keep track of the native port connection
-import { handleMessage } from '@eurora/browser-shared/messaging';
-import { getCurrentTabIcon } from '@eurora/browser-shared/tabs';
+import { handleMessage } from '@eurora/browser-shared/background/messaging';
+import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
 
 let nativePort: chrome.runtime.Port | null = null;
 
