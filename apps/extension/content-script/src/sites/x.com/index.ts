@@ -1,7 +1,7 @@
 import {
 	Watcher,
 	type WatcherResponse,
-} from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+} from '@eurora/browser-shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { TwitterChromeMessage, WatcherParams } from './types.js';
 
@@ -9,7 +9,7 @@ import type {
 	NativeTwitterAsset,
 	NativeTwitterSnapshot,
 	NativeTwitterTweet,
-} from '@eurora/chrome-ext-shared/bindings';
+} from '@eurora/browser-shared/content/bindings';
 
 export class TwitterWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {

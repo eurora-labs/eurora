@@ -1,4 +1,4 @@
-import { handleMessage } from '@eurora/browser-shared/messaging';
+import { handleMessage } from '@eurora/browser-shared/background/messaging';
 
 console.log('Extension background services started');
 

@@ -1,12 +1,12 @@
 import {
 	Watcher,
 	type WatcherResponse,
-} from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+} from '@eurora/browser-shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import {
 	createArticleAsset,
 	createArticleSnapshot,
-} from '@eurora/chrome-ext-shared/extensions/article/util';
+} from '@eurora/browser-shared/content/extensions/article/util';
 import { ArticleChromeMessage, type WatcherParams } from './types.js';
 
 export class ArticleWatcher extends Watcher<WatcherParams> {
