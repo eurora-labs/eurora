@@ -1,6 +1,6 @@
 import { Readability } from '@mozilla/readability';
-import type { NativeArticleAsset, NativeArticleSnapshot } from '$lib/bindings.js';
-import type { NativeResponse } from '$lib/models';
+import type { NativeArticleAsset, NativeArticleSnapshot } from '../../bindings.js';
+import type { NativeResponse } from '../../models.js';
 
 export function createArticleAsset(document: Document): NativeResponse {
 	try {
