@@ -15,31 +15,31 @@ path = "src/main.rs"
 test = false
 
 [build-dependencies]
-tauri-build = { version = "2.0.3", features = [] }
+tauri-build = { version = "2.5.1", features = [] }
 
 [dependencies]
-tauri-utils = "2.7.0"                                                       # single entry removes second 8.6 s build
-tauri-plugin-stronghold = "2.0.0"
+tauri-utils = "2.8.0"                                                       # single entry removes second 8.6 s build
+tauri-plugin-stronghold = "2.3.1"
 anyhow = { workspace = true }
 eur-secret = { workspace = true }
 eur-prompt-kit = { workspace = true }
 keyring = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
-reqwest = { version = "0.12.23", features = ["json", "native-tls"] }
+reqwest = { version = "0.12.24", features = ["json", "native-tls"] }
 serde = { workspace = true }
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
 tauri = { version = "^2.7.0", features = ["unstable", "tray-icon"] }
-tauri-plugin-dialog = "2.3.2"
+tauri-plugin-dialog = "2.4.2"
 tauri-plugin-fs = "2.4.1"
-tauri-plugin-http = "2.5.1"
-tauri-plugin-log = "2.6.0"
+tauri-plugin-http = "2.5.4"
+tauri-plugin-log = "2.7.1"
 tauri-plugin-os = "2"
-tauri-plugin-process = "2.3.0"
-tauri-plugin-shell = "2.3.1"
-tauri-plugin-single-instance = "2.3.4"
-tauri-plugin-store = "2.4.0"
+tauri-plugin-process = "2.3.1"
+tauri-plugin-shell = "2.3.3"
+tauri-plugin-single-instance = "2.3.6"
+tauri-plugin-store = "2.4.1"
 tauri-plugin-updater = "2.9.0"
-tauri-plugin-window-state = "2.4.0"
+tauri-plugin-window-state = "2.4.1"
 eur-vision = { workspace = true }
 eur-screen-position = { workspace = true }
 image = { workspace = true }
@@ -96,7 +96,7 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-updater = "2"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
-tauri-plugin-autostart = "2.5.0"
+tauri-plugin-autostart = "2.5.1"
 tauri-plugin-updater = "2"
 
 [lints.clippy]
