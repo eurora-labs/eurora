@@ -10,7 +10,7 @@ use std::{
 };
 
 use eur_activity::processes::{Eurora, ProcessFunctionality};
-use eur_activity::{DefaultStrategy, strategies::ActivityStrategyFunctionality};
+use eur_activity::{DefaultStrategy, NoStrategy, strategies::ActivityStrategyFunctionality};
 use ferrous_focus::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
@@ -272,49 +272,54 @@ impl CollectorService {
                     let focus_event_tx_inner = focus_event_tx.clone();
                     let storage_inner = Arc::clone(&storage_for_focus);
                     async move {
-                        if let Some(process_name) = window.process_name
-                            && process_name != Eurora.get_name()
-                        {
+                        if let Some(process_name) = window.process_name {
                             let new_focus =
                                 Some((process_name.clone(), window.window_title.clone()));
 
                             // Check if focus changed
                             let mut prev = prev_focus_inner.lock().await;
                             if new_focus != *prev {
-                                // Initialize strategy only when focus changes
-                                if let Ok(mut new_strategy) =
-                                    ActivityStrategy::new(&process_name).await
-                                {
-                                    // Retrieve initial assets and create activity
-                                    if let Ok(assets) = new_strategy.retrieve_assets().await {
-                                        let activity = crate::Activity::new(
-                                            window.window_title.clone().unwrap_or_default(),
-                                            "".to_string(), // For now ignore the icon, later save it to disk and provide path
-                                            process_name.clone(),
-                                            assets,
-                                        );
-
-                                        // Add activity to storage BEFORE emitting event
-                                        {
-                                            let mut storage = storage_inner.lock().await;
-                                            storage.add_activity(activity);
-                                        }
-                                    }
-
-                                    // Get icon and emit focus change event
-                                    let icon = match new_strategy.get_icon().await {
-                                        Some(icon) => Some(icon),
-                                        None => window.icon,
-                                    };
-                                    let focus_event = FocusedWindowEvent::new(
-                                        process_name.clone(),
-                                        window.window_title.clone().unwrap_or_default(),
-                                        icon,
-                                    );
-                                    let _ = focus_event_tx_inner.send(focus_event);
-
+                                // Check if this is Eurora itself
+                                if process_name == Eurora.get_name() {
+                                    // Use NoStrategy for Eurora to skip snapshot retrieval
                                     let mut strategy_write = strategy_for_update.write().await;
-                                    *strategy_write = new_strategy;
+                                    *strategy_write = ActivityStrategy::NoStrategy(NoStrategy);
+                                } else {
+                                    // Initialize strategy only when focus changes
+                                    if let Ok(mut new_strategy) =
+                                        ActivityStrategy::new(&process_name).await
+                                    {
+                                        // Retrieve initial assets and create activity
+                                        if let Ok(assets) = new_strategy.retrieve_assets().await {
+                                            let activity = crate::Activity::new(
+                                                window.window_title.clone().unwrap_or_default(),
+                                                "".to_string(), // For now ignore the icon, later save it to disk and provide path
+                                                process_name.clone(),
+                                                assets,
+                                            );
+
+                                            // Add activity to storage BEFORE emitting event
+                                            {
+                                                let mut storage = storage_inner.lock().await;
+                                                storage.add_activity(activity);
+                                            }
+                                        }
+
+                                        // Get icon and emit focus change event
+                                        let icon = match new_strategy.get_icon().await {
+                                            Some(icon) => Some(icon),
+                                            None => window.icon,
+                                        };
+                                        let focus_event = FocusedWindowEvent::new(
+                                            process_name.clone(),
+                                            window.window_title.clone().unwrap_or_default(),
+                                            icon,
+                                        );
+                                        let _ = focus_event_tx_inner.send(focus_event);
+
+                                        let mut strategy_write = strategy_for_update.write().await;
+                                        *strategy_write = new_strategy;
+                                    }
                                 }
                                 *prev = new_focus;
                             }
