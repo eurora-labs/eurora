@@ -5,10 +5,12 @@ use enum_dispatch::enum_dispatch;
 
 pub mod browser;
 pub mod default;
+pub mod no_strategy;
 pub mod processes;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
+pub use no_strategy::NoStrategy;
 
 use crate::{
     error::ActivityResult,
@@ -26,6 +28,7 @@ pub struct StrategyMetadata {
 pub enum ActivityStrategy {
     BrowserStrategy,
     DefaultStrategy,
+    NoStrategy,
 }
 
 #[async_trait]
