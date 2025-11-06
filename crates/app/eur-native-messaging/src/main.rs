@@ -169,7 +169,7 @@ fn generate_typescript_definitions() -> Result<()> {
 
     Typescript::default()
         .export_to(
-            "packages/chrome-ext-shared/src/lib/bindings.ts",
+            "packages/browser-shared/src/content/bindings.ts",
             &specta::export(),
         )
         .unwrap();
