@@ -5,10 +5,13 @@ use enum_dispatch::enum_dispatch;
 
 pub mod browser;
 pub mod default;
+pub mod no_strategy;
 pub mod processes;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
+use eur_native_messaging::NativeMetadata;
+pub use no_strategy::NoStrategy;
 
 use crate::{
     error::ActivityResult,
@@ -20,12 +23,19 @@ pub struct StrategyMetadata {
     pub icon_base64: Option<String>,
 }
 
+impl From<NativeMetadata> for StrategyMetadata {
+    fn from(_metadata: NativeMetadata) -> Self {
+        StrategyMetadata { icon_base64: None }
+    }
+}
+
 /// Enum containing all possible activity strategies
 #[enum_dispatch(ActivityStrategyFunctionality)]
 #[derive(Debug, Clone)]
 pub enum ActivityStrategy {
     BrowserStrategy,
     DefaultStrategy,
+    NoStrategy,
 }
 
 #[async_trait]
@@ -35,7 +45,7 @@ pub trait ActivityStrategyFunctionality {
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
 
-    async fn get_icon(&mut self) -> Option<image::RgbaImage>;
+    async fn get_icon(&mut self) -> ActivityResult<image::RgbaImage>;
 }
 
 impl ActivityStrategy {

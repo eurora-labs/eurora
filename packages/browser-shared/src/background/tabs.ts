@@ -61,8 +61,7 @@ export async function getCurrentTabIcon(): Promise<string> {
 			reader.onloadend = () => {
 				const result = reader.result as string;
 				// Extract base64 part from data URL
-				const base64Match = result.match(/^data:image\/[^;]+;base64,(.+)$/);
-				resolve(base64Match ? base64Match[1] : '');
+				resolve(result);
 			};
 			reader.onerror = reject;
 			reader.readAsDataURL(blob);
