@@ -7,19 +7,12 @@ pub use super::processes::*;
 pub use super::{ActivityStrategy, StrategySupport};
 use crate::utils::convert_svg_to_rgba;
 use async_trait::async_trait;
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::MessageRequest;
-use image::ImageBuffer;
-use image::Rgba;
-use image::RgbaImage;
-use resvg::render;
 use serde::{Deserialize, Serialize};
-use tiny_skia::Pixmap;
 use tokio::sync::Mutex;
 use tracing::{debug, warn};
-use usvg::{Options, Tree};
 
 use crate::strategies::StrategyMetadata;
 use eur_native_messaging::NativeIcon;
@@ -199,7 +192,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 let icon_url = icon.base64;
                 if let Some(icon) = icon_url {
                     match icon.starts_with("data:image/svg+xml;base64") {
-                        true => convert_svg_to_rgba(&icon),
+                        true => convert_svg_to_rgba(&icon).ok(),
                         false => {
                             let icon = icon.split(',').nth(1).unwrap_or(&icon);
                             let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
