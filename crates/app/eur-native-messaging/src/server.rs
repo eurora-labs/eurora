@@ -265,6 +265,24 @@ impl TauriIpc for TauriIpcServer {
             }
         }
     }
+
+    async fn get_icon(&self, _req: Request<MessageRequest>) -> IpcResult<MessageResponse> {
+        debug!("Received get_icon request");
+
+        match self.send_native_message("GET_ICON").await {
+            Ok(native_asset) => match self.native_message_to_response(native_asset) {
+                Ok(response) => Ok(Response::new(response)),
+                Err(e) => {
+                    debug!("Error converting asset to response: {}", e);
+                    Err(Status::internal(format!("Conversion error: {}", e)))
+                }
+            },
+            Err(e) => {
+                debug!("Error in native messaging: {}", e);
+                Err(Status::internal(format!("Native messaging error: {}", e)))
+            }
+        }
+    }
 }
 
 /// Read a message from the given reader
