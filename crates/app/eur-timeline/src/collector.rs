@@ -307,8 +307,8 @@ impl CollectorService {
 
                                         // Get icon and emit focus change event
                                         let icon = match new_strategy.get_icon().await {
-                                            Some(icon) => Some(icon),
-                                            None => window.icon,
+                                            Ok(icon) => Some(icon),
+                                            Err(_) => window.icon,
                                         };
                                         let focus_event = FocusedWindowEvent::new(
                                             process_name.clone(),
