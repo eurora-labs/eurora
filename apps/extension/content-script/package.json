@@ -20,7 +20,7 @@
 		"@eslint/compat": "^1.4.1",
 		"@eslint/js": "^9.39.1",
 		"@eurora/shared": "workspace:*",
-		"@eurora/chrome-ext-shared": "workspace:*",
+		"@eurora/browser-shared": "workspace:*",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@types/chrome": "^0.1.27",
 		"eslint": "^9.39.1",

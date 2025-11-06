@@ -5,7 +5,9 @@ use std::sync::Arc;
 pub use super::ActivityStrategyFunctionality;
 pub use super::processes::*;
 pub use super::{ActivityStrategy, StrategySupport};
+use crate::utils::convert_svg_to_rgba;
 use async_trait::async_trait;
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,8 @@ use tokio::sync::Mutex;
 use tracing::{debug, warn};
 
 use crate::strategies::StrategyMetadata;
+use eur_native_messaging::NativeIcon;
+
 use crate::{
     ActivityError,
     error::ActivityResult,
@@ -146,11 +150,100 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
-        Ok(StrategyMetadata::default())
+        debug!("Retrieving metadata for browser strategy");
+
+        let Some(client) = &self.client else {
+            warn!("No IPC client available for browser strategy trying to retrieve metadata");
+            return Ok(StrategyMetadata::default());
+        };
+
+        let mut client_guard = client.lock().await;
+        let request = MessageRequest {};
+
+        match client_guard.get_metadata(request).await {
+            Ok(response) => {
+                debug!("Received metadata response from browser extension");
+
+                let resp = response.into_inner();
+
+                let native_metadata = serde_json::from_slice::<NativeMessage>(&resp.content)
+                    .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+
+                let metadata = match native_metadata {
+                    NativeMessage::NativeMetadata(metadata) => StrategyMetadata::from(metadata),
+                    _ => StrategyMetadata::default(),
+                };
+                Ok(metadata)
+            }
+            Err(e) => {
+                warn!("Failed to retrieve metadata from browser: {}", e);
+
+                Ok(StrategyMetadata::default())
+            }
+        }
     }
 
-    async fn get_icon(&mut self) -> Option<image::RgbaImage> {
-        None
+    async fn get_icon(&mut self) -> ActivityResult<image::RgbaImage> {
+        match self._get_icon().await {
+            Ok(icon) => {
+                let icon_url = icon.base64;
+                if let Some(icon) = icon_url {
+                    match icon.starts_with("data:image/svg+xml;base64") {
+                        true => convert_svg_to_rgba(&icon),
+                        false => {
+                            let icon = icon.split(',').nth(1).unwrap_or(&icon);
+                            let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
+
+                            let icon_image =
+                                image::load_from_memory(&icon_data.unwrap_or_default())?;
+
+                            Ok(icon_image.to_rgba8())
+                        }
+                    }
+                } else {
+                    Err(ActivityError::invalid_data("Failed to create an icon"))
+                }
+            }
+            Err(e) => Err(ActivityError::invalid_data(format!(
+                "Failed to create an icon: {:?}",
+                e
+            ))),
+        }
+    }
+}
+
+impl BrowserStrategy {
+    async fn _get_icon(&mut self) -> ActivityResult<NativeIcon> {
+        debug!("Retrieving metadata for browser strategy");
+
+        let Some(client) = &self.client else {
+            warn!("No IPC client available for browser strategy trying to retrieve metadata");
+            return Ok(NativeIcon::default());
+        };
+
+        let mut client_guard = client.lock().await;
+        let request = MessageRequest {};
+
+        match client_guard.get_icon(request).await {
+            Ok(response) => {
+                debug!("Received metadata response from browser extension");
+
+                let resp = response.into_inner();
+
+                let native_metadata = serde_json::from_slice::<NativeMessage>(&resp.content)
+                    .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+
+                let metadata = match native_metadata {
+                    NativeMessage::NativeIcon(metadata) => metadata,
+                    _ => NativeIcon::default(),
+                };
+                Ok(metadata)
+            }
+            Err(e) => {
+                warn!("Failed to retrieve metadata from browser: {}", e);
+                Ok(NativeIcon::default())
+            }
+        }
     }
 }
 
