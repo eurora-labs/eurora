@@ -170,10 +170,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
                 let metadata = match native_metadata {
-                    NativeMessage::NativeMetadata(metadata) => {
-                        let metadata = StrategyMetadata::from(metadata);
-                        metadata
-                    }
+                    NativeMessage::NativeMetadata(metadata) => StrategyMetadata::from(metadata),
                     _ => StrategyMetadata::default(),
                 };
                 Ok(metadata)
