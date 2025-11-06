@@ -15,20 +15,22 @@ async function connect() {
 async function onMessageListener(message: { command: string }, sender: chrome.runtime.Port) {
 	switch (message.command) {
 		case 'GET_METADATA':
+			throw new Error('GET_METADATA command not implemented');
+		case 'GET_ICON':
 			try {
 				const iconBase64 = await getCurrentTabIcon();
 				sender.postMessage({
-					kind: 'NativeMetadata',
+					kind: 'NativeIcon',
 					data: {
-						icon_base64: iconBase64,
+						base64: iconBase64,
 					},
 				});
 			} catch (error) {
 				console.error('Error getting tab icon:', error);
 				sender.postMessage({
-					kind: 'NativeMetadata',
+					kind: 'NativeIcon',
 					data: {
-						icon_base64: undefined,
+						base64: undefined,
 					},
 				});
 			}
