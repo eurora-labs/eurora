@@ -18,26 +18,6 @@ pub fn os_pick<'a>(_windows: &'a str, _linux: &'a str, _macos: &'a str) -> &'a s
     }
 }
 
-/// Converts an SVG string (either base64-encoded or raw) to an RGBA image.
-///
-/// # Arguments
-///
-/// * `svg` - SVG content as either a data URL (`data:image/svg+xml;base64,...`) or base64 string
-///
-/// # Returns
-///
-/// Returns an `RgbaImage` on success, or an `ActivityError` if:
-/// - Base64 decoding fails
-/// - SVG parsing fails
-/// - Pixmap creation fails
-/// - Image buffer creation fails
-///
-/// # Example
-///
-/// ```ignore
-/// let svg_data = "data:image/svg+xml;base64,PHN2Zy...";
-/// let image = convert_svg_to_rgba(svg_data)?;
-/// ```
 pub fn convert_svg_to_rgba(svg: &str) -> ActivityResult<image::RgbaImage> {
     // Strip data URL prefix if present
     let b64 = svg
