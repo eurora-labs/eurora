@@ -40,7 +40,7 @@
 							{#if item.icon_base64}<img
 									src={item.icon_base64}
 									alt={item.name}
-									class="w-4 h-4"
+									class="w-8 h-8 bg-white rounded-full drop-shadow p-1"
 								/>{:else}{item.name}{/if}
 						</Timeline.Item>
 					{/each}

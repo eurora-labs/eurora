@@ -4,7 +4,9 @@ export type NativeArticleAsset = { url: string; content: string; text_content: s
 
 export type NativeArticleSnapshot = { highlighted_text: string | null }
 
-export type NativeMetadata = { icon_base64: string | null }
+export type NativeIcon = { base64: string | null }
+
+export type NativeMetadata = Record<string, never>
 
 export type NativeTwitterAsset = { url: string; title: string; tweets: NativeTwitterTweet[]; timestamp: string }
 
