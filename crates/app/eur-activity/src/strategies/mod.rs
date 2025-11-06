@@ -24,7 +24,7 @@ pub struct StrategyMetadata {
 }
 
 impl From<NativeMetadata> for StrategyMetadata {
-    fn from(metadata: NativeMetadata) -> Self {
+    fn from(_metadata: NativeMetadata) -> Self {
         StrategyMetadata { icon_base64: None }
     }
 }
