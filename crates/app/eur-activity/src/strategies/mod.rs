@@ -10,6 +10,7 @@ pub mod processes;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
+use eur_native_messaging::NativeMetadata;
 pub use no_strategy::NoStrategy;
 
 use crate::{
@@ -20,6 +21,12 @@ use crate::{
 #[derive(Debug, Clone, Default)]
 pub struct StrategyMetadata {
     pub icon_base64: Option<String>,
+}
+
+impl From<NativeMetadata> for StrategyMetadata {
+    fn from(metadata: NativeMetadata) -> Self {
+        StrategyMetadata { icon_base64: None }
+    }
 }
 
 /// Enum containing all possible activity strategies
