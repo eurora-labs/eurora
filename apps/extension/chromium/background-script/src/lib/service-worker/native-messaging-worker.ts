@@ -1,7 +1,7 @@
 // Native Messaging Service Worker - centralized handler for all native messaging
 // Keep track of the native port connection
-import { handleMessage } from '@eurora/browser-shared/messaging';
-import { getCurrentTabIcon } from '@eurora/browser-shared/tabs';
+import { handleMessage } from '@eurora/browser-shared/background/messaging';
+import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
 
 let nativePort: chrome.runtime.Port | null = null;
 
@@ -15,20 +15,22 @@ async function connect() {
 async function onMessageListener(message: { command: string }, sender: chrome.runtime.Port) {
 	switch (message.command) {
 		case 'GET_METADATA':
+			throw new Error('GET_METADATA command not implemented');
+		case 'GET_ICON':
 			try {
 				const iconBase64 = await getCurrentTabIcon();
 				sender.postMessage({
-					kind: 'NativeMetadata',
+					kind: 'NativeIcon',
 					data: {
-						icon_base64: iconBase64,
+						base64: iconBase64,
 					},
 				});
 			} catch (error) {
 				console.error('Error getting tab icon:', error);
 				sender.postMessage({
-					kind: 'NativeMetadata',
+					kind: 'NativeIcon',
 					data: {
-						icon_base64: undefined,
+						base64: undefined,
 					},
 				});
 			}
