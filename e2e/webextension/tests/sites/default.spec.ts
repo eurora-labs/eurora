@@ -1,4 +1,4 @@
-import { WatcherResponse } from '@eurora/chrome-ext-shared/extensions/watchers/watcher';
+import { WatcherResponse } from '@eurora/browser-shared/content/extensions/watchers/watcher';
 import { test, expect } from '../utils/fixtures.ts';
 import { waitForBootstrap, waitForSiteMounted } from '../utils/helpers.ts';
 
