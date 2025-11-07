@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-    ActivityError,
     error::ActivityResult,
     strategies::{ActivityStrategyFunctionality, StrategyMetadata, StrategySupport},
     types::{ActivityAsset, ActivitySnapshot},
@@ -39,12 +38,6 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata::default())
-    }
-
-    async fn get_icon(&mut self) -> ActivityResult<image::RgbaImage> {
-        Err(ActivityError::Unknown(
-            "Custom icon not implemented for default strategy".to_string(),
-        ))
     }
 }
 

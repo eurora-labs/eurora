@@ -6,7 +6,7 @@ export type NativeArticleSnapshot = { highlighted_text: string | null }
 
 export type NativeIcon = { base64: string | null }
 
-export type NativeMetadata = Record<string, never>
+export type NativeMetadata = { url: string | null; icon_base64: string | null }
 
 export type NativeTwitterAsset = { url: string; title: string; tweets: NativeTwitterTweet[]; timestamp: string }
 
