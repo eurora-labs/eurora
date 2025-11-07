@@ -389,6 +389,11 @@ impl TimelineManager {
         self.collector.subscribe_to_focus_events()
     }
 
+    /// Subscribe to new assets events
+    pub fn subscribe_to_assets_events(&self) -> tokio::sync::broadcast::Receiver<Vec<ContextChip>> {
+        self.collector.subscribe_to_assets_events()
+    }
+
     /// Update storage configuration
     pub async fn configure_storage(
         &mut self,
