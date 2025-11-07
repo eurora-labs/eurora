@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-    ActivityError,
     error::ActivityResult,
     strategies::{ActivityStrategyFunctionality, StrategyMetadata, StrategySupport},
     types::{ActivityAsset, ActivitySnapshot},
@@ -43,12 +42,6 @@ impl ActivityStrategyFunctionality for NoStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata::default())
     }
-
-    async fn get_icon(&mut self) -> ActivityResult<image::RgbaImage> {
-        Err(ActivityError::Unknown(
-            "Custom icon not implemented for 'no' strategy".to_string(),
-        ))
-    }
 }
 
 #[cfg(test)]
@@ -64,8 +57,5 @@ mod tests {
 
         let snapshots = strategy.retrieve_snapshots().await.unwrap();
         assert!(snapshots.is_empty());
-
-        let icon = strategy.get_icon().await;
-        assert!(icon.is_err());
     }
 }
