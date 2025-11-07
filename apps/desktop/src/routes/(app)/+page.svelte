@@ -68,6 +68,7 @@
 
 		taurpc.timeline.new_assets_event.on((assets) => {
 			if (!editorRef) return false;
+			clearQuery(editorRef);
 			assets.forEach((command) => {
 				executeCommand(editorRef!, command);
 			});
