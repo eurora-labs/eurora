@@ -20,7 +20,7 @@ use tokio::{
     task::JoinHandle,
     time,
 };
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     ActivityStrategy,
@@ -74,7 +74,7 @@ pub struct CollectorService {
     restart_attempts: u32,
     /// Broadcast channel for focus change events
     focus_event_tx: broadcast::Sender<FocusedWindowEvent>,
-    /// Broadcast channed for new assets event
+    /// Broadcast channel for new assets event
     assets_event_tx: broadcast::Sender<Vec<ContextChip>>,
 }
 
@@ -259,7 +259,7 @@ impl CollectorService {
         self.focus_event_tx.subscribe()
     }
 
-    /// Subscribe to focus change events
+    /// Subscribe to assets change events
     pub fn subscribe_to_assets_events(&self) -> broadcast::Receiver<Vec<ContextChip>> {
         self.assets_event_tx.subscribe()
     }
@@ -292,6 +292,7 @@ impl CollectorService {
                         if let Some(process_name) = window.process_name {
                             let new_focus =
                                 Some((process_name.clone(), window.window_title.clone()));
+                            debug!("New focus: {:?}", new_focus);
 
                             // Check if focus changed
                             let mut prev = prev_focus_inner.lock().await;
@@ -325,17 +326,24 @@ impl CollectorService {
                                             }
                                         }
 
-                                        // Get icon and emit focus change event
-                                        let icon = match new_strategy.get_icon().await {
-                                            Ok(icon) => Some(icon),
-                                            Err(_) => window.icon,
-                                        };
-                                        let focus_event = FocusedWindowEvent::new(
-                                            process_name.clone(),
-                                            window.window_title.clone().unwrap_or_default(),
-                                            icon,
-                                        );
-                                        let _ = focus_event_tx_inner.send(focus_event);
+                                        // Get metadata and emit focus change event
+                                        match new_strategy.get_metadata().await {
+                                            Ok(metadata) => {
+                                                let icon = match metadata.icon {
+                                                    Some(icon) => Some(icon),
+                                                    None => window.icon,
+                                                };
+                                                let focus_event = FocusedWindowEvent::new(
+                                                    process_name.clone(),
+                                                    window.window_title.clone().unwrap_or_default(),
+                                                    icon,
+                                                );
+                                                let _ = focus_event_tx_inner.send(focus_event);
+                                            }
+                                            Err(err) => {
+                                                error!("Failed to get metadata: {}", err);
+                                            }
+                                        }
 
                                         let mut strategy_write = strategy_for_update.write().await;
                                         *strategy_write = new_strategy;
