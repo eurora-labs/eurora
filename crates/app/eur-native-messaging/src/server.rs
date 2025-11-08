@@ -90,7 +90,7 @@ impl TauriIpcServer {
                 Some(chrome_message) = native_rx.recv() => {
                     // Process incoming chrome messages (if any)
                     debug!("Received chrome message: {:?}", chrome_message);
-                    
+
 
 
                 }
