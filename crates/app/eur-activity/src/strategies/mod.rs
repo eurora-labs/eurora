@@ -35,13 +35,9 @@ impl From<NativeMetadata> for StrategyMetadata {
                     let icon = icon.split(',').nth(1).unwrap_or(&icon);
                     let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
 
-                    let icon_image = image::load_from_memory(&icon_data.unwrap_or_default()).ok();
-
-                    if let Some(icon_image) = icon_image {
-                        Some(icon_image.to_rgba8())
-                    } else {
-                        None
-                    }
+                    image::load_from_memory(&icon_data.unwrap_or_default())
+                        .ok()
+                        .map(|icon_image| icon_image.to_rgba8())
                 }
             },
             None => None,
