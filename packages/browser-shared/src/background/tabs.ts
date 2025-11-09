@@ -25,11 +25,8 @@ export async function getTabsByUrlPattern(urlPattern: string): Promise<browser.T
 	}
 }
 
-export async function getCurrentTabIcon(): Promise<string> {
+export async function getCurrentTabIcon(activeTab: browser.Tabs.Tab): Promise<string> {
 	try {
-		// Get the active tab in the current window
-		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-
 		if (!activeTab || !activeTab.favIconUrl) {
 			return '';
 		}
