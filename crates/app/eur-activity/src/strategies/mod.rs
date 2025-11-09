@@ -1,6 +1,8 @@
 //! Simplified strategy implementations for different activity types
 
+use crate::utils::convert_svg_to_rgba;
 use async_trait::async_trait;
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
 
 pub mod browser;
@@ -20,12 +22,30 @@ use crate::{
 
 #[derive(Debug, Clone, Default)]
 pub struct StrategyMetadata {
-    pub icon_base64: Option<String>,
+    pub url: Option<String>,
+    pub icon: Option<image::RgbaImage>,
 }
 
 impl From<NativeMetadata> for StrategyMetadata {
-    fn from(_metadata: NativeMetadata) -> Self {
-        StrategyMetadata { icon_base64: None }
+    fn from(metadata: NativeMetadata) -> Self {
+        let icon = match metadata.icon_base64 {
+            Some(icon) => match icon.starts_with("data:image/svg+xml;base64") {
+                true => convert_svg_to_rgba(&icon).ok(),
+                false => {
+                    let icon = icon.split(',').nth(1).unwrap_or(&icon);
+                    let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
+
+                    image::load_from_memory(&icon_data.unwrap_or_default())
+                        .ok()
+                        .map(|icon_image| icon_image.to_rgba8())
+                }
+            },
+            None => None,
+        };
+        StrategyMetadata {
+            url: metadata.url,
+            icon,
+        }
     }
 }
 
@@ -44,8 +64,6 @@ pub trait ActivityStrategyFunctionality {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>>;
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
-
-    async fn get_icon(&mut self) -> ActivityResult<image::RgbaImage>;
 }
 
 impl ActivityStrategy {
