@@ -13,7 +13,7 @@
 	import * as Chat from '@eurora/ui/custom-components/chat/index';
 	import Katex from '$lib/components/katex.svelte';
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
-	// import { executeCommand } from '$lib/commands.js';
+	import { executeCommand } from '$lib/commands.js';
 	// import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
 	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
 	import { inject } from '@eurora/shared/context';
@@ -63,6 +63,14 @@
 			taurpc.personal_db.message.get(conversation.id, 5, 0).then((response) => {
 				messages = response;
 				console.log('messages: ', messages);
+			});
+		});
+
+		taurpc.timeline.new_assets_event.on((assets) => {
+			if (!editorRef) return false;
+			clearQuery(editorRef);
+			assets.forEach((command) => {
+				executeCommand(editorRef!, command);
 			});
 		});
 
