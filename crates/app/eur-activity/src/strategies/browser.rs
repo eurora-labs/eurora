@@ -5,9 +5,7 @@ use std::sync::Arc;
 pub use super::ActivityStrategyFunctionality;
 pub use super::processes::*;
 pub use super::{ActivityStrategy, StrategySupport};
-use crate::utils::convert_svg_to_rgba;
 use async_trait::async_trait;
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
@@ -95,7 +93,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             }
             Err(e) => {
                 warn!("Failed to retrieve assets from browser: {}", e);
-                Ok(vec![])
+                Err(ActivityError::invalid_data(e.to_string()))
             }
         }
     }
@@ -170,7 +168,18 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
                 let metadata = match native_metadata {
-                    NativeMessage::NativeMetadata(metadata) => StrategyMetadata::from(metadata),
+                    NativeMessage::NativeMetadata(metadata) => {
+                        // Validate URL if present
+                        if let Some(ref url) = metadata.url
+                            && !url.starts_with("http")
+                        {
+                            return Err(ActivityError::invalid_data(format!(
+                                "Invalid metadata URL: must start with 'http', got: {}",
+                                url
+                            )));
+                        }
+                        StrategyMetadata::from(metadata)
+                    }
                     _ => StrategyMetadata::default(),
                 };
                 Ok(metadata)
@@ -180,34 +189,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
                 Ok(StrategyMetadata::default())
             }
-        }
-    }
-
-    async fn get_icon(&mut self) -> ActivityResult<image::RgbaImage> {
-        match self._get_icon().await {
-            Ok(icon) => {
-                let icon_url = icon.base64;
-                if let Some(icon) = icon_url {
-                    match icon.starts_with("data:image/svg+xml;base64") {
-                        true => convert_svg_to_rgba(&icon),
-                        false => {
-                            let icon = icon.split(',').nth(1).unwrap_or(&icon);
-                            let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
-
-                            let icon_image =
-                                image::load_from_memory(&icon_data.unwrap_or_default())?;
-
-                            Ok(icon_image.to_rgba8())
-                        }
-                    }
-                } else {
-                    Err(ActivityError::invalid_data("Failed to create an icon"))
-                }
-            }
-            Err(e) => Err(ActivityError::invalid_data(format!(
-                "Failed to create an icon: {:?}",
-                e
-            ))),
         }
     }
 }
