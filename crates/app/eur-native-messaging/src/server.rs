@@ -12,7 +12,7 @@ use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::debug;
 
-use crate::types::NativeMessage;
+use crate::types::{ChromeMessage, NativeMessage};
 
 type IpcResult<T> = Result<Response<T>, Status>;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<MessageResponse, Status>> + Send>>;
@@ -36,9 +36,9 @@ pub struct TauriIpcServer {
 }
 
 impl TauriIpcServer {
-    pub fn new() -> (Self, mpsc::Sender<NativeCommand>) {
+    pub fn new() -> (Self, mpsc::Sender<ChromeMessage>) {
         let (tx, rx) = mpsc::channel::<NativeMessageRequest>(32);
-        let (native_tx, native_rx) = mpsc::channel::<NativeCommand>(32);
+        let (native_tx, native_rx) = mpsc::channel::<ChromeMessage>(32);
 
         // Spawn a task to handle the stdio communication
         tokio::spawn(Self::handle_stdio_task(rx, native_rx));
@@ -48,7 +48,7 @@ impl TauriIpcServer {
 
     async fn handle_stdio_task(
         mut request_rx: mpsc::Receiver<NativeMessageRequest>,
-        mut native_rx: mpsc::Receiver<NativeCommand>,
+        mut native_rx: mpsc::Receiver<ChromeMessage>,
     ) {
         let stdin = io::stdin();
         let stdout = io::stdout();
@@ -87,9 +87,12 @@ impl TauriIpcServer {
 
                     let _ = response_sender.send(result);
                 },
-                Some(native_message) = native_rx.recv() => {
-                    // Process incoming native messages (if any)
-                    debug!("Received native message: {:?}", native_message);
+                Some(chrome_message) = native_rx.recv() => {
+                    // Process incoming chrome messages (if any)
+                    debug!("Received chrome message: {:?}", chrome_message);
+
+
+
                 }
                 else => break,
             }

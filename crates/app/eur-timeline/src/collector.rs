@@ -9,7 +9,10 @@ use std::{
     time::Duration,
 };
 
-use eur_activity::processes::{Eurora, ProcessFunctionality};
+use eur_activity::{
+    ContextChip,
+    processes::{Eurora, ProcessFunctionality},
+};
 use eur_activity::{DefaultStrategy, NoStrategy, strategies::ActivityStrategyFunctionality};
 use ferrous_focus::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use tokio::{
@@ -17,7 +20,7 @@ use tokio::{
     task::JoinHandle,
     time,
 };
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     ActivityStrategy,
@@ -71,6 +74,8 @@ pub struct CollectorService {
     restart_attempts: u32,
     /// Broadcast channel for focus change events
     focus_event_tx: broadcast::Sender<FocusedWindowEvent>,
+    /// Broadcast channel for new assets event
+    assets_event_tx: broadcast::Sender<Vec<ContextChip>>,
 }
 
 impl CollectorService {
@@ -82,6 +87,7 @@ impl CollectorService {
         );
 
         let (focus_event_tx, _) = broadcast::channel(100);
+        let (assets_event_tx, _) = broadcast::channel(100);
 
         Self {
             storage,
@@ -93,6 +99,7 @@ impl CollectorService {
             focus_shutdown_signal: None,
             restart_attempts: 0,
             focus_event_tx,
+            assets_event_tx,
         }
     }
 
@@ -107,6 +114,7 @@ impl CollectorService {
         );
 
         let (focus_event_tx, _) = broadcast::channel(100);
+        let (assets_event_tx, _) = broadcast::channel(100);
 
         Self {
             storage,
@@ -118,6 +126,7 @@ impl CollectorService {
             focus_shutdown_signal: None,
             restart_attempts: 0,
             focus_event_tx,
+            assets_event_tx,
         }
     }
 
@@ -250,6 +259,11 @@ impl CollectorService {
         self.focus_event_tx.subscribe()
     }
 
+    /// Subscribe to assets change events
+    pub fn subscribe_to_assets_events(&self) -> broadcast::Receiver<Vec<ContextChip>> {
+        self.assets_event_tx.subscribe()
+    }
+
     /// Alternative start implementation
     async fn start_focus_tracking(&mut self) -> TimelineResult<()> {
         let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
@@ -257,6 +271,7 @@ impl CollectorService {
         )));
         let strategy_clone = Arc::clone(&strategy);
         let focus_event_tx = self.focus_event_tx.clone();
+        let assets_event_tx = self.assets_event_tx.clone();
         let storage_for_focus = Arc::clone(&self.storage);
 
         self.focus_thread_handle = Some(tokio::spawn(async move {
@@ -270,11 +285,14 @@ impl CollectorService {
                     let prev_focus_inner = Arc::clone(&prev_focus);
                     let strategy_for_update = Arc::clone(&strategy_inner);
                     let focus_event_tx_inner = focus_event_tx.clone();
+                    let assets_event_tx_inner = assets_event_tx.clone();
                     let storage_inner = Arc::clone(&storage_for_focus);
+
                     async move {
                         if let Some(process_name) = window.process_name {
                             let new_focus =
                                 Some((process_name.clone(), window.window_title.clone()));
+                            debug!("New focus: {:?}", new_focus);
 
                             // Check if focus changed
                             let mut prev = prev_focus_inner.lock().await;
@@ -298,6 +316,9 @@ impl CollectorService {
                                                 assets,
                                             );
 
+                                            let context_chips = activity.get_context_chips();
+                                            let _ = assets_event_tx_inner.send(context_chips);
+
                                             // Add activity to storage BEFORE emitting event
                                             {
                                                 let mut storage = storage_inner.lock().await;
@@ -305,17 +326,24 @@ impl CollectorService {
                                             }
                                         }
 
-                                        // Get icon and emit focus change event
-                                        let icon = match new_strategy.get_icon().await {
-                                            Ok(icon) => Some(icon),
-                                            Err(_) => window.icon,
-                                        };
-                                        let focus_event = FocusedWindowEvent::new(
-                                            process_name.clone(),
-                                            window.window_title.clone().unwrap_or_default(),
-                                            icon,
-                                        );
-                                        let _ = focus_event_tx_inner.send(focus_event);
+                                        // Get metadata and emit focus change event
+                                        match new_strategy.get_metadata().await {
+                                            Ok(metadata) => {
+                                                let icon = match metadata.icon {
+                                                    Some(icon) => Some(icon),
+                                                    None => window.icon,
+                                                };
+                                                let focus_event = FocusedWindowEvent::new(
+                                                    process_name.clone(),
+                                                    window.window_title.clone().unwrap_or_default(),
+                                                    icon,
+                                                );
+                                                let _ = focus_event_tx_inner.send(focus_event);
+                                            }
+                                            Err(err) => {
+                                                error!("Failed to get metadata: {}", err);
+                                            }
+                                        }
 
                                         let mut strategy_write = strategy_for_update.write().await;
                                         *strategy_write = new_strategy;

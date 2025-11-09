@@ -308,11 +308,25 @@ fn main() {
                             db_app_handle.manage(db_manager);
                             let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
 
+                            let mut asset_receiver = {
+                                let timeline = timeline_mutex.lock().await;
+                                timeline.subscribe_to_assets_events()
+                            };
+                            let assets_timeline_handle = db_app_handle.clone();
+                            tauri::async_runtime::spawn(async move {
+                                while let Ok(assets_event) = asset_receiver.recv().await {
+                                   let _ = TauRpcTimelineApiEventTrigger::new(assets_timeline_handle.clone())
+                                    .new_assets_event(assets_event);
+                                }
+                            });
+
                             // Subscribe to focus change events before starting timeline
                             let mut focus_receiver = {
                                 let timeline = timeline_mutex.lock().await;
                                 timeline.subscribe_to_focus_events()
                             };
+
+
 
                             let focus_timeline_handle = db_app_handle.clone();
                             tauri::async_runtime::spawn(async move {
