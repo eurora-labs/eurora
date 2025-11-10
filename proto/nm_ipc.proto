@@ -1,0 +1,14 @@
+
+syntax = "proto3";
+package nm_ipc;
+
+service NativeMessagingIPC  {
+    rpc SwitchActivity(SwitchActivityRequest) returns (SwitchActivityResponse) {}
+}
+
+message SwitchActivityRequest {
+    string url = 1;
+    optional bytes icon = 2;
+}
+
+message SwitchActivityResponse {}
