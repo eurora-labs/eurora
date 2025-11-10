@@ -1,15 +1,14 @@
 //! Browser strategy implementation for the refactored activity system
 
-use std::sync::Arc;
-
-pub use super::ActivityStrategyFunctionality;
-pub use super::processes::*;
-pub use super::{ActivityStrategy, StrategySupport};
+pub use crate::strategies::ActivityStrategyFunctionality;
+pub use crate::strategies::processes::*;
+pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
+use std::net::ToSocketAddrs;
+use tonic::transport::Server;
 use tracing::{debug, warn};
 
 use crate::strategies::StrategyMetadata;
@@ -25,7 +24,7 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserStrategy {
     #[serde(skip)]
-    client: Option<Arc<Mutex<TauriIpcClient<Channel>>>>,
+    client: Option<TauriIpcClient<Channel>>,
 }
 
 impl BrowserStrategy {
@@ -35,7 +34,7 @@ impl BrowserStrategy {
         let client = match create_grpc_ipc_client().await {
             Ok(client) => {
                 debug!("Successfully created IPC client for browser strategy");
-                Some(Arc::new(Mutex::new(client)))
+                Some(client)
             }
             Err(e) => {
                 warn!(
@@ -45,8 +44,31 @@ impl BrowserStrategy {
                 None
             }
         };
+        let browser_strategy = Self { client };
 
-        Ok(Self { client })
+        let strategy_clone = browser_strategy.clone();
+
+        // Start the gRPC server
+        tokio::spawn(async move {
+            Server::builder()
+                // Use the server module's implementation directly
+                .add_service(
+                    eur_proto::nm_ipc::native_messaging_ipc_server::NativeMessagingIpcServer::new(
+                        strategy_clone,
+                    ),
+                )
+                .serve(
+                    format!("[::1]:{}", super::server::PORT)
+                        .to_socket_addrs()
+                        .unwrap()
+                        .next()
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        });
+
+        Ok(browser_strategy)
     }
 }
 
@@ -63,15 +85,15 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
-        let Some(client) = &self.client else {
+        let Some(ref client) = self.client else {
             warn!("No IPC client available for browser strategy");
             return Ok(vec![]);
         };
 
-        let mut client_guard = client.lock().await;
         let request = MessageRequest {};
+        let mut client = client.clone();
 
-        match client_guard.get_assets(request).await {
+        match client.get_assets(request).await {
             Ok(response) => {
                 debug!("Received assets response from browser extension");
                 let mut assets: Vec<ActivityAsset> = Vec::new();
@@ -150,15 +172,15 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         debug!("Retrieving metadata for browser strategy");
 
-        let Some(client) = &self.client else {
+        let Some(ref client) = self.client else {
             warn!("No IPC client available for browser strategy trying to retrieve metadata");
             return Ok(StrategyMetadata::default());
         };
 
-        let mut client_guard = client.lock().await;
         let request = MessageRequest {};
+        let mut client = client.clone();
 
-        match client_guard.get_metadata(request).await {
+        match client.get_metadata(request).await {
             Ok(response) => {
                 debug!("Received metadata response from browser extension");
 
@@ -197,15 +219,15 @@ impl BrowserStrategy {
     async fn _get_icon(&mut self) -> ActivityResult<NativeIcon> {
         debug!("Retrieving metadata for browser strategy");
 
-        let Some(client) = &self.client else {
+        let Some(ref client) = self.client else {
             warn!("No IPC client available for browser strategy trying to retrieve metadata");
             return Ok(NativeIcon::default());
         };
 
-        let mut client_guard = client.lock().await;
         let request = MessageRequest {};
+        let mut client = client.clone();
 
-        match client_guard.get_icon(request).await {
+        match client.get_icon(request).await {
             Ok(response) => {
                 debug!("Received metadata response from browser extension");
 
@@ -230,7 +252,7 @@ impl BrowserStrategy {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::strategies::*;
 
     #[test]
     fn test_supported_processes() {
