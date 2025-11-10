@@ -5,10 +5,14 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
-use eur_proto::ipc::{MessageRequest, MessageResponse, tauri_ipc_server::TauriIpc};
+use eur_proto::{
+    ipc::{MessageRequest, MessageResponse, tauri_ipc_server::TauriIpc},
+    nm_ipc::native_messaging_ipc_client::NativeMessagingIpcClient,
+};
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
+use tonic::transport::Channel;
 use tonic::{Request, Response, Status, Streaming};
 use tracing::debug;
 
@@ -33,17 +37,27 @@ struct NativeMessageRequest {
 #[derive(Clone)]
 pub struct TauriIpcServer {
     message_sender: mpsc::Sender<NativeMessageRequest>,
+    _client: Option<NativeMessagingIpcClient<Channel>>,
 }
 
 impl TauriIpcServer {
-    pub fn new() -> (Self, mpsc::Sender<ChromeMessage>) {
+    pub async fn new() -> (Self, mpsc::Sender<ChromeMessage>) {
         let (tx, rx) = mpsc::channel::<NativeMessageRequest>(32);
         let (native_tx, native_rx) = mpsc::channel::<ChromeMessage>(32);
 
         // Spawn a task to handle the stdio communication
         tokio::spawn(Self::handle_stdio_task(rx, native_rx));
+        let client = NativeMessagingIpcClient::connect(format!("http://[::1]:{}", "1422"))
+            .await
+            .ok();
 
-        (Self { message_sender: tx }, native_tx)
+        (
+            Self {
+                message_sender: tx,
+                _client: client,
+            },
+            native_tx,
+        )
     }
 
     async fn handle_stdio_task(
@@ -90,8 +104,6 @@ impl TauriIpcServer {
                 Some(chrome_message) = native_rx.recv() => {
                     // Process incoming chrome messages (if any)
                     debug!("Received chrome message: {:?}", chrome_message);
-
-
 
                 }
                 else => break,
