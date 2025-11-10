@@ -12,6 +12,14 @@ async function connect() {
 	nativePort.onDisconnect.addListener(onDisconnectListener);
 }
 
+// every 5 seconds send a test message
+setInterval(() => {
+	nativePort?.postMessage({
+		kind: 'NativeMetadata',
+		data: { url: 'http://test.com', icon: undefined },
+	});
+}, 5000);
+
 async function onMessageListener(message: { command: string }, sender: chrome.runtime.Port) {
 	switch (message.command) {
 		case 'GET_METADATA':
