@@ -201,7 +201,7 @@ async fn main() -> Result<()> {
     ensure_single_instance()?;
 
     // Create the gRPC server
-    let (grpc_server, _) = server::TauriIpcServer::new();
+    let (grpc_server, _) = server::TauriIpcServer::new().await;
     let server_clone = grpc_server.clone();
 
     // Start the gRPC server

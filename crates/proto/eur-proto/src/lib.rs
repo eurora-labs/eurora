@@ -30,6 +30,11 @@ pub mod generated {
         tonic::include_proto!("prompt_service");
         pub use super::*;
     }
+
+    pub mod nm_ipc {
+        tonic::include_proto!("nm_ipc");
+        pub use super::*;
+    }
 }
 
 // Convenience re-exports of the most commonly used types
