@@ -42,6 +42,10 @@ impl ActivityStrategyFunctionality for NoStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata::default())
     }
+
+    async fn close_strategy(&mut self) -> ActivityResult<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
