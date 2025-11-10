@@ -8,8 +8,10 @@ use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_i
 use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
 use std::net::ToSocketAddrs;
+use std::sync::Arc;
+use tokio::sync::OnceCell;
 use tonic::transport::Server;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::strategies::StrategyMetadata;
 use eur_native_messaging::NativeIcon;
@@ -19,6 +21,9 @@ use crate::{
     error::ActivityResult,
     types::{ActivityAsset, ActivitySnapshot},
 };
+
+/// Global singleton for the gRPC server
+static GRPC_SERVER: OnceCell<Arc<tokio::task::JoinHandle<()>>> = OnceCell::const_new();
 
 /// Browser strategy for collecting web browser activity data
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +35,9 @@ pub struct BrowserStrategy {
 impl BrowserStrategy {
     /// Create a new browser strategy
     pub async fn new() -> ActivityResult<Self> {
+        // Initialize the gRPC server exactly once across all strategy instances
+        Self::ensure_grpc_server_running().await;
+
         // Try to create the IPC client
         let client = match create_grpc_ipc_client().await {
             Ok(client) => {
@@ -44,31 +52,80 @@ impl BrowserStrategy {
                 None
             }
         };
-        let browser_strategy = Self { client };
 
-        let strategy_clone = browser_strategy.clone();
+        Ok(Self { client })
+    }
 
-        // Start the gRPC server
-        tokio::spawn(async move {
-            Server::builder()
-                // Use the server module's implementation directly
-                .add_service(
-                    eur_proto::nm_ipc::native_messaging_ipc_server::NativeMessagingIpcServer::new(
-                        strategy_clone,
-                    ),
-                )
-                .serve(
-                    format!("[::1]:{}", super::server::PORT)
+    /// Ensures the gRPC server is running, initializing it only once
+    async fn ensure_grpc_server_running() {
+        GRPC_SERVER
+            .get_or_init(|| async {
+                info!("Initializing persistent gRPC server on port {}", super::server::PORT);
+
+                let handle = tokio::spawn(async {
+                    // Create a server handler that doesn't depend on any specific strategy instance
+                    let service = GrpcServiceHandler;
+
+                    let addr = format!("[::1]:{}", super::server::PORT)
                         .to_socket_addrs()
-                        .unwrap()
+                        .expect("Failed to parse gRPC server address")
                         .next()
-                        .unwrap(),
-                )
-                .await
-                .unwrap();
-        });
+                        .expect("Failed to resolve gRPC server address");
 
-        Ok(browser_strategy)
+                    info!("Starting gRPC server at {}", addr);
+
+                    if let Err(e) = Server::builder()
+                        .add_service(
+                            eur_proto::nm_ipc::native_messaging_ipc_server::NativeMessagingIpcServer::new(
+                                service,
+                            ),
+                        )
+                        .serve(addr)
+                        .await
+                    {
+                        warn!("gRPC server terminated with error: {}", e);
+                    }
+                });
+
+                Arc::new(handle)
+            })
+            .await;
+
+        debug!("gRPC server is running");
+    }
+}
+
+/// Stateless handler for gRPC requests
+/// This decouples the server from individual BrowserStrategy instances
+#[derive(Debug, Clone)]
+struct GrpcServiceHandler;
+
+#[tonic::async_trait]
+impl eur_proto::nm_ipc::native_messaging_ipc_server::NativeMessagingIpc for GrpcServiceHandler {
+    async fn switch_activity(
+        &self,
+        request: tonic::Request<eur_proto::nm_ipc::SwitchActivityRequest>,
+    ) -> Result<tonic::Response<eur_proto::nm_ipc::SwitchActivityResponse>, tonic::Status> {
+        use tonic::Status;
+
+        info!("Received switch activity request via persistent gRPC server");
+        let req = request.into_inner();
+
+        // Validate the URL is not empty
+        if req.url.is_empty() {
+            return Err(Status::invalid_argument("URL cannot be empty"));
+        }
+
+        // TODO: Implement actual activity switching logic here
+        // This is a placeholder implementation that just acknowledges the request
+        // In a production system, you'd emit events to a channel or call a handler
+
+        info!("Processing activity switch for URL: {}", req.url);
+
+        // Return success response
+        Ok(tonic::Response::new(
+            eur_proto::nm_ipc::SwitchActivityResponse {},
+        ))
     }
 }
 
@@ -212,6 +269,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 Ok(StrategyMetadata::default())
             }
         }
+    }
+
+    async fn close_strategy(&mut self) -> ActivityResult<()> {
+        Ok(())
     }
 }
 
