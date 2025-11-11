@@ -429,17 +429,17 @@ impl CollectorService {
                                                 )
                                                 .await;
 
-                                            // Get metadata and emit focus change event
-                                            if let Ok(metadata) = new_strategy.get_metadata().await
-                                            {
-                                                let icon = metadata.icon.or(window.icon);
-                                                let focus_event = FocusedWindowEvent::new(
-                                                    process_name.clone(),
-                                                    window.window_title.clone().unwrap_or_default(),
-                                                    icon,
-                                                );
-                                                let _ = focus_event_tx_inner.send(focus_event);
-                                            }
+                                            // // Get metadata and emit focus change event
+                                            // if let Ok(metadata) = new_strategy.get_metadata().await
+                                            // {
+                                            //     let icon = metadata.icon.or(window.icon);
+                                            //     let focus_event = FocusedWindowEvent::new(
+                                            //         process_name.clone(),
+                                            //         window.window_title.clone().unwrap_or_default(),
+                                            //         icon,
+                                            //     );
+                                            //     let _ = focus_event_tx_inner.send(focus_event);
+                                            // }
 
                                             *strategy_write = new_strategy;
                                         }
