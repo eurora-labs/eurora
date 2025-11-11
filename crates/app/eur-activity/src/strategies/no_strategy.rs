@@ -10,6 +10,7 @@ use tracing::debug;
 
 use crate::{
     error::ActivityResult,
+    processes::{Eurora, ProcessFunctionality},
     strategies::{
         ActivityReport, ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
     },
@@ -24,17 +25,15 @@ pub struct NoStrategy;
 #[async_trait]
 impl StrategySupport for NoStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
-        // NoStrategy doesn't explicitly support any processes
-        // It's used programmatically when needed
-        vec![]
+        vec![Eurora.get_name()]
     }
 }
 
 #[async_trait]
 impl ActivityStrategyFunctionality for NoStrategy {
-    fn can_handle_process(&self, _process_name: &str) -> bool {
-        // NoStrategy doesn't actively handle processes, used for skipping tracking
-        true
+    fn can_handle_process(&self, process_name: &str) -> bool {
+        // Check if the process is in the supported processes list
+        NoStrategy::get_supported_processes().contains(&process_name)
     }
 
     async fn start_tracking(
@@ -49,9 +48,9 @@ impl ActivityStrategyFunctionality for NoStrategy {
     }
 
     async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool> {
-        debug!("NoStrategy: ignoring process change to: {}", process_name);
-        // Continue using NoStrategy regardless of process changes
-        Ok(true)
+        debug!("NoStrategy: handling process change to: {}", process_name);
+        // Only continue if the new process is one we can handle (Eurora)
+        Ok(self.can_handle_process(process_name))
     }
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
