@@ -278,11 +278,14 @@ impl CollectorService {
             let config =
                 FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
             let tracker = FocusTracker::with_config(config);
-            let prev_focus = Arc::new(Mutex::new(None::<(String, Option<String>)>));
+            let prev_focus = Arc::new(Mutex::new(String::new()));
+            // let prev_focus = Arc::new(Mutex::new(None::<(String, Option<String>)>));
+
             let strategy_inner = Arc::clone(&strategy_clone);
             let _ = tracker
                 .track_focus_async(move |window: FocusedWindow| {
-                    let prev_focus_inner = Arc::clone(&prev_focus);
+                    let prev_focus = Arc::clone(&prev_focus);
+                    // let prev_focus_inner = Arc::clone(&prev_focus);
                     let strategy_for_update = Arc::clone(&strategy_inner);
                     let focus_event_tx_inner = focus_event_tx.clone();
                     let assets_event_tx_inner = assets_event_tx.clone();
@@ -290,12 +293,12 @@ impl CollectorService {
 
                     async move {
                         if let Some(process_name) = window.process_name {
-                            let new_focus =
-                                Some((process_name.clone(), window.window_title.clone()));
+                            let new_focus = process_name.clone();
                             debug!("New focus: {:?}", new_focus);
 
                             // Check if focus changed
-                            let mut prev = prev_focus_inner.lock().await;
+                            // let mut prev = prev_focus_inner.lock().await;
+                            let mut prev = prev_focus.lock().await;
                             if new_focus != *prev {
                                 // Check if this is Eurora itself
                                 if process_name == Eurora.get_name() {
