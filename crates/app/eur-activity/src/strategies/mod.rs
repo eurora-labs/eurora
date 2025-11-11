@@ -4,6 +4,7 @@ use crate::utils::convert_svg_to_rgba;
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
+use tokio::sync::mpsc;
 
 pub mod browser;
 pub mod default;
@@ -17,13 +18,26 @@ pub use no_strategy::NoStrategy;
 
 use crate::{
     error::ActivityResult,
-    types::{ActivityAsset, ActivitySnapshot},
+    types::{Activity, ActivityAsset, ActivitySnapshot},
 };
 
 #[derive(Debug, Clone, Default)]
 pub struct StrategyMetadata {
     pub url: Option<String>,
     pub icon: Option<image::RgbaImage>,
+}
+
+/// Report sent by strategies to the timeline
+#[derive(Debug, Clone)]
+pub enum ActivityReport {
+    /// A new activity should be created
+    NewActivity(Activity),
+    /// Snapshots to add to the current activity
+    Snapshots(Vec<ActivitySnapshot>),
+    /// Assets to add to the current activity
+    Assets(Vec<ActivityAsset>),
+    /// Strategy is stopping
+    Stopping,
 }
 
 impl From<NativeMetadata> for StrategyMetadata {
@@ -61,11 +75,31 @@ pub enum ActivityStrategy {
 #[async_trait]
 #[enum_dispatch]
 pub trait ActivityStrategyFunctionality {
+    /// Check if this strategy can handle the given process name
+    fn can_handle_process(&self, process_name: &str) -> bool;
+
+    /// Start tracking and reporting activities
+    /// The strategy should spawn its own tasks and report activities through the sender
+    async fn start_tracking(
+        &mut self,
+        process_name: String,
+        window_title: String,
+        sender: mpsc::UnboundedSender<ActivityReport>,
+    ) -> ActivityResult<()>;
+
+    /// Handle a process name change
+    /// Returns Ok(true) if the strategy can continue handling the new process
+    /// Returns Ok(false) if a strategy switch is needed
+    /// Returns Err if there was an error
+    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool>;
+
+    /// Stop tracking gracefully
+    async fn stop_tracking(&mut self) -> ActivityResult<()>;
+
+    /// Legacy methods - kept for backward compatibility during migration
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>>;
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
-
-    async fn close_strategy(&mut self) -> ActivityResult<()>;
 }
 
 impl ActivityStrategy {
