@@ -30,7 +30,7 @@
 		"prettier": "^3.6.2",
 		"rxjs": "^7.8.2",
 		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.46.3",
+		"typescript-eslint": "^8.46.4",
 		"vite": "catalog:",
 		"vite-plugin-dts": "^4.5.3",
 		"vitest": "catalog:"
