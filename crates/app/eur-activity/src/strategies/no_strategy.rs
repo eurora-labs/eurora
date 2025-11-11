@@ -5,11 +5,14 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 use tracing::debug;
 
 use crate::{
     error::ActivityResult,
-    strategies::{ActivityStrategyFunctionality, StrategyMetadata, StrategySupport},
+    strategies::{
+        ActivityReport, ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
+    },
     types::{ActivityAsset, ActivitySnapshot},
 };
 
@@ -29,6 +32,33 @@ impl StrategySupport for NoStrategy {
 
 #[async_trait]
 impl ActivityStrategyFunctionality for NoStrategy {
+    fn can_handle_process(&self, _process_name: &str) -> bool {
+        // NoStrategy doesn't actively handle processes, used for skipping tracking
+        true
+    }
+
+    async fn start_tracking(
+        &mut self,
+        process_name: String,
+        _window_title: String,
+        _sender: mpsc::UnboundedSender<ActivityReport>,
+    ) -> ActivityResult<()> {
+        debug!("NoStrategy: not starting tracking for {}", process_name);
+        // Intentionally do nothing - this strategy is for processes we want to ignore
+        Ok(())
+    }
+
+    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool> {
+        debug!("NoStrategy: ignoring process change to: {}", process_name);
+        // Continue using NoStrategy regardless of process changes
+        Ok(true)
+    }
+
+    async fn stop_tracking(&mut self) -> ActivityResult<()> {
+        debug!("NoStrategy: stopping tracking (no-op)");
+        Ok(())
+    }
+
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("NoStrategy: skipping asset retrieval");
         Ok(vec![])
@@ -41,10 +71,6 @@ impl ActivityStrategyFunctionality for NoStrategy {
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata::default())
-    }
-
-    async fn close_strategy(&mut self) -> ActivityResult<()> {
-        Ok(())
     }
 }
 

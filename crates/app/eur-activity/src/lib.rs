@@ -32,7 +32,7 @@ pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSn
 pub use storage::{ActivityStorage, ActivityStorageConfig, SaveableAsset, SavedAssetInfo};
 pub use strategies::ActivityStrategy;
 // Re-export strategy types
-pub use strategies::{BrowserStrategy, DefaultStrategy, NoStrategy};
+pub use strategies::{ActivityReport, BrowserStrategy, DefaultStrategy, NoStrategy};
 pub use types::{
     Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip, DisplayAsset,
 };
