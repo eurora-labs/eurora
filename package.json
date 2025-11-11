@@ -52,7 +52,7 @@
 		"@commitlint/cz-commitlint": "^19.8.1",
 		"@connectrpc/connect": "^2.1.0",
 		"@connectrpc/connect-web": "^2.1.0",
-		"@tauri-apps/cli": "^2.9.2",
+		"@tauri-apps/cli": "^2.9.4",
 		"commitizen": "^4.3.1",
 		"concurrently": "^9.2.1",
 		"cz-conventional-changelog": "^3.3.0",
