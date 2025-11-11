@@ -9,15 +9,16 @@ use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
-use tokio::sync::OnceCell;
+use tokio::sync::{OnceCell, mpsc};
+use tokio::time::{Duration, interval};
 use tonic::transport::Server;
 use tracing::{debug, info, warn};
 
-use crate::strategies::StrategyMetadata;
+use crate::strategies::{ActivityReport, StrategyMetadata};
 use eur_native_messaging::NativeIcon;
 
 use crate::{
-    ActivityError,
+    Activity, ActivityError,
     error::ActivityResult,
     types::{ActivityAsset, ActivitySnapshot},
 };
@@ -30,6 +31,8 @@ static GRPC_SERVER: OnceCell<Arc<tokio::task::JoinHandle<()>>> = OnceCell::const
 pub struct BrowserStrategy {
     #[serde(skip)]
     client: Option<TauriIpcClient<Channel>>,
+    #[serde(skip)]
+    tracking_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 }
 
 impl BrowserStrategy {
@@ -53,7 +56,10 @@ impl BrowserStrategy {
             }
         };
 
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            tracking_handle: None,
+        })
     }
 
     /// Ensures the gRPC server is running, initializing it only once
@@ -138,6 +144,74 @@ impl StrategySupport for BrowserStrategy {
 
 #[async_trait]
 impl ActivityStrategyFunctionality for BrowserStrategy {
+    fn can_handle_process(&self, process_name: &str) -> bool {
+        BrowserStrategy::get_supported_processes().contains(&process_name)
+    }
+
+    async fn start_tracking(
+        &mut self,
+        process_name: String,
+        window_title: String,
+        sender: mpsc::UnboundedSender<ActivityReport>,
+    ) -> ActivityResult<()> {
+        debug!("Browser strategy starting tracking for: {}", process_name);
+
+        // Retrieve initial assets and create activity
+        if let Ok(assets) = self.retrieve_assets().await {
+            let activity =
+                Activity::new(window_title, "".to_string(), process_name.clone(), assets);
+            let _ = sender.send(ActivityReport::NewActivity(activity));
+        }
+
+        // Start periodic snapshot collection
+        let handle = tokio::spawn(async move {
+            let mut interval = interval(Duration::from_secs(10)); // Collect snapshots every 10 seconds
+
+            loop {
+                interval.tick().await;
+
+                // For now, snapshots are disabled in BrowserStrategy
+                // This is a placeholder for future implementation
+                debug!("Browser strategy: snapshot collection tick");
+            }
+        });
+
+        self.tracking_handle = Some(Arc::new(handle));
+        Ok(())
+    }
+
+    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool> {
+        debug!(
+            "Browser strategy handling process change to: {}",
+            process_name
+        );
+
+        // Check if this strategy can handle the new process
+        if self.can_handle_process(process_name) {
+            debug!("Browser strategy can continue handling: {}", process_name);
+            Ok(true)
+        } else {
+            debug!(
+                "Browser strategy cannot handle: {}, need to switch",
+                process_name
+            );
+            Ok(false)
+        }
+    }
+
+    async fn stop_tracking(&mut self) -> ActivityResult<()> {
+        debug!("Browser strategy stopping tracking");
+
+        if let Some(handle) = self.tracking_handle.take() {
+            // Try to unwrap Arc, if we're the only owner, abort the task
+            if let Ok(handle) = Arc::try_unwrap(handle) {
+                handle.abort();
+            }
+        }
+
+        Ok(())
+    }
+
     /// Retrieve assets from the browser
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
@@ -269,10 +343,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 Ok(StrategyMetadata::default())
             }
         }
-    }
-
-    async fn close_strategy(&mut self) -> ActivityResult<()> {
-        Ok(())
     }
 }
 
