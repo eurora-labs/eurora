@@ -241,10 +241,7 @@ async fn main() -> Result<()> {
                     if let Ok(chrome_message) =
                         serde_json::from_value::<ChromeMessage>(json_value.clone())
                     {
-                        debug!(
-                            "Received unsolicited chrome message from stdin: {:?}",
-                            chrome_message
-                        );
+                        debug!("Received unsolicited chrome message from stdin");
                         if native_tx.send(chrome_message).await.is_err() {
                             debug!("Failed to send chrome message to channel, receiver dropped");
                             break;
