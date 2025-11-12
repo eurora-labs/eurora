@@ -9,6 +9,7 @@ use std::{
     time::Duration,
 };
 
+use eur_activity::Activity;
 use eur_activity::strategies::ActivityReport;
 use eur_activity::{BrowserStrategy, DefaultStrategy, NoStrategy};
 use eur_activity::{
@@ -77,6 +78,8 @@ pub struct CollectorService {
     focus_event_tx: broadcast::Sender<FocusedWindowEvent>,
     /// Broadcast channel for new assets event
     assets_event_tx: broadcast::Sender<Vec<ContextChip>>,
+    /// Broadcast channel for new activity events
+    activity_event_tx: broadcast::Sender<Vec<Activity>>,
 }
 
 impl CollectorService {
@@ -89,6 +92,7 @@ impl CollectorService {
 
         let (focus_event_tx, _) = broadcast::channel(100);
         let (assets_event_tx, _) = broadcast::channel(100);
+        let (activity_event_tx, _) = broadcast::channel(100);
 
         Self {
             storage,
@@ -101,6 +105,7 @@ impl CollectorService {
             restart_attempts: 0,
             focus_event_tx,
             assets_event_tx,
+            activity_event_tx,
         }
     }
 
@@ -116,6 +121,7 @@ impl CollectorService {
 
         let (focus_event_tx, _) = broadcast::channel(100);
         let (assets_event_tx, _) = broadcast::channel(100);
+        let (activity_event_tx, _) = broadcast::channel(100);
 
         Self {
             storage,
@@ -128,6 +134,7 @@ impl CollectorService {
             restart_attempts: 0,
             focus_event_tx,
             assets_event_tx,
+            activity_event_tx,
         }
     }
 
@@ -273,6 +280,7 @@ impl CollectorService {
         let strategy_clone = Arc::clone(&strategy);
         let focus_event_tx = self.focus_event_tx.clone();
         let assets_event_tx = self.assets_event_tx.clone();
+        let activity_event_tx = self.activity_event_tx.clone();
 
         // Create channel for activity reports from strategies
         let (activity_tx, mut activity_rx) = mpsc::unbounded_channel::<ActivityReport>();
@@ -281,12 +289,20 @@ impl CollectorService {
         let storage_for_reports = Arc::clone(&self.storage);
         let assets_event_tx_for_reports = assets_event_tx.clone();
         tokio::spawn(async move {
+            let focus_event_tx_inner = focus_event_tx.clone();
             while let Some(report) = activity_rx.recv().await {
                 match report {
                     ActivityReport::NewActivity(activity) => {
                         debug!("Received new activity report: {}", activity.name);
                         let context_chips = activity.get_context_chips();
                         let _ = assets_event_tx_for_reports.send(context_chips);
+
+                        let focus_event = FocusedWindowEvent::new(
+                            activity.process_name.clone(),
+                            activity.name.clone(),
+                            None,
+                        );
+                        let _ = focus_event_tx_inner.send(focus_event);
 
                         let mut storage = storage_for_reports.lock().await;
                         storage.add_activity(activity);
@@ -328,7 +344,6 @@ impl CollectorService {
                 .track_focus_async(move |window: FocusedWindow| {
                     let prev_focus = Arc::clone(&prev_focus);
                     let strategy_for_update = Arc::clone(&strategy_inner);
-                    let focus_event_tx_inner = focus_event_tx.clone();
                     let activity_tx_inner = activity_tx.clone();
 
                     async move {
@@ -339,12 +354,14 @@ impl CollectorService {
                             let mut prev = prev_focus.lock().await;
                             if new_focus != *prev {
                                 let mut strategy_write = strategy_for_update.write().await;
+
                                 match strategy_write.handle_process_change(&process_name).await {
                                     Ok(true) => {
                                         debug!("Strategy can continue handling: {}", process_name);
                                     }
                                     Ok(false) => {
                                         debug!("Strategy can no longer handle: {}", process_name);
+
                                         if let Ok(mut new_strategy) =
                                             ActivityStrategy::new(&process_name).await
                                         {
@@ -356,6 +373,7 @@ impl CollectorService {
                                                     activity_tx_inner.clone(),
                                                 )
                                                 .await;
+
                                             *strategy_write = new_strategy;
                                         }
                                     }
