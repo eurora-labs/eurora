@@ -157,7 +157,7 @@ impl TauriIpcServer {
         metadata: NativeMetadata,
         client: &mut Option<NativeMessagingIpcClient<Channel>>,
     ) {
-        debug!("Received metadata: {:#?}", metadata);
+        debug!("Received metadata for url: {:?}", metadata.url);
         // Validate that we have a URL
         let Some(url) = metadata.url else {
             debug!("Received metadata without URL, skipping activity switch");
@@ -178,6 +178,9 @@ impl TauriIpcServer {
                     let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
 
                     image::load_from_memory(&icon_data.unwrap_or_default())
+                        .map_err(|err| {
+                            error!("Failed to load icon image: {}", err);
+                        })
                         .ok()
                         .map(|icon_image| icon_image.to_rgba8())
                 }
