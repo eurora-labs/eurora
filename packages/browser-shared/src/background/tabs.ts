@@ -57,7 +57,6 @@ export async function getCurrentTabIcon(activeTab: browser.Tabs.Tab): Promise<st
 			const reader = new FileReader();
 			reader.onloadend = () => {
 				const result = reader.result as string;
-				// Extract base64 part from data URL
 				resolve(result);
 			};
 			reader.onerror = reject;
