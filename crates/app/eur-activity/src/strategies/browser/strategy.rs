@@ -92,6 +92,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 info!("Received activity event: {:?}", event.url);
                 let icon = match event.icon {
                     Some(icon) => {
+                        debug!("Received icon data");
                         image::RgbaImage::from_vec(icon.width as u32, icon.height as u32, icon.data)
                     }
                     None => default_icon.clone(),
