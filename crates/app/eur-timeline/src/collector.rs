@@ -10,12 +10,12 @@ use std::{
 };
 
 use eur_activity::strategies::ActivityReport;
+use eur_activity::{BrowserStrategy, DefaultStrategy, NoStrategy};
 use eur_activity::{
     ContextChip,
     processes::{Eurora, ProcessFunctionality},
-    strategies::ActivityStrategyFunctionality,
+    strategies::{ActivityStrategyFunctionality, StrategySupport},
 };
-use eur_activity::{DefaultStrategy, NoStrategy};
 use ferrous_focus::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
@@ -339,84 +339,12 @@ impl CollectorService {
                             let mut prev = prev_focus.lock().await;
                             if new_focus != *prev {
                                 let mut strategy_write = strategy_for_update.write().await;
-
-                                // Check if this is Eurora itself
-                                if process_name == Eurora.get_name() {
-                                    // Stop current strategy if it's not NoStrategy
-                                    if !matches!(*strategy_write, ActivityStrategy::NoStrategy(_)) {
-                                        let _ = strategy_write.stop_tracking().await;
+                                match strategy_write.handle_process_change(&process_name).await {
+                                    Ok(true) => {
+                                        debug!("Strategy can continue handling: {}", process_name);
                                     }
-
-                                    // Switch to NoStrategy for Eurora
-                                    *strategy_write = ActivityStrategy::NoStrategy(NoStrategy);
-                                    let _ = strategy_write
-                                        .start_tracking(
-                                            process_name.clone(),
-                                            window.window_title.clone().unwrap_or_default(),
-                                            activity_tx_inner.clone(),
-                                        )
-                                        .await;
-                                } else {
-                                    // Check if current strategy can handle the new process
-                                    let can_handle =
-                                        strategy_write.can_handle_process(&process_name);
-
-                                    if can_handle {
-                                        // Let the strategy handle the process change
-                                        match strategy_write
-                                            .handle_process_change(&process_name)
-                                            .await
-                                        {
-                                            Ok(true) => {
-                                                debug!(
-                                                    "Strategy can continue handling: {}",
-                                                    process_name
-                                                );
-                                            }
-                                            Ok(false) | Err(_) => {
-                                                // Strategy cannot continue, need to switch
-                                                let _ = strategy_write.stop_tracking().await;
-
-                                                if let Ok(mut new_strategy) =
-                                                    ActivityStrategy::new(&process_name).await
-                                                {
-                                                    // Start tracking with new strategy
-                                                    let _ = new_strategy
-                                                        .start_tracking(
-                                                            process_name.clone(),
-                                                            window
-                                                                .window_title
-                                                                .clone()
-                                                                .unwrap_or_default(),
-                                                            activity_tx_inner.clone(),
-                                                        )
-                                                        .await;
-
-                                                    // Get metadata and emit focus change event
-                                                    if let Ok(metadata) =
-                                                        new_strategy.get_metadata().await
-                                                    {
-                                                        let icon = metadata.icon.or(window.icon);
-                                                        let focus_event = FocusedWindowEvent::new(
-                                                            process_name.clone(),
-                                                            window
-                                                                .window_title
-                                                                .clone()
-                                                                .unwrap_or_default(),
-                                                            icon,
-                                                        );
-                                                        let _ =
-                                                            focus_event_tx_inner.send(focus_event);
-                                                    }
-
-                                                    *strategy_write = new_strategy;
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        // Current strategy cannot handle this process, stop and create new one
-                                        let _ = strategy_write.stop_tracking().await;
-
+                                    Ok(false) => {
+                                        debug!("Strategy can no longer handle: {}", process_name);
                                         if let Ok(mut new_strategy) =
                                             ActivityStrategy::new(&process_name).await
                                         {
@@ -428,21 +356,11 @@ impl CollectorService {
                                                     activity_tx_inner.clone(),
                                                 )
                                                 .await;
-
-                                            // // Get metadata and emit focus change event
-                                            // if let Ok(metadata) = new_strategy.get_metadata().await
-                                            // {
-                                            //     let icon = metadata.icon.or(window.icon);
-                                            //     let focus_event = FocusedWindowEvent::new(
-                                            //         process_name.clone(),
-                                            //         window.window_title.clone().unwrap_or_default(),
-                                            //         icon,
-                                            //     );
-                                            //     let _ = focus_event_tx_inner.send(focus_event);
-                                            // }
-
                                             *strategy_write = new_strategy;
                                         }
+                                    }
+                                    Err(err) => {
+                                        debug!("Error handling process change: {}", err);
                                     }
                                 }
                                 *prev = new_focus;
