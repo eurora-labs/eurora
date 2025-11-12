@@ -96,7 +96,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                         event.height.unwrap_or(0),
                         icon,
                     ),
-                    None => None,
+                    None => default_icon.clone(),
                 };
                 let activity = Activity::new(event.url.clone(), icon, "".to_string(), vec![]);
                 if sender.send(ActivityReport::NewActivity(activity)).is_err() {
@@ -125,6 +125,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 "Browser strategy cannot handle: {}, need to switch",
                 process_name
             );
+            self.tracking_handle.take();
             Ok(false)
         }
     }
