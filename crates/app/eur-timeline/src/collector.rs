@@ -297,12 +297,12 @@ impl CollectorService {
                         let context_chips = activity.get_context_chips();
                         let _ = assets_event_tx_for_reports.send(context_chips);
 
-                        // let focus_event = FocusedWindowEvent::new(
-                        //     activity.process_name.clone(),
-                        //     activity.name.clone(),
-                        //     activity.icon,
-                        // );
-                        // let _ = focus_event_tx_inner.send(focus_event);
+                        let focus_event = FocusedWindowEvent::new(
+                            activity.process_name.clone(),
+                            activity.name.clone(),
+                            activity.icon.clone(),
+                        );
+                        let _ = focus_event_tx_inner.send(focus_event);
 
                         let mut storage = storage_for_reports.lock().await;
                         storage.add_activity(activity);
