@@ -457,12 +457,7 @@ mod tests {
     use crate::config::TimelineConfig;
 
     fn create_test_activity(name: &str) -> Activity {
-        crate::Activity::new(
-            name.to_string(),
-            "test_icon".to_string(),
-            "test_process".to_string(),
-            vec![],
-        )
+        crate::Activity::new(name.to_string(), None, "test_process".to_string(), vec![])
     }
 
     #[tokio::test]
