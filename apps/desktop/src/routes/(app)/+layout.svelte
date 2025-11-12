@@ -25,6 +25,11 @@
 			timelineItems.push(e);
 		});
 	});
+
+	function getFirstLetterAndCapitalize(name: string) {
+		if (!name) return '';
+		return name.charAt(0).toUpperCase();
+	}
 </script>
 
 <Menubar />
@@ -41,7 +46,13 @@
 									src={item.icon_base64}
 									alt={item.name}
 									class="w-8 h-8 bg-white rounded-full drop-shadow p-1"
-								/>{:else}{item.name}{/if}
+								/>{:else}
+								<div
+									class="w-8 h-8 bg-white rounded-full drop-shadow p-1 flex items-center justify-center"
+								>
+									{getFirstLetterAndCapitalize(item.name)}
+								</div>
+							{/if}
 						</Timeline.Item>
 					{/each}
 				</Timeline.Root>
