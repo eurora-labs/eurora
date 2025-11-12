@@ -91,11 +91,9 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             while let Ok(event) = activity_receiver.recv().await {
                 info!("Received activity event: {:?}", event.url);
                 let icon = match event.icon {
-                    Some(icon) => image::RgbaImage::from_vec(
-                        event.width.unwrap_or(0),
-                        event.height.unwrap_or(0),
-                        icon,
-                    ),
+                    Some(icon) => {
+                        image::RgbaImage::from_vec(icon.width as u32, icon.height as u32, icon.data)
+                    }
                     None => default_icon.clone(),
                 };
                 let activity = Activity::new(event.url.clone(), icon, "".to_string(), vec![]);
