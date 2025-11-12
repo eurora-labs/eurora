@@ -124,7 +124,8 @@ pub struct Activity {
     /// Name of the activity
     pub name: String,
     /// Icon representing the activity
-    pub icon: String,
+    #[serde(skip)]
+    pub icon: Option<image::RgbaImage>,
     /// Process name of the activity
     pub process_name: String,
     /// Start time
@@ -141,7 +142,7 @@ impl Activity {
     /// Create a new activity
     pub fn new(
         name: String,
-        icon: String,
+        icon: Option<image::RgbaImage>,
         process_name: String,
         assets: Vec<ActivityAsset>,
     ) -> Self {
@@ -165,7 +166,7 @@ impl Activity {
                 if let Some(icon) = asset.get_icon() {
                     DisplayAsset::new(asset.get_name().to_string(), icon.to_string())
                 } else {
-                    DisplayAsset::new(asset.get_name().to_string(), self.icon.clone())
+                    DisplayAsset::new(asset.get_name().to_string(), "".to_string())
                 }
             })
             .collect()

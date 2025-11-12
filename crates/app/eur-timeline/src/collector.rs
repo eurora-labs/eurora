@@ -297,12 +297,12 @@ impl CollectorService {
                         let context_chips = activity.get_context_chips();
                         let _ = assets_event_tx_for_reports.send(context_chips);
 
-                        let focus_event = FocusedWindowEvent::new(
-                            activity.process_name.clone(),
-                            activity.name.clone(),
-                            None,
-                        );
-                        let _ = focus_event_tx_inner.send(focus_event);
+                        // let focus_event = FocusedWindowEvent::new(
+                        //     activity.process_name.clone(),
+                        //     activity.name.clone(),
+                        //     activity.icon,
+                        // );
+                        // let _ = focus_event_tx_inner.send(focus_event);
 
                         let mut storage = storage_for_reports.lock().await;
                         storage.add_activity(activity);
@@ -347,7 +347,7 @@ impl CollectorService {
                     let activity_tx_inner = activity_tx.clone();
 
                     async move {
-                        if let Some(process_name) = window.process_name {
+                        if let Some(process_name) = window.process_name.clone() {
                             let new_focus = process_name.clone();
                             debug!("New focus: {:?}", new_focus);
 
@@ -367,11 +367,7 @@ impl CollectorService {
                                         {
                                             // Start tracking with new strategy
                                             let _ = new_strategy
-                                                .start_tracking(
-                                                    process_name.clone(),
-                                                    window.window_title.clone().unwrap_or_default(),
-                                                    activity_tx_inner.clone(),
-                                                )
+                                                .start_tracking(&window, activity_tx_inner.clone())
                                                 .await;
 
                                             *strategy_write = new_strategy;

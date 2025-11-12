@@ -82,8 +82,7 @@ pub trait ActivityStrategyFunctionality {
     /// The strategy should spawn its own tasks and report activities through the sender
     async fn start_tracking(
         &mut self,
-        process_name: String,
-        window_title: String,
+        focus_window: &ferrous_focus::FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()>;
 
