@@ -185,15 +185,23 @@ impl TauriIpcServer {
             None => None,
         };
 
-        let width = icon.as_ref().map_or(0, |icon| icon.width());
-        let height = icon.as_ref().map_or(0, |icon| icon.height());
+        let icon = match icon {
+            Some(icon) => {
+                let data = icon.to_vec();
+                Some(eur_proto::shared::ProtoImage {
+                    data,
+                    format: eur_proto::shared::ProtoImageFormat::Raw as i32,
+                    width: icon.width() as i32,
+                    height: icon.height() as i32,
+                })
+            }
+            None => None,
+        };
 
         // Create the switch activity request
         let request = SwitchActivityRequest {
             url: url.clone(),
-            width: Some(width),
-            height: Some(height),
-            icon: icon.map(|icon| icon.to_vec()),
+            icon,
         };
 
         // Call the switch_activity RPC
