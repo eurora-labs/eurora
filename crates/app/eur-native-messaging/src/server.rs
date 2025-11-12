@@ -40,7 +40,6 @@ struct NativeMessageRequest {
 pub struct TauriIpcServer {
     message_sender: mpsc::Sender<NativeMessageRequest>,
     /// gRPC client for native messaging IPC (stored for future direct use if needed)
-    #[allow(dead_code)]
     client: Option<NativeMessagingIpcClient<Channel>>,
 }
 
@@ -58,32 +57,27 @@ impl TauriIpcServer {
             .await
             .ok();
 
-        // Clone the client for the background task
-        let client_for_task = client.clone();
+        let server = Self {
+            message_sender: tx,
+            client,
+        };
 
         // Spawn a task to handle the stdio communication
-        tokio::spawn(Self::handle_stdio_task(
-            rx,
-            native_rx,
-            stdin_rx,
-            client_for_task,
-        ));
+        let mut tokio_server = server.clone();
+        tokio::spawn(async move {
+            tokio_server
+                .handle_stdio_task(rx, native_rx, stdin_rx)
+                .await;
+        });
 
-        (
-            Self {
-                message_sender: tx,
-                client,
-            },
-            native_tx,
-            stdin_tx,
-        )
+        (server, native_tx, stdin_tx)
     }
 
     async fn handle_stdio_task(
+        &mut self,
         mut request_rx: mpsc::Receiver<NativeMessageRequest>,
         mut native_rx: mpsc::Receiver<ChromeMessage>,
         mut stdin_rx: mpsc::Receiver<NativeMessage>,
-        mut client: Option<NativeMessagingIpcClient<Channel>>,
     ) {
         let stdout = io::stdout();
         let stdout_mutex = Arc::new(tokio::sync::Mutex::new(stdout));
@@ -126,7 +120,7 @@ impl TauriIpcServer {
                     drop(stdout_guard);
                 },
                 Some(native_message) = stdin_rx.recv() => {
-                    debug!("Received native response message");
+                    debug!("Received native response message: {:?}", native_message);
 
                     // Match response to pending request based on message type
                     // For now, we'll use a simple FIFO approach - take the first pending request
@@ -139,11 +133,25 @@ impl TauriIpcServer {
                 },
                 Some(chrome_message) = native_rx.recv() => {
                     info!("Received chrome message");
+                    let mut client = match self.client.clone() {
+                        Some( client) => Some(client),
+                        None => {
+                            let client = NativeMessagingIpcClient::connect(format!("http://[::1]:{}", "1422"))
+                                .await
+                                .ok();
+                            self.client = client.clone();
+                            client
+                        }
+                    };
+                    let Some(client) = client.as_mut() else {
+                        debug!("No client available");
+                        return;
+                    };
 
                     // Handle different types of Chrome messages
                     match chrome_message {
                         ChromeMessage::NativeMetadata(metadata) => {
-                            Self::handle_metadata_message(metadata, &mut client).await;
+                            Self::handle_metadata_message(metadata, client).await;
                         }
                     }
                 }
@@ -155,18 +163,12 @@ impl TauriIpcServer {
     /// Handle incoming metadata messages from Chrome and trigger activity switching
     async fn handle_metadata_message(
         metadata: NativeMetadata,
-        client: &mut Option<NativeMessagingIpcClient<Channel>>,
+        client: &mut NativeMessagingIpcClient<Channel>,
     ) {
         debug!("Received metadata for url: {:?}", metadata.url);
         // Validate that we have a URL
         let Some(url) = metadata.url else {
             debug!("Received metadata without URL, skipping activity switch");
-            return;
-        };
-
-        // Check if the client is available
-        let Some(client) = client.as_mut() else {
-            debug!("NativeMessagingIpcClient not available, cannot switch activity");
             return;
         };
 
