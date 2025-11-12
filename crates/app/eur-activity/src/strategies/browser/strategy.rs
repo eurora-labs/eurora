@@ -74,7 +74,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
         let process_name = focus_window.process_name.clone();
-        let window_title = focus_window.window_title.clone();
 
         debug!("Browser strategy starting tracking for: {:?}", process_name);
 
@@ -86,6 +85,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         let server = get_server();
         let mut activity_receiver = server.activity_event_tx.subscribe();
         let default_icon = focus_window.icon.clone();
+        let mut strategy = self.clone();
 
         let handle = tokio::spawn(async move {
             while let Ok(event) = activity_receiver.recv().await {
@@ -97,7 +97,16 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     }
                     None => default_icon.clone(),
                 };
-                let activity = Activity::new(event.url.clone(), icon, "".to_string(), vec![]);
+                let assets = strategy.retrieve_assets().await.map_err(|e| {
+                    warn!("Failed to retrieve assets: {}", e);
+                    e
+                });
+                let activity = Activity::new(
+                    event.url.clone(),
+                    icon,
+                    "".to_string(),
+                    assets.unwrap_or_default(),
+                );
                 if sender.send(ActivityReport::NewActivity(activity)).is_err() {
                     warn!("Failed to send new activity report - receiver dropped");
                     break;
