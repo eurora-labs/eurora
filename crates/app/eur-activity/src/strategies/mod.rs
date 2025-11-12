@@ -104,6 +104,10 @@ pub trait ActivityStrategyFunctionality {
 
 impl ActivityStrategy {
     pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
+        if NoStrategy::get_supported_processes().contains(&process_name) {
+            return Ok(ActivityStrategy::NoStrategy(NoStrategy));
+        }
+
         if BrowserStrategy::get_supported_processes().contains(&process_name) {
             return Ok(ActivityStrategy::BrowserStrategy(
                 BrowserStrategy::new().await?,
