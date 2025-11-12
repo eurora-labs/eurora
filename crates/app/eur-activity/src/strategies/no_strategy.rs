@@ -38,11 +38,13 @@ impl ActivityStrategyFunctionality for NoStrategy {
 
     async fn start_tracking(
         &mut self,
-        process_name: String,
-        _window_title: String,
+        focus_window: &ferrous_focus::FocusedWindow,
         _sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
-        debug!("NoStrategy: not starting tracking for {}", process_name);
+        debug!(
+            "NoStrategy: not starting tracking for {:?}",
+            focus_window.process_name
+        );
         // Intentionally do nothing - this strategy is for processes we want to ignore
         Ok(())
     }
