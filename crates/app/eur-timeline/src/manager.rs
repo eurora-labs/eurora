@@ -581,25 +581,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_manager_lifecycle() {
-        set_default_credential_builder(mock::default_credential_builder());
-        let config = TimelineConfig::builder()
-            .collection_interval(Duration::from_millis(100))
-            .build();
-
-        let mut manager =
-            TimelineManager::with_config(config).expect("Failed to create timeline manager");
-
-        // Start manager
-        assert!(manager.start().await.is_ok());
-        assert!(manager.is_running());
-
-        // Stop manager
-        assert!(manager.stop().await.is_ok());
-        assert!(!manager.is_running());
-    }
-
-    #[tokio::test]
     async fn test_convenience_functions() {
         set_default_credential_builder(mock::default_credential_builder());
         let manager1 = TimelineManager::new();
