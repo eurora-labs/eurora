@@ -232,12 +232,7 @@ mod tests {
     use super::*;
 
     fn create_test_activity(name: &str) -> Activity {
-        Activity::new(
-            name.to_string(),
-            "test_icon".to_string(),
-            "test_process".to_string(),
-            vec![],
-        )
+        Activity::new(name.to_string(), None, "test_process".to_string(), vec![])
     }
 
     #[test]
