@@ -333,7 +333,7 @@ fn main() {
                                 let db_manager = focus_timeline_handle.state::<PersonalDatabaseManager>().inner();
                                 while let Ok(focus_event) = focus_receiver.recv().await {
                                     debug!("Focus changed to: {} - {}",
-                                        focus_event.process_name,
+                                        focus_event.process_name.clone(),
                                         focus_event.window_title.clone()
                                     );
 
@@ -347,7 +347,7 @@ fn main() {
 
                                     let _ = TauRpcTimelineApiEventTrigger::new(focus_timeline_handle.clone())
                                         .new_app_event( TimelineAppEvent {
-                                            name: focus_event.window_title.clone(),
+                                            name: focus_event.process_name.clone(),
                                             color: primary_icon_color,
                                             icon_base64
                                         });
