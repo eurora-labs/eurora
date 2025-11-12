@@ -6,6 +6,7 @@ pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::MessageRequest;
+use eur_proto::nm_ipc::native_messaging_ipc_server::NativeMessagingIpc;
 use serde::{Deserialize, Serialize};
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
@@ -107,7 +108,7 @@ impl BrowserStrategy {
 struct GrpcServiceHandler;
 
 #[tonic::async_trait]
-impl eur_proto::nm_ipc::native_messaging_ipc_server::NativeMessagingIpc for GrpcServiceHandler {
+impl NativeMessagingIpc for GrpcServiceHandler {
     async fn switch_activity(
         &self,
         request: tonic::Request<eur_proto::nm_ipc::SwitchActivityRequest>,
