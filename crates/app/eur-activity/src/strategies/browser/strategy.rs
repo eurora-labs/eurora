@@ -151,16 +151,22 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
     async fn start_tracking(
         &mut self,
-        process_name: String,
-        window_title: String,
+        focus_window: &ferrous_focus::FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
-        debug!("Browser strategy starting tracking for: {}", process_name);
+        let process_name = focus_window.process_name.clone();
+        let window_title = focus_window.window_title.clone();
+
+        debug!("Browser strategy starting tracking for: {:?}", process_name);
 
         // Retrieve initial assets and create activity
         if let Ok(assets) = self.retrieve_assets().await {
-            let activity =
-                Activity::new(window_title, "".to_string(), process_name.clone(), assets);
+            let activity = Activity::new(
+                window_title.unwrap_or_default(),
+                focus_window.icon.clone(),
+                process_name.unwrap_or_default(),
+                assets,
+            );
             let _ = sender.send(ActivityReport::NewActivity(activity));
         }
 

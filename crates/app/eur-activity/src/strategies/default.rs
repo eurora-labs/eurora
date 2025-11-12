@@ -35,14 +35,21 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
 
     async fn start_tracking(
         &mut self,
-        process_name: String,
-        window_title: String,
+        focus_window: &ferrous_focus::FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
-        debug!("Default strategy starting tracking for: {}", process_name);
+        debug!(
+            "Default strategy starting tracking for: {:?}",
+            focus_window.process_name
+        );
 
         // Create a simple activity with no assets
-        let activity = Activity::new(window_title, "".to_string(), process_name, vec![]);
+        let activity = Activity::new(
+            focus_window.window_title.clone().unwrap_or_default(),
+            focus_window.icon.clone(),
+            focus_window.process_name.clone().unwrap_or_default(),
+            vec![],
+        );
 
         // Send the new activity
         let _ = sender.send(ActivityReport::NewActivity(activity));
