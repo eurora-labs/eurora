@@ -9,6 +9,8 @@ service NativeMessagingIPC  {
 message SwitchActivityRequest {
     string url = 1;
     optional bytes icon = 2;
+    optional uint32 width = 3;
+    optional uint32 height = 4;
 }
 
 message SwitchActivityResponse {}
