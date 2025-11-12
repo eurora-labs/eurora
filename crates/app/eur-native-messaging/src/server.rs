@@ -4,7 +4,9 @@ use std::{
     sync::Arc,
 };
 
+use crate::utils::convert_svg_to_rgba;
 use anyhow::{Result, anyhow};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use eur_proto::{
     ipc::{MessageRequest, MessageResponse, tauri_ipc_server::TauriIpc},
     nm_ipc::{SwitchActivityRequest, native_messaging_ipc_client::NativeMessagingIpcClient},
@@ -168,21 +170,30 @@ impl TauriIpcServer {
             return;
         };
 
-        // // Decode icon from base64 if present
-        // let icon_bytes = metadata.icon_base64.and_then(|base64_str| {
-        //     base64::engine::general_purpose::STANDARD
-        //         .decode(base64_str)
-        //         .map_err(|e| {
-        //             warn!("Failed to decode base64 icon: {}", e);
-        //             e
-        //         })
-        //         .ok()
-        // });
+        let icon = match metadata.icon_base64 {
+            Some(icon) => match icon.starts_with("data:image/svg+xml;base64") {
+                true => convert_svg_to_rgba(&icon).ok(),
+                false => {
+                    let icon = icon.split(',').nth(1).unwrap_or(&icon);
+                    let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
+
+                    image::load_from_memory(&icon_data.unwrap_or_default())
+                        .ok()
+                        .map(|icon_image| icon_image.to_rgba8())
+                }
+            },
+            None => None,
+        };
+
+        let width = icon.as_ref().map_or(0, |icon| icon.width());
+        let height = icon.as_ref().map_or(0, |icon| icon.height());
 
         // Create the switch activity request
         let request = SwitchActivityRequest {
             url: url.clone(),
-            icon: None,
+            width: Some(width),
+            height: Some(height),
+            icon: icon.map(|icon| icon.to_vec()),
         };
 
         // Call the switch_activity RPC
