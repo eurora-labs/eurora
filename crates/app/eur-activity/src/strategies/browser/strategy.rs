@@ -29,6 +29,9 @@ pub struct BrowserStrategy {
     client: Option<TauriIpcClient<Channel>>,
     #[serde(skip)]
     tracking_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
+
+    #[serde(skip)]
+    sender: Option<mpsc::UnboundedSender<ActivityReport>>,
 }
 
 impl BrowserStrategy {
@@ -52,6 +55,7 @@ impl BrowserStrategy {
         Ok(Self {
             client,
             tracking_handle: None,
+            sender: None,
         })
     }
 }
@@ -74,7 +78,25 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         focus_window: &ferrous_focus::FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
+        self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
+
+        match self.get_metadata().await {
+            Ok(metadata) => {
+                let activity = Activity::new(
+                    metadata.url.unwrap_or_default(),
+                    metadata.icon,
+                    process_name.clone().unwrap_or_default(),
+                    vec![],
+                );
+                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    warn!("Failed to send new activity report - receiver dropped");
+                }
+            }
+            Err(err) => {
+                warn!("Failed to get metadata: {}", err);
+            }
+        }
 
         debug!("Browser strategy starting tracking for: {:?}", process_name);
 
@@ -95,11 +117,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             while let Ok(event) = activity_receiver.recv().await {
                 let mut prev = last_url.lock().await;
                 let url = Url::parse(&event.url).unwrap();
-                if let Some(prev_url) = prev.take() {
-                    if prev_url.domain() == url.domain() {
-                        *prev = Some(url);
-                        continue;
-                    }
+                if let Some(prev_url) = prev.take()
+                    && prev_url.domain() == url.domain()
+                {
+                    *prev = Some(url);
+                    continue;
                 }
                 *prev = Some(url);
 
@@ -144,6 +166,24 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         // Check if this strategy can handle the new process
         if self.can_handle_process(process_name) {
             debug!("Browser strategy can continue handling: {}", process_name);
+            if let Some(sender) = self.sender.clone() {
+                match self.get_metadata().await {
+                    Ok(metadata) => {
+                        let activity = Activity::new(
+                            metadata.url.unwrap_or_default(),
+                            metadata.icon,
+                            process_name.to_string(),
+                            vec![],
+                        );
+                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                            warn!("Failed to send new activity report - receiver dropped");
+                        }
+                    }
+                    Err(err) => {
+                        warn!("Failed to get metadata: {}", err);
+                    }
+                }
+            }
             Ok(true)
         } else {
             debug!(
