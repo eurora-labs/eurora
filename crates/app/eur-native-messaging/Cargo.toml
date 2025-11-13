@@ -23,12 +23,16 @@ h2 = "0.4.12"
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
-sentry = { workspace = true, features = ["logs", "tracing"]}
+sentry = { workspace = true, features = ["logs", "tracing"] }
 specta = { workspace = true, features = ["derive", "function", "export", "serde", "serde_json"] }
 specta-typescript = { version = "0.0.9" }
 enum_dispatch = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
+usvg = { version = "0.45", default-features = true }
+tiny-skia = "0.11"
+resvg = { version = "0.45" }
+image = { workspace = true, features = ["default"]}
 
 
 [target.'cfg(windows)'.dependencies]
