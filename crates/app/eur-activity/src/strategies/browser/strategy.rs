@@ -9,8 +9,9 @@ use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_i
 use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
+use tokio::sync::{Mutex, mpsc};
+use tracing::{debug, warn};
+use url::Url;
 
 use crate::strategies::{ActivityReport, StrategyMetadata};
 use eur_native_messaging::NativeIcon;
@@ -86,10 +87,22 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         let mut activity_receiver = server.activity_event_tx.subscribe();
         let default_icon = focus_window.icon.clone();
         let mut strategy = self.clone();
+        let last_url: Arc<Mutex<Option<Url>>> = Arc::new(Mutex::new(None));
 
         let handle = tokio::spawn(async move {
+            let last_url = Arc::clone(&last_url);
+
             while let Ok(event) = activity_receiver.recv().await {
-                info!("Received activity event: {:?}", event.url);
+                let mut prev = last_url.lock().await;
+                let url = Url::parse(&event.url).unwrap();
+                if let Some(prev_url) = prev.take() {
+                    if prev_url.domain() == url.domain() {
+                        *prev = Some(url);
+                        continue;
+                    }
+                }
+                *prev = Some(url);
+
                 let icon = match event.icon {
                     Some(icon) => {
                         debug!("Received icon data");
@@ -107,7 +120,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     "".to_string(),
                     assets.unwrap_or_default(),
                 );
-                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+
+                if sender
+                    .send(ActivityReport::NewActivity(activity.clone()))
+                    .is_err()
+                {
                     warn!("Failed to send new activity report - receiver dropped");
                     break;
                 }
