@@ -133,19 +133,14 @@ impl TauriIpcServer {
                 },
                 Some(chrome_message) = native_rx.recv() => {
                     info!("Received chrome message");
-                    let mut client = match self.client.clone() {
-                        Some( client) => Some(client),
-                        None => {
-                            let client = NativeMessagingIpcClient::connect(format!("http://[::1]:{}", "1422"))
-                                .await
-                                .ok();
-                            self.client = client.clone();
-                            client
-                        }
-                    };
-                    let Some(client) = client.as_mut() else {
+                    if self.client.is_none() {
+                        self.client = NativeMessagingIpcClient::connect(format!("http://[::1]:{}", "1422"))
+                            .await
+                            .ok();
+                    }
+                    let Some(client) = self.client.as_mut() else {
                         debug!("No client available");
-                        return;
+                        continue;
                     };
 
                     // Handle different types of Chrome messages
