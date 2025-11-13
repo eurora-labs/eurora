@@ -1,8 +1,9 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     io::{self, Write},
     pin::Pin,
     sync::Arc,
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use crate::utils::convert_svg_to_rgba;
@@ -21,13 +22,17 @@ use tracing::{debug, error, info};
 
 use crate::types::{ChromeMessage, NativeMessage, NativeMetadata};
 
+// Global message ID counter
+static MESSAGE_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
+
 type IpcResult<T> = Result<Response<T>, Status>;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<MessageResponse, Status>> + Send>>;
 
-// Message type for native messaging
+// Message type for native messaging with ID tracking
 #[derive(Clone, Debug)]
 pub struct NativeCommand {
     pub command: String,
+    pub message_id: u64,
 }
 
 // Request type for internal communication
@@ -35,6 +40,19 @@ pub struct NativeCommand {
 struct NativeMessageRequest {
     message: NativeCommand,
     response_sender: oneshot::Sender<anyhow::Result<NativeMessage>>,
+}
+
+// Enum to distinguish between responses and unsolicited messages
+// This allows proper routing of messages from Chrome:
+// - Messages with message_id are responses to commands (matched via ID)
+// - Messages without message_id are unsolicited (e.g., tab changes)
+#[derive(Debug, Clone)]
+pub enum IncomingMessage {
+    Response {
+        message_id: u64,
+        data: NativeMessage,
+    },
+    Unsolicited(ChromeMessage),
 }
 
 #[derive(Clone)]
@@ -48,11 +66,11 @@ impl TauriIpcServer {
     pub async fn new() -> (
         Self,
         mpsc::Sender<ChromeMessage>,
-        mpsc::Sender<NativeMessage>,
+        mpsc::Sender<IncomingMessage>,
     ) {
         let (tx, rx) = mpsc::channel::<NativeMessageRequest>(32);
         let (native_tx, native_rx) = mpsc::channel::<ChromeMessage>(32);
-        let (stdin_tx, stdin_rx) = mpsc::channel::<NativeMessage>(32);
+        let (stdin_tx, stdin_rx) = mpsc::channel::<IncomingMessage>(32);
 
         let client = NativeMessagingIpcClient::connect(format!("http://[::1]:{}", "1422"))
             .await
@@ -78,15 +96,15 @@ impl TauriIpcServer {
         &mut self,
         mut request_rx: mpsc::Receiver<NativeMessageRequest>,
         mut native_rx: mpsc::Receiver<ChromeMessage>,
-        mut stdin_rx: mpsc::Receiver<NativeMessage>,
+        mut stdin_rx: mpsc::Receiver<IncomingMessage>,
     ) {
         let stdout = io::stdout();
         let stdout_mutex = Arc::new(tokio::sync::Mutex::new(stdout));
 
-        // Queue to track pending requests in FIFO order
+        // Map to track pending requests by message ID
         let pending_requests: Arc<
-            tokio::sync::Mutex<VecDeque<oneshot::Sender<anyhow::Result<NativeMessage>>>>,
-        > = Arc::new(tokio::sync::Mutex::new(VecDeque::new()));
+            tokio::sync::Mutex<HashMap<u64, oneshot::Sender<anyhow::Result<NativeMessage>>>>,
+        > = Arc::new(tokio::sync::Mutex::new(HashMap::new()));
 
         let pending_requests_clone = pending_requests.clone();
 
@@ -95,14 +113,16 @@ impl TauriIpcServer {
                 Some(request) = request_rx.recv() => {
                     let NativeMessageRequest { message, response_sender } = request;
                     let command = message.command.clone();
+                    let message_id = message.message_id;
 
-                    // Create the message to send to Chrome extension
+                    // Create the message to send to Chrome extension with message ID
                     let message_value = json!({
-                        "command": command
+                        "command": command,
+                        "message_id": message_id
                     });
 
-                    // Add response sender to the end of the queue
-                    pending_requests_clone.lock().await.push_back(response_sender);
+                    // Store response sender with message ID
+                    pending_requests_clone.lock().await.insert(message_id, response_sender);
 
                     // Acquire mutex for stdout
                     let stdout_guard = stdout_mutex.lock().await;
@@ -110,27 +130,49 @@ impl TauriIpcServer {
                     // Write command to stdout
                     if let Err(e) = write_message(&*stdout_guard, &message_value) {
                         error!("Failed to write command to stdout: {}", e);
-                        // Remove the last added sender from queue and send error
-                        if let Some(sender) = pending_requests_clone.lock().await.pop_back() {
+                        // Remove the sender and send error
+                        if let Some(sender) = pending_requests_clone.lock().await.remove(&message_id) {
                             let _ = sender.send(Err(anyhow!("Write error: {}", e)));
                         }
                     }
 
                     drop(stdout_guard);
                 },
-                Some(native_message) = stdin_rx.recv() => {
-                    debug!("Received native response message: {:?}", native_message);
+                Some(incoming) = stdin_rx.recv() => {
+                    match incoming {
+                        IncomingMessage::Response { message_id, data } => {
+                            debug!("Received response for message_id {}: {:?}", message_id, data);
 
-                    // Match response to pending request using FIFO order
-                    let mut pending = pending_requests_clone.lock().await;
-                    if let Some(sender) = pending.pop_front() {
-                        let _ = sender.send(Ok(native_message));
-                    } else {
-                        debug!("Received response but no pending request found");
+                            // Match response to pending request using message ID
+                            let mut pending = pending_requests_clone.lock().await;
+                            if let Some(sender) = pending.remove(&message_id) {
+                                let _ = sender.send(Ok(data));
+                            } else {
+                                debug!("Received response for unknown message_id: {}", message_id);
+                            }
+                        },
+                        IncomingMessage::Unsolicited(chrome_message) => {
+                            debug!("Received unsolicited message from Chrome: {:?}", chrome_message);
+                            // Process unsolicited messages directly
+                            match chrome_message {
+                                ChromeMessage::NativeMetadata(metadata) => {
+                                    if self.client.is_none() {
+                                        self.client = NativeMessagingIpcClient::connect(format!("http://[::1]:{}", "1422"))
+                                            .await
+                                            .ok();
+                                    }
+                                    if let Some(client) = self.client.as_mut() {
+                                        Self::handle_metadata_message(metadata, client).await;
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 Some(chrome_message) = native_rx.recv() => {
-                    info!("Received chrome message");
+                    // This channel is kept for potential future use where we might want to
+                    // send unsolicited messages from other parts of the application
+                    info!("Received chrome message from native_rx channel");
                     if self.client.is_none() {
                         self.client = NativeMessagingIpcClient::connect(format!("http://[::1]:{}", "1422"))
                             .await
@@ -141,7 +183,6 @@ impl TauriIpcServer {
                         continue;
                     };
 
-                    // Handle different types of Chrome messages
                     match chrome_message {
                         ChromeMessage::NativeMetadata(metadata) => {
                             Self::handle_metadata_message(metadata, client).await;
@@ -221,8 +262,12 @@ impl TauriIpcServer {
     }
 
     async fn send_native_message(&self, command: &str) -> Result<NativeMessage> {
+        // Generate a unique message ID
+        let message_id = MESSAGE_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
+
         let message = NativeCommand {
             command: command.to_string(),
+            message_id,
         };
 
         let (tx, rx) = oneshot::channel();
