@@ -7,7 +7,7 @@ use std::net::ToSocketAddrs;
 use std::sync::OnceLock;
 use tokio::sync::broadcast;
 use tonic::{Status, transport::Server};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// Port number for the persistent gRPC server
 pub const PORT: &str = "1422";
@@ -27,11 +27,6 @@ impl NativeMessagingServer {
     pub fn new() -> Self {
         let activity_event_tx = broadcast::channel(100).0;
         Self { activity_event_tx }
-    }
-
-    /// Get a receiver for activity events
-    pub fn subscribe(&self) -> broadcast::Receiver<SwitchActivityRequest> {
-        self.activity_event_tx.subscribe()
     }
 }
 

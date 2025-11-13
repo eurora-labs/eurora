@@ -10,13 +10,9 @@ use std::{
 };
 
 use eur_activity::Activity;
+use eur_activity::DefaultStrategy;
 use eur_activity::strategies::ActivityReport;
-use eur_activity::{BrowserStrategy, DefaultStrategy, NoStrategy};
-use eur_activity::{
-    ContextChip,
-    processes::{Eurora, ProcessFunctionality},
-    strategies::{ActivityStrategyFunctionality, StrategySupport},
-};
+use eur_activity::{ContextChip, strategies::ActivityStrategyFunctionality};
 use ferrous_focus::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
@@ -280,7 +276,7 @@ impl CollectorService {
         let strategy_clone = Arc::clone(&strategy);
         let focus_event_tx = self.focus_event_tx.clone();
         let assets_event_tx = self.assets_event_tx.clone();
-        let activity_event_tx = self.activity_event_tx.clone();
+        let _activity_event_tx = self.activity_event_tx.clone();
 
         // Create channel for activity reports from strategies
         let (activity_tx, mut activity_rx) = mpsc::unbounded_channel::<ActivityReport>();
@@ -450,8 +446,6 @@ pub struct CollectorStats {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use super::*;
 
     #[tokio::test]
