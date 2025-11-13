@@ -10,12 +10,14 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 	if (!nativePort) return;
 
 	await onUpdated(tabId, changeInfo, tab, nativePort);
+	return true;
 });
 
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
 	if (!nativePort) return;
 
 	await onActivated(activeInfo.tabId, nativePort);
+	return true;
 });
 
 async function connect() {
@@ -25,18 +27,26 @@ async function connect() {
 	nativePort.onDisconnect.addListener(onDisconnectListener);
 }
 
-async function onMessageListener(message: { command: string }, sender: chrome.runtime.Port) {
+async function onMessageListener(
+	message: { command: string; message_id?: number },
+	sender: chrome.runtime.Port,
+) {
+	console.log('Received message:', message);
+	const messageId = message.message_id;
+
 	switch (message.command) {
 		case 'GET_METADATA':
 			try {
 				const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 				const iconBase64 = await getCurrentTabIcon(activeTab);
+				console.log('Tab metadata:', { url: activeTab.url, icon_base64: iconBase64 });
 				sender.postMessage({
 					kind: 'NativeMetadata',
 					data: {
 						url: activeTab.url,
 						icon_base64: iconBase64,
 					},
+					message_id: messageId, // Echo back message ID for request/response matching
 				});
 			} catch (error) {
 				console.error('Error getting tab metadata:', error);
@@ -46,6 +56,7 @@ async function onMessageListener(message: { command: string }, sender: chrome.ru
 						url: undefined,
 						icon_base64: undefined,
 					},
+					message_id: messageId,
 				});
 			}
 			break;
@@ -58,6 +69,7 @@ async function onMessageListener(message: { command: string }, sender: chrome.ru
 					data: {
 						base64: iconBase64,
 					},
+					message_id: messageId, // Echo back message ID
 				});
 			} catch (error) {
 				console.error('Error getting tab icon:', error);
@@ -66,6 +78,7 @@ async function onMessageListener(message: { command: string }, sender: chrome.ru
 					data: {
 						base64: undefined,
 					},
+					message_id: messageId,
 				});
 			}
 			break;
@@ -73,14 +86,23 @@ async function onMessageListener(message: { command: string }, sender: chrome.ru
 			handleMessage(message.command)
 				.then((response) => {
 					console.log('Finished responding to type: ', message.command);
-					sender.postMessage(response);
+					// Add message_id to response if present
+					const responseWithId =
+						messageId !== undefined ? { ...response, message_id: messageId } : response;
+					sender.postMessage(responseWithId);
 				})
 				.catch((error) => {
 					console.error('Error responding to message', error);
-					sender.postMessage({ success: false, error: String(error) });
+					const errorResponse = { success: false, error: String(error) };
+					const errorWithId =
+						messageId !== undefined
+							? { ...errorResponse, message_id: messageId }
+							: errorResponse;
+					sender.postMessage(errorWithId);
 				});
 			break;
 	}
+	return true;
 }
 
 function onDisconnectListener() {
