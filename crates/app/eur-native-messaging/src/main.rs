@@ -206,6 +206,7 @@ async fn main() -> Result<()> {
 
     // Start background task to read from stdin and route messages
     tokio::spawn(async move {
+        use eur_native_messaging::server::IncomingMessage;
         use eur_native_messaging::types::{ChromeMessage, NativeMessage};
         use serde_json::Value;
         use tokio::io::{AsyncReadExt, stdin};
@@ -234,34 +235,54 @@ async fn main() -> Result<()> {
                 break;
             }
 
-            // First parse as generic JSON to determine message type
+            // Parse as generic JSON to check for message_id
             match serde_json::from_slice::<Value>(&buffer) {
                 Ok(json_value) => {
-                    // Try to parse as ChromeMessage (unsolicited messages)
-                    if let Ok(chrome_message) =
-                        serde_json::from_value::<ChromeMessage>(json_value.clone())
+                    // Check if this is a response (has message_id) or unsolicited message
+                    if let Some(message_id) = json_value.get("message_id").and_then(|v| v.as_u64())
                     {
-                        debug!("Received unsolicited chrome message from stdin");
-                        if native_tx.send(chrome_message).await.is_err() {
-                            debug!("Failed to send chrome message to channel, receiver dropped");
-                            break;
-                        }
-                    }
-                    // Try to parse as NativeMessage (response to commands)
-                    else if let Ok(native_message) =
-                        serde_json::from_value::<NativeMessage>(json_value.clone())
-                    {
-                        debug!("Received native response message from stdin");
-                        if stdin_tx.send(native_message).await.is_err() {
-                            debug!("Failed to send native response to channel, receiver dropped");
-                            break;
+                        // This is a response to a command - extract the data
+                        debug!("Received response with message_id: {}", message_id);
+
+                        // Try to parse the inner data as NativeMessage
+                        if let Ok(native_message) =
+                            serde_json::from_value::<NativeMessage>(json_value.clone())
+                        {
+                            let incoming = IncomingMessage::Response {
+                                message_id,
+                                data: native_message,
+                            };
+
+                            if stdin_tx.send(incoming).await.is_err() {
+                                debug!("Failed to send response to channel, receiver dropped");
+                                break;
+                            }
+                        } else {
+                            debug!("Failed to parse response data as NativeMessage");
+                            if let Ok(raw_str) = serde_json::to_string_pretty(&json_value) {
+                                debug!("Raw JSON: {}", raw_str);
+                            }
                         }
                     } else {
-                        debug!(
-                            "Received message from stdin that doesn't match ChromeMessage or NativeMessage format"
-                        );
-                        if let Ok(raw_str) = serde_json::to_string_pretty(&json_value) {
-                            debug!("Raw JSON: {}", raw_str);
+                        // No message_id, treat as unsolicited message
+                        debug!("Received unsolicited message (no message_id)");
+
+                        if let Ok(chrome_message) =
+                            serde_json::from_value::<ChromeMessage>(json_value.clone())
+                        {
+                            let incoming = IncomingMessage::Unsolicited(chrome_message);
+
+                            if stdin_tx.send(incoming).await.is_err() {
+                                debug!(
+                                    "Failed to send unsolicited message to channel, receiver dropped"
+                                );
+                                break;
+                            }
+                        } else {
+                            debug!("Failed to parse as ChromeMessage");
+                            if let Ok(raw_str) = serde_json::to_string_pretty(&json_value) {
+                                debug!("Raw JSON: {}", raw_str);
+                            }
                         }
                     }
                 }
