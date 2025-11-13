@@ -6,6 +6,7 @@ pub mod server;
 pub mod types;
 pub mod utils;
 
+pub use server::IncomingMessage;
 pub use types::*;
 
 // Define the port as a constant to ensure consistency
