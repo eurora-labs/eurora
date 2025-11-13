@@ -200,9 +200,80 @@ async fn main() -> Result<()> {
     // Ensure only one instance is running
     ensure_single_instance()?;
 
-    // Create the gRPC server
-    let (grpc_server, _) = server::TauriIpcServer::new();
+    // Create the gRPC server with channels for both unsolicited and response messages
+    let (grpc_server, native_tx, stdin_tx) = server::TauriIpcServer::new().await;
     let server_clone = grpc_server.clone();
+
+    // Start background task to read from stdin and route messages
+    tokio::spawn(async move {
+        use eur_native_messaging::types::{ChromeMessage, NativeMessage};
+        use serde_json::Value;
+        use tokio::io::{AsyncReadExt, stdin};
+
+        let mut stdin = stdin();
+        loop {
+            // Read message size (4 bytes)
+            let mut size_bytes = [0u8; 4];
+            if let Err(e) = stdin.read_exact(&mut size_bytes).await {
+                debug!(
+                    "Failed to read message size from stdin: {}, exiting stdin reader",
+                    e
+                );
+                break;
+            }
+
+            let message_size = u32::from_ne_bytes(size_bytes) as usize;
+
+            // Read message body
+            let mut buffer = vec![0u8; message_size];
+            if let Err(e) = stdin.read_exact(&mut buffer).await {
+                debug!(
+                    "Failed to read message body from stdin: {}, exiting stdin reader",
+                    e
+                );
+                break;
+            }
+
+            // First parse as generic JSON to determine message type
+            match serde_json::from_slice::<Value>(&buffer) {
+                Ok(json_value) => {
+                    // Try to parse as ChromeMessage (unsolicited messages)
+                    if let Ok(chrome_message) =
+                        serde_json::from_value::<ChromeMessage>(json_value.clone())
+                    {
+                        debug!("Received unsolicited chrome message from stdin");
+                        if native_tx.send(chrome_message).await.is_err() {
+                            debug!("Failed to send chrome message to channel, receiver dropped");
+                            break;
+                        }
+                    }
+                    // Try to parse as NativeMessage (response to commands)
+                    else if let Ok(native_message) =
+                        serde_json::from_value::<NativeMessage>(json_value.clone())
+                    {
+                        debug!("Received native response message from stdin");
+                        if stdin_tx.send(native_message).await.is_err() {
+                            debug!("Failed to send native response to channel, receiver dropped");
+                            break;
+                        }
+                    } else {
+                        debug!(
+                            "Received message from stdin that doesn't match ChromeMessage or NativeMessage format"
+                        );
+                        if let Ok(raw_str) = serde_json::to_string_pretty(&json_value) {
+                            debug!("Raw JSON: {}", raw_str);
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!("Failed to parse JSON from stdin: {}", e);
+                    if let Ok(raw_str) = String::from_utf8(buffer.clone()) {
+                        debug!("Raw message: {}", raw_str);
+                    }
+                }
+            }
+        }
+    });
 
     // Start the gRPC server
     tokio::spawn(async move {

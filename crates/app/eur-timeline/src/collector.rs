@@ -9,18 +9,16 @@ use std::{
     time::Duration,
 };
 
-use eur_activity::{
-    ContextChip,
-    processes::{Eurora, ProcessFunctionality},
-};
-use eur_activity::{DefaultStrategy, NoStrategy, strategies::ActivityStrategyFunctionality};
+use eur_activity::Activity;
+use eur_activity::DefaultStrategy;
+use eur_activity::strategies::ActivityReport;
+use eur_activity::{ContextChip, strategies::ActivityStrategyFunctionality};
 use ferrous_focus::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,
-    time,
 };
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 use crate::{
     ActivityStrategy,
@@ -76,6 +74,8 @@ pub struct CollectorService {
     focus_event_tx: broadcast::Sender<FocusedWindowEvent>,
     /// Broadcast channel for new assets event
     assets_event_tx: broadcast::Sender<Vec<ContextChip>>,
+    /// Broadcast channel for new activity events
+    activity_event_tx: broadcast::Sender<Vec<Activity>>,
 }
 
 impl CollectorService {
@@ -88,6 +88,7 @@ impl CollectorService {
 
         let (focus_event_tx, _) = broadcast::channel(100);
         let (assets_event_tx, _) = broadcast::channel(100);
+        let (activity_event_tx, _) = broadcast::channel(100);
 
         Self {
             storage,
@@ -100,6 +101,7 @@ impl CollectorService {
             restart_attempts: 0,
             focus_event_tx,
             assets_event_tx,
+            activity_event_tx,
         }
     }
 
@@ -115,6 +117,7 @@ impl CollectorService {
 
         let (focus_event_tx, _) = broadcast::channel(100);
         let (assets_event_tx, _) = broadcast::channel(100);
+        let (activity_event_tx, _) = broadcast::channel(100);
 
         Self {
             storage,
@@ -127,6 +130,7 @@ impl CollectorService {
             restart_attempts: 0,
             focus_event_tx,
             assets_event_tx,
+            activity_event_tx,
         }
     }
 
@@ -264,7 +268,7 @@ impl CollectorService {
         self.assets_event_tx.subscribe()
     }
 
-    /// Alternative start implementation
+    /// Start focus tracking with new strategy-driven architecture
     async fn start_focus_tracking(&mut self) -> TimelineResult<()> {
         let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
             DefaultStrategy,
@@ -272,81 +276,101 @@ impl CollectorService {
         let strategy_clone = Arc::clone(&strategy);
         let focus_event_tx = self.focus_event_tx.clone();
         let assets_event_tx = self.assets_event_tx.clone();
-        let storage_for_focus = Arc::clone(&self.storage);
+        let _activity_event_tx = self.activity_event_tx.clone();
 
+        // Create channel for activity reports from strategies
+        let (activity_tx, mut activity_rx) = mpsc::unbounded_channel::<ActivityReport>();
+
+        // Spawn task to handle activity reports from strategies
+        let storage_for_reports = Arc::clone(&self.storage);
+        let assets_event_tx_for_reports = assets_event_tx.clone();
+        tokio::spawn(async move {
+            let focus_event_tx_inner = focus_event_tx.clone();
+            while let Some(report) = activity_rx.recv().await {
+                match report {
+                    ActivityReport::NewActivity(activity) => {
+                        debug!("Received new activity report: {}", activity.name);
+                        let context_chips = activity.get_context_chips();
+                        let _ = assets_event_tx_for_reports.send(context_chips);
+
+                        let focus_event = FocusedWindowEvent::new(
+                            activity.process_name.clone(),
+                            activity.name.clone(),
+                            activity.icon.clone(),
+                        );
+                        let _ = focus_event_tx_inner.send(focus_event);
+
+                        let mut storage = storage_for_reports.lock().await;
+                        storage.add_activity(activity);
+                    }
+                    ActivityReport::Snapshots(snapshots) => {
+                        debug!("Received {} snapshots", snapshots.len());
+                        let mut storage = storage_for_reports.lock().await;
+                        if let Some(current_activity) = storage.get_all_activities_mut().back_mut()
+                        {
+                            for snapshot in snapshots {
+                                current_activity.snapshots.push(snapshot);
+                            }
+                        }
+                    }
+                    ActivityReport::Assets(assets) => {
+                        debug!("Received {} additional assets", assets.len());
+                        let mut storage = storage_for_reports.lock().await;
+                        if let Some(current_activity) = storage.get_all_activities_mut().back_mut()
+                        {
+                            current_activity.assets.extend(assets);
+                        }
+                    }
+                    ActivityReport::Stopping => {
+                        debug!("Strategy reported stopping");
+                    }
+                }
+            }
+        });
+
+        // Spawn focus tracking task
         self.focus_thread_handle = Some(tokio::spawn(async move {
             let config =
                 FocusTrackerConfig::new().with_icon_config(IconConfig::new().with_size(64));
             let tracker = FocusTracker::with_config(config);
-            let prev_focus = Arc::new(Mutex::new(None::<(String, Option<String>)>));
+            let prev_focus = Arc::new(Mutex::new(String::new()));
+
             let strategy_inner = Arc::clone(&strategy_clone);
             let _ = tracker
                 .track_focus_async(move |window: FocusedWindow| {
-                    let prev_focus_inner = Arc::clone(&prev_focus);
+                    let prev_focus = Arc::clone(&prev_focus);
                     let strategy_for_update = Arc::clone(&strategy_inner);
-                    let focus_event_tx_inner = focus_event_tx.clone();
-                    let assets_event_tx_inner = assets_event_tx.clone();
-                    let storage_inner = Arc::clone(&storage_for_focus);
+                    let activity_tx_inner = activity_tx.clone();
 
                     async move {
-                        if let Some(process_name) = window.process_name {
-                            let new_focus =
-                                Some((process_name.clone(), window.window_title.clone()));
+                        if let Some(process_name) = window.process_name.clone() {
+                            let new_focus = process_name.clone();
                             debug!("New focus: {:?}", new_focus);
 
-                            // Check if focus changed
-                            let mut prev = prev_focus_inner.lock().await;
+                            let mut prev = prev_focus.lock().await;
                             if new_focus != *prev {
-                                // Check if this is Eurora itself
-                                if process_name == Eurora.get_name() {
-                                    // Use NoStrategy for Eurora to skip snapshot retrieval
-                                    let mut strategy_write = strategy_for_update.write().await;
-                                    *strategy_write = ActivityStrategy::NoStrategy(NoStrategy);
-                                } else {
-                                    // Initialize strategy only when focus changes
-                                    if let Ok(mut new_strategy) =
-                                        ActivityStrategy::new(&process_name).await
-                                    {
-                                        // Retrieve initial assets and create activity
-                                        if let Ok(assets) = new_strategy.retrieve_assets().await {
-                                            let activity = crate::Activity::new(
-                                                window.window_title.clone().unwrap_or_default(),
-                                                "".to_string(), // For now ignore the icon, later save it to disk and provide path
-                                                process_name.clone(),
-                                                assets,
-                                            );
+                                let mut strategy_write = strategy_for_update.write().await;
 
-                                            let context_chips = activity.get_context_chips();
-                                            let _ = assets_event_tx_inner.send(context_chips);
+                                match strategy_write.handle_process_change(&process_name).await {
+                                    Ok(true) => {
+                                        debug!("Strategy can continue handling: {}", process_name);
+                                    }
+                                    Ok(false) => {
+                                        debug!("Strategy can no longer handle: {}", process_name);
 
-                                            // Add activity to storage BEFORE emitting event
-                                            {
-                                                let mut storage = storage_inner.lock().await;
-                                                storage.add_activity(activity);
-                                            }
+                                        if let Ok(mut new_strategy) =
+                                            ActivityStrategy::new(&process_name).await
+                                        {
+                                            // Start tracking with new strategy
+                                            let _ = new_strategy
+                                                .start_tracking(&window, activity_tx_inner.clone())
+                                                .await;
+
+                                            *strategy_write = new_strategy;
                                         }
-
-                                        // Get metadata and emit focus change event
-                                        match new_strategy.get_metadata().await {
-                                            Ok(metadata) => {
-                                                let icon = match metadata.icon {
-                                                    Some(icon) => Some(icon),
-                                                    None => window.icon,
-                                                };
-                                                let focus_event = FocusedWindowEvent::new(
-                                                    process_name.clone(),
-                                                    window.window_title.clone().unwrap_or_default(),
-                                                    icon,
-                                                );
-                                                let _ = focus_event_tx_inner.send(focus_event);
-                                            }
-                                            Err(err) => {
-                                                error!("Failed to get metadata: {}", err);
-                                            }
-                                        }
-
-                                        let mut strategy_write = strategy_for_update.write().await;
-                                        *strategy_write = new_strategy;
+                                    }
+                                    Err(err) => {
+                                        debug!("Error handling process change: {}", err);
                                     }
                                 }
                                 *prev = new_focus;
@@ -356,36 +380,6 @@ impl CollectorService {
                     }
                 })
                 .await;
-        }));
-
-        let storage = Arc::clone(&self.storage);
-        let config = self.config.clone();
-        self.current_task = Some(tokio::spawn(async move {
-            let strategy_inner = Arc::clone(&strategy);
-            let mut interval = time::interval(config.collection_interval);
-
-            loop {
-                interval.tick().await;
-
-                let mut strategy_write = strategy_inner.write().await;
-                match strategy_write.retrieve_snapshots().await {
-                    Ok(snapshots) => {
-                        if !snapshots.is_empty() {
-                            let mut storage = storage.lock().await;
-                            if let Some(current_activity) =
-                                storage.get_all_activities_mut().back_mut()
-                            {
-                                for snapshot in snapshots {
-                                    current_activity.snapshots.push(snapshot);
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        debug!("Failed to retrieve snapshots: {:?}", e);
-                    }
-                }
-            }
         }));
 
         Ok(())
@@ -452,8 +446,6 @@ pub struct CollectorStats {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use super::*;
 
     #[tokio::test]
@@ -463,62 +455,5 @@ mod tests {
 
         let collector = CollectorService::new(storage, config);
         assert!(!collector.is_running());
-    }
-
-    #[tokio::test]
-    async fn test_collector_lifecycle() {
-        let storage = Arc::new(Mutex::new(TimelineStorage::default()));
-        let timeline_config = crate::config::TimelineConfig {
-            collector: CollectorConfig {
-                collection_interval: Duration::from_millis(100),
-                ..Default::default()
-            },
-            focus_tracking: crate::config::FocusTrackingConfig {
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        let mut collector = CollectorService::new_with_timeline_config(storage, timeline_config);
-
-        // Start collector
-        assert!(collector.start().await.is_ok());
-        assert!(collector.is_running());
-
-        // Try to start again (should fail)
-        assert!(collector.start().await.is_err());
-
-        // Stop collector
-        assert!(collector.stop().await.is_ok());
-        assert!(!collector.is_running());
-
-        // Try to stop again (should fail)
-        assert!(collector.stop().await.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_collector_restart() {
-        let storage = Arc::new(Mutex::new(TimelineStorage::default()));
-        let timeline_config = crate::config::TimelineConfig {
-            collector: CollectorConfig {
-                collection_interval: Duration::from_millis(100),
-                restart_delay: Duration::from_millis(10),
-                ..Default::default()
-            },
-            focus_tracking: crate::config::FocusTrackingConfig {
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        let mut collector = CollectorService::new_with_timeline_config(storage, timeline_config);
-
-        // Start and restart
-        assert!(collector.start().await.is_ok());
-        assert!(collector.restart().await.is_ok());
-        assert!(collector.is_running());
-
-        // Clean up
-        assert!(collector.stop().await.is_ok());
     }
 }

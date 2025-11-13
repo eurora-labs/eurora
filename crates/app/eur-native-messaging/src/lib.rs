@@ -4,6 +4,7 @@ pub use tonic::transport::Channel;
 
 pub mod server;
 pub mod types;
+pub mod utils;
 
 pub use types::*;
 

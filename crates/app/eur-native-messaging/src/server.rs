@@ -1,18 +1,25 @@
 use std::{
-    io::{self, Read, Write},
+    collections::VecDeque,
+    io::{self, Write},
     pin::Pin,
     sync::Arc,
 };
 
+use crate::utils::convert_svg_to_rgba;
 use anyhow::{Result, anyhow};
-use eur_proto::ipc::{MessageRequest, MessageResponse, tauri_ipc_server::TauriIpc};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use eur_proto::{
+    ipc::{MessageRequest, MessageResponse, tauri_ipc_server::TauriIpc},
+    nm_ipc::{SwitchActivityRequest, native_messaging_ipc_client::NativeMessagingIpcClient},
+};
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt, wrappers::ReceiverStream};
+use tonic::transport::Channel;
 use tonic::{Request, Response, Status, Streaming};
-use tracing::debug;
+use tracing::{debug, error, info};
 
-use crate::types::{ChromeMessage, NativeMessage};
+use crate::types::{ChromeMessage, NativeMessage, NativeMetadata};
 
 type IpcResult<T> = Result<Response<T>, Status>;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<MessageResponse, Status>> + Send>>;
@@ -33,68 +40,176 @@ struct NativeMessageRequest {
 #[derive(Clone)]
 pub struct TauriIpcServer {
     message_sender: mpsc::Sender<NativeMessageRequest>,
+    /// gRPC client for native messaging IPC (stored for future direct use if needed)
+    client: Option<NativeMessagingIpcClient<Channel>>,
 }
 
 impl TauriIpcServer {
-    pub fn new() -> (Self, mpsc::Sender<ChromeMessage>) {
+    pub async fn new() -> (
+        Self,
+        mpsc::Sender<ChromeMessage>,
+        mpsc::Sender<NativeMessage>,
+    ) {
         let (tx, rx) = mpsc::channel::<NativeMessageRequest>(32);
         let (native_tx, native_rx) = mpsc::channel::<ChromeMessage>(32);
+        let (stdin_tx, stdin_rx) = mpsc::channel::<NativeMessage>(32);
+
+        let client = NativeMessagingIpcClient::connect(format!("http://[::1]:{}", "1422"))
+            .await
+            .ok();
+
+        let server = Self {
+            message_sender: tx,
+            client,
+        };
 
         // Spawn a task to handle the stdio communication
-        tokio::spawn(Self::handle_stdio_task(rx, native_rx));
+        let mut tokio_server = server.clone();
+        tokio::spawn(async move {
+            tokio_server
+                .handle_stdio_task(rx, native_rx, stdin_rx)
+                .await;
+        });
 
-        (Self { message_sender: tx }, native_tx)
+        (server, native_tx, stdin_tx)
     }
 
     async fn handle_stdio_task(
+        &mut self,
         mut request_rx: mpsc::Receiver<NativeMessageRequest>,
         mut native_rx: mpsc::Receiver<ChromeMessage>,
+        mut stdin_rx: mpsc::Receiver<NativeMessage>,
     ) {
-        let stdin = io::stdin();
         let stdout = io::stdout();
-
-        // Use mutexes to prevent concurrent access to stdin/stdout
-        let stdin_mutex = Arc::new(tokio::sync::Mutex::new(stdin));
         let stdout_mutex = Arc::new(tokio::sync::Mutex::new(stdout));
+
+        // Queue to track pending requests in FIFO order
+        let pending_requests: Arc<
+            tokio::sync::Mutex<VecDeque<oneshot::Sender<anyhow::Result<NativeMessage>>>>,
+        > = Arc::new(tokio::sync::Mutex::new(VecDeque::new()));
+
+        let pending_requests_clone = pending_requests.clone();
 
         loop {
             tokio::select! {
                 Some(request) = request_rx.recv() => {
                     let NativeMessageRequest { message, response_sender } = request;
+                    let command = message.command.clone();
 
                     // Create the message to send to Chrome extension
                     let message_value = json!({
-                        "command": message.command
+                        "command": command
                     });
 
-                    // Acquire mutexes for atomic stdio operation
+                    // Add response sender to the end of the queue
+                    pending_requests_clone.lock().await.push_back(response_sender);
+
+                    // Acquire mutex for stdout
                     let stdout_guard = stdout_mutex.lock().await;
-                    let stdin_guard = stdin_mutex.lock().await;
 
-                    // Perform write and read as atomic operation
-                    let result = async {
-                        write_message(&*stdout_guard, &message_value)
-                            .map_err(|e| anyhow!("Write error: {}", e))?;
-                        let response = read_message(&*stdin_guard)
-                            .map_err(|e| anyhow!("Read error: {}", e))?;
+                    // Write command to stdout
+                    if let Err(e) = write_message(&*stdout_guard, &message_value) {
+                        error!("Failed to write command to stdout: {}", e);
+                        // Remove the last added sender from queue and send error
+                        if let Some(sender) = pending_requests_clone.lock().await.pop_back() {
+                            let _ = sender.send(Err(anyhow!("Write error: {}", e)));
+                        }
+                    }
 
-                        // Parse the response as NativeMessage
-                        let native_asset: NativeMessage = serde_json::from_value(response)
-                            .map_err(|e| anyhow!("Failed to parse response as NativeMessage: {}", e))?;
+                    drop(stdout_guard);
+                },
+                Some(native_message) = stdin_rx.recv() => {
+                    debug!("Received native response message: {:?}", native_message);
 
-                        Ok(native_asset)
-                    }.await;
-
-                    let _ = response_sender.send(result);
+                    // Match response to pending request using FIFO order
+                    let mut pending = pending_requests_clone.lock().await;
+                    if let Some(sender) = pending.pop_front() {
+                        let _ = sender.send(Ok(native_message));
+                    } else {
+                        debug!("Received response but no pending request found");
+                    }
                 },
                 Some(chrome_message) = native_rx.recv() => {
-                    // Process incoming chrome messages (if any)
-                    debug!("Received chrome message: {:?}", chrome_message);
+                    info!("Received chrome message");
+                    if self.client.is_none() {
+                        self.client = NativeMessagingIpcClient::connect(format!("http://[::1]:{}", "1422"))
+                            .await
+                            .ok();
+                    }
+                    let Some(client) = self.client.as_mut() else {
+                        debug!("No client available");
+                        continue;
+                    };
 
-
-
+                    // Handle different types of Chrome messages
+                    match chrome_message {
+                        ChromeMessage::NativeMetadata(metadata) => {
+                            Self::handle_metadata_message(metadata, client).await;
+                        }
+                    }
                 }
                 else => break,
+            }
+        }
+    }
+
+    /// Handle incoming metadata messages from Chrome and trigger activity switching
+    async fn handle_metadata_message(
+        metadata: NativeMetadata,
+        client: &mut NativeMessagingIpcClient<Channel>,
+    ) {
+        debug!("Received metadata for url: {:?}", metadata.url);
+        // Validate that we have a URL
+        let Some(url) = metadata.url else {
+            debug!("Received metadata without URL, skipping activity switch");
+            return;
+        };
+
+        let icon = match metadata.icon_base64 {
+            Some(icon) => match icon.starts_with("data:image/svg+xml;base64") {
+                true => convert_svg_to_rgba(&icon).ok(),
+                false => {
+                    let icon = icon.split(',').nth(1).unwrap_or(&icon);
+                    let icon_data = BASE64_STANDARD.decode(icon.trim()).ok();
+
+                    image::load_from_memory(&icon_data.unwrap_or_default())
+                        .map_err(|err| {
+                            error!("Failed to load icon image: {}", err);
+                        })
+                        .ok()
+                        .map(|icon_image| icon_image.to_rgba8())
+                }
+            },
+            None => None,
+        };
+
+        let icon = match icon {
+            Some(icon) => {
+                let data = icon.to_vec();
+                Some(eur_proto::shared::ProtoImage {
+                    data,
+                    format: eur_proto::shared::ProtoImageFormat::Raw as i32,
+                    width: icon.width() as i32,
+                    height: icon.height() as i32,
+                })
+            }
+            None => None,
+        };
+
+        // Create the switch activity request
+        let request = SwitchActivityRequest {
+            url: url.clone(),
+            icon,
+        };
+
+        // Call the switch_activity RPC
+        match client.switch_activity(Request::new(request)).await {
+            Ok(response) => {
+                info!("Successfully switched activity for URL: {}", url);
+                debug!("Switch activity response: {:?}", response);
+            }
+            Err(e) => {
+                error!("Failed to switch activity: {}", e);
             }
         }
     }
@@ -286,18 +401,6 @@ impl TauriIpc for TauriIpcServer {
             }
         }
     }
-}
-
-/// Read a message from the given reader
-fn read_message<R: Read>(mut input: R) -> Result<Value> {
-    let mut size_bytes = [0u8; 4];
-    input.read_exact(&mut size_bytes)?;
-
-    let message_size = u32::from_ne_bytes(size_bytes) as usize;
-    let mut buffer = vec![0u8; message_size];
-    input.read_exact(&mut buffer)?;
-
-    Ok(serde_json::from_slice(&buffer)?)
 }
 
 /// Write a message to the given writer
