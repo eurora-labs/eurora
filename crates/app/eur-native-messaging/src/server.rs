@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     io::{self, Write},
     pin::Pin,
     sync::Arc,
@@ -82,12 +83,10 @@ impl TauriIpcServer {
         let stdout = io::stdout();
         let stdout_mutex = Arc::new(tokio::sync::Mutex::new(stdout));
 
-        // Map to track pending requests by command
+        // Queue to track pending requests in FIFO order
         let pending_requests: Arc<
-            tokio::sync::Mutex<
-                std::collections::HashMap<String, oneshot::Sender<anyhow::Result<NativeMessage>>>,
-            >,
-        > = Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
+            tokio::sync::Mutex<VecDeque<oneshot::Sender<anyhow::Result<NativeMessage>>>>,
+        > = Arc::new(tokio::sync::Mutex::new(VecDeque::new()));
 
         let pending_requests_clone = pending_requests.clone();
 
@@ -102,8 +101,8 @@ impl TauriIpcServer {
                         "command": command
                     });
 
-                    // Store the response sender
-                    pending_requests_clone.lock().await.insert(command.clone(), response_sender);
+                    // Add response sender to the end of the queue
+                    pending_requests_clone.lock().await.push_back(response_sender);
 
                     // Acquire mutex for stdout
                     let stdout_guard = stdout_mutex.lock().await;
@@ -111,8 +110,8 @@ impl TauriIpcServer {
                     // Write command to stdout
                     if let Err(e) = write_message(&*stdout_guard, &message_value) {
                         error!("Failed to write command to stdout: {}", e);
-                        // Remove from pending and send error
-                        if let Some(sender) = pending_requests_clone.lock().await.remove(&command) {
+                        // Remove the last added sender from queue and send error
+                        if let Some(sender) = pending_requests_clone.lock().await.pop_back() {
                             let _ = sender.send(Err(anyhow!("Write error: {}", e)));
                         }
                     }
@@ -122,10 +121,9 @@ impl TauriIpcServer {
                 Some(native_message) = stdin_rx.recv() => {
                     debug!("Received native response message: {:?}", native_message);
 
-                    // Match response to pending request based on message type
-                    // For now, we'll use a simple FIFO approach - take the first pending request
+                    // Match response to pending request using FIFO order
                     let mut pending = pending_requests_clone.lock().await;
-                    if let Some((_, sender)) = pending.drain().next() {
+                    if let Some(sender) = pending.pop_front() {
                         let _ = sender.send(Ok(native_message));
                     } else {
                         debug!("Received response but no pending request found");
