@@ -2,12 +2,15 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 use tracing::debug;
 
 use crate::{
     error::ActivityResult,
-    strategies::{ActivityStrategyFunctionality, StrategyMetadata, StrategySupport},
-    types::{ActivityAsset, ActivitySnapshot},
+    strategies::{
+        ActivityReport, ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
+    },
+    types::{Activity, ActivityAsset, ActivitySnapshot},
 };
 
 /// Default strategy for applications that don't have specific implementations
@@ -25,9 +28,51 @@ impl StrategySupport for DefaultStrategy {
 
 #[async_trait]
 impl ActivityStrategyFunctionality for DefaultStrategy {
+    fn can_handle_process(&self, _process_name: &str) -> bool {
+        // DefaultStrategy is a fallback that doesn't actively handle processes
+        false
+    }
+
+    async fn start_tracking(
+        &mut self,
+        focus_window: &ferrous_focus::FocusedWindow,
+        sender: mpsc::UnboundedSender<ActivityReport>,
+    ) -> ActivityResult<()> {
+        debug!(
+            "Default strategy starting tracking for: {:?}",
+            focus_window.process_name
+        );
+
+        // Create a simple activity with no assets
+        let activity = Activity::new(
+            focus_window.window_title.clone().unwrap_or_default(),
+            focus_window.icon.clone(),
+            focus_window.process_name.clone().unwrap_or_default(),
+            vec![],
+        );
+
+        // Send the new activity
+        let _ = sender.send(ActivityReport::NewActivity(activity));
+
+        Ok(())
+    }
+
+    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool> {
+        debug!(
+            "Default strategy handling process change to: {}",
+            process_name
+        );
+        // DefaultStrategy cannot handle process changes, request strategy switch
+        Ok(false)
+    }
+
+    async fn stop_tracking(&mut self) -> ActivityResult<()> {
+        debug!("Default strategy stopping tracking");
+        Ok(())
+    }
+
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for default strategy");
-
         Ok(vec![])
     }
 
