@@ -1,22 +1,22 @@
 //! Browser strategy implementation for the refactored activity system
 
-use std::sync::Arc;
-
-pub use super::ActivityStrategyFunctionality;
-pub use super::processes::*;
-pub use super::{ActivityStrategy, StrategySupport};
+use super::server::{ensure_grpc_server_running, get_server};
+pub use crate::strategies::ActivityStrategyFunctionality;
+pub use crate::strategies::processes::*;
+pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
 use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
-use tracing::{debug, warn};
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tracing::{debug, info, warn};
 
-use crate::strategies::StrategyMetadata;
+use crate::strategies::{ActivityReport, StrategyMetadata};
 use eur_native_messaging::NativeIcon;
 
 use crate::{
-    ActivityError,
+    Activity, ActivityError,
     error::ActivityResult,
     types::{ActivityAsset, ActivitySnapshot},
 };
@@ -25,7 +25,9 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserStrategy {
     #[serde(skip)]
-    client: Option<Arc<Mutex<TauriIpcClient<Channel>>>>,
+    client: Option<TauriIpcClient<Channel>>,
+    #[serde(skip)]
+    tracking_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 }
 
 impl BrowserStrategy {
@@ -35,7 +37,7 @@ impl BrowserStrategy {
         let client = match create_grpc_ipc_client().await {
             Ok(client) => {
                 debug!("Successfully created IPC client for browser strategy");
-                Some(Arc::new(Mutex::new(client)))
+                Some(client)
             }
             Err(e) => {
                 warn!(
@@ -46,7 +48,10 @@ impl BrowserStrategy {
             }
         };
 
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            tracking_handle: None,
+        })
     }
 }
 
@@ -59,19 +64,107 @@ impl StrategySupport for BrowserStrategy {
 
 #[async_trait]
 impl ActivityStrategyFunctionality for BrowserStrategy {
+    fn can_handle_process(&self, process_name: &str) -> bool {
+        BrowserStrategy::get_supported_processes().contains(&process_name)
+    }
+
+    async fn start_tracking(
+        &mut self,
+        focus_window: &ferrous_focus::FocusedWindow,
+        sender: mpsc::UnboundedSender<ActivityReport>,
+    ) -> ActivityResult<()> {
+        let process_name = focus_window.process_name.clone();
+
+        debug!("Browser strategy starting tracking for: {:?}", process_name);
+
+        // Clone process_name before using it to avoid borrow issues
+        // Ensure the gRPC server is running
+        ensure_grpc_server_running().await;
+
+        // Get the server and subscribe to activity events
+        let server = get_server();
+        let mut activity_receiver = server.activity_event_tx.subscribe();
+        let default_icon = focus_window.icon.clone();
+        let mut strategy = self.clone();
+
+        let handle = tokio::spawn(async move {
+            while let Ok(event) = activity_receiver.recv().await {
+                info!("Received activity event: {:?}", event.url);
+                let icon = match event.icon {
+                    Some(icon) => {
+                        debug!("Received icon data");
+                        image::RgbaImage::from_vec(icon.width as u32, icon.height as u32, icon.data)
+                    }
+                    None => default_icon.clone(),
+                };
+                let assets = strategy.retrieve_assets().await.map_err(|e| {
+                    warn!("Failed to retrieve assets: {}", e);
+                    e
+                });
+                let activity = Activity::new(
+                    event.url.clone(),
+                    icon,
+                    "".to_string(),
+                    assets.unwrap_or_default(),
+                );
+                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    warn!("Failed to send new activity report - receiver dropped");
+                    break;
+                }
+            }
+        });
+
+        self.tracking_handle = Some(Arc::new(handle));
+        Ok(())
+    }
+
+    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool> {
+        debug!(
+            "Browser strategy handling process change to: {}",
+            process_name
+        );
+
+        // Check if this strategy can handle the new process
+        if self.can_handle_process(process_name) {
+            debug!("Browser strategy can continue handling: {}", process_name);
+            Ok(true)
+        } else {
+            debug!(
+                "Browser strategy cannot handle: {}, stopping tracking",
+                process_name
+            );
+            // Properly stop tracking to abort the listener task
+            self.stop_tracking().await?;
+            Ok(false)
+        }
+    }
+
+    async fn stop_tracking(&mut self) -> ActivityResult<()> {
+        debug!("Browser strategy stopping tracking");
+
+        if let Some(handle) = self.tracking_handle.take() {
+            // Try to unwrap Arc, if we're the only owner, abort the task
+            if let Ok(handle) = Arc::try_unwrap(handle) {
+                handle.abort();
+            }
+        }
+
+        Ok(())
+    }
+
     /// Retrieve assets from the browser
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
-        let Some(client) = &self.client else {
+        let Some(ref client) = self.client else {
             warn!("No IPC client available for browser strategy");
             return Ok(vec![]);
         };
 
-        let mut client_guard = client.lock().await;
         let request = MessageRequest {};
+        let mut client = client.clone();
 
-        match client_guard.get_assets(request).await {
+        match client.get_assets(request).await {
             Ok(response) => {
                 debug!("Received assets response from browser extension");
                 let mut assets: Vec<ActivityAsset> = Vec::new();
@@ -150,15 +243,15 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         debug!("Retrieving metadata for browser strategy");
 
-        let Some(client) = &self.client else {
+        let Some(ref client) = self.client else {
             warn!("No IPC client available for browser strategy trying to retrieve metadata");
             return Ok(StrategyMetadata::default());
         };
 
-        let mut client_guard = client.lock().await;
         let request = MessageRequest {};
+        let mut client = client.clone();
 
-        match client_guard.get_metadata(request).await {
+        match client.get_metadata(request).await {
             Ok(response) => {
                 debug!("Received metadata response from browser extension");
 
@@ -197,15 +290,15 @@ impl BrowserStrategy {
     async fn _get_icon(&mut self) -> ActivityResult<NativeIcon> {
         debug!("Retrieving metadata for browser strategy");
 
-        let Some(client) = &self.client else {
+        let Some(ref client) = self.client else {
             warn!("No IPC client available for browser strategy trying to retrieve metadata");
             return Ok(NativeIcon::default());
         };
 
-        let mut client_guard = client.lock().await;
         let request = MessageRequest {};
+        let mut client = client.clone();
 
-        match client_guard.get_icon(request).await {
+        match client.get_icon(request).await {
             Ok(response) => {
                 debug!("Received metadata response from browser extension");
 
@@ -230,7 +323,7 @@ impl BrowserStrategy {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::strategies::*;
 
     #[test]
     fn test_supported_processes() {
