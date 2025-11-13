@@ -17,9 +17,5 @@ export type { NativeResponse } from './models.js';
 export { createArticleAsset, createArticleSnapshot } from './extensions/article/util.js';
 
 // Export watcher types and class
-export type {
-	MessageType,
-	BrowserObj,
-	WatcherResponse,
-} from './extensions/watchers/watcher.js';
+export type { MessageType, BrowserObj, WatcherResponse } from './extensions/watchers/watcher.js';
 export { Watcher } from './extensions/watchers/watcher.js';

@@ -2,8 +2,21 @@
 // Keep track of the native port connection
 import { handleMessage } from '@eurora/browser-shared/background/messaging';
 import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
+import { onUpdated, onActivated } from '@eurora/browser-shared/background/focus-tracker';
 
 let nativePort: chrome.runtime.Port | null = null;
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+	if (!nativePort) return;
+
+	await onUpdated(tabId, changeInfo, tab, nativePort);
+});
+
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+	if (!nativePort) return;
+
+	await onActivated(activeInfo.tabId, nativePort);
+});
 
 async function connect() {
 	console.log('Connecting to native messaging app');

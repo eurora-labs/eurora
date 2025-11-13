@@ -5,11 +5,15 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 use tracing::debug;
 
 use crate::{
     error::ActivityResult,
-    strategies::{ActivityStrategyFunctionality, StrategyMetadata, StrategySupport},
+    processes::{Eurora, ProcessFunctionality},
+    strategies::{
+        ActivityReport, ActivityStrategyFunctionality, StrategyMetadata, StrategySupport,
+    },
     types::{ActivityAsset, ActivitySnapshot},
 };
 
@@ -21,14 +25,41 @@ pub struct NoStrategy;
 #[async_trait]
 impl StrategySupport for NoStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
-        // NoStrategy doesn't explicitly support any processes
-        // It's used programmatically when needed
-        vec![]
+        vec![Eurora.get_name()]
     }
 }
 
 #[async_trait]
 impl ActivityStrategyFunctionality for NoStrategy {
+    fn can_handle_process(&self, process_name: &str) -> bool {
+        // Check if the process is in the supported processes list
+        NoStrategy::get_supported_processes().contains(&process_name)
+    }
+
+    async fn start_tracking(
+        &mut self,
+        focus_window: &ferrous_focus::FocusedWindow,
+        _sender: mpsc::UnboundedSender<ActivityReport>,
+    ) -> ActivityResult<()> {
+        debug!(
+            "NoStrategy: not starting tracking for {:?}",
+            focus_window.process_name
+        );
+        // Intentionally do nothing - this strategy is for processes we want to ignore
+        Ok(())
+    }
+
+    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool> {
+        debug!("NoStrategy: handling process change to: {}", process_name);
+        // Only continue if the new process is one we can handle (Eurora)
+        Ok(self.can_handle_process(process_name))
+    }
+
+    async fn stop_tracking(&mut self) -> ActivityResult<()> {
+        debug!("NoStrategy: stopping tracking (no-op)");
+        Ok(())
+    }
+
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("NoStrategy: skipping asset retrieval");
         Ok(vec![])
