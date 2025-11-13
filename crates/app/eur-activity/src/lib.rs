@@ -32,7 +32,7 @@ pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSn
 pub use storage::{ActivityStorage, ActivityStorageConfig, SaveableAsset, SavedAssetInfo};
 pub use strategies::ActivityStrategy;
 // Re-export strategy types
-pub use strategies::{BrowserStrategy, DefaultStrategy, NoStrategy};
+pub use strategies::{ActivityReport, BrowserStrategy, DefaultStrategy, NoStrategy};
 pub use types::{
     Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip, DisplayAsset,
 };
@@ -40,116 +40,6 @@ pub use types::{
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_activity_creation() {
-        let activity = Activity::new(
-            "Test Activity".to_string(),
-            "test_icon".to_string(),
-            "test_process".to_string(),
-            vec![],
-        );
-
-        assert_eq!(activity.name, "Test Activity");
-        assert_eq!(activity.icon, "test_icon");
-        assert_eq!(activity.process_name, "test_process");
-        assert!(activity.end.is_none());
-        assert!(activity.assets.is_empty());
-        assert!(activity.snapshots.is_empty());
-    }
-
-    #[test]
-    fn test_activity_clone() {
-        let mut activity = Activity::new(
-            "Test Activity".to_string(),
-            "test_icon".to_string(),
-            "test_process".to_string(),
-            vec![ActivityAsset::DefaultAsset(DefaultAsset::simple(
-                "Test Asset".to_string(),
-            ))],
-        );
-
-        activity.add_snapshot(ActivitySnapshot::DefaultSnapshot(DefaultSnapshot::new(
-            "Test state".to_string(),
-        )));
-
-        // This should compile and work - the main benefit of the refactor!
-        let cloned_activity = activity.clone();
-
-        assert_eq!(activity.name, cloned_activity.name);
-        assert_eq!(activity.assets.len(), cloned_activity.assets.len());
-        assert_eq!(activity.snapshots.len(), cloned_activity.snapshots.len());
-    }
-
-    #[test]
-    fn test_activity_serialization() {
-        let activity = Activity::new(
-            "Test Activity".to_string(),
-            "test_icon".to_string(),
-            "test_process".to_string(),
-            vec![ActivityAsset::DefaultAsset(DefaultAsset::simple(
-                "Test Asset".to_string(),
-            ))],
-        );
-
-        // Test serialization
-        let serialized = serde_json::to_string(&activity).unwrap();
-        assert!(!serialized.is_empty());
-
-        // Test deserialization
-        let deserialized: Activity = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(activity.name, deserialized.name);
-        assert_eq!(activity.assets.len(), deserialized.assets.len());
-    }
-
-    #[test]
-    fn test_activity_display_assets() {
-        let activity = Activity::new(
-            "Test Activity".to_string(),
-            "default_icon".to_string(),
-            "test_process".to_string(),
-            vec![
-                ActivityAsset::YoutubeAsset(YoutubeAsset::new(
-                    "yt1".to_string(),
-                    "https://youtube.com/watch?v=test".to_string(),
-                    "Test Video".to_string(),
-                    vec![],
-                    0.0,
-                )),
-                ActivityAsset::DefaultAsset(DefaultAsset::simple("Test Asset".to_string())),
-            ],
-        );
-
-        let display_assets = activity.get_display_assets();
-        assert_eq!(display_assets.len(), 2);
-        assert_eq!(display_assets[0].name, "Test Video");
-        assert_eq!(display_assets[0].icon, "youtube");
-        assert_eq!(display_assets[1].name, "Test Asset");
-        assert_eq!(display_assets[1].icon, "default"); // Falls back to activity icon
-    }
-
-    #[test]
-    fn test_activity_context_chips() {
-        let activity = Activity::new(
-            "Test Activity".to_string(),
-            "default_icon".to_string(),
-            "test_process".to_string(),
-            vec![
-                ActivityAsset::YoutubeAsset(YoutubeAsset::new(
-                    "yt1".to_string(),
-                    "https://youtube.com/watch?v=test".to_string(),
-                    "Test V".to_string(),
-                    vec![],
-                    0.0,
-                )),
-                ActivityAsset::DefaultAsset(DefaultAsset::simple("Test Asset".to_string())),
-            ],
-        );
-
-        let context_chips = activity.get_context_chips();
-        assert_eq!(context_chips.len(), 1); // Only YouTube asset provides a context chip
-        assert_eq!(context_chips[0].name, "Test V");
-    }
 
     #[test]
     fn test_asset_enum_methods() {

@@ -1,0 +1,16 @@
+
+syntax = "proto3";
+package nm_ipc;
+
+import "shared.proto";
+
+service NativeMessagingIPC  {
+    rpc SwitchActivity(SwitchActivityRequest) returns (SwitchActivityResponse) {}
+}
+
+message SwitchActivityRequest {
+    string url = 1;
+    optional shared.ProtoImage icon = 2;
+}
+
+message SwitchActivityResponse {}
