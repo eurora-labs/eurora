@@ -51,3 +51,7 @@ export async function onActivated(tabId: number, nativePort: browser.Runtime.Por
 		console.error(error);
 	}
 }
+
+export async function onRemoved(tabId: number) {
+	lastUrl.delete(tabId);
+}
