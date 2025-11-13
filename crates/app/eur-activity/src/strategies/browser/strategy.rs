@@ -130,10 +130,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             Ok(true)
         } else {
             debug!(
-                "Browser strategy cannot handle: {}, need to switch",
+                "Browser strategy cannot handle: {}, stopping tracking",
                 process_name
             );
-            self.tracking_handle.take();
+            // Properly stop tracking to abort the listener task
+            self.stop_tracking().await?;
             Ok(false)
         }
     }
