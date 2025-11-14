@@ -1,12 +1,16 @@
 use anyhow::Result;
-pub use eur_proto::ipc::tauri_ipc_client::TauriIpcClient;
+// pub use eur_proto::ipc::tauri_ipc_client::TauriIpcClient;
 pub use tonic::transport::Channel;
 
-pub mod server;
+mod error;
+// pub mod server_o;
+pub mod server_n;
 pub mod types;
 pub mod utils;
 
-pub use server::IncomingMessage;
+pub use server_n::TauriIpcClient;
+
+// pub use server_o::IncomingMessage;
 pub use types::*;
 
 // Define the port as a constant to ensure consistency
