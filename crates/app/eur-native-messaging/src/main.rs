@@ -1,7 +1,13 @@
 use std::{env, fs::File, net::ToSocketAddrs, process};
 
 use anyhow::{Context, Result, anyhow};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use eur_native_messaging::PORT;
+use eur_native_messaging::types::NativeMessage;
+use eur_native_messaging::utils::convert_svg_to_rgba;
+use eur_proto::nm_ipc::{
+    SwitchActivityRequest, native_messaging_ipc_client::NativeMessagingIpcClient,
+};
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 // use eur_native_messaging::server_o;
 use eur_native_messaging::server_n::{self, Frame};
@@ -273,10 +279,118 @@ async fn main() -> Result<()> {
         let chrome_from_tx = chrome_from_tx.clone();
         tokio::spawn(async move {
             let mut stdin = io::stdin();
+            let mut activity_client: Option<NativeMessagingIpcClient<tonic::transport::Channel>> =
+                None;
+
             info!("Native messaging reader task started");
             loop {
                 match read_framed(&mut stdin).await {
                     Ok(Some(frame)) => {
+                        // Check if this is an activity event that needs forwarding
+                        if frame.kind == "event"
+                            && (frame.event == "tab_updated" || frame.event == "tab_activated")
+                        {
+                            info!("Detected activity event: {}", frame.event);
+
+                            // Parse the payload to extract metadata
+                            if let Some(payload) = &frame.payload {
+                                match serde_json::from_str::<NativeMessage>(&payload.content) {
+                                    Ok(NativeMessage::NativeMetadata(metadata)) => {
+                                        info!(
+                                            "Processing activity event for URL: {:?}",
+                                            metadata.url
+                                        );
+
+                                        // Ensure we have an activity client
+                                        if activity_client.is_none() {
+                                            match NativeMessagingIpcClient::connect(
+                                                "http://[::1]:1422",
+                                            )
+                                            .await
+                                            {
+                                                Ok(client) => {
+                                                    info!(
+                                                        "Connected to activity server at port 1422"
+                                                    );
+                                                    activity_client = Some(client);
+                                                }
+                                                Err(e) => {
+                                                    error!(
+                                                        "Failed to connect to activity server: {}",
+                                                        e
+                                                    );
+                                                }
+                                            }
+                                        }
+
+                                        // Forward to activity server if we have a URL
+                                        if let Some(url) = metadata.url {
+                                            // Process icon
+                                            let icon = match metadata.icon_base64 {
+                                                Some(icon_str) => {
+                                                    let rgba_image = if icon_str
+                                                        .starts_with("data:image/svg+xml;base64")
+                                                    {
+                                                        convert_svg_to_rgba(&icon_str).ok()
+                                                    } else {
+                                                        let icon_data_str = icon_str
+                                                            .split(',')
+                                                            .nth(1)
+                                                            .unwrap_or(&icon_str);
+                                                        BASE64_STANDARD
+                                                            .decode(icon_data_str.trim())
+                                                            .ok()
+                                                            .and_then(|data| {
+                                                                image::load_from_memory(&data)
+                                                                    .ok()
+                                                                    .map(|img| img.to_rgba8())
+                                                            })
+                                                    };
+
+                                                    rgba_image.map(|img| {
+                                                        eur_proto::shared::ProtoImage {
+                                                            data: img.to_vec(),
+                                                            format: eur_proto::shared::ProtoImageFormat::Raw as i32,
+                                                            width: img.width() as i32,
+                                                            height: img.height() as i32,
+                                                        }
+                                                    })
+                                                }
+                                                None => None,
+                                            };
+
+                                            if let Some(client) = activity_client.as_mut() {
+                                                let request = SwitchActivityRequest {
+                                                    url: url.clone(),
+                                                    icon,
+                                                };
+                                                match client
+                                                    .switch_activity(tonic::Request::new(request))
+                                                    .await
+                                                {
+                                                    Ok(_) => info!(
+                                                        "Successfully forwarded activity event for URL: {}",
+                                                        url
+                                                    ),
+                                                    Err(e) => error!(
+                                                        "Failed to forward activity event: {}",
+                                                        e
+                                                    ),
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Ok(_) => {
+                                        debug!("Received non-metadata message in activity event")
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to parse activity event payload: {}", e)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Broadcast frame to gRPC clients
                         if let Err(err) = chrome_from_tx.send(frame) {
                             info!("Chrome sender error: {err:?}");
                         }
