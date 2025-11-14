@@ -11,11 +11,6 @@ pub mod generated {
         pub use super::*;
     }
 
-    pub mod ipc {
-        tonic::include_proto!("ipc");
-        pub use super::*;
-    }
-
     pub mod proto_ocr_service {
         tonic::include_proto!("ocr_service");
         pub use super::*;
