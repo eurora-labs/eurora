@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use tokio::sync::broadcast;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tonic::Streaming;
 use tracing::{debug, error, warn};
@@ -44,11 +45,16 @@ pub struct BrowserStrategy {
     request_id_counter: Option<Arc<AtomicU64>>,
     #[serde(skip)]
     stream_task_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
+
+    #[serde(skip)]
+    activity_event_tx: Option<broadcast::Sender<Frame>>,
 }
 
 impl BrowserStrategy {
     /// Create a new browser strategy
     pub async fn new() -> ActivityResult<Self> {
+        let activity_event_tx = broadcast::channel(100).0;
+
         // Try to create the IPC client and initialize bidirectional stream
         let (client, stream_tx, pending_requests, request_id_counter, stream_task_handle) =
             match create_grpc_ipc_client().await {
@@ -70,6 +76,7 @@ impl BrowserStrategy {
                     {
                         Ok(response) => {
                             let mut inbound_stream = response.into_inner();
+                            let activity_event_tx = activity_event_tx.clone();
 
                             // Spawn task to handle incoming frames
                             let stream_task = tokio::spawn(async move {
@@ -88,9 +95,11 @@ impl BrowserStrategy {
                                         }
                                     } else {
                                         debug!(
-                                            "Received frame with no pending request: id={}",
-                                            frame.id
+                                            "Received frame with no pending request: id={} kind={}",
+                                            frame.id.clone(),
+                                            frame.kind.clone(),
                                         );
+                                        let _ = activity_event_tx.send(frame);
                                     }
                                 }
                                 debug!("Stream handler task ended");
@@ -130,6 +139,7 @@ impl BrowserStrategy {
             pending_requests,
             request_id_counter,
             stream_task_handle,
+            activity_event_tx: Some(activity_event_tx),
         })
     }
 }
@@ -180,7 +190,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
         // Get the server and subscribe to activity events
         let server = get_server();
-        let mut activity_receiver = server.activity_event_tx.subscribe();
+        let mut activity_receiver = self.activity_event_tx.clone().unwrap().subscribe();
         let default_icon = focus_window.icon.clone();
         let mut strategy = self.clone();
         let last_url: Arc<Mutex<Option<Url>>> = Arc::new(Mutex::new(None));
@@ -189,8 +199,19 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             let last_url = Arc::clone(&last_url);
 
             while let Ok(event) = activity_receiver.recv().await {
+                let native_asset =
+                    serde_json::from_str::<NativeMessage>(&event.payload.unwrap().content)
+                        .map_err(|e| -> ActivityError { ActivityError::from(e) })
+                        .unwrap();
+
+                let event = match native_asset {
+                    NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
+                    _ => {
+                        panic!("Unexpected native asset type");
+                    }
+                };
                 let mut prev = last_url.lock().await;
-                let url = Url::parse(&event.url).unwrap();
+                let url = Url::parse(&event.url.clone().unwrap()).unwrap();
                 if let Some(prev_url) = prev.take()
                     && prev_url.domain() == url.domain()
                 {
@@ -198,20 +219,22 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     continue;
                 }
                 *prev = Some(url);
+                let icon = event.icon;
 
-                let icon = match event.icon {
-                    Some(icon) => {
-                        debug!("Received icon data");
-                        image::RgbaImage::from_vec(icon.width as u32, icon.height as u32, icon.data)
-                    }
-                    None => default_icon.clone(),
-                };
+                // let icon = match event.icon {
+                //     Some(icon) => {
+                //         debug!("Received icon data");
+                //         image::RgbaImage::from_vec(icon.width as u32, icon.height as u32, icon.data)
+                //     }
+                //     None => default_icon.clone(),
+                // };
+
                 let assets = strategy.retrieve_assets().await.map_err(|e| {
                     warn!("Failed to retrieve assets: {}", e);
                     e
                 });
                 let activity = Activity::new(
-                    event.url.clone(),
+                    event.url.unwrap().clone(),
                     icon,
                     "".to_string(),
                     assets.unwrap_or_default(),
