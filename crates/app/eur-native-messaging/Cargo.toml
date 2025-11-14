@@ -14,7 +14,9 @@ dirs = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 once_cell = { workspace = true }
 tonic = { workspace = true, features = ["server", "tls-native-roots", "channel", "router"] }
+tonic-prost = { workspace = true }
 prost = { workspace = true }
+prost-types = { workspace = true }
 futures = { workspace = true }
 tokio-stream = { workspace = true }
 base64 = { workspace = true }
