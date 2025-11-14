@@ -5,12 +5,15 @@ pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
+use eur_native_messaging::server_n::{Frame, Payload};
 use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
-use eur_proto::ipc::MessageRequest;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
-use tracing::{debug, warn};
+use std::sync::atomic::{AtomicU64, Ordering};
+use tokio::sync::{Mutex, mpsc, oneshot};
+use tonic::Streaming;
+use tracing::{debug, error, warn};
 use url::Url;
 
 use crate::strategies::{ActivityReport, StrategyMetadata};
@@ -29,33 +32,104 @@ pub struct BrowserStrategy {
     client: Option<TauriIpcClient<Channel>>,
     #[serde(skip)]
     tracking_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
-
     #[serde(skip)]
     sender: Option<mpsc::UnboundedSender<ActivityReport>>,
+
+    // Bidirectional stream components
+    #[serde(skip)]
+    stream_tx: Option<mpsc::UnboundedSender<Frame>>,
+    #[serde(skip)]
+    pending_requests: Option<Arc<Mutex<HashMap<u64, oneshot::Sender<Frame>>>>>,
+    #[serde(skip)]
+    request_id_counter: Option<Arc<AtomicU64>>,
+    #[serde(skip)]
+    stream_task_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 }
 
 impl BrowserStrategy {
     /// Create a new browser strategy
     pub async fn new() -> ActivityResult<Self> {
-        // Try to create the IPC client
-        let client = match create_grpc_ipc_client().await {
-            Ok(client) => {
-                debug!("Successfully created IPC client for browser strategy");
-                Some(client)
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to create IPC client: {}. Browser strategy will work with limited functionality.",
-                    e
-                );
-                None
-            }
-        };
+        // Try to create the IPC client and initialize bidirectional stream
+        let (client, stream_tx, pending_requests, request_id_counter, stream_task_handle) =
+            match create_grpc_ipc_client().await {
+                Ok(mut client) => {
+                    debug!("Successfully created IPC client for browser strategy");
+
+                    // Initialize bidirectional stream
+                    let (tx, rx) = mpsc::unbounded_channel::<Frame>();
+                    let pending_requests =
+                        Arc::new(Mutex::new(HashMap::<u64, oneshot::Sender<Frame>>::new()));
+                    let request_id_counter = Arc::new(AtomicU64::new(1));
+
+                    let pending_requests_clone = Arc::clone(&pending_requests);
+
+                    // Open the bidirectional stream
+                    match client
+                        .open(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
+                        .await
+                    {
+                        Ok(response) => {
+                            let mut inbound_stream = response.into_inner();
+
+                            // Spawn task to handle incoming frames
+                            let stream_task = tokio::spawn(async move {
+                                debug!("Stream handler task started");
+                                while let Ok(Some(frame)) = inbound_stream.message().await {
+                                    debug!(
+                                        "Received frame: kind={}, id={}, action={}",
+                                        frame.kind, frame.id, frame.action
+                                    );
+
+                                    // Match response to pending request
+                                    let mut pending = pending_requests_clone.lock().await;
+                                    if let Some(sender) = pending.remove(&frame.id) {
+                                        if let Err(_) = sender.send(frame) {
+                                            warn!("Failed to send frame to waiting request");
+                                        }
+                                    } else {
+                                        debug!(
+                                            "Received frame with no pending request: id={}",
+                                            frame.id
+                                        );
+                                    }
+                                }
+                                debug!("Stream handler task ended");
+                            });
+
+                            (
+                                Some(client),
+                                Some(tx),
+                                Some(pending_requests),
+                                Some(request_id_counter),
+                                Some(Arc::new(stream_task)),
+                            )
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to open bidirectional stream: {}. Browser strategy will work with limited functionality.",
+                                e
+                            );
+                            (Some(client), None, None, None, None)
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to create IPC client: {}. Browser strategy will work with limited functionality.",
+                        e
+                    );
+                    (None, None, None, None, None)
+                }
+            };
 
         Ok(Self {
             client,
             tracking_handle: None,
             sender: None,
+            stream_tx,
+            pending_requests,
+            request_id_counter,
+            stream_task_handle,
         })
     }
 }
@@ -206,6 +280,13 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             }
         }
 
+        // Clean up stream task
+        if let Some(handle) = self.stream_task_handle.take() {
+            if let Ok(handle) = Arc::try_unwrap(handle) {
+                handle.abort();
+            }
+        }
+
         Ok(())
     }
 
@@ -213,39 +294,26 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
-        let Some(ref client) = self.client else {
-            warn!("No IPC client available for browser strategy");
+        let response_frame = self.send_request("request", "get_assets").await?;
+
+        if !response_frame.ok {
+            warn!("Failed to retrieve assets: request failed");
+            return Ok(vec![]);
+        }
+
+        let Some(payload) = response_frame.payload else {
+            warn!("No payload in assets response");
             return Ok(vec![]);
         };
 
-        let request = MessageRequest {};
-        let mut client = client.clone();
+        let native_asset = serde_json::from_str::<NativeMessage>(&payload.content)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
-        match client.get_assets(request).await {
-            Ok(response) => {
-                debug!("Received assets response from browser extension");
-                let mut assets: Vec<ActivityAsset> = Vec::new();
+        let asset = ActivityAsset::try_from(native_asset)
+            .map_err(|e| -> ActivityError { ActivityError::InvalidAssetType(e.to_string()) })?;
 
-                let resp = response.into_inner();
-
-                let native_asset = serde_json::from_slice::<NativeMessage>(&resp.content)
-                    .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
-
-                let asset =
-                    ActivityAsset::try_from(native_asset).map_err(|e| -> ActivityError {
-                        ActivityError::InvalidAssetType(e.to_string())
-                    })?;
-
-                assets.push(asset);
-
-                debug!("Retrieved {} assets from browser", assets.len());
-                Ok(assets)
-            }
-            Err(e) => {
-                warn!("Failed to retrieve assets from browser: {}", e);
-                Err(ActivityError::invalid_data(e.to_string()))
-            }
-        }
+        debug!("Retrieved 1 asset from browser");
+        Ok(vec![asset])
     }
 
     /// Retrieve snapshots from the browser
@@ -300,81 +368,132 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         debug!("Retrieving metadata for browser strategy");
 
-        let Some(ref client) = self.client else {
-            warn!("No IPC client available for browser strategy trying to retrieve metadata");
+        let response_frame = self.send_request("request", "get_metadata").await?;
+
+        if !response_frame.ok {
+            warn!("Failed to retrieve metadata: request failed");
+            return Ok(StrategyMetadata::default());
+        }
+
+        let Some(payload) = response_frame.payload else {
+            warn!("No payload in metadata response");
             return Ok(StrategyMetadata::default());
         };
 
-        let request = MessageRequest {};
-        let mut client = client.clone();
+        let native_metadata = serde_json::from_str::<NativeMessage>(&payload.content)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
-        match client.get_metadata(request).await {
-            Ok(response) => {
-                debug!("Received metadata response from browser extension");
-
-                let resp = response.into_inner();
-
-                let native_metadata = serde_json::from_slice::<NativeMessage>(&resp.content)
-                    .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
-
-                let metadata = match native_metadata {
-                    NativeMessage::NativeMetadata(metadata) => {
-                        // Validate URL if present
-                        if let Some(ref url) = metadata.url
-                            && !url.starts_with("http")
-                        {
-                            return Err(ActivityError::invalid_data(format!(
-                                "Invalid metadata URL: must start with 'http', got: {}",
-                                url
-                            )));
-                        }
-                        StrategyMetadata::from(metadata)
-                    }
-                    _ => StrategyMetadata::default(),
-                };
-                Ok(metadata)
+        let metadata = match native_metadata {
+            NativeMessage::NativeMetadata(metadata) => {
+                // Validate URL if present
+                if let Some(ref url) = metadata.url
+                    && !url.starts_with("http")
+                {
+                    return Err(ActivityError::invalid_data(format!(
+                        "Invalid metadata URL: must start with 'http', got: {}",
+                        url
+                    )));
+                }
+                StrategyMetadata::from(metadata)
             }
-            Err(e) => {
-                warn!("Failed to retrieve metadata from browser: {}", e);
-
-                Ok(StrategyMetadata::default())
-            }
-        }
+            _ => StrategyMetadata::default(),
+        };
+        Ok(metadata)
     }
 }
 
 impl BrowserStrategy {
-    async fn _get_icon(&mut self) -> ActivityResult<NativeIcon> {
-        debug!("Retrieving metadata for browser strategy");
+    /// Helper method to send a request frame and wait for response
+    async fn send_request(&self, kind: &str, action: &str) -> ActivityResult<Frame> {
+        let stream_tx = self
+            .stream_tx
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("No stream sender available"))?;
 
-        let Some(ref client) = self.client else {
-            warn!("No IPC client available for browser strategy trying to retrieve metadata");
+        let pending_requests = self
+            .pending_requests
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("No pending requests map available"))?;
+
+        let request_id_counter = self
+            .request_id_counter
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("No request ID counter available"))?;
+
+        // Generate unique request ID
+        let request_id = request_id_counter.fetch_add(1, Ordering::SeqCst);
+
+        // Create oneshot channel for response
+        let (tx, rx) = oneshot::channel();
+
+        // Register pending request
+        {
+            let mut pending = pending_requests.lock().await;
+            pending.insert(request_id, tx);
+        }
+
+        // Create and send request frame
+        let request_frame = Frame {
+            kind: kind.to_string(),
+            id: request_id,
+            action: action.to_string(),
+            event: String::new(),
+            payload: None,
+            ok: true,
+        };
+
+        debug!(
+            "Sending request frame: kind={}, id={}, action={}",
+            kind, request_id, action
+        );
+
+        stream_tx
+            .send(request_frame)
+            .map_err(|_| ActivityError::invalid_data("Failed to send request frame"))?;
+
+        // Wait for response with timeout
+        match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
+            Ok(Ok(response)) => {
+                debug!("Received response for request {}", request_id);
+                Ok(response)
+            }
+            Ok(Err(_)) => {
+                error!("Response channel closed for request {}", request_id);
+                Err(ActivityError::invalid_data("Response channel closed"))
+            }
+            Err(_) => {
+                error!("Timeout waiting for response to request {}", request_id);
+                // Clean up pending request on timeout
+                let mut pending = pending_requests.lock().await;
+                pending.remove(&request_id);
+                Err(ActivityError::invalid_data("Request timeout"))
+            }
+        }
+    }
+
+    async fn _get_icon(&mut self) -> ActivityResult<NativeIcon> {
+        debug!("Retrieving icon for browser strategy");
+
+        let response_frame = self.send_request("request", "get_icon").await?;
+
+        if !response_frame.ok {
+            warn!("Failed to retrieve icon: request failed");
+            return Ok(NativeIcon::default());
+        }
+
+        let Some(payload) = response_frame.payload else {
+            warn!("No payload in icon response");
             return Ok(NativeIcon::default());
         };
 
-        let request = MessageRequest {};
-        let mut client = client.clone();
+        let native_metadata = serde_json::from_str::<NativeMessage>(&payload.content)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
-        match client.get_icon(request).await {
-            Ok(response) => {
-                debug!("Received metadata response from browser extension");
-
-                let resp = response.into_inner();
-
-                let native_metadata = serde_json::from_slice::<NativeMessage>(&resp.content)
-                    .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
-
-                let metadata = match native_metadata {
-                    NativeMessage::NativeIcon(metadata) => metadata,
-                    _ => NativeIcon::default(),
-                };
-                Ok(metadata)
-            }
-            Err(e) => {
-                warn!("Failed to retrieve metadata from browser: {}", e);
-                Ok(NativeIcon::default())
-            }
-        }
+        let metadata = match native_metadata {
+            NativeMessage::NativeIcon(metadata) => metadata,
+            _ => NativeIcon::default(),
+        };
+        Ok(metadata)
     }
 }
 

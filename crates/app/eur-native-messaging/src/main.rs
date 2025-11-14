@@ -435,5 +435,17 @@ async fn main() -> Result<()> {
     // // Handle stdio in the main thread
     // server_clone.handle_stdio().await?;
 
+    tokio::select! {
+        _ = writer_handle => {
+            info!("Native messaging writer task stopped");
+            }
+        _ = reader_handle => {
+            info!("Native messaging reader task stopped");
+            }
+        _ = grpc_handle => {
+            info!("gRPC server ended");
+            }
+    }
+
     Ok(())
 }
