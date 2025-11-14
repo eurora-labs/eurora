@@ -4,6 +4,21 @@ import { handleMessage } from '@eurora/browser-shared/background/messaging';
 import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
 import { onUpdated, onActivated } from '@eurora/browser-shared/background/focus-tracker';
 
+// Frame protocol types matching the proto definition
+interface Payload {
+	kind: string;
+	content: string; // JSON-encoded string
+}
+
+interface Frame {
+	kind: string;
+	id: number;
+	action: string;
+	event: string;
+	payload?: Payload;
+	ok: boolean;
+}
+
 let nativePort: chrome.runtime.Port | null = null;
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
@@ -27,79 +42,134 @@ async function connect() {
 	nativePort.onDisconnect.addListener(onDisconnectListener);
 }
 
-async function onMessageListener(
-	message: { command: string; message_id?: number },
-	sender: chrome.runtime.Port,
-) {
-	console.log('Received message:', message);
-	const messageId = message.message_id;
+async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
+	console.log('Received frame:', frame);
 
-	switch (message.command) {
-		case 'GET_METADATA':
+	switch (frame.action) {
+		case 'get_metadata':
 			try {
 				const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 				const iconBase64 = await getCurrentTabIcon(activeTab);
 				console.log('Tab metadata:', { url: activeTab.url, icon_base64: iconBase64 });
-				sender.postMessage({
+
+				const responseData = {
 					kind: 'NativeMetadata',
 					data: {
 						url: activeTab.url,
 						icon_base64: iconBase64,
 					},
-					message_id: messageId, // Echo back message ID for request/response matching
-				});
+				};
+
+				const responseFrame: Frame = {
+					kind: 'response',
+					id: frame.id, // Echo back the request ID
+					action: frame.action,
+					event: '',
+					payload: {
+						kind: 'NativeMetadata',
+						content: JSON.stringify(responseData),
+					},
+					ok: true,
+				};
+
+				sender.postMessage(responseFrame);
 			} catch (error) {
 				console.error('Error getting tab metadata:', error);
-				sender.postMessage({
-					kind: 'NativeMetadata',
-					data: {
-						url: undefined,
-						icon_base64: undefined,
-					},
-					message_id: messageId,
-				});
+				const errorFrame: Frame = {
+					kind: 'response',
+					id: frame.id,
+					action: frame.action,
+					event: '',
+					payload: undefined,
+					ok: false,
+				};
+				sender.postMessage(errorFrame);
 			}
 			break;
-		case 'GET_ICON':
+
+		case 'get_icon':
 			try {
 				const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 				const iconBase64 = await getCurrentTabIcon(activeTab);
-				sender.postMessage({
+
+				const responseData = {
 					kind: 'NativeIcon',
 					data: {
 						base64: iconBase64,
 					},
-					message_id: messageId, // Echo back message ID
-				});
+				};
+
+				const responseFrame: Frame = {
+					kind: 'response',
+					id: frame.id,
+					action: frame.action,
+					event: '',
+					payload: {
+						kind: 'NativeIcon',
+						content: JSON.stringify(responseData),
+					},
+					ok: true,
+				};
+
+				sender.postMessage(responseFrame);
 			} catch (error) {
 				console.error('Error getting tab icon:', error);
-				sender.postMessage({
-					kind: 'NativeIcon',
-					data: {
-						base64: undefined,
-					},
-					message_id: messageId,
-				});
+				const errorFrame: Frame = {
+					kind: 'response',
+					id: frame.id,
+					action: frame.action,
+					event: '',
+					payload: undefined,
+					ok: false,
+				};
+				sender.postMessage(errorFrame);
 			}
 			break;
+
+		case 'get_assets':
+			try {
+				// Handle assets request using the existing handleMessage
+				const response = await handleMessage('GET_ASSETS');
+				console.log('Finished responding to get_assets');
+
+				const responseFrame: Frame = {
+					kind: 'response',
+					id: frame.id,
+					action: frame.action,
+					event: '',
+					payload: {
+						kind: response.kind || 'unknown',
+						content: JSON.stringify(response),
+					},
+					ok: true,
+				};
+
+				sender.postMessage(responseFrame);
+			} catch (error) {
+				console.error('Error responding to get_assets', error);
+				const errorFrame: Frame = {
+					kind: 'response',
+					id: frame.id,
+					action: frame.action,
+					event: '',
+					payload: undefined,
+					ok: false,
+				};
+				sender.postMessage(errorFrame);
+			}
+			break;
+
 		default:
-			handleMessage(message.command)
-				.then((response) => {
-					console.log('Finished responding to type: ', message.command);
-					// Add message_id to response if present
-					const responseWithId =
-						messageId !== undefined ? { ...response, message_id: messageId } : response;
-					sender.postMessage(responseWithId);
-				})
-				.catch((error) => {
-					console.error('Error responding to message', error);
-					const errorResponse = { success: false, error: String(error) };
-					const errorWithId =
-						messageId !== undefined
-							? { ...errorResponse, message_id: messageId }
-							: errorResponse;
-					sender.postMessage(errorWithId);
-				});
+			console.warn('Unknown action:', frame.action);
+			const errorFrame: Frame = {
+				kind: 'response',
+				id: frame.id,
+				action: frame.action,
+				event: '',
+				payload: undefined,
+				ok: false,
+			};
+			sender.postMessage(errorFrame);
 			break;
 	}
 	return true;
