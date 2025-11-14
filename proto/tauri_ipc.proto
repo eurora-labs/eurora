@@ -7,7 +7,8 @@ service TauriIPC {
 
 message Payload {
     string kind = 1;
-    bytes content = 2;
+    // JSON-encoded string
+    string content = 2;
 }
 
 message Frame {
