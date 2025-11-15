@@ -5,7 +5,7 @@ use eur_native_messaging::PORT;
 use specta_typescript::BigIntExportBehavior;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 // use eur_native_messaging::server_o;
-use eur_native_messaging::server_n::{self, Frame};
+use eur_native_messaging::server::{self, Frame};
 use tokio::sync::{broadcast, mpsc};
 use tonic::transport::Server;
 use tracing::{debug, error, info};
@@ -300,7 +300,7 @@ async fn main() -> Result<()> {
     };
 
     // gRPC server
-    let ipc_server = server_n::IpcService {
+    let ipc_server = server::IpcService {
         chrome_tx,
         chrome_from_tx,
     };
@@ -313,7 +313,7 @@ async fn main() -> Result<()> {
             .unwrap();
         info!("Starting gRPC server at {}", addr);
         if let Err(e) = Server::builder()
-            .add_service(server_n::TauriIpcServer::new(ipc_server))
+            .add_service(server::TauriIpcServer::new(ipc_server))
             .serve(addr)
             .await
         {
