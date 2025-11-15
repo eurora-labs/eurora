@@ -4,6 +4,21 @@ import { NativeMetadata } from '../content/bindings.js';
 
 const lastUrl = new Map();
 
+// Frame protocol types matching the proto definition
+interface Payload {
+	kind: string;
+	content: string; // JSON-encoded string
+}
+
+interface Frame {
+	kind: string;
+	id: number;
+	action: string;
+	event: string;
+	payload?: Payload;
+	ok: boolean;
+}
+
 function isRealWebUrl(url: string): boolean {
 	if (!url || typeof url !== 'string') return false;
 	if (!/^https?:\/\//i.test(url)) return false;
@@ -22,13 +37,27 @@ export async function onUpdated(
 			console.log(`[URL Changed] ${changeInfo.url}`);
 			lastUrl.set(tabId, changeInfo.url);
 
-			nativePort.postMessage({
+			const metadata = {
 				kind: 'NativeMetadata',
 				data: {
 					url: changeInfo.url,
 					icon_base64: await getCurrentTabIcon(tab),
 				} as NativeMetadata,
-			});
+			};
+
+			const frame: Frame = {
+				kind: 'event',
+				id: 0,
+				action: '',
+				event: 'tab_updated',
+				payload: {
+					kind: 'NativeMetadata',
+					content: JSON.stringify(metadata),
+				},
+				ok: true,
+			};
+
+			nativePort.postMessage(frame);
 		}
 	}
 }
@@ -40,13 +69,28 @@ export async function onActivated(tabId: number, nativePort: browser.Runtime.Por
 		const url = tab.url;
 		if (!url || !isRealWebUrl(url)) return;
 		console.log(`[Tab Activated] ${url}`);
-		nativePort.postMessage({
+
+		const metadata = {
 			kind: 'NativeMetadata',
 			data: {
 				url,
 				icon_base64: await getCurrentTabIcon(tab),
 			} as NativeMetadata,
-		});
+		};
+
+		const frame: Frame = {
+			kind: 'event',
+			id: 0,
+			action: '',
+			event: 'tab_activated',
+			payload: {
+				kind: 'NativeMetadata',
+				content: JSON.stringify(metadata),
+			},
+			ok: true,
+		};
+
+		nativePort.postMessage(frame);
 	} catch (error) {
 		console.error(error);
 	}
