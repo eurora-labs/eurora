@@ -3,21 +3,7 @@
 import { handleMessage } from '@eurora/browser-shared/background/messaging';
 import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
 import { onUpdated, onActivated } from '@eurora/browser-shared/background/focus-tracker';
-
-// Frame protocol types matching the proto definition
-interface Payload {
-	kind: string;
-	content: string; // JSON-encoded string
-}
-
-interface Frame {
-	kind: string;
-	id: number;
-	action: string;
-	event: string;
-	payload?: Payload;
-	ok: boolean;
-}
+import { Frame } from '@eurora/browser-shared/content/bindings';
 
 let nativePort: chrome.runtime.Port | null = null;
 
