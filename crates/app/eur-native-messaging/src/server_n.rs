@@ -1,8 +1,8 @@
 use futures::Stream;
-use std::{net::ToSocketAddrs, pin::Pin};
+use std::pin::Pin;
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{Request, Response, Status, transport::Server};
+use tonic::{Request, Response, Status};
 use tracing::info;
 
 mod proto {
