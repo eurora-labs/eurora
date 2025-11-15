@@ -129,8 +129,8 @@ async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
 		case 'get_assets':
 			try {
 				// Handle assets request using the existing handleMessage
-				const response = await handleMessage('GET_ASSETS');
-				console.log('Finished responding to get_assets');
+				const response = await handleMessage('GENERATE_ASSETS');
+				console.log('Finished responding to get_assets: ', response);
 
 				const responseFrame: Frame = {
 					kind: 'response',
