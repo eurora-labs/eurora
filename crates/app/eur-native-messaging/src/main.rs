@@ -2,6 +2,7 @@ use std::{env, fs::File, net::ToSocketAddrs, process};
 
 use anyhow::{Context, Result, anyhow};
 use eur_native_messaging::PORT;
+use specta_typescript::BigIntExportBehavior;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 // use eur_native_messaging::server_o;
 use eur_native_messaging::server_n::{self, Frame};
@@ -170,12 +171,15 @@ fn ensure_single_instance() -> Result<()> {
 fn generate_typescript_definitions() -> Result<()> {
     use specta_typescript::Typescript;
 
-    Typescript::default()
+    if let Err(e) = Typescript::default()
+        .bigint(BigIntExportBehavior::BigInt)
         .export_to(
             "packages/browser-shared/src/content/bindings.ts",
             &specta::export(),
         )
-        .unwrap();
+    {
+        debug!("Failed to generate TypeScript definitions: {}", e);
+    }
 
     Ok(())
 }
@@ -225,14 +229,6 @@ where
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Check for command line arguments
-    let args: Vec<String> = env::args().collect();
-
-    // Handle the generate_specta argument
-    if args.len() > 1 && args[1] == "--generate_specta" {
-        return generate_typescript_definitions();
-    }
-
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
         .parse_lossy("eur_=trace,hyper=off,tokio=off"); // keep yours, silence deps
@@ -242,6 +238,14 @@ async fn main() -> Result<()> {
         .with_env_filter(filter.clone())
         .with_writer(File::create("eur-native-messaging.log")?)
         .init();
+
+    // Check for command line arguments
+    let args: Vec<String> = env::args().collect();
+
+    // Handle the generate_specta argument
+    if args.len() > 1 && args[1] == "--generate_specta" {
+        return generate_typescript_definitions();
+    }
 
     // Ensure only one instance is running
     ensure_single_instance()?;
