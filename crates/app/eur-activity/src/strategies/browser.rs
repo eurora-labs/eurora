@@ -1,19 +1,17 @@
 //! Browser strategy implementation for the refactored activity system
 
-use super::server::{ensure_grpc_server_running, get_server};
 pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
-use eur_native_messaging::server_n::{Frame, Payload};
-use eur_native_messaging::{Channel, NativeMessage, TauriIpcClient, create_grpc_ipc_client};
+use eur_native_messaging::server_n::Frame;
+use eur_native_messaging::{NativeMessage, create_grpc_ipc_client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::broadcast;
 use tokio::sync::{Mutex, mpsc, oneshot};
-use tonic::Streaming;
 use tracing::{debug, error, warn};
 use url::Url;
 
@@ -29,8 +27,6 @@ use crate::{
 /// Browser strategy for collecting web browser activity data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserStrategy {
-    #[serde(skip)]
-    client: Option<TauriIpcClient<Channel>>,
     #[serde(skip)]
     tracking_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
     #[serde(skip)]
@@ -56,7 +52,7 @@ impl BrowserStrategy {
         let activity_event_tx = broadcast::channel(100).0;
 
         // Try to create the IPC client and initialize bidirectional stream
-        let (client, stream_tx, pending_requests, request_id_counter, stream_task_handle) =
+        let (_client, stream_tx, pending_requests, request_id_counter, stream_task_handle) =
             match create_grpc_ipc_client().await {
                 Ok(mut client) => {
                     debug!("Successfully created IPC client for browser strategy");
@@ -90,8 +86,11 @@ impl BrowserStrategy {
                                     // Match response to pending request
                                     let mut pending = pending_requests_clone.lock().await;
                                     if let Some(sender) = pending.remove(&frame.id) {
-                                        if let Err(_) = sender.send(frame) {
-                                            warn!("Failed to send frame to waiting request");
+                                        if let Err(err) = sender.send(frame) {
+                                            warn!(
+                                                "Failed to send frame to waiting request: {:?}",
+                                                err
+                                            );
                                         }
                                     } else {
                                         debug!(
@@ -132,7 +131,6 @@ impl BrowserStrategy {
             };
 
         Ok(Self {
-            client,
             tracking_handle: None,
             sender: None,
             stream_tx,
@@ -184,14 +182,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
         debug!("Browser strategy starting tracking for: {:?}", process_name);
 
-        // Clone process_name before using it to avoid borrow issues
-        // Ensure the gRPC server is running
-        ensure_grpc_server_running().await;
-
-        // Get the server and subscribe to activity events
-        let server = get_server();
         let mut activity_receiver = self.activity_event_tx.clone().unwrap().subscribe();
-        let default_icon = focus_window.icon.clone();
+        let _default_icon = focus_window.icon.clone();
         let mut strategy = self.clone();
         let last_url: Arc<Mutex<Option<Url>>> = Arc::new(Mutex::new(None));
 
@@ -304,10 +296,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         }
 
         // Clean up stream task
-        if let Some(handle) = self.stream_task_handle.take() {
-            if let Ok(handle) = Arc::try_unwrap(handle) {
-                handle.abort();
-            }
+        if let Some(handle) = self.stream_task_handle.take()
+            && let Ok(handle) = Arc::try_unwrap(handle)
+        {
+            handle.abort();
         }
 
         Ok(())
