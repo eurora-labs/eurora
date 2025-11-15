@@ -32,7 +32,7 @@ async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
 	console.log('Received frame:', frame);
 
 	switch (frame.action) {
-		case 'get_metadata':
+		case 'GET_METADATA':
 			try {
 				const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 				const iconBase64 = await getCurrentTabIcon(activeTab);
@@ -72,51 +72,11 @@ async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
 				sender.postMessage(errorFrame);
 			}
 			break;
-
-		case 'get_icon':
-			try {
-				const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-				const iconBase64 = await getCurrentTabIcon(activeTab);
-
-				const responseData = {
-					kind: 'NativeIcon',
-					data: {
-						base64: iconBase64,
-					},
-				};
-
-				const responseFrame: Frame = {
-					kind: 'response',
-					id: frame.id,
-					action: frame.action,
-					event: '',
-					payload: {
-						kind: 'NativeIcon',
-						content: JSON.stringify(responseData),
-					},
-					ok: true,
-				};
-
-				sender.postMessage(responseFrame);
-			} catch (error) {
-				console.error('Error getting tab icon:', error);
-				const errorFrame: Frame = {
-					kind: 'response',
-					id: frame.id,
-					action: frame.action,
-					event: '',
-					payload: undefined,
-					ok: false,
-				};
-				sender.postMessage(errorFrame);
-			}
-			break;
-
-		case 'get_assets':
+		default:
 			try {
 				// Handle assets request using the existing handleMessage
-				const response = await handleMessage('GENERATE_ASSETS');
-				console.log('Finished responding to get_assets: ', response);
+				const response = await handleMessage(frame.action);
+				console.log('Finished responding to ', frame.action, ': ', response);
 
 				const responseFrame: Frame = {
 					kind: 'response',
@@ -132,7 +92,7 @@ async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
 
 				sender.postMessage(responseFrame);
 			} catch (error) {
-				console.error('Error responding to get_assets', error);
+				console.error('Error responding to ', frame.action, ': ', error);
 				const errorFrame: Frame = {
 					kind: 'response',
 					id: frame.id,
@@ -143,19 +103,6 @@ async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
 				};
 				sender.postMessage(errorFrame);
 			}
-			break;
-
-		default:
-			console.warn('Unknown action:', frame.action);
-			const errorFrame: Frame = {
-				kind: 'response',
-				id: frame.id,
-				action: frame.action,
-				event: '',
-				payload: undefined,
-				ok: false,
-			};
-			sender.postMessage(errorFrame);
 			break;
 	}
 	return true;
