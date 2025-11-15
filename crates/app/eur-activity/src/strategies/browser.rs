@@ -4,7 +4,7 @@ pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
-use eur_native_messaging::server_n::Frame;
+use eur_native_messaging::server::Frame;
 use eur_native_messaging::{NativeMessage, create_grpc_ipc_client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -16,7 +16,6 @@ use tracing::{debug, error, warn};
 use url::Url;
 
 use crate::strategies::{ActivityReport, StrategyMetadata};
-use eur_native_messaging::NativeIcon;
 
 use crate::{
     Activity, ActivityError,
@@ -309,7 +308,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
-        let response_frame = self.send_request("request", "get_assets").await?;
+        let response_frame = self.send_request("request", "GENERATE_ASSETS").await?;
 
         if !response_frame.ok {
             warn!("Failed to retrieve assets: request failed");
@@ -383,7 +382,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         debug!("Retrieving metadata for browser strategy");
 
-        let response_frame = self.send_request("request", "get_metadata").await?;
+        let response_frame = self.send_request("request", "GET_METADATA").await?;
 
         if !response_frame.ok {
             warn!("Failed to retrieve metadata: request failed");
@@ -484,31 +483,6 @@ impl BrowserStrategy {
                 Err(ActivityError::invalid_data("Request timeout"))
             }
         }
-    }
-
-    async fn _get_icon(&mut self) -> ActivityResult<NativeIcon> {
-        debug!("Retrieving icon for browser strategy");
-
-        let response_frame = self.send_request("request", "get_icon").await?;
-
-        if !response_frame.ok {
-            warn!("Failed to retrieve icon: request failed");
-            return Ok(NativeIcon::default());
-        }
-
-        let Some(payload) = response_frame.payload else {
-            warn!("No payload in icon response");
-            return Ok(NativeIcon::default());
-        };
-
-        let native_metadata = serde_json::from_str::<NativeMessage>(&payload.content)
-            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
-
-        let metadata = match native_metadata {
-            NativeMessage::NativeIcon(metadata) => metadata,
-            _ => NativeIcon::default(),
-        };
-        Ok(metadata)
     }
 }
 
