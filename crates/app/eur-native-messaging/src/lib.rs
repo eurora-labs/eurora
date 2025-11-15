@@ -1,13 +1,11 @@
 use anyhow::Result;
-// pub use eur_proto::ipc::tauri_ipc_client::TauriIpcClient;
 pub use tonic::transport::Channel;
 
-// pub mod server_o;
-pub mod server_n;
+pub mod server;
 pub mod types;
 pub mod utils;
 
-pub use server_n::TauriIpcClient;
+pub use server::TauriIpcClient;
 
 // pub use server_o::IncomingMessage;
 pub use types::*;
