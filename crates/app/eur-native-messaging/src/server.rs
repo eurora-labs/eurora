@@ -6,17 +6,17 @@ use tonic::{Request, Response, Status};
 use tracing::info;
 
 mod proto {
-    tonic::include_proto!("ipc");
+    tonic::include_proto!("browser_bridge");
 }
 
 pub use proto::{
     Frame, Payload,
-    tauri_ipc_client::TauriIpcClient,
-    tauri_ipc_server::{TauriIpc, TauriIpcServer},
+    browser_bridge_client::BrowserBridgeClient,
+    browser_bridge_server::{BrowserBridge, BrowserBridgeServer},
 };
 
 #[derive(Clone)]
-pub struct IpcService {
+pub struct BrowserBridgeService {
     /// Frames going to Chrome (native writer)
     pub chrome_tx: mpsc::UnboundedSender<Frame>,
     /// Frames coming from Chrome (broadcast to all gRPC clients)
@@ -24,7 +24,7 @@ pub struct IpcService {
 }
 
 #[tonic::async_trait]
-impl TauriIpc for IpcService {
+impl BrowserBridge for BrowserBridgeService {
     type OpenStream = Pin<Box<dyn Stream<Item = Result<Frame, Status>> + Send + 'static>>;
 
     async fn open(
