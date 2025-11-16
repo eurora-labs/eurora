@@ -4,10 +4,10 @@ pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
+use dashmap::DashMap;
 use eur_native_messaging::server::Frame;
 use eur_native_messaging::{NativeMessage, create_browser_bridge_client};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::broadcast;
@@ -16,6 +16,32 @@ use tracing::{debug, error, warn};
 use url::Url;
 
 use crate::strategies::{ActivityReport, StrategyMetadata};
+
+/// Wrapper for pending request sender
+struct PendingRequest {
+    sender: oneshot::Sender<Frame>,
+}
+
+impl std::fmt::Debug for PendingRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PendingRequest")
+            .field("sender", &"oneshot::Sender<Frame>")
+            .finish()
+    }
+}
+
+impl PendingRequest {
+    fn new(sender: oneshot::Sender<Frame>) -> Self {
+        Self { sender }
+    }
+
+    fn send(self, frame: Frame) -> Result<(), ()> {
+        if self.sender.send(frame).is_err() {
+            error!("Failed to send frame to waiting request");
+        }
+        Ok(())
+    }
+}
 
 use crate::{
     Activity, ActivityError,
@@ -35,7 +61,7 @@ pub struct BrowserStrategy {
     #[serde(skip)]
     stream_tx: Option<mpsc::UnboundedSender<Frame>>,
     #[serde(skip)]
-    pending_requests: Option<Arc<Mutex<HashMap<u64, oneshot::Sender<Frame>>>>>,
+    pending_requests: Option<Arc<DashMap<u64, PendingRequest>>>,
     #[serde(skip)]
     request_id_counter: Option<Arc<AtomicU64>>,
     #[serde(skip)]
@@ -58,8 +84,7 @@ impl BrowserStrategy {
 
                     // Initialize bidirectional stream
                     let (tx, rx) = mpsc::unbounded_channel::<Frame>();
-                    let pending_requests =
-                        Arc::new(Mutex::new(HashMap::<u64, oneshot::Sender<Frame>>::new()));
+                    let pending_requests = Arc::new(DashMap::<u64, PendingRequest>::new());
                     let request_id_counter = Arc::new(AtomicU64::new(1));
 
                     let pending_requests_clone = Arc::clone(&pending_requests);
@@ -83,9 +108,10 @@ impl BrowserStrategy {
                                     );
 
                                     // Match response to pending request
-                                    let mut pending = pending_requests_clone.lock().await;
-                                    if let Some(sender) = pending.remove(&frame.id) {
-                                        if let Err(err) = sender.send(frame) {
+                                    if let Some((_, pending_request)) =
+                                        pending_requests_clone.remove(&frame.id)
+                                    {
+                                        if let Err(err) = pending_request.send(frame) {
                                             warn!(
                                                 "Failed to send frame to waiting request: {:?}",
                                                 err
@@ -441,10 +467,7 @@ impl BrowserStrategy {
         let (tx, rx) = oneshot::channel();
 
         // Register pending request
-        {
-            let mut pending = pending_requests.lock().await;
-            pending.insert(request_id, tx);
-        }
+        pending_requests.insert(request_id, PendingRequest::new(tx));
 
         // Create and send request frame
         let request_frame = Frame {
@@ -478,8 +501,7 @@ impl BrowserStrategy {
             Err(_) => {
                 error!("Timeout waiting for response to request {}", request_id);
                 // Clean up pending request on timeout
-                let mut pending = pending_requests.lock().await;
-                pending.remove(&request_id);
+                pending_requests.remove(&request_id);
                 Err(ActivityError::invalid_data("Request timeout"))
             }
         }
