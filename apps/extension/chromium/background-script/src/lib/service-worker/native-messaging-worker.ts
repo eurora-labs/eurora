@@ -11,14 +11,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 	if (!nativePort) return;
 
 	await onUpdated(tabId, changeInfo, tab, nativePort);
-	return true;
 });
 
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
 	if (!nativePort) return;
 
 	await onActivated(activeInfo.tabId, nativePort);
-	return true;
 });
 
 async function connect() {
