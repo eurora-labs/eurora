@@ -215,7 +215,7 @@ pub fn generate_typescript_definitions() -> Result<()> {
     use specta_typescript::Typescript;
 
     if let Err(e) = Typescript::default()
-        .bigint(BigIntExportBehavior::BigInt)
+        .bigint(BigIntExportBehavior::Fail)
         .export_to(
             "packages/browser-shared/src/content/bindings.ts",
             &specta::export(),
