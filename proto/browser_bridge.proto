@@ -13,7 +13,7 @@ message Payload {
 
 message Frame {
     string kind = 1;
-    uint64 id = 2;
+    uint32 id = 2;
     string action = 3;
     string event = 4;
     Payload payload = 5;
