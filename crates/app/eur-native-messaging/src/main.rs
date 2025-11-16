@@ -300,7 +300,7 @@ async fn main() -> Result<()> {
     };
 
     // gRPC server
-    let ipc_server = server::IpcService {
+    let ipc_server = server::BrowserBridgeService {
         chrome_tx,
         chrome_from_tx,
     };
@@ -311,9 +311,11 @@ async fn main() -> Result<()> {
             .unwrap()
             .next()
             .unwrap();
+
         info!("Starting gRPC server at {}", addr);
+
         if let Err(e) = Server::builder()
-            .add_service(server::TauriIpcServer::new(ipc_server))
+            .add_service(server::BrowserBridgeServer::new(ipc_server))
             .serve(addr)
             .await
         {
@@ -321,123 +323,6 @@ async fn main() -> Result<()> {
         }
         info!("gRPC server ended");
     });
-
-    // // Create the gRPC server with channels for both unsolicited and response messages
-    // let (grpc_server, native_tx, stdin_tx) = server_n::TauriIpcServer::new().await;
-    // let server_clone = grpc_server.clone();
-
-    // // Start background task to read from stdin and route messages
-    // tokio::spawn(async move {
-    //     use eur_native_messaging::server_n::IncomingMessage;
-    //     use eur_native_messaging::types::{ChromeMessage, NativeMessage};
-    //     use serde_json::Value;
-    //     use tokio::io::{AsyncReadExt, stdin};
-
-    //     let mut stdin = stdin();
-    //     loop {
-    //         // Read message size (4 bytes)
-    //         let mut size_bytes = [0u8; 4];
-    //         if let Err(e) = stdin.read_exact(&mut size_bytes).await {
-    //             debug!(
-    //                 "Failed to read message size from stdin: {}, exiting stdin reader",
-    //                 e
-    //             );
-    //             break;
-    //         }
-
-    //         let message_size = u32::from_ne_bytes(size_bytes) as usize;
-
-    //         // Read message body
-    //         let mut buffer = vec![0u8; message_size];
-    //         if let Err(e) = stdin.read_exact(&mut buffer).await {
-    //             debug!(
-    //                 "Failed to read message body from stdin: {}, exiting stdin reader",
-    //                 e
-    //             );
-    //             break;
-    //         }
-
-    //         // Parse as generic JSON to check for message_id
-    //         match serde_json::from_slice::<Value>(&buffer) {
-    //             Ok(json_value) => {
-    //                 // Check if this is a response (has message_id) or unsolicited message
-    //                 if let Some(message_id) = json_value.get("message_id").and_then(|v| v.as_u64())
-    //                 {
-    //                     // This is a response to a command - extract the data
-    //                     debug!("Received response with message_id: {}", message_id);
-
-    //                     // Try to parse the inner data as NativeMessage
-    //                     if let Ok(native_message) =
-    //                         serde_json::from_value::<NativeMessage>(json_value.clone())
-    //                     {
-    //                         let incoming = IncomingMessage::Response {
-    //                             message_id,
-    //                             data: native_message,
-    //                         };
-
-    //                         if stdin_tx.send(incoming).await.is_err() {
-    //                             debug!("Failed to send response to channel, receiver dropped");
-    //                             break;
-    //                         }
-    //                     } else {
-    //                         debug!("Failed to parse response data as NativeMessage");
-    //                         if let Ok(raw_str) = serde_json::to_string_pretty(&json_value) {
-    //                             debug!("Raw JSON: {}", raw_str);
-    //                         }
-    //                     }
-    //                 } else {
-    //                     // No message_id, treat as unsolicited message
-    //                     debug!("Received unsolicited message (no message_id)");
-
-    //                     if let Ok(chrome_message) =
-    //                         serde_json::from_value::<ChromeMessage>(json_value.clone())
-    //                     {
-    //                         let incoming = IncomingMessage::Unsolicited(chrome_message);
-
-    //                         if stdin_tx.send(incoming).await.is_err() {
-    //                             debug!(
-    //                                 "Failed to send unsolicited message to channel, receiver dropped"
-    //                             );
-    //                             break;
-    //                         }
-    //                     } else {
-    //                         debug!("Failed to parse as ChromeMessage");
-    //                         if let Ok(raw_str) = serde_json::to_string_pretty(&json_value) {
-    //                             debug!("Raw JSON: {}", raw_str);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //             Err(e) => {
-    //                 debug!("Failed to parse JSON from stdin: {}", e);
-    //                 if let Ok(raw_str) = String::from_utf8(buffer.clone()) {
-    //                     debug!("Raw message: {}", raw_str);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // });
-
-    // // Start the gRPC server
-    // tokio::spawn(async move {
-    //     Server::builder()
-    //         // Use the server module's implementation directly
-    //         .add_service(eur_proto::ipc::tauri_ipc_server::TauriIpcServer::new(
-    //             grpc_server,
-    //         ))
-    //         .serve(
-    //             format!("[::1]:{}", PORT)
-    //                 .to_socket_addrs()
-    //                 .unwrap()
-    //                 .next()
-    //                 .unwrap(),
-    //         )
-    //         .await
-    //         .unwrap();
-    // });
-
-    // // Handle stdio in the main thread
-    // server_clone.handle_stdio().await?;
 
     tokio::select! {
         _ = writer_handle => {
