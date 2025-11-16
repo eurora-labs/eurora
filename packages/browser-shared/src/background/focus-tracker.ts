@@ -1,23 +1,8 @@
 import { getCurrentTabIcon } from './tabs.js';
 import browser from 'webextension-polyfill';
-import { NativeMetadata } from '../content/bindings.js';
+import { NativeMetadata, Frame, Payload } from '../content/bindings.js';
 
 const lastUrl = new Map();
-
-// Frame protocol types matching the proto definition
-interface Payload {
-	kind: string;
-	content: string; // JSON-encoded string
-}
-
-interface Frame {
-	kind: string;
-	id: number;
-	action: string;
-	event: string;
-	payload?: Payload;
-	ok: boolean;
-}
 
 function isRealWebUrl(url: string): boolean {
 	if (!url || typeof url !== 'string') return false;
@@ -31,16 +16,18 @@ export async function onUpdated(
 	tab: browser.Tabs.Tab,
 	nativePort: browser.Runtime.Port,
 ): Promise<void> {
-	if (typeof changeInfo.url === 'string' && isRealWebUrl(changeInfo.url)) {
+	if (changeInfo.status !== 'complete') return;
+
+	if (typeof tab.url === 'string' && isRealWebUrl(tab.url)) {
 		const prev = lastUrl.get(tabId);
-		if (prev !== changeInfo.url) {
-			console.log(`[URL Changed] ${changeInfo.url}`);
-			lastUrl.set(tabId, changeInfo.url);
+		if (prev !== tab.url) {
+			console.log(`[URL Changed] ${tab.url}`);
+			lastUrl.set(tabId, tab.url);
 
 			const metadata = {
 				kind: 'NativeMetadata',
 				data: {
-					url: changeInfo.url,
+					url: tab.url,
 					icon_base64: await getCurrentTabIcon(tab),
 				} as NativeMetadata,
 			};

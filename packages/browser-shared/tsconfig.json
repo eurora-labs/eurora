@@ -2,8 +2,8 @@
 	"compilerOptions": {
 		"module": "NodeNext",
 		"moduleResolution": "nodenext",
-		"target": "ES6",
-		"lib": ["ES6", "DOM"],
+		"target": "ES2024",
+		"lib": ["ES2024", "DOM"],
 		"types": ["chrome", "vite/client", "webextension-polyfill"],
 		"strict": true,
 		"skipLibCheck": true,

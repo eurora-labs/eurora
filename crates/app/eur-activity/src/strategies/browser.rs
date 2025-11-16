@@ -9,7 +9,7 @@ use eur_native_messaging::server::Frame;
 use eur_native_messaging::{NativeMessage, create_browser_bridge_client};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::broadcast;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::{debug, error, warn};
@@ -61,9 +61,9 @@ pub struct BrowserStrategy {
     #[serde(skip)]
     stream_tx: Option<mpsc::UnboundedSender<Frame>>,
     #[serde(skip)]
-    pending_requests: Option<Arc<DashMap<u64, PendingRequest>>>,
+    pending_requests: Option<Arc<DashMap<u32, PendingRequest>>>,
     #[serde(skip)]
-    request_id_counter: Option<Arc<AtomicU64>>,
+    request_id_counter: Option<Arc<AtomicU32>>,
     #[serde(skip)]
     stream_task_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 
@@ -84,8 +84,8 @@ impl BrowserStrategy {
 
                     // Initialize bidirectional stream
                     let (tx, rx) = mpsc::unbounded_channel::<Frame>();
-                    let pending_requests = Arc::new(DashMap::<u64, PendingRequest>::new());
-                    let request_id_counter = Arc::new(AtomicU64::new(1));
+                    let pending_requests = Arc::new(DashMap::<u32, PendingRequest>::new());
+                    let request_id_counter = Arc::new(AtomicU32::new(1));
 
                     let pending_requests_clone = Arc::clone(&pending_requests);
 
@@ -190,11 +190,12 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
         match self.get_metadata().await {
             Ok(metadata) => {
+                let assets = self.retrieve_assets().await.unwrap_or(vec![]);
                 let activity = Activity::new(
                     metadata.url.unwrap_or_default(),
                     metadata.icon,
                     process_name.clone().unwrap_or_default(),
-                    vec![],
+                    assets,
                 );
                 if sender.send(ActivityReport::NewActivity(activity)).is_err() {
                     warn!("Failed to send new activity report - receiver dropped");
