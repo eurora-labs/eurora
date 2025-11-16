@@ -6,7 +6,7 @@
 use dotenv::dotenv;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_encrypt::MainKey;
-use eur_native_messaging::create_grpc_ipc_client;
+use eur_native_messaging::create_browser_bridge_client;
 use eur_personal_db::{Activity, PersonalDatabaseManager};
 use eur_settings::AppSettings;
 use eur_tauri::launcher::{monitor_cursor_for_hover, toggle_launcher_window};
@@ -435,7 +435,7 @@ fn main() {
                     // Initialize IPC client
                     let ipc_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        match create_grpc_ipc_client().await {
+                        match create_browser_bridge_client().await {
                             Ok(ipc_client) => {
                                 ipc_handle.manage(ipc_client.clone());
                                 debug!("gRPC IPC client initialized");
