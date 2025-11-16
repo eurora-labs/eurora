@@ -5,7 +5,7 @@ pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use eur_native_messaging::server::Frame;
-use eur_native_messaging::{NativeMessage, create_grpc_ipc_client};
+use eur_native_messaging::{NativeMessage, create_browser_bridge_client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -52,7 +52,7 @@ impl BrowserStrategy {
 
         // Try to create the IPC client and initialize bidirectional stream
         let (_client, stream_tx, pending_requests, request_id_counter, stream_task_handle) =
-            match create_grpc_ipc_client().await {
+            match create_browser_bridge_client().await {
                 Ok(mut client) => {
                     debug!("Successfully created IPC client for browser strategy");
 
