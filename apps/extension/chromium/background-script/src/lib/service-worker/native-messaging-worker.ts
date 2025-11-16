@@ -7,6 +7,19 @@ import { Frame } from '@eurora/browser-shared/content/bindings';
 
 let nativePort: chrome.runtime.Port | null = null;
 
+function addBase64Prefix(base64: string) {
+	const head = base64.substring(0, 6);
+	switch (head) {
+		case 'PHN2Zy':
+			return `data:image/svg+xml;base64,${base64}`;
+		case 'CiAgPH':
+			return `data:image/svg+xml;base64,${base64.substring(4)}`;
+
+		default:
+			return base64;
+	}
+}
+
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 	if (!nativePort) return;
 
@@ -33,7 +46,7 @@ async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
 		case 'GET_METADATA':
 			try {
 				const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-				const iconBase64 = await getCurrentTabIcon(activeTab);
+				const iconBase64 = addBase64Prefix(await getCurrentTabIcon(activeTab));
 				console.log('Tab metadata:', { url: activeTab.url, icon_base64: iconBase64 });
 
 				const responseData = {
