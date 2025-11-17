@@ -7,6 +7,8 @@ pub mod utils;
 
 pub use server::BrowserBridgeClient;
 
+pub const MAX_FRAME_SIZE: usize = 8 * 1024 * 1024;
+
 // pub use server_o::IncomingMessage;
 pub use types::*;
 
