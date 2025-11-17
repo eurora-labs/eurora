@@ -1,7 +1,6 @@
 import { getCurrentTabIcon } from './tabs.js';
 import browser from 'webextension-polyfill';
 import { NativeMetadata, Frame } from '../content/bindings.js';
-import { FrameKindToIndex, FrameEndpointToIndex } from '../content/util.js';
 
 const lastUrl = new Map();
 
@@ -34,16 +33,9 @@ export async function onUpdated(
 			};
 
 			const frame: Frame = {
-				id: 0,
-				kind: FrameKindToIndex.Event,
-				source: FrameEndpointToIndex.Browser,
-				target: FrameEndpointToIndex.Tauri,
+				id: { Event: 0 },
 				command: 'TAB_UPDATED',
-				payload: {
-					kind: 'NativeMetadata',
-					content: JSON.stringify(metadata),
-				},
-				metadata: null,
+				payload: JSON.stringify(metadata),
 			};
 
 			nativePort.postMessage(frame);
@@ -68,16 +60,9 @@ export async function onActivated(tabId: number, nativePort: browser.Runtime.Por
 		};
 
 		const frame: Frame = {
-			id: 0,
-			kind: FrameKindToIndex.Event,
-			source: FrameEndpointToIndex.Browser,
-			target: FrameEndpointToIndex.Tauri,
+			id: { Event: 0 },
 			command: 'TAB_ACTIVATED',
-			payload: {
-				kind: 'NativeMetadata',
-				content: JSON.stringify(metadata),
-			},
-			metadata: null,
+			payload: JSON.stringify(metadata),
 		};
 
 		nativePort.postMessage(frame);
