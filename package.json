@@ -67,7 +67,7 @@
 		"svelte-eslint-parser": "^1.4.0",
 		"tailwindcss": "catalog:",
 		"ts-proto": "^2.8.3",
-		"turbo": "^2.6.0",
+		"turbo": "^2.6.1",
 		"web-ext": "^8.10.0"
 	},
 	"packageManager": "pnpm@10.21.0",
