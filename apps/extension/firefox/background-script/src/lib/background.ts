@@ -2,7 +2,6 @@ import { handleMessage } from '@eurora/browser-shared/background/messaging';
 import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
 import { onUpdated, onActivated } from '@eurora/browser-shared/background/focus-tracker';
 import { Frame } from '@eurora/browser-shared/content/bindings';
-import { FrameKindToIndex } from '@eurora/browser-shared/content/util';
 
 console.log('Extension background services started');
 
@@ -50,6 +49,14 @@ function addBase64Prefix(base64: string) {
 async function onMessageListener(frame: Frame, sender: browser.runtime.Port) {
 	console.log('Received frame:', frame);
 
+	let frameId = 0;
+	// For now this is fine as Firefox doesn't send messages expecting a response
+	if ('Request' in frame.id) {
+		frameId = frame.id.Request;
+	} else {
+		throw new Error('Invalid frame ID: ' + frame.id);
+	}
+
 	switch (frame.command) {
 		case 'GET_METADATA':
 			try {
@@ -67,30 +74,21 @@ async function onMessageListener(frame: Frame, sender: browser.runtime.Port) {
 				};
 
 				const responseFrame: Frame = {
-					id: frame.id,
-					kind: FrameKindToIndex.Response,
-					source: frame.target,
-					target: frame.source,
+					id: { Response: frameId },
 					command: frame.command,
-					payload: {
-						kind: 'NativeMetadata',
-						content: JSON.stringify(responseData),
-					},
-					metadata: null,
+					payload: JSON.stringify(responseData),
 				};
 
 				sender.postMessage(responseFrame);
 			} catch (error) {
 				console.error('Error getting tab metadata:', error);
+
 				const errorFrame: Frame = {
-					id: frame.id,
-					kind: FrameKindToIndex.Response,
-					source: frame.target,
-					target: frame.source,
+					id: { Error: frameId },
 					command: frame.command,
 					payload: undefined,
-					metadata: null,
 				};
+
 				sender.postMessage(errorFrame);
 			}
 			break;
@@ -101,30 +99,21 @@ async function onMessageListener(frame: Frame, sender: browser.runtime.Port) {
 				console.log('Finished responding to ', frame.command, ': ', response);
 
 				const responseFrame: Frame = {
-					id: frame.id,
-					kind: FrameKindToIndex.Response,
-					source: frame.target,
-					target: frame.source,
+					id: { Response: frameId },
 					command: frame.command,
-					payload: {
-						kind: response.kind || 'unknown',
-						content: JSON.stringify(response),
-					},
-					metadata: null,
+					payload: JSON.stringify(response),
 				};
 
 				sender.postMessage(responseFrame);
 			} catch (error) {
 				console.error('Error responding to ', frame.command, ': ', error);
+
 				const errorFrame: Frame = {
-					id: frame.id,
-					kind: FrameKindToIndex.Response,
-					source: frame.target,
-					target: frame.source,
+					id: { Error: frameId },
 					command: frame.command,
 					payload: undefined,
-					metadata: null,
 				};
+
 				sender.postMessage(errorFrame);
 			}
 			break;
