@@ -10,7 +10,7 @@ mod proto {
 }
 
 pub use proto::{
-    Frame, FrameEndpoint, FrameKind, FramePayload,
+    Frame,
     browser_bridge_client::BrowserBridgeClient,
     browser_bridge_server::{BrowserBridge, BrowserBridgeServer},
 };
@@ -47,8 +47,8 @@ impl BrowserBridge for BrowserBridgeService {
                 match inbound.message().await {
                     Ok(Some(frame)) => {
                         info!(
-                            "Forwarding frame from gRPC client to Chrome: kind={:?} id={} command={}",
-                            frame.kind, frame.id, frame.command
+                            "Forwarding frame from gRPC client to Chrome: id={:?} command={}",
+                            frame.id, frame.command
                         );
                         if let Err(e) = chrome_tx.send(frame) {
                             info!("Error forwarding frame to Chrome: {e:?}");
@@ -75,8 +75,8 @@ impl BrowserBridge for BrowserBridgeService {
                 match chrome_from_rx.recv().await {
                     Ok(frame) => {
                         info!(
-                            "Forwarding frame from Chrome to gRPC client: kind={:?} id={} command={}",
-                            frame.kind, frame.id, frame.command
+                            "Forwarding frame from Chrome to gRPC client: id={:?} command={}",
+                            frame.id, frame.command
                         );
                         if let Err(e) = tx_to_client.send(Ok(frame)).await {
                             info!("Error forwarding frame to gRPC client: {e:?}");

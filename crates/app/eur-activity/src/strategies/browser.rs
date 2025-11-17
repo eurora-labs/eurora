@@ -5,7 +5,7 @@ pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use eur_native_messaging::server::{Frame, FrameEndpoint, FrameKind};
+use eur_native_messaging::server::Frame;
 use eur_native_messaging::{NativeMessage, create_browser_bridge_client};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -103,8 +103,8 @@ impl BrowserStrategy {
                                 debug!("Stream handler task started");
                                 while let Ok(Some(frame)) = inbound_stream.message().await {
                                     debug!(
-                                        "Received frame: kind={}, id={}, command={}",
-                                        frame.kind, frame.id, frame.command
+                                        "Received frame: id={:?}, command={}",
+                                        frame.id, frame.command
                                     );
 
                                     // Match response to pending request
