@@ -5,49 +5,18 @@ service BrowserBridge {
     rpc Open(stream Frame) returns (stream Frame);
 }
 
-enum FrameKind {
-    FRAME_KIND_UNSPECIFIED = 0;
-    FRAME_KIND_REQUEST = 1;
-    FRAME_KIND_RESPONSE = 2;
-    FRAME_KIND_EVENT = 3;
-    FRAME_KIND_ERROR = 4;
-    FRAME_KIND_CANCEL = 5;
-}
-
-enum FrameEndpoint {
-    FRAME_ENDPOINT_UNSPECIFIED = 0;
-    FRAME_ENDPOINT_BROWSER = 1;
-    FRAME_ENDPOINT_TAURI = 2;
-}
-
-message FramePayload {
-    string kind = 1;
-    // JSON-encoded string
-    string content = 2;
-}
-
-message ErrorPayload {
-    uint32 code = 1;
-    string message = 2;
-    bytes details = 3;
-}
-
-
 message Frame {
-    // Has to be uint32 in order to avoid Chrome serializer issues
-    uint32 id = 1;
-    FrameKind kind = 2;
-
-    FrameEndpoint source = 3;
-    FrameEndpoint target = 4;
-
-    // Decides which listener responds to this frame
-    string command = 5;
-
-    FramePayload payload = 6;
-
-    // Reserved for future
-    oneof metadata {
-        ErrorPayload error = 7;
+    // Each uint32 is the request id of the different type
+    oneof id {
+        uint32 Request = 1;
+        uint32 Response = 2;
+        uint32 Event = 3;
+        uint32 Error = 4;
+        uint32 Cancel = 5;
     }
+    // Decides which listener responds to this frame
+    string command = 6;
+
+    // JSON-encoded string
+    string payload = 7;
 }
