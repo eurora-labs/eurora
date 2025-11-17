@@ -1,13 +1,13 @@
+use crate::MAX_FRAME_SIZE;
 use crate::server::Frame;
-use anyhow::{Context, Result, anyhow};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
+use anyhow::{Context, Result, anyhow, bail};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use image::{ImageBuffer, Rgba};
 use resvg::render;
 use specta_typescript::BigIntExportBehavior;
 use std::process;
 use tiny_skia::Pixmap;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tracing::debug;
 use usvg::{Options, Tree};
 
@@ -229,7 +229,7 @@ pub fn generate_typescript_definitions() -> Result<()> {
 
 pub async fn read_framed<R>(reader: &mut R) -> anyhow::Result<Option<Frame>>
 where
-    R: AsyncReadExt + Unpin,
+    R: AsyncRead + Unpin,
 {
     let mut len_buf = [0u8; 4];
 
@@ -242,7 +242,21 @@ where
     }
 
     let len = u32::from_le_bytes(len_buf) as usize;
+    if len == 0 {
+        // Chrome native messaging always sends valid JSON; empty is invalid.
+        return Err(anyhow!("received empty frame (length = 0)"));
+    }
+
+    if len > MAX_FRAME_SIZE {
+        bail!(
+            "frame too large: {} bytes (limit {} bytes)",
+            len,
+            MAX_FRAME_SIZE
+        );
+    }
+
     let mut buf = vec![0u8; len];
+
     reader
         .read_exact(&mut buf)
         .await
@@ -255,17 +269,28 @@ where
 
 pub async fn write_framed<W>(writer: &mut W, frame: &Frame) -> anyhow::Result<()>
 where
-    W: AsyncWriteExt + Unpin,
+    W: AsyncWrite + Unpin,
 {
     let json = serde_json::to_vec(frame).context("serializing Frame to JSON")?;
-    let len = json.len() as u32;
+    let len = json.len();
+
+    if len > u32::MAX as usize {
+        bail!("frame too large: {} bytes (limit {} bytes)", len, u32::MAX);
+    }
+
+    let len = len as u32;
+    let len_bytes = len.to_le_bytes();
 
     writer
-        .write_all(&len.to_le_bytes())
+        .write_all(&len_bytes)
         .await
-        .context("writing length")?;
-    writer.write_all(&json).await.context("writing body")?;
-    writer.flush().await.context("flushing stdout")?;
+        .context("writing message length")?;
+
+    writer
+        .write_all(&json)
+        .await
+        .context("writing message body")?;
+    writer.flush().await.context("flushing stdout writer")?;
 
     Ok(())
 }
