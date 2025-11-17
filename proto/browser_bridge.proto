@@ -1,0 +1,21 @@
+syntax = "proto3";
+package browser_bridge;
+
+service BrowserBridge {
+    rpc Open(stream Frame) returns (stream Frame);
+}
+
+message Payload {
+    string kind = 1;
+    // JSON-encoded string
+    string content = 2;
+}
+
+message Frame {
+    string kind = 1;
+    uint32 id = 2;
+    string action = 3;
+    string event = 4;
+    Payload payload = 5;
+    bool ok = 6;
+}
