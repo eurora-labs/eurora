@@ -1,6 +1,6 @@
 import { getCurrentTabIcon } from './tabs.js';
 import browser from 'webextension-polyfill';
-import { NativeMetadata } from '../content/bindings.js';
+import { NativeMetadata, Frame, Payload } from '../content/bindings.js';
 
 const lastUrl = new Map();
 
@@ -16,19 +16,35 @@ export async function onUpdated(
 	tab: browser.Tabs.Tab,
 	nativePort: browser.Runtime.Port,
 ): Promise<void> {
-	if (typeof changeInfo.url === 'string' && isRealWebUrl(changeInfo.url)) {
-		const prev = lastUrl.get(tabId);
-		if (prev !== changeInfo.url) {
-			console.log(`[URL Changed] ${changeInfo.url}`);
-			lastUrl.set(tabId, changeInfo.url);
+	if (changeInfo.status !== 'complete') return;
 
-			nativePort.postMessage({
+	if (typeof tab.url === 'string' && isRealWebUrl(tab.url)) {
+		const prev = lastUrl.get(tabId);
+		if (prev !== tab.url) {
+			console.log(`[URL Changed] ${tab.url}`);
+			lastUrl.set(tabId, tab.url);
+
+			const metadata = {
 				kind: 'NativeMetadata',
 				data: {
-					url: changeInfo.url,
+					url: tab.url,
 					icon_base64: await getCurrentTabIcon(tab),
 				} as NativeMetadata,
-			});
+			};
+
+			const frame: Frame = {
+				kind: 'event',
+				id: 0,
+				action: '',
+				event: 'tab_updated',
+				payload: {
+					kind: 'NativeMetadata',
+					content: JSON.stringify(metadata),
+				},
+				ok: true,
+			};
+
+			nativePort.postMessage(frame);
 		}
 	}
 }
@@ -40,13 +56,28 @@ export async function onActivated(tabId: number, nativePort: browser.Runtime.Por
 		const url = tab.url;
 		if (!url || !isRealWebUrl(url)) return;
 		console.log(`[Tab Activated] ${url}`);
-		nativePort.postMessage({
+
+		const metadata = {
 			kind: 'NativeMetadata',
 			data: {
 				url,
 				icon_base64: await getCurrentTabIcon(tab),
 			} as NativeMetadata,
-		});
+		};
+
+		const frame: Frame = {
+			kind: 'event',
+			id: 0,
+			action: '',
+			event: 'tab_activated',
+			payload: {
+				kind: 'NativeMetadata',
+				content: JSON.stringify(metadata),
+			},
+			ok: true,
+		};
+
+		nativePort.postMessage(frame);
 	} catch (error) {
 		console.error(error);
 	}
