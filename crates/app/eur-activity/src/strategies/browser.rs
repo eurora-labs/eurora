@@ -5,7 +5,7 @@ pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use eur_native_messaging::server::Frame;
+use eur_native_messaging::server::{Frame, FrameEndpoint, FrameKind};
 use eur_native_messaging::{NativeMessage, create_browser_bridge_client};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -103,8 +103,8 @@ impl BrowserStrategy {
                                 debug!("Stream handler task started");
                                 while let Ok(Some(frame)) = inbound_stream.message().await {
                                     debug!(
-                                        "Received frame: kind={}, id={}, action={}",
-                                        frame.kind, frame.id, frame.action
+                                        "Received frame: kind={}, id={}, command={}",
+                                        frame.kind, frame.id, frame.command
                                     );
 
                                     // Match response to pending request
@@ -335,9 +335,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
-        let response_frame = self.send_request("request", "GENERATE_ASSETS").await?;
+        let response_frame = self
+            .send_request(FrameKind::Request, "GENERATE_ASSETS")
+            .await?;
 
-        if !response_frame.ok {
+        if response_frame.metadata.is_none() {
             warn!("Failed to retrieve assets: request failed");
             return Ok(vec![]);
         }
@@ -409,9 +411,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         debug!("Retrieving metadata for browser strategy");
 
-        let response_frame = self.send_request("request", "GET_METADATA").await?;
+        let response_frame = self
+            .send_request(FrameKind::Request, "GET_METADATA")
+            .await?;
 
-        if !response_frame.ok {
+        if response_frame.metadata.is_none() {
             warn!("Failed to retrieve metadata: request failed");
             return Ok(StrategyMetadata::default());
         }
@@ -445,7 +449,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
 impl BrowserStrategy {
     /// Helper method to send a request frame and wait for response
-    async fn send_request(&self, kind: &str, action: &str) -> ActivityResult<Frame> {
+    async fn send_request(&self, kind: FrameKind, command: &str) -> ActivityResult<Frame> {
         let stream_tx = self
             .stream_tx
             .as_ref()
@@ -472,17 +476,18 @@ impl BrowserStrategy {
 
         // Create and send request frame
         let request_frame = Frame {
-            kind: kind.to_string(),
             id: request_id,
-            action: action.to_string(),
-            event: String::new(),
+            kind: kind.into(),
+            source: FrameEndpoint::Tauri.into(),
+            target: FrameEndpoint::Browser.into(),
+            command: command.to_string(),
             payload: None,
-            ok: true,
+            metadata: None,
         };
 
         debug!(
-            "Sending request frame: kind={}, id={}, action={}",
-            kind, request_id, action
+            "Sending request frame: kind={:?}, id={}, command={}",
+            kind, request_id, command
         );
 
         stream_tx

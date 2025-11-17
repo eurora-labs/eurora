@@ -3,7 +3,14 @@
 import { handleMessage } from '@eurora/browser-shared/background/messaging';
 import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
 import { onUpdated, onActivated } from '@eurora/browser-shared/background/focus-tracker';
-import { Frame } from '@eurora/browser-shared/content/bindings';
+import {
+	Frame,
+	type FrameKind,
+	FrameEndpoint,
+	FramePayload,
+} from '@eurora/browser-shared/content/bindings';
+
+import { FrameKindToIndex } from '@eurora/browser-shared/content/util';
 
 let nativePort: chrome.runtime.Port | null = null;
 
@@ -42,7 +49,7 @@ async function connect() {
 async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
 	console.log('Received frame:', frame);
 
-	switch (frame.action) {
+	switch (frame.command) {
 		case 'GET_METADATA':
 			try {
 				const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -58,27 +65,29 @@ async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
 				};
 
 				const responseFrame: Frame = {
-					kind: 'response',
 					id: frame.id, // Echo back the request ID
-					action: frame.action,
-					event: '',
+					kind: FrameKindToIndex.Response,
+					source: frame.target,
+					target: frame.source,
+					command: frame.command,
 					payload: {
 						kind: 'NativeMetadata',
 						content: JSON.stringify(responseData),
 					},
-					ok: true,
+					metadata: null,
 				};
 
 				sender.postMessage(responseFrame);
 			} catch (error) {
 				console.error('Error getting tab metadata:', error);
 				const errorFrame: Frame = {
-					kind: 'response',
 					id: frame.id,
-					action: frame.action,
-					event: '',
+					kind: FrameKindToIndex.Response,
+					source: frame.target,
+					target: frame.source,
+					command: frame.command,
 					payload: undefined,
-					ok: false,
+					metadata: null,
 				};
 				sender.postMessage(errorFrame);
 			}
@@ -86,31 +95,33 @@ async function onMessageListener(frame: Frame, sender: chrome.runtime.Port) {
 		default:
 			try {
 				// Handle assets request using the existing handleMessage
-				const response = await handleMessage(frame.action);
-				console.log('Finished responding to ', frame.action, ': ', response);
+				const response = await handleMessage(frame.command);
+				console.log('Finished responding to ', frame.command, ': ', response);
 
 				const responseFrame: Frame = {
-					kind: 'response',
 					id: frame.id,
-					action: frame.action,
-					event: '',
+					kind: FrameKindToIndex.Response,
+					source: frame.target,
+					target: frame.source,
+					command: frame.command,
 					payload: {
 						kind: response.kind || 'unknown',
 						content: JSON.stringify(response),
 					},
-					ok: true,
+					metadata: null,
 				};
 
 				sender.postMessage(responseFrame);
 			} catch (error) {
-				console.error('Error responding to ', frame.action, ': ', error);
+				console.error('Error responding to ', frame.command, ': ', error);
 				const errorFrame: Frame = {
-					kind: 'response',
 					id: frame.id,
-					action: frame.action,
-					event: '',
+					kind: FrameKindToIndex.Response,
+					source: frame.target,
+					target: frame.source,
+					command: frame.command,
 					payload: undefined,
-					ok: false,
+					metadata: null,
 				};
 				sender.postMessage(errorFrame);
 			}

@@ -54,8 +54,8 @@ async fn main() -> Result<()> {
         info!("Native messaging writer task started");
         while let Some(frame) = chrome_rx.recv().await {
             info!(
-                "Writing frame to Chrome: kind={} id={} action={}",
-                frame.kind, frame.id, frame.action,
+                "Writing frame to Chrome: kind={:?} id={} command={}",
+                frame.kind, frame.id, frame.command,
             );
             if let Err(err) = write_framed(&mut stdout, &frame).await {
                 info!("Native host write error: {err:?}");
