@@ -102,10 +102,7 @@ impl BrowserStrategy {
                             let stream_task = tokio::spawn(async move {
                                 debug!("Stream handler task started");
                                 while let Ok(Some(frame)) = inbound_stream.message().await {
-                                    debug!(
-                                        "Received frame: id={:?}, command={}",
-                                        frame.id, frame.command
-                                    );
+                                    debug!("Received frame: {:?}", frame);
 
                                     // Match response to pending request
                                     if let Some((_, pending_request)) =

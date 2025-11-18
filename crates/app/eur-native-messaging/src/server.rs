@@ -5,11 +5,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::info;
 
-mod proto {
-    tonic::include_proto!("browser_bridge");
-}
-
-pub use proto::{
+pub use crate::types::proto::{
     Frame,
     browser_bridge_client::BrowserBridgeClient,
     browser_bridge_server::{BrowserBridge, BrowserBridgeServer},
@@ -46,10 +42,7 @@ impl BrowserBridge for BrowserBridgeService {
             loop {
                 match inbound.message().await {
                     Ok(Some(frame)) => {
-                        info!(
-                            "Forwarding frame from gRPC client to Chrome: id={:?} command={}",
-                            frame.id, frame.command
-                        );
+                        info!("Forwarding frame from gRPC client to Chrome: {:?}", frame);
                         if let Err(e) = chrome_tx.send(frame) {
                             info!("Error forwarding frame to Chrome: {e:?}");
                             break;
@@ -74,10 +67,7 @@ impl BrowserBridge for BrowserBridgeService {
             loop {
                 match chrome_from_rx.recv().await {
                     Ok(frame) => {
-                        info!(
-                            "Forwarding frame from Chrome to gRPC client: id={:?} command={}",
-                            frame.id, frame.command
-                        );
+                        info!("Forwarding frame from Chrome to gRPC client: {:?}", frame);
                         if let Err(e) = tx_to_client.send(Ok(frame)).await {
                             info!("Error forwarding frame to gRPC client: {e:?}");
                             break;
