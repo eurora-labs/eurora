@@ -6,17 +6,44 @@ service BrowserBridge {
 }
 
 message Frame {
-    // Each uint32 is the request id of the different type
-    oneof id {
-        uint32 Request = 1;
-        uint32 Response = 2;
-        uint32 Event = 3;
-        uint32 Error = 4;
-        uint32 Cancel = 5;
+    oneof kind {
+        RequestFrame request = 1;
+        ResponseFrame response = 2;
+        EventFrame event = 3;
+        ErrorFrame error = 4;
+        CancelFrame cancel = 5;
     }
-    // Decides which listener responds to this frame
-    string command = 6;
+}
 
-    // JSON-encoded string
-    string payload = 7;
+message RequestFrame {
+    uint32 id = 1;
+    string kind = 2;
+    // JSON string
+    optional string payload = 3;
+}
+
+message ResponseFrame {
+    uint32 id = 1;
+    string kind = 2;
+    // JSON string
+    optional string payload = 3;
+}
+
+// Event doesn't have an id because it doesn't expect a response
+message EventFrame {
+    string kind = 1;
+    // JSON string
+    optional string payload = 2;
+}
+
+message ErrorFrame {
+    uint32 id = 1;
+    uint32 code = 2;
+    string message = 3;
+    // JSON string
+    optional string details = 4;
+}
+
+message CancelFrame {
+    uint32 id = 1;
 }
