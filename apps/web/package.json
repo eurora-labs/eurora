@@ -33,7 +33,7 @@
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
-		"@lucide/svelte": "^0.553.0",
+		"@lucide/svelte": "^0.554.0",
 		"@playwright/test": "^1.56.1",
 		"@sveltejs/adapter-auto": "^4.0.0",
 		"@sveltejs/adapter-static": "catalog:svelte",
