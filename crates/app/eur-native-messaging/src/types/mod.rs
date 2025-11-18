@@ -4,6 +4,7 @@ use strum_macros::AsRefStr;
 
 mod assets;
 mod metadata;
+pub mod proto;
 mod shared;
 mod snapshots;
 
