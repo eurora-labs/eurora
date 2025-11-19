@@ -4,3 +4,4 @@ export * from './tabs.js';
 export * from './bg.js';
 export * from './messaging.js';
 export * from './focus-tracker.js';
+export * from './native-messenger.js';
