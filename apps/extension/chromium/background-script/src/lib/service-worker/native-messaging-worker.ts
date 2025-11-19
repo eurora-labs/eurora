@@ -4,10 +4,12 @@
 // import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
 // import { onUpdated, onActivated } from '@eurora/browser-shared/background/focus-tracker';
 // import { Frame } from '@eurora/browser-shared/content/bindings';
-import { NativeMessenger } from '@eurora/browser-shared/background/native-messenger';
+import { startNativeMessenger } from '@eurora/browser-shared/background/native-messenger';
 
-const messenger = new NativeMessenger();
-messenger.start();
+startNativeMessenger();
+
+// const messenger = new NativeMessenger();
+// messenger.startNativeMessenger();
 
 // let nativePort: chrome.runtime.Port | null = null;
 
