@@ -1,7 +1,6 @@
-import { NativeMessenger } from '@eurora/browser-shared/background/native-messenger';
+import { startNativeMessenger } from '@eurora/browser-shared/background/native-messenger';
 
-const messenger = new NativeMessenger();
-messenger.start();
+startNativeMessenger();
 
 // console.log('Extension background services started');
 
