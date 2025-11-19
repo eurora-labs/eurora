@@ -17,21 +17,21 @@ message Frame {
 
 message RequestFrame {
     uint32 id = 1;
-    string kind = 2;
+    string action = 2;
     // JSON string
     optional string payload = 3;
 }
 
 message ResponseFrame {
     uint32 id = 1;
-    string kind = 2;
+    string action = 2;
     // JSON string
     optional string payload = 3;
 }
 
 // Event doesn't have an id because it doesn't expect a response
 message EventFrame {
-    string kind = 1;
+    string action = 1;
     // JSON string
     optional string payload = 2;
 }
