@@ -4,7 +4,7 @@
 		"moduleResolution": "nodenext",
 		"target": "ES2024",
 		"lib": ["ES2024", "DOM"],
-		"types": ["chrome", "vite/client", "webextension-polyfill"],
+		"types": ["vite/client", "webextension-polyfill"],
 		"strict": true,
 		"skipLibCheck": true,
 		"noPropertyAccessFromIndexSignature": true,
