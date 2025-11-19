@@ -500,7 +500,7 @@ impl BrowserStrategy {
             .map_err(|_| ActivityError::invalid_data("Failed to send request frame"))?;
 
         // Wait for response with timeout
-        match tokio::time::timeout(std::time::Duration::from_secs(1), rx).await {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
             Ok(Ok(frame)) => {
                 let response = match frame.kind.unwrap() {
                     FrameKind::Response(frame) => {
