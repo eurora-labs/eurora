@@ -110,7 +110,16 @@ impl BrowserStrategy {
                                     let kind = frame.kind.unwrap();
                                     match kind {
                                         FrameKind::Request(frame) => {
-                                            todo!("Handle request frame");
+                                            debug!(
+                                                "Received request frame: id={}, action={}",
+                                                frame.id, frame.action
+                                            );
+                                            // For now, log unsupported requests from browser extension
+                                            // In the future, this could handle requests initiated by the extension
+                                            warn!(
+                                                "Received unsupported request from browser extension: action={}",
+                                                frame.action
+                                            );
                                         }
                                         FrameKind::Response(frame) => {
                                             // Match response to pending request
@@ -134,13 +143,38 @@ impl BrowserStrategy {
                                             }
                                         }
                                         FrameKind::Event(frame) => {
-                                            todo!("Handle event frame");
+                                            // Broadcast event frames to activity tracking
+                                            debug!(
+                                                "Received event frame: action={}",
+                                                frame.action.clone()
+                                            );
+                                            let _ = activity_event_tx.send(frame.into());
                                         }
                                         FrameKind::Error(frame) => {
-                                            todo!("Handle error frame");
+                                            error!(
+                                                "Received error frame: id={}, message={}",
+                                                frame.id, frame.message
+                                            );
+                                            // Match error to pending request if applicable
+                                            if let Some((_, pending_request)) =
+                                                pending_requests_clone.remove(&frame.id)
+                                                && let Err(err) = pending_request.send(frame.into())
+                                            {
+                                                warn!(
+                                                    "Failed to send error frame to waiting request: {:?}",
+                                                    err
+                                                );
+                                            }
                                         }
                                         FrameKind::Cancel(frame) => {
-                                            todo!("Handle cancel frame");
+                                            debug!("Received cancel frame: id={}", frame.id);
+                                            // Remove pending request if it exists
+                                            if pending_requests_clone.remove(&frame.id).is_some() {
+                                                debug!(
+                                                    "Cancelled pending request: id={}",
+                                                    frame.id
+                                                );
+                                            }
                                         }
                                     }
                                 }
