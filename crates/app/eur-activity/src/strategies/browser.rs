@@ -535,20 +535,17 @@ impl BrowserStrategy {
 
         // Wait for response with timeout
         match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
-            Ok(Ok(frame)) => {
-                let response = match frame.kind.unwrap() {
-                    FrameKind::Response(frame) => {
-                        debug!("Received response for request {}", request_id);
-                        Ok(frame)
-                    }
-                    FrameKind::Error(frame) => Err(ActivityError::invalid_data(format!(
-                        "Browser error: {}",
-                        frame.message
-                    ))),
-                    _ => Err(ActivityError::invalid_data("Unexpected frame kind")),
-                };
-                response
-            }
+            Ok(Ok(frame)) => match frame.kind.unwrap() {
+                FrameKind::Response(frame) => {
+                    debug!("Received response for request {}", request_id);
+                    Ok(frame)
+                }
+                FrameKind::Error(frame) => Err(ActivityError::invalid_data(format!(
+                    "Browser error: {}",
+                    frame.message
+                ))),
+                _ => Err(ActivityError::invalid_data("Unexpected frame kind")),
+            },
             Ok(Err(_)) => {
                 error!("Response channel closed for request {}", request_id);
                 Err(ActivityError::invalid_data("Response channel closed"))
