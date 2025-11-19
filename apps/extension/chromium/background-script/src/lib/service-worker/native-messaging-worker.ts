@@ -3,7 +3,7 @@
 import { handleMessage } from '@eurora/browser-shared/background/messaging';
 import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
 import { onUpdated, onActivated } from '@eurora/browser-shared/background/focus-tracker';
-import { Frame, type Id } from '@eurora/browser-shared/content/bindings';
+import { Frame } from '@eurora/browser-shared/content/bindings';
 
 let nativePort: chrome.runtime.Port | null = null;
 
