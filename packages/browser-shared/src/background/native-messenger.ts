@@ -2,6 +2,7 @@ import browser from 'webextension-polyfill';
 import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings.js';
 import { getCurrentTabIcon } from './tabs.js';
 import { handleMessage } from './messaging.js';
+import { onUpdated, onActivated } from '@eurora/browser-shared/background/focus-tracker';
 
 export class NativeMessenger {
 	private host: string;
@@ -13,7 +14,24 @@ export class NativeMessenger {
 		this.connectTimeout = connectTimeout;
 	}
 
-	private async connect() {
+	public start() {
+		this.connect();
+		browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+			if (!this.nativePort) return;
+
+			await onUpdated(tabId, changeInfo, tab, this.nativePort);
+		});
+
+		browser.tabs.onActivated.addListener(async (activeInfo) => {
+			if (!this.nativePort) return;
+
+			await onActivated(activeInfo.tabId, this.nativePort);
+		});
+
+		console.log('Native messaging service worker registered');
+	}
+
+	private connect() {
 		this.nativePort = browser.runtime.connectNative(this.host);
 		this.nativePort.onDisconnect.addListener(this.onNativePortDisconnect);
 		this.nativePort?.onMessage.addListener(this.onNativePortMessage);
@@ -98,9 +116,8 @@ export class NativeMessenger {
 
 		// Try to reconnect after a delay
 		setTimeout(() => {
-			this.connect().then(() => {
-				console.log('Reconnected to native host');
-			});
+			this.connect();
+			console.log('Reconnected to native host');
 		}, this.connectTimeout);
 	}
 }
