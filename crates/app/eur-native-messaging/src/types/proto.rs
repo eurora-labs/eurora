@@ -1,8 +1,8 @@
-mod proto {
+mod proto_types {
     tonic::include_proto!("browser_bridge");
 }
 
-pub use proto::*;
+pub use proto_types::*;
 
 // The code below is useful only to avoid super ugly frame type
 // to parent frame conversions
