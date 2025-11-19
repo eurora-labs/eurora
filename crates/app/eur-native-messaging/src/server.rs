@@ -6,9 +6,10 @@ use tonic::{Request, Response, Status};
 use tracing::info;
 
 pub use crate::types::proto::{
-    Frame,
+    EventFrame, Frame, RequestFrame, ResponseFrame,
     browser_bridge_client::BrowserBridgeClient,
     browser_bridge_server::{BrowserBridge, BrowserBridgeServer},
+    frame::Kind as FrameKind,
 };
 
 #[derive(Clone)]
