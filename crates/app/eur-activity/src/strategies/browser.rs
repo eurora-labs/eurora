@@ -5,8 +5,12 @@ pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use eur_native_messaging::server::Frame;
-use eur_native_messaging::{NativeMessage, create_browser_bridge_client};
+use eur_native_messaging::proto::RequestFrame;
+use eur_native_messaging::proto::ResponseFrame;
+use eur_native_messaging::{
+    NativeMessage, create_browser_bridge_client,
+    server::{Frame, FrameKind},
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -74,7 +78,7 @@ pub struct BrowserStrategy {
 impl BrowserStrategy {
     /// Create a new browser strategy
     pub async fn new() -> ActivityResult<Self> {
-        let activity_event_tx = broadcast::channel(100).0;
+        let activity_event_tx: broadcast::Sender<Frame> = broadcast::channel(100).0;
 
         // Try to create the IPC client and initialize bidirectional stream
         let (_client, stream_tx, pending_requests, request_id_counter, stream_task_handle) =
@@ -102,28 +106,76 @@ impl BrowserStrategy {
                             let stream_task = tokio::spawn(async move {
                                 debug!("Stream handler task started");
                                 while let Ok(Some(frame)) = inbound_stream.message().await {
-                                    debug!(
-                                        "Received frame: kind={}, id={}, action={}",
-                                        frame.kind, frame.id, frame.action
-                                    );
-
-                                    // Match response to pending request
-                                    if let Some((_, pending_request)) =
-                                        pending_requests_clone.remove(&frame.id)
-                                    {
-                                        if let Err(err) = pending_request.send(frame) {
+                                    debug!("Received frame: {:?}", frame);
+                                    let kind = frame.kind.unwrap();
+                                    match kind {
+                                        FrameKind::Request(frame) => {
+                                            debug!(
+                                                "Received request frame: id={}, action={}",
+                                                frame.id, frame.action
+                                            );
+                                            // For now, log unsupported requests from browser extension
+                                            // In the future, this could handle requests initiated by the extension
                                             warn!(
-                                                "Failed to send frame to waiting request: {:?}",
-                                                err
+                                                "Received unsupported request from browser extension: action={}",
+                                                frame.action
                                             );
                                         }
-                                    } else {
-                                        debug!(
-                                            "Received frame with no pending request: id={} kind={}",
-                                            frame.id.clone(),
-                                            frame.kind.clone(),
-                                        );
-                                        let _ = activity_event_tx.send(frame);
+                                        FrameKind::Response(frame) => {
+                                            // Match response to pending request
+                                            if let Some((_, pending_request)) =
+                                                pending_requests_clone.remove(&frame.id)
+                                            {
+                                                if let Err(err) = pending_request.send(frame.into())
+                                                {
+                                                    warn!(
+                                                        "Failed to send frame to waiting request: {:?}",
+                                                        err
+                                                    );
+                                                }
+                                            } else {
+                                                debug!(
+                                                    "Received frame with no pending request: id={} action={}",
+                                                    frame.id.clone(),
+                                                    frame.action.clone(),
+                                                );
+                                                let _ = activity_event_tx.send(frame.into());
+                                            }
+                                        }
+                                        FrameKind::Event(frame) => {
+                                            // Broadcast event frames to activity tracking
+                                            debug!(
+                                                "Received event frame: action={}",
+                                                frame.action.clone()
+                                            );
+                                            let _ = activity_event_tx.send(frame.into());
+                                        }
+                                        FrameKind::Error(frame) => {
+                                            error!(
+                                                "Received error frame: id={}, message={}",
+                                                frame.id, frame.message
+                                            );
+                                            // Match error to pending request if applicable
+                                            if let Some((_, pending_request)) =
+                                                pending_requests_clone.remove(&frame.id)
+                                                && let Err(err) = pending_request.send(frame.into())
+                                            {
+                                                warn!(
+                                                    "Failed to send error frame to waiting request: {:?}",
+                                                    err
+                                                );
+                                            }
+                                        }
+                                        FrameKind::Cancel(frame) => {
+                                            debug!("Received cancel frame: id={}", frame.id);
+                                            // Remove pending request if it exists
+                                            if pending_requests_clone.remove(&frame.id).is_some() {
+                                                debug!(
+                                                    "Cancelled pending request: id={}",
+                                                    frame.id
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                                 debug!("Stream handler task ended");
@@ -216,11 +268,16 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         let handle = tokio::spawn(async move {
             let last_url = Arc::clone(&last_url);
 
-            while let Ok(event) = activity_receiver.recv().await {
-                let native_asset =
-                    serde_json::from_str::<NativeMessage>(&event.payload.unwrap().content)
-                        .map_err(|e| -> ActivityError { ActivityError::from(e) })
-                        .unwrap();
+            while let Ok(frame) = activity_receiver.recv().await {
+                let kind = frame.kind.unwrap();
+                let payload = match kind {
+                    FrameKind::Response(frame) => frame.payload,
+                    FrameKind::Event(frame) => frame.payload,
+                    _ => None,
+                };
+                let native_asset = serde_json::from_str::<NativeMessage>(&payload.unwrap())
+                    .map_err(|e| -> ActivityError { ActivityError::from(e) })
+                    .unwrap();
 
                 let event = match native_asset {
                     NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
@@ -335,19 +392,14 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
-        let response_frame = self.send_request("request", "GENERATE_ASSETS").await?;
-
-        if !response_frame.ok {
-            warn!("Failed to retrieve assets: request failed");
-            return Ok(vec![]);
-        }
+        let response_frame = self.send_request("GENERATE_ASSETS").await?;
 
         let Some(payload) = response_frame.payload else {
             warn!("No payload in assets response");
             return Ok(vec![]);
         };
 
-        let native_asset = serde_json::from_str::<NativeMessage>(&payload.content)
+        let native_asset = serde_json::from_str::<NativeMessage>(&payload)
             .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
         let asset = ActivityAsset::try_from(native_asset)
@@ -409,19 +461,14 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         debug!("Retrieving metadata for browser strategy");
 
-        let response_frame = self.send_request("request", "GET_METADATA").await?;
-
-        if !response_frame.ok {
-            warn!("Failed to retrieve metadata: request failed");
-            return Ok(StrategyMetadata::default());
-        }
+        let response_frame = self.send_request("GET_METADATA").await?;
 
         let Some(payload) = response_frame.payload else {
             warn!("No payload in metadata response");
             return Ok(StrategyMetadata::default());
         };
 
-        let native_metadata = serde_json::from_str::<NativeMessage>(&payload.content)
+        let native_metadata = serde_json::from_str::<NativeMessage>(&payload)
             .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
         let metadata = match native_metadata {
@@ -445,7 +492,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
 impl BrowserStrategy {
     /// Helper method to send a request frame and wait for response
-    async fn send_request(&self, kind: &str, action: &str) -> ActivityResult<Frame> {
+    async fn send_request(&self, action: &str) -> ActivityResult<ResponseFrame> {
         let stream_tx = self
             .stream_tx
             .as_ref()
@@ -471,30 +518,34 @@ impl BrowserStrategy {
         pending_requests.insert(request_id, PendingRequest::new(tx));
 
         // Create and send request frame
-        let request_frame = Frame {
-            kind: kind.to_string(),
+        let request_frame = RequestFrame {
             id: request_id,
             action: action.to_string(),
-            event: String::new(),
             payload: None,
-            ok: true,
         };
 
         debug!(
-            "Sending request frame: kind={}, id={}, action={}",
-            kind, request_id, action
+            "Sending request frame: id={}, command={}",
+            request_id, action
         );
 
         stream_tx
-            .send(request_frame)
+            .send(request_frame.into())
             .map_err(|_| ActivityError::invalid_data("Failed to send request frame"))?;
 
         // Wait for response with timeout
         match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
-            Ok(Ok(response)) => {
-                debug!("Received response for request {}", request_id);
-                Ok(response)
-            }
+            Ok(Ok(frame)) => match frame.kind.unwrap() {
+                FrameKind::Response(frame) => {
+                    debug!("Received response for request {}", request_id);
+                    Ok(frame)
+                }
+                FrameKind::Error(frame) => Err(ActivityError::invalid_data(format!(
+                    "Browser error: {}",
+                    frame.message
+                ))),
+                _ => Err(ActivityError::invalid_data("Unexpected frame kind")),
+            },
             Ok(Err(_)) => {
                 error!("Response channel closed for request {}", request_id);
                 Err(ActivityError::invalid_data("Response channel closed"))
