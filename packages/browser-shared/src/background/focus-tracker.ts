@@ -1,6 +1,6 @@
 import { getCurrentTabIcon } from './tabs.js';
 import browser from 'webextension-polyfill';
-import { NativeMetadata, Frame, Payload } from '../content/bindings.js';
+import { NativeMetadata, Frame } from '../content/bindings.js';
 
 const lastUrl = new Map();
 
@@ -33,15 +33,12 @@ export async function onUpdated(
 			};
 
 			const frame: Frame = {
-				kind: 'event',
-				id: 0,
-				action: '',
-				event: 'tab_updated',
-				payload: {
-					kind: 'NativeMetadata',
-					content: JSON.stringify(metadata),
+				kind: {
+					Event: {
+						action: 'TAB_UPDATED',
+						payload: JSON.stringify(metadata),
+					},
 				},
-				ok: true,
 			};
 
 			nativePort.postMessage(frame);
@@ -66,15 +63,12 @@ export async function onActivated(tabId: number, nativePort: browser.Runtime.Por
 		};
 
 		const frame: Frame = {
-			kind: 'event',
-			id: 0,
-			action: '',
-			event: 'tab_activated',
-			payload: {
-				kind: 'NativeMetadata',
-				content: JSON.stringify(metadata),
+			kind: {
+				Event: {
+					action: 'TAB_ACTIVATED',
+					payload: JSON.stringify(metadata),
+				},
 			},
-			ok: true,
 		};
 
 		nativePort.postMessage(frame);
