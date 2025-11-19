@@ -1,138 +1,138 @@
-import { handleMessage } from '@eurora/browser-shared/background/messaging';
-import { getCurrentTabIcon } from '@eurora/browser-shared/background/tabs';
-import { onUpdated, onActivated } from '@eurora/browser-shared/background/focus-tracker';
-import { Frame } from '@eurora/browser-shared/content/bindings';
+import { NativeMessenger } from '@eurora/browser-shared/background/native-messenger';
 
-console.log('Extension background services started');
+const messenger = new NativeMessenger();
+messenger.start();
 
-let nativePort: browser.runtime.Port | null = null;
+// console.log('Extension background services started');
 
-browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-	if (!nativePort) return;
+// let nativePort: browser.runtime.Port | null = null;
 
-	await onUpdated(tabId, changeInfo, tab, nativePort);
-});
+// browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+// 	if (!nativePort) return;
 
-browser.tabs.onActivated.addListener(async (activeInfo) => {
-	if (!nativePort) return;
+// 	await onUpdated(tabId, changeInfo, tab, nativePort);
+// });
 
-	await onActivated(activeInfo.tabId, nativePort);
-});
+// browser.tabs.onActivated.addListener(async (activeInfo) => {
+// 	if (!nativePort) return;
 
-connect();
+// 	await onActivated(activeInfo.tabId, nativePort);
+// });
 
-function connect() {
-	nativePort = browser.runtime.connectNative('com.eurora.app');
-	console.log('Native port:', nativePort);
-	const error = browser.runtime.lastError;
-	if (error) {
-		console.error('Native port connection failed:', error);
-		return;
-	}
-	nativePort.onDisconnect.addListener(onDisconnectListener);
-	nativePort.onMessage.addListener(onMessageListener as any);
-}
+// connect();
 
-function addBase64Prefix(base64: string) {
-	const head = base64.substring(0, 6);
-	switch (head) {
-		case 'PHN2Zy':
-			return `data:image/svg+xml;base64,${base64}`;
-		case 'CiAgPH':
-			return `data:image/svg+xml;base64,${base64.substring(4)}`;
+// function connect() {
+// 	nativePort = browser.runtime.connectNative('com.eurora.app');
+// 	console.log('Native port:', nativePort);
+// 	const error = browser.runtime.lastError;
+// 	if (error) {
+// 		console.error('Native port connection failed:', error);
+// 		return;
+// 	}
+// 	nativePort.onDisconnect.addListener(onDisconnectListener);
+// 	nativePort.onMessage.addListener(onMessageListener as any);
+// }
 
-		default:
-			return base64;
-	}
-}
+// function addBase64Prefix(base64: string) {
+// 	const head = base64.substring(0, 6);
+// 	switch (head) {
+// 		case 'PHN2Zy':
+// 			return `data:image/svg+xml;base64,${base64}`;
+// 		case 'CiAgPH':
+// 			return `data:image/svg+xml;base64,${base64.substring(4)}`;
 
-async function onMessageListener(frame: Frame, sender: browser.runtime.Port) {
-	console.log('Received frame:', frame);
+// 		default:
+// 			return base64;
+// 	}
+// }
 
-	let frameId = 0;
-	// For now this is fine as Firefox doesn't send messages expecting a response
-	if ('Request' in frame.id) {
-		frameId = frame.id.Request;
-	} else {
-		throw new Error('Invalid frame ID: ' + frame.id);
-	}
+// async function onMessageListener(frame: Frame, sender: browser.runtime.Port) {
+// 	console.log('Received frame:', frame);
 
-	switch (frame.command) {
-		case 'GET_METADATA':
-			try {
-				const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-				const iconBase64 = addBase64Prefix(await getCurrentTabIcon(activeTab));
+// 	let frameId = 0;
+// 	// For now this is fine as Firefox doesn't send messages expecting a response
+// 	if ('Request' in frame.id) {
+// 		frameId = frame.id.Request;
+// 	} else {
+// 		throw new Error('Invalid frame ID: ' + frame.id);
+// 	}
 
-				console.log('Tab metadata:', { url: activeTab.url, icon_base64: iconBase64 });
+// 	switch (frame.command) {
+// 		case 'GET_METADATA':
+// 			try {
+// 				const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+// 				const iconBase64 = addBase64Prefix(await getCurrentTabIcon(activeTab));
 
-				const responseData = {
-					kind: 'NativeMetadata',
-					data: {
-						url: activeTab.url,
-						icon_base64: iconBase64,
-					},
-				};
+// 				console.log('Tab metadata:', { url: activeTab.url, icon_base64: iconBase64 });
 
-				const responseFrame: Frame = {
-					id: { Response: frameId },
-					command: frame.command,
-					payload: JSON.stringify(responseData),
-				};
+// 				const responseData = {
+// 					kind: 'NativeMetadata',
+// 					data: {
+// 						url: activeTab.url,
+// 						icon_base64: iconBase64,
+// 					},
+// 				};
 
-				sender.postMessage(responseFrame);
-			} catch (error) {
-				console.error('Error getting tab metadata:', error);
+// 				const responseFrame: Frame = {
+// 					id: { Response: frameId },
+// 					command: frame.command,
+// 					payload: JSON.stringify(responseData),
+// 				};
 
-				const errorFrame: Frame = {
-					id: { Error: frameId },
-					command: frame.command,
-					payload: undefined,
-				};
+// 				sender.postMessage(responseFrame);
+// 			} catch (error) {
+// 				console.error('Error getting tab metadata:', error);
 
-				sender.postMessage(errorFrame);
-			}
-			break;
-		default:
-			try {
-				// Handle assets request using the existing handleMessage
-				const response = await handleMessage(frame.command);
-				console.log('Finished responding to ', frame.command, ': ', response);
+// 				const errorFrame: Frame = {
+// 					id: { Error: frameId },
+// 					command: frame.command,
+// 					payload: undefined,
+// 				};
 
-				const responseFrame: Frame = {
-					id: { Response: frameId },
-					command: frame.command,
-					payload: JSON.stringify(response),
-				};
+// 				sender.postMessage(errorFrame);
+// 			}
+// 			break;
+// 		default:
+// 			try {
+// 				// Handle assets request using the existing handleMessage
+// 				const response = await handleMessage(frame.command);
+// 				console.log('Finished responding to ', frame.command, ': ', response);
 
-				sender.postMessage(responseFrame);
-			} catch (error) {
-				console.error('Error responding to ', frame.command, ': ', error);
+// 				const responseFrame: Frame = {
+// 					id: { Response: frameId },
+// 					command: frame.command,
+// 					payload: JSON.stringify(response),
+// 				};
 
-				const errorFrame: Frame = {
-					id: { Error: frameId },
-					command: frame.command,
-					payload: undefined,
-				};
+// 				sender.postMessage(responseFrame);
+// 			} catch (error) {
+// 				console.error('Error responding to ', frame.command, ': ', error);
 
-				sender.postMessage(errorFrame);
-			}
-			break;
-	}
-	return true;
-}
+// 				const errorFrame: Frame = {
+// 					id: { Error: frameId },
+// 					command: frame.command,
+// 					payload: undefined,
+// 				};
 
-function onDisconnectListener() {
-	console.log('Native port disconnected');
-	nativePort = null;
-	const error = browser.runtime.lastError;
-	if (error) {
-		console.error('Native port disconnected:', error);
-		return;
-	}
+// 				sender.postMessage(errorFrame);
+// 			}
+// 			break;
+// 	}
+// 	return true;
+// }
 
-	setTimeout(() => {
-		connect();
-	}, 5000);
-}
+// function onDisconnectListener() {
+// 	console.log('Native port disconnected');
+// 	nativePort = null;
+// 	const error = browser.runtime.lastError;
+// 	if (error) {
+// 		console.error('Native port disconnected:', error);
+// 		return;
+// 	}
 
-console.log('Extension background services finished');
+// 	setTimeout(() => {
+// 		connect();
+// 	}, 5000);
+// }
+
+// console.log('Extension background services finished');

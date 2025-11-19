@@ -33,9 +33,12 @@ export async function onUpdated(
 			};
 
 			const frame: Frame = {
-				id: { Event: 0 },
-				command: 'TAB_UPDATED',
-				payload: JSON.stringify(metadata),
+				kind: {
+					Event: {
+						action: 'TAB_UPDATED',
+						payload: JSON.stringify(metadata),
+					},
+				},
 			};
 
 			nativePort.postMessage(frame);
@@ -60,9 +63,12 @@ export async function onActivated(tabId: number, nativePort: browser.Runtime.Por
 		};
 
 		const frame: Frame = {
-			id: { Event: 0 },
-			command: 'TAB_ACTIVATED',
-			payload: JSON.stringify(metadata),
+			kind: {
+				Event: {
+					action: 'TAB_ACTIVATED',
+					payload: JSON.stringify(metadata),
+				},
+			},
 		};
 
 		nativePort.postMessage(frame);
