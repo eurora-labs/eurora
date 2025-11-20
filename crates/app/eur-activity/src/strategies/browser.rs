@@ -73,6 +73,9 @@ pub struct BrowserStrategy {
 
     #[serde(skip)]
     activity_event_tx: Option<broadcast::Sender<Frame>>,
+
+    #[serde(skip)]
+    snapshot_collection_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 }
 
 impl BrowserStrategy {
@@ -214,6 +217,7 @@ impl BrowserStrategy {
             request_id_counter,
             stream_task_handle,
             activity_event_tx: Some(activity_event_tx),
+            snapshot_collection_handle: None,
         })
     }
 }
@@ -295,14 +299,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 *prev = Some(url);
                 let icon = event.icon;
 
-                // let icon = match event.icon {
-                //     Some(icon) => {
-                //         debug!("Received icon data");
-                //         image::RgbaImage::from_vec(icon.width as u32, icon.height as u32, icon.data)
-                //     }
-                //     None => default_icon.clone(),
-                // };
-
                 let assets = strategy.retrieve_assets().await.map_err(|e| {
                     warn!("Failed to retrieve assets: {}", e);
                     e
@@ -325,6 +321,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         });
 
         self.tracking_handle = Some(Arc::new(handle));
+
+        // Start snapshot collection
+        self.collect_snapshots();
+
         Ok(())
     }
 
@@ -382,6 +382,13 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             && let Ok(handle) = Arc::try_unwrap(handle)
         {
             handle.abort();
+        }
+
+        // Clean up snapshot collection task
+        if let Some(handle) = self.snapshot_collection_handle.take() {
+            if let Ok(handle) = Arc::try_unwrap(handle) {
+                handle.abort();
+            }
         }
 
         Ok(())
@@ -525,6 +532,47 @@ impl BrowserStrategy {
                 Err(ActivityError::invalid_data("Request timeout"))
             }
         }
+    }
+
+    fn collect_snapshots(&mut self) {
+        let sender = match self.sender.clone() {
+            Some(sender) => sender,
+            None => {
+                warn!("No sender available for snapshot collection");
+                return;
+            }
+        };
+
+        let mut strategy_clone = self.clone();
+
+        let handle = tokio::spawn(async move {
+            debug!("Starting snapshot collection task");
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
+
+            loop {
+                interval.tick().await;
+
+                match strategy_clone.retrieve_snapshots().await {
+                    Ok(snapshots) if !snapshots.is_empty() => {
+                        debug!("Collected {} snapshot(s)", snapshots.len());
+                        if sender.send(ActivityReport::Snapshots(snapshots)).is_err() {
+                            warn!("Failed to send snapshots - receiver dropped");
+                            break;
+                        }
+                    }
+                    Ok(_) => {
+                        debug!("No snapshots collected");
+                    }
+                    Err(e) => {
+                        warn!("Failed to retrieve snapshots: {}", e);
+                    }
+                }
+            }
+
+            debug!("Snapshot collection task ended");
+        });
+
+        self.snapshot_collection_handle = Some(Arc::new(handle));
     }
 }
 
