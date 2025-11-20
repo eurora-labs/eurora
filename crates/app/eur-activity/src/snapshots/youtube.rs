@@ -2,7 +2,6 @@
 
 use eur_native_messaging::types::NativeYoutubeSnapshot;
 use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
-use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 
 use crate::{error::ActivityError, types::SnapshotFunctionality};
@@ -34,53 +33,37 @@ use crate::{error::ActivityError, types::SnapshotFunctionality};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YoutubeSnapshot {
     pub id: String,
-    pub video_frame: Option<Vec<u8>>, // Serialized image data
     pub current_time: f32,
+    pub video_frame: Option<String>, // Runtime image, not serialized
     pub video_duration: Option<f32>,
     pub video_title: Option<String>,
     pub video_url: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
-
-    #[serde(skip)]
-    pub video_frame_image: Option<DynamicImage>, // Runtime image, not serialized
 }
 
 impl YoutubeSnapshot {
     /// Create a new YouTube snapshot
     pub fn new(
         id: Option<String>,
-        video_frame: Option<DynamicImage>,
+        video_frame: Option<String>,
         current_time: f32,
         video_duration: Option<f32>,
         video_title: Option<String>,
         video_url: Option<String>,
     ) -> Self {
         let now = chrono::Utc::now().timestamp() as u64;
-
-        // Serialize image to bytes if present
-        let video_frame_bytes = video_frame.as_ref().and_then(|img| {
-            let mut buffer = Vec::new();
-            match img.write_to(
-                &mut std::io::Cursor::new(&mut buffer),
-                image::ImageFormat::Png,
-            ) {
-                Ok(_) => Some(buffer),
-                Err(_) => None,
-            }
-        });
         let id = id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
         Self {
             id,
-            video_frame: video_frame_bytes,
+            video_frame,
             current_time,
             video_duration,
             video_title,
             video_url,
             created_at: now,
             updated_at: now,
-            video_frame_image: video_frame,
         }
     }
 
@@ -91,47 +74,19 @@ impl YoutubeSnapshot {
         // } else {
         //     None
         // };
-        let video_frame_image: Option<DynamicImage> = None;
 
         let now = chrono::Utc::now().timestamp() as u64;
 
-        // Serialize image to bytes if present
-        let video_frame_bytes = video_frame_image.as_ref().and_then(|img| {
-            let mut buffer = Vec::new();
-            match img.write_to(
-                &mut std::io::Cursor::new(&mut buffer),
-                image::ImageFormat::Png,
-            ) {
-                Ok(_) => Some(buffer),
-                Err(_) => None,
-            }
-        });
-
         Ok(YoutubeSnapshot {
             id: uuid::Uuid::new_v4().to_string(),
-            video_frame: video_frame_bytes,
+            video_frame: Some(snapshot.video_frame_base64),
             current_time: snapshot.current_time,
             video_duration: None,
             video_title: None,
             video_url: None,
             created_at: now,
             updated_at: now,
-            video_frame_image,
         })
-    }
-
-    /// Get the video frame as a DynamicImage
-    pub fn get_video_frame(&mut self) -> Option<&DynamicImage> {
-        // If we don't have the runtime image but have serialized data, deserialize it
-        if self.video_frame_image.is_none()
-            && self.video_frame.is_some()
-            && let Some(bytes) = &self.video_frame
-            && let Ok(img) = image::load_from_memory(bytes)
-        {
-            self.video_frame_image = Some(img);
-        }
-
-        self.video_frame_image.as_ref()
     }
 
     /// Get progress percentage (0.0 to 1.0)
@@ -198,9 +153,9 @@ impl SnapshotFunctionality for YoutubeSnapshot {
         }];
 
         // Add image if available
-        if let Some(image) = &self.video_frame_image {
+        if let Some(image) = &self.video_frame {
             content_parts.push(ContentPart::Image {
-                image_source: ImageSource::DynamicImage(image.clone()),
+                image_source: ImageSource::Url(format!("data:image/png;base64,{}", image.clone())),
                 detail: None,
             });
         }
