@@ -35,6 +35,9 @@ pub enum ActivityError {
     #[error("Invalid asset type: {0}")]
     InvalidAssetType(String),
 
+    #[error("Invalid snapshot type: {0}")]
+    InvalidSnapshotType(String),
+
     #[error("Unknown error: {0}")]
     Unknown(String),
 }
