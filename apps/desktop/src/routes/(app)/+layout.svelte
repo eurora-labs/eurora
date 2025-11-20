@@ -43,27 +43,32 @@
 	<Sidebar.Inset>
 		<div class="flex flex-col h-[calc(100vh-70px)]">
 			<div class="flex-1">{@render children?.()}</div>
-			<div class="flex flex-row mb-4">
-				<div class="flex w-[535px]">
-					<Timeline.Root class="w-1 flex-1" align="right">
-						{#each timelineItems as item}
-							<Timeline.Item color={item.color}>
-								{#if item.icon_base64}<img
-										src={item.icon_base64}
-										alt={item.name}
-										class="w-8 h-8 bg-white rounded-full drop-shadow p-1"
-									/>{:else}
-									<div
-										class="w-8 h-8 bg-white rounded-full drop-shadow p-1 flex items-center justify-center"
-									>
-										{getFirstLetterAndCapitalize(item.name)}
-									</div>
-								{/if}
-							</Timeline.Item>
-						{/each}
-					</Timeline.Root>
+			<div class="flex flex-col">
+				<div class="flex w-full justify-center mb-4">Now</div>
+				<div class="flex flex-row mb-4 h-[100px]">
+					<div class="flex w-1/2 items-center">
+						<Timeline.Root class="w-1 flex-1 h-fit" align="right">
+							{#each timelineItems as item}
+								<Timeline.Item color={item.color}>
+									{#if item.icon_base64}<img
+											src={item.icon_base64}
+											alt={item.name}
+											class="w-8 h-8 bg-white rounded-full drop-shadow p-1"
+										/>{:else}
+										<div
+											class="w-8 h-8 bg-white rounded-full drop-shadow p-1 flex items-center justify-center"
+										>
+											{getFirstLetterAndCapitalize(item.name)}
+										</div>
+									{/if}
+								</Timeline.Item>
+							{/each}
+						</Timeline.Root>
+					</div>
+					<div class="flex w-[200px] gap-2 h-full">
+						<div class="h-full w-[5px] border rounded-full"></div>
+					</div>
 				</div>
-				<div class="flex w-[200px] gap-2"><ArrowLeftToLine /> You are here</div>
 			</div>
 		</div>
 	</Sidebar.Inset>
