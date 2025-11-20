@@ -106,7 +106,6 @@ impl BrowserStrategy {
                             let stream_task = tokio::spawn(async move {
                                 debug!("Stream handler task started");
                                 while let Ok(Some(frame)) = inbound_stream.message().await {
-                                    debug!("Received frame: {:?}", frame);
                                     let kind = frame.kind.unwrap();
                                     match kind {
                                         FrameKind::Request(frame) => {
@@ -411,51 +410,20 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
     /// Retrieve snapshots from the browser
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        Ok(vec![])
-        // debug!("Retrieving snapshots for browser strategy");
+        let response_frame = self.send_request("GENERATE_SNAPSHOT").await?;
 
-        // let Some(client) = &self.client else {
-        //     warn!("No IPC client available for browser strategy");
-        //     return Ok(vec![]);
-        // };
+        let Some(payload) = response_frame.payload else {
+            warn!("No payload in snapshot response");
+            return Ok(vec![]);
+        };
 
-        // let mut client_guard = client.lock().await;
-        // let request = StateRequest {};
+        let native_message = serde_json::from_str::<NativeMessage>(&payload)
+            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
 
-        // match client_guard.get_snapshots(request).await {
-        //     Ok(response) => {
-        //         debug!("Received snapshot response from browser extension");
-        //         let mut snapshots = Vec::new();
+        let snapshot = ActivitySnapshot::try_from(native_message)
+            .map_err(|e| -> ActivityError { ActivityError::InvalidSnapshotType(e.to_string()) })?;
 
-        //         if let Some(snapshot) = response.into_inner().snapshot {
-        //             match snapshot {
-        //                 ipc::snapshot_response::Snapshot::Youtube(youtube_snapshot) => {
-        //                     match YoutubeSnapshot::try_from(youtube_snapshot) {
-        //                         Ok(snapshot) => {
-        //                             snapshots.push(ActivitySnapshot::YoutubeSnapshot(snapshot))
-        //                         }
-        //                         Err(e) => warn!("Failed to create YouTube snapshot: {}", e),
-        //                     }
-        //                 }
-        //                 ipc::snapshot_response::Snapshot::Article(article_snapshot) => {
-        //                     let snapshot = ArticleSnapshot::from(article_snapshot);
-        //                     snapshots.push(ActivitySnapshot::ArticleSnapshot(snapshot));
-        //                 }
-        //                 ipc::snapshot_response::Snapshot::Twitter(twitter_snapshot) => {
-        //                     let snapshot = TwitterSnapshot::from(twitter_snapshot);
-        //                     snapshots.push(ActivitySnapshot::TwitterSnapshot(snapshot));
-        //                 }
-        //             }
-        //         }
-
-        //         debug!("Retrieved {} snapshots from browser", snapshots.len());
-        //         Ok(snapshots)
-        //     }
-        //     Err(e) => {
-        //         warn!("Failed to retrieve browser snapshots: {}", e);
-        //         Ok(vec![])
-        //     }
-        // }
+        Ok(vec![snapshot])
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
