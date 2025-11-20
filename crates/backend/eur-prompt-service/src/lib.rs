@@ -133,7 +133,10 @@ impl ProtoChatService for PromptService {
             .provider
             .chat_stream(chat_request)
             .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                debug!("Error in chat_stream: {}", e);
+                Status::internal(e.to_string())
+            })?;
 
         let output_stream = openai_stream.map(|result| {
             match result {

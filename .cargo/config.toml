@@ -2,5 +2,5 @@
 rustflags = ["--cfg", "tokio_unstable"]
 target-dir = "target" # Needs to be the default directory as this assumption is used by some of the TypeScript files
 
-# [target.x86_64-unknown-linux-gnu]
-# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
