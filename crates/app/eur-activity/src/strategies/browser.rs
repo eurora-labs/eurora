@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::broadcast;
 use tokio::sync::{Mutex, mpsc, oneshot};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 use url::Url;
 
 use crate::strategies::{ActivityReport, StrategyMetadata};
@@ -76,6 +76,9 @@ pub struct BrowserStrategy {
 
     #[serde(skip)]
     snapshot_collection_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
+
+    #[serde(skip)]
+    active_browser: Option<String>,
 }
 
 impl BrowserStrategy {
@@ -218,6 +221,7 @@ impl BrowserStrategy {
             stream_task_handle,
             activity_event_tx: Some(activity_event_tx),
             snapshot_collection_handle: None,
+            active_browser: None,
         })
     }
 }
@@ -242,6 +246,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     ) -> ActivityResult<()> {
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
+        self.active_browser = process_name.clone();
 
         match self.get_metadata().await {
             Ok(metadata) => {
@@ -257,6 +262,16 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 }
             }
             Err(err) => {
+                let activity = Activity::new(
+                    focus_window.process_name.clone().unwrap_or_default(),
+                    focus_window.icon.clone(),
+                    focus_window.process_name.clone().unwrap_or_default(),
+                    vec![],
+                );
+                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    warn!("Failed to send new activity report - receiver dropped");
+                }
+
                 warn!("Failed to get metadata: {}", err);
             }
         }
@@ -337,6 +352,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         // Check if this strategy can handle the new process
         if self.can_handle_process(process_name) {
             debug!("Browser strategy can continue handling: {}", process_name);
+            if self.active_browser == Some(process_name.to_string()) {
+                info!("Browser strategy is already tracking {}", process_name);
+            }
+
             if let Some(sender) = self.sender.clone() {
                 match self.get_metadata().await {
                     Ok(metadata) => {
@@ -355,6 +374,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     }
                 }
             }
+
             Ok(true)
         } else {
             debug!(
