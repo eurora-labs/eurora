@@ -18,7 +18,7 @@ chrono = { workspace = true, features = ["serde"] }
 tracing = { workspace = true }
 eur-proto = { workspace = true }
 taurpc = { version = "0.5.1" }
-specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
+specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
 tauri-specta = { version = "2.0.0-rc.21", features = [
     "javascript",
