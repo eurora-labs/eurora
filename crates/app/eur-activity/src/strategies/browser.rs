@@ -385,10 +385,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         }
 
         // Clean up snapshot collection task
-        if let Some(handle) = self.snapshot_collection_handle.take() {
-            if let Ok(handle) = Arc::try_unwrap(handle) {
-                handle.abort();
-            }
+        if let Some(handle) = self.snapshot_collection_handle.take()
+            && let Ok(handle) = Arc::try_unwrap(handle)
+        {
+            handle.abort();
         }
 
         Ok(())
