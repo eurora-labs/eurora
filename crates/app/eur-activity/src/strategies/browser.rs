@@ -352,7 +352,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         // Check if this strategy can handle the new process
         if self.can_handle_process(process_name) {
             debug!("Browser strategy can continue handling: {}", process_name);
-            if self.active_browser == Some(process_name.to_string()) {
+            if self.active_browser.as_deref() == Some(process_name) {
                 info!("Browser strategy is already tracking {}", process_name);
             }
 
@@ -389,6 +389,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
         debug!("Browser strategy stopping tracking");
+        self.active_browser = None;
 
         if let Some(handle) = self.tracking_handle.take() {
             // Try to unwrap Arc, if we're the only owner, abort the task
