@@ -116,6 +116,25 @@ pub enum ActivitySnapshot {
     DefaultSnapshot,
 }
 
+impl TryFrom<NativeMessage> for ActivitySnapshot {
+    type Error = anyhow::Error;
+
+    fn try_from(value: NativeMessage) -> Result<Self, Self::Error> {
+        match value {
+            NativeMessage::NativeYoutubeSnapshot(snapshot) => Ok(
+                ActivitySnapshot::YoutubeSnapshot(YoutubeSnapshot::from(snapshot)),
+            ),
+            NativeMessage::NativeArticleSnapshot(snapshot) => Ok(
+                ActivitySnapshot::ArticleSnapshot(ArticleSnapshot::from(snapshot)),
+            ),
+            NativeMessage::NativeTwitterSnapshot(snapshot) => Ok(
+                ActivitySnapshot::TwitterSnapshot(TwitterSnapshot::from(snapshot)),
+            ),
+            _ => Err(anyhow::anyhow!("Invalid snapshot type")),
+        }
+    }
+}
+
 /// Main activity structure - now fully cloneable and serializable
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Activity {
