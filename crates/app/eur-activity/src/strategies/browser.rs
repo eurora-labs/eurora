@@ -5,8 +5,6 @@ pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use eur_native_messaging::BrowserBridgeClient;
-use eur_native_messaging::Channel;
 use eur_native_messaging::proto::RequestFrame;
 use eur_native_messaging::proto::ResponseFrame;
 use eur_native_messaging::{
@@ -88,10 +86,7 @@ impl BrowserStrategy {
     /// Creates thin network layer to manage incoming and outgoing requests
     async fn initialize_browser_communication(&mut self) -> ActivityResult<()> {
         let mut client = create_browser_bridge_client().await.map_err(|e| {
-            ActivityError::Network(format!(
-                "Failed to create browser bridge client: {}",
-                e.to_string()
-            ))
+            ActivityError::Network(format!("Failed to create browser bridge client: {}", e))
         })?;
 
         let activity_event_tx: broadcast::Sender<Frame> = broadcast::channel(100).0;
