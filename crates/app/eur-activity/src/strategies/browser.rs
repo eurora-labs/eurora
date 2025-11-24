@@ -5,18 +5,21 @@ pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use dashmap::DashMap;
+use eur_native_messaging::BrowserBridgeClient;
+use eur_native_messaging::Channel;
 use eur_native_messaging::proto::RequestFrame;
 use eur_native_messaging::proto::ResponseFrame;
 use eur_native_messaging::{
     NativeMessage, create_browser_bridge_client,
     server::{Frame, FrameKind},
 };
+use ferrous_focus::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::broadcast;
 use tokio::sync::{Mutex, mpsc, oneshot};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 use url::Url;
 
 use crate::strategies::{ActivityReport, StrategyMetadata};
@@ -54,7 +57,7 @@ use crate::{
 };
 
 /// Browser strategy for collecting web browser activity data
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BrowserStrategy {
     #[serde(skip)]
     tracking_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
@@ -76,193 +79,118 @@ pub struct BrowserStrategy {
 
     #[serde(skip)]
     snapshot_collection_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
+
+    #[serde(skip)]
+    active_browser: Option<String>,
 }
 
 impl BrowserStrategy {
-    /// Create a new browser strategy
-    pub async fn new() -> ActivityResult<Self> {
+    /// Creates thin network layer to manage incoming and outgoing requests
+    async fn initialize_browser_communication(&mut self) -> ActivityResult<()> {
+        let mut client = create_browser_bridge_client().await.map_err(|e| {
+            ActivityError::Network(format!(
+                "Failed to create browser bridge client: {}",
+                e.to_string()
+            ))
+        })?;
+
         let activity_event_tx: broadcast::Sender<Frame> = broadcast::channel(100).0;
 
-        // Try to create the IPC client and initialize bidirectional stream
-        let (_client, stream_tx, pending_requests, request_id_counter, stream_task_handle) =
-            match create_browser_bridge_client().await {
-                Ok(mut client) => {
-                    debug!("Successfully created IPC client for browser strategy");
+        let (tx, rx) = mpsc::unbounded_channel::<Frame>();
+        let pending_requests = Arc::new(DashMap::<u32, PendingRequest>::new());
+        let request_id_counter = Arc::new(AtomicU32::new(1));
 
-                    // Initialize bidirectional stream
-                    let (tx, rx) = mpsc::unbounded_channel::<Frame>();
-                    let pending_requests = Arc::new(DashMap::<u32, PendingRequest>::new());
-                    let request_id_counter = Arc::new(AtomicU32::new(1));
+        let pending_requests_clone = Arc::clone(&pending_requests);
 
-                    let pending_requests_clone = Arc::clone(&pending_requests);
+        let response = client
+            .open(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
+            .await
+            .map_err(|e| {
+                error!("Failed to open bidirectional browser channel: {}", e);
+                ActivityError::Network("Failed to open browser bridge client".to_string())
+            })?;
+        let mut inbound_stream = response.into_inner();
 
-                    // Open the bidirectional stream
-                    match client
-                        .open(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
-                        .await
-                    {
-                        Ok(response) => {
-                            let mut inbound_stream = response.into_inner();
-                            let activity_event_tx = activity_event_tx.clone();
+        let activity_event_tx_clone = activity_event_tx.clone();
 
-                            // Spawn task to handle incoming frames
-                            let stream_task = tokio::spawn(async move {
-                                debug!("Stream handler task started");
-                                while let Ok(Some(frame)) = inbound_stream.message().await {
-                                    let kind = frame.kind.unwrap();
-                                    match kind {
-                                        FrameKind::Request(frame) => {
-                                            debug!(
-                                                "Received request frame: id={}, action={}",
-                                                frame.id, frame.action
-                                            );
-                                            // For now, log unsupported requests from browser extension
-                                            // In the future, this could handle requests initiated by the extension
-                                            warn!(
-                                                "Received unsupported request from browser extension: action={}",
-                                                frame.action
-                                            );
-                                        }
-                                        FrameKind::Response(frame) => {
-                                            // Match response to pending request
-                                            if let Some((_, pending_request)) =
-                                                pending_requests_clone.remove(&frame.id)
-                                            {
-                                                if let Err(err) = pending_request.send(frame.into())
-                                                {
-                                                    warn!(
-                                                        "Failed to send frame to waiting request: {:?}",
-                                                        err
-                                                    );
-                                                }
-                                            } else {
-                                                debug!(
-                                                    "Received frame with no pending request: id={} action={}",
-                                                    frame.id.clone(),
-                                                    frame.action.clone(),
-                                                );
-                                                let _ = activity_event_tx.send(frame.into());
-                                            }
-                                        }
-                                        FrameKind::Event(frame) => {
-                                            // Broadcast event frames to activity tracking
-                                            debug!(
-                                                "Received event frame: action={}",
-                                                frame.action.clone()
-                                            );
-                                            let _ = activity_event_tx.send(frame.into());
-                                        }
-                                        FrameKind::Error(frame) => {
-                                            error!(
-                                                "Received error frame: id={}, message={}",
-                                                frame.id, frame.message
-                                            );
-                                            // Match error to pending request if applicable
-                                            if let Some((_, pending_request)) =
-                                                pending_requests_clone.remove(&frame.id)
-                                                && let Err(err) = pending_request.send(frame.into())
-                                            {
-                                                warn!(
-                                                    "Failed to send error frame to waiting request: {:?}",
-                                                    err
-                                                );
-                                            }
-                                        }
-                                        FrameKind::Cancel(frame) => {
-                                            debug!("Received cancel frame: id={}", frame.id);
-                                            // Remove pending request if it exists
-                                            if pending_requests_clone.remove(&frame.id).is_some() {
-                                                debug!(
-                                                    "Cancelled pending request: id={}",
-                                                    frame.id
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                debug!("Stream handler task ended");
-                            });
-
-                            (
-                                Some(client),
-                                Some(tx),
-                                Some(pending_requests),
-                                Some(request_id_counter),
-                                Some(Arc::new(stream_task)),
-                            )
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Failed to open bidirectional stream: {}. Browser strategy will work with limited functionality.",
-                                e
+        let stream_task = tokio::spawn(async move {
+            debug!("Stream handler task started");
+            while let Ok(Some(frame)) = inbound_stream.message().await {
+                let kind = frame.kind.unwrap();
+                match kind {
+                    FrameKind::Request(frame) => {
+                        debug!(
+                            "Received request frame: id={}, action={}",
+                            frame.id, frame.action
+                        );
+                        // For now, log unsupported requests from browser extension
+                        // In the future, this could handle requests initiated by the extension
+                        warn!(
+                            "Received unsupported request from browser extension: action={}",
+                            frame.action
+                        );
+                    }
+                    FrameKind::Response(frame) => {
+                        // Match response to pending request
+                        if let Some((_, pending_request)) = pending_requests_clone.remove(&frame.id)
+                        {
+                            if let Err(err) = pending_request.send(frame.into()) {
+                                warn!("Failed to send frame to waiting request: {:?}", err);
+                            }
+                        } else {
+                            debug!(
+                                "Received frame with no pending request: id={} action={}",
+                                frame.id.clone(),
+                                frame.action.clone(),
                             );
-                            (Some(client), None, None, None, None)
+                            let _ = activity_event_tx_clone.send(frame.into());
+                        }
+                    }
+                    FrameKind::Event(frame) => {
+                        // Broadcast event frames to activity tracking
+                        debug!("Received event frame: action={}", frame.action.clone());
+                        let _ = activity_event_tx_clone.send(frame.into());
+                    }
+                    FrameKind::Error(frame) => {
+                        error!(
+                            "Received error frame: id={}, message={}",
+                            frame.id, frame.message
+                        );
+                        // Match error to pending request if applicable
+                        if let Some((_, pending_request)) = pending_requests_clone.remove(&frame.id)
+                            && let Err(err) = pending_request.send(frame.into())
+                        {
+                            warn!("Failed to send error frame to waiting request: {:?}", err);
+                        }
+                    }
+                    FrameKind::Cancel(frame) => {
+                        debug!("Received cancel frame: id={}", frame.id);
+                        // Remove pending request if it exists
+                        if pending_requests_clone.remove(&frame.id).is_some() {
+                            debug!("Cancelled pending request: id={}", frame.id);
                         }
                     }
                 }
-                Err(e) => {
-                    warn!(
-                        "Failed to create IPC client: {}. Browser strategy will work with limited functionality.",
-                        e
-                    );
-                    (None, None, None, None, None)
-                }
-            };
-
-        Ok(Self {
-            tracking_handle: None,
-            sender: None,
-            stream_tx,
-            pending_requests,
-            request_id_counter,
-            stream_task_handle,
-            activity_event_tx: Some(activity_event_tx),
-            snapshot_collection_handle: None,
-        })
-    }
-}
-
-#[async_trait]
-impl StrategySupport for BrowserStrategy {
-    fn get_supported_processes() -> Vec<&'static str> {
-        vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
-    }
-}
-
-#[async_trait]
-impl ActivityStrategyFunctionality for BrowserStrategy {
-    fn can_handle_process(&self, process_name: &str) -> bool {
-        BrowserStrategy::get_supported_processes().contains(&process_name)
-    }
-
-    async fn start_tracking(
-        &mut self,
-        focus_window: &ferrous_focus::FocusedWindow,
-        sender: mpsc::UnboundedSender<ActivityReport>,
-    ) -> ActivityResult<()> {
-        self.sender = Some(sender.clone());
-        let process_name = focus_window.process_name.clone();
-
-        match self.get_metadata().await {
-            Ok(metadata) => {
-                let assets = self.retrieve_assets().await.unwrap_or(vec![]);
-                let activity = Activity::new(
-                    metadata.url.unwrap_or_default(),
-                    metadata.icon,
-                    process_name.clone().unwrap_or_default(),
-                    assets,
-                );
-                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                    warn!("Failed to send new activity report - receiver dropped");
-                }
             }
-            Err(err) => {
-                warn!("Failed to get metadata: {}", err);
-            }
-        }
+            debug!("Stream handler task ended");
+        });
 
-        debug!("Browser strategy starting tracking for: {:?}", process_name);
+        self.stream_tx = Some(tx);
+        self.pending_requests = Some(pending_requests);
+        self.request_id_counter = Some(request_id_counter);
+        self.stream_task_handle = Some(Arc::new(stream_task));
+        self.activity_event_tx = Some(activity_event_tx);
 
+        Ok(())
+    }
+
+    async fn init_collection(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
+        // Initialize tracking logic here
+        let Some(sender) = self.sender.clone() else {
+            return Err(ActivityError::Strategy(
+                "Sender not initialized".to_string(),
+            ));
+        };
         let mut activity_receiver = self.activity_event_tx.clone().unwrap().subscribe();
         let _default_icon = focus_window.icon.clone();
         let mut strategy = self.clone();
@@ -324,6 +252,71 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
         // Start snapshot collection
         self.collect_snapshots();
+        Ok(())
+    }
+
+    /// Create a new browser strategy
+    pub async fn new() -> ActivityResult<Self> {
+        let mut strategy = BrowserStrategy::default();
+        strategy.initialize_browser_communication().await?;
+
+        Ok(strategy)
+    }
+}
+
+#[async_trait]
+impl StrategySupport for BrowserStrategy {
+    fn get_supported_processes() -> Vec<&'static str> {
+        vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
+    }
+}
+
+#[async_trait]
+impl ActivityStrategyFunctionality for BrowserStrategy {
+    fn can_handle_process(&self, process_name: &str) -> bool {
+        BrowserStrategy::get_supported_processes().contains(&process_name)
+    }
+
+    async fn start_tracking(
+        &mut self,
+        focus_window: &FocusedWindow,
+        sender: mpsc::UnboundedSender<ActivityReport>,
+    ) -> ActivityResult<()> {
+        self.sender = Some(sender.clone());
+        let process_name = focus_window.process_name.clone();
+        self.active_browser = process_name.clone();
+
+        match self.get_metadata().await {
+            Ok(metadata) => {
+                let assets = self.retrieve_assets().await.unwrap_or(vec![]);
+                let activity = Activity::new(
+                    metadata.url.unwrap_or_default(),
+                    metadata.icon,
+                    process_name.clone().unwrap_or_default(),
+                    assets,
+                );
+                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    warn!("Failed to send new activity report - receiver dropped");
+                }
+            }
+            Err(err) => {
+                let activity = Activity::new(
+                    focus_window.process_name.clone().unwrap_or_default(),
+                    focus_window.icon.clone(),
+                    focus_window.process_name.clone().unwrap_or_default(),
+                    vec![],
+                );
+                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    warn!("Failed to send new activity report - receiver dropped");
+                }
+
+                warn!("Failed to get metadata: {}", err);
+            }
+        }
+
+        self.init_collection(focus_window).await?;
+
+        debug!("Browser strategy starting tracking for: {:?}", process_name);
 
         Ok(())
     }
@@ -337,6 +330,14 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         // Check if this strategy can handle the new process
         if self.can_handle_process(process_name) {
             debug!("Browser strategy can continue handling: {}", process_name);
+            if self.active_browser.as_deref() != Some(process_name) {
+                info!(
+                    "Detected new browser {} that is not being tracked. Ignoring.",
+                    process_name
+                );
+                return Ok(true);
+            }
+
             if let Some(sender) = self.sender.clone() {
                 match self.get_metadata().await {
                     Ok(metadata) => {
@@ -355,6 +356,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     }
                 }
             }
+
             Ok(true)
         } else {
             debug!(
@@ -369,6 +371,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
         debug!("Browser strategy stopping tracking");
+        self.active_browser = None;
 
         if let Some(handle) = self.tracking_handle.take() {
             // Try to unwrap Arc, if we're the only owner, abort the task
