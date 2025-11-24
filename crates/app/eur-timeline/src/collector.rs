@@ -18,7 +18,7 @@ use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,
 };
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     ActivityStrategy,
@@ -357,6 +357,25 @@ impl CollectorService {
                                     }
                                     Ok(false) => {
                                         debug!("Strategy can no longer handle: {}", process_name);
+                                        match ActivityStrategy::new(&process_name).await {
+                                            Ok(mut new_strategy) => {
+                                                // Start tracking with new strategy
+                                                let _ = new_strategy
+                                                    .start_tracking(
+                                                        &window,
+                                                        activity_tx_inner.clone(),
+                                                    )
+                                                    .await
+                                                    .map_err(|err| {
+                                                        error!("Failed to start tracking: {}", err);
+                                                    });
+
+                                                *strategy_write = new_strategy;
+                                            }
+                                            Err(err) => {
+                                                error!("Failed to create new strategy: {}", err);
+                                            }
+                                        };
 
                                         if let Ok(mut new_strategy) =
                                             ActivityStrategy::new(&process_name).await
@@ -367,6 +386,11 @@ impl CollectorService {
                                                 .await;
 
                                             *strategy_write = new_strategy;
+                                        } else {
+                                            debug!(
+                                                "Failed to create new strategy for: {}",
+                                                process_name
+                                            );
                                         }
                                     }
                                     Err(err) => {
