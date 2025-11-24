@@ -27,7 +27,7 @@
 		"@sveltejs/vite-plugin-svelte": "catalog:svelte",
 		"@tailwindcss/postcss": "catalog:",
 		"autoprefixer": "^10.4.22",
-		"bits-ui": "^2.14.3",
+		"bits-ui": "^2.14.4",
 		"clsx": "^2.1.1",
 		"eslint": "^9.39.1",
 		"formsnap": "^2.0.1",
