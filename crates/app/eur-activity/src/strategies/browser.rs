@@ -352,8 +352,12 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         // Check if this strategy can handle the new process
         if self.can_handle_process(process_name) {
             debug!("Browser strategy can continue handling: {}", process_name);
-            if self.active_browser.as_deref() == Some(process_name) {
-                info!("Browser strategy is already tracking {}", process_name);
+            if self.active_browser.as_deref() != Some(process_name) {
+                info!(
+                    "Detected new browser {} that is not being tracked. Ignoring.",
+                    process_name
+                );
+                return Ok(true);
             }
 
             if let Some(sender) = self.sender.clone() {
