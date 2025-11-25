@@ -27,13 +27,13 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v5
+            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
               with:
                   persist-credentials: false
                   lfs: true
               if: ${{ github.event_name != 'workflow_dispatch' }}
               name: Checkout
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v5
+            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
               name: Checkout (specific commit from manual dispatch)
               if: ${{ github.event_name == 'workflow_dispatch' }}
               with:
