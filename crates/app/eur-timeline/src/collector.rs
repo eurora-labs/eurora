@@ -308,9 +308,8 @@ impl CollectorService {
                         let mut storage = storage_for_reports.lock().await;
                         if let Some(current_activity) = storage.get_all_activities_mut().back_mut()
                         {
-                            for snapshot in snapshots {
-                                current_activity.snapshots.push(snapshot);
-                            }
+                            current_activity.snapshots.clear();
+                            current_activity.snapshots.extend(snapshots);
                         }
                     }
                     ActivityReport::Assets(assets) => {
@@ -318,6 +317,7 @@ impl CollectorService {
                         let mut storage = storage_for_reports.lock().await;
                         if let Some(current_activity) = storage.get_all_activities_mut().back_mut()
                         {
+                            current_activity.assets.clear();
                             current_activity.assets.extend(assets);
                         }
                     }
