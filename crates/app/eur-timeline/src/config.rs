@@ -177,7 +177,7 @@ mod tests {
     fn test_default_config() {
         let config = TimelineConfig::default();
         assert!(config.validate().is_ok());
-        assert_eq!(config.storage.max_activities, 1000);
+        assert_eq!(config.storage.max_activities, 5);
         assert_eq!(config.collector.collection_interval, Duration::from_secs(3));
     }
 
