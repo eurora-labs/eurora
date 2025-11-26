@@ -18,7 +18,7 @@ pub struct StorageConfig {
 impl Default for StorageConfig {
     fn default() -> Self {
         Self {
-            max_activities: 1000,
+            max_activities: 5,
             max_age: Duration::from_secs(3600), // 1 hour
             auto_cleanup: true,
         }
