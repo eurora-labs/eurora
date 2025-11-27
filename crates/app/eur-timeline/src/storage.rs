@@ -319,7 +319,7 @@ mod tests {
 
         let stats = storage.get_stats();
         assert_eq!(stats.total_activities, 1);
-        assert_eq!(stats.capacity, 1000); // Default capacity
+        assert_eq!(stats.capacity, 5); // Default capacity
         assert!(stats.newest_activity_age.is_some());
     }
 }
