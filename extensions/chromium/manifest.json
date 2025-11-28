@@ -1,9 +1,9 @@
 {
 	"name": "Eurora",
 	"description": "Eurora Chrome Extension",
-	"version": "0.0.8",
+	"version": "0.1.0",
 	"manifest_version": 3,
-	"homepage_url": "https://eurora-labs.com",
+	"homepage_url": "https://www.eurora-labs.com",
 	"background": {
 		"service_worker": "scripts/background/main.js"
 	},
