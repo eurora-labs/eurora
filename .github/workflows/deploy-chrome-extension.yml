@@ -1,0 +1,240 @@
+name: Deploy Chrome Extension
+
+on:
+    # Manual trigger
+    workflow_dispatch:
+        inputs:
+            channel:
+                type: choice
+                required: true
+                description: Release channel
+                default: production
+                options:
+                    - production
+                    - beta
+            version:
+                type: string
+                required: true
+                description: Extension version (e.g., 0.1.0)
+
+    # Trigger on tags matching extension release pattern
+    push:
+        tags:
+            - 'chrome/v*.*.*'
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        environment:
+            name: chrome-web-store
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
+                  lfs: true
+
+            - name: Init Node Environment
+              uses: ./.github/actions/init-env-node
+
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
+
+            - name: Extract version from input or tag
+              id: version
+              shell: bash
+              env:
+                  EVENT_NAME: ${{ github.event_name }}
+                  GITHUB_REF: ${{ github.ref }}
+                  INPUT_VERSION: ${{ github.event.inputs.version }}
+              run: |
+                  if [ "$EVENT_NAME" == "push" ]; then
+                    # Extract version from tag (e.g., chrome/v0.1.0 -> 0.1.0)
+                    VERSION="${GITHUB_REF#refs/tags/chrome/v}"
+                  else
+                    VERSION="$INPUT_VERSION"
+                  fi
+                  if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}([-\+][0-9A-Za-z\.-]+)?$ ]]; then
+                    echo "Invalid version: $VERSION" >&2
+                    exit 1
+                  fi
+                  printf "version=%s\n" "$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "Chrome extension version: $VERSION"
+
+            - name: Update manifest version
+              shell: bash
+              env:
+                  VERSION: ${{ steps.version.outputs.version }}
+              run: |
+                  # Update version in Chrome manifest safely using jq
+                  tmp=$(mktemp)
+                  jq --arg v "$VERSION" '.version = $v' extensions/chromium/manifest.json > "$tmp"
+                  mv "$tmp" extensions/chromium/manifest.json
+                  echo "Updated manifest.json version to $VERSION"
+
+            - name: Build everything for chrome
+              run: pnpm build:chrome
+              env:
+                  NODE_ENV: production
+
+            - name: Create Chrome extension zip
+              shell: bash
+              run: |
+                  cd extensions/chromium
+                  zip -r ../../chrome-extension.zip . -x "*.git*" -x "*.zip"
+                  cd ../..
+                  echo "Created chrome-extension.zip"
+                  ls -lh chrome-extension.zip
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+              with:
+                  name: chrome-extension-${{ steps.version.outputs.version }}
+                  path: chrome-extension.zip
+                  retention-days: 30
+
+            - name: Upload to Chrome Web Store
+              if: github.event.inputs.channel == 'production' || github.event_name == 'push'
+              shell: bash
+              env:
+                  CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+                  CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+                  CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+                  CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+              run: |
+                  # Get access token using refresh token
+                  ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+                    -d "client_id=$CHROME_CLIENT_ID" \
+                    -d "client_secret=$CHROME_CLIENT_SECRET" \
+                    -d "refresh_token=$CHROME_REFRESH_TOKEN" \
+                    -d "grant_type=refresh_token" | jq -r '.access_token')
+
+                  if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+                    echo "Failed to get access token"
+                    exit 1
+                  fi
+
+                  # Upload the extension
+                  UPLOAD_RESPONSE=$(curl -s -X PUT \
+                    "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID" \
+                    -H "Authorization: Bearer $ACCESS_TOKEN" \
+                    -H "x-goog-api-version: 2" \
+                    -F "file=@chrome-extension.zip")
+
+                  echo "Upload response: $UPLOAD_RESPONSE"
+
+                  UPLOAD_STATUS=$(echo "$UPLOAD_RESPONSE" | jq -r '.uploadState')
+                  if [ "$UPLOAD_STATUS" != "SUCCESS" ]; then
+                    echo "Upload failed with status: $UPLOAD_STATUS"
+                    echo "$UPLOAD_RESPONSE" | jq -r '.itemError[]?.error_detail // empty'
+                    exit 1
+                  fi
+
+                  echo "Extension uploaded successfully"
+
+                  # Publish the extension
+                  PUBLISH_RESPONSE=$(curl -s -X POST \
+                    "https://www.googleapis.com/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID/publish" \
+                    -H "Authorization: Bearer $ACCESS_TOKEN" \
+                    -H "x-goog-api-version: 2" \
+                    -H "Content-Length: 0")
+
+                  echo "Publish response: $PUBLISH_RESPONSE"
+
+                  PUBLISH_STATUS=$(echo "$PUBLISH_RESPONSE" | jq -r '.status[0]')
+                  if [ "$PUBLISH_STATUS" != "OK" ] && [ "$PUBLISH_STATUS" != "PENDING_REVIEW" ]; then
+                    echo "Publish failed with status: $PUBLISH_STATUS"
+                    exit 1
+                  fi
+
+                  echo "Extension published successfully (status: $PUBLISH_STATUS)"
+
+            - name: Upload to Chrome Web Store (Beta/Trusted Testers)
+              if: github.event.inputs.channel == 'beta'
+              shell: bash
+              env:
+                  CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+                  CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+                  CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+                  CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+              run: |
+                  # Get access token using refresh token
+                  ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+                    -d "client_id=$CHROME_CLIENT_ID" \
+                    -d "client_secret=$CHROME_CLIENT_SECRET" \
+                    -d "refresh_token=$CHROME_REFRESH_TOKEN" \
+                    -d "grant_type=refresh_token" | jq -r '.access_token')
+
+                  if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+                    echo "Failed to get access token"
+                    exit 1
+                  fi
+
+                  # Upload the extension
+                  UPLOAD_RESPONSE=$(curl -s -X PUT \
+                    "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID" \
+                    -H "Authorization: Bearer $ACCESS_TOKEN" \
+                    -H "x-goog-api-version: 2" \
+                    -F "file=@chrome-extension.zip")
+
+                  echo "Upload response: $UPLOAD_RESPONSE"
+
+                  UPLOAD_STATUS=$(echo "$UPLOAD_RESPONSE" | jq -r '.uploadState')
+                  if [ "$UPLOAD_STATUS" != "SUCCESS" ]; then
+                    echo "Upload failed with status: $UPLOAD_STATUS"
+                    echo "$UPLOAD_RESPONSE" | jq -r '.itemError[]?.error_detail // empty'
+                    exit 1
+                  fi
+
+                  echo "Extension uploaded successfully"
+
+                  # Publish to trusted testers only
+                  PUBLISH_RESPONSE=$(curl -s -X POST \
+                    "https://www.googleapis.com/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID/publish?publishTarget=trustedTesters" \
+                    -H "Authorization: Bearer $ACCESS_TOKEN" \
+                    -H "x-goog-api-version: 2" \
+                    -H "Content-Length: 0")
+
+                  echo "Publish response: $PUBLISH_RESPONSE"
+
+                  PUBLISH_STATUS=$(echo "$PUBLISH_RESPONSE" | jq -r '.status[0]')
+                  if [ "$PUBLISH_STATUS" != "OK" ] && [ "$PUBLISH_STATUS" != "PENDING_REVIEW" ]; then
+                    echo "Publish failed with status: $PUBLISH_STATUS"
+                    exit 1
+                  fi
+
+                  echo "Extension published to trusted testers (status: $PUBLISH_STATUS)"
+
+            - name: Create GitHub Release
+              if: github.event_name == 'push'
+              uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe # v2
+              with:
+                  files: |
+                      chrome-extension.zip
+                  body: |
+                      Chrome Extension Release ${{ steps.version.outputs.version }}
+
+                      This release has been automatically built and submitted to the Chrome Web Store.
+                  draft: false
+                  prerelease: false
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Notify on success
+              if: success()
+              run: |
+                  echo "✅ Chrome extension ${{ steps.version.outputs.version }} successfully built and deployed!"
+
+            - name: Notify on failure
+              if: failure()
+              run: |
+                  echo "❌ Chrome extension deployment failed. Check the logs for details."
