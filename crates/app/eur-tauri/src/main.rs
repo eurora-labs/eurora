@@ -7,7 +7,7 @@ use dotenv::dotenv;
 // use eur_conversation::{ChatMessage, Conversation, ConversationStorage};
 use eur_encrypt::MainKey;
 use eur_native_messaging::create_browser_bridge_client;
-use eur_personal_db::{Activity, PersonalDatabaseManager};
+// use eur_personal_db::{Activity, PersonalDatabaseManager};
 use eur_settings::AppSettings;
 use eur_tauri::launcher::{monitor_cursor_for_hover, toggle_launcher_window};
 use eur_tauri::procedures::timeline_procedures::TimelineAppEvent;
@@ -46,7 +46,6 @@ use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tokio::sync::Mutex;
 use tracing::{debug, error};
-use uuid::Uuid;
 
 async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
     if let Some(update) = app.updater()?.check().await? {
@@ -320,66 +319,63 @@ fn main() {
                                 }
                             });
 
-                            // Subscribe to focus change events before starting timeline
-                            let mut focus_receiver = {
+                            // Subscribe to activity change events before starting timeline
+                            let mut activity_receiver = {
                                 let timeline = timeline_mutex.lock().await;
-                                timeline.subscribe_to_focus_events()
+                                timeline.subscribe_to_activity_events()
                             };
 
 
 
-                            let focus_timeline_handle = db_app_handle.clone();
+                            let activity_timeline_handle = db_app_handle.clone();
                             tauri::async_runtime::spawn(async move {
-                                let db_manager = focus_timeline_handle.state::<PersonalDatabaseManager>().inner();
-                                while let Ok(focus_event) = focus_receiver.recv().await {
-                                    debug!("Focus changed to: {} - {}",
-                                        focus_event.process_name.clone(),
-                                        focus_event.window_title.clone()
+                                // let db_manager = activity_timeline_handle.state::<PersonalDatabaseManager>().inner();
+                                while let Ok(activity_event) = activity_receiver.recv().await {
+                                    debug!("Activity changed to: {}",
+                                        activity_event.name.clone(),
                                     );
 
                                     let mut primary_icon_color = None;
                                     let mut icon_base64 = None;
 
-                                    if let Some(icon) = focus_event.icon.as_ref() {
+                                    if let Some(icon) = activity_event.icon.as_ref() {
                                         primary_icon_color = color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 10, 10).ok().map(|c| format!("#{r:02X}{g:02X}{b:02X}", r = c[0].r, g = c[0].g, b = c[0].b));
                                         icon_base64 = eur_vision::rgba_to_base64(icon).ok();
                                     }
 
-                                    let _ = TauRpcTimelineApiEventTrigger::new(focus_timeline_handle.clone())
+                                    let _ = TauRpcTimelineApiEventTrigger::new(activity_timeline_handle.clone())
                                         .new_app_event( TimelineAppEvent {
-                                            name: focus_event.process_name.clone(),
+                                            name: activity_event.name.clone(),
                                             color: primary_icon_color,
                                             icon_base64
                                         });
 
 
-                                    debug!("Timestamp: {}", focus_event.timestamp);
+                                    // // Close previous active activity if exists
+                                    // if let Ok(Some(last_activity)) = db_manager.get_last_active_activity().await {
+                                    //     let _ = db_manager.update_activity_end_time(&last_activity.id, focus_event.timestamp).await;
+                                    //     debug!("Closed previous activity: {}", last_activity.name);
+                                    // }
 
-                                    // Close previous active activity if exists
-                                    if let Ok(Some(last_activity)) = db_manager.get_last_active_activity().await {
-                                        let _ = db_manager.update_activity_end_time(&last_activity.id, focus_event.timestamp).await;
-                                        debug!("Closed previous activity: {}", last_activity.name);
-                                    }
+                                    // // Create new activity for the focus change
+                                    // let activity = Activity {
+                                    //     id: Uuid::new_v4().to_string(),
+                                    //     name: focus_event.window_title.clone(),
+                                    //     icon_path: None,
+                                    //     process_name: focus_event.process_name.clone(),
+                                    //     started_at: focus_event.timestamp.to_rfc3339(),
+                                    //     ended_at: None,
+                                    // };
 
-                                    // Create new activity for the focus change
-                                    let activity = Activity {
-                                        id: Uuid::new_v4().to_string(),
-                                        name: focus_event.window_title.clone(),
-                                        icon_path: None,
-                                        process_name: focus_event.process_name.clone(),
-                                        started_at: focus_event.timestamp.to_rfc3339(),
-                                        ended_at: None,
-                                    };
-
-                                    match db_manager.insert_activity(&activity).await {
-                                        Ok(_) => {
-                                            debug!("Inserted activity: {} ({})", activity.name, activity.process_name);
-                                            debug!("Activity inserted with ID: {}", activity.id);
-                                        }
-                                        Err(e) => {
-                                            error!("Failed to insert activity: {}", e);
-                                        }
-                                    }
+                                    // match db_manager.insert_activity(&activity).await {
+                                    //     Ok(_) => {
+                                    //         debug!("Inserted activity: {} ({})", activity.name, activity.process_name);
+                                    //         debug!("Activity inserted with ID: {}", activity.id);
+                                    //     }
+                                    //     Err(e) => {
+                                    //         error!("Failed to insert activity: {}", e);
+                                    //     }
+                                    // }
                                 }
                             });
 
