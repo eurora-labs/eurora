@@ -1,6 +1,4 @@
 //! Timeline collector service implementation
-
-use chrono::{DateTime, Utc};
 use std::{
     sync::{
         Arc,
@@ -9,7 +7,6 @@ use std::{
     time::Duration,
 };
 
-use eur_activity::Activity;
 use eur_activity::DefaultStrategy;
 use eur_activity::strategies::ActivityReport;
 use eur_activity::{ContextChip, strategies::ActivityStrategyFunctionality};
@@ -29,27 +26,11 @@ use crate::{
 
 /// Event emitted when focus changes to a new application
 #[derive(Debug, Clone)]
-pub struct FocusedWindowEvent {
-    /// The name of the process that received focus
-    pub process_name: String,
-    /// The title of the window that received focus
-    pub window_title: String,
+pub struct ActivityEvent {
+    /// The name of the activity
+    pub name: String,
     /// The icon of the application (if available)
     pub icon: Option<image::RgbaImage>,
-    /// Timestamp when the focus change occurred
-    pub timestamp: DateTime<Utc>,
-}
-
-impl FocusedWindowEvent {
-    /// Create a new focus change event
-    pub fn new(process_name: String, window_title: String, icon: Option<image::RgbaImage>) -> Self {
-        Self {
-            process_name,
-            window_title,
-            icon,
-            timestamp: chrono::Utc::now(),
-        }
-    }
 }
 
 /// Service responsible for collecting activities and managing the collection lifecycle
@@ -71,11 +52,9 @@ pub struct CollectorService {
     /// Restart attempt counter
     restart_attempts: u32,
     /// Broadcast channel for focus change events
-    focus_event_tx: broadcast::Sender<FocusedWindowEvent>,
+    activity_event_tx: broadcast::Sender<ActivityEvent>,
     /// Broadcast channel for new assets event
     assets_event_tx: broadcast::Sender<Vec<ContextChip>>,
-    /// Broadcast channel for new activity events
-    activity_event_tx: broadcast::Sender<Vec<Activity>>,
 }
 
 impl CollectorService {
@@ -86,9 +65,8 @@ impl CollectorService {
             config.collection_interval
         );
 
-        let (focus_event_tx, _) = broadcast::channel(100);
-        let (assets_event_tx, _) = broadcast::channel(100);
         let (activity_event_tx, _) = broadcast::channel(100);
+        let (assets_event_tx, _) = broadcast::channel(100);
 
         Self {
             storage,
@@ -99,9 +77,8 @@ impl CollectorService {
             focus_thread_handle: None,
             focus_shutdown_signal: None,
             restart_attempts: 0,
-            focus_event_tx,
-            assets_event_tx,
             activity_event_tx,
+            assets_event_tx,
         }
     }
 
@@ -115,9 +92,8 @@ impl CollectorService {
             timeline_config.collector.collection_interval
         );
 
-        let (focus_event_tx, _) = broadcast::channel(100);
-        let (assets_event_tx, _) = broadcast::channel(100);
         let (activity_event_tx, _) = broadcast::channel(100);
+        let (assets_event_tx, _) = broadcast::channel(100);
 
         Self {
             storage,
@@ -128,9 +104,8 @@ impl CollectorService {
             focus_thread_handle: None,
             focus_shutdown_signal: None,
             restart_attempts: 0,
-            focus_event_tx,
-            assets_event_tx,
             activity_event_tx,
+            assets_event_tx,
         }
     }
 
@@ -143,7 +118,6 @@ impl CollectorService {
         debug!("Starting timeline collection service");
 
         self.start_focus_tracking().await?;
-        // self.start_with_focus_tracking().await?;
 
         self.restart_attempts = 0;
         Ok(())
@@ -258,9 +232,9 @@ impl CollectorService {
         }
     }
 
-    /// Subscribe to focus change events
-    pub fn subscribe_to_focus_events(&self) -> broadcast::Receiver<FocusedWindowEvent> {
-        self.focus_event_tx.subscribe()
+    /// Subscribe to activity events
+    pub fn subscribe_to_activity_events(&self) -> broadcast::Receiver<ActivityEvent> {
+        self.activity_event_tx.subscribe()
     }
 
     /// Subscribe to assets change events
@@ -274,9 +248,8 @@ impl CollectorService {
             DefaultStrategy,
         )));
         let strategy_clone = Arc::clone(&strategy);
-        let focus_event_tx = self.focus_event_tx.clone();
+        let activity_event_tx = self.activity_event_tx.clone();
         let assets_event_tx = self.assets_event_tx.clone();
-        let _activity_event_tx = self.activity_event_tx.clone();
 
         // Create channel for activity reports from strategies
         let (activity_tx, mut activity_rx) = mpsc::unbounded_channel::<ActivityReport>();
@@ -285,7 +258,7 @@ impl CollectorService {
         let storage_for_reports = Arc::clone(&self.storage);
         let assets_event_tx_for_reports = assets_event_tx.clone();
         tokio::spawn(async move {
-            let focus_event_tx_inner = focus_event_tx.clone();
+            let activity_event_tx_inner = activity_event_tx.clone();
             while let Some(report) = activity_rx.recv().await {
                 match report {
                     ActivityReport::NewActivity(activity) => {
@@ -293,12 +266,11 @@ impl CollectorService {
                         let context_chips = activity.get_context_chips();
                         let _ = assets_event_tx_for_reports.send(context_chips);
 
-                        let focus_event = FocusedWindowEvent::new(
-                            activity.process_name.clone(),
-                            activity.name.clone(),
-                            activity.icon.clone(),
-                        );
-                        let _ = focus_event_tx_inner.send(focus_event);
+                        let focus_event = ActivityEvent {
+                            name: activity.name.clone(),
+                            icon: activity.icon.clone(),
+                        };
+                        let _ = activity_event_tx_inner.send(focus_event);
 
                         let mut storage = storage_for_reports.lock().await;
                         storage.add_activity(activity);
@@ -376,22 +348,6 @@ impl CollectorService {
                                                 error!("Failed to create new strategy: {}", err);
                                             }
                                         };
-
-                                        if let Ok(mut new_strategy) =
-                                            ActivityStrategy::new(&process_name).await
-                                        {
-                                            // Start tracking with new strategy
-                                            let _ = new_strategy
-                                                .start_tracking(&window, activity_tx_inner.clone())
-                                                .await;
-
-                                            *strategy_write = new_strategy;
-                                        } else {
-                                            debug!(
-                                                "Failed to create new strategy for: {}",
-                                                process_name
-                                            );
-                                        }
                                     }
                                     Err(err) => {
                                         debug!("Error handling process change: {}", err);
