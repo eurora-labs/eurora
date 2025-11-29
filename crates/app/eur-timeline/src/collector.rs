@@ -77,7 +77,7 @@ impl CollectorService {
             focus_thread_handle: None,
             focus_shutdown_signal: None,
             restart_attempts: 0,
-            activity_event_tx: activity_event_tx,
+            activity_event_tx,
             assets_event_tx,
         }
     }
@@ -104,7 +104,7 @@ impl CollectorService {
             focus_thread_handle: None,
             focus_shutdown_signal: None,
             restart_attempts: 0,
-            activity_event_tx: activity_event_tx,
+            activity_event_tx,
             assets_event_tx,
         }
     }
