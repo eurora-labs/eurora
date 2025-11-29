@@ -3,7 +3,7 @@
         "autostart": true
     },
     "hover": {
-        "enabled": true
+        "enabled": false
     },
     "telemetry": {
         "anonymousMetrics": true,
