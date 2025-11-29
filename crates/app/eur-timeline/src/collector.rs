@@ -376,22 +376,6 @@ impl CollectorService {
                                                 error!("Failed to create new strategy: {}", err);
                                             }
                                         };
-
-                                        if let Ok(mut new_strategy) =
-                                            ActivityStrategy::new(&process_name).await
-                                        {
-                                            // Start tracking with new strategy
-                                            let _ = new_strategy
-                                                .start_tracking(&window, activity_tx_inner.clone())
-                                                .await;
-
-                                            *strategy_write = new_strategy;
-                                        } else {
-                                            debug!(
-                                                "Failed to create new strategy for: {}",
-                                                process_name
-                                            );
-                                        }
                                     }
                                     Err(err) => {
                                         debug!("Error handling process change: {}", err);
