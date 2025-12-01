@@ -14,10 +14,6 @@ general: GeneralSettings;
  */
 telemetry: TelemetrySettings; 
 /**
- * Launcher settings
- */
-launcher: LauncherSettings; 
-/**
  * Backend provider settings
  */
 backend?: BackendSettings }
@@ -69,15 +65,11 @@ export type GeneralSettings = {
  */
 autostart: boolean }
 
-export type Hotkey = { modifiers: string[]; key: string }
-
 export type ImageSource = 
 /**
  * The URL or base64-encoded image data
  */
 { Url: string }
-
-export type LauncherSettings = { hotkey?: Hotkey }
 
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
@@ -190,7 +182,7 @@ tool_call_id: string | null;
  */
 text: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["conversation","channel","query"],"switch_conversation":["conversation_id"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'personal_db.conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"]}', 'personal_db.message':'{"get":["conversation_id","limit","offset"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_launcher_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_launcher_settings":["launcher_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["conversation","channel","query"],"switch_conversation":["conversation_id"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'personal_db.conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"]}', 'personal_db.message':'{"get":["conversation_id","limit","offset"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[],"send_key_to_launcher":["key"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}', 'user':'{"set_launcher_hotkey":["key","modifiers"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
 "chat": {current_conversation_changed: (conversation: Conversation) => Promise<void>, 
@@ -210,10 +202,8 @@ switch_to_ollama: (baseUrl: string, model: string) => Promise<null>,
 switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<null>},
 "settings": {get_all_settings: () => Promise<AppSettings>, 
 get_general_settings: () => Promise<GeneralSettings>, 
-get_launcher_settings: () => Promise<LauncherSettings>, 
 get_telemetry_settings: () => Promise<TelemetrySettings>, 
-set_general_settings: (generalSettings: GeneralSettings) => Promise<null>, 
-set_launcher_settings: (launcherSettings: LauncherSettings) => Promise<null>},
+set_general_settings: (generalSettings: GeneralSettings) => Promise<null>},
 "system": {check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
 list_activities: () => Promise<ContextChip[]>, 
 send_key_to_launcher: (key: string) => Promise<null>},

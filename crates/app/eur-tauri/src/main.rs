@@ -10,7 +10,6 @@ use eur_native_messaging::create_browser_bridge_client;
 // use eur_personal_db::{Activity, PersonalDatabaseManager};
 use eur_settings::AppSettings;
 use eur_tauri::procedures::timeline_procedures::TimelineAppEvent;
-use eur_tauri::util;
 use eur_tauri::{
     WindowState, create_window,
     procedures::{
@@ -37,7 +36,6 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tauri_plugin_log::{Target, TargetKind, fern};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
@@ -376,16 +374,6 @@ fn main() {
                             })
                             .unwrap();
                         app_handle_user.manage(user_controller);
-
-                        // Register the initial global shortcut now that user controller is available
-                        let launcher_shortcut = crate::util::convert_hotkey_to_shortcut(app_settings.launcher.hotkey.clone());
-
-                        // Register the global shortcut
-                        if let Err(e) = app_handle_user.global_shortcut().register(launcher_shortcut) {
-                            error!("Failed to register initial launcher shortcut: {}", e);
-                        } else {
-                            debug!("Successfully registered initial launcher shortcut: {:?}", launcher_shortcut);
-                        }
                     });
 
 
