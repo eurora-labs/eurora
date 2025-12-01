@@ -1,9 +1,7 @@
-use eur_settings::{AppSettings, GeneralSettings, LauncherSettings, TelemetrySettings};
+use eur_settings::{AppSettings, GeneralSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
-use tauri_plugin_global_shortcut::GlobalShortcutExt;
-use tracing::debug;
 
-use crate::{shared_types::SharedAppSettings, util::convert_hotkey_to_shortcut};
+use crate::shared_types::SharedAppSettings;
 
 #[taurpc::procedures(path = "settings")]
 pub trait SettingsApi {
@@ -19,18 +17,9 @@ pub trait SettingsApi {
         app_handle: tauri::AppHandle<R>,
     ) -> Result<GeneralSettings, String>;
 
-    async fn get_launcher_settings<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<LauncherSettings, String>;
-
     async fn set_general_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         general_settings: GeneralSettings,
-    ) -> Result<(), String>;
-
-    async fn set_launcher_settings<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        launcher_settings: LauncherSettings,
     ) -> Result<(), String>;
 }
 #[derive(Clone)]
@@ -68,16 +57,6 @@ impl SettingsApi for SettingsApiImpl {
         Ok(settings.general.clone())
     }
 
-    async fn get_launcher_settings<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<LauncherSettings, String> {
-        let state = app_handle.state::<SharedAppSettings>();
-        let settings = state.lock().await;
-
-        Ok(settings.launcher.clone())
-    }
-
     async fn set_general_settings<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
@@ -90,43 +69,6 @@ impl SettingsApi for SettingsApiImpl {
         settings
             .save_to_default_path()
             .map_err(|e| format!("Failed to persist general settings: {e}"))?;
-
-        Ok(())
-    }
-
-    async fn set_launcher_settings<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        launcher_settings: LauncherSettings,
-    ) -> Result<(), String> {
-        let state = app_handle.state::<SharedAppSettings>();
-        let mut settings = state.lock().await;
-        debug!("Launcher settings changed: {:?}", launcher_settings);
-
-        if settings.launcher.hotkey != launcher_settings.hotkey {
-            let previous_hotkey = convert_hotkey_to_shortcut(settings.launcher.hotkey.clone());
-            let new_hotkey = convert_hotkey_to_shortcut(launcher_settings.hotkey.clone());
-
-            app_handle
-                .global_shortcut()
-                .unregister(previous_hotkey)
-                .map_err(|e| {
-                    format!(
-                        "Failed to unregister previous shortcut '{}': {}",
-                        previous_hotkey, e
-                    )
-                })?;
-
-            app_handle
-                .global_shortcut()
-                .register(new_hotkey)
-                .map_err(|e| format!("Failed to register new shortcut '{}': {}", new_hotkey, e))?;
-        }
-
-        settings.launcher = launcher_settings;
-        settings
-            .save_to_default_path()
-            .map_err(|e| format!("Failed to persist launcher settings: {e}"))?;
 
         Ok(())
     }
