@@ -1,5 +1,4 @@
 use tauri::AppHandle;
-use tracing::debug;
 
 pub(crate) mod state {
 
@@ -82,64 +81,6 @@ pub fn create(
     Ok(window)
 }
 
-#[cfg(not(target_os = "macos"))]
-pub fn create_launcher(
-    handle: &AppHandle,
-    label: &str,
-    window_relative_url: String,
-) -> tauri::Result<tauri::WebviewWindow> {
-    debug!("creating window '{label}' created at '{window_relative_url}'");
-
-    let window = tauri::WebviewWindowBuilder::new(
-        handle,
-        label,
-        tauri::WebviewUrl::App(window_relative_url.into()),
-        // #[cfg(debug_assertions)]
-        // tauri::WebviewUrl::External(Url::parse("http://localhost:1420/launcher").unwrap()),
-        // #[cfg(not(debug_assertions))]
-        // tauri::WebviewUrl::External(Url::parse("http://tauri.localhost/l`auncher").unwrap()),
-    )
-    .resizable(true)
-    .inner_size(1024.0, 100.0)
-    .disable_drag_drop_handler()
-    .decorations(false)
-    .always_on_top(true)
-    .center()
-    .visible(false)
-    .build()?;
-
-    Ok(window)
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn create_hover(
-    handle: &AppHandle,
-    label: &str,
-    window_relative_url: String,
-) -> tauri::Result<tauri::WebviewWindow> {
-    debug!("creating window '{label}' created at '{window_relative_url}'");
-    let window = tauri::WebviewWindowBuilder::new(
-        handle,
-        label,
-        tauri::WebviewUrl::App(window_relative_url.into()),
-    )
-    .inner_size(50.0, 50.0)
-    .max_inner_size(50.0, 50.0)
-    .resizable(true)
-    // .disable_drag_drop_handler()
-    .decorations(false)
-    .always_on_top(true)
-    .transparent(true)
-    .shadow(false)
-    .skip_taskbar(true)
-    // .position(0.0, 0.0)
-    // .center()
-    .visible(true)
-    .build()?;
-
-    Ok(window)
-}
-
 #[cfg(target_os = "macos")]
 pub fn create(
     handle: &AppHandle,
@@ -160,64 +101,5 @@ pub fn create(
     .disable_drag_drop_handler()
     .title_bar_style(tauri::TitleBarStyle::Overlay)
     .build()?;
-    Ok(window)
-}
-#[cfg(target_os = "macos")]
-pub fn create_launcher(
-    handle: &AppHandle,
-    label: &str,
-    window_relative_url: String,
-) -> tauri::Result<tauri::WebviewWindow> {
-    let window = tauri::WebviewWindowBuilder::new(
-        handle,
-        label,
-        tauri::WebviewUrl::App(window_relative_url.into()),
-        // #[cfg(debug_assertions)]
-        // tauri::WebviewUrl::External(Url::parse("http://localhost:1420/launcher").unwrap()),
-        // #[cfg(not(debug_assertions))]
-        // tauri::WebviewUrl::External(Url::parse("http://tauri.localhost/launcher").unwrap()),
-    )
-    .resizable(true)
-    .min_inner_size(575.0, 500.0)
-    .inner_size(575.0, 500.0)
-    .disable_drag_drop_handler()
-    .decorations(false)
-    .always_on_top(true)
-    .center()
-    .title_bar_style(tauri::TitleBarStyle::Overlay)
-    .hidden_title(true)
-    .visible(false)
-    .content_protected(true)
-    .build()?;
-
-    Ok(window)
-}
-
-#[cfg(target_os = "macos")]
-pub fn create_hover(
-    handle: &AppHandle,
-    label: &str,
-    window_relative_url: String,
-) -> tauri::Result<tauri::WebviewWindow> {
-    debug!("creating window '{label}' created at '{window_relative_url}'");
-    let window = tauri::WebviewWindowBuilder::new(
-        handle,
-        label,
-        tauri::WebviewUrl::App(window_relative_url.into()),
-    )
-    .inner_size(50.0, 50.0)
-    .max_inner_size(50.0, 50.0)
-    .resizable(false)
-    // .disable_drag_drop_handler()
-    .decorations(false)
-    .title_bar_style(tauri::TitleBarStyle::Transparent)
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .shadow(false)
-    // .position(0.0, 0.0)
-    // .center()
-    .visible(true)
-    .build()?;
-
     Ok(window)
 }
