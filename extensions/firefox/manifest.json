@@ -50,7 +50,6 @@
 		"storage",
 		"scripting",
 		"activeTab",
-		"declarativeNetRequestWithHostAccess",
 		"webNavigation"
 	],
 	"browser_specific_settings": {
