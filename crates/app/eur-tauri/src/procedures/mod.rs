@@ -9,6 +9,5 @@ pub mod system_procedures;
 pub mod third_party_procedures;
 pub mod timeline_procedures;
 pub mod user_procedures;
-pub mod window_procedures;
 
 pub use personal_db::*;
