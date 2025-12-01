@@ -1,4 +1,6 @@
 <script lang="ts">
+	import 'katex/dist/katex.min.css';
+	import Katex from '$lib/components/katex.svelte';
 	import { onMount } from 'svelte';
 	import {
 		type ResponseChunk,
@@ -11,7 +13,6 @@
 	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import * as Chat from '@eurora/ui/custom-components/chat/index';
-	import Katex from '$lib/components/katex.svelte';
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
 	import { executeCommand } from '$lib/commands.js';
 	// import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
