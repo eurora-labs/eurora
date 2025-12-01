@@ -2,9 +2,6 @@
     "general": {
         "autostart": true
     },
-    "hover": {
-        "enabled": false
-    },
     "telemetry": {
         "anonymousMetrics": true,
         "anonymousErrors": true,

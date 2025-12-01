@@ -9,8 +9,7 @@ mod watch;
 
 pub use hotkey::Hotkey;
 pub use settings::{
-    BackendSettings, BackendType, GeneralSettings, HoverSettings, LauncherSettings,
-    TelemetrySettings,
+    BackendSettings, BackendType, GeneralSettings, LauncherSettings, TelemetrySettings,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
@@ -20,8 +19,6 @@ pub struct AppSettings {
     pub general: GeneralSettings,
     /// Telemetry settings
     pub telemetry: TelemetrySettings,
-    /// Hover settings
-    pub hover: HoverSettings,
     /// Launcher settings
     pub launcher: LauncherSettings,
     /// Backend provider settings
