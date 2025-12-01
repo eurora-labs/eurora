@@ -1,6 +1,4 @@
-use eur_settings::{
-    AppSettings, GeneralSettings, HoverSettings, LauncherSettings, TelemetrySettings,
-};
+use eur_settings::{AppSettings, GeneralSettings, LauncherSettings, TelemetrySettings};
 use tauri::{Manager, Runtime};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tracing::debug;
@@ -12,10 +10,6 @@ pub trait SettingsApi {
     async fn get_all_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<AppSettings, String>;
-
-    async fn get_hover_settings<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<HoverSettings, String>;
 
     async fn get_telemetry_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -32,11 +26,6 @@ pub trait SettingsApi {
     async fn set_general_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         general_settings: GeneralSettings,
-    ) -> Result<(), String>;
-
-    async fn set_hover_settings<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        hover_settings: HoverSettings,
     ) -> Result<(), String>;
 
     async fn set_launcher_settings<R: Runtime>(
@@ -57,16 +46,6 @@ impl SettingsApi for SettingsApiImpl {
         let settings = state.lock().await;
 
         Ok(settings.clone())
-    }
-
-    async fn get_hover_settings<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<HoverSettings, String> {
-        let state = app_handle.state::<SharedAppSettings>();
-        let settings = state.lock().await;
-
-        Ok(settings.hover.clone())
     }
 
     async fn get_telemetry_settings<R: Runtime>(
@@ -110,23 +89,7 @@ impl SettingsApi for SettingsApiImpl {
         settings.general = general_settings;
         settings
             .save_to_default_path()
-            .map_err(|e| format!("Failed to persist hover settings: {e}"))?;
-
-        Ok(())
-    }
-
-    async fn set_hover_settings<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        hover_settings: HoverSettings,
-    ) -> Result<(), String> {
-        let state = app_handle.state::<SharedAppSettings>();
-        let mut settings = state.lock().await;
-
-        settings.hover = hover_settings;
-        settings
-            .save_to_default_path()
-            .map_err(|e| format!("Failed to persist hover settings: {e}"))?;
+            .map_err(|e| format!("Failed to persist general settings: {e}"))?;
 
         Ok(())
     }
