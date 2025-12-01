@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use eur_screen_position::ActiveMonitor;
 use eur_settings::Hotkey;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
@@ -131,38 +130,6 @@ pub fn get_default_shortcut() -> Shortcut {
 
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     return Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
-}
-
-/// Get the launcher shortcut from user settings or default
-#[allow(unused)]
-pub fn get_launcher_shortcut(app_handle: &tauri::AppHandle) -> Shortcut {
-    if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>()
-        && let Ok(Some(user)) = user_controller.get_user()
-        && !user.hotkeys.open_launcher.key.is_empty()
-        && let Some(shortcut) = user_hotkey_to_shortcut(&user.hotkeys.open_launcher)
-    {
-        debug!("Using custom launcher shortcut: {:?}", shortcut);
-        return shortcut;
-    }
-
-    let default = get_default_shortcut();
-    debug!("Using default launcher shortcut: {:?}", default);
-    default
-}
-
-pub fn position_hover_window(hover_window: &tauri::WebviewWindow) {
-    let active_monitor = ActiveMonitor::default();
-    let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(
-        tauri::PhysicalSize::new(50, 50),
-        1.0,
-        0.75,
-    );
-    let _ = hover_window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
-        x: hover_x,
-        y: hover_y,
-    }));
-
-    let _ = hover_window.set_size(tauri::PhysicalSize::new(50, 50));
 }
 
 pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {

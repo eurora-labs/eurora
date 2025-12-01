@@ -9,11 +9,10 @@ use eur_encrypt::MainKey;
 use eur_native_messaging::create_browser_bridge_client;
 // use eur_personal_db::{Activity, PersonalDatabaseManager};
 use eur_settings::AppSettings;
-use eur_tauri::launcher::{monitor_cursor_for_hover, toggle_launcher_window};
 use eur_tauri::procedures::timeline_procedures::TimelineAppEvent;
 use eur_tauri::util;
 use eur_tauri::{
-    WindowState, create_hover, create_launcher, create_window,
+    WindowState, create_window,
     procedures::{
         auth_procedures::{AuthApi, AuthApiImpl},
         chat_procedures::{ChatApi, ChatApiImpl},
@@ -27,7 +26,6 @@ use eur_tauri::{
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
         user_procedures::{UserApi, UserApiImpl},
-        window_procedures::{WindowApi, WindowApiImpl},
     },
     shared_types::{
         SharedCurrentConversation, SharedPromptKitService, create_shared_database_manager,
@@ -35,12 +33,11 @@ use eur_tauri::{
 };
 use eur_timeline::TimelineManager;
 use tauri::{
-    AppHandle, Manager, Wry, generate_context,
+    Manager, generate_context,
     menu::{Menu, MenuItem},
-    plugin::TauriPlugin,
     tray::TrayIconBuilder,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tauri_plugin_log::{Target, TargetKind, fern};
 use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
@@ -201,28 +198,6 @@ fn main() {
 
                     if started_by_autostart {
                         main_window.hide().expect("Failed to hide main window");
-                    }
-
-
-                    // Create launcher window without Arc<Mutex>
-                    let launcher_window =
-                        create_launcher(tauri_app.handle(), "launcher", "launcher".into())
-                            .expect("Failed to create launcher window");
-
-                        let hover_window = create_hover(tauri_app.handle(), "hover", "hover".into())
-                            .expect("Failed to create hover window");
-
-                        // Position hover window initially
-                        util::position_hover_window(&hover_window);
-
-                        // Start cursor monitoring for hover window
-                        let hover_window_clone = hover_window.clone();
-                        tauri::async_runtime::spawn(async move {
-                            monitor_cursor_for_hover(hover_window_clone).await;
-                        });
-
-                    if !app_settings.hover.enabled {
-                        hover_window.hide().expect("Failed to hide hover window");
                     }
 
                     let app_handle = tauri_app.handle();
@@ -390,9 +365,6 @@ fn main() {
                     });
 
 
-                    let launcher_label = launcher_window.label().to_string();
-                    app_handle.plugin(shortcut_plugin(launcher_label.clone()))?;
-
                     let app_handle_user = app_handle.clone();
                     let path = tauri_app.path().app_data_dir().unwrap();
                     tauri::async_runtime::spawn(async move {
@@ -511,7 +483,6 @@ fn main() {
                 .merge(SystemApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
-                .merge(WindowApiImpl.into_handler())
                 .merge(ChatApiImpl.into_handler())
                 .merge(UserApiImpl.into_handler());
             builder
@@ -521,20 +492,4 @@ fn main() {
                 .expect("Failed to build tauri app")
                 .run(|_app_handle, _event| {});
         });
-}
-
-fn shortcut_plugin(launcher_label: String) -> TauriPlugin<Wry> {
-    tauri_plugin_global_shortcut::Builder::new()
-        .with_handler(move |app: &AppHandle, _shortcut, event| {
-            // Handle any registered shortcut - we'll validate it's a launcher shortcut
-            // by checking if it matches the current user's launcher shortcut
-            if ShortcutState::Pressed != event.state() {
-                return;
-            }
-            let Some(launcher) = app.get_window(&launcher_label) else {
-                return;
-            };
-            let _ = toggle_launcher_window(&launcher);
-        })
-        .build()
 }
