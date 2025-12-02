@@ -1,9 +1,5 @@
-use std::str::FromStr;
-
-use eur_settings::Hotkey;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
-use tracing::debug;
 
 /// Convert string modifiers to Tauri Modifiers
 #[allow(unused)]
@@ -132,12 +128,12 @@ pub fn get_default_shortcut() -> Shortcut {
     return Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
 }
 
-pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
-    debug!("Converting hotkey to shortcut: {:?}", hotkey.clone());
-    let key_code = Code::from_str(&hotkey.key).unwrap_or(Code::Space);
-    let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
-    Shortcut::new(modifiers, key_code)
-}
+// pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
+//     debug!("Converting hotkey to shortcut: {:?}", hotkey.clone());
+//     let key_code = Code::from_str(&hotkey.key).unwrap_or(Code::Space);
+//     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
+//     Shortcut::new(modifiers, key_code)
+// }
 
 pub fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     let base_path = app_handle.path().app_data_dir().unwrap();
