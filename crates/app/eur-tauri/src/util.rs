@@ -1,10 +1,5 @@
-use std::str::FromStr;
-
-use eur_screen_position::ActiveMonitor;
-use eur_settings::Hotkey;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
-use tracing::debug;
 
 /// Convert string modifiers to Tauri Modifiers
 #[allow(unused)]
@@ -109,13 +104,13 @@ pub fn string_key_to_tauri_code(key: &str) -> Option<Code> {
     }
 }
 
-/// Convert user hotkey to Tauri shortcut
-#[allow(unused)]
-pub fn user_hotkey_to_shortcut(hotkey: &eur_user::Hotkey) -> Option<Shortcut> {
-    let key_code = string_key_to_tauri_code(&hotkey.key)?;
-    let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
-    Some(Shortcut::new(modifiers, key_code))
-}
+// /// Convert user hotkey to Tauri shortcut
+// #[allow(unused)]
+// pub fn user_hotkey_to_shortcut(hotkey: &eur_user::Hotkey) -> Option<Shortcut> {
+//     let key_code = string_key_to_tauri_code(&hotkey.key)?;
+//     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
+//     Some(Shortcut::new(modifiers, key_code))
+// }
 
 /// Get default shortcut for the current OS
 #[allow(unused)]
@@ -133,44 +128,12 @@ pub fn get_default_shortcut() -> Shortcut {
     return Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
 }
 
-/// Get the launcher shortcut from user settings or default
-#[allow(unused)]
-pub fn get_launcher_shortcut(app_handle: &tauri::AppHandle) -> Shortcut {
-    if let Some(user_controller) = app_handle.try_state::<eur_user::Controller>()
-        && let Ok(Some(user)) = user_controller.get_user()
-        && !user.hotkeys.open_launcher.key.is_empty()
-        && let Some(shortcut) = user_hotkey_to_shortcut(&user.hotkeys.open_launcher)
-    {
-        debug!("Using custom launcher shortcut: {:?}", shortcut);
-        return shortcut;
-    }
-
-    let default = get_default_shortcut();
-    debug!("Using default launcher shortcut: {:?}", default);
-    default
-}
-
-pub fn position_hover_window(hover_window: &tauri::WebviewWindow) {
-    let active_monitor = ActiveMonitor::default();
-    let (hover_x, hover_y) = active_monitor.calculate_position_for_percentage(
-        tauri::PhysicalSize::new(50, 50),
-        1.0,
-        0.75,
-    );
-    let _ = hover_window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
-        x: hover_x,
-        y: hover_y,
-    }));
-
-    let _ = hover_window.set_size(tauri::PhysicalSize::new(50, 50));
-}
-
-pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
-    debug!("Converting hotkey to shortcut: {:?}", hotkey.clone());
-    let key_code = Code::from_str(&hotkey.key).unwrap_or(Code::Space);
-    let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
-    Shortcut::new(modifiers, key_code)
-}
+// pub fn convert_hotkey_to_shortcut(hotkey: Hotkey) -> Shortcut {
+//     debug!("Converting hotkey to shortcut: {:?}", hotkey.clone());
+//     let key_code = Code::from_str(&hotkey.key).unwrap_or(Code::Space);
+//     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
+//     Shortcut::new(modifiers, key_code)
+// }
 
 pub fn get_db_path(app_handle: &tauri::AppHandle) -> String {
     let base_path = app_handle.path().app_data_dir().unwrap();
