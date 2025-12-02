@@ -108,13 +108,13 @@ pub fn string_key_to_tauri_code(key: &str) -> Option<Code> {
     }
 }
 
-/// Convert user hotkey to Tauri shortcut
-#[allow(unused)]
-pub fn user_hotkey_to_shortcut(hotkey: &eur_user::Hotkey) -> Option<Shortcut> {
-    let key_code = string_key_to_tauri_code(&hotkey.key)?;
-    let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
-    Some(Shortcut::new(modifiers, key_code))
-}
+// /// Convert user hotkey to Tauri shortcut
+// #[allow(unused)]
+// pub fn user_hotkey_to_shortcut(hotkey: &eur_user::Hotkey) -> Option<Shortcut> {
+//     let key_code = string_key_to_tauri_code(&hotkey.key)?;
+//     let modifiers = string_modifiers_to_tauri(&hotkey.modifiers);
+//     Some(Shortcut::new(modifiers, key_code))
+// }
 
 /// Get default shortcut for the current OS
 #[allow(unused)]
