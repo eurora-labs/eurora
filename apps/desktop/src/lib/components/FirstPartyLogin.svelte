@@ -23,7 +23,7 @@
 				return;
 			}
 			console.log('Login successful');
-			goto('/onboarding/hotkey');
+			goto('/');
 			clearInterval(interval);
 		}, 5000);
 	}
