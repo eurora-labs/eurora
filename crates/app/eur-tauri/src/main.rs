@@ -222,14 +222,6 @@ fn main() {
                         // launcher_window.open_devtools();
                     }
 
-                    // Ensure launcher is hidden on startup for Windows
-                    #[cfg(target_os = "windows")]
-                    {
-                        launcher_window
-                            .hide()
-                            .expect("Failed to hide launcher window on startup");
-                    }
-
                     let open_i = MenuItem::with_id(tauri_app, "open", "Open", true, None::<&str>)?;
                     let quit_i = MenuItem::with_id(tauri_app, "quit", "Quit", true, None::<&str>)?;
                     let menu = Menu::with_items(tauri_app, &[&open_i, &quit_i])?;
