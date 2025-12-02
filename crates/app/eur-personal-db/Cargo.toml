@@ -28,7 +28,7 @@ image = { workspace = true, features = [
 chrono = { workspace = true, features = ["serde"] }
 sqlite-vec = "0.1.3"
 tracing = { workspace = true }
-zerocopy = { version = "0.8.26" }
+zerocopy = { version = "0.8.31" }
 uuid = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
