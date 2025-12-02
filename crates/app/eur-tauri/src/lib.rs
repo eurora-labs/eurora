@@ -16,13 +16,11 @@
 
 // pub mod commands;
 
-// pub mod logs;
-pub mod launcher;
 pub mod procedures;
 pub mod shared_types;
 pub mod util;
 pub mod window;
 pub use window::{
-    create as create_window, create_hover, create_launcher,
+    create as create_window,
     state::{WindowState, event::ChangeForFrontend},
 };
