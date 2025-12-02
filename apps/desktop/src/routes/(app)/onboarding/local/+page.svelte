@@ -5,7 +5,7 @@
 	import { goto } from '$app/navigation';
 
 	async function finished() {
-		goto('/onboarding/hotkey');
+		goto('/');
 	}
 </script>
 
