@@ -1,6 +1,6 @@
 use eur_activity::ContextChip;
 use eur_timeline::TimelineManager;
-use tauri::{Emitter, Manager, Runtime};
+use tauri::{Manager, Runtime};
 use tokio::sync::Mutex;
 use tracing::debug;
 
@@ -12,11 +12,6 @@ pub trait SystemApi {
     async fn list_activities<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String>;
-
-    async fn send_key_to_launcher<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        key: String,
-    ) -> Result<(), String>;
 }
 
 #[derive(Clone)]
@@ -62,18 +57,5 @@ impl SystemApi for SystemApiImpl {
         let limited_activities = activities.into_iter().take(5).collect::<Vec<ContextChip>>();
 
         Ok(limited_activities)
-    }
-
-    async fn send_key_to_launcher<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        key: String,
-    ) -> Result<(), String> {
-        if let Some(launcher) = app_handle.get_window("launcher") {
-            launcher
-                .emit("key_event", key)
-                .map_err(|e| format!("Failed to send key event: {}", e))?;
-        }
-        Ok(())
     }
 }
