@@ -18,7 +18,7 @@ test = false
 tauri-build = { version = "2.5.1", features = [] }
 
 [dependencies]
-tauri-utils = "2.8.0"                                                       # single entry removes second 8.6 s build
+tauri-utils = "2.8.1"                                                       # single entry removes second 8.6 s build
 tauri-plugin-stronghold = "2.3.1"
 anyhow = { workspace = true }
 eur-secret = { workspace = true }
@@ -28,7 +28,7 @@ backtrace = { version = "0.3.76", optional = true }
 reqwest = { version = "0.12.24", features = ["json", "native-tls"] }
 serde = { workspace = true }
 serde_json = { version = "1.0", features = ["std", "arbitrary_precision"] }
-tauri = { version = "2.9.2", features = ["unstable", "tray-icon"] }
+tauri = { version = "2.9.3", features = ["unstable", "tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-http = "2"
@@ -48,7 +48,7 @@ log = { workspace = true }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["rt-multi-thread", "parking_lot"] }
 tokio-stream = { workspace = true }
-tracing-appender = "0.2.3"
+tracing-appender = "0.2.4"
 tracing-forest = { version = "0.3.0" }
 open = "5"
 url = "2.5.4"
