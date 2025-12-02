@@ -24,7 +24,6 @@ use eur_tauri::{
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
-        user_procedures::{UserApi, UserApiImpl},
     },
     shared_types::{
         SharedCurrentConversation, SharedPromptKitService, create_shared_database_manager,
@@ -202,7 +201,6 @@ fn main() {
 
                     let main_window_handle = app_handle.clone();
                     main_window.on_window_event(move |event| {
-                        debug!("Window event: {:?}", event);
                         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                             let main_window = main_window_handle.get_window("main").expect("Failed to get main window");
                             main_window.hide().expect("Failed to hide main window");
@@ -214,7 +212,6 @@ fn main() {
                             if !*focused && minimized {
                                 main_window.hide().expect("Failed to hide main window");
                             }
-                            debug!("Window focused: {}", focused);
                         }
                     });
 
@@ -471,8 +468,7 @@ fn main() {
                 .merge(SystemApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
-                .merge(ChatApiImpl.into_handler())
-                .merge(UserApiImpl.into_handler());
+                .merge(ChatApiImpl.into_handler());
             builder
                 // .invoke_handler(tauri::generate_handler![list_conversations,])
                 .invoke_handler(router.into_handler())
