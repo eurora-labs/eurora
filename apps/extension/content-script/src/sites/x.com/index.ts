@@ -3,7 +3,7 @@ import {
 	type WatcherResponse,
 } from '@eurora/browser-shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
-import type { TwitterChromeMessage, WatcherParams } from './types.js';
+import type { TwitterBrowserMessage, WatcherParams } from './types.js';
 
 import type {
 	NativeTwitterAsset,
@@ -38,7 +38,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 	}
 
 	public listen(
-		obj: TwitterChromeMessage,
+		obj: TwitterBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
 	): boolean {
@@ -68,7 +68,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleNew(
-		obj: TwitterChromeMessage,
+		obj: TwitterBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		// Update current URL and page info
@@ -86,7 +86,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleGenerateAssets(
-		obj: TwitterChromeMessage,
+		obj: TwitterBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
@@ -119,7 +119,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleGenerateSnapshot(
-		obj: TwitterChromeMessage,
+		obj: TwitterBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
