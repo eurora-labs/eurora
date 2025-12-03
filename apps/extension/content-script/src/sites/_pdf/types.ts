@@ -7,6 +7,6 @@ export type PdfMessageType = MessageType;
 
 export interface WatcherParams {}
 
-export interface YoutubeBrowserMessage extends Omit<BrowserObj, 'type'> {
+export interface PdfBrowserMessage extends Omit<BrowserObj, 'type'> {
 	type: PdfMessageType;
 }
