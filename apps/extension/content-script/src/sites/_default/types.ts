@@ -10,6 +10,6 @@ export interface WatcherParams {
 	// Article watcher doesn't need specific parameters for now
 }
 
-export interface ArticleChromeMessage extends Omit<BrowserObj, 'type'> {
+export interface ArticleBrowserMessage extends Omit<BrowserObj, 'type'> {
 	type: ArticleMessageType;
 }
