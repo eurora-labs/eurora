@@ -7,7 +7,7 @@ import {
 	createArticleAsset,
 	createArticleSnapshot,
 } from '@eurora/browser-shared/content/extensions/article/util';
-import { ArticleChromeMessage, type WatcherParams } from './types.js';
+import { ArticleBrowserMessage, type WatcherParams } from './types.js';
 
 export class ArticleWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
@@ -15,7 +15,7 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 	}
 
 	public listen(
-		obj: ArticleChromeMessage,
+		obj: ArticleBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
 	): boolean {
@@ -52,21 +52,21 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleNew(
-		_obj: ArticleChromeMessage,
+		_obj: ArticleBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		console.log('Article Watcher: New article detected');
 	}
 
 	public async handleGenerateAssets(
-		_obj: ArticleChromeMessage,
+		_obj: ArticleBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		return createArticleAsset(document);
 	}
 
 	public async handleGenerateSnapshot(
-		_obj: ArticleChromeMessage,
+		_obj: ArticleBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		return createArticleSnapshot(window);
