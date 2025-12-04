@@ -6,3 +6,12 @@ pages/*
 scripts/*
 !scripts/.gitkeep
 
+content/*
+!content/.gitkeep
+
+pdfjs/*
+!pdfjs/.gitkeep
+
+contentstyle.css
+devtools.html
+devtools.js
