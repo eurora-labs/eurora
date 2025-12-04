@@ -18,7 +18,18 @@
 	},
 	"web_accessible_resources": [
 		{
-			"resources": ["scripts/background/*", "scripts/content/*", "pages/popup/**/*"],
+			"resources": [
+				"scripts/background/*",
+				"scripts/content/*",
+				"pages/popup/**/*",
+				"viewer.html",
+				"viewer_init.mjs",
+				"pdf.mjs",
+				"pdf.worker.mjs",
+				"pdf_viewer.mjs",
+				"pdf_viewer.css",
+				"images/*"
+			],
 			"matches": ["<all_urls>"],
 			"extension_ids": ["*"]
 		}
@@ -39,7 +50,8 @@
 		"storage",
 		"scripting",
 		"declarativeNetRequestWithHostAccess",
-		"webNavigation"
+		"webNavigation",
+		"webRequest"
 	],
 	"host_permissions": ["<all_urls>"]
 }

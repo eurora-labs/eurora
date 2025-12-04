@@ -18,7 +18,7 @@ limitations under the License.
 'use strict';
 
 (function ExtensionRouterClosure() {
-	var VIEWER_URL = chrome.runtime.getURL('content/web/viewer.html');
+	var VIEWER_URL = chrome.runtime.getURL('viewer.html');
 	var CRX_BASE_URL = chrome.runtime.getURL('/');
 
 	var schemes = [
@@ -75,10 +75,11 @@ limitations under the License.
 
 	self.addEventListener('fetch', (event: any) => {
 		const req = event.request;
-		if (req.destination === 'document') {
+		// Handle both document (main_frame) and iframe (sub_frame) navigations
+		if (req.destination === 'document' || req.destination === 'iframe' || req.destination === '') {
 			var url = resolveViewerURL(req.url);
 			if (url) {
-				console.log('Redirecting ' + req.url + ' to ' + url);
+				console.log('Redirecting ' + req.url + ' to ' + url + ' (destination: ' + req.destination + ')');
 				event.respondWith(Response.redirect(url));
 			}
 		}
@@ -88,14 +89,21 @@ limitations under the License.
 	// resolve in that case. Catch this and redirect to destination.
 	chrome.webNavigation.onErrorOccurred.addListener(
 		(details) => {
-			if (details.frameId !== 0) {
-				// Not a top-level frame. Cannot easily navigate a specific child frame.
-				return;
-			}
 			const url = resolveViewerURL(details.url);
 			if (url) {
-				console.log(`Redirecting ${details.url} to ${url} (fallback)`);
-				chrome.tabs.update(details.tabId, { url });
+				if (details.frameId === 0) {
+					// Main frame - can update tab directly
+					console.log(`Redirecting ${details.url} to ${url} (fallback)`);
+					chrome.tabs.update(details.tabId, { url });
+				} else {
+					// Sub frame - use executeScript to navigate the iframe
+					console.log(`Redirecting sub_frame ${details.url} to ${url} (fallback)`);
+					chrome.scripting.executeScript({
+						target: { tabId: details.tabId, frameIds: [details.frameId] },
+						func: (redirectUrl) => { window.location.href = redirectUrl; },
+						args: [url],
+					}).catch((err) => console.error('Failed to redirect sub_frame:', err));
+				}
 			}
 		},
 		{ url: [{ urlPrefix: CRX_BASE_URL }] },

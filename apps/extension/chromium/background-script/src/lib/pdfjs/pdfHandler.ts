@@ -18,7 +18,8 @@ limitations under the License.
 
 'use strict';
 
-var VIEWER_URL = chrome.runtime.getURL('content/web/viewer.html');
+var VIEWER_URL = chrome.runtime.getURL('viewer.html');
+var CRX_BASE_URL = chrome.runtime.getURL('/');
 
 import { canRequestBody } from './preserve-referer.ts';
 
@@ -58,16 +59,15 @@ async function registerPdfRedirectRule() {
 	// "allow" means to ignore rules (from this extension) with lower priority.
 	const ACTION_IGNORE_OTHER_RULES = { type: 'allow' };
 
-	// Redirect to viewer. The rule condition is expected to specify regexFilter
-	// that matches the full request URL.
+	// Redirect to viewer via extension URL. The service worker's fetch listener
+	// in extension-router.ts will intercept requests to chrome-extension://[id]/https://...
+	// and redirect to the actual viewer.html with the file parameter.
 	const ACTION_REDIRECT_TO_VIEWER = {
 		type: 'redirect',
 		redirect: {
-			// DNR does not support transformations such as encodeURIComponent on the
-			// match, so we just concatenate the URL as is without modifications.
-			// TODO: use "?file=\\0" when DNR supports transformations as proposed at
-			// https://github.com/w3c/webextensions/issues/636#issuecomment-2165978322
-			regexSubstitution: VIEWER_URL + '?DNR:\\0',
+			// Redirect to chrome-extension://[id]/[pdf-url] format.
+			// The fetch listener in extension-router.ts will handle the redirect to viewer.html
+			regexSubstitution: CRX_BASE_URL + '\\0',
 		},
 	};
 
