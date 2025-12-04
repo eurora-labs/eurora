@@ -29,7 +29,9 @@ export type NativeIcon = { base64: string | null }
 
 export type NativeMetadata = { url: string | null; icon_base64: string | null }
 
-export type NativePdfAsset = { url: string; title: string; content: string; selected_text: string | null }
+export type NativePdfAsset = { url: string; title: string; content: string }
+
+export type NativePdfSnapshot = { selected_text: string | null }
 
 export type NativeTwitterAsset = { url: string; title: string; tweets: NativeTwitterTweet[]; timestamp: string }
 
