@@ -22,3 +22,8 @@ pub struct NativeTwitterSnapshot {
     pub tweets: Vec<NativeTwitterTweet>,
     pub timestamp: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
+pub struct NativePdfSnapshot {
+    pub selected_text: Option<String>,
+}
