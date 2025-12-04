@@ -2,13 +2,13 @@ import {
 	Watcher,
 	type WatcherResponse,
 } from '@eurora/browser-shared/content/extensions/watchers/watcher';
-import browser from 'webextension-polyfill';
 import {
 	createArticleAsset,
 	createArticleSnapshot,
 } from '@eurora/browser-shared/content/extensions/article/util';
 import { PdfBrowserMessage, type WatcherParams } from './types.js';
-import type { NativePdfAsset } from '@eurora/browser-shared/content/bindings';
+import browser from 'webextension-polyfill';
+import type { NativePdfAsset, NativePdfSnapshot } from '@eurora/browser-shared/content/bindings';
 
 export class PdfWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
@@ -74,7 +74,6 @@ export class PdfWatcher extends Watcher<WatcherParams> {
 				url: pdfViewerApplication.url,
 				content,
 				title: document.title,
-				selected_text: window.getSelection().toString() ?? null,
 			} as NativePdfAsset,
 		};
 	}
@@ -83,7 +82,12 @@ export class PdfWatcher extends Watcher<WatcherParams> {
 		_obj: PdfBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		// return createArticleSnapshot(window);
+		return {
+			kind: 'NativePdfSnapshot',
+			data: {
+				selected_text: window.getSelection().toString() ?? null,
+			} as NativePdfSnapshot,
+		};
 	}
 }
 
@@ -102,3 +106,7 @@ async function getPageContent(application: any): Promise<string> {
 
 	return content.items.map((item) => item.str).join(' ');
 }
+
+// This watcher is initialized via external file instead of the bootstrap.ts.
+// So we need to call main() by hand
+main();
