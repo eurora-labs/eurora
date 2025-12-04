@@ -37,5 +37,4 @@ pub struct NativePdfAsset {
     pub url: String,
     pub title: String,
     pub content: String,
-    pub selected_text: Option<String>,
 }
