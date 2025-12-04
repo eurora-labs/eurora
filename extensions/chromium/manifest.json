@@ -18,7 +18,25 @@
 	},
 	"web_accessible_resources": [
 		{
-			"resources": ["scripts/background/*", "scripts/content/*", "pages/popup/**/*"],
+			"resources": [
+				"scripts/background/*",
+				"scripts/content/*",
+				"pages/popup/**/*",
+
+				"content/web/viewer.html",
+				"pdfjs/viewer/*",
+				"pdfjs/*",
+				"pdfjs/viewer/assets/*",
+				"pdfjs-lib/*",
+				"http:/*",
+				"https:/*",
+				"file:/*",
+				"chrome-extension:/*",
+				"blob:*",
+				"data:*",
+				"filesystem:/*",
+				"drive:*"
+			],
 			"matches": ["<all_urls>"],
 			"extension_ids": ["*"]
 		}
@@ -39,6 +57,7 @@
 		"storage",
 		"scripting",
 		"declarativeNetRequestWithHostAccess",
+		"webRequest",
 		"webNavigation"
 	],
 	"host_permissions": ["<all_urls>"]
