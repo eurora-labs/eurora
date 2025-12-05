@@ -14,6 +14,6 @@ export interface WatcherParams {
 	youtubePlayer: HTMLVideoElement | null;
 }
 
-export interface YoutubeChromeMessage extends Omit<BrowserObj, 'type'> {
+export interface YoutubeBrowserMessage extends Omit<BrowserObj, 'type'> {
 	type: YoutubeMessageType;
 }

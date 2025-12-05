@@ -449,6 +449,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 // Validate URL if present
                 if let Some(ref url) = metadata.url
                     && !url.starts_with("http")
+                    // TODO: Add the actual extension ID after we're accepted to chrome
+                    && !url.starts_with("chrome-extension:")
                 {
                     return Err(ActivityError::invalid_data(format!(
                         "Invalid metadata URL: must start with 'http', got: {}",

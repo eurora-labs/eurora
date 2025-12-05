@@ -12,6 +12,6 @@ export interface WatcherParams {
 	tweets: NativeTwitterTweet[];
 }
 
-export interface TwitterChromeMessage extends Omit<BrowserObj, 'type'> {
+export interface TwitterBrowserMessage extends Omit<BrowserObj, 'type'> {
 	type: TwitterMessageType;
 }
