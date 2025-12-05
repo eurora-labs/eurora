@@ -3,7 +3,7 @@ import {
 	type WatcherResponse,
 } from '@eurora/browser-shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
-import { YoutubeChromeMessage, type WatcherParams } from './types.js';
+import { YoutubeBrowserMessage, type WatcherParams } from './types.js';
 import { YouTubeTranscriptApi } from './transcript/index.js';
 import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import { createArticleAsset } from '@eurora/browser-shared/content/extensions/article/util';
@@ -35,7 +35,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	public listen(
-		obj: YoutubeChromeMessage,
+		obj: YoutubeBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 		response: (response?: WatcherResponse) => void,
 	): boolean {
@@ -68,7 +68,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handlePlay(
-		obj: YoutubeChromeMessage,
+		obj: YoutubeBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 	): Promise<any> {
 		const { value } = obj;
@@ -78,7 +78,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleNew(
-		obj: YoutubeChromeMessage,
+		obj: YoutubeBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		const currentVideoId = getCurrentVideoId();
@@ -150,7 +150,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleGenerateAssets(
-		obj: YoutubeChromeMessage,
+		obj: YoutubeBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		if (window.location.href.includes('/watch?v=')) {
@@ -162,7 +162,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleGenerateSnapshot(
-		obj: YoutubeChromeMessage,
+		obj: YoutubeBrowserMessage,
 		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		const currentTime = this.getCurrentVideoTime();
