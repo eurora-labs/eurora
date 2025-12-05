@@ -31,3 +31,10 @@ pub struct NativeTwitterAsset {
     pub tweets: Vec<NativeTwitterTweet>,
     pub timestamp: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
+pub struct NativePdfAsset {
+    pub url: String,
+    pub title: String,
+    pub content: String,
+}
