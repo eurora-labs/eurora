@@ -1,9 +1,9 @@
 name: 'Publish'
-
-permissions:
-    contents: read # Required for checkout
-    actions: read # Required for downloading artifacts
-
+env:
+    RUSTUP_TOOLCHAIN: stable
+# permissions:
+#     contents: read # Required for checkout
+#     actions: read # Required for downloading artifacts
 on:
     schedule:
         # every day at 3am
