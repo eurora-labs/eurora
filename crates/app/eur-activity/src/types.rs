@@ -14,7 +14,7 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
-    assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset},
+    assets::{ArticleAsset, DefaultAsset, PdfAsset, TwitterAsset, YoutubeAsset},
     error::ActivityResult,
     snapshots::*,
     storage::{ActivityStorage, SaveableAsset, SavedAssetInfo},
@@ -52,6 +52,7 @@ pub enum ActivityAsset {
     ArticleAsset,
     TwitterAsset,
     DefaultAsset,
+    PdfAsset,
 }
 
 impl TryFrom<NativeMessage> for ActivityAsset {
@@ -68,6 +69,10 @@ impl TryFrom<NativeMessage> for ActivityAsset {
             NativeMessage::NativeTwitterAsset(asset) => {
                 Ok(ActivityAsset::TwitterAsset(TwitterAsset::from(asset)))
             }
+            NativeMessage::NativePdfAsset(asset) => {
+                Ok(ActivityAsset::PdfAsset(PdfAsset::from(asset)))
+            }
+
             _ => Err(anyhow::anyhow!("Invalid asset type")),
         }
     }
