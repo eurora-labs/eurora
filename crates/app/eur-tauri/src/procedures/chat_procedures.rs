@@ -110,7 +110,6 @@ impl ChatApi for ChatApiImpl {
                     .await,
             );
         }
-        debug!("messages: {:?}", messages);
 
         let user_message = Message {
             role: Role::User,
