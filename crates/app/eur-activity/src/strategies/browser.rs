@@ -246,7 +246,7 @@ impl BrowserStrategy {
         self.tracking_handle = Some(Arc::new(handle));
 
         // Start snapshot collection
-        // self.collect_snapshots();
+        self.collect_snapshots();
         Ok(())
     }
 
