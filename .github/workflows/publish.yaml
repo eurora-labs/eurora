@@ -1,9 +1,9 @@
 name: 'Publish'
-
-permissions:
-    contents: read # Required for checkout
-    actions: read # Required for downloading artifacts
-
+env:
+    RUSTUP_TOOLCHAIN: stable
+# permissions:
+#     contents: read # Required for checkout
+#     actions: read # Required for downloading artifacts
 on:
     schedule:
         # every day at 3am
@@ -125,8 +125,8 @@ jobs:
             matrix:
                 # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-private-repositories
                 platform:
-                    # - macos-13 # [macOs, x64]
-                    # - macos-latest # [macOs, ARM64]
+                    - macos-15 # [macOs, x64]
+                    - macos-latest # [macOs, ARM64]
                     - ubuntu-24.04 # [linux, x64]
                     - windows-latest # [windows, x64]
 
@@ -284,8 +284,8 @@ jobs:
             matrix:
                 # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-private-repositories
                 platform:
-                    # - macos-13 # [macOs, x64]
-                    # - macos-latest # [macOs, ARM64]
+                    - macos-15 # [macOs, x64]
+                    - macos-latest # [macOs, ARM64]
                     - ubuntu-24.04 # [linux, x64]
                     - windows-latest # [windows, x64]
         steps:
