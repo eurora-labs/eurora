@@ -1,7 +1,7 @@
 use euro_activity::AssetFunctionality;
+use euro_llm_core::{Message, MessageContent, Role};
 use euro_personal_db::{Conversation, NewAsset, PersonalDatabaseManager, UpdateConversation};
 use euro_timeline::TimelineManager;
-use ferrous_llm_core::{Message, MessageContent, Role};
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
