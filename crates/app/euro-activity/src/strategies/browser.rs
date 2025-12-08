@@ -11,7 +11,7 @@ use euro_native_messaging::{
     NativeMessage, create_browser_bridge_client,
     server::{Frame, FrameKind},
 };
-use ferrous_focus::FocusedWindow;
+use euro_focus::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
