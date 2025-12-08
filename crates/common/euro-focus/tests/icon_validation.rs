@@ -8,8 +8,8 @@ mod util;
 use euro_focus::{FocusTracker, FocusedWindow};
 use serial_test::serial;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
 use tracing::info;
