@@ -1,6 +1,6 @@
 //! OpenAI provider configuration.
 
-use euro_llm_core::{validation, ConfigError, HttpConfig, ProviderConfig, SecretString};
+use euro_llm_core::{ConfigError, HttpConfig, ProviderConfig, SecretString, validation};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use url::Url;
