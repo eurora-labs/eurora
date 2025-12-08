@@ -1,7 +1,0 @@
-{
-	"allowed_extensions": ["{271903fe-1905-4636-b47f-6f0873dc97f8}"],
-	"description": "Eurora Native Messaging Host",
-	"name": "com.eurora.app",
-	"path": "eur-native-messaging.exe",
-	"type": "stdio"
-}

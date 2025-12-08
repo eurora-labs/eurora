@@ -1,0 +1,16 @@
+[package]
+name = "euro-proto-client"
+version = "0.0.0"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+description = "Eurora gRPC client"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+euro-proto = { workspace = true }
+euro-secret = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+tokio-stream = { workspace = true }
+tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
+tracing = { workspace = true }

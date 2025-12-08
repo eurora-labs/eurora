@@ -1,0 +1,59 @@
+[package]
+name = "euro-native-messaging"
+version = "0.0.0"
+authors.workspace = true
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+base64 = { workspace = true }
+ctrlc = "3.5.1"
+dirs = { workspace = true }
+enum_dispatch = { workspace = true }
+euro-proto = { workspace = true }
+futures = { workspace = true }
+h2 = "0.4.12"
+image = { workspace = true, features = ["default"] }
+log = { workspace = true }
+once_cell = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+resvg = { version = "0.45" }
+sentry = { workspace = true, features = ["logs", "tracing"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+specta = { workspace = true, features = [
+  "derive",
+  "export",
+  "function",
+  "serde",
+  "serde_json"
+] }
+specta-typescript = { version = "0.0.9" }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+thiserror = { workspace = true }
+tiny-skia = "0.11"
+tokio = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true }
+tonic = { workspace = true, features = [
+  "channel",
+  "router",
+  "server",
+  "tls-native-roots"
+] }
+tonic-prost = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+usvg = { version = "0.45", default-features = true }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+
+[lints.clippy]
+all = "deny"
+correctness = "deny"
+perf = "deny"

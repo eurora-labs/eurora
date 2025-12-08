@@ -3018,7 +3018,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-activity"
+name = "euro-activity"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3029,11 +3029,11 @@ dependencies = [
  "dashmap",
  "dirs 6.0.0",
  "enum_dispatch",
- "eur-encrypt",
- "eur-fs",
- "eur-native-messaging",
- "eur-proto",
- "eur-secret",
+ "euro-encrypt",
+ "euro-fs",
+ "euro-native-messaging",
+ "euro-proto",
+ "euro-secret",
  "ferrous-focus",
  "ferrous-llm-core",
  "hex",
@@ -3063,15 +3063,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-auth"
+name = "euro-auth"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "eur-proto",
- "eur-proto-client",
- "eur-secret",
+ "euro-proto",
+ "euro-proto-client",
+ "euro-secret",
  "jsonwebtoken",
  "serde",
  "serde_json",
@@ -3086,7 +3086,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-auth-service"
+name = "euro-auth-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3095,9 +3095,9 @@ dependencies = [
  "bcrypt",
  "chrono",
  "dotenv",
- "eur-auth",
- "eur-proto",
- "eur-remote-db",
+ "euro-auth",
+ "euro-proto",
+ "euro-remote-db",
  "futures",
  "hex",
  "image",
@@ -3120,23 +3120,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-client-grpc"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "tokio",
- "tonic",
- "tracing",
-]
-
-[[package]]
-name = "eur-encrypt"
+name = "euro-encrypt"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chacha20poly1305",
- "eur-secret",
+ "euro-secret",
  "hkdf",
  "rand 0.9.2",
  "serde",
@@ -3149,15 +3139,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-eurora-provider"
+name = "euro-eurora-provider"
 version = "0.0.0"
 dependencies = [
  "async-stream",
  "async-trait",
  "base64 0.22.1",
  "chrono",
- "eur-secret",
- "eur-user",
+ "euro-secret",
+ "euro-user",
  "ferrous-llm-core",
  "futures",
  "image",
@@ -3178,7 +3168,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-fs"
+name = "euro-fs"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3189,19 +3179,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-monolith"
+name = "euro-monolith"
 version = "0.0.1"
 dependencies = [
  "anyhow",
  "axum",
  "dotenv",
- "eur-auth",
- "eur-auth-service",
- "eur-ocr-service",
- "eur-prompt-service",
- "eur-proto",
- "eur-remote-db",
- "eur-update-service",
+ "euro-auth",
+ "euro-auth-service",
+ "euro-ocr-service",
+ "euro-prompt-service",
+ "euro-proto",
+ "euro-remote-db",
+ "euro-update-service",
  "futures",
  "image",
  "prost",
@@ -3218,7 +3208,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-native-messaging"
+name = "euro-native-messaging"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3226,7 +3216,7 @@ dependencies = [
  "ctrlc",
  "dirs 6.0.0",
  "enum_dispatch",
- "eur-proto",
+ "euro-proto",
  "futures",
  "h2 0.4.12",
  "image",
@@ -3256,7 +3246,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-ocr"
+name = "euro-ocr"
 version = "0.0.0"
 dependencies = [
  "image",
@@ -3264,14 +3254,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-ocr-service"
+name = "euro-ocr-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "dotenv",
- "eur-auth",
- "eur-ocr",
- "eur-proto",
+ "euro-auth",
+ "euro-ocr",
+ "euro-proto",
  "futures",
  "image",
  "prost",
@@ -3283,13 +3273,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-personal-db"
+name = "euro-personal-db"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
- "eur-secret",
+ "euro-secret",
  "ferrous-llm-core",
  "futures",
  "image",
@@ -3307,14 +3297,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-prompt-kit"
+name = "euro-prompt-kit"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "async_from",
- "eur-eurora-provider",
- "eur-proto",
- "eur-util",
+ "euro-eurora-provider",
+ "euro-proto",
  "ferrous-llm",
  "futures",
  "image",
@@ -3326,16 +3315,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-prompt-service"
+name = "euro-prompt-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
  "dotenv",
- "eur-auth",
- "eur-eurora-provider",
- "eur-ocr",
+ "euro-auth",
+ "euro-eurora-provider",
+ "euro-ocr",
  "ferrous-llm",
  "futures",
  "image",
@@ -3349,7 +3338,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-proto"
+name = "euro-proto"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3364,12 +3353,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-proto-client"
+name = "euro-proto-client"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "eur-proto",
- "eur-secret",
+ "euro-proto",
+ "euro-secret",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -3377,7 +3366,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-remote-db"
+name = "euro-remote-db"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3394,7 +3383,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-screen-position"
+name = "euro-screen-position"
 version = "0.0.0"
 dependencies = [
  "enigo",
@@ -3404,7 +3393,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-secret"
+name = "euro-secret"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3414,16 +3403,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-settings"
+name = "euro-settings"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "async_from",
  "dirs 6.0.0",
- "eur-eurora-provider",
- "eur-fs",
- "eur-prompt-kit",
- "eur-secret",
+ "euro-eurora-provider",
+ "euro-fs",
+ "euro-prompt-kit",
+ "euro-secret",
  "notify",
  "serde",
  "serde_json",
@@ -3434,11 +3423,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-storage"
+name = "euro-storage"
 version = "0.0.0"
 
 [[package]]
-name = "eur-tauri"
+name = "euro-tauri"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3450,21 +3439,20 @@ dependencies = [
  "defer",
  "dirs 6.0.0",
  "dotenv",
- "eur-activity",
- "eur-client-grpc",
- "eur-encrypt",
- "eur-eurora-provider",
- "eur-native-messaging",
- "eur-personal-db",
- "eur-prompt-kit",
- "eur-proto",
- "eur-proto-client",
- "eur-screen-position",
- "eur-secret",
- "eur-settings",
- "eur-timeline",
- "eur-user",
- "eur-vision",
+ "euro-activity",
+ "euro-encrypt",
+ "euro-eurora-provider",
+ "euro-native-messaging",
+ "euro-personal-db",
+ "euro-prompt-kit",
+ "euro-proto",
+ "euro-proto-client",
+ "euro-screen-position",
+ "euro-secret",
+ "euro-settings",
+ "euro-timeline",
+ "euro-user",
+ "euro-vision",
  "ferrous-llm-core",
  "futures",
  "image",
@@ -3512,7 +3500,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-timeline"
+name = "euro-timeline"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3520,11 +3508,11 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "dirs 6.0.0",
- "eur-activity",
- "eur-fs",
- "eur-native-messaging",
- "eur-personal-db",
- "eur-proto",
+ "euro-activity",
+ "euro-fs",
+ "euro-native-messaging",
+ "euro-personal-db",
+ "euro-proto",
  "ferrous-focus",
  "ferrous-llm",
  "ferrous-llm-core",
@@ -3546,7 +3534,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-update-service"
+name = "euro-update-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3567,16 +3555,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-user"
+name = "euro-user"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
- "eur-proto",
- "eur-proto-client",
- "eur-secret",
- "eur-storage",
+ "euro-proto",
+ "euro-proto-client",
+ "euro-secret",
+ "euro-storage",
  "image",
  "rand 0.9.2",
  "serde",
@@ -3588,22 +3576,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "eur-util"
-version = "0.0.0"
-dependencies = [
- "eur-proto",
- "once_cell",
- "regex",
-]
-
-[[package]]
-name = "eur-vision"
+name = "euro-vision"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "bytemuck",
- "eur-ocr",
+ "euro-ocr",
  "futures-intrusive",
  "image",
  "pollster",

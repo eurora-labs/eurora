@@ -1,0 +1,33 @@
+[package]
+name = "euro-eurora-provider"
+version = "0.0.0"
+authors.workspace = true
+edition = "2024"
+publish = false
+
+[dependencies]
+async-stream = "0.3.1"
+async-trait = "0.1.89"
+base64 = { workspace = true }
+chrono = { workspace = true }
+euro-secret = { workspace = true }
+euro-user = { workspace = true }
+ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
+futures = { workspace = true }
+image = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
+tonic-async-interceptor = "0.14.1"
+tonic-prost = { workspace = true }
+tower = "0.5.2"
+tracing = { workspace = true }
+url = "2.5.1"
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }
