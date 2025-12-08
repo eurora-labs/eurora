@@ -25,7 +25,6 @@ defer = "0.2.1"
 dirs = "6.0.0"
 dotenv = "0.15.0"
 euro-activity = { workspace = true }
-euro-client-grpc = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-eurora-provider = { workspace = true }
 euro-native-messaging = { workspace = true }
