@@ -1,0 +1,21 @@
+[package]
+name = "euro-prompt-kit"
+version = "0.0.0"
+authors.workspace = true
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+# euro-proto-client = { workspace = true }
+async_from = { workspace = true }
+euro-eurora-provider = { workspace = true }
+euro-proto = { workspace = true }
+euro-util = { workspace = true }
+ferrous-llm = { workspace = true, features = ["anthropic", "ollama", "openai"] }
+futures = { workspace = true }
+image = { workspace = true }
+regex = "1.12.2"
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tracing = { workspace = true }

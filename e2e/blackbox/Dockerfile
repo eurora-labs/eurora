@@ -10,7 +10,7 @@
 # The rest is run inside the container in your SSH session:
 # 6. cd /root/eurora
 # 7. pnpm install && cargo build
-# 8. cargo build -p eur-tauri
+# 8. cargo build -p euro-tauri
 # 9. pnpm build:desktop -- --mode development
 # 10. cd e2e/blackbox && pnpm test:e2e:blackbox
 
