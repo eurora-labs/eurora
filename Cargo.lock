@@ -3127,10 +3127,10 @@ dependencies = [
  "euro-encrypt",
  "euro-focus",
  "euro-fs",
+ "euro-llm-core",
  "euro-native-messaging",
  "euro-proto",
  "euro-secret",
- "ferrous-llm-core",
  "hex",
  "humantime-serde",
  "image",
@@ -3234,35 +3234,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-eurora-provider"
-version = "0.0.0"
-dependencies = [
- "async-stream",
- "async-trait",
- "base64 0.22.1",
- "chrono",
- "euro-secret",
- "euro-user",
- "ferrous-llm-core",
- "futures",
- "image",
- "prost",
- "prost-types",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-async-interceptor",
- "tonic-prost",
- "tonic-prost-build",
- "tower",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "euro-focus"
 version = "0.1.0"
 dependencies = [
@@ -3297,6 +3268,109 @@ dependencies = [
  "serde",
  "toml 0.9.8",
  "walkdir",
+]
+
+[[package]]
+name = "euro-llm-anthropic"
+version = "0.6.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dotenv",
+ "euro-llm-core",
+ "futures",
+ "reqwest 0.12.24",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "euro-llm-core"
+version = "0.6.1"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "chrono",
+ "futures",
+ "image",
+ "serde",
+ "serde_json",
+ "specta",
+ "thiserror 2.0.17",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "euro-llm-eurora"
+version = "0.0.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "base64 0.22.1",
+ "chrono",
+ "euro-llm-core",
+ "euro-secret",
+ "euro-user",
+ "futures",
+ "image",
+ "prost",
+ "prost-types",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-async-interceptor",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tower",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "euro-llm-ollama"
+version = "0.6.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dotenv",
+ "euro-llm-core",
+ "futures",
+ "reqwest 0.12.24",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "euro-llm-openai"
+version = "0.6.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dotenv",
+ "euro-llm-core",
+ "futures",
+ "reqwest 0.12.24",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
@@ -3400,8 +3474,8 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
+ "euro-llm-core",
  "euro-secret",
- "ferrous-llm-core",
  "futures",
  "image",
  "libsqlite3-sys",
@@ -3423,9 +3497,12 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "async_from",
- "euro-eurora-provider",
+ "euro-llm-anthropic",
+ "euro-llm-core",
+ "euro-llm-eurora",
+ "euro-llm-ollama",
+ "euro-llm-openai",
  "euro-proto",
- "ferrous-llm",
  "futures",
  "image",
  "regex",
@@ -3444,9 +3521,10 @@ dependencies = [
  "chrono",
  "dotenv",
  "euro-auth",
- "euro-eurora-provider",
+ "euro-llm-core",
+ "euro-llm-eurora",
+ "euro-llm-openai",
  "euro-ocr",
- "ferrous-llm",
  "futures",
  "image",
  "prost",
@@ -3530,8 +3608,8 @@ dependencies = [
  "anyhow",
  "async_from",
  "dirs 6.0.0",
- "euro-eurora-provider",
  "euro-fs",
+ "euro-llm-eurora",
  "euro-prompt-kit",
  "euro-secret",
  "notify",
@@ -3562,7 +3640,8 @@ dependencies = [
  "dotenv",
  "euro-activity",
  "euro-encrypt",
- "euro-eurora-provider",
+ "euro-llm-core",
+ "euro-llm-eurora",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-prompt-kit",
@@ -3574,7 +3653,6 @@ dependencies = [
  "euro-timeline",
  "euro-user",
  "euro-vision",
- "ferrous-llm-core",
  "futures",
  "image",
  "keyring",
@@ -3632,11 +3710,10 @@ dependencies = [
  "euro-activity",
  "euro-focus",
  "euro-fs",
+ "euro-llm-core",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-proto",
- "ferrous-llm",
- "ferrous-llm-core",
  "image",
  "keyring",
  "orion",
@@ -3792,100 +3869,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4316185f709b23713e41e3195f90edef7fb00c3ed4adc79769cf09cc762a3b29"
 dependencies = [
  "log",
-]
-
-[[package]]
-name = "ferrous-llm"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72c0a41f41fae9b73520002c69b61fa57cace8bbf11bfa3b5a3fa1b9cb6162d2"
-dependencies = [
- "chrono",
- "dotenv",
- "ferrous-llm-anthropic",
- "ferrous-llm-core",
- "ferrous-llm-ollama",
- "ferrous-llm-openai",
- "futures",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
-]
-
-[[package]]
-name = "ferrous-llm-anthropic"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e065f9531d456cd3bd5ed6775d7595dc4c77b12b57ea18e5da465d0cd53ad561"
-dependencies = [
- "async-trait",
- "chrono",
- "ferrous-llm-core",
- "futures",
- "reqwest 0.12.24",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "url",
-]
-
-[[package]]
-name = "ferrous-llm-core"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39be37002fd827642b544d63b626e70f3f65c5260982ffae8b52955aa4bfcb49"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "chrono",
- "futures",
- "image",
- "serde",
- "serde_json",
- "specta",
- "thiserror 2.0.17",
- "tokio",
- "url",
-]
-
-[[package]]
-name = "ferrous-llm-ollama"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ef693d85d4dd3bf205961f8315376e1e5d7267940fe33c087342016d2bcf68e"
-dependencies = [
- "async-trait",
- "chrono",
- "ferrous-llm-core",
- "futures",
- "reqwest 0.12.24",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "url",
-]
-
-[[package]]
-name = "ferrous-llm-openai"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8d1bb448116ca5f2e82d96b67a5d927fd81a2cf112ee603cf1a600f0c41388b"
-dependencies = [
- "async-trait",
- "chrono",
- "ferrous-llm-core",
- "futures",
- "reqwest 0.12.24",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "url",
 ]
 
 [[package]]

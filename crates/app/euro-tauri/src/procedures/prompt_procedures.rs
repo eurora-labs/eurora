@@ -1,5 +1,5 @@
 use async_from::AsyncTryFrom;
-use euro_eurora_provider::EuroraConfig;
+use euro_llm_eurora::EuroraConfig;
 use euro_prompt_kit::{OllamaConfig, OpenAIConfig};
 use euro_secret::secret;
 use euro_settings::BackendType;
