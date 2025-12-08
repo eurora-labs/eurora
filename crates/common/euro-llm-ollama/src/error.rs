@@ -249,18 +249,24 @@ mod tests {
 
     #[test]
     fn test_retryable_errors() {
-        assert!(OllamaError::ServiceUnavailable {
-            message: "test".to_string()
-        }
-        .is_retryable());
-        assert!(OllamaError::ResourceExhausted {
-            message: "test".to_string()
-        }
-        .is_retryable());
-        assert!(!OllamaError::ModelNotFound {
-            model: "test".to_string()
-        }
-        .is_retryable());
+        assert!(
+            OllamaError::ServiceUnavailable {
+                message: "test".to_string()
+            }
+            .is_retryable()
+        );
+        assert!(
+            OllamaError::ResourceExhausted {
+                message: "test".to_string()
+            }
+            .is_retryable()
+        );
+        assert!(
+            !OllamaError::ModelNotFound {
+                model: "test".to_string()
+            }
+            .is_retryable()
+        );
     }
 
     #[test]
