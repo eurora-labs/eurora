@@ -112,13 +112,12 @@ codegen-units = 256
 [profile.dev]
 overflow-checks = false
 incremental = true
-codegen-units = 256
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
 [profile.release]
 opt-level = "s"  # Optimize for binary size
-debug = true  # Enable debug symbols, for profiling
+debug = false  # Enable debug symbols, for profiling
 lto = true  # Enables link to optimizations
 codegen-units = 1  # Compile crates one after another so the compiler can optimize better
