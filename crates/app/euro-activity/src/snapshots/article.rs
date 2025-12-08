@@ -1,7 +1,7 @@
 //! Article snapshot implementation
 
+use euro_llm_core::{Message, MessageContent, Role};
 use euro_native_messaging::types::NativeArticleSnapshot;
-use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
 use crate::{ActivityResult, types::SnapshotFunctionality};

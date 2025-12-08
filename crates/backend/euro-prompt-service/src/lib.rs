@@ -2,14 +2,13 @@ use std::pin::Pin;
 
 use anyhow::{Result, anyhow};
 use euro_auth::{Claims, JwtConfig, validate_access_token};
-use euro_eurora_provider::proto::chat::{
+use euro_llm_core::{ChatRequest, StreamingProvider};
+use euro_llm_eurora::proto::chat::{
     ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse, ProtoFinishReason,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
 };
-use ferrous_llm::{
-    ChatRequest, StreamingProvider,
-    openai::{OpenAIConfig, OpenAIProvider},
-};
+use euro_llm_openai::{OpenAIConfig, OpenAIProvider};
+
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
 use tracing::debug;

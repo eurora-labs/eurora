@@ -1,7 +1,7 @@
 //! Default asset implementation for unsupported activity types
 
 use async_trait::async_trait;
-use ferrous_llm_core::{Message, MessageContent, Role};
+use euro_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
 use crate::{

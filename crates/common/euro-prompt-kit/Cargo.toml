@@ -8,9 +8,12 @@ edition = "2024"
 anyhow = { workspace = true }
 # euro-proto-client = { workspace = true }
 async_from = { workspace = true }
-euro-eurora-provider = { workspace = true }
+euro-llm-anthropic = { workspace = true }
+euro-llm-core = { workspace = true }
+euro-llm-eurora = { workspace = true }
+euro-llm-ollama = { workspace = true }
+euro-llm-openai = { workspace = true }
 euro-proto = { workspace = true }
-ferrous-llm = { workspace = true, features = ["anthropic", "ollama", "openai"] }
 futures = { workspace = true }
 image = { workspace = true }
 regex = "1.12.2"

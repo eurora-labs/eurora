@@ -1,4 +1,4 @@
-//! gRPC provider for ferrous-llm.
+//! gRPC provider for euro-llm.
 //!
 //! This crate provides gRPC-based implementations of the ChatProvider and StreamingProvider traits.
 
@@ -16,7 +16,7 @@ pub mod types;
 // Re-export main types for convenience
 pub use config::EuroraConfig;
 pub use error::EuroraError;
-pub use ferrous_llm_core::StreamingProvider;
+pub use euro_llm_core::StreamingProvider;
 pub use provider::{EuroraChatProvider, EuroraStreamingProvider};
 
 #[cfg(test)]

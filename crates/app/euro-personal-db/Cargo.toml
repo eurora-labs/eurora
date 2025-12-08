@@ -9,8 +9,8 @@ description = "Eurora Personal DB"
 anyhow.workspace = true
 base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
+euro-llm-core = { workspace = true, features = ["specta"] }
 euro-secret = { workspace = true }
-ferrous-llm-core = { workspace = true, features = ["specta"] }
 futures = { workspace = true, features = ["std"] }
 image = { workspace = true, default-features = false, features = [
   "jpeg",
