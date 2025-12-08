@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use ferrous_llm_core::config::ProviderConfig;
+use euro_llm_core::config::ProviderConfig;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -64,7 +64,7 @@ impl Default for EuroraConfig {
             keep_alive_timeout: Some(Duration::from_secs(5)),
             keep_alive_while_idle: true,
             max_concurrent_requests: Some(100),
-            user_agent: Some("ferrous-llm-grpc/0.2.0".to_string()),
+            user_agent: Some("euro-llm-grpc/0.2.0".to_string()),
         }
     }
 }
@@ -72,8 +72,8 @@ impl Default for EuroraConfig {
 impl ProviderConfig for EuroraConfig {
     type Provider = crate::provider::EuroraChatProvider;
 
-    fn build(self) -> Result<Self::Provider, ferrous_llm_core::error::ConfigError> {
-        use ferrous_llm_core::error::ConfigError;
+    fn build(self) -> Result<Self::Provider, euro_llm_core::error::ConfigError> {
+        use euro_llm_core::error::ConfigError;
 
         self.validate()?;
 
@@ -85,8 +85,8 @@ impl ProviderConfig for EuroraConfig {
         ))
     }
 
-    fn validate(&self) -> Result<(), ferrous_llm_core::error::ConfigError> {
-        use ferrous_llm_core::error::ConfigError;
+    fn validate(&self) -> Result<(), euro_llm_core::error::ConfigError> {
+        use euro_llm_core::error::ConfigError;
 
         // Validate endpoint
         if self.endpoint.scheme() != "http" && self.endpoint.scheme() != "https" {

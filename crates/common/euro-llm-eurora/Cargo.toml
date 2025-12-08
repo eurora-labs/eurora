@@ -1,5 +1,5 @@
 [package]
-name = "euro-eurora-provider"
+name = "euro-llm-eurora"
 version = "0.0.0"
 authors.workspace = true
 edition = "2024"
@@ -10,9 +10,9 @@ async-stream = "0.3.1"
 async-trait = "0.1.89"
 base64 = { workspace = true }
 chrono = { workspace = true }
+euro-llm-core = { workspace = true, features = ["dynamic-image"] }
 euro-secret = { workspace = true }
 euro-user = { workspace = true }
-ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
 futures = { workspace = true }
 image = { workspace = true }
 prost = { workspace = true }
