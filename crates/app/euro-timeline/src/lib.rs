@@ -8,7 +8,7 @@ pub use euro_activity::{
     ActivityStorageConfig, ActivityStrategy, AssetFunctionality, ContextChip, DisplayAsset,
     SaveableAsset,
 };
-pub use ferrous_llm_core::Message;
+pub use euro_llm_core::Message;
 pub use manager::{TimelineManager, TimelineManagerBuilder, create_timeline};
 pub use storage::{StorageStats, TimelineStorage};
 

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use ferrous_llm_core::types::*;
+use euro_llm_core::types::*;
 
 use crate::proto::chat::{
     ProtoAudioPart, ProtoChatRequest, ProtoChatResponse, ProtoContentPart, ProtoFinishReason,
@@ -96,10 +96,10 @@ impl From<ProtoFunctionCall> for FunctionCall {
 impl From<ContentPart> for ProtoContentPart {
     fn from(part: ContentPart) -> Self {
         let part_type = match part {
-            ferrous_llm_core::types::ContentPart::Text { text } => {
+            euro_llm_core::types::ContentPart::Text { text } => {
                 ProtoPartType::Text(ProtoTextPart { text })
             }
-            ferrous_llm_core::types::ContentPart::Image {
+            euro_llm_core::types::ContentPart::Image {
                 image_source,
                 detail,
             } => {
@@ -110,7 +110,7 @@ impl From<ContentPart> for ProtoContentPart {
                     detail,
                 })
             }
-            ferrous_llm_core::types::ContentPart::Audio { audio_url, format } => {
+            euro_llm_core::types::ContentPart::Audio { audio_url, format } => {
                 ProtoPartType::Audio(ProtoAudioPart { audio_url, format })
             }
         };
@@ -174,8 +174,8 @@ impl From<ProtoMessageContent> for MessageContent {
 impl From<MessageContent> for ProtoMessageContent {
     fn from(content: MessageContent) -> Self {
         let content_type = match content {
-            ferrous_llm_core::types::MessageContent::Text(text) => ProtoContentType::Text(text),
-            ferrous_llm_core::types::MessageContent::Multimodal(parts) => {
+            euro_llm_core::types::MessageContent::Text(text) => ProtoContentType::Text(text),
+            euro_llm_core::types::MessageContent::Multimodal(parts) => {
                 let proto_parts = parts
                     .into_iter()
                     .map(|part| part.into())
@@ -183,7 +183,7 @@ impl From<MessageContent> for ProtoMessageContent {
 
                 ProtoContentType::Multimodal(ProtoMultimodalContent { parts: proto_parts })
             }
-            ferrous_llm_core::types::MessageContent::Tool(tool_content) => {
+            euro_llm_core::types::MessageContent::Tool(tool_content) => {
                 let tool_calls = tool_content
                     .tool_calls
                     .unwrap_or_default()

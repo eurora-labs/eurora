@@ -1,7 +1,7 @@
 //! Authentication procedures for the Tauri application.
 
 use async_from::AsyncTryFrom;
-use euro_eurora_provider::EuroraConfig;
+use euro_llm_eurora::EuroraConfig;
 use euro_secret::{Sensitive, secret};
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
