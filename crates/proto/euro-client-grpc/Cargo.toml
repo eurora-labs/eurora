@@ -1,0 +1,12 @@
+[package]
+name = "euro-client-grpc"
+version = "0.0.0"
+authors.workspace = true
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+tokio = { workspace = true, default-features = false }
+tonic = { workspace = true }
+tracing = { workspace = true }

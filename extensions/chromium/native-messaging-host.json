@@ -2,6 +2,6 @@
 	"allowed_origins": ["chrome-extension://bagamdmkmgflajpfehjgancnbngignfp/"],
 	"description": "Eurora Native Messaging Host",
 	"name": "com.eurora.app",
-	"path": "/home/andre/Projects/eurora/eurora/target/debug/eur-native-messaging",
+	"path": "/home/andre/Projects/eurora/eurora/target/debug/euro-native-messaging",
 	"type": "stdio"
 }
