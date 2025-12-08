@@ -85,9 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Simulate async processing that might involve network or computation
 #[cfg(feature = "async")]
-async fn simulate_async_processing(
-    window: &euro_focus::FocusedWindow,
-) -> FerrousFocusResult<()> {
+async fn simulate_async_processing(window: &euro_focus::FocusedWindow) -> FerrousFocusResult<()> {
     // Simulate some async work
     tokio::time::sleep(Duration::from_millis(50)).await;
 

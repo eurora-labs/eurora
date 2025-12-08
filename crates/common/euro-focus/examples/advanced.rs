@@ -10,8 +10,8 @@
 //! Usage: cargo run --example advanced
 
 use euro_focus::{FerrousFocusResult, FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 fn save_icon_to_file(
     icon_data: &image::RgbaImage,
