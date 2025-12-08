@@ -10,7 +10,6 @@ anyhow = { workspace = true }
 async_from = { workspace = true }
 euro-eurora-provider = { workspace = true }
 euro-proto = { workspace = true }
-euro-util = { workspace = true }
 ferrous-llm = { workspace = true, features = ["anthropic", "ollama", "openai"] }
 futures = { workspace = true }
 image = { workspace = true }
