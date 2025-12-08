@@ -14,10 +14,10 @@ permissions:
     id-token: write
     contents: read
     packages: read
- 
+
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
     changes:
@@ -125,8 +125,8 @@ jobs:
         if: ${{ needs.changes.outputs.rust == 'true' }}
         runs-on: ubuntu-latest
 
-        container:
-            image: ghcr.io/eurora-labs/ci-base-image:latest
+        # container:
+        #     image: ghcr.io/eurora-labs/ci-base-image:latest
         env:
             CARGO_TERM_COLOR: always
         steps:
@@ -145,8 +145,8 @@ jobs:
         needs: changes
         if: ${{ needs.changes.outputs.rust == 'true' }}
         runs-on: ubuntu-latest
-        container:
-            image: ghcr.io/eurora-labs/ci-base-image:latest
+        # container:
+        # image: ghcr.io/eurora-labs/ci-base-image:latest
         env:
             CARGO_TERM_COLOR: always
         strategy:
