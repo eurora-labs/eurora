@@ -12,11 +12,11 @@ base64.workspace = true
 chrono = { workspace = true, features = ["serde"] }
 dirs = { workspace = true }
 euro-activity = { workspace = true }
+euro-focus = { workspace = true, features = ["async"] }
 euro-fs = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true }
 euro-proto = { workspace = true }
-ferrous-focus = { workspace = true, features = ["async"] }
 ferrous-llm = { workspace = true, features = ["openai"] }
 ferrous-llm-core = { workspace = true }
 image.workspace = true

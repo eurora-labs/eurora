@@ -25,6 +25,7 @@ euro-auth = { path = "crates/common/euro-auth" }
 euro-auth-service = { path = "crates/backend/euro-auth-service" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-eurora-provider = { path = "crates/common/euro-eurora-provider" }
+euro-focus = { path = "crates/common/euro-focus" }
 euro-fs = { path = "crates/common/euro-fs" }
 euro-monolith = { path = "crates/backend/euro-monolith" }
 # App
@@ -47,7 +48,6 @@ euro-timeline = { path = "crates/app/euro-timeline" }
 euro-update-service = { path = "crates/backend/euro-update-service" }
 euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
-ferrous-focus = { version = "0.6.0" }
 ferrous-llm = { version = "0.6.1" }
 ferrous-llm-core = { version = "0.6.1" }
 futures = { version = "0.3.31" }

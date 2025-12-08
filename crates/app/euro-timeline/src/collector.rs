@@ -10,7 +10,7 @@ use std::{
 use euro_activity::DefaultStrategy;
 use euro_activity::strategies::ActivityReport;
 use euro_activity::{ContextChip, strategies::ActivityStrategyFunctionality};
-use ferrous_focus::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
+use euro_focus::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,

@@ -38,7 +38,7 @@ impl ActivityStrategyFunctionality for NoStrategy {
 
     async fn start_tracking(
         &mut self,
-        focus_window: &ferrous_focus::FocusedWindow,
+        focus_window: &euro_focus::FocusedWindow,
         _sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
         debug!(
