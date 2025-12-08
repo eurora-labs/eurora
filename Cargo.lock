@@ -3120,16 +3120,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-client-grpc"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "tokio",
- "tonic",
- "tracing",
-]
-
-[[package]]
 name = "euro-encrypt"
 version = "0.0.0"
 dependencies = [
@@ -3314,7 +3304,6 @@ dependencies = [
  "async_from",
  "euro-eurora-provider",
  "euro-proto",
- "euro-util",
  "ferrous-llm",
  "futures",
  "image",
@@ -3451,7 +3440,6 @@ dependencies = [
  "dirs 6.0.0",
  "dotenv",
  "euro-activity",
- "euro-client-grpc",
  "euro-encrypt",
  "euro-eurora-provider",
  "euro-native-messaging",
@@ -3585,15 +3573,6 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "euro-util"
-version = "0.0.0"
-dependencies = [
- "euro-proto",
- "once_cell",
- "regex",
 ]
 
 [[package]]
