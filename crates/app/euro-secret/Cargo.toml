@@ -1,0 +1,12 @@
+[package]
+name = "euro-secret"
+version = "0.0.0"
+authors.workspace = true
+edition = "2024"
+description = "Secret management for Eurora"
+
+[dependencies]
+anyhow = { workspace = true }
+keyring = { workspace = true }
+serde = { workspace = true, features = ["std"] }
+tracing.workspace = true
