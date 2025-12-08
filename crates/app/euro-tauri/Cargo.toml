@@ -1,0 +1,114 @@
+[package]
+name = "euro-tauri"
+version = "0.0.0"
+authors.workspace = true
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib", "staticlib"]
+doctest = false
+
+[[bin]]
+name = "euro-tauri"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+anyhow = { workspace = true }
+async_from = { workspace = true }
+backtrace = { version = "0.3.76", optional = true }
+base64 = "0.22.1"
+chrono = { workspace = true }
+color-thief = "0.2.2"
+defer = "0.2.1"
+dirs = "6.0.0"
+dotenv = "0.15.0"
+euro-activity = { workspace = true }
+euro-client-grpc = { workspace = true }
+euro-encrypt = { workspace = true }
+euro-eurora-provider = { workspace = true }
+euro-native-messaging = { workspace = true }
+euro-personal-db = { workspace = true }
+euro-prompt-kit = { workspace = true }
+euro-proto = { workspace = true }
+euro-proto-client = { workspace = true }
+euro-screen-position = { workspace = true }
+euro-secret = { workspace = true }
+euro-settings = { workspace = true }
+euro-timeline = { workspace = true }
+euro-user = { workspace = true }
+euro-vision = { workspace = true }
+ferrous-llm-core = { workspace = true, features = ["specta"] }
+futures = { workspace = true }
+image = { workspace = true }
+keyring = { workspace = true }
+lazy_static = "1.4.0"
+log = { workspace = true }
+open = "5"
+parking_lot = { workspace = true }
+pollster = "0.4"
+posthog-rs = { workspace = true }
+reqwest = { version = "0.12.24", features = ["json", "native-tls"] }
+sentry = { workspace = true, features = ["log", "logs", "tracing"] }
+serde = { workspace = true }
+serde_json = { version = "1.0", features = ["arbitrary_precision", "std"] }
+specta = { workspace = true, features = ["derive", "function"] }
+specta-typescript = { version = "0.0.9" }
+tauri = { version = "2.9.3", features = ["tray-icon", "unstable"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-http = "2"
+tauri-plugin-log = "2"
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-store = "2"
+tauri-plugin-stronghold = "2.3.1"
+tauri-plugin-updater = "2"
+tauri-plugin-window-state = "2"
+tauri-specta = { version = "2.0.0-rc.21", features = [
+  "javascript",
+  "typescript",
+] }
+tauri-utils = "2.8.1"  # single entry removes second 8.6 s build
+taurpc = { version = "0.5.1" }
+# The features here optimize for performance.
+tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+tracing-appender = "0.2.4"
+tracing-forest = { version = "0.3.0" }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+url = "2.5.4"
+uuid = { workspace = true }
+
+[build-dependencies]
+tauri-build = { version = "2.5.1", features = [] }
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-autostart = "2"
+tauri-plugin-updater = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
+
+[features]
+default = ["custom-protocol", "devtools"]
+# this feature is used used for production builds where `devPath` points to the filesystem
+# DO NOT remove this
+custom-protocol = ["tauri/custom-protocol"]
+devtools = ["tauri/devtools"]
+error-context = ["dep:backtrace"]
+# Use mock keyring for testing (e2e tests, CI environments without system keyring)
+mock-keyring = []
+## A forwarding to all crates that have windows-specific adjustments for testing on non-Windows.
+windows = []
+
+[lints.clippy]
+all = "deny"
+correctness = "deny"
+perf = "deny"

@@ -1,0 +1,62 @@
+[package]
+name = "euro-activity"
+version = "0.0.0"
+authors.workspace = true
+edition = "2024"
+description = "Refactored activity system with enum-based type-safe design"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+cfg-if = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+dashmap = "6.1.0"
+dirs = { workspace = true }
+enum_dispatch = { workspace = true }
+euro-encrypt = { workspace = true }
+euro-fs = { workspace = true }
+euro-native-messaging = { workspace = true }
+euro-proto = { workspace = true }
+euro-secret = { workspace = true }
+ferrous-focus = { workspace = true, features = ["async"] }
+ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
+hex = "0.4.3"
+humantime-serde = { workspace = true }
+image.workspace = true
+lazy_static = { version = "1.5.0" }
+rand = { workspace = true }
+regex = "1.12.2"
+resvg = { version = "0.45" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sha2 = "0.10.8"
+specta = { workspace = true, features = ["derive", "function"] }
+specta-typescript = { version = "0.0.9" }
+taurpc = { version = "0.5.1" }
+tempfile = "3.23.0"
+thiserror = { workspace = true }
+tiny-skia = "0.11"
+tokio = { workspace = true, default-features = false, features = [
+  "fs",
+  "macros",
+  "rt-multi-thread",
+] }
+tokio-stream = { workspace = true }
+tonic = { workspace = true, features = [
+  "channel",
+  "router",
+  "server",
+  "tls-native-roots"
+] }
+tracing = { workspace = true }
+url = { version = "2.5.7" }
+usvg = { version = "0.45", default-features = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+
+[features]
+default = []
+compat = []  # Enable backward compatibility layer
