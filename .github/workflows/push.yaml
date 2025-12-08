@@ -26,7 +26,7 @@ jobs:
             node: ${{ steps.filter.outputs.node }}
             rust: ${{ steps.filter.outputs.rust }}
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   persist-credentials: false
 
@@ -69,7 +69,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'false' &&  needs.changes.outputs.docs == 'true'}}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -80,7 +80,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -91,7 +91,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -108,7 +108,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -124,22 +124,30 @@ jobs:
         needs: changes
         if: ${{ needs.changes.outputs.rust == 'true' }}
         runs-on: ubuntu-latest
-
-        # container:
-        #     image: ghcr.io/eurora-labs/ci-base-image:latest
+        container:
+            image: ghcr.io/eurora-labs/ci-base-image:latest
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   persist-credentials: false
                   lfs: true
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+            - name: Rust Cache
+              uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
               with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+                  shared-key: lint
+                  save-if: ${{ github.ref == 'refs/heads/master' }}
+            # - name: Install Protoc
+            #   uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+            #   with:
+            #       repo-token: ${{ secrets.GITHUB_TOKEN }}
             - run: cargo fmt --check --all
             - run: cargo check --workspace --all-targets
+            - name: Cargo Clippy
+              run: |
+                  rustup component add clippy
+                  cargo clippy --workspace --all-targets -- -D warnings
 
     rust-test:
         needs: changes
@@ -163,7 +171,7 @@ jobs:
                     - [tokio]
                     - [devtools]
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   persist-credentials: false
                   lfs: true
@@ -199,7 +207,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   persist-credentials: false
                   lfs: true
