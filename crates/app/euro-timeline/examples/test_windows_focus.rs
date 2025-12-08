@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo run --example test_windows_focus
 
-use ferrous_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
+use euro_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
 use tracing::debug;
 
 fn main() -> anyhow::Result<()> {
