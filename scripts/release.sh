@@ -155,7 +155,7 @@ info "	sign: $DO_SIGN"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' exit
 
-CONFIG_PATH=$(readlink -f "$PWD/../crates/app/eur-tauri/tauri.conf.$CHANNEL.json")
+CONFIG_PATH=$(readlink -f "$PWD/../crates/app/euro-tauri/tauri.conf.$CHANNEL.json")
 
 # update the version in the tauri release config
 jq '.version="'"$VERSION"'"' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
@@ -167,7 +167,7 @@ else
 fi
 
 # Build native messaging
-cargo build --package eur-native-messaging --release
+cargo build --package euro-native-messaging --release
 
 # build the app with release config
 tauri build \
@@ -217,10 +217,10 @@ elif [ "$OS" = "windows" ]; then
 	WINDOWS_UPDATER_SIG="$(find "$BUNDLE_DIR/msi" -name \*.msi.zip.sig)"
 
 	cp "$WINDOWS_INSTALLER" "$RELEASE_DIR"
-	
+
 	# Uncomment and adapt if you have auxiliary binaries to include
 	# mkdir -p tauri-aux-artifacts
-	# cp target/release/eur-aux-binary.exe tauri-aux-artifacts/
+	# cp target/release/euro-aux-binary.exe tauri-aux-artifacts/
 	cp "$WINDOWS_UPDATER" "$RELEASE_DIR"
 	cp "$WINDOWS_UPDATER_SIG" "$RELEASE_DIR"
 
@@ -235,50 +235,50 @@ fi
 # Install Chrome extension native messaging host manifest
 function install_native_messaging_host() {
 	info "Installing Chrome extension native messaging host manifest..."
-	
+
 	# Path to the native messaging host binary in the release
 	local NATIVE_MESSAGING_HOST_BINARY
 	local MANIFEST_DIR
 	local MANIFEST_PATH
 	local MANIFEST_CONTENT
-	
+
 	# Get the path to the native-messaging-host.json template
 	local TEMPLATE_PATH="$PWD/../extensions/chromium/native-messaging-host.json"
-	
+
 	if [ "$OS" = "macos" ]; then
 		# For macOS, the binary is inside the .app bundle
-		NATIVE_MESSAGING_HOST_BINARY="/Applications/Eurora.app/Contents/MacOS/eur-native-messaging"
+		NATIVE_MESSAGING_HOST_BINARY="/Applications/Eurora.app/Contents/MacOS/euro-native-messaging"
 		MANIFEST_DIR="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-		
+
 		# Also support Chromium and other browsers
 		mkdir -p "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
 		mkdir -p "$HOME/Library/Application Support/Chromium/NativeMessagingHosts"
 		mkdir -p "$HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts"
 		mkdir -p "$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"
-		
+
 	elif [ "$OS" = "linux" ]; then
 		# For Linux, use the installed binary path
-		NATIVE_MESSAGING_HOST_BINARY="/usr/bin/eur-native-messaging"
+		NATIVE_MESSAGING_HOST_BINARY="/usr/bin/euro-native-messaging"
 		MANIFEST_DIR="$HOME/.config/google-chrome/NativeMessagingHosts"
-		
+
 		# Also support Chromium and other browsers
 		mkdir -p "$HOME/.config/google-chrome/NativeMessagingHosts"
 		mkdir -p "$HOME/.config/chromium/NativeMessagingHosts"
 		mkdir -p "$HOME/.config/microsoft-edge/NativeMessagingHosts"
 		mkdir -p "$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
-		
+
 	elif [ "$OS" = "windows" ]; then
 		# For Windows, use the installed binary path
-		NATIVE_MESSAGING_HOST_BINARY="C:\\Program Files\\Eurora\\eur-native-messaging.exe"
+		NATIVE_MESSAGING_HOST_BINARY="C:\\Program Files\\Eurora\\euro-native-messaging.exe"
 		# Windows uses registry instead of file system for manifest
 		MANIFEST_DIR=""
 	else
 		error "Unsupported OS for native messaging host: $OS"
 	fi
-	
+
 	# Create the manifest content with the correct binary path
 	MANIFEST_CONTENT=$(cat "$TEMPLATE_PATH" | sed "s|\"path\": \".*\"|\"path\": \"$NATIVE_MESSAGING_HOST_BINARY\"|")
-	
+
 	if [ "$OS" = "macos" ] || [ "$OS" = "linux" ]; then
 		# For macOS and Linux, write the manifest to the filesystem
 		for browser_dir in "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts" \
@@ -304,7 +304,7 @@ function install_native_messaging_host() {
 		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Google\\Chrome\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"C:\\Program Files\\Eurora\\com.eurora.app.json\" /f"
 		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Chromium\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"C:\\Program Files\\Eurora\\com.eurora.app.json\" /f"
 		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Edge\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"C:\\Program Files\\Eurora\\com.eurora.app.json\" /f"
-		
+
 		# Also create the manifest file in the installation directory
 		info "  - The manifest file should be placed at: C:\\Program Files\\Eurora\\com.eurora.app.json"
 	fi
