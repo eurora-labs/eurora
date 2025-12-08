@@ -1,7 +1,9 @@
 mod error;
 mod service;
 pub use error::PromptKitError;
-pub use ferrous_llm::{ProviderConfig, ollama::OllamaConfig, openai::OpenAIConfig};
+pub use euro_llm_core::ProviderConfig;
+pub use euro_llm_ollama::OllamaConfig;
+pub use euro_llm_openai::OpenAIConfig;
 pub use service::PromptKitService;
 
 #[derive(Debug, Default, Copy, Clone)]
