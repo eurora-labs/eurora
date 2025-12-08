@@ -1,7 +1,7 @@
 //! Twitter snapshot implementation
 
+use euro_llm_core::{Message, MessageContent, Role};
 use euro_native_messaging::types::NativeTwitterSnapshot;
-use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
