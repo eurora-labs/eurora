@@ -1,0 +1,22 @@
+[package]
+name = "euro-settings"
+version = "0.0.0"
+authors.workspace = true
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+async_from = { workspace = true }
+dirs = { workspace = true }
+euro-eurora-provider = { workspace = true }
+euro-fs = { workspace = true }
+euro-prompt-kit = { workspace = true }
+euro-secret = { workspace = true }
+notify = { version = "8.2.0" }
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
+serde_json_lenient = { workspace = true }
+specta = { version = "=2.0.0-rc.22", features = ["derive", "function"] }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tracing = { workspace = true }

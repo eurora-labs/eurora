@@ -4,11 +4,11 @@ on:
     push:
         branches: ['main']
         paths:
-            - 'crates/backend/eur-monolith/**'
-            - 'crates/backend/eur-auth-service/**'
-            - 'crates/backend/eur-ocr-service/**'
-            - 'crates/backend/eur-remote-db/**'
-            - 'crates/common/eur-auth/**'
+            - 'crates/backend/euro-monolith/**'
+            - 'crates/backend/euro-auth-service/**'
+            - 'crates/backend/euro-ocr-service/**'
+            - 'crates/backend/euro-remote-db/**'
+            - 'crates/common/euro-auth/**'
             - 'proto/**'
             - '.github/workflows/deploy-monolith.yml'
     workflow_dispatch:
@@ -25,7 +25,7 @@ concurrency:
 env:
     RUST_VERSION: nightly
     REGISTRY: ghcr.io
-    IMAGE_NAME: ${{ github.repository }}/eur-monolith
+    IMAGE_NAME: ${{ github.repository }}/euro-monolith
 
 jobs:
     build:
@@ -42,7 +42,7 @@ jobs:
 
             - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
               with:
-                  workspaces: 'crates/backend/eur-monolith'
+                  workspaces: 'crates/backend/euro-monolith'
 
             - name: Install system dependencies
               run: |
@@ -61,12 +61,12 @@ jobs:
                   # run: cargo test --workspace
 
             - name: Build monolith
-              run: cargo build --release --package eur-monolith
+              run: cargo build --release --package euro-monolith
 
             - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
               with:
-                  name: eur-monolith-binary
-                  path: target/release/eur-monolith
+                  name: euro-monolith-binary
+                  path: target/release/euro-monolith
                   retention-days: 7
 
     docker:
@@ -81,11 +81,11 @@ jobs:
             - name: Download build artifact
               uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
               with:
-                  name: eur-monolith-binary
+                  name: euro-monolith-binary
                   path: ./target/release/
 
             - name: Make binary executable
-              run: chmod +x ./target/release/eur-monolith
+              run: chmod +x ./target/release/euro-monolith
 
             - name: Create Dockerfile
               run: |
@@ -93,13 +93,13 @@ jobs:
                   FROM ubuntu:24.04
                   RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
                   RUN useradd -r -s /bin/false eurora
-                  COPY target/release/eur-monolith /usr/local/bin/eur-monolith
-                  RUN chown eurora:eurora /usr/local/bin/eur-monolith
+                  COPY target/release/euro-monolith /usr/local/bin/euro-monolith
+                  RUN chown eurora:eurora /usr/local/bin/euro-monolith
                   USER eurora
                   EXPOSE 50051
                   ENV MONOLITH_ADDR=[::]:50051
                   HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD timeout 3s bash -c "</dev/tcp/localhost/50051" || exit 1
-                  CMD ["/usr/local/bin/eur-monolith"]
+                  CMD ["/usr/local/bin/euro-monolith"]
                   EOF
 
             - name: Set up Docker Buildx
