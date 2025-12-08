@@ -1,0 +1,11 @@
+[package]
+name = "euro-screen-position"
+version = "0.0.0"
+authors.workspace = true
+edition = "2024"
+
+[dependencies]
+enigo = "0.6.1"
+tauri = { version = "^2.9.3", features = ["tray-icon", "unstable"] }
+tracing = { workspace = true }
+xcap = { version = "0.7.0" }

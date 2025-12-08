@@ -1,0 +1,38 @@
+[package]
+name = "euro-auth-service"
+version = "0.0.0"
+edition = "2024"
+authors = ["Eurora <eurora@company.com>"]
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+axum = { version = "0.8.7", features = ["macros"] }
+base64 = { workspace = true }
+bcrypt = "0.17"
+chrono = { workspace = true, features = ["serde"] }
+dotenv = "0.15"
+euro-auth = { workspace = true }
+euro-proto = { workspace = true }
+euro-remote-db = { workspace = true }
+futures = "0.3"
+hex = "0.4.3"
+image = { workspace = true }
+jsonwebtoken = "9.3"
+oauth2 = "5.0.0"
+openidconnect = "4.0.1"
+prost = { workspace = true }
+rand = { workspace = true }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { workspace = true, features = ["derive"] }
+serde_urlencoded = "0.7"
+sha2 = "0.10"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+tonic = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = "2.5"
+uuid = { workspace = true, features = ["serde", "v4"] }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }
