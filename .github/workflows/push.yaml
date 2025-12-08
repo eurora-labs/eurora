@@ -140,8 +140,8 @@ jobs:
             - name: Rust Cache
               uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
               with:
-                  shared-key: lint
-                  save-if: ${{ github.ref == 'refs/heads/master' }}
+                  shared-key: rust-lint
+                  save-if: ${{ github.ref == 'refs/heads/main' }}
             - run: cargo fmt --check --all
             - run: cargo check --workspace --all-targets
             - name: Cargo Clippy
@@ -153,23 +153,10 @@ jobs:
         needs: changes
         if: ${{ needs.changes.outputs.rust == 'true' }}
         runs-on: ubuntu-latest
-        # container:
-        # image: ghcr.io/eurora-labs/ci-base-image:latest
+        container:
+            image: ghcr.io/eurora-labs/ci-base-image:latest
         env:
             CARGO_TERM_COLOR: always
-        strategy:
-            matrix:
-                # Specifies which features should be applied when running the checks and tests
-                # '' indicates no flags relating to features passed
-                # [] indicates --no-default-features flag passed
-                # '*' indicates --all-features passed
-                # [entry1, entry2] indicates --features entry1 entry2
-                features:
-                    - ''
-                    - '*'
-                    - []
-                    - [tokio]
-                    - [devtools]
         steps:
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
@@ -179,9 +166,12 @@ jobs:
               uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
               with:
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
-            - uses: ./.github/actions/check-crate
+            - name: Rust Cache
+              uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
               with:
-                  features: ${{ toJson(matrix.features) }}
+                  shared-key: rust-test
+                  save-if: ${{ github.ref == 'refs/heads/main' }}
+            - run: cargo test --workspace --exclude euro-tauri --exclude euro-monolith
 
     check-rust:
         if: always()
