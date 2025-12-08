@@ -4,7 +4,6 @@ members = [
   "crates/app/euro-*",
   "crates/backend/euro-*",
   "crates/common/euro-*",
-  "crates/proto/euro-*",
 ]
 
 [workspace.package]
@@ -24,7 +23,6 @@ euro-activity = { path = "crates/app/euro-activity" }
 # Common
 euro-auth = { path = "crates/common/euro-auth" }
 euro-auth-service = { path = "crates/backend/euro-auth-service" }
-euro-client-grpc = { path = "crates/proto/euro-client-grpc" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-eurora-provider = { path = "crates/common/euro-eurora-provider" }
 euro-fs = { path = "crates/common/euro-fs" }
@@ -37,7 +35,7 @@ euro-personal-db = { path = "crates/app/euro-personal-db" }
 euro-prompt-kit = { path = "crates/common/euro-prompt-kit" }
 # Backend
 euro-prompt-service = { path = "crates/backend/euro-prompt-service" }
-euro-proto = { path = "crates/proto/euro-proto" }
+euro-proto = { path = "crates/common/euro-proto" }
 euro-proto-client = { path = "crates/common/euro-proto-client" }
 euro-remote-db = { path = "crates/backend/euro-remote-db" }
 euro-screen-position = { path = "crates/app/euro-screen-position" }
@@ -48,7 +46,6 @@ euro-tauri = { path = "crates/app/euro-tauri" }
 euro-timeline = { path = "crates/app/euro-timeline" }
 euro-update-service = { path = "crates/backend/euro-update-service" }
 euro-user = { path = "crates/app/euro-user" }
-euro-util = { path = "crates/common/euro-util" }
 euro-vision = { path = "crates/app/euro-vision" }
 ferrous-focus = { version = "0.6.0" }
 ferrous-llm = { version = "0.6.1" }
