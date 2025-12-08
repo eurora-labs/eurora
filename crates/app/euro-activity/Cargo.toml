@@ -17,10 +17,10 @@ enum_dispatch = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-focus = { workspace = true, features = ["async"] }
 euro-fs = { workspace = true }
+euro-llm-core = { workspace = true, features = ["dynamic-image"] }
 euro-native-messaging = { workspace = true }
 euro-proto = { workspace = true }
 euro-secret = { workspace = true }
-ferrous-llm-core = { workspace = true, features = ["dynamic-image"] }
 hex = "0.4.3"
 humantime-serde = { workspace = true }
 image.workspace = true
