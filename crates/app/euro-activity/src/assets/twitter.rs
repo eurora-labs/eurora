@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use euro_llm_core::{Message, MessageContent, Role};
 use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet};
-use ferrous_llm_core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
 use crate::{

@@ -1,5 +1,5 @@
+use euro_llm_core::Message;
 use euro_personal_db::PersonalDatabaseManager;
-use ferrous_llm_core::Message;
 use tauri::{Manager, Runtime};
 
 #[taurpc::procedures(path = "personal_db.message")]

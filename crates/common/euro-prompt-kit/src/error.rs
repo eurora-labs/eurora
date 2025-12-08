@@ -1,5 +1,6 @@
-use euro_eurora_provider::EuroraError;
-use ferrous_llm::{ollama::OllamaError, openai::OpenAIError};
+use euro_llm_eurora::EuroraError;
+use euro_llm_ollama::OllamaError;
+use euro_llm_openai::OpenAIError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

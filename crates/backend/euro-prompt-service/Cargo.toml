@@ -1,8 +1,8 @@
 [package]
 name = "euro-prompt-service"
 version = "0.0.0"
-edition = "2024"
-authors = ["Eurora <eurora@company.com>"]
+authors.workspace = true
+edition.workspace = true
 publish = false
 
 [dependencies]
@@ -11,10 +11,11 @@ async-trait = "0.1.89"
 chrono = { workspace = true }
 dotenv = "0.15"
 euro-auth = { workspace = true }
-euro-eurora-provider = { workspace = true }
+euro-llm-core = { workspace = true }
+euro-llm-eurora = { workspace = true }
+euro-llm-openai = { workspace = true }
 euro-ocr = { workspace = true }
-ferrous-llm = { workspace = true, features = ["openai"] }
-futures = "0.3"
+futures = { workspace = true }
 image = { workspace = true }
 prost = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
