@@ -1,5 +1,5 @@
+use euro_llm_core::Message;
 use euro_personal_db::{Conversation, PersonalDatabaseManager};
-use ferrous_llm_core::Message;
 use tauri::{Manager, Runtime};
 
 use crate::shared_types::SharedCurrentConversation;

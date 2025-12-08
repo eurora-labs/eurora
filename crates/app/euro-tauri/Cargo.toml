@@ -26,7 +26,8 @@ dirs = "6.0.0"
 dotenv = "0.15.0"
 euro-activity = { workspace = true }
 euro-encrypt = { workspace = true }
-euro-eurora-provider = { workspace = true }
+euro-llm-core = { workspace = true, features = ["specta"] }
+euro-llm-eurora = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true }
 euro-prompt-kit = { workspace = true }
@@ -38,7 +39,6 @@ euro-settings = { workspace = true }
 euro-timeline = { workspace = true }
 euro-user = { workspace = true }
 euro-vision = { workspace = true }
-ferrous-llm-core = { workspace = true, features = ["specta"] }
 futures = { workspace = true }
 image = { workspace = true }
 keyring = { workspace = true }
