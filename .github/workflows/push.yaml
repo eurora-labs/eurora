@@ -14,6 +14,10 @@ permissions:
     id-token: write
     contents: read
     packages: read
+ 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
     changes:
