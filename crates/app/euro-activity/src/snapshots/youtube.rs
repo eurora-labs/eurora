@@ -1,7 +1,7 @@
 //! YouTube snapshot implementation
 
+use euro_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
 use euro_native_messaging::types::NativeYoutubeSnapshot;
-use ferrous_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
 use crate::{error::ActivityError, types::SnapshotFunctionality};
