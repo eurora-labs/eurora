@@ -11,7 +11,7 @@ let tauriDriver: ChildProcess;
 // Get the absolute path to the Tauri binary
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const tauriBinaryPath = path.resolve(__dirname, '../../target/debug/eur-tauri');
+const tauriBinaryPath = path.resolve(__dirname, '../../target/debug/euro-tauri');
 
 export const config = {
 	hostname: '127.0.0.1',
@@ -22,7 +22,7 @@ export const config = {
 	capabilities: [
 		{
 			'tauri:options': {
-				application: '../target/debug/eur-tauri',
+				application: '../target/debug/euro-tauri',
 			},
 		},
 	],
