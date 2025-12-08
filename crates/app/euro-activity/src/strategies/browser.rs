@@ -5,13 +5,13 @@ pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use dashmap::DashMap;
+use euro_focus::FocusedWindow;
 use euro_native_messaging::proto::RequestFrame;
 use euro_native_messaging::proto::ResponseFrame;
 use euro_native_messaging::{
     NativeMessage, create_browser_bridge_client,
     server::{Frame, FrameKind},
 };
-use euro_focus::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
