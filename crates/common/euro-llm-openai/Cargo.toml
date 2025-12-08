@@ -1,0 +1,33 @@
+[package]
+name = "euro-llm-openai"
+version = "0.6.1"
+authors.workspace = true
+edition.workspace = true
+description = "OpenAI provider for the LLM library"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+chrono = { workspace = true, features = ["serde"] }
+euro-llm-core.workspace = true
+futures.workspace = true
+reqwest = { version = "0.12", features = ["json", "stream"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tokio-stream = "0.1"
+url = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+dotenv = "0.15"
+tracing-subscriber = "0.3.22"
+
+[features]
+default = []
+dynamic-image = ["euro-llm-core/dynamic-image"]
+e2e-tests = []
+integration-tests = []
+specta = ["euro-llm-core/specta"]
