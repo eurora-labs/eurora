@@ -3127,7 +3127,7 @@ dependencies = [
  "euro-encrypt",
  "euro-focus",
  "euro-fs",
- "euro-llm-core",
+ "euro-llm",
  "euro-native-messaging",
  "euro-proto",
  "euro-secret",
@@ -3271,38 +3271,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-llm-anthropic"
-version = "0.6.1"
-dependencies = [
- "async-trait",
- "chrono",
- "dotenv",
- "euro-llm-core",
- "futures",
- "reqwest 0.12.24",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
-name = "euro-llm-core"
-version = "0.6.1"
+name = "euro-llm"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
  "futures",
  "image",
+ "reqwest 0.12.24",
  "serde",
  "serde_json",
  "specta",
  "thiserror 2.0.17",
  "tokio",
+ "tokio-stream",
  "url",
 ]
 
@@ -3314,7 +3297,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
- "euro-llm-core",
+ "euro-llm",
  "euro-secret",
  "euro-user",
  "futures",
@@ -3332,44 +3315,6 @@ dependencies = [
  "tonic-prost-build",
  "tower",
  "tracing",
- "url",
-]
-
-[[package]]
-name = "euro-llm-ollama"
-version = "0.6.1"
-dependencies = [
- "async-trait",
- "chrono",
- "dotenv",
- "euro-llm-core",
- "futures",
- "reqwest 0.12.24",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
-name = "euro-llm-openai"
-version = "0.6.1"
-dependencies = [
- "async-trait",
- "chrono",
- "dotenv",
- "euro-llm-core",
- "futures",
- "reqwest 0.12.24",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "tracing-subscriber",
  "url",
 ]
 
@@ -3474,7 +3419,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
- "euro-llm-core",
+ "euro-llm",
  "euro-secret",
  "futures",
  "image",
@@ -3497,11 +3442,8 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "async_from",
- "euro-llm-anthropic",
- "euro-llm-core",
+ "euro-llm",
  "euro-llm-eurora",
- "euro-llm-ollama",
- "euro-llm-openai",
  "euro-proto",
  "futures",
  "image",
@@ -3521,9 +3463,8 @@ dependencies = [
  "chrono",
  "dotenv",
  "euro-auth",
- "euro-llm-core",
+ "euro-llm",
  "euro-llm-eurora",
- "euro-llm-openai",
  "euro-ocr",
  "futures",
  "image",
@@ -3640,7 +3581,7 @@ dependencies = [
  "dotenv",
  "euro-activity",
  "euro-encrypt",
- "euro-llm-core",
+ "euro-llm",
  "euro-llm-eurora",
  "euro-native-messaging",
  "euro-personal-db",
@@ -3710,7 +3651,7 @@ dependencies = [
  "euro-activity",
  "euro-focus",
  "euro-fs",
- "euro-llm-core",
+ "euro-llm",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-proto",
