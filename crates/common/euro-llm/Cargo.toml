@@ -1,0 +1,37 @@
+[package]
+name = "euro-llm"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+description = "Eurora LLM library"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+base64 = { workspace = true, optional = true }
+chrono = { workspace = true, features = ["serde"] }
+futures = { workspace = true }
+image = { workspace = true, features = ["jpeg", "png"], optional = true }
+reqwest = { version = "0.12", features = ["json", "stream"], optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+specta = { workspace = true, features = [
+  "chrono",
+  "derive",
+  "serde",
+  "serde_json",
+], optional = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true, optional = true }
+url = { workspace = true, features = ["serde"] }
+
+[features]
+default = ["anthropic", "dynamic-image", "ollama", "openai", "specta"]
+anthropic = ["reqwest", "tokio-stream"]
+dynamic-image = ["base64", "image"]
+ollama = ["reqwest", "tokio-stream"]
+openai = ["reqwest", "tokio-stream"]
+specta = ["dep:specta"]
