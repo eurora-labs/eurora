@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use euro_llm_core::config::ProviderConfig;
+use euro_llm::core::config::ProviderConfig;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -72,8 +72,8 @@ impl Default for EuroraConfig {
 impl ProviderConfig for EuroraConfig {
     type Provider = crate::provider::EuroraChatProvider;
 
-    fn build(self) -> Result<Self::Provider, euro_llm_core::error::ConfigError> {
-        use euro_llm_core::error::ConfigError;
+    fn build(self) -> Result<Self::Provider, euro_llm::core::error::ConfigError> {
+        use euro_llm::core::error::ConfigError;
 
         self.validate()?;
 
@@ -85,8 +85,8 @@ impl ProviderConfig for EuroraConfig {
         ))
     }
 
-    fn validate(&self) -> Result<(), euro_llm_core::error::ConfigError> {
-        use euro_llm_core::error::ConfigError;
+    fn validate(&self) -> Result<(), euro_llm::core::error::ConfigError> {
+        use euro_llm::core::error::ConfigError;
 
         // Validate endpoint
         if self.endpoint.scheme() != "http" && self.endpoint.scheme() != "https" {
