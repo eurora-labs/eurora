@@ -22,14 +22,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-euro-focus = "0.6.0"
+euro-focus = "*"
 ```
 
 For async support:
 
 ```toml
 [dependencies]
-euro-focus = { version = "0.6.0", features = ["async"] }
+euro-focus = { version = "*", features = ["async"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
