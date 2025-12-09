@@ -24,6 +24,7 @@ cfg-if = "1.0.4"
 chrono = { version = "0.4.41", features = ["serde"] }
 dirs = "6.0"
 enum_dispatch = "0.3.13"
+# App
 euro-activity = { path = "crates/app/euro-activity" }
 # Common
 euro-auth = { path = "crates/common/euro-auth" }
@@ -31,13 +32,9 @@ euro-auth-service = { path = "crates/backend/euro-auth-service" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-focus = { path = "crates/common/euro-focus" }
 euro-fs = { path = "crates/common/euro-fs" }
-euro-llm-anthropic = { path = "crates/common/euro-llm-anthropic" }
-euro-llm-core = { path = "crates/common/euro-llm-core" }
+euro-llm = { path = "crates/common/euro-llm" }
 euro-llm-eurora = { path = "crates/common/euro-llm-eurora" }
-euro-llm-ollama = { path = "crates/common/euro-llm-ollama" }
-euro-llm-openai = { path = "crates/common/euro-llm-openai" }
 euro-monolith = { path = "crates/backend/euro-monolith" }
-# App
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
 euro-ocr = { path = "crates/common/euro-ocr" }
 euro-ocr-service = { path = "crates/backend/euro-ocr-service" }

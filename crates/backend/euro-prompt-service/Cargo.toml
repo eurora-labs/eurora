@@ -11,9 +11,8 @@ async-trait = "0.1.89"
 chrono = { workspace = true }
 dotenv = "0.15"
 euro-auth = { workspace = true }
-euro-llm-core = { workspace = true }
+euro-llm = { workspace = true }
 euro-llm-eurora = { workspace = true }
-euro-llm-openai = { workspace = true }
 euro-ocr = { workspace = true }
 futures = { workspace = true }
 image = { workspace = true }
