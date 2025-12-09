@@ -16,7 +16,7 @@ pub mod types;
 // Re-export main types for convenience
 pub use config::EuroraConfig;
 pub use error::EuroraError;
-pub use euro_llm_core::StreamingProvider;
+pub use euro_llm::core::StreamingProvider;
 pub use provider::{EuroraChatProvider, EuroraStreamingProvider};
 
 #[cfg(test)]

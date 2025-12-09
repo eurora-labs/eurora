@@ -1,6 +1,6 @@
 //! Error types for gRPC providers.
 
-use euro_llm_core::error::ProviderError;
+use euro_llm::core::error::ProviderError;
 use thiserror::Error;
 use tonic::Status;
 
