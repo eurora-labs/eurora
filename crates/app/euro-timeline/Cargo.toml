@@ -14,7 +14,7 @@ dirs = { workspace = true }
 euro-activity = { workspace = true }
 euro-focus = { workspace = true, features = ["async"] }
 euro-fs = { workspace = true }
-euro-llm-core = { workspace = true }
+euro-llm = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true }
 euro-proto = { workspace = true }

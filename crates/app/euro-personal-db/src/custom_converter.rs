@@ -1,5 +1,5 @@
 use chrono::Utc;
-use euro_llm_core::{Message, MessageContent};
+use euro_llm::core::{Message, MessageContent};
 
 use crate::{NewChatMessage, db::PersonalDatabaseManager, types::ChatMessage};
 

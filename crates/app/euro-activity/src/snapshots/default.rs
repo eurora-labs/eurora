@@ -1,6 +1,6 @@
 //! Default snapshot implementation for unsupported activity types
 
-use euro_llm_core::{Message, MessageContent, Role};
+use euro_llm::core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
 use crate::types::SnapshotFunctionality;

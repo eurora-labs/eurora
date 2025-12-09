@@ -1,10 +1,11 @@
 use anyhow::Result;
 use async_from::{AsyncTryFrom, async_trait};
-use euro_llm_core::{ChatRequest, Message};
+use euro_llm::core::{ChatRequest, Message};
+use euro_llm::{
+    ollama::{OllamaConfig, OllamaProvider},
+    openai::{OpenAIConfig, OpenAIProvider},
+};
 use euro_llm_eurora::{EuroraConfig, EuroraStreamingProvider, StreamingProvider};
-use euro_llm_ollama::{OllamaConfig, OllamaProvider};
-use euro_llm_openai::{OpenAIConfig, OpenAIProvider};
-
 use tokio_stream::{Stream, StreamExt};
 use tracing::info;
 

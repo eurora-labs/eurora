@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use euro_llm_core::{Message, MessageContent, Role};
+use euro_llm::core::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use sqlx::FromRow;

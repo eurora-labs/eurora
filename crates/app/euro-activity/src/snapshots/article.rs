@@ -1,6 +1,6 @@
 //! Article snapshot implementation
 
-use euro_llm_core::{Message, MessageContent, Role};
+use euro_llm::core::{Message, MessageContent, Role};
 use euro_native_messaging::types::NativeArticleSnapshot;
 use serde::{Deserialize, Serialize};
 

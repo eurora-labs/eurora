@@ -1,5 +1,5 @@
 use euro_activity::AssetFunctionality;
-use euro_llm_core::{Message, MessageContent, Role};
+use euro_llm::core::{Message, MessageContent, Role};
 use euro_personal_db::{Conversation, NewAsset, PersonalDatabaseManager, UpdateConversation};
 use euro_timeline::TimelineManager;
 use futures::StreamExt;

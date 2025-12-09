@@ -3,7 +3,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use euro_activity::{ActivityAsset, SavedAssetInfo, types::SnapshotFunctionality};
-use euro_llm_core::Message;
+use euro_llm::core::Message;
 use tokio::sync::Mutex;
 use tracing::debug;
 
