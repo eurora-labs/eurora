@@ -6,7 +6,7 @@ edition.workspace = true
 description = "Eurora LLM library"
 homepage.workspace = true
 repository.workspace = true
-license.workspace = true
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 async-trait = { workspace = true }
