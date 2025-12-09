@@ -1,6 +1,6 @@
 //! YouTube snapshot implementation
 
-use euro_llm_core::{ContentPart, ImageSource, Message, MessageContent, Role};
+use euro_llm::core::{ContentPart, ImageSource, Message, MessageContent, Role};
 use euro_native_messaging::types::NativeYoutubeSnapshot;
 use serde::{Deserialize, Serialize};
 
