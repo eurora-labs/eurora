@@ -9,7 +9,7 @@
 //! ```
 
 #[cfg(feature = "async")]
-use euro_focus::{FerrousFocusResult, FocusTracker};
+use euro_focus::{EuroFocusResult, FocusTracker};
 #[cfg(feature = "async")]
 use std::sync::Arc;
 #[cfg(feature = "async")]
@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Simulate async processing that might involve network or computation
 #[cfg(feature = "async")]
-async fn simulate_async_processing(window: &euro_focus::FocusedWindow) -> FerrousFocusResult<()> {
+async fn simulate_async_processing(window: &euro_focus::FocusedWindow) -> EuroFocusResult<()> {
     // Simulate some async work
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -99,7 +99,7 @@ async fn simulate_async_processing(window: &euro_focus::FocusedWindow) -> Ferrou
 
 /// Simulate async data processing
 #[cfg(feature = "async")]
-async fn process_window_data(window: &euro_focus::FocusedWindow) -> FerrousFocusResult<()> {
+async fn process_window_data(window: &euro_focus::FocusedWindow) -> EuroFocusResult<()> {
     // Simulate some computation that benefits from async
     tokio::time::sleep(Duration::from_millis(30)).await;
 
