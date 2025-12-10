@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo run --example test_windows_focus
 
-use euro_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
+use euro_focus::{EuroFocusResult, FocusTracker, FocusedWindow};
 use tracing::debug;
 
 fn main() -> anyhow::Result<()> {
@@ -12,7 +12,7 @@ fn main() -> anyhow::Result<()> {
 
     let tracker = FocusTracker::new();
 
-    tracker.track_focus(|event: FocusedWindow| -> FerrousFocusResult<()> {
+    tracker.track_focus(|event: FocusedWindow| -> EuroFocusResult<()> {
         debug!("Focus changed:");
         debug!("  Process: {}", event.process_name.unwrap());
         debug!("  Title: {}", event.window_title.unwrap());
