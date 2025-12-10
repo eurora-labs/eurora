@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
-use euro_llm::core::Message;
+use euro_llm::Message;
 use euro_native_messaging::NativeMessage;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
