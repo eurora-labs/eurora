@@ -5,7 +5,7 @@
 
 mod util;
 
-use euro_focus::{FerrousFocusResult, FocusTracker, FocusedWindow};
+use euro_focus::{EuroFocusResult, FocusTracker, FocusedWindow};
 use serial_test::serial;
 use std::sync::{
     Arc, Mutex,
@@ -89,7 +89,7 @@ fn test_basic_focus_tracking() {
     let tracker_handle = std::thread::spawn(move || {
         let tracker = FocusTracker::new();
         let result = tracker.track_focus_with_stop(
-            move |window: FocusedWindow| -> FerrousFocusResult<()> {
+            move |window: FocusedWindow| -> EuroFocusResult<()> {
                 info!("Focus event: {:?}", window);
                 if let Ok(mut events) = focus_events_clone.lock() {
                     events.push(window);

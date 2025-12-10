@@ -51,7 +51,7 @@ fn test_icon_format_png() {
                 let tracker_handle = std::thread::spawn(move || {
                     let tracker = FocusTracker::new();
                     let _ = tracker.track_focus_with_stop(
-                        move |window: FocusedWindow| -> euro_focus::FerrousFocusResult<()> {
+                        move |window: FocusedWindow| -> euro_focus::EuroFocusResult<()> {
                             if let Ok(mut events) = focus_events_clone.lock() {
                                 events.push(window);
                             }
@@ -119,7 +119,7 @@ fn test_icon_format_rgba() {
                 let tracker_handle = std::thread::spawn(move || {
                     let tracker = FocusTracker::new();
                     let _ = tracker.track_focus_with_stop(
-                        move |window: FocusedWindow| -> euro_focus::FerrousFocusResult<()> {
+                        move |window: FocusedWindow| -> euro_focus::EuroFocusResult<()> {
                             if let Ok(mut events) = focus_events_clone.lock() {
                                 events.push(window);
                             }
@@ -214,7 +214,7 @@ fn test_icon_diff_between_apps() {
                 let tracker_handle = std::thread::spawn(move || {
                     let tracker = FocusTracker::new();
                     let _ = tracker.track_focus_with_stop(
-                        move |window: FocusedWindow| -> euro_focus::FerrousFocusResult<()> {
+                        move |window: FocusedWindow| -> euro_focus::EuroFocusResult<()> {
                             if let Ok(mut events) = focus_events_clone.lock() {
                                 events.push(window);
                             }

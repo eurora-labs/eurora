@@ -9,7 +9,7 @@
 //!
 //! Usage: cargo run --example advanced
 
-use euro_focus::{FerrousFocusResult, FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
+use euro_focus::{EuroFocusResult, FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start advanced focus tracking with full control
     let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FerrousFocusResult<()> {
+        |window: FocusedWindow| -> EuroFocusResult<()> {
             event_count += 1;
 
             // Extract window information
