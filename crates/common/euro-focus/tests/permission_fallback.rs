@@ -5,7 +5,7 @@
 
 mod util;
 
-use euro_focus::{FerrousFocusError, FerrousFocusResult, FocusTracker, FocusedWindow};
+use euro_focus::{EuroFocusError, EuroFocusResult, FocusTracker, FocusedWindow};
 use serial_test::serial;
 #[allow(unused_imports)]
 use std::env;
@@ -43,7 +43,7 @@ fn test_macos_accessibility_permission() {
     // or return an error/None window title (if permission denied)
     let focus_events_clone = Arc::clone(&focus_events);
     let result = tracker.track_focus_with_stop(
-        move |window: FocusedWindow| -> FerrousFocusResult<()> {
+        move |window: FocusedWindow| -> EuroFocusResult<()> {
             info!("Focus event received: {:?}", window);
             if let Ok(mut events) = focus_events_clone.lock() {
                 events.push(window);
@@ -67,7 +67,7 @@ fn test_macos_accessibility_permission() {
                 }
             }
         }
-        Err(FerrousFocusError::PermissionDenied) => {
+        Err(EuroFocusError::PermissionDenied) => {
             info!("Expected PermissionDenied error received");
         }
         Err(e) => {
@@ -102,7 +102,7 @@ fn test_macos_accessibility_no_permission_mock() {
     stop_signal.store(true, Ordering::Relaxed);
 
     let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FerrousFocusResult<()> {
+        |window: FocusedWindow| -> EuroFocusResult<()> {
             // If we get a window with no title, that could indicate permission issues
             if window.window_title.is_none() {
                 info!("Received window with no title - possible permission issue");
@@ -157,7 +157,7 @@ fn test_wayland_unsupported_compositor() {
     stop_signal.store(true, Ordering::Relaxed);
 
     let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FerrousFocusResult<()> {
+        |window: FocusedWindow| -> EuroFocusResult<()> {
             info!(
                 "Unexpected focus event in unsupported environment: {:?}",
                 window
@@ -174,7 +174,7 @@ fn test_wayland_unsupported_compositor() {
         Ok(_) => {
             info!("Focus tracking completed - compositor may be supported");
         }
-        Err(FerrousFocusError::Unsupported) => {
+        Err(EuroFocusError::Unsupported) => {
             info!("Expected Unsupported error received - test passed");
         }
         Err(e) => {
@@ -217,7 +217,7 @@ fn test_missing_x_server() {
         stop_signal.store(true, Ordering::Relaxed);
 
         tracker.track_focus_with_stop(
-            |window: FocusedWindow| -> FerrousFocusResult<()> {
+            |window: FocusedWindow| -> EuroFocusResult<()> {
                 info!("Unexpected focus event without display: {:?}", window);
                 Ok(())
             },
@@ -242,10 +242,10 @@ fn test_missing_x_server() {
             Ok(_) => {
                 info!("Focus tracking completed unexpectedly without display");
             }
-            Err(FerrousFocusError::NoDisplay) => {
+            Err(EuroFocusError::NoDisplay) => {
                 info!("Expected NoDisplay error received - test passed");
             }
-            Err(FerrousFocusError::Unsupported) => {
+            Err(EuroFocusError::Unsupported) => {
                 info!("Received Unsupported error - acceptable fallback");
             }
             Err(e) => {
@@ -280,7 +280,7 @@ fn test_windows_service_context_mock() {
     stop_signal.store(true, Ordering::Relaxed);
 
     let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FerrousFocusResult<()> {
+        |window: FocusedWindow| -> EuroFocusResult<()> {
             info!("Focus event in service context: {:?}", window);
             Ok(())
         },
@@ -291,7 +291,7 @@ fn test_windows_service_context_mock() {
         Ok(_) => {
             info!("Focus tracking completed - interactive session available");
         }
-        Err(FerrousFocusError::NotInteractiveSession) => {
+        Err(EuroFocusError::NotInteractiveSession) => {
             info!("Expected NotInteractiveSession error received - test passed");
         }
         Err(e) => {
@@ -334,13 +334,13 @@ fn test_error_types() {
     info!("Testing all error types");
 
     let errors = vec![
-        FerrousFocusError::Error("Test error".to_string()),
-        FerrousFocusError::StdSyncPoisonError("Test poison".to_string()),
-        FerrousFocusError::Unsupported,
-        FerrousFocusError::PermissionDenied,
-        FerrousFocusError::NoDisplay,
-        FerrousFocusError::NotInteractiveSession,
-        FerrousFocusError::Platform("Test platform error".to_string()),
+        EuroFocusError::Error("Test error".to_string()),
+        EuroFocusError::StdSyncPoisonError("Test poison".to_string()),
+        EuroFocusError::Unsupported,
+        EuroFocusError::PermissionDenied,
+        EuroFocusError::NoDisplay,
+        EuroFocusError::NotInteractiveSession,
+        EuroFocusError::Platform("Test platform error".to_string()),
     ];
 
     for error in errors {
@@ -381,7 +381,7 @@ fn test_timeout_behavior() {
     let start_time = std::time::Instant::now();
 
     let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FerrousFocusResult<()> {
+        |window: FocusedWindow| -> EuroFocusResult<()> {
             info!("Focus event: {:?}", window);
             Ok(())
         },

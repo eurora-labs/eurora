@@ -1,4 +1,4 @@
-use crate::{FerrousFocusResult, FocusTrackerConfig, FocusedWindow};
+use crate::{EuroFocusResult, FocusTrackerConfig, FocusedWindow};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::debug;
 
@@ -47,9 +47,9 @@ fn should_stop(stop_signal: Option<&AtomicBool>) -> bool {
 }
 
 impl ImplFocusTracker {
-    pub fn track_focus<F>(&self, on_focus: F, config: &FocusTrackerConfig) -> FerrousFocusResult<()>
+    pub fn track_focus<F>(&self, on_focus: F, config: &FocusTrackerConfig) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         self.run(on_focus, None, config)
     }
@@ -59,9 +59,9 @@ impl ImplFocusTracker {
         on_focus: F,
         stop_signal: &AtomicBool,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         self.run(on_focus, Some(stop_signal), config)
     }
@@ -71,10 +71,10 @@ impl ImplFocusTracker {
         &self,
         on_focus: F,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         self.run_async(on_focus, None, config).await
     }
@@ -85,10 +85,10 @@ impl ImplFocusTracker {
         on_focus: F,
         stop_signal: &AtomicBool,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         self.run_async(on_focus, Some(stop_signal), config).await
     }
@@ -99,10 +99,10 @@ impl ImplFocusTracker {
         mut on_focus: F,
         stop_signal: Option<&AtomicBool>,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         let mut prev_state = FocusState::default();
 
@@ -145,9 +145,9 @@ impl ImplFocusTracker {
         mut on_focus: F,
         stop_signal: Option<&AtomicBool>,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         let mut prev_state = FocusState::default();
 
