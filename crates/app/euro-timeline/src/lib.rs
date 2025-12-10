@@ -8,7 +8,7 @@ pub use euro_activity::{
     ActivityStorageConfig, ActivityStrategy, AssetFunctionality, ContextChip, DisplayAsset,
     SaveableAsset,
 };
-pub use euro_llm::core::Message;
+pub use euro_llm::Message;
 pub use manager::{TimelineManager, TimelineManagerBuilder, create_timeline};
 pub use storage::{StorageStats, TimelineStorage};
 

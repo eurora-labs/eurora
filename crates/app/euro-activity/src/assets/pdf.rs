@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use euro_llm::core::{Message, MessageContent, Role};
+use euro_llm::{Message, MessageContent, Role};
 use euro_native_messaging::NativePdfAsset;
 use serde::{Deserialize, Serialize};
 

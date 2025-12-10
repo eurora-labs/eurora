@@ -1,7 +1,7 @@
 mod error;
 mod service;
 pub use error::PromptKitError;
-pub use euro_llm::core::ProviderConfig;
+pub use euro_llm::ProviderConfig;
 pub use euro_llm::{ollama::OllamaConfig, openai::OpenAIConfig};
 pub use service::PromptKitService;
 
