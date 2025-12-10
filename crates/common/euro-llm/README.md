@@ -306,8 +306,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 -   [Documentation](https://docs.rs/euro-llm)
 -   [Crates.io](https://crates.io/crates/euro-llm)
--   [Repository](https://github.com/your-username/euro-llm)
--   [Issues](https://github.com/your-username/euro-llm/issues)
+-   [Repository](https://github.com/eurora-labs/eurora/tree/main/crates/common/euro-llm)
+-   [Issues](https://github.com/eurora-labs/eurora/issues)
 
 ## 🙏 Acknowledgments
 
