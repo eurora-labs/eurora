@@ -1,4 +1,4 @@
-use crate::{FerrousFocusError, FerrousFocusResult, FocusTrackerConfig, FocusedWindow};
+use crate::{EuroFocusError, EuroFocusResult, FocusTrackerConfig, FocusedWindow};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(feature = "async")]
@@ -27,9 +27,9 @@ impl ImplFocusTracker {
 }
 
 impl ImplFocusTracker {
-    pub fn track_focus<F>(&self, on_focus: F, config: &FocusTrackerConfig) -> FerrousFocusResult<()>
+    pub fn track_focus<F>(&self, on_focus: F, config: &FocusTrackerConfig) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         self.run(on_focus, None, config)
     }
@@ -39,9 +39,9 @@ impl ImplFocusTracker {
         on_focus: F,
         stop_signal: &AtomicBool,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         self.run(on_focus, Some(stop_signal), config)
     }
@@ -51,10 +51,10 @@ impl ImplFocusTracker {
         &self,
         on_focus: F,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         self.run_async(on_focus, None, config).await
     }
@@ -65,10 +65,10 @@ impl ImplFocusTracker {
         on_focus: F,
         stop_signal: &AtomicBool,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         self.run_async(on_focus, Some(stop_signal), config).await
     }
@@ -79,14 +79,14 @@ impl ImplFocusTracker {
         mut on_focus: F,
         stop_signal: Option<&AtomicBool>,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         // Check if we're in an interactive session
         if !utils::is_interactive_session()? {
-            return Err(FerrousFocusError::NotInteractiveSession);
+            return Err(EuroFocusError::NotInteractiveSession);
         }
 
         // Track the previously focused window to avoid duplicate events
@@ -187,13 +187,13 @@ impl ImplFocusTracker {
         mut on_focus: F,
         stop_signal: Option<&AtomicBool>,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         // Check if we're in an interactive session
         if !utils::is_interactive_session()? {
-            return Err(FerrousFocusError::NotInteractiveSession);
+            return Err(EuroFocusError::NotInteractiveSession);
         }
 
         // Track the previously focused window to avoid duplicate events
@@ -365,7 +365,7 @@ fn get_window_icon(
 unsafe fn extract_window_icon(
     hwnd: HWND,
     icon_config: &crate::config::IconConfig,
-) -> FerrousFocusResult<image::RgbaImage> {
+) -> EuroFocusResult<image::RgbaImage> {
     use windows_sys::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
 
     // Try to get the icon from the window in order of preference:
@@ -390,7 +390,7 @@ unsafe fn extract_window_icon(
                 if hicon != 0 {
                     hicon
                 } else {
-                    return Err(FerrousFocusError::Platform(
+                    return Err(EuroFocusError::Platform(
                         "No icon found for window".to_string(),
                     ));
                 }
@@ -401,7 +401,7 @@ unsafe fn extract_window_icon(
     // Get icon information
     let mut icon_info: ICONINFO = unsafe { std::mem::zeroed() };
     if unsafe { GetIconInfo(hicon as _, &mut icon_info) } == 0 {
-        return Err(FerrousFocusError::Platform(
+        return Err(EuroFocusError::Platform(
             "Failed to get icon info".to_string(),
         ));
     }
@@ -424,9 +424,7 @@ unsafe fn extract_window_icon(
                 DeleteObject(icon_info.hbmMask);
             }
         }
-        return Err(FerrousFocusError::Platform(
-            "Failed to create DC".to_string(),
-        ));
+        return Err(EuroFocusError::Platform("Failed to create DC".to_string()));
     }
 
     // Select the bitmap into the DC
@@ -459,7 +457,7 @@ unsafe fn extract_window_icon(
                 DeleteObject(icon_info.hbmMask);
             }
         }
-        return Err(FerrousFocusError::Platform(
+        return Err(EuroFocusError::Platform(
             "Failed to get bitmap info".to_string(),
         ));
     }
@@ -478,7 +476,7 @@ unsafe fn extract_window_icon(
                 DeleteObject(icon_info.hbmMask);
             }
         }
-        return Err(FerrousFocusError::Platform(
+        return Err(EuroFocusError::Platform(
             "Invalid icon dimensions".to_string(),
         ));
     }
@@ -515,7 +513,7 @@ unsafe fn extract_window_icon(
                 DeleteObject(icon_info.hbmMask);
             }
         }
-        return Err(FerrousFocusError::Platform(
+        return Err(EuroFocusError::Platform(
             "Failed to get bitmap bits".to_string(),
         ));
     }
@@ -546,7 +544,7 @@ unsafe fn extract_window_icon(
 
     // Create RgbaImage from pixel data
     let mut image = image::RgbaImage::from_raw(width, height, pixels).ok_or_else(|| {
-        FerrousFocusError::Platform("Failed to create RgbaImage from pixel data".to_string())
+        EuroFocusError::Platform("Failed to create RgbaImage from pixel data".to_string())
     })?;
 
     // Resize the icon if needed
