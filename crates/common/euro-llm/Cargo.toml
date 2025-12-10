@@ -28,6 +28,13 @@ tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true, optional = true }
 url = { workspace = true, features = ["serde"] }
 
+[dev-dependencies]
+base64 = { workspace = true }
+dotenv = "0.15"
+image = { workspace = true, features = ["jpeg", "png"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
 [features]
 default = ["anthropic", "dynamic-image", "ollama", "openai", "specta"]
 anthropic = ["reqwest", "tokio-stream"]
