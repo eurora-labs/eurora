@@ -1,11 +1,8 @@
 <script lang="ts">
 	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
-	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import ChevronUp from '@lucide/svelte/icons/chevron-up';
 	import Menubar from '$lib/components/Menubar.svelte';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
-	import * as Collapsible from '@eurora/ui/components/collapsible/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import { inject } from '@eurora/shared/context';
@@ -46,22 +43,18 @@
 	<Sidebar.Inset>
 		<div class="flex flex-col h-[calc(100vh-70px)]">
 			<div class="flex-1">{@render children?.()}</div>
-			<Collapsible.Root bind:open={timelineOpen} class="w-full">
-				<Collapsible.Trigger class="w-full">
-					<div class="flex flex-row w-full justify-end items-end">
-						{#if timelineOpen}
-							<ChevronDown />
-						{:else}
-							<ChevronUp />
-						{/if}
-					</div>
-				</Collapsible.Trigger>
-				<Collapsible.Content>
+			<div class="flex flex-col w-full">
+				<Timeline.Root
+					class="w-full"
+					align="right"
+					collapsible
+					bind:open={timelineOpen}
+				>
 					<div class="flex flex-col">
 						<div class="flex w-full justify-center mb-4">Now</div>
 						<div class="flex flex-row mb-4 h-[100px]">
-							<div class="flex w-1/2 items-center">
-								<Timeline.Root class="w-1 flex-1 h-fit" align="right">
+							<div class="flex w-1/2 items-center justify-end">
+								<div class="flex flex-row w-max gap-2">
 									{#each timelineItems as item}
 										<Timeline.Item color={item.color}>
 											{#if item.icon_base64}<img
@@ -77,15 +70,15 @@
 											{/if}
 										</Timeline.Item>
 									{/each}
-								</Timeline.Root>
+								</div>
 							</div>
 							<div class="flex w-[200px] gap-2 h-full">
 								<div class="h-full w-[5px] border rounded-full"></div>
 							</div>
 						</div>
 					</div>
-				</Collapsible.Content>
-			</Collapsible.Root>
+				</Timeline.Root>
+			</div>
 		</div>
 	</Sidebar.Inset>
 </Sidebar.Provider>
