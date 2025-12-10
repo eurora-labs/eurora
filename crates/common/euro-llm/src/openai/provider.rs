@@ -1,10 +1,7 @@
 //! OpenAI provider implementation.
 
 use super::{config::OpenAIConfig, error::OpenAIError, types::*};
-use crate::core::{
-    self, ChatProvider, ChatRequest, CompletionProvider, CompletionRequest, Embedding,
-    EmbeddingProvider, ProviderResult, StreamingProvider, Tool, ToolProvider,
-};
+use crate::*;
 use async_trait::async_trait;
 use futures::Stream;
 use reqwest::{Client, RequestBuilder};
@@ -29,7 +26,7 @@ impl OpenAIProvider {
         headers.insert(
             reqwest::header::AUTHORIZATION,
             auth_value.parse().map_err(|_| OpenAIError::Config {
-                source: core::ConfigError::invalid_value("api_key", "Invalid API key format"),
+                source: ConfigError::invalid_value("api_key", "Invalid API key format"),
             })?,
         );
 
@@ -38,7 +35,7 @@ impl OpenAIProvider {
             headers.insert(
                 "OpenAI-Organization",
                 org.parse().map_err(|_| OpenAIError::Config {
-                    source: core::ConfigError::invalid_value(
+                    source: ConfigError::invalid_value(
                         "organization",
                         "Invalid organization format",
                     ),
@@ -51,7 +48,7 @@ impl OpenAIProvider {
             headers.insert(
                 "OpenAI-Project",
                 project.parse().map_err(|_| OpenAIError::Config {
-                    source: core::ConfigError::invalid_value("project", "Invalid project format"),
+                    source: ConfigError::invalid_value("project", "Invalid project format"),
                 })?,
             );
         }
@@ -61,10 +58,7 @@ impl OpenAIProvider {
             headers.insert(
                 reqwest::header::USER_AGENT,
                 user_agent.parse().map_err(|_| OpenAIError::Config {
-                    source: core::ConfigError::invalid_value(
-                        "user_agent",
-                        "Invalid user agent format",
-                    ),
+                    source: ConfigError::invalid_value("user_agent", "Invalid user agent format"),
                 })?,
             );
         }
@@ -73,11 +67,11 @@ impl OpenAIProvider {
         for (key, value) in &config.http.headers {
             let header_name: reqwest::header::HeaderName =
                 key.parse().map_err(|_| OpenAIError::Config {
-                    source: core::ConfigError::invalid_value("headers", "Invalid header name"),
+                    source: ConfigError::invalid_value("headers", "Invalid header name"),
                 })?;
             let header_value: reqwest::header::HeaderValue =
                 value.parse().map_err(|_| OpenAIError::Config {
-                    source: core::ConfigError::invalid_value("headers", "Invalid header value"),
+                    source: ConfigError::invalid_value("headers", "Invalid header value"),
                 })?;
             headers.insert(header_name, header_value);
         }
@@ -364,7 +358,7 @@ impl ToolProvider for OpenAIProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{Message, Metadata, Parameters};
+    use crate::{Message, Metadata, Parameters};
 
     fn create_test_config() -> OpenAIConfig {
         OpenAIConfig::new("sk-test123456789", "gpt-3.5-turbo")
