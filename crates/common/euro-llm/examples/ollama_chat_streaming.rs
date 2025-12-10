@@ -13,8 +13,8 @@
 #[cfg(feature = "ollama")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use euro_llm::core::{ChatRequest, StreamingProvider};
     use euro_llm::ollama::{OllamaConfig, OllamaProvider};
+    use euro_llm::{ChatRequest, StreamingProvider};
     use futures::StreamExt;
     use std::io::{self, Write};
     use tracing::{error, info};

@@ -1,6 +1,6 @@
 //! Anthropic-specific error types.
 
-use crate::core::ProviderError;
+use crate::ProviderError;
 use std::time::Duration;
 use thiserror::Error;
 
@@ -57,7 +57,7 @@ pub enum AnthropicError {
     #[error("Configuration error: {source}")]
     Config {
         #[from]
-        source: crate::core::ConfigError,
+        source: crate::ConfigError,
     },
 
     /// Generic error
