@@ -1,4 +1,4 @@
-import Root from './timeline.svelte';
-import Item from './timeline-item.svelte';
+import Root, { type TimelineProps } from './timeline.svelte';
+import Item, { type TimelineItemProps } from './timeline-item.svelte';
 
-export { Root, Root as Timeline, Item };
+export { Root, Root as Timeline, Item, type TimelineProps, type TimelineItemProps };
