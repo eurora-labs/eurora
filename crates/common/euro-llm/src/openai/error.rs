@@ -1,6 +1,6 @@
 //! OpenAI-specific error types.
 
-use crate::core::{self, ProviderError};
+use crate::*;
 use std::time::Duration;
 use thiserror::Error;
 
@@ -53,7 +53,7 @@ pub enum OpenAIError {
     #[error("Configuration error: {source}")]
     Config {
         #[from]
-        source: core::ConfigError,
+        source: ConfigError,
     },
 
     /// Generic error

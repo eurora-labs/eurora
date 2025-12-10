@@ -12,8 +12,8 @@
 #[cfg(feature = "openai")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use euro_llm::core::{ChatRequest, StreamingProvider};
     use euro_llm::openai::{OpenAIConfig, OpenAIProvider};
+    use euro_llm::{ChatRequest, StreamingProvider};
     use futures::StreamExt;
     use std::io::{self, Write};
     use tracing::{error, info};

@@ -19,4 +19,4 @@ pub use types::{
 };
 
 // Re-export core traits
-pub use crate::core::{ChatProvider, CompletionProvider, EmbeddingProvider, StreamingProvider};
+pub use crate::{ChatProvider, CompletionProvider, EmbeddingProvider, StreamingProvider};

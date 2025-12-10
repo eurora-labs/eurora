@@ -1,8 +1,6 @@
 //! OpenAI-specific request and response types.
 
-use crate::core::{
-    self, ChatResponse, CompletionResponse, FinishReason, FunctionCall, Metadata, ToolCall, Usage,
-};
+use crate::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -487,26 +485,26 @@ impl CompletionResponse for OpenAICompletionResponse {
 }
 
 // Conversion utilities
-impl From<&core::Message> for OpenAIMessage {
-    fn from(message: &core::Message) -> Self {
+impl From<&Message> for OpenAIMessage {
+    fn from(message: &Message) -> Self {
         let role = match message.role {
-            core::Role::User => "user".to_string(),
-            core::Role::Assistant => "assistant".to_string(),
-            core::Role::System => "system".to_string(),
-            core::Role::Tool => "tool".to_string(),
+            Role::User => "user".to_string(),
+            Role::Assistant => "assistant".to_string(),
+            Role::System => "system".to_string(),
+            Role::Tool => "tool".to_string(),
         };
 
         let content = match &message.content {
-            core::MessageContent::Text(text) => Some(serde_json::Value::String(text.clone())),
-            core::MessageContent::Multimodal(parts) => {
+            MessageContent::Text(text) => Some(serde_json::Value::String(text.clone())),
+            MessageContent::Multimodal(parts) => {
                 let content_array: Vec<serde_json::Value> = parts
                     .iter()
                     .map(|part| match part {
-                        core::ContentPart::Text { text } => serde_json::json!({
+                        ContentPart::Text { text } => serde_json::json!({
                             "type": "text",
                             "text": text
                         }),
-                        core::ContentPart::Image {
+                        ContentPart::Image {
                             image_source,
                             detail,
                         } => {
@@ -519,7 +517,7 @@ impl From<&core::Message> for OpenAIMessage {
                                 }
                             })
                         }
-                        core::ContentPart::Audio { audio_url, format } => {
+                        ContentPart::Audio { audio_url, format } => {
                             serde_json::json!({
                                 "type": "audio",
                                 "audio": {
@@ -540,7 +538,7 @@ impl From<&core::Message> for OpenAIMessage {
                     .collect();
                 Some(serde_json::Value::Array(content_array))
             }
-            core::MessageContent::Tool(tool_content) => {
+            MessageContent::Tool(tool_content) => {
                 // Handle tool content - use text if available, otherwise create a placeholder
                 let text = tool_content.text.as_deref().unwrap_or("[Tool response]");
                 Some(serde_json::Value::String(text.to_string()))
@@ -549,7 +547,7 @@ impl From<&core::Message> for OpenAIMessage {
 
         // Extract tool information from MessageContent::Tool if present
         let (tool_calls, tool_call_id) = match &message.content {
-            core::MessageContent::Tool(tool_content) => {
+            MessageContent::Tool(tool_content) => {
                 let tool_calls = tool_content.tool_calls.as_ref().map(|calls| {
                     calls
                         .iter()
@@ -578,8 +576,8 @@ impl From<&core::Message> for OpenAIMessage {
     }
 }
 
-impl From<&core::Tool> for OpenAITool {
-    fn from(tool: &core::Tool) -> Self {
+impl From<&Tool> for OpenAITool {
+    fn from(tool: &Tool) -> Self {
         Self {
             tool_type: tool.tool_type.clone(),
             function: OpenAIFunction {

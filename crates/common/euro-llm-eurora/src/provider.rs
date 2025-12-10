@@ -3,7 +3,7 @@
 use std::pin::Pin;
 
 use async_trait::async_trait;
-use euro_llm::core::traits::{ChatProvider, StreamingProvider};
+use euro_llm::{ChatProvider, StreamingProvider};
 use futures::Stream;
 use tonic::{
     Request, Status, Streaming,
@@ -73,7 +73,7 @@ pub struct EuroraChatProvider {
 impl EuroraChatProvider {
     /// Create a new gRPC chat provider with the given configuration.
     pub async fn new(config: EuroraConfig) -> Result<Self, EuroraError> {
-        use euro_llm::core::config::ProviderConfig;
+        use euro_llm::ProviderConfig;
         config
             .validate()
             .map_err(|e| EuroraError::InvalidConfig(e.to_string()))?;
@@ -147,10 +147,7 @@ impl ChatProvider for EuroraChatProvider {
     type Response = ProtoChatResponse;
     type Error = EuroraError;
 
-    async fn chat(
-        &self,
-        request: euro_llm::core::types::ChatRequest,
-    ) -> Result<Self::Response, Self::Error> {
+    async fn chat(&self, request: euro_llm::ChatRequest) -> Result<Self::Response, Self::Error> {
         let proto_request = request.into();
         let mut client = self.client.clone();
 
@@ -183,10 +180,7 @@ impl ChatProvider for EuroraStreamingProvider {
     type Response = ProtoChatResponse;
     type Error = EuroraError;
 
-    async fn chat(
-        &self,
-        request: euro_llm::core::types::ChatRequest,
-    ) -> Result<Self::Response, Self::Error> {
+    async fn chat(&self, request: euro_llm::ChatRequest) -> Result<Self::Response, Self::Error> {
         self.inner.chat(request).await
     }
 }
@@ -199,7 +193,7 @@ impl StreamingProvider for EuroraStreamingProvider {
 
     async fn chat_stream(
         &self,
-        request: euro_llm::core::types::ChatRequest,
+        request: euro_llm::ChatRequest,
     ) -> Result<Self::Stream, Self::Error> {
         debug!("Sending chat stream");
         let proto_request = request.into();
