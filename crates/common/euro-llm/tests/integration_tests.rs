@@ -1,5 +1,5 @@
 //! Integration tests for euro-llm
-use euro_llm::core::*;
+use euro_llm::*;
 
 #[test]
 fn test_message_creation() {

@@ -1,6 +1,6 @@
 //! OpenAI provider configuration.
 
-use crate::core::{ConfigError, HttpConfig, ProviderConfig, SecretString, validation};
+use crate::{ConfigError, HttpConfig, ProviderConfig, SecretString, validation};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use url::Url;
@@ -130,7 +130,7 @@ impl OpenAIConfig {
 
     /// Load configuration from environment variables.
     pub fn from_env() -> Result<Self, ConfigError> {
-        use crate::core::env;
+        use crate::env;
 
         let api_key = env::required_secret("OPENAI_API_KEY")?;
         let model = env::with_default("OPENAI_MODEL", "gpt-3.5-turbo");
