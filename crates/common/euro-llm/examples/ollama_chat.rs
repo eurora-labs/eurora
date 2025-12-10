@@ -13,8 +13,8 @@
 #[cfg(feature = "ollama")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use euro_llm::core::{ChatProvider, ChatRequest, ChatResponse};
     use euro_llm::ollama::{OllamaConfig, OllamaProvider};
+    use euro_llm::{ChatProvider, ChatRequest, ChatResponse};
     use tracing::info;
     dotenv::dotenv().ok();
     // Initialize tracing for better error reporting

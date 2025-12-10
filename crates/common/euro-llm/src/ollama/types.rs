@@ -1,6 +1,6 @@
 //! Ollama-specific request and response types.
 
-use crate::core::{self, ChatResponse, CompletionResponse, FinishReason, Metadata, Usage};
+use crate::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -297,7 +297,7 @@ impl ChatResponse for OllamaChatResponseWrapper {
         self.converted_metadata.clone()
     }
 
-    fn tool_calls(&self) -> Option<Vec<core::ToolCall>> {
+    fn tool_calls(&self) -> Option<Vec<ToolCall>> {
         // Ollama doesn't support tool calls in the same way as OpenAI
         None
     }
@@ -372,7 +372,7 @@ impl ChatResponse for OllamaChatResponse {
         }
     }
 
-    fn tool_calls(&self) -> Option<Vec<core::ToolCall>> {
+    fn tool_calls(&self) -> Option<Vec<ToolCall>> {
         None
     }
 }
@@ -425,29 +425,29 @@ impl CompletionResponse for OllamaCompletionResponse {
 }
 
 // Conversion utilities
-impl From<&core::Message> for OllamaMessage {
-    fn from(message: &core::Message) -> Self {
+impl From<&Message> for OllamaMessage {
+    fn from(message: &Message) -> Self {
         let role = match message.role {
-            core::Role::User => "user".to_string(),
-            core::Role::Assistant => "assistant".to_string(),
-            core::Role::System => "system".to_string(),
-            core::Role::Tool => "tool".to_string(),
+            Role::User => "user".to_string(),
+            Role::Assistant => "assistant".to_string(),
+            Role::System => "system".to_string(),
+            Role::Tool => "tool".to_string(),
         };
 
         let content = match &message.content {
-            core::MessageContent::Text(text) => text.clone(),
-            core::MessageContent::Multimodal(parts) => {
+            MessageContent::Text(text) => text.clone(),
+            MessageContent::Multimodal(parts) => {
                 // Extract text parts and collect images
                 let text_parts: Vec<String> = parts
                     .iter()
                     .filter_map(|part| match part {
-                        core::ContentPart::Text { text } => Some(text.clone()),
+                        ContentPart::Text { text } => Some(text.clone()),
                         _ => None,
                     })
                     .collect();
                 text_parts.join("\n")
             }
-            core::MessageContent::Tool(tool_content) => {
+            MessageContent::Tool(tool_content) => {
                 // Handle tool content - use text if available, otherwise create a placeholder
                 tool_content
                     .text
@@ -459,11 +459,11 @@ impl From<&core::Message> for OllamaMessage {
 
         // Extract images from multimodal content
         let images = match &message.content {
-            core::MessageContent::Multimodal(parts) => {
+            MessageContent::Multimodal(parts) => {
                 let image_data: Vec<String> = parts
                     .iter()
                     .filter_map(|part| match part {
-                        core::ContentPart::Image { image_source, .. } => {
+                        ContentPart::Image { image_source, .. } => {
                             let url: String = image_source.clone().into();
                             Some(url)
                         }
@@ -520,7 +520,7 @@ mod tests {
 
     #[test]
     fn test_message_conversion() {
-        let core_message = core::Message::user("Hello, world!");
+        let core_message = Message::user("Hello, world!");
         let ollama_message = OllamaMessage::from(&core_message);
 
         assert_eq!(ollama_message.role, "user");

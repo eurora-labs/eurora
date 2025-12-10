@@ -1,10 +1,7 @@
 //! Anthropic provider implementation.
 
 use super::{config::AnthropicConfig, error::AnthropicError, types::*};
-use crate::core::{
-    self, ChatProvider, ChatRequest, ConfigError, ProviderResult, StreamingProvider, Tool,
-    ToolProvider,
-};
+use crate::*;
 use async_trait::async_trait;
 use futures::Stream;
 use reqwest::{Client, RequestBuilder};
@@ -121,8 +118,8 @@ impl AnthropicProvider {
 
         // Separate system messages from other messages
         for message in &request.messages {
-            if message.role == core::Role::System {
-                if let core::MessageContent::Text(text) = &message.content {
+            if message.role == Role::System {
+                if let MessageContent::Text(text) = &message.content {
                     system_message = Some(text.clone());
                 }
             } else {
@@ -311,7 +308,7 @@ impl ToolProvider for AnthropicProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{Message, Metadata, Parameters};
+    use crate::{Message, Metadata, Parameters};
 
     fn create_test_config() -> AnthropicConfig {
         AnthropicConfig::new("sk-ant-test123456789", "claude-3-5-sonnet-20241022")

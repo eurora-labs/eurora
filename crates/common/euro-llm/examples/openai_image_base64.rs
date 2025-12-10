@@ -13,8 +13,8 @@
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     use base64::{Engine as _, engine::general_purpose};
-    use euro_llm::core::{ChatProvider, ChatRequest, ChatResponse, ContentPart, ImageSource};
     use euro_llm::openai::{OpenAIConfig, OpenAIProvider};
+    use euro_llm::{ChatProvider, ChatRequest, ChatResponse, ContentPart, ImageSource};
     use std::path::Path;
     use tracing::info;
 

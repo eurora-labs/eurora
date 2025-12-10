@@ -1,4 +1,4 @@
-use euro_llm::core::Message;
+use euro_llm::Message;
 use euro_personal_db::{Conversation, PersonalDatabaseManager};
 use tauri::{Manager, Runtime};
 
