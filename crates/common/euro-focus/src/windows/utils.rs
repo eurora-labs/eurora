@@ -1,4 +1,4 @@
-use crate::{FerrousFocusError, FerrousFocusResult};
+use crate::{EuroFocusError, EuroFocusResult};
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
 use windows_sys::Win32::{
@@ -23,7 +23,7 @@ pub fn get_foreground_window() -> Option<HWND> {
 }
 
 /// Check if we're running in an interactive session
-pub fn is_interactive_session() -> FerrousFocusResult<bool> {
+pub fn is_interactive_session() -> EuroFocusResult<bool> {
     // Check if we can get the foreground window
     // In a service context, this will typically fail
     Ok(unsafe { !GetForegroundWindow().is_null() })
@@ -34,7 +34,7 @@ pub fn is_interactive_session() -> FerrousFocusResult<bool> {
 /// # Safety
 /// This function is unsafe because it dereferences a raw pointer (HWND).
 /// The caller must ensure that the HWND is valid.
-pub unsafe fn get_window_title(hwnd: HWND) -> FerrousFocusResult<String> {
+pub unsafe fn get_window_title(hwnd: HWND) -> EuroFocusResult<String> {
     let mut buffer = [0u16; 512];
     let len = unsafe { GetWindowTextW(hwnd, buffer.as_mut_ptr(), buffer.len() as i32) };
 
@@ -54,14 +54,14 @@ pub unsafe fn get_window_title(hwnd: HWND) -> FerrousFocusResult<String> {
 /// # Safety
 /// This function is unsafe because it dereferences a raw pointer (HWND).
 /// The caller must ensure that the HWND is valid.
-pub unsafe fn get_window_process_id(hwnd: HWND) -> FerrousFocusResult<u32> {
+pub unsafe fn get_window_process_id(hwnd: HWND) -> EuroFocusResult<u32> {
     let mut process_id = 0u32;
     unsafe {
         GetWindowThreadProcessId(hwnd, &mut process_id);
     }
 
     if process_id == 0 {
-        return Err(FerrousFocusError::Platform(
+        return Err(EuroFocusError::Platform(
             "Failed to get process ID".to_string(),
         ));
     }
@@ -70,12 +70,12 @@ pub unsafe fn get_window_process_id(hwnd: HWND) -> FerrousFocusResult<u32> {
 }
 
 /// Get the process name from a process ID
-pub fn get_process_name(process_id: u32) -> FerrousFocusResult<String> {
+pub fn get_process_name(process_id: u32) -> EuroFocusResult<String> {
     let process_handle =
         unsafe { OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, process_id) };
 
     if process_handle.is_null() {
-        return Err(FerrousFocusError::Platform(
+        return Err(EuroFocusError::Platform(
             "Failed to open process".to_string(),
         ));
     }
@@ -96,7 +96,7 @@ pub fn get_process_name(process_id: u32) -> FerrousFocusResult<String> {
     }
 
     if len == 0 {
-        return Err(FerrousFocusError::Platform(
+        return Err(EuroFocusError::Platform(
             "Failed to get module name".to_string(),
         ));
     }
@@ -113,7 +113,7 @@ pub fn get_process_name(process_id: u32) -> FerrousFocusResult<String> {
 /// # Safety
 /// This function is unsafe because it calls unsafe functions that dereference raw pointers.
 /// The caller must ensure that the HWND is valid.
-pub unsafe fn get_window_info(hwnd: HWND) -> FerrousFocusResult<(String, String)> {
+pub unsafe fn get_window_info(hwnd: HWND) -> EuroFocusResult<(String, String)> {
     let title = unsafe { get_window_title(hwnd) }.unwrap_or_else(|_| String::new());
     let process_id = unsafe { get_window_process_id(hwnd) }?;
     let process_name =
