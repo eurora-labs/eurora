@@ -1,4 +1,4 @@
-use crate::{FerrousFocusError, FerrousFocusResult, FocusTrackerConfig, FocusedWindow};
+use crate::{EuroFocusError, EuroFocusResult, FocusTrackerConfig, FocusedWindow};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::info;
 
@@ -15,9 +15,9 @@ use x11rb::{
     rust_connection::RustConnection,
 };
 
-pub fn track_focus<F>(on_focus: F, config: &FocusTrackerConfig) -> FerrousFocusResult<()>
+pub fn track_focus<F>(on_focus: F, config: &FocusTrackerConfig) -> EuroFocusResult<()>
 where
-    F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+    F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
 {
     run(on_focus, None, config)
 }
@@ -26,9 +26,9 @@ pub fn track_focus_with_stop<F>(
     on_focus: F,
     stop_signal: &AtomicBool,
     config: &FocusTrackerConfig,
-) -> FerrousFocusResult<()>
+) -> EuroFocusResult<()>
 where
-    F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+    F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
 {
     run(on_focus, Some(stop_signal), config)
 }
@@ -37,10 +37,10 @@ where
 pub async fn track_focus_async<F, Fut>(
     on_focus: F,
     config: &FocusTrackerConfig,
-) -> FerrousFocusResult<()>
+) -> EuroFocusResult<()>
 where
     F: FnMut(FocusedWindow) -> Fut,
-    Fut: Future<Output = FerrousFocusResult<()>>,
+    Fut: Future<Output = EuroFocusResult<()>>,
 {
     run_async(on_focus, None, config).await
 }
@@ -50,10 +50,10 @@ pub async fn track_focus_async_with_stop<F, Fut>(
     on_focus: F,
     stop_signal: &AtomicBool,
     config: &FocusTrackerConfig,
-) -> FerrousFocusResult<()>
+) -> EuroFocusResult<()>
 where
     F: FnMut(FocusedWindow) -> Fut,
-    Fut: Future<Output = FerrousFocusResult<()>>,
+    Fut: Future<Output = EuroFocusResult<()>>,
 {
     run_async(on_focus, Some(stop_signal), config).await
 }
@@ -63,10 +63,10 @@ async fn run_async<F, Fut>(
     mut on_focus: F,
     stop_signal: Option<&AtomicBool>,
     config: &FocusTrackerConfig,
-) -> FerrousFocusResult<()>
+) -> EuroFocusResult<()>
 where
     F: FnMut(FocusedWindow) -> Fut,
-    Fut: Future<Output = FerrousFocusResult<()>>,
+    Fut: Future<Output = EuroFocusResult<()>>,
 {
     use std::sync::Arc;
     use tokio::sync::mpsc;
@@ -83,7 +83,7 @@ where
     let cleanup_stop = Arc::clone(&internal_stop);
 
     // Spawn a blocking task for X11 operations (X11 is inherently blocking)
-    let blocking_handle = tokio::task::spawn_blocking(move || -> FerrousFocusResult<()> {
+    let blocking_handle = tokio::task::spawn_blocking(move || -> EuroFocusResult<()> {
         // ── X11 setup ──────────────────────────────────────────────────────────────
         let (conn, screen_num) = connect_to_x11()?;
         let screen = &conn.setup().roots[screen_num];
@@ -257,7 +257,7 @@ where
                 }
             }
         }
-        Ok::<(), FerrousFocusError>(())
+        Ok::<(), EuroFocusError>(())
     }
     .await;
 
@@ -284,7 +284,7 @@ where
         Err(e) => {
             let err_msg = format!("X11 blocking task failed: {}", e);
             info!("{}", err_msg);
-            Err(FerrousFocusError::Platform(err_msg))
+            Err(EuroFocusError::Platform(err_msg))
         }
     }
 }
@@ -293,9 +293,9 @@ fn run<F>(
     mut on_focus: F,
     stop_signal: Option<&AtomicBool>,
     config: &FocusTrackerConfig,
-) -> FerrousFocusResult<()>
+) -> EuroFocusResult<()>
 where
-    F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+    F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
 {
     // ── X11 setup ──────────────────────────────────────────────────────────────
     let (conn, screen_num) = connect_to_x11()?;
@@ -427,7 +427,7 @@ fn should_stop(stop_signal: Option<&AtomicBool>) -> bool {
 }
 
 /// Connect to X11 server with proper error handling.
-fn connect_to_x11() -> FerrousFocusResult<(RustConnection, usize)> {
+fn connect_to_x11() -> EuroFocusResult<(RustConnection, usize)> {
     RustConnection::connect(None).map_err(|e| {
         let error_str = e.to_string();
         // Check if this is a "no display" error
@@ -435,15 +435,15 @@ fn connect_to_x11() -> FerrousFocusResult<(RustConnection, usize)> {
             || error_str.contains("display")
             || error_str.contains("No such file or directory")
         {
-            FerrousFocusError::NoDisplay
+            EuroFocusError::NoDisplay
         } else {
-            FerrousFocusError::Platform(error_str)
+            EuroFocusError::Platform(error_str)
         }
     })
 }
 
 /// Setup all required X11 atoms.
-fn setup_atoms<C: Connection>(conn: &C) -> FerrousFocusResult<X11Atoms> {
+fn setup_atoms<C: Connection>(conn: &C) -> EuroFocusResult<X11Atoms> {
     Ok(X11Atoms {
         net_active_window: get_atom(conn, b"_NET_ACTIVE_WINDOW")?,
         net_wm_name: get_atom(conn, b"_NET_WM_NAME")?,
@@ -454,15 +454,15 @@ fn setup_atoms<C: Connection>(conn: &C) -> FerrousFocusResult<X11Atoms> {
 }
 
 /// Setup monitoring for the root window.
-fn setup_root_window_monitoring<C: Connection>(conn: &C, root: u32) -> FerrousFocusResult<()> {
+fn setup_root_window_monitoring<C: Connection>(conn: &C, root: u32) -> EuroFocusResult<()> {
     conn.change_window_attributes(
         root,
         &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
     )
-    .map_err(|e| FerrousFocusError::Platform(e.to_string()))?;
+    .map_err(|e| EuroFocusError::Platform(e.to_string()))?;
 
     conn.flush()
-        .map_err(|e| FerrousFocusError::Platform(e.to_string()))?;
+        .map_err(|e| EuroFocusError::Platform(e.to_string()))?;
 
     Ok(())
 }
@@ -472,7 +472,7 @@ fn get_next_event<C: Connection>(
     conn: &C,
     stop_signal: Option<&AtomicBool>,
     config: &FocusTrackerConfig,
-) -> FerrousFocusResult<Event> {
+) -> EuroFocusResult<Event> {
     match stop_signal {
         Some(_) => {
             // Use polling when stop signal is available
@@ -535,9 +535,9 @@ fn update_window_monitoring<C: Connection>(
 }
 
 /// Flush the X11 connection.
-fn flush_connection<C: Connection>(conn: &C) -> FerrousFocusResult<()> {
+fn flush_connection<C: Connection>(conn: &C) -> EuroFocusResult<()> {
     conn.flush()
-        .map_err(|e| FerrousFocusError::Platform(format!("Failed to flush connection: {e}")))
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to flush connection: {e}")))
 }
 
 /// Get window info (process name, title) without fetching the icon.
@@ -546,7 +546,7 @@ fn get_window_info<C: Connection>(
     conn: &C,
     window: u32,
     atoms: &X11Atoms,
-) -> FerrousFocusResult<FocusedWindow> {
+) -> EuroFocusResult<FocusedWindow> {
     // Handle window property queries with graceful error handling
     let title = get_window_name(conn, window, atoms).unwrap_or_else(|e| {
         info!("Failed to get window title for window {}: {}", window, e);
@@ -569,14 +569,14 @@ fn get_window_info<C: Connection>(
 }
 
 /// Get an X11 atom by name.
-fn get_atom<C: Connection>(conn: &C, name: &[u8]) -> FerrousFocusResult<u32> {
+fn get_atom<C: Connection>(conn: &C, name: &[u8]) -> EuroFocusResult<u32> {
     let cookie = conn
         .intern_atom(false, name)
-        .map_err(|e| FerrousFocusError::Platform(e.to_string()))?;
+        .map_err(|e| EuroFocusError::Platform(e.to_string()))?;
 
     let reply = cookie
         .reply()
-        .map_err(|e| FerrousFocusError::Platform(e.to_string()))?;
+        .map_err(|e| EuroFocusError::Platform(e.to_string()))?;
 
     Ok(reply.atom)
 }
@@ -586,14 +586,14 @@ fn get_active_window<C: Connection>(
     conn: &C,
     root: u32,
     net_active_window: u32,
-) -> FerrousFocusResult<Option<u32>> {
+) -> EuroFocusResult<Option<u32>> {
     let cookie = conn
         .get_property(false, root, net_active_window, AtomEnum::WINDOW, 0, 1)
-        .map_err(|e| FerrousFocusError::Platform(format!("Failed to get active window: {e}")))?;
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to get active window: {e}")))?;
 
     let reply = cookie
         .reply()
-        .map_err(|e| FerrousFocusError::Platform(format!("Failed to get active window: {e}")))?;
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to get active window: {e}")))?;
 
     Ok(reply.value32().and_then(|mut v| v.next()))
 }
@@ -603,7 +603,7 @@ fn get_window_name<C: Connection>(
     conn: &C,
     window: u32,
     atoms: &X11Atoms,
-) -> FerrousFocusResult<String> {
+) -> EuroFocusResult<String> {
     // Try UTF‑8 first
     match try_get_property_string(conn, window, atoms.net_wm_name, atoms.utf8_string) {
         Ok(Some(title)) => Ok(title),
@@ -616,7 +616,7 @@ fn get_window_name<C: Connection>(
                 AtomEnum::STRING.into(),
             )
             .and_then(|opt| {
-                opt.ok_or_else(|| FerrousFocusError::Platform("No window name found".to_string()))
+                opt.ok_or_else(|| EuroFocusError::Platform("No window name found".to_string()))
             })
         }
     }
@@ -628,14 +628,14 @@ fn try_get_property_string<C: Connection>(
     window: u32,
     property: u32,
     property_type: u32,
-) -> FerrousFocusResult<Option<String>> {
+) -> EuroFocusResult<Option<String>> {
     let cookie = conn
         .get_property(false, window, property, property_type, 0, u32::MAX)
-        .map_err(|e| FerrousFocusError::Platform(format!("Failed to get property: {e}")))?;
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to get property: {e}")))?;
 
     let reply = cookie
         .reply()
-        .map_err(|e| FerrousFocusError::Platform(format!("Failed to get property: {e}")))?;
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to get property: {e}")))?;
 
     if reply.value_len > 0 {
         Ok(Some(String::from_utf8_lossy(&reply.value).into_owned()))
@@ -649,20 +649,20 @@ fn get_process_info<C: Connection>(
     conn: &C,
     window: u32,
     net_wm_pid: u32,
-) -> FerrousFocusResult<(u32, String)> {
+) -> EuroFocusResult<(u32, String)> {
     // fetch the PID stored in _NET_WM_PID
     let cookie = conn
         .get_property(false, window, net_wm_pid, AtomEnum::CARDINAL, 0, 1)
-        .map_err(|e| FerrousFocusError::Platform(format!("Failed to get PID: {e}")))?;
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to get PID: {e}")))?;
 
     let reply = cookie
         .reply()
-        .map_err(|e| FerrousFocusError::Platform(format!("Failed to get PID: {e}")))?;
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to get PID: {e}")))?;
 
     let pid = reply
         .value32()
         .and_then(|mut v| v.next())
-        .ok_or_else(|| FerrousFocusError::Platform("No PID found for window".to_string()))?;
+        .ok_or_else(|| EuroFocusError::Platform("No PID found for window".to_string()))?;
 
     // read /proc/<pid>/comm (single line: executable name)
     let process_name = std::fs::read_to_string(format!("/proc/{pid}/comm"))
@@ -670,7 +670,7 @@ fn get_process_info<C: Connection>(
             std::fs::read_link(format!("/proc/{pid}/exe")).map(|p| p.to_string_lossy().into())
         })
         .map(|name| name.trim_end_matches('\n').to_owned())
-        .map_err(|e| FerrousFocusError::Platform(format!("Failed to get process name: {e}")))?;
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to get process name: {e}")))?;
 
     Ok((pid, process_name))
 }
@@ -695,7 +695,7 @@ fn get_icon_data<C: Connection>(
     window: u32,
     net_wm_icon: u32,
     icon_config: &crate::config::IconConfig,
-) -> FerrousFocusResult<image::RgbaImage> {
+) -> EuroFocusResult<image::RgbaImage> {
     let cookie = conn
         .get_property(
             false,
@@ -705,27 +705,25 @@ fn get_icon_data<C: Connection>(
             0,
             u32::MAX / 4, // Limit size to avoid huge icons
         )
-        .map_err(|e| {
-            FerrousFocusError::Platform(format!("Failed to request icon property: {e}"))
-        })?;
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to request icon property: {e}")))?;
 
     let reply = cookie
         .reply()
-        .map_err(|e| FerrousFocusError::Platform(format!("Failed to get icon property: {e}")))?;
+        .map_err(|e| EuroFocusError::Platform(format!("Failed to get icon property: {e}")))?;
 
     if reply.value_len == 0 {
-        return Err(FerrousFocusError::Unsupported);
+        return Err(EuroFocusError::Unsupported);
     }
 
     let values: Vec<u32> = reply
         .value32()
         .ok_or_else(|| {
-            FerrousFocusError::Platform("Failed to parse icon data as 32-bit values".to_string())
+            EuroFocusError::Platform("Failed to parse icon data as 32-bit values".to_string())
         })?
         .collect();
 
     if values.len() < 2 {
-        return Err(FerrousFocusError::Platform(
+        return Err(EuroFocusError::Platform(
             "Invalid icon data: missing width/height".to_string(),
         ));
     }
@@ -734,18 +732,18 @@ fn get_icon_data<C: Connection>(
     let height = values[1];
 
     if width == 0 || height == 0 {
-        return Err(FerrousFocusError::Platform(
+        return Err(EuroFocusError::Platform(
             "Invalid icon dimensions".to_string(),
         ));
     }
 
     let expected_pixels = (width as usize)
         .checked_mul(height as usize)
-        .ok_or_else(|| FerrousFocusError::Platform("Icon dimensions overflow".into()))?;
+        .ok_or_else(|| EuroFocusError::Platform("Icon dimensions overflow".into()))?;
     let available_pixels = values.len() - 2; // Subtract width and height
 
     if available_pixels < expected_pixels {
-        return Err(FerrousFocusError::Platform(format!(
+        return Err(EuroFocusError::Platform(format!(
             "Insufficient pixel data: expected {expected_pixels}, got {available_pixels}",
         )));
     }
@@ -754,7 +752,7 @@ fn get_icon_data<C: Connection>(
     let mut pixels = Vec::with_capacity(
         expected_pixels
             .checked_mul(4)
-            .ok_or_else(|| FerrousFocusError::Platform("Icon dimensions overflow".into()))?,
+            .ok_or_else(|| EuroFocusError::Platform("Icon dimensions overflow".into()))?,
     );
 
     for &argb in &values[2..2 + expected_pixels] {
@@ -773,7 +771,7 @@ fn get_icon_data<C: Connection>(
 
     // Create RgbaImage from the pixel data
     let mut image = image::RgbaImage::from_raw(width, height, pixels).ok_or_else(|| {
-        FerrousFocusError::Platform("Failed to create RgbaImage from pixel data".to_string())
+        EuroFocusError::Platform("Failed to create RgbaImage from pixel data".to_string())
     })?;
 
     // Resize the icon if needed

@@ -1,5 +1,5 @@
 use crate::{
-    FerrousFocusResult, FocusTrackerConfig, FocusedWindow,
+    EuroFocusResult, FocusTrackerConfig, FocusedWindow,
     platform::impl_focus_tracker::ImplFocusTracker,
 };
 use std::sync::{atomic::AtomicBool, mpsc};
@@ -33,9 +33,9 @@ impl Default for FocusTracker {
 }
 
 impl FocusTracker {
-    pub fn track_focus<F>(&self, on_focus: F) -> FerrousFocusResult<()>
+    pub fn track_focus<F>(&self, on_focus: F) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         self.impl_focus_tracker.track_focus(on_focus, &self.config)
     }
@@ -44,9 +44,9 @@ impl FocusTracker {
         &self,
         on_focus: F,
         stop_signal: &AtomicBool,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         self.impl_focus_tracker
             .track_focus_with_stop(on_focus, stop_signal, &self.config)
@@ -54,10 +54,10 @@ impl FocusTracker {
 
     /// Async version of track_focus - requires the "async" feature
     #[cfg(feature = "async")]
-    pub async fn track_focus_async<F, Fut>(&self, on_focus: F) -> FerrousFocusResult<()>
+    pub async fn track_focus_async<F, Fut>(&self, on_focus: F) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         self.impl_focus_tracker
             .track_focus_async(on_focus, &self.config)
@@ -70,10 +70,10 @@ impl FocusTracker {
         &self,
         on_focus: F,
         stop_signal: &AtomicBool,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         self.impl_focus_tracker
             .track_focus_async_with_stop(on_focus, stop_signal, &self.config)
@@ -81,7 +81,7 @@ impl FocusTracker {
     }
 
     /// Subscribe to focus changes and receive them via a channel
-    pub fn subscribe_focus_changes(&self) -> FerrousFocusResult<mpsc::Receiver<FocusedWindow>> {
+    pub fn subscribe_focus_changes(&self) -> EuroFocusResult<mpsc::Receiver<FocusedWindow>> {
         let (sender, receiver) = mpsc::channel();
         let stop_signal = AtomicBool::new(false);
 
@@ -91,12 +91,10 @@ impl FocusTracker {
         // Spawn a background thread to track focus changes
         std::thread::spawn(move || {
             let _ = tracker.track_focus_with_stop(
-                move |window: FocusedWindow| -> FerrousFocusResult<()> {
+                move |window: FocusedWindow| -> EuroFocusResult<()> {
                     if sender.send(window).is_err() {
                         // Receiver has been dropped, stop tracking
-                        return Err(crate::FerrousFocusError::Error(
-                            "Receiver dropped".to_string(),
-                        ));
+                        return Err(crate::EuroFocusError::Error("Receiver dropped".to_string()));
                     }
                     Ok(())
                 },
