@@ -1,5 +1,4 @@
-//! Integration tests for euro-llm-core.
-
+//! Integration tests for euro-llm
 use euro_llm::core::*;
 
 #[test]
