@@ -1,10 +1,7 @@
 //! Ollama provider implementation.
 
 use super::{config::OllamaConfig, error::OllamaError, types::*};
-use crate::core::{
-    self, ChatProvider, ChatRequest, CompletionProvider, CompletionRequest, Embedding,
-    EmbeddingProvider, ProviderResult, StreamingProvider,
-};
+use crate::*;
 use async_trait::async_trait;
 use futures::Stream;
 use reqwest::{Client, RequestBuilder};
@@ -30,7 +27,7 @@ impl OllamaProvider {
             "application/json"
                 .parse()
                 .map_err(|_| OllamaError::Config {
-                    source: core::ConfigError::invalid_value("headers", "Invalid content type"),
+                    source: ConfigError::invalid_value("headers", "Invalid content type"),
                 })?,
         );
 
@@ -39,10 +36,7 @@ impl OllamaProvider {
             headers.insert(
                 reqwest::header::USER_AGENT,
                 user_agent.parse().map_err(|_| OllamaError::Config {
-                    source: core::ConfigError::invalid_value(
-                        "user_agent",
-                        "Invalid user agent format",
-                    ),
+                    source: ConfigError::invalid_value("user_agent", "Invalid user agent format"),
                 })?,
             );
         }
@@ -51,11 +45,11 @@ impl OllamaProvider {
         for (key, value) in &config.http.headers {
             let header_name: reqwest::header::HeaderName =
                 key.parse().map_err(|_| OllamaError::Config {
-                    source: core::ConfigError::invalid_value("headers", "Invalid header name"),
+                    source: ConfigError::invalid_value("headers", "Invalid header name"),
                 })?;
             let header_value: reqwest::header::HeaderValue =
                 value.parse().map_err(|_| OllamaError::Config {
-                    source: core::ConfigError::invalid_value("headers", "Invalid header value"),
+                    source: ConfigError::invalid_value("headers", "Invalid header value"),
                 })?;
             headers.insert(header_name, header_value);
         }
@@ -107,7 +101,7 @@ impl OllamaProvider {
 
     /// Apply request parameters to options, handling both existing and new options.
     fn apply_parameters_to_options(
-        parameters: &core::Parameters,
+        parameters: &Parameters,
         existing_options: Option<serde_json::Value>,
     ) -> Option<serde_json::Value> {
         // Check if any parameters are set
@@ -383,7 +377,7 @@ impl StreamingProvider for OllamaProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{Message, Metadata, Parameters};
+    use crate::{Message, Metadata, Parameters};
 
     fn create_test_config() -> OllamaConfig {
         OllamaConfig::new("llama2")
