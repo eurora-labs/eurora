@@ -3272,11 +3272,12 @@ dependencies = [
 
 [[package]]
 name = "euro-llm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "dotenv",
  "futures",
  "image",
  "reqwest 0.12.24",
@@ -3286,6 +3287,8 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
  "url",
 ]
 
