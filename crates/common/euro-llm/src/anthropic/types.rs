@@ -1,6 +1,6 @@
 //! Anthropic-specific request and response types.
 
-use crate::core::{self, ChatResponse, FinishReason, FunctionCall, Metadata, ToolCall, Usage};
+use crate::*;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -322,26 +322,26 @@ impl ChatResponse for AnthropicMessagesResponse {
 }
 
 // Conversion utilities
-impl From<&core::Message> for AnthropicMessage {
-    fn from(message: &core::Message) -> Self {
+impl From<&Message> for AnthropicMessage {
+    fn from(message: &Message) -> Self {
         let role = match message.role {
-            core::Role::User => "user".to_string(),
-            core::Role::Assistant => "assistant".to_string(),
+            Role::User => "user".to_string(),
+            Role::Assistant => "assistant".to_string(),
             // Anthropic handles system messages differently - they go in the system field
-            core::Role::System => "system".to_string(),
-            core::Role::Tool => "user".to_string(), // Tool results become user messages
+            Role::System => "system".to_string(),
+            Role::Tool => "user".to_string(), // Tool results become user messages
         };
 
         let content = match &message.content {
-            core::MessageContent::Text(text) => AnthropicContent::Text(text.clone()),
-            core::MessageContent::Multimodal(parts) => {
+            MessageContent::Text(text) => AnthropicContent::Text(text.clone()),
+            MessageContent::Multimodal(parts) => {
                 let blocks: Vec<AnthropicContentBlock> = parts
                     .iter()
                     .map(|part| match part {
-                        core::ContentPart::Text { text } => {
+                        ContentPart::Text { text } => {
                             AnthropicContentBlock::Text { text: text.clone() }
                         }
-                        core::ContentPart::Image { image_source, .. } => {
+                        ContentPart::Image { image_source, .. } => {
                             let url: String = image_source.clone().into();
                             // Parse the image URL to determine if it's a data URI or external URL
                             if url.starts_with("data:") {
@@ -377,7 +377,7 @@ impl From<&core::Message> for AnthropicMessage {
                             }
                         }
 
-                        core::ContentPart::Audio { audio_url, .. } => {
+                        ContentPart::Audio { audio_url, .. } => {
                             // Anthropic doesn't support audio in the same way, convert to text description
                             AnthropicContentBlock::Text {
                                 text: format!("[Audio content: {audio_url}]"),
@@ -387,7 +387,7 @@ impl From<&core::Message> for AnthropicMessage {
                     .collect();
                 AnthropicContent::Blocks(blocks)
             }
-            core::MessageContent::Tool(tool_content) => {
+            MessageContent::Tool(tool_content) => {
                 // Handle tool content - use text if available, otherwise create a placeholder
                 let text = tool_content.text.as_deref().unwrap_or("[Tool response]");
                 AnthropicContent::Text(text.to_string())
@@ -398,8 +398,8 @@ impl From<&core::Message> for AnthropicMessage {
     }
 }
 
-impl From<&core::Tool> for AnthropicTool {
-    fn from(tool: &core::Tool) -> Self {
+impl From<&Tool> for AnthropicTool {
+    fn from(tool: &Tool) -> Self {
         Self {
             name: tool.function.name.clone(),
             description: tool.function.description.clone(),

@@ -1,6 +1,6 @@
 //! Ollama provider configuration.
 
-use crate::core::{ConfigError, HttpConfig, ProviderConfig, validation};
+use crate::{ConfigError, HttpConfig, ProviderConfig, validation};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use url::Url;
@@ -133,7 +133,7 @@ impl OllamaConfig {
 
     /// Load configuration from environment variables.
     pub fn from_env() -> Result<Self, ConfigError> {
-        use crate::core::env;
+        use crate::env;
 
         let model = env::with_default("OLLAMA_MODEL", "llama2");
         let embedding_model = env::optional("OLLAMA_EMBEDDING_MODEL");
