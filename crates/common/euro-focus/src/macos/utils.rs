@@ -1,4 +1,4 @@
-use crate::{FocusedWindow, config::IconConfig, error::FerrousFocusResult};
+use crate::{FocusedWindow, config::IconConfig, error::EuroFocusResult};
 use core_foundation::array::{CFArray, CFArrayRef};
 use core_foundation::base::{CFType, TCFType};
 use core_foundation::dictionary::CFDictionary;
@@ -51,7 +51,7 @@ const K_CG_WINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS: u32 = 1 << 4;
 const K_CG_NULL_WINDOW_ID: u32 = 0;
 
 /// Get basic window info without icon (for change detection)
-pub fn get_frontmost_window_basic_info() -> FerrousFocusResult<FocusedWindow> {
+pub fn get_frontmost_window_basic_info() -> EuroFocusResult<FocusedWindow> {
     autoreleasepool(|_pool| {
         let pid = get_frontmost_window_pid()?;
 
@@ -79,7 +79,7 @@ pub fn get_frontmost_window_basic_info() -> FerrousFocusResult<FocusedWindow> {
 pub fn fetch_icon_for_pid(
     pid: i32,
     icon_config: &IconConfig,
-) -> FerrousFocusResult<Option<image::RgbaImage>> {
+) -> EuroFocusResult<Option<image::RgbaImage>> {
     autoreleasepool(|_pool| {
         let running_app = NSRunningApplication::runningApplicationWithProcessIdentifier(pid);
         if let Some(app) = running_app {
@@ -90,7 +90,7 @@ pub fn fetch_icon_for_pid(
     })
 }
 
-fn get_frontmost_window_pid() -> FerrousFocusResult<i32> {
+fn get_frontmost_window_pid() -> EuroFocusResult<i32> {
     unsafe {
         // Get list of all on-screen windows, ordered by front-to-back
         let options =
@@ -98,7 +98,7 @@ fn get_frontmost_window_pid() -> FerrousFocusResult<i32> {
         let window_list_ref = CGWindowListCopyWindowInfo(options, K_CG_NULL_WINDOW_ID);
 
         if window_list_ref.is_null() {
-            return Err(crate::error::FerrousFocusError::Platform(
+            return Err(crate::error::EuroFocusError::Platform(
                 "Failed to get window list".to_string(),
             ));
         }
@@ -106,7 +106,7 @@ fn get_frontmost_window_pid() -> FerrousFocusResult<i32> {
         let window_list: CFArray<CFDictionary> = CFArray::wrap_under_create_rule(window_list_ref);
 
         if window_list.is_empty() {
-            return Err(crate::error::FerrousFocusError::Platform(
+            return Err(crate::error::EuroFocusError::Platform(
                 "No windows found".to_string(),
             ));
         }
@@ -117,7 +117,7 @@ fn get_frontmost_window_pid() -> FerrousFocusResult<i32> {
         // Find the first window at layer 0 (normal application windows)
         for i in 0..window_list.len() {
             let window_info = window_list.get(i).ok_or_else(|| {
-                crate::error::FerrousFocusError::Platform(format!("Failed to get window {}", i))
+                crate::error::EuroFocusError::Platform(format!("Failed to get window {}", i))
             })?;
 
             // Check window layer
@@ -137,33 +137,31 @@ fn get_frontmost_window_pid() -> FerrousFocusResult<i32> {
             let pid_value_ptr = window_info
                 .find(pid_key.as_CFTypeRef() as *const _)
                 .ok_or_else(|| {
-                    crate::error::FerrousFocusError::Platform(
+                    crate::error::EuroFocusError::Platform(
                         "Failed to get window owner PID".to_string(),
                     )
                 })?;
 
             let pid_cftype = CFType::wrap_under_get_rule(pid_value_ptr.cast());
             let pid_number: CFNumber = pid_cftype.downcast().ok_or_else(|| {
-                crate::error::FerrousFocusError::Platform(
+                crate::error::EuroFocusError::Platform(
                     "Failed to downcast PID to CFNumber".to_string(),
                 )
             })?;
             let pid: i32 = pid_number.to_i32().ok_or_else(|| {
-                crate::error::FerrousFocusError::Platform(
-                    "Failed to convert PID to i32".to_string(),
-                )
+                crate::error::EuroFocusError::Platform("Failed to convert PID to i32".to_string())
             })?;
 
             return Ok(pid);
         }
 
-        Err(crate::error::FerrousFocusError::Platform(
+        Err(crate::error::EuroFocusError::Platform(
             "No normal application window found".to_string(),
         ))
     }
 }
 
-fn get_window_title_via_accessibility(pid: i32) -> FerrousFocusResult<Option<String>> {
+fn get_window_title_via_accessibility(pid: i32) -> EuroFocusResult<Option<String>> {
     let app_element = unsafe { AXUIElementCreateApplication(pid) };
     if app_element.is_null() {
         return Ok(None);
@@ -183,7 +181,7 @@ fn get_window_title_via_accessibility(pid: i32) -> FerrousFocusResult<Option<Str
     unsafe { CFRelease(app_element as *const c_void) };
 
     if result == K_AX_ERROR_APIDISABLED {
-        return Err(crate::error::FerrousFocusError::PermissionDenied);
+        return Err(crate::error::EuroFocusError::PermissionDenied);
     }
 
     if result != K_AX_ERROR_SUCCESS || focused_window.is_null() {
@@ -256,7 +254,7 @@ unsafe fn cfstring_to_string(cf_string: *const c_void) -> Option<String> {
 fn get_app_icon(
     app: &NSRunningApplication,
     icon_config: &IconConfig,
-) -> FerrousFocusResult<Option<image::RgbaImage>> {
+) -> EuroFocusResult<Option<image::RgbaImage>> {
     let bundle_url = match app.bundleURL() {
         Some(url) => url,
         None => return Ok(None),
@@ -274,10 +272,7 @@ fn get_app_icon(
     Ok(Some(rgba_image))
 }
 
-fn nsimage_to_rgba(
-    image: &NSImage,
-    icon_config: &IconConfig,
-) -> FerrousFocusResult<image::RgbaImage> {
+fn nsimage_to_rgba(image: &NSImage, icon_config: &IconConfig) -> EuroFocusResult<image::RgbaImage> {
     let icon_size = icon_config.get_size_or_default() as f64;
 
     let size = NSSize {
@@ -309,7 +304,7 @@ fn nsimage_to_rgba(
     };
 
     if bitmap_rep.is_none() {
-        return Err(crate::error::FerrousFocusError::Platform(
+        return Err(crate::error::EuroFocusError::Platform(
             "Failed to create bitmap representation".to_string(),
         ));
     }
@@ -352,7 +347,7 @@ fn nsimage_to_rgba(
     };
 
     if png_data.is_none() {
-        return Err(crate::error::FerrousFocusError::Platform(
+        return Err(crate::error::EuroFocusError::Platform(
             "Failed to get PNG data from bitmap".to_string(),
         ));
     }
@@ -365,7 +360,7 @@ fn nsimage_to_rgba(
 
     let rgba_image = image::load_from_memory(bytes)
         .map_err(|e| {
-            crate::error::FerrousFocusError::Platform(format!(
+            crate::error::EuroFocusError::Platform(format!(
                 "Failed to load image from PNG data: {}",
                 e
             ))
