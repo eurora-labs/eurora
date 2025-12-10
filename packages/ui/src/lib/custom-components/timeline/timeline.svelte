@@ -11,6 +11,11 @@
 		 * @default true
 		 */
 		defaultOpen?: boolean;
+		/**
+		 * Label to display at the top of the timeline
+		 * @default "Now"
+		 */
+		label?: string;
 	}
 </script>
 
@@ -24,6 +29,7 @@
 		children,
 		open = $bindable(true),
 		defaultOpen = true,
+		label = 'Now',
 	}: TimelineProps = $props();
 
 	// Initialize open state with defaultOpen if not explicitly set
@@ -45,6 +51,18 @@
 		</div>
 	</Collapsible.Trigger>
 	<Collapsible.Content>
-		{@render children?.()}
+		<div class="flex flex-col">
+			<div class="flex w-full justify-center mb-4">{label}</div>
+			<div class="flex flex-row mb-4 h-[100px]">
+				<div class="flex w-1/2 items-center justify-end">
+					<div class="flex flex-row w-max gap-2">
+						{@render children?.()}
+					</div>
+				</div>
+				<div class="flex w-[200px] gap-2 h-full">
+					<div class="h-full w-[5px] border rounded-full"></div>
+				</div>
+			</div>
+		</div>
 	</Collapsible.Content>
 </Collapsible.Root>
