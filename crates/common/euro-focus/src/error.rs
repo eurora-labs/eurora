@@ -3,7 +3,7 @@ use std::sync::PoisonError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum FerrousFocusError {
+pub enum EuroFocusError {
     #[error("{0}")]
     Error(String),
 
@@ -26,16 +26,16 @@ pub enum FerrousFocusError {
     Platform(String),
 }
 
-impl FerrousFocusError {
+impl EuroFocusError {
     pub fn new<S: ToString>(err: S) -> Self {
-        FerrousFocusError::Error(err.to_string())
+        EuroFocusError::Error(err.to_string())
     }
 }
 
-pub type FerrousFocusResult<T> = Result<T, FerrousFocusError>;
+pub type EuroFocusResult<T> = Result<T, EuroFocusError>;
 
-impl<T> From<PoisonError<T>> for FerrousFocusError {
+impl<T> From<PoisonError<T>> for EuroFocusError {
     fn from(value: PoisonError<T>) -> Self {
-        FerrousFocusError::StdSyncPoisonError(value.to_string())
+        EuroFocusError::StdSyncPoisonError(value.to_string())
     }
 }
