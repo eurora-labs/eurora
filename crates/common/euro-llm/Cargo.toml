@@ -1,6 +1,6 @@
 [package]
 name = "euro-llm"
-version = "0.1.0"
+version = "0.2.0"
 authors.workspace = true
 edition.workspace = true
 description = "Eurora LLM library"
@@ -27,6 +27,13 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true, optional = true }
 url = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+base64 = { workspace = true }
+dotenv = "0.15"
+image = { workspace = true, features = ["jpeg", "png"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 [features]
 default = ["anthropic", "dynamic-image", "ollama", "openai", "specta"]
