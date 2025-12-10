@@ -1,12 +1,12 @@
 [package]
 name = "euro-focus"
-version = "0.1.1"
+version = "0.2.0"
 authors.workspace = true
 edition = "2024"
 description = "Cross-platform focus tracker for Linux (X11), macOS and Windows"
 homepage = "https://github.com/eurora-labs/eurora/tree/main/crates/common/euro-focus"
 repository = "https://github.com/eurora-labs/eurora.git"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 keywords = [
   "application",
   "desktop",

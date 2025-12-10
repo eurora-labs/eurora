@@ -1,5 +1,5 @@
 use super::{utils::wayland_detect, xorg_focus_tracker};
-use crate::{FerrousFocusError, FerrousFocusResult, FocusTrackerConfig, FocusedWindow};
+use crate::{EuroFocusError, EuroFocusResult, FocusTrackerConfig, FocusedWindow};
 use std::sync::atomic::AtomicBool;
 
 #[cfg(feature = "async")]
@@ -15,13 +15,13 @@ impl ImplFocusTracker {
 }
 
 impl ImplFocusTracker {
-    pub fn track_focus<F>(&self, on_focus: F, config: &FocusTrackerConfig) -> FerrousFocusResult<()>
+    pub fn track_focus<F>(&self, on_focus: F, config: &FocusTrackerConfig) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         if wayland_detect() {
             // Wayland is not supported for the time being
-            Err(FerrousFocusError::Unsupported)
+            Err(EuroFocusError::Unsupported)
         } else {
             xorg_focus_tracker::track_focus(on_focus, config)
         }
@@ -32,13 +32,13 @@ impl ImplFocusTracker {
         on_focus: F,
         stop_signal: &AtomicBool,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
-        F: FnMut(FocusedWindow) -> FerrousFocusResult<()>,
+        F: FnMut(FocusedWindow) -> EuroFocusResult<()>,
     {
         if wayland_detect() {
             // Wayland is not supported for the time being
-            Err(FerrousFocusError::Unsupported)
+            Err(EuroFocusError::Unsupported)
         } else {
             xorg_focus_tracker::track_focus_with_stop(on_focus, stop_signal, config)
         }
@@ -49,14 +49,14 @@ impl ImplFocusTracker {
         &self,
         on_focus: F,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         if wayland_detect() {
             // Wayland is not supported for the time being
-            Err(FerrousFocusError::Unsupported)
+            Err(EuroFocusError::Unsupported)
         } else {
             xorg_focus_tracker::track_focus_async(on_focus, config).await
         }
@@ -68,14 +68,14 @@ impl ImplFocusTracker {
         on_focus: F,
         stop_signal: &AtomicBool,
         config: &FocusTrackerConfig,
-    ) -> FerrousFocusResult<()>
+    ) -> EuroFocusResult<()>
     where
         F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FerrousFocusResult<()>>,
+        Fut: Future<Output = EuroFocusResult<()>>,
     {
         if wayland_detect() {
             // Wayland is not supported for the time being
-            Err(FerrousFocusError::Unsupported)
+            Err(EuroFocusError::Unsupported)
         } else {
             xorg_focus_tracker::track_focus_async_with_stop(on_focus, stop_signal, config).await
         }
