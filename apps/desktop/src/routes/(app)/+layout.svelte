@@ -44,12 +44,7 @@
 		<div class="flex flex-col h-[calc(100vh-70px)]">
 			<div class="flex-1">{@render children?.()}</div>
 			<div class="flex flex-col w-full">
-				<Timeline.Root
-					class="w-full"
-					align="right"
-					collapsible
-					bind:open={timelineOpen}
-				>
+				<Timeline.Root class="w-full" bind:open={timelineOpen}>
 					<div class="flex flex-col">
 						<div class="flex w-full justify-center mb-4">Now</div>
 						<div class="flex flex-row mb-4 h-[100px]">
