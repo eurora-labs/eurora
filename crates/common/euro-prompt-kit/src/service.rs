@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_from::{AsyncTryFrom, async_trait};
-use euro_llm::core::{ChatRequest, Message};
+use euro_llm::{ChatRequest, Message};
 use euro_llm::{
     ollama::{OllamaConfig, OllamaProvider},
     openai::{OpenAIConfig, OpenAIProvider},

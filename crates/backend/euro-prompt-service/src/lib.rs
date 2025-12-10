@@ -2,8 +2,8 @@ use std::pin::Pin;
 
 use anyhow::{Result, anyhow};
 use euro_auth::{Claims, JwtConfig, validate_access_token};
-use euro_llm::core::{ChatRequest, StreamingProvider};
 use euro_llm::openai::{OpenAIConfig, OpenAIProvider};
+use euro_llm::{ChatRequest, StreamingProvider};
 use euro_llm_eurora::proto::chat::{
     ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse, ProtoFinishReason,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
