@@ -298,7 +298,7 @@ jobs:
                   overwrite: true
 
     publish-tauri:
-        needs: [sign-tauri, build-tauri]
+        needs: [build-tauri]
         runs-on: ubuntu-latest
         outputs:
             version: ${{ env.version }}
