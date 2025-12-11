@@ -81,6 +81,15 @@ jobs:
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
+
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
+
             - name: Build SvelteKit
               run: pnpm build:desktop -- --mode ${{ env.vitemode }}
               env:
@@ -218,12 +227,22 @@ jobs:
                     xdg-utils;
 
                   sudo apt install -y \
-                    libwebkit2gtk-4.1-0=2.44.0-2 \
-                    libwebkit2gtk-4.1-dev=2.44.0-2 \
-                    libjavascriptcoregtk-4.1-0=2.44.0-2 \
-                    libjavascriptcoregtk-4.1-dev=2.44.0-2 \
-                    gir1.2-javascriptcoregtk-4.1=2.44.0-2 \
-                    gir1.2-webkit2-4.1=2.44.0-2;
+                    libwebkit2gtk-4.1-0 \
+                    libwebkit2gtk-4.1-dev \
+                    libgbm-dev \
+                    libjavascriptcoregtk-4.1-0 \
+                    libjavascriptcoregtk-4.1-dev \
+                    gir1.2-javascriptcoregtk-4.1 \
+                    gir1.2-webkit2-4.1 \
+                    libpipewire-0.3-dev;
+
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
 
             - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
               name: Download SvelteKit build output
