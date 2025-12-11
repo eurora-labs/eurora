@@ -44,7 +44,7 @@
 		<div class="flex flex-col h-[calc(100vh-70px)]">
 			<div class="flex-1">{@render children?.()}</div>
 			<div class="flex flex-col w-full">
-				<Timeline.Root class="w-full" bind:open={timelineOpen}>
+				<Timeline.Root class="w-full" bind:open={timelineOpen} defaultOpen={false}>
 					{#each timelineItems as item}
 						<Timeline.Item color={item.color}>
 							{#if item.icon_base64}<img
