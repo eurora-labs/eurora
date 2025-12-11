@@ -9,6 +9,7 @@ PWD="$(dirname "$(readlink -f -- "$0")")"
 CHANNEL=""
 DO_SIGN="false"
 VERSION=""
+TARGET="${CARGO_BUILD_TARGET:-}"
 
 function help() {
 	local to
@@ -56,6 +57,22 @@ function os() {
 
 function arch() {
 	local arch
+
+	# If TARGET is specified, extract architecture from it
+	if [ -n "${TARGET:-}" ]; then
+		case "$TARGET" in
+		*aarch64* | *arm64*)
+			echo "aarch64"
+			return
+			;;
+		*x86_64* | *amd64*)
+			echo "x86_64"
+			return
+			;;
+		esac
+	fi
+
+	# Otherwise, detect from system
 	arch="$(uname -m)"
 	case "$arch" in
 	arm64 | aarch64)
@@ -75,7 +92,7 @@ OS="$(os)"
 DIST="release"
 
 function tauri() {
-	(cd "$PWD/.." && pnpm tauri "$@")
+	(cd "$PWD/.." && pnpm tauri-for-release "$@")
 }
 
 while [[ $# -gt 0 ]]; do
@@ -109,6 +126,9 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
+# Recalculate ARCH after TARGET is set
+ARCH="$(arch)"
+
 [ -z "${VERSION-}" ] && error "--version is not set"
 
 [ -z "${TAURI_SIGNING_PRIVATE_KEY-}" ] && error "$TAURI_SIGNING_PRIVATE_KEY is not set"
@@ -138,7 +158,7 @@ if [ "$DO_SIGN" = "true" ]; then
 		export APPIMAGETOOL_SIGN_PASSPHRASE="$APPIMAGE_KEY_PASSPHRASE"
 	elif [ "$OS" == "windows" ]; then
 		# Nothing to do on windows
-		:
+		export OS
 	else
 		error "signing is not supported on $(uname -s)"
 	fi
@@ -151,31 +171,50 @@ info "	os: $OS"
 info "	arch: $ARCH"
 info "	dist: $DIST"
 info "	sign: $DO_SIGN"
+info "	target: ${TARGET:-default}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' exit
 
-CONFIG_PATH=$(readlink -f "$PWD/../crates/app/euro-tauri/tauri.conf.$CHANNEL.json")
+CONFIG_PATH=$(readlink -f "$PWD/../crates/euro-tauri/tauri.conf.$CHANNEL.json")
 
 # update the version in the tauri release config
-jq '.version="'"$VERSION"'"' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
+jq  --arg version "$VERSION"\
+    --argjson externalBin "$EXTERNAL_BIN"\
+  '.version = $version | .bundle.externalBin = $externalBin' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
 
-if [ "$OS" = "windows" ]; then
-	FEATURES="windows"
+# Useful for understanding exactly what goes into the tauri build/bundle.
+cat "$TMP_DIR/tauri.conf.json"
+
+# set the VERSION and CHANNEL as an environment variables
+export VERSION
+export CHANNEL
+
+# Build the app with release config
+if [ -n "$TARGET" ]; then
+	# Export TARGET for cargo to use
+	export CARGO_BUILD_TARGET="$TARGET"
+
+	# Build with specified target
+	# Note: passing --target is necessary to let tauri find the binaries,
+	# it ignores CARGO_BUILD_TARGET and is more of a hack.
+	tauri build \
+		--verbose \
+		--features "$FEATURES" \
+		--config "$TMP_DIR/tauri.conf.json" \
+		--target "$TARGET"
+
+  BUNDLE_DIR=$(readlink -f "$PWD/../target/$TARGET/release/bundle")
 else
-	FEATURES=""
+	# Build with default target
+	tauri build \
+		--verbose \
+		--features "$FEATURES" \
+		--config "$TMP_DIR/tauri.conf.json"
+
+	BUNDLE_DIR=$(readlink -f "$PWD/../target/release/bundle")
 fi
 
-# Build native messaging
-cargo build --package euro-native-messaging --release
-
-# build the app with release config
-tauri build \
-	--verbose \
-	--features "$FEATURES" \
-	--config "$TMP_DIR/tauri.conf.json"
-
-BUNDLE_DIR=$(readlink -f "$PWD/../target/release/bundle")
 RELEASE_DIR="$DIST/$OS/$ARCH"
 mkdir -p "$RELEASE_DIR"
 
@@ -217,10 +256,6 @@ elif [ "$OS" = "windows" ]; then
 	WINDOWS_UPDATER_SIG="$(find "$BUNDLE_DIR/msi" -name \*.msi.zip.sig)"
 
 	cp "$WINDOWS_INSTALLER" "$RELEASE_DIR"
-
-	# Uncomment and adapt if you have auxiliary binaries to include
-	# mkdir -p tauri-aux-artifacts
-	# cp target/release/euro-aux-binary.exe tauri-aux-artifacts/
 	cp "$WINDOWS_UPDATER" "$RELEASE_DIR"
 	cp "$WINDOWS_UPDATER_SIG" "$RELEASE_DIR"
 
@@ -231,86 +266,5 @@ elif [ "$OS" = "windows" ]; then
 else
 	error "unsupported os: $OS"
 fi
-
-# Install Chrome extension native messaging host manifest
-function install_native_messaging_host() {
-	info "Installing Chrome extension native messaging host manifest..."
-
-	# Path to the native messaging host binary in the release
-	local NATIVE_MESSAGING_HOST_BINARY
-	local MANIFEST_DIR
-	local MANIFEST_PATH
-	local MANIFEST_CONTENT
-
-	# Get the path to the native-messaging-host.json template
-	local TEMPLATE_PATH="$PWD/../extensions/chromium/native-messaging-host.json"
-
-	if [ "$OS" = "macos" ]; then
-		# For macOS, the binary is inside the .app bundle
-		NATIVE_MESSAGING_HOST_BINARY="/Applications/Eurora.app/Contents/MacOS/euro-native-messaging"
-		MANIFEST_DIR="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-
-		# Also support Chromium and other browsers
-		mkdir -p "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-		mkdir -p "$HOME/Library/Application Support/Chromium/NativeMessagingHosts"
-		mkdir -p "$HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts"
-		mkdir -p "$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"
-
-	elif [ "$OS" = "linux" ]; then
-		# For Linux, use the installed binary path
-		NATIVE_MESSAGING_HOST_BINARY="/usr/bin/euro-native-messaging"
-		MANIFEST_DIR="$HOME/.config/google-chrome/NativeMessagingHosts"
-
-		# Also support Chromium and other browsers
-		mkdir -p "$HOME/.config/google-chrome/NativeMessagingHosts"
-		mkdir -p "$HOME/.config/chromium/NativeMessagingHosts"
-		mkdir -p "$HOME/.config/microsoft-edge/NativeMessagingHosts"
-		mkdir -p "$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
-
-	elif [ "$OS" = "windows" ]; then
-		# For Windows, use the installed binary path
-		NATIVE_MESSAGING_HOST_BINARY="C:\\Program Files\\Eurora\\euro-native-messaging.exe"
-		# Windows uses registry instead of file system for manifest
-		MANIFEST_DIR=""
-	else
-		error "Unsupported OS for native messaging host: $OS"
-	fi
-
-	# Create the manifest content with the correct binary path
-	MANIFEST_CONTENT=$(cat "$TEMPLATE_PATH" | sed "s|\"path\": \".*\"|\"path\": \"$NATIVE_MESSAGING_HOST_BINARY\"|")
-
-	if [ "$OS" = "macos" ] || [ "$OS" = "linux" ]; then
-		# For macOS and Linux, write the manifest to the filesystem
-		for browser_dir in "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts" \
-                            "$HOME/Library/Application Support/Chromium/NativeMessagingHosts" \
-                            "$HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts" \
-                            "$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts" \
-                            "$HOME/.config/google-chrome/NativeMessagingHosts" \
-                            "$HOME/.config/chromium/NativeMessagingHosts" \
-                            "$HOME/.config/microsoft-edge/NativeMessagingHosts" \
-                            "$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"; do
-			if [ -d "$browser_dir" ]; then
-				MANIFEST_PATH="$browser_dir/com.eurora.app.json"
-				echo "$MANIFEST_CONTENT" > "$MANIFEST_PATH"
-				info "  - Installed manifest to $MANIFEST_PATH"
-			fi
-		done
-	elif [ "$OS" = "windows" ]; then
-		# For Windows, we need to create registry entries
-		# This would typically be done by the installer, but we'll include the commands here
-		# Note: This requires administrative privileges to run
-		info "  - On Windows, the native messaging host manifest is installed via registry"
-		info "  - The installer should run the following commands:"
-		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Google\\Chrome\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"C:\\Program Files\\Eurora\\com.eurora.app.json\" /f"
-		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Chromium\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"C:\\Program Files\\Eurora\\com.eurora.app.json\" /f"
-		info "    REG ADD \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Edge\\NativeMessagingHosts\\com.eurora.app\" /ve /t REG_SZ /d \"C:\\Program Files\\Eurora\\com.eurora.app.json\" /f"
-
-		# Also create the manifest file in the installation directory
-		info "  - The manifest file should be placed at: C:\\Program Files\\Eurora\\com.eurora.app.json"
-	fi
-}
-
-# Call the function to install the native messaging host
-install_native_messaging_host
 
 info "done! bye!"
