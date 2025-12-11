@@ -1,4 +1,4 @@
-use std::{str::FromStr, time::Duration};
+use std::{ffi::c_char, str::FromStr, time::Duration};
 
 use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
@@ -38,7 +38,7 @@ impl PersonalDatabaseManager {
                 *const (),
                 unsafe extern "C" fn(
                     *mut libsqlite3_sys::sqlite3,
-                    *mut *mut i8,
+                    *mut *mut c_char,
                     *const libsqlite3_sys::sqlite3_api_routines,
                 ) -> i32,
             >(sqlite3_vec_init as *const ())));
