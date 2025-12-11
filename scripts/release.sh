@@ -176,12 +176,10 @@ info "	target: ${TARGET:-default}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' exit
 
-CONFIG_PATH=$(readlink -f "$PWD/../crates/euro-tauri/tauri.conf.$CHANNEL.json")
+CONFIG_PATH=$(readlink -f "$PWD/../crates/app/euro-tauri/tauri.conf.$CHANNEL.json")
 
 # update the version in the tauri release config
-jq  --arg version "$VERSION"\
-    --argjson externalBin "$EXTERNAL_BIN"\
-  '.version = $version | .bundle.externalBin = $externalBin' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
+jq '.version="'"$VERSION"'"' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
 
 # Useful for understanding exactly what goes into the tauri build/bundle.
 cat "$TMP_DIR/tauri.conf.json"
