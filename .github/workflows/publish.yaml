@@ -48,7 +48,9 @@ jobs:
               run: curl "${{ secrets.SENTRY_CRONS }}?status=in_progress"
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
-                  token: ${{ secrets.PAT_JUNON }}
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
+                  lfs: true
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
@@ -144,7 +146,9 @@ jobs:
 
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
-                  token: ${{ secrets.PAT_JUNON }} # custom token here so that we can push tags later
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
+                  lfs: true
             - name: Set Cargo build target to ${{ matrix.target }}
               shell: bash
               if: matrix.target != ''
@@ -322,7 +326,9 @@ jobs:
         steps:
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
-                  token: ${{ secrets.PAT_JUNON }} # custom token here so that we can push tags later
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
+                  lfs: true
             - name: Set artifact name suffix
               shell: bash
               run: |
@@ -378,7 +384,9 @@ jobs:
         steps:
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
-                  token: ${{ secrets.PAT_JUNON }} # custom token here so that we can push tags later
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
+                  lfs: true
             - name: Create git tag
               shell: bash
               env:
