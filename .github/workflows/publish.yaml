@@ -369,12 +369,13 @@ jobs:
     create-git-tag:
         needs: [publish-tauri, build-tauri]
         runs-on: ubuntu-latest
+        permissions:
+            contents: write # Required for creating and pushing git tags
         steps:
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
-                  lfs: true
             - name: Create git tag
               shell: bash
               env:
