@@ -34,7 +34,7 @@
 
 	// Initialize open state with defaultOpen if not explicitly set
 	$effect(() => {
-		if (open === undefined) {
+		if (defaultOpen !== undefined) {
 			open = defaultOpen;
 		}
 	});
@@ -50,6 +50,21 @@
 			{/if}
 		</div>
 	</Collapsible.Trigger>
+	{#if !open}
+		<div class="flex flex-col">
+			<div class="flex flex-row mb-4 h-8">
+				<div class="flex w-1/2 items-center justify-end">
+					<div class="flex flex-row w-max gap-2">
+						{@render children?.()}
+					</div>
+				</div>
+				<div class="flex w-fit justify-center pl-2 ml-4 border-l-2 items-center">
+					{label}
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	<Collapsible.Content>
 		<div class="flex flex-col">
 			<div class="flex w-full justify-center mb-4">{label}</div>
