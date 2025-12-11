@@ -6,8 +6,8 @@ permissions:
     actions: read # Required for downloading artifacts
 on:
     schedule:
-        # every day at 3am
-        - cron: '0 3 * * *'
+        # every day at 1am UTC, 3AM CEST or 2AM CET.
+        - cron: '0 1 * * *'
     workflow_run:
         workflows: ['Nightly build']
         types:
@@ -37,8 +37,6 @@ on:
 jobs:
     build-sveltekit:
         runs-on: ubuntu-latest
-        environment:
-            name: eurora-main-app
         env:
             SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         steps:
@@ -48,32 +46,19 @@ jobs:
               run: curl "${{ secrets.SENTRY_CRONS }}?status=in_progress"
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  persist-credentials: false
-                  lfs: true
+                  token: ${{ secrets.PAT_JUNON }}
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
-              env:
-                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
-                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
                   VITEMODE=nightly
-                  if [[ "$INPUT_CHANNEL" == "release" ]]; then
+                  if [[ "${{ github.event.inputs.channel }}" == "release" ]]; then
                     VITEMODE=production
                   fi
 
-                  {
-                    echo "vitemode<<EOF"
-                    echo "$VITEMODE"
-                    echo "EOF"
-                    echo "channel<<EOF"
-                    echo "$INPUT_CHANNEL"
-                    echo "EOF"
-                    echo "bump<<EOF"
-                    echo "$INPUT_BUMP"
-                    echo "EOF"
-                  } >> $GITHUB_ENV
+                  echo "vitemode=$VITEMODE" >> $GITHUB_ENV
+                  echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
+                  echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
             - name: Calculate next version
               shell: bash
               run: |
@@ -89,15 +74,9 @@ jobs:
                     echo "EOF"
                   } >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
+
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Compile Protobuf
-              run: pnpm proto:typescript
             - name: Build SvelteKit
               run: pnpm build:desktop -- --mode ${{ env.vitemode }}
               env:
@@ -125,9 +104,9 @@ jobs:
             matrix:
                 # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-private-repositories
                 include:
-                    - platform: macos-15 # [macOs, ARM64]
+                    - platform: macos-15 # [macOs, ARM64] - default target
                       target: ''
-                    - platform: macos-15 # [macOs, x64]
+                    - platform: macos-15 # [macOs, x64] - cross-compile
                       target: x86_64-apple-darwin
                     - platform: ubuntu-24.04 # [linux, x64]
                       target: ''
@@ -147,12 +126,6 @@ jobs:
             - name: perl -V (before re-install)
               if: runner.os == 'Windows'
               run: which perl && perl -V
-            - name: Setup perl
-              if: runner.os == 'Windows'
-              uses: shogo82148/actions-setup-perl@f9f0bf89e0d19ddbabb2f40d43db2e944bce7d2f # v1
-              with:
-                  perl-version: '5.38'
-                  distribution: strawberry
             - name: Set git to use LF
               if: runner.os == 'Windows'
               run: |
@@ -161,9 +134,6 @@ jobs:
             - name: perl -V
               if: runner.os == 'Windows'
               run: which perl && perl -V
-            - name: Ensure we have a working Perl toolchain
-              if: runner.os == 'Windows'
-              run: cpanm ExtUtils::Manifest App::cpanminus Locale::Maketext::Simple
             - name: Set Perl environment variables
               if: runner.os == 'Windows'
               run: |
@@ -172,28 +142,27 @@ jobs:
 
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  persist-credentials: false
-                  lfs: true
-
+                  token: ${{ secrets.PAT_JUNON }} # custom token here so that we can push tags later
+            - name: Set Cargo build target to ${{ matrix.target }}
+              shell: bash
+              if: matrix.target != ''
+              run: |
+                  echo "CARGO_BUILD_TARGET=${{ matrix.target }}" >> $GITHUB_ENV
+                  rustup target add ${{ matrix.target }}
+            # The cache doesn't pick up the environment variable set above, so we have to set it ourselves.
+            - name: Rust Cache ${{ matrix.target }}
+              uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+              with:
+                  shared-key: app-release-build-${{ github.event.inputs.channel || 'nightly' }}${{ matrix.target }}
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
 
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
-              env:
-                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
-                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
-                  {
-                    echo "channel<<EOF"
-                    echo "$INPUT_CHANNEL"
-                    echo "EOF"
-                    echo "bump<<EOF"
-                    echo "$INPUT_BUMP"
-                    echo "EOF"
-                  } >> $GITHUB_ENV
+                  echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
+                  echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
 
             - name: Calculate next version
               shell: bash
@@ -211,10 +180,18 @@ jobs:
                   } >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
 
-            #   - name: Import GPG key
-            #     if: runner.os == 'Linux'
-            #     uses: crazy-max/ghaction-import-gpg@v6
-            #     with:
+            # - name: Calculate next version
+            #   shell: bash
+            #   run: |
+            #       CURRENT_VERSION="$(curl --silent "https://app.eurora-labs.com/releases/${{ env.channel }}" | jq -r '.version')"
+            #       NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
+            #       echo "version=$NEXT_VERSION" >> $GITHUB_ENV
+            #       mkdir -p release && echo "$NEXT_VERSION" > release/version
+
+            # - name: Import GPG key
+            #   if: runner.os == 'Linux'
+            #   uses: crazy-max/ghaction-import-gpg@v6
+            #   with:
             #       gpg_private_key: ${{ secrets.APPIMAGE_PRIVATE_KEY }}
             #       passphrase: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
 
@@ -232,32 +209,33 @@ jobs:
                     libgtk-3-dev \
                     libappindicator3-dev \
                     librsvg2-dev \
-                    libwebkit2gtk-4.1-0 \
-                    libwebkit2gtk-4.1-dev \
-                    libgbm-dev \
-                    libjavascriptcoregtk-4.1-0 \
-                    libjavascriptcoregtk-4.1-dev \
-                    gir1.2-javascriptcoregtk-4.1 \
-                    gir1.2-webkit2-4.1 \
-                    libpipewire-0.3-dev;
+                    xdg-utils;
 
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Compile Protobuf
-              run: pnpm proto:typescript
+                  sudo apt install -y \
+                    libwebkit2gtk-4.1-0=2.44.0-2 \
+                    libwebkit2gtk-4.1-dev=2.44.0-2 \
+                    libjavascriptcoregtk-4.1-0=2.44.0-2 \
+                    libjavascriptcoregtk-4.1-dev=2.44.0-2 \
+                    gir1.2-javascriptcoregtk-4.1=2.44.0-2 \
+                    gir1.2-webkit2-4.1=2.44.0-2;
 
             - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+              name: Download SvelteKit build output
               with:
                   name: sveltekit-build
                   path: ./apps/desktop/build/
-
+            - name: Set release build optimization env vars
+              shell: bash
+              if: github.event.inputs.channel == 'release'
+              run: |
+                  echo "CARGO_PROFILE_RELEASE_LTO=fat" >> $GITHUB_ENV
+                  echo "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1" >> $GITHUB_ENV
+                  echo "CARGO_PROFILE_RELEASE_OPT_LEVEL=s" >> $GITHUB_ENV
             - name: Build binary
               shell: bash
               run: |
                   ./scripts/release.sh \
+                    --sign \
                     --channel                    "${{ env.channel }}" \
                     --dist                       "./release" \
                     --version                    "${{ env.version }}"
@@ -273,15 +251,54 @@ jobs:
                   APPIMAGE_KEY_PASSPHRASE: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
                   POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
 
+            - name: Set artifact name suffix
+              shell: bash
+              run: |
+                  # Only add suffix for macOS x86_64 to distinguish from ARM64
+                  if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
+                    echo "artifact_suffix=-x86_64" >> $GITHUB_ENV
+                  else
+                    echo "artifact_suffix=" >> $GITHUB_ENV
+                  fi
             - name: Upload Artifacts
               uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
               with:
-                  name: '${{ env.channel }}-${{ matrix.platform }}-${{ github.run_number }}'
+                  name: '${{ env.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
                   path: release/
                   if-no-files-found: error
 
+    sign-windows:
+        needs: build-tauri
+        runs-on: [self-hosted, evcodesignd]
+        strategy:
+            matrix:
+                platform:
+                    - windows-latest # [windows, x64]
+        steps:
+            - name: Clean artifact directory
+              shell: bash
+              run: rm -rf release
+            - name: Download unsigned artifacts
+              uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+              with:
+                  name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}-${{ github.run_number }}'
+                  path: release
+            - name: Sign Windows binary
+              shell: bash
+              run: |
+                  find release -name "*.msi" -type f -print0 | xargs -0 -n1 -I{} python3 /sign-with-evcodesignd.py "{}"
+              env:
+                  EVCODESIGND_PSK: ${{ secrets.EVCODESIGND_PSK }}
+            - name: Upload signed artifacts
+              uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+              with:
+                  name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}-${{ github.run_number }}'
+                  path: release/
+                  if-no-files-found: error
+                  overwrite: true
+
     publish-tauri:
-        needs: [build-tauri]
+        needs: [sign-tauri, build-tauri]
         runs-on: ubuntu-latest
         outputs:
             version: ${{ env.version }}
@@ -290,9 +307,9 @@ jobs:
             matrix:
                 # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-private-repositories
                 include:
-                    - platform: macos-15 # [macOs, ARM64]
+                    - platform: macos-15 # [macOs, ARM64] - default target
                       target: ''
-                    - platform: macos-15 # [macOs, x64]
+                    - platform: macos-15 # [macOs, x64] - cross-compile
                       target: x86_64-apple-darwin
                     - platform: ubuntu-24.04 # [linux, x64]
                       target: ''
@@ -303,29 +320,34 @@ jobs:
         steps:
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  persist-credentials: false
+                  token: ${{ secrets.PAT_JUNON }} # custom token here so that we can push tags later
+            - name: Set artifact name suffix
+              shell: bash
+              run: |
+                  # Only add suffix for macOS x86_64 to distinguish from ARM64
+                  if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
+                    echo "artifact_suffix=-x86_64" >> $GITHUB_ENV
+                  else
+                    echo "artifact_suffix=" >> $GITHUB_ENV
+                  fi
             - name: Download artifacts
               uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
               with:
-                  name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}-${{ github.run_number }}'
+                  name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
                   path: release
             - name: Extract version
               shell: bash
               run: |
                   VERSION="$(cat release/version)"
-                  {
-                    echo "version<<EOF"
-                    echo "$VERSION"
-                    echo "EOF"
-                  } >> $GITHUB_ENV
+                  echo "version=$VERSION" >> $GITHUB_ENV
             - name: Prepare S3 payload
               shell: bash
               run: |
                   rm -rf release-s3
                   mkdir -p release-s3
                   rsync -avE --prune-empty-dirs --include-from='.github/workflows/publish.include.txt' --exclude='*' release/ release-s3/
-                  bash scripts/normalize_spaces.sh ./release-s3
+                  bash scripts/normalize-spaces.sh ./release-s3
+
             - uses: shallwefootball/s3-upload-action@0d261a6f15b3b2e209dfebdecace4b100c04f95b # master
               name: Upload To S3
               id: S3
@@ -351,13 +373,10 @@ jobs:
     create-git-tag:
         needs: [publish-tauri, build-tauri]
         runs-on: ubuntu-latest
-        permissions:
-            contents: write # Required for creating and pushing git tags
         steps:
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  persist-credentials: true
+                  token: ${{ secrets.PAT_JUNON }} # custom token here so that we can push tags later
             - name: Create git tag
               shell: bash
               env:
