@@ -37,6 +37,8 @@ on:
 jobs:
     build-sveltekit:
         runs-on: ubuntu-latest
+        environment:
+            name: eurora-main-app
         env:
             SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         steps:
