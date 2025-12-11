@@ -178,6 +178,12 @@ trap 'rm -rf "$TMP_DIR"' exit
 
 CONFIG_PATH=$(readlink -f "$PWD/../crates/app/euro-tauri/tauri.conf.$CHANNEL.json")
 
+if [ "$OS" = "windows" ]; then
+	FEATURES="windows"
+else
+	FEATURES=""
+fi
+
 # update the version in the tauri release config
 jq '.version="'"$VERSION"'"' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
 
