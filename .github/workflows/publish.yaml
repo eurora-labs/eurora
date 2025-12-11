@@ -241,7 +241,6 @@ jobs:
               shell: bash
               run: |
                   ./scripts/release.sh \
-                    --sign \
                     --channel                    "${{ env.channel }}" \
                     --dist                       "./release" \
                     --version                    "${{ env.version }}"
@@ -272,36 +271,6 @@ jobs:
                   name: '${{ env.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
                   path: release/
                   if-no-files-found: error
-
-    sign-windows:
-        needs: build-tauri
-        runs-on: [self-hosted, evcodesignd]
-        strategy:
-            matrix:
-                platform:
-                    - windows-latest # [windows, x64]
-        steps:
-            - name: Clean artifact directory
-              shell: bash
-              run: rm -rf release
-            - name: Download unsigned artifacts
-              uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
-              with:
-                  name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}-${{ github.run_number }}'
-                  path: release
-            - name: Sign Windows binary
-              shell: bash
-              run: |
-                  find release -name "*.msi" -type f -print0 | xargs -0 -n1 -I{} python3 /sign-with-evcodesignd.py "{}"
-              env:
-                  EVCODESIGND_PSK: ${{ secrets.EVCODESIGND_PSK }}
-            - name: Upload signed artifacts
-              uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
-              with:
-                  name: '${{ needs.build-tauri.outputs.channel }}-${{ matrix.platform }}-${{ github.run_number }}'
-                  path: release/
-                  if-no-files-found: error
-                  overwrite: true
 
     publish-tauri:
         needs: [build-tauri]
