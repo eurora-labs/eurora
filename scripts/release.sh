@@ -194,13 +194,14 @@ cat "$TMP_DIR/tauri.conf.json"
 export VERSION
 export CHANNEL
 
+# Build native messaging
+cargo build --package euro-native-messaging --release
+
 # Build the app with release config
 if [ -n "$TARGET" ]; then
 	# Export TARGET for cargo to use
 	export CARGO_BUILD_TARGET="$TARGET"
 
-    # Build native messaging
-    cargo build --package euro-native-messaging --release
 
 	# Build with specified target
 	# Note: passing --target is necessary to let tauri find the binaries,
@@ -213,9 +214,6 @@ if [ -n "$TARGET" ]; then
 
   BUNDLE_DIR=$(readlink -f "$PWD/../target/$TARGET/release/bundle")
 else
-    # Build native messaging
-    cargo build --package euro-native-messaging
-
 	# Build with default target
 	tauri build \
 		--verbose \
