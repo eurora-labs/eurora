@@ -19,6 +19,7 @@ use euro_tauri::{
         conversation_procedures::{ConversationApi, ConversationApiImpl},
         message_procedures::{MessageApi, MessageApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
+        onboarding_procedures::{OnboardingApi, OnboardingApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
         settings_procedures::{SettingsApi, SettingsApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
@@ -460,6 +461,7 @@ fn main() {
                 .merge(SystemApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
+                .merge(OnboardingApiImpl.into_handler())
                 .merge(ChatApiImpl.into_handler());
             builder
                 // .invoke_handler(tauri::generate_handler![list_conversations,])
