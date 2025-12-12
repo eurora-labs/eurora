@@ -5,7 +5,6 @@
 	import {
 		type ResponseChunk,
 		type Query,
-		// type ContextChip,
 		type Message,
 		type Conversation,
 	} from '$lib/bindings/bindings.js';
@@ -15,7 +14,6 @@
 	import * as Chat from '@eurora/ui/custom-components/chat/index';
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
 	import { executeCommand } from '$lib/commands.js';
-	// import { extensionFactory, registerCoreExtensions } from '$lib/prosemirror/index.js';
 	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
 	import { inject } from '@eurora/shared/context';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
@@ -74,32 +72,7 @@
 				executeCommand(editorRef!, command);
 			});
 		});
-
-		// taurpc.timeline.new_app_event.on(async (e) => {
-		// 	const intervalID = setInterval(async () => {
-		// 		const success = await loadActivities();
-		// 		if (success) {
-		// 			clearInterval(intervalID);
-		// 		}
-		// 	}, 1000);
-		// });
 	});
-
-	// // Function to load activities from the backend
-	// async function loadActivities(): Promise<boolean> {
-	// 	try {
-	// 		// Note: list_activities is not yet available in TauRPC, fallback to invoke for now
-	// 		const result: ContextChip[] = await taurpc.context_chip.get();
-	// 		if (!editorRef) return false;
-	// 		result.forEach((command) => {
-	// 			executeCommand(editorRef!, command);
-	// 		});
-	// 		return true;
-	// 	} catch (error) {
-	// 		console.error('Failed to load activities:', error);
-	// 		return false;
-	// 	}
-	// }
 
 	function handleEscapeKey(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
@@ -107,36 +80,6 @@
 			console.log('Escape pressed: cleared messages and set conversation to NEW');
 		}
 	}
-
-	// function addExampleMessages() {
-	// 	messages.push(
-	// 		create(ProtoChatMessageSchema, {
-	// 			role: 'user',
-	// 			content: 'What am I doing right now?',
-	// 		}),
-	// 	);
-
-	// 	messages.push(
-	// 		create(ProtoChatMessageSchema, {
-	// 			role: 'system',
-	// 			content:
-	// 				'You are currently looking at a website called Eurora AI. What would you like to know?',
-	// 		}),
-	// 	);
-
-	// 	messages.push(
-	// 		create(ProtoChatMessageSchema, {
-	// 			role: 'user',
-	// 			content: 'How do I install it?',
-	// 		}),
-	// 	);
-	// }
-
-	// function handleKeydown(event: KeyboardEvent) {
-	// 	if (event.key === 'Enter') {
-	// 		// addExampleMessages();
-	// 	}
-	// }
 
 	async function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && !event.shiftKey) {
@@ -205,22 +148,10 @@
 	}
 </script>
 
-<!-- <div class="absolute top-1/2 w-full h-fit">
-	<div class=" flex flex-col justify-center items-center gap-4 w-full">
-		{#if messages.length === 0}
-			<h1 class="text-2xl font-bold">Eurora is ready!</h1>
-			<div class="flex justify-start">
-				Either press the hotkey, the Eurora Logo on the right of your screen, or start
-				asking questions here.
-			</div>
-		{/if}
-	</div>
-</div> -->
-
 <div
 	class="w-full h-full flex flex-col {messages.length === 0
 		? 'justify-center'
-		: 'justify-end'} items-center gap-4 pb-4"
+		: 'justify-end'} items-center gap-4"
 >
 	{#if messages.length > 0}
 		<ScrollArea
