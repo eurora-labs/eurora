@@ -87,7 +87,7 @@
 					class="bg-blue-600 w-full"
 					variant="secondary"
 					size="lg"
-					href={FIREFOX_EXTENSION_URL}
+					href={CHROME_EXTENSION_URL}
 				>
 					<Chromium class="h-5 w-5" />
 					Chrome / Chromium
