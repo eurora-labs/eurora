@@ -50,10 +50,6 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Browser Extension | Eurora</title>
-</svelte:head>
-
 <div class="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
 	{#if redirecting}
 		<div class="flex flex-col items-center gap-4">
