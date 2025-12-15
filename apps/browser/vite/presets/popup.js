@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { sveltekit } from '@sveltejs/kit/vite';
 
 export function popupConfig({ browser, outDir, emptyOutDir }) {
 	return defineConfig({
@@ -7,17 +7,8 @@ export function popupConfig({ browser, outDir, emptyOutDir }) {
 			__BROWSER__: JSON.stringify(browser),
 		},
 		plugins: [
-			svelte(),
+			sveltekit(),
 			// your “special browser adapter” plugin for popup goes here
 		],
-		build: {
-			outDir,
-			emptyOutDir,
-			rollupOptions: {
-				input: {
-					popup: 'src/popup/app.html',
-				},
-			},
-		},
 	});
 }
