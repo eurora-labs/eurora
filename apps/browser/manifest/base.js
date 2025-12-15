@@ -4,19 +4,25 @@ export const base = {
 	version: '0.0.0',
 	minimum_chrome_version: '102.0',
 	action: { default_popup: 'popup.html' },
-	permissions: ['storage'],
+	permissions: [
+		'nativeMessaging',
+		'tabs',
+		'storage',
+		'scripting',
+		'declarativeNetRequestWithHostAccess',
+		'webRequest',
+		'webNavigation',
+	],
 	host_permissions: ['<all_urls>'],
 	background: { service_worker: 'assets/background.js', type: 'module' },
-	content_scripts: [
-		{
-			matches: ['<all_urls>'],
-			js: ['assets/content.js'],
-			run_at: 'document_idle',
-		},
-	],
+	storage: {
+		managed_schema: 'preferences_schema.json',
+	},
+	// Content scripts are managed programmatically by the background script
+	// using browser.scripting.executeScript, not declared here
 	web_accessible_resources: [
 		{
-			resources: ['assets/*'],
+			resources: ['assets/*', 'scripts/content/*'],
 			matches: ['<all_urls>'],
 		},
 	],
