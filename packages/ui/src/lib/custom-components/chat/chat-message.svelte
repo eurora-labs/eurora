@@ -3,7 +3,7 @@
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	export const messageVariants = tv({
-		base: 'message flex flex-col w-fit items-center gap-2 py-2 rounded-2xl [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+		base: 'message flex flex-col w-fit items-center gap-2 py-[12px] rounded-2xl [&_svg:not([class*="size-"])]:size-10 [&_svg]:pointer-events-none [&_svg]:shrink-0',
 		variants: {
 			variant: {
 				default:
