@@ -94,13 +94,13 @@ jobs:
               run: pnpm build:desktop -- --mode ${{ env.vitemode }}
               env:
                   SENTRY_RELEASE: ${{ env.version }}
-            - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+            - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
               name: Upload pnpm-store contents
               with:
                   name: pnpm-store
                   path: /home/runner/setup-pnpm/node_modules/.bin/store/v3
                   retention-days: 7
-            - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+            - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
               name: Upload SvelteKit build output
               with:
                   name: sveltekit-build
@@ -285,7 +285,7 @@ jobs:
                     echo "artifact_suffix=" >> $GITHUB_ENV
                   fi
             - name: Upload Artifacts
-              uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
               with:
                   name: '${{ env.channel }}-${{ matrix.platform }}${{ env.artifact_suffix }}-${{ github.run_number }}'
                   path: release/
