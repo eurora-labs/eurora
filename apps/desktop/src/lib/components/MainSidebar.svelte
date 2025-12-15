@@ -6,10 +6,10 @@
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { type Conversation } from '$lib/bindings/bindings.js';
-	import { inject } from '@eurora/shared/context';
 	import { onMount } from 'svelte';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { inject } from '@eurora/shared/context';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	let conversations: Conversation[] = $state([]);

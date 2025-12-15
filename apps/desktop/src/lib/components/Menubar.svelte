@@ -44,12 +44,6 @@
 </script>
 
 <div class="flex items-center justify-end p-4 h-[70px]">
-	<!-- <div class="flex items-center gap-2">
-		<a href="/onboarding" class="flex items-center gap-2">
-			<EuroraLogo class="size-12" />
-			Eurora Labs
-		</a>
-	</div> -->
 	<div class="flex items-center gap-2">
 		{#if service_name}
 			<DropdownMenu.Root>
@@ -65,9 +59,5 @@
 				</DropdownMenu.Content>
 			</DropdownMenu.Root>
 		{/if}
-		<Button variant="outline" href="/settings">
-			Settings
-			<CircleUserRoundIcon size="24px" class="size-6" />
-		</Button>
 	</div>
 </div>
