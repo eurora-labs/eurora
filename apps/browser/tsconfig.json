@@ -1,7 +1,8 @@
 {
+	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
-		"module": "NodeNext",
-		"moduleResolution": "NodeNext",
+		"module": "ES2022",
+		"moduleResolution": "bundler",
 		"target": "ES2022",
 		"lib": ["es2022", "DOM"],
 		"types": ["vite/client", "webextension-polyfill"],
