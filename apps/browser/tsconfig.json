@@ -1,0 +1,20 @@
+{
+	"compilerOptions": {
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"target": "ES2022",
+		"lib": ["es2022", "DOM"],
+		"types": ["vite/client", "webextension-polyfill"],
+		"strict": false,
+		"noPropertyAccessFromIndexSignature": true,
+		"allowImportingTsExtensions": true,
+		"emitDeclarationOnly": true,
+		"emitDecoratorMetadata": false,
+		"allowJs": true,
+		"checkJs": true,
+		"allowSyntheticDefaultImports": true,
+		"composite": false,
+		"declaration": true,
+		"declarationMap": true,
+	},
+}
