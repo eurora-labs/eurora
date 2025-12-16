@@ -107,7 +107,7 @@ jobs:
                   ls -lh firefox-extension.zip
 
             - name: Upload artifact
-              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
                   name: firefox-extension-${{ steps.version.outputs.version }}
                   path: firefox-extension.zip
