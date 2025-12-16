@@ -71,6 +71,14 @@
 			"type": "string",
 			"default": ""
 		},
+		"commentLearnMoreUrl": {
+			"type": "string",
+			"default": ""
+		},
+		"enableSignatureEditor": {
+			"type": "boolean",
+			"default": false
+		},
 		"enableUpdatedAddImage": {
 			"type": "boolean",
 			"default": false
@@ -100,7 +108,7 @@
 		},
 		"highlightEditorColors": {
 			"type": "string",
-			"default": "yellow=#FFFF98,green=#53FFBC,blue=#80EBFF,pink=#FFCBE6,red=#FF4F5F"
+			"default": "yellow=#FFFF98,green=#53FFBC,blue=#80EBFF,pink=#FFCBE6,red=#FF4F5F,yellow_HCM=#FFFFCC,green_HCM=#53FFBC,blue_HCM=#80EBFF,pink_HCM=#F6B8FF,red_HCM=#C50043"
 		},
 		"disableRange": {
 			"title": "Disable range requests",
@@ -168,6 +176,10 @@
 			"enum": [-1, 0, 3, 15],
 			"default": 0
 		},
+		"capCanvasAreaFactor": {
+			"type": "integer",
+			"default": 200
+		},
 		"enablePermissions": {
 			"type": "boolean",
 			"default": false
@@ -220,6 +232,21 @@
 			"description": "The color is a string as defined in CSS. Its goal is to help improve readability in high contrast mode",
 			"type": "string",
 			"default": "CanvasText"
+		},
+		"enableAutoLinking": {
+			"description": "Enable creation of hyperlinks from text that look like URLs.",
+			"type": "boolean",
+			"default": true
+		},
+		"enableComment": {
+			"description": "Enable creation of comment annotations.",
+			"type": "boolean",
+			"default": false
+		},
+		"enableOptimizedPartialRendering": {
+			"description": "Enable tracking of PDF operations to optimize partial rendering.",
+			"type": "boolean",
+			"default": false
 		}
 	}
 }
