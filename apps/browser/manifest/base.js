@@ -23,7 +23,6 @@ export const base = {
 		128: 'icon-128x128.png',
 	},
 	host_permissions: ['<all_urls>'],
-	background: { service_worker: 'assets/background.js', type: 'module' },
 	storage: {
 		managed_schema: 'preferences_schema.json',
 	},
