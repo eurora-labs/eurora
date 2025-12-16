@@ -96,7 +96,7 @@ jobs:
                   ls -lh chrome-extension.zip
 
             - name: Upload artifact
-              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
                   name: chrome-extension-${{ steps.version.outputs.version }}
                   path: chrome-extension.zip
