@@ -45,14 +45,14 @@
 	},
 	"devDependencies": {
 		"@bufbuild/buf": "^1.61.0",
-		"@bufbuild/protobuf": "^2.10.1",
-		"@bufbuild/protoc-gen-es": "^2.10.1",
+		"@bufbuild/protobuf": "^2.10.2",
+		"@bufbuild/protoc-gen-es": "^2.10.2",
 		"@commitlint/cli": "^19.8.1",
 		"@commitlint/config-conventional": "^19.8.1",
 		"@commitlint/cz-commitlint": "^19.8.1",
 		"@connectrpc/connect": "^2.1.1",
 		"@connectrpc/connect-web": "^2.1.1",
-		"@tauri-apps/cli": "^2.9.5",
+		"@tauri-apps/cli": "^2.9.6",
 		"commitizen": "^4.3.1",
 		"concurrently": "^9.2.1",
 		"cz-conventional-changelog": "^3.3.0",
@@ -61,7 +61,7 @@
 		"inquirer": "^9.3.8",
 		"prettier": "^3.7.4",
 		"prettier-plugin-css-order": "^2.1.2",
-		"prettier-plugin-svelte": "^3.4.0",
+		"prettier-plugin-svelte": "^3.4.1",
 		"prettier-plugin-tailwindcss": "^0.7.2",
 		"protolint": "^0.56.4",
 		"svelte-eslint-parser": "^1.4.1",
@@ -70,7 +70,7 @@
 		"turbo": "^2.6.3",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.25.0",
+	"packageManager": "pnpm@10.26.0",
 	"engines": {
 		"node": ">=20.11"
 	},
