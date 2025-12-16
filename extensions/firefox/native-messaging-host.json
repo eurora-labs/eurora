@@ -1,7 +1,0 @@
-{
-	"name": "com.eurora.app",
-	"description": "Eurora Native Messaging Host",
-	"type": "stdio",
-	"path": "/home/andre/Projects/eurora/eurora/target/debug/euro-native-messaging",
-	"allowed_extensions": ["dev@eurora-labs.com"]
-}
