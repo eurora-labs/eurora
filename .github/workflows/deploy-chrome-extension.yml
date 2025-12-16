@@ -70,28 +70,19 @@ jobs:
                   printf "version=%s\n" "$VERSION" >> "$GITHUB_OUTPUT"
                   echo "Chrome extension version: $VERSION"
 
-            - name: Update manifest version
-              shell: bash
-              env:
-                  VERSION: ${{ steps.version.outputs.version }}
-              run: |
-                  # Update version in Chrome manifest safely using jq
-                  tmp=$(mktemp)
-                  jq --arg v "$VERSION" '.version = $v' extensions/chromium/manifest.json > "$tmp"
-                  mv "$tmp" extensions/chromium/manifest.json
-                  echo "Updated manifest.json version to $VERSION"
-
-            - name: Build everything for chrome
-              run: pnpm build:chrome
+            - name: Build Chrome extension
+              working-directory: apps/browser
+              run: pnpm run build:chrome
               env:
                   NODE_ENV: production
+                  VERSION: ${{ steps.version.outputs.version }}
 
             - name: Create Chrome extension zip
               shell: bash
               run: |
-                  cd extensions/chromium
-                  zip -r ../../chrome-extension.zip . -x "*.git*" -x "*.zip"
-                  cd ../..
+                  cd apps/browser/dist/chrome
+                  zip -r ../../../../chrome-extension.zip . -x "*.git*" -x "*.zip"
+                  cd ../../../..
                   echo "Created chrome-extension.zip"
                   ls -lh chrome-extension.zip
 

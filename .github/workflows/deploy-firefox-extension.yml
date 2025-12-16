@@ -70,39 +70,37 @@ jobs:
                   printf "version=%s\n" "$VERSION" >> "$GITHUB_OUTPUT"
                   echo "Firefox version: $VERSION"
 
-            - name: Update manifest version
+            - name: Determine Firefox extension ID
+              id: firefox-id
               shell: bash
               env:
-                  VERSION: ${{ steps.version.outputs.version }}
+                  EVENT_NAME: ${{ github.event_name }}
+                  CHANNEL: ${{ github.event.inputs.channel }}
               run: |
-                  # Update version in Firefox manifest safely using jq
-                  tmp=$(mktemp)
-                  jq --arg v "$VERSION" '.version = $v' extensions/firefox/manifest.json > "$tmp"
-                  mv "$tmp" extensions/firefox/manifest.json
-                  echo "Updated manifest.json version to $VERSION"
+                  # Use production ID for production channel or tag push, dev ID for beta
+                  if [ "$EVENT_NAME" == "push" ] || [ "$CHANNEL" == "production" ]; then
+                    FIREFOX_ID="{271903fe-1905-4636-b47f-6f0873dc97f8}"
+                    echo "Using production Firefox extension ID"
+                  else
+                    FIREFOX_ID="dev@eurora-labs.com"
+                    echo "Using development Firefox extension ID"
+                  fi
+                  printf "firefox_id=%s\n" "$FIREFOX_ID" >> "$GITHUB_OUTPUT"
 
-            - name: Build everything for firefox
-              run: pnpm build:firefox
+            - name: Build Firefox extension
+              working-directory: apps/browser
+              run: pnpm run build:firefox
               env:
                   NODE_ENV: production
-
-            - name: Replace Firefox extension ID for production
-              if: github.event.inputs.channel == 'production' || github.event_name == 'push'
-              shell: bash
-              run: |
-                  # Replace dev ID with production ID in manifest
-                  sed -i 's/"id": "dev@eurora-labs.com"/"id": "{271903fe-1905-4636-b47f-6f0873dc97f8}"/' extensions/firefox/manifest.json
-                  echo "Replaced Firefox ID with production ID"
-
-                  # Verify the change
-                  grep '"id":' extensions/firefox/manifest.json
+                  VERSION: ${{ steps.version.outputs.version }}
+                  FIREFOX_EXTENSION_ID: ${{ steps.firefox-id.outputs.firefox_id }}
 
             - name: Create Firefox extension zip
               shell: bash
               run: |
-                  cd extensions/firefox
-                  zip -r ../../firefox-extension.zip . -x "*.git*" -x "*.zip"
-                  cd ../..
+                  cd apps/browser/dist/firefox
+                  zip -r ../../../../firefox-extension.zip . -x "*.git*" -x "*.zip"
+                  cd ../../../..
                   echo "Created firefox-extension.zip"
                   ls -lh firefox-extension.zip
 
@@ -123,7 +121,7 @@ jobs:
                   WEB_EXT_API_KEY: ${{ secrets.FIREFOX_API_KEY }}
                   WEB_EXT_API_SECRET: ${{ secrets.FIREFOX_API_SECRET }}
               run: |
-                  cd extensions/firefox
+                  cd apps/browser/dist/firefox
 
                   # Sign and submit the Firefox extension
                   web-ext sign \
@@ -141,7 +139,7 @@ jobs:
                   WEB_EXT_API_KEY: ${{ secrets.FIREFOX_API_KEY }}
                   WEB_EXT_API_SECRET: ${{ secrets.FIREFOX_API_SECRET }}
               run: |
-                  cd extensions/firefox
+                  cd apps/browser/dist/firefox
 
                   # Sign and submit to unlisted (beta) channel
                   web-ext sign \
@@ -157,7 +155,7 @@ jobs:
               uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
               with:
                   files: |
-                      web-ext-artifacts/*.xpi
+                      apps/browser/dist/firefox/web-ext-artifacts/*.xpi
                       firefox-extension.zip
                   body: |
                       Firefox Extension Release ${{ steps.version.outputs.version }}
