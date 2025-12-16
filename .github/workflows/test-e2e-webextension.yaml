@@ -53,7 +53,7 @@ jobs:
 
             - name: Build extension
               # run: pnpm build
-              run: pnpm build:webextension
+              run: pnpm build:browser
 
             - name: Run Playwright tests for extensions
               run: pnpm exec turbo run test:e2e:webextension
