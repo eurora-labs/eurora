@@ -4,6 +4,9 @@ export const base = {
 	version: '0.0.0',
 	minimum_chrome_version: '102.0',
 	action: { default_popup: 'popup.html' },
+	content_security_policy: {
+		extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+	},
 	permissions: [
 		'nativeMessaging',
 		'tabs',
