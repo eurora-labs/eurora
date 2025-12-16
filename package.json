@@ -70,7 +70,7 @@
 		"turbo": "^2.6.3",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.25.0",
+	"packageManager": "pnpm@10.26.0",
 	"engines": {
 		"node": ">=20.11"
 	},

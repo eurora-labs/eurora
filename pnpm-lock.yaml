@@ -106,7 +106,7 @@ importers:
         specifier: ^1.4.1
         version: 1.4.1(svelte@5.46.0)
       tailwindcss:
-        specifier: 4.1.18
+        specifier: 'catalog:'
         version: 4.1.18
       ts-proto:
         specifier: ^2.8.3
