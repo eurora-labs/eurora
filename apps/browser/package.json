@@ -12,6 +12,7 @@
 		"lint": "prettier --check . && eslint .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run",
+		"build:all": "pnpm run build:chrome && pnpm run build:firefox && pnpm run build:safari",
 		"build:chrome": "cross-env BROWSER=chrome node scripts/build.mjs",
 		"build:firefox": "cross-env BROWSER=firefox node scripts/build.mjs",
 		"build:safari": "cross-env BROWSER=safari node scripts/build.mjs"
