@@ -291,3 +291,7 @@ vitest.config.*.timestamp*
 /context_portal/
 *.sqlite
 *.sqlite-journal
+
+# PDF.js viewer cache (downloaded during build)
+apps/browser/.pdfjs-viewer/
+apps/browser/.pdfjs-temp/
