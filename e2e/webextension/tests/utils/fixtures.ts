@@ -21,7 +21,7 @@ export const test = base.extend<{
 	// Override context to load the complete extension (content scripts, background, popup)
 	context: async ({}, use) => {
 		// Path to the built extension directory
-		const pathToExtension = path.join(__dirname, '../../../../extensions/chromium');
+		const pathToExtension = path.join(__dirname, '../../../../apps/browser/dist/chrome');
 
 		const context = await chromium.launchPersistentContext('', {
 			channel: 'chromium',
