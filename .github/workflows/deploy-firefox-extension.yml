@@ -88,7 +88,6 @@ jobs:
                   printf "firefox_id=%s\n" "$FIREFOX_ID" >> "$GITHUB_OUTPUT"
 
             - name: Build Firefox extension
-              working-directory: apps/browser
               run: pnpm run build:firefox
               env:
                   NODE_ENV: production
