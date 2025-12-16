@@ -25,6 +25,7 @@ function targetPatch(browser) {
 			browser_specific_settings: {
 				gecko: { id: firefoxId },
 			},
+			background: { scripts: ['assets/background.js'] },
 			// Firefox MV3 differences frequently land here
 		};
 	}
@@ -33,7 +34,9 @@ function targetPatch(browser) {
 			// keep it WebExtensions-compatible; Safari packaging is done after build
 		};
 	}
-	return {}; // chrome baseline
+	return {
+		background: { service_worker: 'assets/background.js', type: 'module' },
+	}; // chrome baseline
 }
 
 export async function writeManifest({ browser, outDir }) {
