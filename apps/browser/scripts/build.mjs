@@ -20,8 +20,10 @@ async function main() {
 	fs.rmSync(outDir, { recursive: true, force: true });
 	fs.mkdirSync(outDir, { recursive: true });
 
-	// Ensure PDF.js viewer cache exists
-	await ensurePdfjsCache();
+	// Ensure PDF.js viewer cache exists (Chrome only)
+	if (browser === 'chrome') {
+		await ensurePdfjsCache();
+	}
 
 	// Build SvelteKit popup using command line (it uses vite.config.ts and svelte.config.js)
 	console.log('Building SvelteKit popup...');
@@ -56,8 +58,10 @@ async function main() {
 		console.log('Copied preferences_schema.json to', outDir);
 	}
 
-	// Copy PDF.js viewer files
-	await copyPdfjsViewer(outDir);
+	// Copy PDF.js viewer files (Chrome only)
+	if (browser === 'chrome') {
+		await copyPdfjsViewer(outDir);
+	}
 }
 
 // ============================================================================
@@ -248,9 +252,9 @@ async function copyPdfjsViewer(outDir) {
 }
 
 /**
-	* Inject the PDF handler script into viewer.html
-	* Adds a script tag just above the closing </head> tag
-	*/
+ * Inject the PDF handler script into viewer.html
+ * Adds a script tag just above the closing </head> tag
+ */
 function injectPdfHandlerScript(viewerHtmlPath) {
 	if (!fs.existsSync(viewerHtmlPath)) {
 		console.warn('  - viewer.html not found, skipping script injection');
@@ -258,7 +262,8 @@ function injectPdfHandlerScript(viewerHtmlPath) {
 	}
 
 	let content = fs.readFileSync(viewerHtmlPath, 'utf-8');
-	const scriptTag = '<script src="../../scripts/content/sites/_pdf/index.js" type="module"></script>';
+	const scriptTag =
+		'<script src="../../scripts/content/sites/_pdf/index.js" type="module"></script>';
 	const closingHeadTag = '</head>';
 
 	if (content.includes(scriptTag)) {
