@@ -332,6 +332,8 @@ impl StreamingProvider for OpenAIProvider {
 
 #[async_trait]
 impl ToolProvider for OpenAIProvider {
+    type ToolStream = Pin<Box<dyn Stream<Item = Result<StreamEvent, Self::Error>> + Send>>;
+
     async fn chat_with_tools(
         &self,
         request: ChatRequest,
@@ -352,6 +354,179 @@ impl ToolProvider for OpenAIProvider {
             .map_err(|e| OpenAIError::Network { source: e })?;
 
         self.handle_response(response).await
+    }
+
+    async fn chat_stream_with_tools(
+        &self,
+        request: ChatRequest,
+        tools: &[Tool],
+    ) -> ProviderResult<Self::ToolStream, Self::Error> {
+        let mut openai_request = self.convert_chat_request(&request);
+        openai_request.stream = Some(true);
+
+        if !tools.is_empty() {
+            openai_request.tools = Some(tools.iter().map(|t| t.into()).collect());
+            openai_request.tool_choice = Some(json!("auto"));
+        }
+
+        let response = self
+            .request_builder(reqwest::Method::POST, &self.config.chat_url())
+            .json(&openai_request)
+            .send()
+            .await
+            .map_err(|e| OpenAIError::Network { source: e })?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(OpenAIError::from_response(status, &body));
+        }
+
+        // Create a tokio channel for streaming
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<StreamEvent, OpenAIError>>(100);
+
+        // Spawn a task to process the SSE stream
+        let tx_clone = tx.clone();
+        tokio::spawn(async move {
+            let mut byte_stream = response.bytes_stream();
+            let mut buffer = Vec::new();
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                match chunk_result {
+                    Ok(chunk) => {
+                        buffer.extend_from_slice(chunk.as_ref());
+
+                        // Process complete lines
+                        let mut start = 0;
+                        while let Some(pos) = buffer[start..].iter().position(|&b| b == b'\n') {
+                            let line_end = start + pos;
+                            let line = String::from_utf8_lossy(&buffer[start..line_end])
+                                .trim()
+                                .to_string();
+                            start = line_end + 1;
+
+                            // Process SSE format: "data: {json}" or "data: [DONE]"
+                            if let Some(data) = line.strip_prefix("data: ") {
+                                if data == "[DONE]" {
+                                    // Send done event and end stream
+                                    let _ = tx_clone.send(Ok(StreamEvent::done(None))).await;
+                                    drop(tx_clone);
+                                    return;
+                                }
+
+                                // Try to parse the JSON chunk
+                                if let Ok(chunk) = serde_json::from_str::<OpenAIStreamChunk>(data) {
+                                    if let Some(choice) = chunk.choices.first() {
+                                        // Check for finish reason
+                                        let finish_reason =
+                                            choice.finish_reason.as_ref().and_then(|r| {
+                                                match r.as_str() {
+                                                    "stop" => Some(FinishReason::Stop),
+                                                    "length" => Some(FinishReason::Length),
+                                                    "tool_calls" => Some(FinishReason::ToolCalls),
+                                                    "content_filter" => {
+                                                        Some(FinishReason::ContentFilter)
+                                                    }
+                                                    _ => None,
+                                                }
+                                            });
+
+                                        // Handle text content delta
+                                        if let Some(content) = &choice.delta.content {
+                                            if !content.is_empty() {
+                                                if tx_clone
+                                                    .send(Ok(StreamEvent::content_delta(
+                                                        content.clone(),
+                                                    )))
+                                                    .await
+                                                    .is_err()
+                                                {
+                                                    // Receiver dropped
+                                                    return;
+                                                }
+                                            }
+                                        }
+
+                                        // Handle tool calls
+                                        if let Some(tool_calls) = &choice.delta.tool_calls {
+                                            for tool_call in tool_calls {
+                                                // Tool call start (has id and function name)
+                                                if let (Some(id), Some(function)) =
+                                                    (&tool_call.id, &tool_call.function)
+                                                {
+                                                    if let Some(name) = &function.name {
+                                                        let event = StreamEvent::tool_call_start(
+                                                            tool_call.index,
+                                                            id.clone(),
+                                                            tool_call
+                                                                .call_type
+                                                                .clone()
+                                                                .unwrap_or_else(|| {
+                                                                    "function".to_string()
+                                                                }),
+                                                            name.clone(),
+                                                        );
+                                                        if tx_clone.send(Ok(event)).await.is_err() {
+                                                            return;
+                                                        }
+                                                    }
+                                                }
+
+                                                // Tool call delta (has arguments)
+                                                if let Some(function) = &tool_call.function {
+                                                    if let Some(arguments) = &function.arguments {
+                                                        if !arguments.is_empty() {
+                                                            let event =
+                                                                StreamEvent::tool_call_delta(
+                                                                    tool_call.index,
+                                                                    arguments.clone(),
+                                                                );
+                                                            if tx_clone
+                                                                .send(Ok(event))
+                                                                .await
+                                                                .is_err()
+                                                            {
+                                                                return;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // If there's a finish reason, send done event
+                                        if let Some(reason) = finish_reason {
+                                            if tx_clone
+                                                .send(Ok(StreamEvent::done(Some(reason))))
+                                                .await
+                                                .is_err()
+                                            {
+                                                return;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Keep remaining bytes in buffer
+                        buffer.drain(0..start);
+                    }
+                    Err(e) => {
+                        let _ = tx_clone.send(Err(OpenAIError::Network { source: e })).await;
+                        return;
+                    }
+                }
+            }
+
+            // Close the channel when done
+            drop(tx_clone);
+        });
+
+        // Convert the receiver to a stream
+        let event_stream = ReceiverStream::new(rx);
+
+        Ok(Box::pin(event_stream))
     }
 }
 

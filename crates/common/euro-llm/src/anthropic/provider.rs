@@ -282,6 +282,8 @@ impl StreamingProvider for AnthropicProvider {
 
 #[async_trait]
 impl ToolProvider for AnthropicProvider {
+    type ToolStream = Pin<Box<dyn Stream<Item = Result<StreamEvent, Self::Error>> + Send>>;
+
     async fn chat_with_tools(
         &self,
         request: ChatRequest,
@@ -302,6 +304,207 @@ impl ToolProvider for AnthropicProvider {
             .map_err(|e| AnthropicError::Network { source: e })?;
 
         self.handle_response(response).await
+    }
+
+    async fn chat_stream_with_tools(
+        &self,
+        request: ChatRequest,
+        tools: &[Tool],
+    ) -> ProviderResult<Self::ToolStream, Self::Error> {
+        let mut anthropic_request = self.convert_chat_request(&request);
+        anthropic_request.stream = Some(true);
+
+        if !tools.is_empty() {
+            anthropic_request.tools = Some(tools.iter().map(|t| t.into()).collect());
+            anthropic_request.tool_choice = Some(AnthropicToolChoice::Auto);
+        }
+
+        let response = self
+            .request_builder(reqwest::Method::POST, &self.config.messages_url())
+            .json(&anthropic_request)
+            .send()
+            .await
+            .map_err(|e| AnthropicError::Network { source: e })?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AnthropicError::from_response(status, &body));
+        }
+
+        // Create a tokio channel for streaming
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<StreamEvent, AnthropicError>>(100);
+
+        // Spawn a task to process the SSE stream
+        let tx_clone = tx.clone();
+        tokio::spawn(async move {
+            let mut byte_stream = response.bytes_stream();
+            let mut buffer = Vec::new();
+            // Track current tool use for accumulating input_json_delta
+            let mut current_tool_index: Option<u32> = None;
+            let mut tool_counter: u32 = 0;
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                match chunk_result {
+                    Ok(chunk) => {
+                        buffer.extend_from_slice(chunk.as_ref());
+
+                        // Process complete lines
+                        let mut start = 0;
+                        while let Some(pos) = buffer[start..].iter().position(|&b| b == b'\n') {
+                            let line_end = start + pos;
+                            let line = String::from_utf8_lossy(&buffer[start..line_end])
+                                .trim()
+                                .to_string();
+                            start = line_end + 1;
+
+                            // Process SSE format: "data: {json}" or "event: message_stop"
+                            if let Some(data) = line.strip_prefix("data: ") {
+                                // Try to parse the JSON chunk
+                                if let Ok(chunk) =
+                                    serde_json::from_str::<AnthropicStreamChunk>(data)
+                                {
+                                    match chunk {
+                                        AnthropicStreamChunk::ContentBlockStart {
+                                            index,
+                                            content_block,
+                                        } => {
+                                            // Check if this is a tool_use content block
+                                            if let AnthropicContentBlock::ToolUse {
+                                                id, name, ..
+                                            } = content_block
+                                            {
+                                                current_tool_index = Some(index);
+
+                                                let event = StreamEvent::tool_call_start(
+                                                    tool_counter,
+                                                    id,
+                                                    "function",
+                                                    name,
+                                                );
+                                                tool_counter += 1;
+
+                                                if tx_clone.send(Ok(event)).await.is_err() {
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                        AnthropicStreamChunk::ContentBlockDelta {
+                                            index,
+                                            delta,
+                                        } => {
+                                            match delta {
+                                                AnthropicContentDelta::TextDelta { text } => {
+                                                    if !text.is_empty() {
+                                                        if tx_clone
+                                                            .send(Ok(StreamEvent::content_delta(
+                                                                text,
+                                                            )))
+                                                            .await
+                                                            .is_err()
+                                                        {
+                                                            return;
+                                                        }
+                                                    }
+                                                }
+                                                AnthropicContentDelta::InputJsonDelta {
+                                                    partial_json,
+                                                } => {
+                                                    // This is a tool call argument delta
+                                                    if let Some(_tool_idx) = current_tool_index {
+                                                        if index == _tool_idx
+                                                            && !partial_json.is_empty()
+                                                        {
+                                                            let event =
+                                                                StreamEvent::tool_call_delta(
+                                                                    tool_counter.saturating_sub(1),
+                                                                    partial_json,
+                                                                );
+                                                            if tx_clone
+                                                                .send(Ok(event))
+                                                                .await
+                                                                .is_err()
+                                                            {
+                                                                return;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        AnthropicStreamChunk::ContentBlockStop { index } => {
+                                            // Reset tool tracking if this was a tool block
+                                            if current_tool_index == Some(index) {
+                                                current_tool_index = None;
+                                            }
+                                        }
+                                        AnthropicStreamChunk::MessageDelta { delta, usage: _ } => {
+                                            // Check for stop reason
+                                            if let Some(stop_reason) = delta.stop_reason {
+                                                let finish_reason = match stop_reason.as_str() {
+                                                    "end_turn" => Some(FinishReason::Stop),
+                                                    "max_tokens" => Some(FinishReason::Length),
+                                                    "tool_use" => Some(FinishReason::ToolCalls),
+                                                    "stop_sequence" => {
+                                                        Some(FinishReason::StopSequence)
+                                                    }
+                                                    _ => None,
+                                                };
+                                                if tx_clone
+                                                    .send(Ok(StreamEvent::done(finish_reason)))
+                                                    .await
+                                                    .is_err()
+                                                {
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                        AnthropicStreamChunk::MessageStop => {
+                                            // End of stream - send done event if not already sent
+                                            let _ =
+                                                tx_clone.send(Ok(StreamEvent::done(None))).await;
+                                            drop(tx_clone);
+                                            return;
+                                        }
+                                        AnthropicStreamChunk::Error { error } => {
+                                            let _ = tx_clone
+                                                .send(Err(AnthropicError::Other {
+                                                    message: error.message,
+                                                }))
+                                                .await;
+                                            return;
+                                        }
+                                        _ => {} // Handle other chunk types if needed
+                                    }
+                                }
+                            } else if line.starts_with("event: message_stop") {
+                                // Alternative way to detect end of stream
+                                let _ = tx_clone.send(Ok(StreamEvent::done(None))).await;
+                                drop(tx_clone);
+                                return;
+                            }
+                        }
+
+                        // Keep remaining bytes in buffer
+                        buffer.drain(0..start);
+                    }
+                    Err(e) => {
+                        let _ = tx_clone
+                            .send(Err(AnthropicError::Network { source: e }))
+                            .await;
+                        return;
+                    }
+                }
+            }
+
+            // Close the channel when done
+            drop(tx_clone);
+        });
+
+        // Convert the receiver to a stream
+        let event_stream = ReceiverStream::new(rx);
+
+        Ok(Box::pin(event_stream))
     }
 }
 

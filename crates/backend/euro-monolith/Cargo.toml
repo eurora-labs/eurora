@@ -1,8 +1,8 @@
 [package]
 name = "euro-monolith"
 version = "0.0.1"
-edition = "2024"
-authors = ["Eurora <eurora@company.com>"]
+authors.workspace = true
+edition.workspace = true
 publish = false
 
 [dependencies]
@@ -16,7 +16,7 @@ euro-prompt-service = { workspace = true }
 euro-proto = { workspace = true }
 euro-remote-db = { workspace = true }
 euro-update-service = { workspace = true }
-futures = "0.3"
+futures = { workspace = true }
 image = { workspace = true }
 prost = { workspace = true }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }

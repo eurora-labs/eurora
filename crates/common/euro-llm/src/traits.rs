@@ -84,6 +84,11 @@ pub trait StreamingProvider: ChatProvider {
 /// This extends ChatProvider to add tool calling capabilities.
 #[async_trait]
 pub trait ToolProvider: ChatProvider {
+    /// Stream type for tool-enabled streaming responses.
+    /// Each item in the stream is a [`StreamEvent`] representing either
+    /// text content or tool call information.
+    type ToolStream: Stream<Item = Result<StreamEvent, Self::Error>> + Send + 'static;
+
     /// Send a chat request with available tools.
     ///
     /// # Arguments
@@ -97,6 +102,52 @@ pub trait ToolProvider: ChatProvider {
         request: ChatRequest,
         tools: &[Tool],
     ) -> Result<Self::Response, Self::Error>;
+
+    /// Send a chat request with tools and receive a streaming response.
+    ///
+    /// This method enables streaming responses while supporting tool/function calls.
+    /// The stream emits [`StreamEvent`] items that can be either:
+    /// - `ContentDelta`: Incremental text content from the assistant
+    /// - `ToolCallStart`: Beginning of a tool call with ID and function name
+    /// - `ToolCallDelta`: Incremental tool call arguments
+    /// - `Done`: Signal that the stream has completed
+    ///
+    /// # Arguments
+    /// * `request` - The chat request containing messages and parameters
+    /// * `tools` - Available tools that the model can call
+    ///
+    /// # Returns
+    /// A result containing a stream of [`StreamEvent`] items or an error
+    ///
+    /// # Example
+    /// ```ignore
+    /// use futures::StreamExt;
+    ///
+    /// let mut stream = provider.chat_stream_with_tools(request, &tools).await?;
+    /// let mut accumulated_args = String::new();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event? {
+    ///         StreamEvent::ContentDelta { content } => {
+    ///             print!("{}", content);
+    ///         }
+    ///         StreamEvent::ToolCallStart { index, id, name, .. } => {
+    ///             println!("Tool call started: {} ({})", name, id);
+    ///         }
+    ///         StreamEvent::ToolCallDelta { arguments_delta, .. } => {
+    ///             accumulated_args.push_str(&arguments_delta);
+    ///         }
+    ///         StreamEvent::Done { finish_reason } => {
+    ///             println!("Stream finished: {:?}", finish_reason);
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    async fn chat_stream_with_tools(
+        &self,
+        request: ChatRequest,
+        tools: &[Tool],
+    ) -> Result<Self::ToolStream, Self::Error>;
 }
 
 /// Trait for providers that support text embeddings.

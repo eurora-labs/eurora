@@ -292,6 +292,110 @@ impl From<ImageSource> for String {
     }
 }
 
+/// A streaming event that can contain text content or tool call updates.
+///
+/// When streaming with tools enabled, the LLM can emit both text content
+/// and tool call information incrementally. This enum represents the
+/// different types of events that can occur during streaming.
+#[cfg_attr(feature = "specta", derive(Type))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum StreamEvent {
+    /// A chunk of text content from the assistant's response.
+    ContentDelta {
+        /// The text content delta
+        content: String,
+    },
+    /// Start of a tool call.
+    ToolCallStart {
+        /// Index of this tool call in the response
+        index: u32,
+        /// Unique identifier for the tool call
+        id: String,
+        /// Type of the tool call (usually "function")
+        call_type: String,
+        /// Name of the function being called
+        name: String,
+    },
+    /// A delta for tool call arguments (streamed incrementally).
+    ToolCallDelta {
+        /// Index of the tool call this delta belongs to
+        index: u32,
+        /// Partial arguments JSON string
+        arguments_delta: String,
+    },
+    /// The stream has completed.
+    Done {
+        /// The reason why generation finished, if available
+        finish_reason: Option<FinishReason>,
+    },
+}
+
+impl StreamEvent {
+    /// Create a new content delta event.
+    pub fn content_delta(content: impl Into<String>) -> Self {
+        Self::ContentDelta {
+            content: content.into(),
+        }
+    }
+
+    /// Create a new tool call start event.
+    pub fn tool_call_start(
+        index: u32,
+        id: impl Into<String>,
+        call_type: impl Into<String>,
+        name: impl Into<String>,
+    ) -> Self {
+        Self::ToolCallStart {
+            index,
+            id: id.into(),
+            call_type: call_type.into(),
+            name: name.into(),
+        }
+    }
+
+    /// Create a new tool call delta event.
+    pub fn tool_call_delta(index: u32, arguments_delta: impl Into<String>) -> Self {
+        Self::ToolCallDelta {
+            index,
+            arguments_delta: arguments_delta.into(),
+        }
+    }
+
+    /// Create a done event.
+    pub fn done(finish_reason: Option<FinishReason>) -> Self {
+        Self::Done { finish_reason }
+    }
+
+    /// Returns true if this is a content delta event.
+    pub fn is_content_delta(&self) -> bool {
+        matches!(self, Self::ContentDelta { .. })
+    }
+
+    /// Returns true if this is a tool call start event.
+    pub fn is_tool_call_start(&self) -> bool {
+        matches!(self, Self::ToolCallStart { .. })
+    }
+
+    /// Returns true if this is a tool call delta event.
+    pub fn is_tool_call_delta(&self) -> bool {
+        matches!(self, Self::ToolCallDelta { .. })
+    }
+
+    /// Returns true if this is a done event.
+    pub fn is_done(&self) -> bool {
+        matches!(self, Self::Done { .. })
+    }
+
+    /// Get the content if this is a content delta event.
+    pub fn as_content(&self) -> Option<&str> {
+        match self {
+            Self::ContentDelta { content } => Some(content),
+            _ => None,
+        }
+    }
+}
+
 /// A tool/function call made by the AI.
 #[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -350,6 +454,7 @@ pub struct Usage {
 }
 
 /// Reason why the model stopped generating.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum FinishReason {
