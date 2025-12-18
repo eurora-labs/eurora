@@ -1,6 +1,6 @@
 use agent_chain::chat_models::ChatModel;
 use agent_chain::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
-use agent_chain::{openai::ChatOpenAI, ollama::ChatOllama, ContentPart, ImageDetail, ImageSource};
+use agent_chain::{ContentPart, ImageDetail, ImageSource, ollama::ChatOllama, openai::ChatOpenAI};
 use anyhow::Result;
 use async_from::{AsyncTryFrom, async_trait};
 use euro_llm::{ChatRequest, Message, Role};
