@@ -72,7 +72,8 @@ pub use chat_models::{
 
 // Re-export message types
 pub use messages::{
-    AIMessage, AnyMessage, BaseMessage, HasId, HumanMessage, SystemMessage, ToolCall, ToolMessage,
+    AIMessage, AnyMessage, BaseMessage, ContentPart, HasId, HumanMessage, ImageDetail, ImageSource,
+    MessageContent, SystemMessage, ToolCall, ToolMessage,
 };
 
 // Re-export tool types
