@@ -5,7 +5,7 @@ authors.workspace = true
 edition = "2024"
 
 [dependencies]
-agent-chain = { workspace = true }
+agent-chain = { workspace = true, features = ["anthropic", "openai", "ollama"] }
 agent-graph = { workspace = true }
 anyhow = { workspace = true }
 async_from = { workspace = true }
