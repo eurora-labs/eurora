@@ -42,12 +42,11 @@ impl PromptApi for PromptApiImpl {
         base_url: String,
         model: String,
     ) -> Result<(), String> {
-        let config = OllamaConfig::builder()
-            .model(model)
-            .base_url(base_url)
-            .expect("Failed to connect to Ollama")
-            .keep_alive(300)
-            .build();
+        let config = OllamaConfig {
+            model,
+            base_url: Some(base_url),
+            temperature: None,
+        };
 
         let state = app_handle.state::<SharedAppSettings>();
         let mut app_settings = state.lock().await;
