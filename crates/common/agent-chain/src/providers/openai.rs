@@ -56,7 +56,9 @@ use crate::chat_models::{
     UsageMetadata,
 };
 use crate::error::{Error, Result};
-use crate::messages::{AIMessage, BaseMessage, ToolCall};
+use crate::messages::{
+    AIMessage, BaseMessage, ContentPart, ImageDetail, ImageSource, MessageContent, ToolCall,
+};
 use crate::tools::ToolDefinition;
 
 /// Default API base URL for OpenAI.
@@ -364,9 +366,47 @@ impl ChatOpenAI {
                     })
                 }
                 BaseMessage::Human(m) => {
+                    let content = match m.message_content() {
+                        MessageContent::Text(text) => serde_json::json!(text),
+                        MessageContent::Parts(parts) => {
+                            let content_parts: Vec<serde_json::Value> = parts
+                                .iter()
+                                .map(|part| match part {
+                                    ContentPart::Text { text } => {
+                                        serde_json::json!({
+                                            "type": "text",
+                                            "text": text
+                                        })
+                                    }
+                                    ContentPart::Image { source, detail } => {
+                                        let url = match source {
+                                            ImageSource::Url { url } => url.clone(),
+                                            ImageSource::Base64 { media_type, data } => {
+                                                format!("data:{};base64,{}", media_type, data)
+                                            }
+                                        };
+                                        let mut image_url =
+                                            serde_json::json!({ "url": url });
+                                        if let Some(d) = detail {
+                                            image_url["detail"] = serde_json::json!(match d {
+                                                ImageDetail::Low => "low",
+                                                ImageDetail::High => "high",
+                                                ImageDetail::Auto => "auto",
+                                            });
+                                        }
+                                        serde_json::json!({
+                                            "type": "image_url",
+                                            "image_url": image_url
+                                        })
+                                    }
+                                })
+                                .collect();
+                            serde_json::Value::Array(content_parts)
+                        }
+                    };
                     serde_json::json!({
                         "role": "user",
-                        "content": m.content()
+                        "content": content
                     })
                 }
                 BaseMessage::AI(m) => {
@@ -756,9 +796,46 @@ impl ChatOpenAI {
                     }));
                 }
                 BaseMessage::Human(m) => {
+                    let content = match m.message_content() {
+                        MessageContent::Text(text) => serde_json::json!(text),
+                        MessageContent::Parts(parts) => {
+                            let content_parts: Vec<serde_json::Value> = parts
+                                .iter()
+                                .map(|part| match part {
+                                    ContentPart::Text { text } => {
+                                        serde_json::json!({
+                                            "type": "input_text",
+                                            "text": text
+                                        })
+                                    }
+                                    ContentPart::Image { source, detail } => {
+                                        let url = match source {
+                                            ImageSource::Url { url } => url.clone(),
+                                            ImageSource::Base64 { media_type, data } => {
+                                                format!("data:{};base64,{}", media_type, data)
+                                            }
+                                        };
+                                        let mut block = serde_json::json!({
+                                            "type": "input_image",
+                                            "image_url": url
+                                        });
+                                        if let Some(d) = detail {
+                                            block["detail"] = serde_json::json!(match d {
+                                                ImageDetail::Low => "low",
+                                                ImageDetail::High => "high",
+                                                ImageDetail::Auto => "auto",
+                                            });
+                                        }
+                                        block
+                                    }
+                                })
+                                .collect();
+                            serde_json::Value::Array(content_parts)
+                        }
+                    };
                     input.push(serde_json::json!({
                         "role": "user",
-                        "content": m.content()
+                        "content": content
                     }));
                 }
                 BaseMessage::AI(m) => {
