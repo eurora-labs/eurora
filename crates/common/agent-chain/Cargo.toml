@@ -20,6 +20,7 @@ tokio-util = { version = "0.7", features = ["io"] }
 uuid = { workspace = true, features = ["v4"] }
 
 [features]
-default = ["anthropic", "openai"]
+default = []
 anthropic = []
 openai = []
+ollama = []
