@@ -19,6 +19,10 @@ pub enum Error {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
+    /// IO error.
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
     /// API returned an error response.
     #[error("API error ({status}): {message}")]
     Api {

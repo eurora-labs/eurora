@@ -25,8 +25,12 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 
+use async_stream::try_stream;
 use async_trait::async_trait;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio_util::io::StreamReader;
 
 use crate::chat_models::{
     ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream, LangSmithParams, ToolChoice,
@@ -624,13 +628,84 @@ impl ChatModel for ChatOllama {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<ChatStream> {
-        let result = self.generate(messages, stop).await?;
-        let chunk = ChatChunk {
-            content: result.message.content().to_string(),
-            is_final: true,
-            metadata: Some(result.metadata),
+        let client = self.build_client();
+        let payload = self.build_request_payload(&messages, stop, None, true);
+        let base_url = self.get_base_url();
+        let model_name = self.model.clone();
+
+        let response = client
+            .post(format!("{}/api/chat", base_url))
+            .header("Content-Type", "application/json")
+            .json(&payload)
+            .send()
+            .await
+            .map_err(Error::Http)?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(Error::api(status, error_text));
+        }
+
+        let byte_stream = response
+            .bytes_stream()
+            .map(|result| result.map_err(std::io::Error::other));
+        let stream_reader = StreamReader::new(byte_stream);
+        let buf_reader = BufReader::new(stream_reader);
+        let mut lines = buf_reader.lines();
+
+        let stream = try_stream! {
+            while let Some(line) = lines.next_line().await.map_err(Error::Io)? {
+                if line.trim().is_empty() {
+                    continue;
+                }
+
+                let stream_resp: OllamaResponse = serde_json::from_str(&line)
+                    .map_err(Error::Json)?;
+
+                let content = stream_resp
+                    .message
+                    .as_ref()
+                    .and_then(|m| m.content.clone())
+                    .unwrap_or_default();
+
+                let is_done = stream_resp.done.unwrap_or(false);
+
+                // Skip responses with done_reason='load' and empty content
+                if is_done
+                    && stream_resp.done_reason.as_deref() == Some("load")
+                    && content.trim().is_empty()
+                {
+                    continue;
+                }
+
+                let metadata = if is_done {
+                    let usage = if let (Some(prompt_eval_count), Some(eval_count)) =
+                        (stream_resp.prompt_eval_count, stream_resp.eval_count)
+                    {
+                        Some(UsageMetadata::new(prompt_eval_count, eval_count))
+                    } else {
+                        None
+                    };
+
+                    Some(ChatResultMetadata {
+                        model: stream_resp.model.or_else(|| Some(model_name.clone())),
+                        stop_reason: stream_resp.done_reason,
+                        usage,
+                    })
+                } else {
+                    None
+                };
+
+                yield ChatChunk {
+                    content,
+                    is_final: is_done,
+                    metadata,
+                };
+            }
         };
-        Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })))
+
+        Ok(Box::pin(stream))
     }
 
     fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
