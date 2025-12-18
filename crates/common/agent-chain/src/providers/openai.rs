@@ -385,8 +385,7 @@ impl ChatOpenAI {
                                                 format!("data:{};base64,{}", media_type, data)
                                             }
                                         };
-                                        let mut image_url =
-                                            serde_json::json!({ "url": url });
+                                        let mut image_url = serde_json::json!({ "url": url });
                                         if let Some(d) = detail {
                                             image_url["detail"] = serde_json::json!(match d {
                                                 ImageDetail::Low => "low",
