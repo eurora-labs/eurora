@@ -2,8 +2,7 @@ mod error;
 mod service;
 pub use error::PromptKitError;
 pub use euro_llm::ProviderConfig;
-pub use euro_llm::openai::OpenAIConfig;
-pub use service::{OllamaConfig, PromptKitService};
+pub use service::{OllamaConfig, OpenAIConfig, PromptKitService};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub enum EurLLMService {
