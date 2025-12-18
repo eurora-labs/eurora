@@ -1,6 +1,7 @@
 use agent_chain::chat_models::ChatModel;
 use agent_chain::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
 use agent_chain::ollama::ChatOllama;
+use agent_chain::{ContentPart, ImageDetail, ImageSource};
 use anyhow::Result;
 use async_from::{AsyncTryFrom, async_trait};
 use euro_llm::openai::{OpenAIConfig, OpenAIProvider};
@@ -170,24 +171,37 @@ impl PromptKitService {
 
 /// Convert euro_llm::Message to agent_chain::BaseMessage
 fn convert_message_to_base_message(msg: Message) -> BaseMessage {
-    let content = match msg.content {
-        euro_llm::MessageContent::Text(text) => text,
-        euro_llm::MessageContent::Multimodal(parts) => {
-            // Extract text content from multimodal parts
-            parts
-                .into_iter()
-                .filter_map(|part| match part {
-                    euro_llm::ContentPart::Text { text } => Some(text),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-        }
-        euro_llm::MessageContent::Tool(tool_content) => tool_content.text.unwrap_or_default(),
-    };
-
     match msg.role {
-        Role::User => HumanMessage::new(content).into(),
+        Role::User => match msg.content {
+            euro_llm::MessageContent::Text(text) => HumanMessage::new(text).into(),
+            euro_llm::MessageContent::Multimodal(parts) => {
+                let test = parts
+                    .into_iter()
+                    .map(|part| match part {
+                        euro_llm::ContentPart::Text { text } => ContentPart::Text { text },
+                        euro_llm::ContentPart::Image {
+                            image_source,
+                            detail,
+                        } => match image_source {
+                            euro_llm::ImageSource::Url(url) => ContentPart::Image {
+                                source: ImageSource::Url { url },
+                                detail: Some(ImageDetail::default()),
+                            },
+                            _ => {
+                                panic!("Unsupported image source")
+                            }
+                        },
+                        _ => {
+                            panic!("Unsupported content part")
+                        }
+                    })
+                    .collect();
+                HumanMessage::with_content(test).into()
+            }
+            euro_llm::MessageContent::Tool(tool_content) => {
+                HumanMessage::new(tool_content.text.unwrap_or_default()).into()
+            }
+        },
         Role::Assistant => AIMessage::new(content).into(),
         Role::System => SystemMessage::new(content).into(),
         Role::Tool => {
@@ -196,6 +210,32 @@ fn convert_message_to_base_message(msg: Message) -> BaseMessage {
             AIMessage::new(content).into()
         }
     }
+    // let content = match msg.content {
+    //     euro_llm::MessageContent::Text(text) => {}
+    //     euro_llm::MessageContent::Multimodal(parts) => {
+    //         // Extract text content from multimodal parts
+    //         parts
+    //             .into_iter()
+    //             .filter_map(|part| match part {
+    //                 euro_llm::ContentPart::Text { text } => Some(text),
+    //                 _ => None,
+    //             })
+    //             .collect::<Vec<_>>()
+    //             .join("\n")
+    //     }
+    //     euro_llm::MessageContent::Tool(tool_content) => tool_content.text.unwrap_or_default(),
+    // };
+
+    // match msg.role {
+    //     Role::User => HumanMessage::new(content).into(),
+    //     Role::Assistant => AIMessage::new(content).into(),
+    //     Role::System => SystemMessage::new(content).into(),
+    //     Role::Tool => {
+    //         // For tool messages, we'll convert to AI message with the content
+    //         // In a more complete implementation, you'd use ToolMessage
+    //         AIMessage::new(content).into()
+    //     }
+    // }
 }
 
 impl From<OpenAIConfig> for PromptKitService {
