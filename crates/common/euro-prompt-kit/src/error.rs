@@ -1,12 +1,8 @@
-use euro_llm::openai::OpenAIError;
 use euro_llm_eurora::EuroraError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum PromptKitError {
-    #[error("{0}")]
-    OpenAIError(OpenAIError),
-
     #[error("{0}")]
     AgentChainError(#[from] agent_chain::Error),
 
