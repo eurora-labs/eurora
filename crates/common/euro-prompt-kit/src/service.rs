@@ -146,7 +146,7 @@ impl PromptKitService {
             // Convert euro_llm::Message to agent_chain::BaseMessage
             let base_messages: Vec<BaseMessage> = messages
                 .into_iter()
-                .map(|msg| convert_message_to_base_message(msg))
+                .map(convert_message_to_base_message)
                 .collect();
 
             let stream = llm
