@@ -5,6 +5,11 @@ authors.workspace = true
 edition = "2024"
 
 [dependencies]
+serde = {workspace = true, features = ["derive"]}
+agent-chain = { workspace = true }
+agent-chain-macros = { workspace = true }
+agent-graph = { workspace = true }
+agent-graph-macros = { workspace = true }
 anyhow = { workspace = true }
 # euro-proto-client = { workspace = true }
 async_from = { workspace = true }

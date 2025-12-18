@@ -1,4 +1,4 @@
-use euro_llm::{ollama::OllamaError, openai::OpenAIError};
+use euro_llm::openai::OpenAIError;
 use euro_llm_eurora::EuroraError;
 use thiserror::Error;
 
@@ -8,7 +8,7 @@ pub enum PromptKitError {
     OpenAIError(OpenAIError),
 
     #[error("{0}")]
-    OllamaError(OllamaError),
+    AgentChainError(#[from] agent_chain::Error),
 
     #[error("{0}")]
     EuroraError(EuroraError),
