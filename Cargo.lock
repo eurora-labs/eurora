@@ -248,8 +248,6 @@ dependencies = [
  "agent-chain-macros",
  "async-stream",
  "async-trait",
- "base64 0.22.1",
- "chrono",
  "futures",
  "reqwest 0.12.24",
  "serde",
@@ -257,7 +255,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-util",
- "url",
  "uuid",
 ]
 
@@ -277,15 +274,11 @@ dependencies = [
  "agent-chain",
  "agent-graph-macros",
  "async-trait",
- "base64 0.22.1",
- "chrono",
  "futures",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
  "tokio",
- "url",
- "uuid",
 ]
 
 [[package]]
@@ -3294,7 +3287,6 @@ name = "euro-focus"
 version = "0.2.0"
 dependencies = [
  "accessibility-sys",
- "base64 0.22.1",
  "cocoa",
  "core-foundation 0.10.1",
  "core-graphics 0.25.0",
@@ -3500,20 +3492,13 @@ name = "euro-prompt-kit"
 version = "0.0.0"
 dependencies = [
  "agent-chain",
- "agent-chain-macros",
  "agent-graph",
- "agent-graph-macros",
  "anyhow",
  "async_from",
  "euro-llm",
  "euro-llm-eurora",
- "euro-proto",
- "futures",
- "image",
- "regex",
  "serde",
  "thiserror 2.0.17",
- "tokio",
  "tokio-stream",
  "tracing",
 ]
@@ -3545,12 +3530,9 @@ dependencies = [
 name = "euro-proto"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "prost",
  "prost-types",
  "serde",
- "specta",
- "tokio",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
