@@ -19,6 +19,29 @@
 //! let messages = vec![HumanMessage::new("What is the latest news?").into()];
 //! let response = model.generate(messages, None).await?;
 //! ```
+//!
+//! # Streaming with Responses API
+//!
+//! The Responses API also supports streaming for real-time token output:
+//!
+//! ```ignore
+//! use agent_chain::providers::ChatOpenAI;
+//! use agent_chain::providers::openai::BuiltinTool;
+//! use futures::StreamExt;
+//!
+//! let model = ChatOpenAI::new("gpt-4o")
+//!     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
+//!
+//! let messages = vec![HumanMessage::new("What is the latest news?").into()];
+//! let mut stream = model.stream(messages, None).await?;
+//!
+//! while let Some(chunk) = stream.next().await {
+//!     match chunk {
+//!         Ok(c) => print!("{}", c.content),
+//!         Err(e) => eprintln!("Error: {}", e),
+//!     }
+//! }
+//! ```
 
 use std::collections::HashMap;
 use std::env;
@@ -452,6 +475,81 @@ impl ChatOpenAI {
         messages: &[BaseMessage],
         stop: Option<Vec<String>>,
         tools: Option<&[serde_json::Value]>,
+        stream: bool,
+    ) -> serde_json::Value {
+        let input = self.format_messages_for_responses_api(messages);
+
+        let mut payload = serde_json::json!({
+            "model": self.model,
+            "input": input
+        });
+
+        if let Some(max_tokens) = self.max_tokens {
+            payload["max_output_tokens"] = serde_json::json!(max_tokens);
+        }
+
+        if let Some(temp) = self.temperature {
+            payload["temperature"] = serde_json::json!(temp);
+        }
+
+        if let Some(p) = self.top_p {
+            payload["top_p"] = serde_json::json!(p);
+        }
+
+        let stop_sequences = stop.or_else(|| self.stop.clone());
+        if let Some(stop) = stop_sequences {
+            payload["stop"] = serde_json::json!(stop);
+        }
+
+        // Add built-in tools
+        let mut all_tools: Vec<serde_json::Value> = self
+            .builtin_tools
+            .iter()
+            .map(|t| t.to_api_format())
+            .collect();
+
+        // Add function tools
+        if let Some(tools) = tools {
+            for tool in tools {
+                // Convert from Chat Completions format to Responses API format
+                if let Some(function) = tool.get("function") {
+                    all_tools.push(serde_json::json!({
+                        "type": "function",
+                        "name": function.get("name"),
+                        "description": function.get("description"),
+                        "parameters": function.get("parameters")
+                    }));
+                } else {
+                    all_tools.push(tool.clone());
+                }
+            }
+        }
+
+        if !all_tools.is_empty() {
+            payload["tools"] = serde_json::Value::Array(all_tools);
+        }
+
+        if stream {
+            payload["stream"] = serde_json::json!(true);
+        }
+
+        // Add any additional model kwargs
+        if let serde_json::Value::Object(ref mut obj) = payload {
+            for (k, v) in &self.model_kwargs {
+                obj.insert(k.clone(), v.clone());
+            }
+        }
+
+        payload
+    }
+
+    /// Build the request payload for the Responses API (non-streaming).
+    #[allow(dead_code)]
+    fn build_responses_api_payload_non_streaming(
+        &self,
+        messages: &[BaseMessage],
+        stop: Option<Vec<String>>,
+        tools: Option<&[serde_json::Value]>,
     ) -> serde_json::Value {
         let input = self.format_messages_for_responses_api(messages);
 
@@ -513,6 +611,133 @@ impl ChatOpenAI {
         }
 
         payload
+    }
+
+    /// Stream responses using the Responses API.
+    async fn stream_responses_api(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+    ) -> Result<ChatStream> {
+        let api_key = self.get_api_key()?;
+        let client = self.build_client();
+        let payload = self.build_responses_api_payload(&messages, stop, None, true);
+
+        let mut request = client
+            .post(format!("{}/responses", self.api_base))
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json");
+
+        if let Some(ref org) = self.organization {
+            request = request.header("OpenAI-Organization", org);
+        }
+
+        let response = request.json(&payload).send().await.map_err(Error::Http)?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(Error::api(status, error_text));
+        }
+
+        let model = self.model.clone();
+        let stream = async_stream::stream! {
+            let mut bytes_stream = response.bytes_stream();
+            let mut buffer = String::new();
+            let mut accumulated_text = String::new();
+            let mut usage: Option<UsageMetadata> = None;
+            let mut annotations: Vec<TextAnnotation> = Vec::new();
+
+            use futures::StreamExt;
+
+            while let Some(chunk_result) = bytes_stream.next().await {
+                match chunk_result {
+                    Ok(bytes) => {
+                        buffer.push_str(&String::from_utf8_lossy(&bytes));
+
+                        // Process complete SSE events (lines ending with \n\n or single \n for data lines)
+                        while let Some(line_end) = buffer.find('\n') {
+                            let line = buffer[..line_end].to_string();
+                            buffer = buffer[line_end + 1..].to_string();
+
+                            // Skip empty lines
+                            if line.is_empty() || line == "\r" {
+                                continue;
+                            }
+
+                            // Parse SSE data lines
+                            if let Some(data) = line.strip_prefix("data: ") {
+                                if data == "[DONE]" {
+                                    // Final chunk with metadata
+                                    yield Ok(ChatChunk {
+                                        content: String::new(),
+                                        is_final: true,
+                                        metadata: Some(ChatResultMetadata {
+                                            model: Some(model.clone()),
+                                            stop_reason: Some("stop".to_string()),
+                                            usage: usage.clone(),
+                                        }),
+                                    });
+                                    continue;
+                                }
+
+                                // Parse the JSON event
+                                if let Ok(event) = serde_json::from_str::<ResponsesStreamEvent>(data) {
+                                    match event.event_type.as_str() {
+                                        "response.output_text.delta" => {
+                                            // Text content delta
+                                            if let Some(delta) = event.delta {
+                                                accumulated_text.push_str(&delta);
+                                                yield Ok(ChatChunk {
+                                                    content: delta,
+                                                    is_final: false,
+                                                    metadata: None,
+                                                });
+                                            }
+                                        }
+                                        "response.output_text.annotation.added" => {
+                                            // Annotation added
+                                            if let Some(annotation) = event.annotation {
+                                                annotations.push(annotation);
+                                            }
+                                        }
+                                        "response.completed" | "response.incomplete" => {
+                                            // Response complete - extract usage from the response
+                                            if let Some(resp) = event.response && let Some(resp_usage) = resp.usage {
+                                                    usage = Some(UsageMetadata::new(
+                                                        resp_usage.input_tokens,
+                                                        resp_usage.output_tokens,
+                                                    ));
+                                            }
+                                            // Final chunk
+                                            yield Ok(ChatChunk {
+                                                content: String::new(),
+                                                is_final: true,
+                                                metadata: Some(ChatResultMetadata {
+                                                    model: Some(model.clone()),
+                                                    stop_reason: Some("stop".to_string()),
+                                                    usage: usage.clone(),
+                                                }),
+                                            });
+                                        }
+                                        _ => {
+                                            // Other event types (response.created, response.output_item.added, etc.)
+                                            // We don't need to handle these for basic streaming
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        yield Err(Error::Http(e));
+                        break;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
     }
 
     /// Format messages for the Responses API.
@@ -694,7 +919,7 @@ impl ChatOpenAI {
     ) -> Result<ChatResult> {
         let api_key = self.get_api_key()?;
         let client = self.build_client();
-        let payload = self.build_responses_api_payload(&messages, stop, None);
+        let payload = self.build_responses_api_payload(&messages, stop, None, false);
 
         let mut last_error = None;
         for _ in 0..=self.max_retries {
@@ -845,7 +1070,8 @@ impl ChatModel for ChatOpenAI {
         if self.use_responses_api || !self.builtin_tools.is_empty() {
             let api_key = self.get_api_key()?;
             let client = self.build_client();
-            let payload = self.build_responses_api_payload(&messages, stop, Some(&openai_tools));
+            let payload =
+                self.build_responses_api_payload(&messages, stop, Some(&openai_tools), false);
 
             let mut last_error = None;
             for _ in 0..=self.max_retries {
@@ -974,6 +1200,11 @@ impl ChatModel for ChatOpenAI {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<ChatStream> {
+        // Use Responses API if enabled or if using built-in tools
+        if self.use_responses_api || !self.builtin_tools.is_empty() {
+            return self.stream_responses_api(messages, stop).await;
+        }
+
         let api_key = self.get_api_key()?;
         let client = self.build_client();
         let payload = self.build_request_payload(&messages, stop, None, true);
@@ -1219,6 +1450,54 @@ enum ResponsesContent {
 struct ResponsesUsage {
     input_tokens: u32,
     output_tokens: u32,
+}
+
+/// Responses API streaming event.
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct ResponsesStreamEvent {
+    /// Event type (e.g., "response.output_text.delta", "response.completed")
+    #[serde(rename = "type")]
+    event_type: String,
+    /// Delta text content (for text delta events)
+    #[serde(default)]
+    delta: Option<String>,
+    /// Annotation (for annotation events)
+    #[serde(default)]
+    annotation: Option<TextAnnotation>,
+    /// Response object (for completed/incomplete events)
+    #[serde(default)]
+    response: Option<ResponsesStreamResponse>,
+    /// Output index
+    #[serde(default)]
+    output_index: Option<u32>,
+    /// Content index
+    #[serde(default)]
+    content_index: Option<u32>,
+    /// Item ID
+    #[serde(default)]
+    item_id: Option<String>,
+}
+
+/// Response object in streaming events.
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct ResponsesStreamResponse {
+    /// Response ID
+    #[serde(default)]
+    id: Option<String>,
+    /// Model used
+    #[serde(default)]
+    model: Option<String>,
+    /// Usage information
+    #[serde(default)]
+    usage: Option<ResponsesUsage>,
+    /// Output items
+    #[serde(default)]
+    output: Option<Vec<serde_json::Value>>,
+    /// Status
+    #[serde(default)]
+    status: Option<String>,
 }
 
 #[cfg(test)]
