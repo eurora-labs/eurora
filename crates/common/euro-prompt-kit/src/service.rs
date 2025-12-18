@@ -1,10 +1,9 @@
 use agent_chain::chat_models::ChatModel;
 use agent_chain::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
 use agent_chain::ollama::ChatOllama;
-use agent_chain::{ContentPart, ImageDetail, ImageSource};
+use agent_chain::{ChatOpenAI, ContentPart, ImageDetail, ImageSource};
 use anyhow::Result;
 use async_from::{AsyncTryFrom, async_trait};
-use euro_llm::openai::{OpenAIConfig, OpenAIProvider};
 use euro_llm::{ChatRequest, Message, Role};
 use euro_llm_eurora::{EuroraConfig, EuroraStreamingProvider, StreamingProvider};
 use serde::{Deserialize, Serialize};
@@ -12,6 +11,59 @@ use tokio_stream::{Stream, StreamExt};
 use tracing::info;
 
 use crate::PromptKitError;
+
+/// Configuration for OpenAI provider using agent-chain
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIConfig {
+    /// Model name (e.g., "gpt-4o", "gpt-4-turbo")
+    pub model: String,
+    /// API key for authentication
+    pub api_key: Option<String>,
+    /// Base URL for OpenAI API (default: https://api.openai.com/v1)
+    pub base_url: Option<String>,
+    /// Temperature for generation
+    pub temperature: Option<f64>,
+    /// Maximum tokens to generate
+    pub max_tokens: Option<u32>,
+}
+
+impl Default for OpenAIConfig {
+    fn default() -> Self {
+        Self {
+            model: "gpt-4o".to_string(),
+            api_key: None,
+            base_url: None,
+            temperature: None,
+            max_tokens: None,
+        }
+    }
+}
+
+impl OpenAIConfig {
+    /// Create a new OpenAI config with the given API key and model
+    pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
+        Self {
+            model: model.into(),
+            api_key: Some(api_key.into()),
+            base_url: None,
+            temperature: None,
+            max_tokens: None,
+        }
+    }
+
+    /// Load configuration from environment variables
+    pub fn from_env() -> Result<Self, std::env::VarError> {
+        let api_key = std::env::var("OPENAI_API_KEY")?;
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
+        Ok(Self {
+            model,
+            api_key: Some(api_key),
+            base_url: std::env::var("OPENAI_BASE_URL").ok(),
+            temperature: None,
+            max_tokens: None,
+        })
+    }
+}
 
 /// Configuration for Ollama provider using agent-chain
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +88,7 @@ impl Default for OllamaConfig {
 
 #[derive(Debug, Clone)]
 enum LLMProvider {
-    OpenAI(OpenAIProvider),
+    OpenAI(ChatOpenAI),
     Ollama(ChatOllama),
     Eurora(EuroraStreamingProvider),
 }
@@ -49,7 +101,7 @@ pub struct PromptKitService {
 impl Default for PromptKitService {
     fn default() -> Self {
         Self {
-            provider: LLMProvider::OpenAI(OpenAIProvider::new(OpenAIConfig::default()).unwrap()),
+            provider: LLMProvider::OpenAI(ChatOpenAI::new("gpt-4o")),
         }
     }
 }
@@ -113,18 +165,24 @@ impl PromptKitService {
         std::pin::Pin<Box<dyn Stream<Item = Result<String, PromptKitError>> + Send>>,
         PromptKitError,
     > {
-        if let LLMProvider::OpenAI(provider) = &self.provider {
-            let request = ChatRequest {
-                messages,
-                parameters: Default::default(),
-                metadata: Default::default(),
-            };
+        if let LLMProvider::OpenAI(llm) = &self.provider {
+            info!("Starting OpenAI chat stream with agent-chain");
 
-            let stream = provider
-                .chat_stream(request)
+            // Convert euro_llm::Message to agent_chain::BaseMessage
+            let base_messages: Vec<BaseMessage> = messages
+                .into_iter()
+                .map(convert_message_to_base_message)
+                .collect();
+
+            let stream = llm
+                .stream(base_messages, None)
                 .await
-                .map_err(PromptKitError::OpenAIError)?
-                .map(|result| result.map_err(PromptKitError::OpenAIError));
+                .map_err(PromptKitError::AgentChainError)?
+                .map(|result| {
+                    result
+                        .map(|chunk| chunk.content)
+                        .map_err(PromptKitError::AgentChainError)
+                });
 
             Ok(Box::pin(stream))
         } else {
@@ -272,10 +330,26 @@ fn convert_image_source_to_content_part(image_source: euro_llm::ImageSource) -> 
 
 impl From<OpenAIConfig> for PromptKitService {
     fn from(config: OpenAIConfig) -> Self {
-        let provider =
-            OpenAIProvider::new(config.clone()).expect("Failed to create OpenAI provider");
+        let mut llm = ChatOpenAI::new(&config.model);
+
+        if let Some(api_key) = config.api_key {
+            llm = llm.api_key(api_key);
+        }
+
+        if let Some(base_url) = config.base_url {
+            llm = llm.api_base(base_url);
+        }
+
+        if let Some(temp) = config.temperature {
+            llm = llm.temperature(temp);
+        }
+
+        if let Some(max_tokens) = config.max_tokens {
+            llm = llm.max_tokens(max_tokens);
+        }
+
         Self {
-            provider: LLMProvider::OpenAI(provider),
+            provider: LLMProvider::OpenAI(llm),
         }
     }
 }
