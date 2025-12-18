@@ -54,13 +54,6 @@ pub mod messages;
 pub mod providers;
 pub mod tools;
 
-/// Ollama provider module.
-///
-/// This module re-exports the Ollama chat model implementation.
-pub mod ollama {
-    pub use crate::providers::{BoundChatOllama, ChatOllama, MessageWithAny, OllamaFormat};
-}
-
 // Re-export error types
 pub use error::{Error, Result};
 
@@ -80,10 +73,7 @@ pub use messages::{
 pub use tools::{Tool, ToolDefinition, tool};
 
 // Re-export providers
-pub use providers::{
-    BoundChatOllama, BuiltinTool, ChatAnthropic, ChatOllama, ChatOpenAI, ContentBlock,
-    MessageWithAny, OllamaFormat, SUPPORTED_PROVIDERS, TextAnnotation, infer_provider, parse_model,
-};
+pub use providers::*;
 
 // Re-export async_trait for use in generated code
 pub use async_trait::async_trait;
@@ -150,13 +140,10 @@ pub fn init_chat_model(
     let (model_name, provider) = parse_model(&model, model_provider)?;
 
     match provider.as_str() {
-        "anthropic" => Ok(Arc::new(ChatAnthropic::new(model_name))),
-        "openai" => Ok(Arc::new(ChatOpenAI::new(model_name))),
-        "azure_openai" => {
-            // Azure OpenAI uses the same client with different base URL
-            // For now, return regular OpenAI client - user should configure base_url
-            Ok(Arc::new(ChatOpenAI::new(model_name)))
-        }
+        #[cfg(feature = "anthropic")]
+        "anthropic" => Ok(Arc::new(anthropic::ChatAnthropic::new(model_name))),
+        #[cfg(feature = "openai")]
+        "openai" => Ok(Arc::new(openai::ChatOpenAI::new(model_name))),
         _ => Err(Error::unsupported_provider(provider)),
     }
 }
@@ -236,8 +223,9 @@ impl ChatModelBuilder {
         let (model_name, provider) = parse_model(&self.model, self.provider.as_deref())?;
 
         match provider.as_str() {
+            #[cfg(feature = "anthropic")]
             "anthropic" => {
-                let mut model = ChatAnthropic::new(model_name);
+                let mut model = anthropic::ChatAnthropic::new(model_name);
                 if let Some(temp) = self.temperature {
                     model = model.temperature(temp);
                 }
@@ -252,8 +240,9 @@ impl ChatModelBuilder {
                 }
                 Ok(Arc::new(model))
             }
+            #[cfg(feature = "openai")]
             "openai" | "azure_openai" => {
-                let mut model = ChatOpenAI::new(model_name);
+                let mut model = openai::ChatOpenAI::new(model_name);
                 if let Some(temp) = self.temperature {
                     model = model.temperature(temp);
                 }

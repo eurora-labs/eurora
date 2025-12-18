@@ -3,13 +3,14 @@
 //! This module contains provider-specific implementations of the `ChatModel` trait.
 //! Each provider is implemented in its own submodule.
 
-mod anthropic;
-mod ollama;
-mod openai;
+#[cfg(feature = "anthropic")]
+pub mod anthropic;
 
-pub use anthropic::ChatAnthropic;
-pub use ollama::{BoundChatOllama, ChatOllama, MessageWithAny, OllamaFormat};
-pub use openai::{BuiltinTool, ChatOpenAI, ContentBlock, TextAnnotation};
+#[cfg(feature = "ollama")]
+pub mod ollama;
+
+#[cfg(feature = "openai")]
+pub mod openai;
 
 use crate::error::{Error, Result};
 
