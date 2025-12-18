@@ -2,10 +2,106 @@
 //!
 //! This module provides message types for different roles (human, AI, system, tool)
 //! as well as types for tool calls.
+//!
+//! # Multimodal Support
+//!
+//! The [`HumanMessage`] type supports multimodal content including text and images.
+//! Images can be provided as URLs or base64-encoded data.
+//!
+//! ```ignore
+//! use agent_chain::messages::{HumanMessage, ContentPart, ImageSource};
+//!
+//! // Simple text message
+//! let msg = HumanMessage::new("Hello!");
+//!
+//! // Message with image from URL
+//! let msg = HumanMessage::with_content(vec![
+//!     ContentPart::Text { text: "What's in this image?".into() },
+//!     ContentPart::Image {
+//!         source: ImageSource::Url {
+//!             url: "https://example.com/image.jpg".into(),
+//!         },
+//!         detail: None,
+//!     },
+//! ]);
+//!
+//! // Message with base64-encoded image
+//! let msg = HumanMessage::with_content(vec![
+//!     ContentPart::Text { text: "Describe this image".into() },
+//!     ContentPart::Image {
+//!         source: ImageSource::Base64 {
+//!             media_type: "image/jpeg".into(),
+//!             data: base64_image_data,
+//!         },
+//!         detail: Some(ImageDetail::High),
+//!     },
+//! ]);
+//! ```
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
+
+/// Image detail level for vision models.
+///
+/// This controls how the model processes the image:
+/// - `Low`: Faster, lower token cost, suitable for simple images
+/// - `High`: More detailed analysis, higher token cost
+/// - `Auto`: Let the model decide based on image size
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageDetail {
+    Low,
+    High,
+    #[default]
+    Auto,
+}
+
+/// Source of an image for multimodal messages.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ImageSource {
+    /// Image from a URL.
+    Url { url: String },
+    /// Base64-encoded image data.
+    Base64 {
+        /// MIME type (e.g., "image/jpeg", "image/png", "image/gif", "image/webp")
+        media_type: String,
+        /// Base64-encoded image data (without the data URL prefix)
+        data: String,
+    },
+}
+
+/// A content part in a multimodal message.
+///
+/// Messages can contain multiple content parts, allowing for mixed text and images.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContentPart {
+    /// Text content.
+    Text { text: String },
+    /// Image content.
+    Image {
+        source: ImageSource,
+        /// Detail level for image processing (optional, defaults to Auto)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        detail: Option<ImageDetail>,
+    },
+}
+
+impl From<&str> for ContentPart {
+    fn from(text: &str) -> Self {
+        ContentPart::Text {
+            text: text.to_string(),
+        }
+    }
+}
+
+impl From<String> for ContentPart {
+    fn from(text: String) -> Self {
+        ContentPart::Text { text }
+    }
+}
 
 /// A tool call made by the AI model.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -57,11 +153,78 @@ impl ToolCall {
     }
 }
 
+/// Message content that can be either simple text or multipart.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum MessageContent {
+    /// Simple text content.
+    Text(String),
+    /// Multiple content parts (for multimodal messages).
+    Parts(Vec<ContentPart>),
+}
+
+impl MessageContent {
+    /// Get the text content, concatenating text parts if multipart.
+    pub fn as_text(&self) -> String {
+        match self {
+            MessageContent::Text(s) => s.clone(),
+            MessageContent::Parts(parts) => parts
+                .iter()
+                .filter_map(|p| match p {
+                    ContentPart::Text { text } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join(" "),
+        }
+    }
+
+    /// Check if this content has any images.
+    pub fn has_images(&self) -> bool {
+        match self {
+            MessageContent::Text(_) => false,
+            MessageContent::Parts(parts) => {
+                parts.iter().any(|p| matches!(p, ContentPart::Image { .. }))
+            }
+        }
+    }
+
+    /// Get content parts, converting simple text to a single text part if needed.
+    pub fn parts(&self) -> Vec<ContentPart> {
+        match self {
+            MessageContent::Text(s) => vec![ContentPart::Text { text: s.clone() }],
+            MessageContent::Parts(parts) => parts.clone(),
+        }
+    }
+}
+
+impl From<String> for MessageContent {
+    fn from(s: String) -> Self {
+        MessageContent::Text(s)
+    }
+}
+
+impl From<&str> for MessageContent {
+    fn from(s: &str) -> Self {
+        MessageContent::Text(s.to_string())
+    }
+}
+
+impl From<Vec<ContentPart>> for MessageContent {
+    fn from(parts: Vec<ContentPart>) -> Self {
+        MessageContent::Parts(parts)
+    }
+}
+
 /// A human message in the conversation.
+///
+/// Human messages support both simple text content and multimodal content
+/// with images. Use [`HumanMessage::new`] for simple text messages and
+/// [`HumanMessage::with_content`] for multimodal messages.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HumanMessage {
-    /// The message content
-    content: String,
+    /// The message content (text or multipart)
+    content: MessageContent,
     /// Optional unique identifier
     id: Option<String>,
     /// Additional metadata
@@ -70,18 +233,87 @@ pub struct HumanMessage {
 }
 
 impl HumanMessage {
-    /// Create a new human message.
+    /// Create a new human message with simple text content.
     pub fn new(content: impl Into<String>) -> Self {
         Self {
-            content: content.into(),
+            content: MessageContent::Text(content.into()),
             id: Some(Uuid::new_v4().to_string()),
             additional_kwargs: HashMap::new(),
         }
     }
 
-    /// Get the message content.
+    /// Create a new human message with multipart content.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use agent_chain::messages::{HumanMessage, ContentPart, ImageSource};
+    ///
+    /// let msg = HumanMessage::with_content(vec![
+    ///     ContentPart::Text { text: "What's in this image?".into() },
+    ///     ContentPart::Image {
+    ///         source: ImageSource::Url {
+    ///             url: "https://example.com/image.jpg".into(),
+    ///         },
+    ///         detail: None,
+    ///     },
+    /// ]);
+    /// ```
+    pub fn with_content(parts: Vec<ContentPart>) -> Self {
+        Self {
+            content: MessageContent::Parts(parts),
+            id: Some(Uuid::new_v4().to_string()),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
+    /// Create a human message with text and a single image from a URL.
+    pub fn with_image_url(text: impl Into<String>, url: impl Into<String>) -> Self {
+        Self::with_content(vec![
+            ContentPart::Text { text: text.into() },
+            ContentPart::Image {
+                source: ImageSource::Url { url: url.into() },
+                detail: None,
+            },
+        ])
+    }
+
+    /// Create a human message with text and a single base64-encoded image.
+    pub fn with_image_base64(
+        text: impl Into<String>,
+        media_type: impl Into<String>,
+        data: impl Into<String>,
+    ) -> Self {
+        Self::with_content(vec![
+            ContentPart::Text { text: text.into() },
+            ContentPart::Image {
+                source: ImageSource::Base64 {
+                    media_type: media_type.into(),
+                    data: data.into(),
+                },
+                detail: None,
+            },
+        ])
+    }
+
+    /// Get the message content as text.
+    ///
+    /// For multipart messages, this concatenates all text parts.
     pub fn content(&self) -> &str {
+        match &self.content {
+            MessageContent::Text(s) => s,
+            MessageContent::Parts(_) => "",
+        }
+    }
+
+    /// Get the full message content (text or multipart).
+    pub fn message_content(&self) -> &MessageContent {
         &self.content
+    }
+
+    /// Check if this message contains images.
+    pub fn has_images(&self) -> bool {
+        self.content.has_images()
     }
 
     /// Get the message ID.
