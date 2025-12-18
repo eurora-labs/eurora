@@ -74,7 +74,7 @@ impl BackendSettings {
                     )
                     .map_err(|e| format!("Failed to retrieve OpenAI API key: {e}"))?
                     {
-                        config.api_key = api_key.0.clone().into();
+                        config.api_key = Some(api_key.0.clone());
                         config.base_url = None;
                     } else {
                         return Err("No OpenAI API key provided".to_string());
