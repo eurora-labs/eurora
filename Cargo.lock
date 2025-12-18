@@ -256,6 +256,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.17",
  "tokio",
+ "tokio-util",
  "url",
  "uuid",
 ]
@@ -3498,6 +3499,10 @@ dependencies = [
 name = "euro-prompt-kit"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
+ "agent-chain-macros",
+ "agent-graph",
+ "agent-graph-macros",
  "anyhow",
  "async_from",
  "euro-llm",
