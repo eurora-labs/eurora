@@ -75,6 +75,6 @@
 		"postcss-nesting": "^13.0.2",
 		"postcss-pxtorem": "^6.1.0",
 		"@storybook/addon-svelte-csf": "^5.0.10",
-		"storybook": "^8.6.12"
+		"storybook": "^8.6.15"
 	}
 }
