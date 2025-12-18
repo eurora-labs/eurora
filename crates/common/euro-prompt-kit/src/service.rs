@@ -171,71 +171,103 @@ impl PromptKitService {
 
 /// Convert euro_llm::Message to agent_chain::BaseMessage
 fn convert_message_to_base_message(msg: Message) -> BaseMessage {
+    // Helper function to extract text content from MessageContent
+    fn extract_text_content(content: euro_llm::MessageContent) -> String {
+        match content {
+            euro_llm::MessageContent::Text(text) => text,
+            euro_llm::MessageContent::Multimodal(parts) => {
+                // Extract text content from multimodal parts
+                parts
+                    .into_iter()
+                    .filter_map(|part| match part {
+                        euro_llm::ContentPart::Text { text } => Some(text),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }
+            euro_llm::MessageContent::Tool(tool_content) => tool_content.text.unwrap_or_default(),
+        }
+    }
+
     match msg.role {
         Role::User => match msg.content {
             euro_llm::MessageContent::Text(text) => HumanMessage::new(text).into(),
             euro_llm::MessageContent::Multimodal(parts) => {
-                let test = parts
+                let content_parts = parts
                     .into_iter()
                     .map(|part| match part {
                         euro_llm::ContentPart::Text { text } => ContentPart::Text { text },
                         euro_llm::ContentPart::Image {
                             image_source,
-                            detail,
-                        } => match image_source {
-                            euro_llm::ImageSource::Url(url) => ContentPart::Image {
-                                source: ImageSource::Url { url },
-                                detail: Some(ImageDetail::default()),
-                            },
-                            _ => {
-                                panic!("Unsupported image source")
+                            detail: _,
+                        } => convert_image_source_to_content_part(image_source),
+                        euro_llm::ContentPart::Audio { .. } => {
+                            // Audio not directly supported, skip or convert to placeholder
+                            ContentPart::Text {
+                                text: "[Audio content]".to_string(),
                             }
-                        },
-                        _ => {
-                            panic!("Unsupported content part")
                         }
                     })
                     .collect();
-                HumanMessage::with_content(test).into()
+                HumanMessage::with_content(content_parts).into()
             }
             euro_llm::MessageContent::Tool(tool_content) => {
                 HumanMessage::new(tool_content.text.unwrap_or_default()).into()
             }
         },
-        Role::Assistant => AIMessage::new(content).into(),
-        Role::System => SystemMessage::new(content).into(),
+        Role::Assistant => {
+            let content = extract_text_content(msg.content);
+            AIMessage::new(content).into()
+        }
+        Role::System => {
+            let content = extract_text_content(msg.content);
+            SystemMessage::new(content).into()
+        }
         Role::Tool => {
             // For tool messages, we'll convert to AI message with the content
             // In a more complete implementation, you'd use ToolMessage
+            let content = extract_text_content(msg.content);
             AIMessage::new(content).into()
         }
     }
-    // let content = match msg.content {
-    //     euro_llm::MessageContent::Text(text) => {}
-    //     euro_llm::MessageContent::Multimodal(parts) => {
-    //         // Extract text content from multimodal parts
-    //         parts
-    //             .into_iter()
-    //             .filter_map(|part| match part {
-    //                 euro_llm::ContentPart::Text { text } => Some(text),
-    //                 _ => None,
-    //             })
-    //             .collect::<Vec<_>>()
-    //             .join("\n")
-    //     }
-    //     euro_llm::MessageContent::Tool(tool_content) => tool_content.text.unwrap_or_default(),
-    // };
+}
 
-    // match msg.role {
-    //     Role::User => HumanMessage::new(content).into(),
-    //     Role::Assistant => AIMessage::new(content).into(),
-    //     Role::System => SystemMessage::new(content).into(),
-    //     Role::Tool => {
-    //         // For tool messages, we'll convert to AI message with the content
-    //         // In a more complete implementation, you'd use ToolMessage
-    //         AIMessage::new(content).into()
-    //     }
-    // }
+/// Convert euro_llm::ImageSource to agent_chain::ContentPart
+fn convert_image_source_to_content_part(image_source: euro_llm::ImageSource) -> ContentPart {
+    match image_source {
+        euro_llm::ImageSource::Url(url) => {
+            // Check if it's a data URL (base64 encoded)
+            if url.starts_with("data:") {
+                // Parse data URL: data:[<mediatype>][;base64],<data>
+                if let Some((header, data)) =
+                    url.strip_prefix("data:").and_then(|s| s.split_once(','))
+                {
+                    let media_type = header.split(';').next().unwrap_or("image/jpeg").to_string();
+                    ContentPart::Image {
+                        source: ImageSource::Base64 {
+                            media_type,
+                            data: data.to_string(),
+                        },
+                        detail: Some(ImageDetail::default()),
+                    }
+                } else {
+                    // Invalid data URL, treat as regular URL
+                    ContentPart::Image {
+                        source: ImageSource::Url { url },
+                        detail: Some(ImageDetail::default()),
+                    }
+                }
+            } else {
+                // Regular URL
+                ContentPart::Image {
+                    source: ImageSource::Url { url },
+                    detail: Some(ImageDetail::default()),
+                }
+            }
+        }
+        _ => panic!("Unsupported image source: only URL is supported"),
+    }
 }
 
 impl From<OpenAIConfig> for PromptKitService {
