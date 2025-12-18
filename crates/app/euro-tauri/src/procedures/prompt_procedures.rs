@@ -77,10 +77,7 @@ impl PromptApi for PromptApiImpl {
         api_key: String,
         model: String,
     ) -> Result<(), String> {
-        let config = OpenAIConfig::builder()
-            .api_key(api_key.clone())
-            .model(model)
-            .build();
+        let config = OpenAIConfig::new(api_key.clone(), model);
 
         euro_secret::secret::persist(
             "OPENAI_API_KEY",
