@@ -5,21 +5,13 @@ authors.workspace = true
 edition = "2024"
 
 [dependencies]
-serde = {workspace = true, features = ["derive"]}
 agent-chain = { workspace = true }
-agent-chain-macros = { workspace = true }
 agent-graph = { workspace = true }
-agent-graph-macros = { workspace = true }
 anyhow = { workspace = true }
-# euro-proto-client = { workspace = true }
 async_from = { workspace = true }
 euro-llm = { workspace = true }
 euro-llm-eurora = { workspace = true }
-euro-proto = { workspace = true }
-futures = { workspace = true }
-image = { workspace = true }
-regex = "1.12.2"
+serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tracing = { workspace = true }
