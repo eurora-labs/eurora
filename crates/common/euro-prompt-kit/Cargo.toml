@@ -6,7 +6,6 @@ edition = "2024"
 
 [dependencies]
 agent-chain = { workspace = true, features = ["anthropic", "ollama", "openai"] }
-# euro-llm-eurora = { workspace = true }
 agent-chain-eurora = { workspace = true }
 agent-graph = { workspace = true }
 anyhow = { workspace = true }
