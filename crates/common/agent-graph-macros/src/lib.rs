@@ -8,7 +8,12 @@ use syn::{FnArg, ItemFn, Pat, ReturnType, parse_macro_input};
 ///
 /// Tasks are the building blocks of LangGraph workflows. They represent
 /// individual units of work that can be executed and whose results can
-/// be awaited.
+/// be awaited. When called, tasks return a `TaskFuture` that can be:
+/// - Awaited with `.await`
+/// - Blocked on with `.result()`
+///
+/// This matches Python's langgraph functional API where `@task` decorated
+/// functions return a `SyncAsyncFuture`.
 ///
 /// # Example
 ///
@@ -19,6 +24,11 @@ use syn::{FnArg, ItemFn, Pat, ReturnType, parse_macro_input};
 /// async fn process_data(input: String) -> String {
 ///     input.to_uppercase()
 /// }
+///
+/// // Inside an entrypoint:
+/// let future = process_data("hello".to_string());  // Returns TaskFuture
+/// let result = future.await?;  // "HELLO"
+/// // Or: let result = future.result()?;  // Blocking version
 /// ```
 #[proc_macro_attribute]
 pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -27,7 +37,7 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input.sig.ident;
     let fn_vis = &input.vis;
     let fn_block = &input.block;
-    let fn_inputs = &input.sig.inputs;
+    let _fn_inputs = &input.sig.inputs;
     let fn_return_type = &input.sig.output;
 
     // Get the actual return type
@@ -36,9 +46,40 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         ReturnType::Type(_, ty) => quote! { #ty },
     };
 
+    // Extract parameter names and types for the wrapper function
+    let params: Vec<_> = input
+        .sig
+        .inputs
+        .iter()
+        .filter_map(|arg| {
+            if let FnArg::Typed(pat_type) = arg && let Pat::Ident(pat_ident) = pat_type.pat.as_ref() {
+                    let name = &pat_ident.ident;
+                    let ty = &pat_type.ty;
+                    return Some((name.clone(), ty.clone()));
+            }
+            None
+        })
+        .collect();
+
+    let param_names: Vec<_> = params.iter().map(|(name, _)| name.clone()).collect();
+    let param_types: Vec<_> = params.iter().map(|(_, ty)| ty.clone()).collect();
+
+    // Generate the wrapper that returns TaskFuture
     let expanded = quote! {
-        #fn_vis async fn #fn_name(#fn_inputs) -> #actual_return_type {
-            #fn_block
+        #fn_vis fn #fn_name(#(#param_names: #param_types),*) -> agent_graph::func::TaskFuture<#actual_return_type>
+        where
+            #actual_return_type: Send + 'static,
+        {
+            let (sender, receiver) = tokio::sync::oneshot::channel();
+
+            tokio::spawn(async move {
+                let result: #actual_return_type = {
+                    #fn_block
+                };
+                let _ = sender.send(result);
+            });
+
+            agent_graph::func::TaskFuture::new(receiver)
         }
     };
 
