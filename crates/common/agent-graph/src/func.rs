@@ -73,7 +73,9 @@ impl<T> TaskFuture<T> {
     ///
     /// Note: This will block the current thread. Prefer using `.await` in async contexts.
     pub fn result(self) -> Result<T, TaskError> {
-        self.receiver.blocking_recv().map_err(|_| TaskError::Cancelled)
+        self.receiver
+            .blocking_recv()
+            .map_err(|_| TaskError::Cancelled)
     }
 }
 
@@ -570,10 +572,7 @@ pub type BoxedEntrypoint<I, O, C = ()> = Entrypoint<Box<AsyncFn<I, O>>, I, O, C>
 /// let workflow = create_entrypoint("my_workflow", |x: i32| async move { x * 2 });
 /// let result = workflow.invoke(5).await;
 /// ```
-pub fn create_entrypoint<F, Fut, I, O>(
-    name: impl Into<String>,
-    func: F,
-) -> BoxedEntrypoint<I, O>
+pub fn create_entrypoint<F, Fut, I, O>(name: impl Into<String>, func: F) -> BoxedEntrypoint<I, O>
 where
     F: Fn(I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = O> + Send + 'static,

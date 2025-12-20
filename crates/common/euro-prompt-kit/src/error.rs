@@ -1,4 +1,4 @@
-use euro_llm_eurora::EuroraError;
+use agent_chain_eurora::EuroraError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

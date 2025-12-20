@@ -259,6 +259,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "agent-chain-eurora"
+version = "0.0.0"
+dependencies = [
+ "agent-chain",
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "euro-user",
+ "futures",
+ "prost",
+ "prost-types",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-async-interceptor",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tower",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "agent-chain-macros"
 version = "0.0.0"
 dependencies = [
@@ -3344,6 +3370,7 @@ dependencies = [
 name = "euro-llm-eurora"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "async-stream",
  "async-trait",
  "base64 0.22.1",
@@ -3492,11 +3519,11 @@ name = "euro-prompt-kit"
 version = "0.0.0"
 dependencies = [
  "agent-chain",
+ "agent-chain-eurora",
  "agent-graph",
  "anyhow",
  "async_from",
  "euro-llm",
- "euro-llm-eurora",
  "serde",
  "thiserror 2.0.17",
  "tokio-stream",
@@ -3507,13 +3534,13 @@ dependencies = [
 name = "euro-prompt-service"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
+ "agent-chain-eurora",
  "anyhow",
  "async-trait",
  "chrono",
  "dotenv",
  "euro-auth",
- "euro-llm",
- "euro-llm-eurora",
  "euro-ocr",
  "futures",
  "image",
@@ -3592,11 +3619,11 @@ dependencies = [
 name = "euro-settings"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-eurora",
  "anyhow",
  "async_from",
  "dirs 6.0.0",
  "euro-fs",
- "euro-llm-eurora",
  "euro-prompt-kit",
  "euro-secret",
  "notify",
@@ -3616,6 +3643,7 @@ version = "0.0.0"
 name = "euro-tauri"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-eurora",
  "anyhow",
  "async_from",
  "backtrace",
@@ -3628,7 +3656,6 @@ dependencies = [
  "euro-activity",
  "euro-encrypt",
  "euro-llm",
- "euro-llm-eurora",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-prompt-kit",
