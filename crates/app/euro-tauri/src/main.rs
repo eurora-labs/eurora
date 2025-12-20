@@ -86,17 +86,20 @@ fn main() {
         set_default_credential_builder(mock::default_credential_builder());
     }
 
-    let _guard = sentry::init((
-        "https://a0c23c10925999f104c7fd07fd8e3871@o4508907847352320.ingest.de.sentry.io/4510097240424528",
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            traces_sample_rate: 0.0,
-            enable_logs: true,
-            send_default_pii: true, // during closed beta all metrics are non-anonymous
-            debug: true,
-            ..Default::default()
-        },
-    ));
+    if cfg!(not(debug_assertions)) {
+        let _guard = sentry::init((
+            // TODO: Replace with Sentry DSN from env
+            "https://a0c23c10925999f104c7fd07fd8e3871@o4508907847352320.ingest.de.sentry.io/4510097240424528",
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                traces_sample_rate: 0.0,
+                enable_logs: true,
+                send_default_pii: true, // during closed beta all metrics are non-anonymous
+                debug: true,
+                ..Default::default()
+            },
+        ));
+    }
 
     let sentry_logger = sentry::integrations::log::SentryLogger::new()
         .filter(|_md| sentry::integrations::log::LogFilter::Log);
