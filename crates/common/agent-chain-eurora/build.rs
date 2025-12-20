@@ -14,7 +14,6 @@ fn main() -> Result<()> {
         tonic_prost_build::configure()
             .build_server(true)
             .build_client(true)
-            // .compile_well_known_types(true)
             .protoc_arg("--experimental_allow_proto3_optional")
             .compile_protos(&proto_files, &[proto_dir, common_dir])?;
     }
