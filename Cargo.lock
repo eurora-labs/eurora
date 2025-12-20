@@ -3367,36 +3367,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-llm-eurora"
-version = "0.0.0"
-dependencies = [
- "agent-chain",
- "async-stream",
- "async-trait",
- "base64 0.22.1",
- "chrono",
- "euro-llm",
- "euro-secret",
- "euro-user",
- "futures",
- "image",
- "prost",
- "prost-types",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-async-interceptor",
- "tonic-prost",
- "tonic-prost-build",
- "tower",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "euro-monolith"
 version = "0.0.1"
 dependencies = [
