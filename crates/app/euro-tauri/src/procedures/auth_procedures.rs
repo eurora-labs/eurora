@@ -4,6 +4,7 @@ use agent_chain_eurora::EuroraConfig;
 use async_from::AsyncTryFrom;
 use euro_secret::{Sensitive, secret};
 use tauri::{AppHandle, Manager, Runtime};
+use tracing::error;
 use url::Url;
 
 use crate::{
@@ -73,6 +74,7 @@ impl AuthApi for AuthApiImpl {
             let login_token = secret::retrieve(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
                 .map_err(|e| format!("Failed to retrieve login token: {}", e))?
                 .ok_or_else(|| "Login token not found".to_string())?;
+
             match user_controller.login_by_login_token(login_token.0).await {
                 Ok(_) => {
                     secret::delete(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
@@ -115,9 +117,15 @@ impl AuthApi for AuthApiImpl {
 
                     Ok(true)
                 }
-                Err(_) => Ok(false),
+                Err(e) => {
+                    error!("Failed to initialize prompt kit service: {}", e);
+
+                    Ok(false)
+                }
             }
         } else {
+            error!("Failed to initialize prompt kit service: Invalid configuration");
+
             Ok(false)
         }
     }
