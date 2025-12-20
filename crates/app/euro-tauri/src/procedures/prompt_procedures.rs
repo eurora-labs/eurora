@@ -1,5 +1,5 @@
+use agent_chain_eurora::EuroraConfig;
 use async_from::AsyncTryFrom;
-use euro_llm_eurora::EuroraConfig;
 use euro_prompt_kit::{OllamaConfig, OpenAIConfig};
 use euro_secret::secret;
 use euro_settings::BackendType;

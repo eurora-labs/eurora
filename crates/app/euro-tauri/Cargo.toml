@@ -15,6 +15,7 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
+agent-chain-eurora = { workspace = true }
 anyhow = { workspace = true }
 async_from = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
@@ -27,7 +28,7 @@ dotenv = "0.15.0"
 euro-activity = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-llm = { workspace = true, features = ["specta"] }
-euro-llm-eurora = { workspace = true }
+# euro-llm-eurora = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true }
 euro-prompt-kit = { workspace = true }

@@ -52,10 +52,12 @@ pub fn task(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .inputs
         .iter()
         .filter_map(|arg| {
-            if let FnArg::Typed(pat_type) = arg && let Pat::Ident(pat_ident) = pat_type.pat.as_ref() {
-                    let name = &pat_ident.ident;
-                    let ty = &pat_type.ty;
-                    return Some((name.clone(), ty.clone()));
+            if let FnArg::Typed(pat_type) = arg
+                && let Pat::Ident(pat_ident) = pat_type.pat.as_ref()
+            {
+                let name = &pat_ident.ident;
+                let ty = &pat_type.ty;
+                return Some((name.clone(), ty.clone()));
             }
             None
         })

@@ -1,10 +1,10 @@
 use agent_chain::chat_models::ChatModel;
 use agent_chain::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
 use agent_chain::{ContentPart, ImageDetail, ImageSource, ollama::ChatOllama, openai::ChatOpenAI};
+use agent_chain_eurora::{ChatEurora, EuroraConfig};
 use anyhow::Result;
 use async_from::{AsyncTryFrom, async_trait};
-use euro_llm::{ChatRequest, Message, Role};
-use euro_llm_eurora::{EuroraConfig, EuroraStreamingProvider, StreamingProvider};
+use euro_llm::{Message, Role};
 use serde::{Deserialize, Serialize};
 use tokio_stream::{Stream, StreamExt};
 use tracing::info;
@@ -89,7 +89,7 @@ impl Default for OllamaConfig {
 enum LLMProvider {
     OpenAI(ChatOpenAI),
     Ollama(ChatOllama),
-    Eurora(EuroraStreamingProvider),
+    Eurora(ChatEurora),
 }
 
 #[derive(Debug, Clone)]
@@ -135,19 +135,24 @@ impl PromptKitService {
         std::pin::Pin<Box<dyn Stream<Item = Result<String, PromptKitError>> + Send>>,
         PromptKitError,
     > {
-        if let LLMProvider::Eurora(provider) = &self.provider {
-            let request = ChatRequest {
-                messages,
-                parameters: Default::default(),
-                metadata: Default::default(),
-            };
+        if let LLMProvider::Eurora(llm) = &self.provider {
+            info!("Starting Eurora chat stream with agent-chain");
 
-            let stream = provider
-                .chat_stream(request)
+            // Convert euro_llm::Message to agent_chain::BaseMessage
+            let base_messages: Vec<BaseMessage> = messages
+                .into_iter()
+                .map(convert_message_to_base_message)
+                .collect();
+
+            let stream = llm
+                .stream(base_messages, None)
                 .await
-                .map_err(PromptKitError::EuroraError)?
-                .map(|result| result.map_err(PromptKitError::EuroraError))
-                .map(|result| result.map(|message| message.content));
+                .map_err(PromptKitError::AgentChainError)?
+                .map(|result| {
+                    result
+                        .map(|chunk| chunk.content)
+                        .map_err(PromptKitError::AgentChainError)
+                });
 
             Ok(Box::pin(stream))
         } else {
@@ -375,11 +380,11 @@ impl From<OllamaConfig> for PromptKitService {
 impl AsyncTryFrom<EuroraConfig> for PromptKitService {
     type Error = PromptKitError;
     async fn async_try_from(config: EuroraConfig) -> Result<Self, Self::Error> {
-        let provider = EuroraStreamingProvider::new(config.clone())
+        let chat_eurora = ChatEurora::new(config)
             .await
             .map_err(PromptKitError::EuroraError)?;
         Ok(Self {
-            provider: LLMProvider::Eurora(provider),
+            provider: LLMProvider::Eurora(chat_eurora),
         })
     }
 }

@@ -69,7 +69,10 @@ pub mod types;
 // Re-export commonly used types at the crate root (matching langgraph's structure)
 pub use checkpoint::InMemorySaver;
 pub use constants::{END, START};
-pub use func::{entrypoint, task, create_entrypoint, create_task, Entrypoint, EntrypointBuilder, Final, Task, TaskFuture, TaskError, RunConfig};
+pub use func::{
+    Entrypoint, EntrypointBuilder, Final, RunConfig, Task, TaskError, TaskFuture,
+    create_entrypoint, create_task, entrypoint, task,
+};
 pub use graph::{CompiledGraph, MessagesState, StateGraph, add_messages};
 pub use stream::{StreamChunk, StreamMode};
-pub use types::{CachePolicy, RetryPolicy, Command, Send, Interrupt};
+pub use types::{CachePolicy, Command, Interrupt, RetryPolicy, Send};
