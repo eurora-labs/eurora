@@ -86,6 +86,7 @@ fn main() {
         set_default_credential_builder(mock::default_credential_builder());
     }
 
+    // TODO: Check if this still works on Nightly
     if cfg!(not(debug_assertions)) {
         let _guard = sentry::init((
             // TODO: Replace with Sentry DSN from env
