@@ -1,5 +1,5 @@
+use agent_chain_eurora::EuroraConfig;
 use async_from::AsyncTryFrom;
-use euro_llm_eurora::EuroraConfig;
 use euro_prompt_kit::{OllamaConfig, OpenAIConfig};
 use euro_secret::secret;
 use euro_settings::BackendType;
@@ -42,12 +42,11 @@ impl PromptApi for PromptApiImpl {
         base_url: String,
         model: String,
     ) -> Result<(), String> {
-        let config = OllamaConfig::builder()
-            .model(model)
-            .base_url(base_url)
-            .expect("Failed to connect to Ollama")
-            .keep_alive(300)
-            .build();
+        let config = OllamaConfig {
+            model,
+            base_url: Some(base_url),
+            temperature: None,
+        };
 
         let state = app_handle.state::<SharedAppSettings>();
         let mut app_settings = state.lock().await;
@@ -78,10 +77,7 @@ impl PromptApi for PromptApiImpl {
         api_key: String,
         model: String,
     ) -> Result<(), String> {
-        let config = OpenAIConfig::builder()
-            .api_key(api_key.clone())
-            .model(model)
-            .build();
+        let config = OpenAIConfig::new(api_key.clone(), model);
 
         euro_secret::secret::persist(
             "OPENAI_API_KEY",

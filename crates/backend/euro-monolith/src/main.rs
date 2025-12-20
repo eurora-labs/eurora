@@ -25,20 +25,22 @@ use tracing_subscriber::util::SubscriberInitExt;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load environment variables
     dotenv().ok();
-    // Initialize sentry
-    let sentry_dsn = std::env::var("SENTRY_MONOLITH_DSN")
-        .expect("SENTRY_MONOLITH_DSN environment variable must be set");
-    let _guard = sentry::init((
-        sentry_dsn,
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            traces_sample_rate: 0.0,
-            enable_logs: true,
-            send_default_pii: true, // during closed beta all metrics are non-anonymous
-            debug: true,
-            ..Default::default()
-        },
-    ));
+    // Initialize sentry if running in production
+    if cfg!(not(debug_assertions)) {
+        let sentry_dsn =
+            std::env::var("SENTRY_MONOLITH_DSN").expect("SENTRY_MONOLITH_DSN must be set");
+        let _guard = sentry::init((
+            sentry_dsn,
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                traces_sample_rate: 0.0,
+                enable_logs: true,
+                send_default_pii: true, // during closed beta all metrics are non-anonymous
+                debug: true,
+                ..Default::default()
+            },
+        ));
+    }
 
     let (health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
