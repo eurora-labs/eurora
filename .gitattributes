@@ -4,6 +4,7 @@
 *.ico filter=lfs diff=lfs merge=lfs -text
 *.icns filter=lfs diff=lfs merge=lfs -text
 *.mp4 filter=lfs diff=lfs merge=lfs -text
+*.webp filter=lfs diff=lfs merge=lfs -text
 *.jpg !text !filter !merge !diff
 *.svg !text !filter !merge !diff
 *.png !text !filter !merge !diff
