@@ -242,6 +242,81 @@ dependencies = [
 ]
 
 [[package]]
+name = "agent-chain"
+version = "0.0.0"
+dependencies = [
+ "agent-chain-macros",
+ "async-stream",
+ "async-trait",
+ "futures",
+ "reqwest 0.12.24",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "agent-chain-eurora"
+version = "0.0.0"
+dependencies = [
+ "agent-chain",
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "euro-user",
+ "futures",
+ "prost",
+ "prost-types",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-async-interceptor",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tower",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "agent-chain-macros"
+version = "0.0.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
+
+[[package]]
+name = "agent-graph"
+version = "0.0.0"
+dependencies = [
+ "agent-chain",
+ "agent-graph-macros",
+ "async-trait",
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+]
+
+[[package]]
+name = "agent-graph-macros"
+version = "0.0.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
+
+[[package]]
 name = "ahash"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3238,7 +3313,6 @@ name = "euro-focus"
 version = "0.2.0"
 dependencies = [
  "accessibility-sys",
- "base64 0.22.1",
  "cocoa",
  "core-foundation 0.10.1",
  "core-graphics 0.25.0",
@@ -3289,35 +3363,6 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "tracing-subscriber",
- "url",
-]
-
-[[package]]
-name = "euro-llm-eurora"
-version = "0.0.0"
-dependencies = [
- "async-stream",
- "async-trait",
- "base64 0.22.1",
- "chrono",
- "euro-llm",
- "euro-secret",
- "euro-user",
- "futures",
- "image",
- "prost",
- "prost-types",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-async-interceptor",
- "tonic-prost",
- "tonic-prost-build",
- "tower",
- "tracing",
  "url",
 ]
 
@@ -3443,16 +3488,14 @@ dependencies = [
 name = "euro-prompt-kit"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
+ "agent-chain-eurora",
+ "agent-graph",
  "anyhow",
  "async_from",
  "euro-llm",
- "euro-llm-eurora",
- "euro-proto",
- "futures",
- "image",
- "regex",
+ "serde",
  "thiserror 2.0.17",
- "tokio",
  "tokio-stream",
  "tracing",
 ]
@@ -3461,13 +3504,13 @@ dependencies = [
 name = "euro-prompt-service"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
+ "agent-chain-eurora",
  "anyhow",
  "async-trait",
  "chrono",
  "dotenv",
  "euro-auth",
- "euro-llm",
- "euro-llm-eurora",
  "euro-ocr",
  "futures",
  "image",
@@ -3484,12 +3527,9 @@ dependencies = [
 name = "euro-proto"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "prost",
  "prost-types",
  "serde",
- "specta",
- "tokio",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
@@ -3549,11 +3589,11 @@ dependencies = [
 name = "euro-settings"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-eurora",
  "anyhow",
  "async_from",
  "dirs 6.0.0",
  "euro-fs",
- "euro-llm-eurora",
  "euro-prompt-kit",
  "euro-secret",
  "notify",
@@ -3573,6 +3613,7 @@ version = "0.0.0"
 name = "euro-tauri"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-eurora",
  "anyhow",
  "async_from",
  "backtrace",
@@ -3585,7 +3626,6 @@ dependencies = [
  "euro-activity",
  "euro-encrypt",
  "euro-llm",
- "euro-llm-eurora",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-prompt-kit",
