@@ -286,7 +286,9 @@ function install_native_messaging_host() {
 	local MANIFEST_CONTENT
 
 	# Get the path to the native-messaging-host.json template
-	local TEMPLATE_PATH="$PWD/../extensions/chromium/native-messaging-host.json"
+	# local TEMPLATE_PATH="$PWD/../extensions/chromium/native-messaging-host.json"
+	cp "$PWD/../apps/browser/src/native-messaging-host.chromium.json" "$PWD/../apps/browser/src/native-messaging-host.json"
+	local TEMPLATE_PATH="$PWD/../apps/browser/src/native-messaging-host.json"
 
 	if [ "$OS" = "macos" ]; then
 		# For macOS, the binary is inside the .app bundle
