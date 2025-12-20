@@ -1,18 +1,19 @@
-//! Configuration types for gRPC providers.
+//! Configuration types for the Eurora gRPC provider.
 
 use std::time::Duration;
 
-use euro_llm::ProviderConfig;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-/// Configuration for gRPC providers.
+use crate::error::EuroraError;
+
+/// Configuration for the Eurora gRPC provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EuroraConfig {
     /// The gRPC server endpoint URL
     pub endpoint: Url,
 
-    /// Optional authentication token
+    /// Optional authentication token (usually handled by AuthInterceptor)
     pub auth_token: Option<String>,
 
     /// Request timeout duration
@@ -64,100 +65,13 @@ impl Default for EuroraConfig {
             keep_alive_timeout: Some(Duration::from_secs(5)),
             keep_alive_while_idle: true,
             max_concurrent_requests: Some(100),
-            user_agent: Some("euro-llm-grpc/0.2.0".to_string()),
+            user_agent: Some("agent-chain-eurora/0.1.0".to_string()),
         }
-    }
-}
-
-impl ProviderConfig for EuroraConfig {
-    type Provider = crate::provider::EuroraChatProvider;
-
-    fn build(self) -> Result<Self::Provider, euro_llm::ConfigError> {
-        use euro_llm::ConfigError;
-
-        self.validate()?;
-
-        // Note: This is a synchronous build method, but GrpcChatProvider::new is async
-        // In practice, this would need to be handled differently, perhaps with a builder pattern
-        // For now, we'll return an error indicating async construction is needed
-        Err(ConfigError::validation_failed(
-            "EuroraChatProvider requires async construction. Use EuroraChatProvider::new(config).await instead",
-        ))
-    }
-
-    fn validate(&self) -> Result<(), euro_llm::ConfigError> {
-        use euro_llm::ConfigError;
-
-        // Validate endpoint
-        if self.endpoint.scheme() != "http" && self.endpoint.scheme() != "https" {
-            return Err(ConfigError::invalid_value(
-                "endpoint",
-                "Endpoint must use http or https scheme",
-            ));
-        }
-
-        // Validate TLS configuration
-        if self.use_tls && self.endpoint.scheme() != "https" {
-            return Err(ConfigError::invalid_value(
-                "endpoint",
-                "TLS is enabled but endpoint scheme is not https",
-            ));
-        }
-
-        // Validate timeouts
-        if let Some(timeout) = self.timeout
-            && timeout.is_zero()
-        {
-            return Err(ConfigError::invalid_value(
-                "timeout",
-                "Timeout must be greater than zero",
-            ));
-        }
-
-        if let Some(connect_timeout) = self.connect_timeout
-            && connect_timeout.is_zero()
-        {
-            return Err(ConfigError::invalid_value(
-                "connect_timeout",
-                "Connect timeout must be greater than zero",
-            ));
-        }
-
-        // Validate message sizes
-        if let Some(max_request_size) = self.max_request_size
-            && max_request_size == 0
-        {
-            return Err(ConfigError::invalid_value(
-                "max_request_size",
-                "Max request size must be greater than zero",
-            ));
-        }
-
-        if let Some(max_response_size) = self.max_response_size
-            && max_response_size == 0
-        {
-            return Err(ConfigError::invalid_value(
-                "max_response_size",
-                "Max response size must be greater than zero",
-            ));
-        }
-
-        // Validate concurrent requests
-        if let Some(max_concurrent) = self.max_concurrent_requests
-            && max_concurrent == 0
-        {
-            return Err(ConfigError::invalid_value(
-                "max_concurrent_requests",
-                "Max concurrent requests must be greater than zero",
-            ));
-        }
-
-        Ok(())
     }
 }
 
 impl EuroraConfig {
-    /// Create a new gRPC configuration with the given endpoint.
+    /// Create a new Eurora configuration with the given endpoint.
     pub fn new(endpoint: Url) -> Self {
         let use_tls = endpoint.scheme() == "https";
         Self {
@@ -227,5 +141,96 @@ impl EuroraConfig {
     pub fn with_user_agent(mut self, user_agent: String) -> Self {
         self.user_agent = Some(user_agent);
         self
+    }
+
+    /// Validate the configuration.
+    pub fn validate(&self) -> Result<(), EuroraError> {
+        // Validate endpoint
+        if self.endpoint.scheme() != "http" && self.endpoint.scheme() != "https" {
+            return Err(EuroraError::InvalidConfig(
+                "Endpoint must use http or https scheme".to_string(),
+            ));
+        }
+
+        // Validate TLS configuration
+        if self.use_tls && self.endpoint.scheme() != "https" {
+            return Err(EuroraError::InvalidConfig(
+                "TLS is enabled but endpoint scheme is not https".to_string(),
+            ));
+        }
+
+        // Validate timeouts
+        if let Some(timeout) = self.timeout
+            && timeout.is_zero()
+        {
+            return Err(EuroraError::InvalidConfig(
+                "Timeout must be greater than zero".to_string(),
+            ));
+        }
+
+        if let Some(connect_timeout) = self.connect_timeout
+            && connect_timeout.is_zero()
+        {
+            return Err(EuroraError::InvalidConfig(
+                "Connect timeout must be greater than zero".to_string(),
+            ));
+        }
+
+        // Validate message sizes
+        if let Some(max_request_size) = self.max_request_size
+            && max_request_size == 0
+        {
+            return Err(EuroraError::InvalidConfig(
+                "Max request size must be greater than zero".to_string(),
+            ));
+        }
+
+        if let Some(max_response_size) = self.max_response_size
+            && max_response_size == 0
+        {
+            return Err(EuroraError::InvalidConfig(
+                "Max response size must be greater than zero".to_string(),
+            ));
+        }
+
+        // Validate concurrent requests
+        if let Some(max_concurrent) = self.max_concurrent_requests
+            && max_concurrent == 0
+        {
+            return Err(EuroraError::InvalidConfig(
+                "Max concurrent requests must be greater than zero".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config_creation() {
+        let config = EuroraConfig::new(Url::parse("http://localhost:50051").unwrap());
+        assert_eq!(config.endpoint.to_string(), "http://localhost:50051/");
+        assert!(!config.use_tls);
+    }
+
+    #[test]
+    fn test_config_with_tls() {
+        let config = EuroraConfig::new(Url::parse("https://api.example.com").unwrap())
+            .with_tls(Some("api.example.com".to_string()))
+            .with_auth_token("test-token".to_string());
+
+        assert!(config.use_tls);
+        assert_eq!(config.tls_domain, Some("api.example.com".to_string()));
+        assert_eq!(config.auth_token, Some("test-token".to_string()));
+    }
+
+    #[test]
+    fn test_config_validation() {
+        let config = EuroraConfig::new(Url::parse("http://localhost:50051").unwrap());
+        assert!(config.validate().is_ok());
     }
 }

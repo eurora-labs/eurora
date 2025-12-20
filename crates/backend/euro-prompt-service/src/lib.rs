@@ -1,13 +1,14 @@
 use std::pin::Pin;
 
-use anyhow::{Result, anyhow};
-use euro_auth::{Claims, JwtConfig, validate_access_token};
-use euro_llm::openai::{OpenAIConfig, OpenAIProvider};
-use euro_llm::{ChatRequest, StreamingProvider};
-use euro_llm_eurora::proto::chat::{
+use agent_chain::chat_models::ChatModel;
+use agent_chain::messages::BaseMessage;
+use agent_chain::providers::openai::ChatOpenAI;
+use agent_chain_eurora::proto::chat::{
     ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse, ProtoFinishReason,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
 };
+use anyhow::{Result, anyhow};
+use euro_auth::{Claims, JwtConfig, validate_access_token};
 
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
@@ -43,23 +44,19 @@ pub fn get_service(prompt_service: PromptService) -> ProtoChatServiceServer<Prom
 
 #[derive(Debug)]
 pub struct PromptService {
-    provider: OpenAIProvider,
+    provider: ChatOpenAI,
     jwt_config: JwtConfig,
 }
 
 impl PromptService {
     pub fn new(jwt_config: Option<JwtConfig>) -> Self {
-        let config = OpenAIConfig::new(
-            std::env::var("OPENAI_API_KEY").unwrap_or_default(),
-            // "gpt-4o-2024-08-06",
-            // "meta-llama/Llama-4-Maverick-17B-128E-Instruct",
-            std::env::var("OPENAI_MODEL").unwrap_or_default(),
-            // "Llama Maverick",
-            // "deepseek-ai/DeepSeek-V3-0324",
-        );
-        // config.base_url = Some("https://api.chat.nebul.io/v1".parse().unwrap());
+        let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
+
+        let provider = ChatOpenAI::new(&model).api_key(api_key);
+
         Self {
-            provider: OpenAIProvider::new(config).expect("Failed to create OpenAI provider"),
+            provider,
             jwt_config: jwt_config.unwrap_or_default(),
         }
     }
@@ -116,31 +113,26 @@ impl ProtoChatService for PromptService {
         debug!("Received chat_stream request");
         let request_inner = request.into_inner();
 
-        let messages = request_inner
+        // Convert ProtoMessage to agent_chain::BaseMessage
+        let messages: Vec<BaseMessage> = request_inner
             .messages
-            .iter()
-            .map(|msg| msg.clone().into())
+            .into_iter()
+            .map(|msg| msg.into())
             .collect();
 
-        let chat_request = ChatRequest {
-            messages,
-            parameters: Default::default(),
-            metadata: Default::default(),
-        };
-
-        let openai_stream = self.provider.chat_stream(chat_request).await.map_err(|e| {
+        let openai_stream = self.provider.stream(messages, None).await.map_err(|e| {
             debug!("Error in chat_stream: {}", e);
             Status::internal(e.to_string())
         })?;
 
         let output_stream = openai_stream.map(|result| {
             match result {
-                Ok(content) => {
-                    // Check if this is the final chunk (empty content typically indicates end)
-                    let is_final = content.is_empty();
+                Ok(chunk) => {
+                    // Check if this is the final chunk
+                    let is_final = chunk.is_final;
 
                     Ok(ProtoChatStreamResponse {
-                        content,
+                        content: chunk.content,
                         is_final,
                         usage: None, // Usage info typically only available in final chunk
                         finish_reason: if is_final {

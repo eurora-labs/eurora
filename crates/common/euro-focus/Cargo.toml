@@ -16,7 +16,6 @@ keywords = [
 ]
 
 [dependencies]
-base64 = { workspace = true }
 image = { workspace = true }
 thiserror = { workspace = true }
 # Optional async dependencies
