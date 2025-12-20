@@ -39,6 +39,12 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 
+/// Type alias for a boxed future that is Send.
+pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+
+/// Type alias for an async function that takes Args and returns a BoxFuture<T>.
+pub type AsyncFn<Args, T> = dyn Fn(Args) -> BoxFuture<T> + Send + Sync;
+
 use futures::stream::{self, Stream};
 use tokio::sync::oneshot;
 
@@ -210,6 +216,9 @@ where
     }
 }
 
+/// Type alias for a Task with a boxed async function.
+pub type BoxedTask<Args, T> = Task<Box<AsyncFn<Args, T>>, Args, T>;
+
 /// Create a task from an async function.
 ///
 /// This is a convenience function that creates a `Task` wrapper around an async function.
@@ -222,7 +231,7 @@ where
 /// let task = create_task("my_task", |x: i32| async move { x * 2 });
 /// let result = task.call(5).await?;
 /// ```
-pub fn create_task<F, Fut, Args, T>(name: impl Into<String>, func: F) -> Task<impl Fn(Args) -> Pin<Box<dyn Future<Output = T> + Send>> + Send + Sync + 'static, Args, T>
+pub fn create_task<F, Fut, Args, T>(name: impl Into<String>, func: F) -> BoxedTask<Args, T>
 where
     F: Fn(Args) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = T> + Send + 'static,
@@ -230,11 +239,11 @@ where
     T: Send + 'static,
 {
     let func = Arc::new(func);
-    Task::new(move |args: Args| {
+    let wrapper: Box<AsyncFn<Args, T>> = Box::new(move |args: Args| {
         let func = func.clone();
-        Box::pin(async move { func(args).await }) as Pin<Box<dyn Future<Output = T> + Send>>
-    })
-    .with_name(name)
+        Box::pin(async move { func(args).await }) as BoxFuture<T>
+    });
+    Task::new(wrapper).with_name(name)
 }
 
 /// A value returned by an entrypoint that decouples the return value from the saved state.
@@ -519,7 +528,7 @@ impl<C> EntrypointBuilder<C> {
     }
 
     /// Build the entrypoint with the given function.
-    pub fn build<F, Fut, I, O>(self, func: F) -> Entrypoint<impl Fn(I) -> Pin<Box<dyn Future<Output = O> + Send>> + Send + Sync + 'static, I, O, C>
+    pub fn build<F, Fut, I, O>(self, func: F) -> BoxedEntrypoint<I, O, C>
     where
         F: Fn(I) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = O> + Send + 'static,
@@ -530,10 +539,10 @@ impl<C> EntrypointBuilder<C> {
         let name = self.name.unwrap_or_else(|| "entrypoint".to_string());
         let func = Arc::new(func);
 
-        let wrapper = move |input: I| {
+        let wrapper: Box<AsyncFn<I, O>> = Box::new(move |input: I| {
             let func = func.clone();
-            Box::pin(async move { func(input).await }) as Pin<Box<dyn Future<Output = O> + Send>>
-        };
+            Box::pin(async move { func(input).await }) as BoxFuture<O>
+        });
 
         let mut entrypoint = Entrypoint::new(name, wrapper);
         entrypoint.config = EntrypointConfig {
@@ -545,6 +554,9 @@ impl<C> EntrypointBuilder<C> {
         entrypoint
     }
 }
+
+/// Type alias for an Entrypoint with a boxed async function and no context.
+pub type BoxedEntrypoint<I, O, C = ()> = Entrypoint<Box<AsyncFn<I, O>>, I, O, C>;
 
 /// Create an entrypoint from an async function.
 ///
@@ -561,7 +573,7 @@ impl<C> EntrypointBuilder<C> {
 pub fn create_entrypoint<F, Fut, I, O>(
     name: impl Into<String>,
     func: F,
-) -> Entrypoint<impl Fn(I) -> Pin<Box<dyn Future<Output = O> + Send>> + Send + Sync + 'static, I, O>
+) -> BoxedEntrypoint<I, O>
 where
     F: Fn(I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = O> + Send + 'static,
