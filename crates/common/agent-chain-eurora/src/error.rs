@@ -1,10 +1,9 @@
-//! Error types for gRPC providers.
+//! Error types for agent-chain-eurora.
 
-use euro_llm::ProviderError;
 use thiserror::Error;
 use tonic::Status;
 
-/// Errors that can occur when using gRPC providers.
+/// Errors that can occur when using the Eurora gRPC provider.
 #[derive(Debug, Error)]
 pub enum EuroraError {
     /// gRPC transport error
@@ -56,8 +55,9 @@ pub enum EuroraError {
     Other(String),
 }
 
-impl ProviderError for EuroraError {
-    fn error_code(&self) -> Option<&str> {
+impl EuroraError {
+    /// Returns the gRPC error code if available
+    pub fn error_code(&self) -> Option<&str> {
         match self {
             EuroraError::Transport(_) => Some("transport_error"),
             EuroraError::Status(status) => Some(match status.code() {
@@ -92,7 +92,8 @@ impl ProviderError for EuroraError {
         }
     }
 
-    fn is_retryable(&self) -> bool {
+    /// Returns true if this error is retryable
+    pub fn is_retryable(&self) -> bool {
         match self {
             EuroraError::Transport(_) => true,
             EuroraError::Status(status) => {
@@ -112,7 +113,8 @@ impl ProviderError for EuroraError {
         }
     }
 
-    fn is_rate_limited(&self) -> bool {
+    /// Returns true if this is a rate limiting error
+    pub fn is_rate_limited(&self) -> bool {
         match self {
             EuroraError::RateLimit => true,
             EuroraError::Status(status) => status.code() == tonic::Code::ResourceExhausted,
@@ -120,7 +122,8 @@ impl ProviderError for EuroraError {
         }
     }
 
-    fn is_auth_error(&self) -> bool {
+    /// Returns true if this is an authentication error
+    pub fn is_auth_error(&self) -> bool {
         match self {
             EuroraError::Authentication(_) => true,
             EuroraError::Status(status) => {
@@ -131,44 +134,6 @@ impl ProviderError for EuroraError {
             }
             _ => false,
         }
-    }
-
-    fn retry_after(&self) -> Option<std::time::Duration> {
-        match self {
-            EuroraError::RateLimit => Some(std::time::Duration::from_secs(60)),
-            EuroraError::Status(status) if status.code() == tonic::Code::ResourceExhausted => {
-                Some(std::time::Duration::from_secs(30))
-            }
-            _ => None,
-        }
-    }
-
-    fn is_invalid_input(&self) -> bool {
-        match self {
-            EuroraError::InvalidConfig(_) => true,
-            EuroraError::Serialization(_) => true,
-            EuroraError::Status(status) => {
-                matches!(
-                    status.code(),
-                    tonic::Code::InvalidArgument | tonic::Code::OutOfRange
-                )
-            }
-            _ => false,
-        }
-    }
-
-    fn is_service_unavailable(&self) -> bool {
-        match self {
-            EuroraError::ServiceUnavailable => true,
-            EuroraError::Connection(_) => true,
-            EuroraError::Status(status) => status.code() == tonic::Code::Unavailable,
-            _ => false,
-        }
-    }
-
-    fn is_content_filtered(&self) -> bool {
-        // gRPC doesn't have a standard content filtering error code
-        false
     }
 }
 
@@ -187,6 +152,50 @@ impl From<EuroraError> for Status {
             EuroraError::RateLimit => Status::resource_exhausted(error.to_string()),
             EuroraError::ServiceUnavailable => Status::unavailable(error.to_string()),
             EuroraError::Other(_) => Status::internal(error.to_string()),
+        }
+    }
+}
+
+impl From<EuroraError> for agent_chain::Error {
+    fn from(error: EuroraError) -> Self {
+        match error {
+            EuroraError::Transport(e) => agent_chain::Error::Other(e.to_string()),
+            EuroraError::Status(s) => {
+                let code = s.code();
+                let message = s.message().to_string();
+                match code {
+                    tonic::Code::Unauthenticated | tonic::Code::PermissionDenied => {
+                        agent_chain::Error::MissingConfig(format!(
+                            "Authentication error: {}",
+                            message
+                        ))
+                    }
+                    tonic::Code::InvalidArgument => agent_chain::Error::InvalidConfig(message),
+                    _ => agent_chain::Error::Other(format!("gRPC error ({}): {}", code, message)),
+                }
+            }
+            EuroraError::Serialization(e) => agent_chain::Error::Json(e),
+            EuroraError::InvalidConfig(msg) => agent_chain::Error::InvalidConfig(msg),
+            EuroraError::Connection(msg) => {
+                agent_chain::Error::Other(format!("Connection error: {}", msg))
+            }
+            EuroraError::Timeout => agent_chain::Error::Other("Request timeout".to_string()),
+            EuroraError::InvalidResponse(msg) => {
+                agent_chain::Error::Other(format!("Invalid response: {}", msg))
+            }
+            EuroraError::Stream(msg) => agent_chain::Error::Other(format!("Stream error: {}", msg)),
+            EuroraError::Authentication(msg) => {
+                agent_chain::Error::MissingConfig(format!("Authentication error: {}", msg))
+            }
+            EuroraError::RateLimit => agent_chain::Error::Api {
+                status: 429,
+                message: "Rate limit exceeded".to_string(),
+            },
+            EuroraError::ServiceUnavailable => agent_chain::Error::Api {
+                status: 503,
+                message: "Service unavailable".to_string(),
+            },
+            EuroraError::Other(msg) => agent_chain::Error::Other(msg),
         }
     }
 }
