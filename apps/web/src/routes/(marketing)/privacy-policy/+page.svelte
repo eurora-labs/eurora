@@ -274,7 +274,7 @@
 						obtaining parental consent varies between 13 and 16 years. We do not
 						knowingly collect personally identifiable information from children under 13
 						or 16. If you are a parent or guardian and you are aware that your Children
-						has provided us with personal information, please contact us. If we become
+						have provided us with personal information, please contact us. If we become
 						aware that we have collected personal information from a child under age 13
 						or 16 without verification of parental consent, we take steps to remove that
 						information from our servers.
