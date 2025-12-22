@@ -71,6 +71,7 @@ pub fn validate_access_token(token: &str, jwt_config: &JwtConfig) -> Result<Clai
     if !jwt_config
         .approved_emails
         .contains(&claims.email.to_lowercase())
+        && !jwt_config.approved_emails.contains(&"*".to_string())
     {
         return Err(anyhow!("Email not approved"));
     }
