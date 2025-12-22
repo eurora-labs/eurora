@@ -54,16 +54,17 @@ jobs:
             - name: Install dependencies
               run: pnpm install
 
+            - name: Create web environment file
+              run: |
+                  echo "PUBLIC_STRIPE_KEY=${{ secrets.PUBLIC_STRIPE_KEY }}" >> apps/web/.env
+                  echo "SECRET_STRIPE_KEY=${{ secrets.SECRET_STRIPE_KEY }}" >> apps/web/.env
+
             - name: Generate protobuf types
               run: pnpm proto:typescript
 
             - name: Build shared packages
               run: pnpm build
 
-            - name: Create web environment file
-              run: |
-                  echo "PUBLIC_STRIPE_KEY=${{ secrets.PUBLIC_STRIPE_KEY }}" >> apps/web/.env
-                  echo "SECRET_STRIPE_KEY=${{ secrets.SECRET_STRIPE_KEY }}" >> apps/web/.env
 
             - name: Build web application
               run: pnpm build:web
