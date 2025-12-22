@@ -12,6 +12,10 @@ on:
 env:
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
     test:
         name: Run Extension E2E Tests
