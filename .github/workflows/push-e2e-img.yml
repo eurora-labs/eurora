@@ -7,6 +7,10 @@ on:
             - 'e2e/blackbox/Dockerfile'
     workflow_dispatch:
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
     docker_publish:
         runs-on: ubuntu-latest
