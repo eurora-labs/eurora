@@ -41,7 +41,7 @@
 	"devDependencies": {
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
-		"svelte2tsx": "^0.7.45",
+		"svelte2tsx": "^0.7.46",
 		"@sveltejs/vite-plugin-svelte": "catalog:svelte",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "catalog:svelte",
@@ -63,7 +63,7 @@
 		"prosemirror-dropcursor": "^1.8.2",
 		"prosemirror-gapcursor": "^1.4.0",
 		"bits-ui": "^2.14.4",
-		"@lucide/svelte": "^0.561.0",
+		"@lucide/svelte": "^0.562.0",
 		"clsx": "^2.1.1",
 		"tailwind-merge": "^3.4.0",
 		"tailwindcss": "catalog:",
