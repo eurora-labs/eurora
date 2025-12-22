@@ -4,32 +4,12 @@ set -e
 
 APP_ID=$1
 BRANCH_NAME=$2
-ZIP_FILE=$3
 
 echo "Deploy app $APP_ID branch $BRANCH_NAME"
 
-if [ -n "$ZIP_FILE" ] && [ -f "$ZIP_FILE" ]; then
-    echo "Deploying pre-built artifacts from $ZIP_FILE"
-    
-    # Create a deployment and get the upload URL
-    DEPLOYMENT_RESPONSE=$(aws amplify create-deployment --app-id $APP_ID --branch-name $BRANCH_NAME)
-    JOB_ID=$(echo $DEPLOYMENT_RESPONSE | jq -r '.jobId')
-    UPLOAD_URL=$(echo $DEPLOYMENT_RESPONSE | jq -r '.zipUploadUrl')
-    
-    echo "Job ID is $JOB_ID"
-    echo "Uploading deployment artifact..."
-    
-    # Upload the zip file to the presigned URL
-    curl --request PUT --upload-file "$ZIP_FILE" "$UPLOAD_URL" --fail --silent --show-error
-    
-    echo "Upload complete. Starting deployment..."
-    
-    # Start the deployment
-    aws amplify start-deployment --app-id $APP_ID --branch-name $BRANCH_NAME --job-id $JOB_ID
-else
-    echo "No zip file provided, triggering Amplify build..."
-    JOB_ID=$(aws amplify start-job --app-id $APP_ID --branch-name $BRANCH_NAME --job-type RELEASE | jq -r '.jobSummary.jobId')
-fi
+# Trigger Amplify build job
+echo "Triggering Amplify build..."
+JOB_ID=$(aws amplify start-job --app-id $APP_ID --branch-name $BRANCH_NAME --job-type RELEASE | jq -r '.jobSummary.jobId')
 
 echo "Release started"
 echo "Job ID is $JOB_ID"

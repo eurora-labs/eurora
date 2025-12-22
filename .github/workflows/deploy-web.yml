@@ -12,11 +12,8 @@ on:
     # Allows you to run this workflow manually from the Actions tab
     workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-    contents: read
-    pages: write
-    id-token: write
+    contents: write
 
 # Allow only one concurrent deployment
 concurrency:
@@ -29,6 +26,7 @@ env:
     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     AWS_DEFAULT_REGION: us-west-2
     AWS_DEFAULT_OUTPUT: json
+    DEPLOY_BRANCH: deploy-web
 
 jobs:
     build-and-deploy:
@@ -39,7 +37,7 @@ jobs:
               uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
-                  persist-credentials: false
+                  fetch-depth: 0
                   lfs: true
 
             - name: Install pnpm
@@ -65,15 +63,50 @@ jobs:
             - name: Build shared packages
               run: pnpm build
 
-
             - name: Build web application
               run: pnpm build:web
 
-            - name: Create deployment artifact
+            - name: Push to deploy branch
               run: |
-                  cd apps/web/build
-                  zip -r ../../../deployment.zip .
+                  # Configure git
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  
+                  # Create a temporary directory for the deploy branch
+                  DEPLOY_DIR=$(mktemp -d)
+                  
+                  # Copy built artifacts to temp directory
+                  cp -r apps/web/build/* "$DEPLOY_DIR/"
+                  
+                  # Create amplify.yml for the deploy branch (no build needed)
+                  cat > "$DEPLOY_DIR/amplify.yml" << 'EOF'
+                  version: 1
+                  frontend:
+                    phases:
+                      build:
+                        commands:
+                          - echo "Using pre-built artifacts"
+                    artifacts:
+                      baseDirectory: /
+                      files:
+                        - '**/*'
+                  EOF
+                  
+                  # Switch to deploy branch (create if doesn't exist)
+                  git checkout --orphan ${{ env.DEPLOY_BRANCH }}-temp || git checkout ${{ env.DEPLOY_BRANCH }}-temp
+                  git rm -rf . || true
+                  
+                  # Copy artifacts back
+                  cp -r "$DEPLOY_DIR"/* .
+                  
+                  # Commit and push
+                  git add -A
+                  git commit -m "Deploy from ${{ github.sha }}"
+                  git push origin HEAD:${{ env.DEPLOY_BRANCH }} --force
+                  
+                  # Cleanup
+                  rm -rf "$DEPLOY_DIR"
 
-            - name: Deploy to AWS Amplify
+            - name: Trigger Amplify deployment
               id: deployment
-              run: chmod +x ./scripts/amplify-deploy.sh && ./scripts/amplify-deploy.sh ${{ secrets.AMPLIFY_APP_ID }} main ./deployment.zip
+              run: chmod +x ./scripts/amplify-deploy.sh && ./scripts/amplify-deploy.sh ${{ secrets.AMPLIFY_APP_ID }} ${{ env.DEPLOY_BRANCH }}
