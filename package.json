@@ -62,7 +62,7 @@
 		"protolint": "^0.56.4",
 		"svelte-eslint-parser": "^1.4.1",
 		"tailwindcss": "catalog:",
-		"ts-proto": "^2.8.3",
+		"ts-proto": "^2.10.0",
 		"turbo": "^2.7.1",
 		"web-ext": "^8.10.0"
 	},
