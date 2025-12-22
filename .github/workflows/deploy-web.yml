@@ -1,4 +1,4 @@
-name: Deploy Web to GitHub Pages
+name: Deploy Web to AWS Amplify
 
 on:
     # Runs on pushes targeting the main branch
@@ -6,6 +6,7 @@ on:
         branches: ['main']
         paths:
             - 'apps/web/**'
+            - 'packages/**'
             - '.github/workflows/deploy-web.yml'
 
     # Allows you to run this workflow manually from the Actions tab
@@ -19,19 +20,18 @@ permissions:
 
 # Allow only one concurrent deployment
 concurrency:
-    group: 'pages'
+    group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
 env:
-    NODE_VERSION: 'lts/jod' # Set this to the node version to use
+    NODE_VERSION: 'lts/jod'
     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     AWS_DEFAULT_REGION: us-west-2
     AWS_DEFAULT_OUTPUT: json
 
 jobs:
-    # Build job
-    build:
+    build-and-deploy:
         runs-on: ubuntu-latest
         environment: amplify-web
         steps:
@@ -42,50 +42,37 @@ jobs:
                   persist-credentials: false
                   lfs: true
 
-            # - name: Install pnpm
-            #   uses: pnpm/action-setup@v4
-            #   with:
-            #       run_install: false
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
 
-            # - name: Setup Node.js
-            #   uses: actions/setup-node@v4
-            #   with:
-            #       node-version: ${{ env.NODE_VERSION }}
-            #       cache: 'pnpm'
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: 'pnpm'
 
-            # - name: Install dependencies
-            #   run: pnpm install --frozen-lockfile
+            - name: Install dependencies
+              run: pnpm install
 
-            # - name: Generate proto types
-            #   run: pnpm proto:typescript
+            - name: Generate protobuf types
+              run: pnpm proto:typescript
 
-            # - name: Build web app
-            #   run: pnpm turbo run build --filter @eurora/web...
-            #   env:
-            #       VITE_API_BASE_URL: 'https://api.eurora-labs.com'
+            - name: Build shared packages
+              run: pnpm build
 
-            # - name: Create CNAME file
-            #   run: echo "eurora-labs.com" > apps/web/dist/CNAME
+            - name: Create web environment file
+              run: |
+                  echo "PUBLIC_STRIPE_KEY=${{ secrets.PUBLIC_STRIPE_KEY }}" >> apps/web/.env
+                  echo "SECRET_STRIPE_KEY=${{ secrets.SECRET_STRIPE_KEY }}" >> apps/web/.env
 
-            # - name: Setup Pages
-            #   uses: actions/configure-pages@v5
-            #   with:
-            #       static_site_generator: sveltekit
+            - name: Build web application
+              run: pnpm build:web
 
-            # - name: Upload artifact
-            #   uses: actions/upload-pages-artifact@v3
-            #   with:
-            #       path: 'apps/web/dist'
+            - name: Create deployment artifact
+              run: |
+                  cd apps/web/build
+                  zip -r ../../../deployment.zip .
 
             - name: Deploy to AWS Amplify
               id: deployment
-              run: chmod +x ./scripts/amplify-deploy.sh && ./scripts/amplify-deploy.sh ${{ secrets.AMPLIFY_APP_ID }} main
-
-    #GitHub Pages Deployment job
-    # deploy:
-    # runs-on: ubuntu-latest
-    # needs: build
-    # steps:
-    # - name: Deploy to AWS Amplify
-    # id: deployment
-    # run: ./scripts/amplify-deploy.sh eurora main
+              run: chmod +x ./scripts/amplify-deploy.sh && ./scripts/amplify-deploy.sh ${{ secrets.AMPLIFY_APP_ID }} main ./deployment.zip
