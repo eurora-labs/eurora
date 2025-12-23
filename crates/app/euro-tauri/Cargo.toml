@@ -16,6 +16,8 @@ test = false
 
 [dependencies]
 agent-chain-eurora = { workspace = true }
+agent-chain = { workspace = true, features = ["specta"] }
+
 anyhow = { workspace = true }
 async_from = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
