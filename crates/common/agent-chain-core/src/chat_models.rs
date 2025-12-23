@@ -107,8 +107,8 @@ pub struct LangSmithParams {
 /// # Example Implementation
 ///
 /// ```ignore
-/// use agent_chain::chat_model::{ChatModel, ChatResult};
-/// use agent_chain::messages::BaseMessage;
+/// use agent_chain_core::chat_model::{ChatModel, ChatResult};
+/// use agent_chain_core::messages::BaseMessage;
 ///
 /// struct MyChatModel {
 ///     model: String,

@@ -5,7 +5,7 @@
 
 use std::pin::Pin;
 
-use agent_chain::{
+use agent_chain_core::{
     AIMessage, BaseMessage, ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream,
     LangSmithParams, ToolChoice, ToolDefinition, UsageMetadata,
 };
@@ -79,7 +79,7 @@ type EuroraGrpcClient = ProtoChatServiceClient<
 ///
 /// ```ignore
 /// use agent_chain_eurora::{ChatEurora, EuroraConfig};
-/// use agent_chain::{ChatModel, HumanMessage};
+/// use agent_chain_core::{ChatModel, HumanMessage};
 /// use url::Url;
 ///
 /// let config = EuroraConfig::new(Url::parse("https://api.eurora.com").unwrap());
@@ -268,7 +268,7 @@ impl ChatEurora {
     fn convert_stream(
         mut stream: Streaming<ProtoChatStreamResponse>,
         model: String,
-    ) -> impl Stream<Item = agent_chain::Result<ChatChunk>> + Send + 'static {
+    ) -> impl Stream<Item = agent_chain_core::Result<ChatChunk>> + Send + 'static {
         async_stream::stream! {
             while let Some(result) = stream.message().await.transpose() {
                 match result {
@@ -315,7 +315,7 @@ impl ChatModel for ChatEurora {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-    ) -> agent_chain::Result<ChatResult> {
+    ) -> agent_chain_core::Result<ChatResult> {
         let proto_request = self.build_request(&messages, stop);
 
         let mut client = self.client.clone();
@@ -350,7 +350,7 @@ impl ChatModel for ChatEurora {
         _tools: &[ToolDefinition],
         _tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
-    ) -> agent_chain::Result<ChatResult> {
+    ) -> agent_chain_core::Result<ChatResult> {
         // For now, we don't have tool support in the proto definition
         // Just call the regular generate method
         // TODO: Add tool support to the proto definition and implement here
@@ -361,7 +361,7 @@ impl ChatModel for ChatEurora {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-    ) -> agent_chain::Result<ChatStream> {
+    ) -> agent_chain_core::Result<ChatStream> {
         debug!("Sending chat stream");
         let proto_request = self.build_request(&messages, stop);
 
@@ -377,7 +377,7 @@ impl ChatModel for ChatEurora {
         let converted_stream = Self::convert_stream(stream, self.model.clone());
         Ok(Box::pin(converted_stream)
             as Pin<
-                Box<dyn Stream<Item = agent_chain::Result<ChatChunk>> + Send>,
+                Box<dyn Stream<Item = agent_chain_core::Result<ChatChunk>> + Send>,
             >)
     }
 

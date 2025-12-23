@@ -1,6 +1,6 @@
-use agent_chain::chat_models::ChatModel;
-use agent_chain::messages::BaseMessage;
 use agent_chain::{ollama::ChatOllama, openai::ChatOpenAI};
+use agent_chain_core::chat_models::ChatModel;
+use agent_chain_core::messages::BaseMessage;
 use agent_chain_eurora::{ChatEurora, EuroraConfig};
 use anyhow::Result;
 use async_from::{AsyncTryFrom, async_trait};
