@@ -36,7 +36,7 @@ const DEFAULT_MAX_TOKENS: u32 = 4096;
 /// # Example
 ///
 /// ```ignore
-/// use agent_chain::providers::ChatAnthropic;
+/// use agent_chain_core::providers::ChatAnthropic;
 ///
 /// let model = ChatAnthropic::new("claude-sonnet-4-5-20250929")
 ///     .temperature(0.7)

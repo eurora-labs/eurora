@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use agent_chain::{BaseMessage, HumanMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
 use euro_native_messaging::NativeYoutubeAsset;
 use serde::{Deserialize, Serialize};

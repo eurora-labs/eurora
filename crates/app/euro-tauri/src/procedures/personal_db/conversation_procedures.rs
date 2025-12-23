@@ -1,4 +1,4 @@
-use agent_chain::BaseMessage;
+use agent_chain_core::BaseMessage;
 use euro_personal_db::{Conversation, PersonalDatabaseManager};
 use tauri::{Manager, Runtime};
 

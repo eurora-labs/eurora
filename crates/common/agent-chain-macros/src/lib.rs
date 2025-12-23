@@ -12,7 +12,7 @@ use syn::{FnArg, ItemFn, Pat, ReturnType, Type, parse_macro_input};
 /// # Example
 ///
 /// ```ignore
-/// use agent_chain::tools::tool;
+/// use agent_chain_core::tools::tool;
 ///
 /// #[tool]
 /// fn multiply(a: i64, b: i64) -> i64 {
@@ -97,8 +97,8 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
-            #[agent_chain::async_trait]
-            impl agent_chain::tools::Tool for #struct_name {
+            #[agent_chain_core::async_trait]
+            impl agent_chain_core::tools::Tool for #struct_name {
                 fn name(&self) -> &str {
                     #fn_name_str
                 }
@@ -123,7 +123,7 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     })
                 }
 
-                async fn invoke(&self, tool_call: agent_chain::messages::ToolCall) -> agent_chain::messages::BaseMessage {
+                async fn invoke(&self, tool_call: agent_chain_core::messages::ToolCall) -> agent_chain_core::messages::BaseMessage {
                     let args = tool_call.args();
 
                     #(
@@ -136,7 +136,7 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     let result_str = serde_json::to_string(&result).unwrap_or_else(|_| format!("{:?}", result));
 
-                    agent_chain::messages::ToolMessage::new(result_str, tool_call.id()).into()
+                    agent_chain_core::messages::ToolMessage::new(result_str, tool_call.id()).into()
                 }
             }
 
