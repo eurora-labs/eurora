@@ -1,4 +1,4 @@
-use euro_llm::Message;
+use agent_chain::BaseMessage;
 use euro_personal_db::PersonalDatabaseManager;
 use tauri::{Manager, Runtime};
 
@@ -9,7 +9,7 @@ pub trait MessageApi {
         conversation_id: String,
         limit: Option<u32>,
         offset: Option<u32>,
-    ) -> Result<Vec<Message>, String>;
+    ) -> Result<Vec<BaseMessage>, String>;
 }
 
 #[derive(Clone)]
@@ -23,7 +23,7 @@ impl MessageApi for MessageApiImpl {
         conversation_id: String,
         _limit: Option<u32>,
         _offset: Option<u32>,
-    ) -> Result<Vec<Message>, String> {
+    ) -> Result<Vec<BaseMessage>, String> {
         let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
         let chat_messages = personal_db
@@ -34,6 +34,6 @@ impl MessageApi for MessageApiImpl {
         Ok(chat_messages
             .into_iter()
             .map(|message| message.into())
-            .collect::<Vec<Message>>())
+            .collect::<Vec<BaseMessage>>())
     }
 }

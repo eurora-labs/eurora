@@ -5,7 +5,7 @@
 	import {
 		type ResponseChunk,
 		type Query,
-		type Message,
+		type BaseMessage,
 		type Conversation,
 	} from '$lib/bindings/bindings.js';
 
@@ -24,7 +24,7 @@
 	} from '@eurora/prosemirror-core/index';
 
 	let conversation = $state<Conversation | null>(null);
-	let messages = $state<Message[]>([]);
+	let messages = $state<BaseMessage[]>([]);
 	let status = $state<string>('');
 	let taurpc = inject(TAURPC_SERVICE);
 
@@ -81,6 +81,27 @@
 		}
 	}
 
+	// Helper to get content from BaseMessage
+	function getMessageContent(message: BaseMessage): string {
+		const content = message.content;
+		if (typeof content === 'string') {
+			return content;
+		}
+		// For multipart content, extract text parts
+		if (Array.isArray(content)) {
+			return content
+				.filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+				.map((part) => part.text)
+				.join(' ');
+		}
+		return '';
+	}
+
+	// Helper to check if message is from user/human
+	function isUserMessage(message: BaseMessage): boolean {
+		return message.type === 'Human';
+	}
+
 	async function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && !event.shiftKey) {
 			// await taurpc.window.resize_launcher_window(100, 1.0);
@@ -92,8 +113,10 @@
 				}
 				const query = processQuery(editorRef);
 				messages.push({
-					role: 'user',
+					type: 'Human',
 					content: query.text,
+					id: null,
+					additional_kwargs: {},
 				});
 				console.log('query', query);
 				searchQuery.text = '';
@@ -114,16 +137,20 @@
 				text: query.text,
 				assets: query.assets,
 			};
-			// messages.push(create(ProtoChatMessageSchema, { role: 'agent', content: '' }));
-			messages.push({
-				role: 'assistant',
+			// Create an AI message placeholder for streaming response
+			const aiMessage: BaseMessage = {
+				type: 'AI',
 				content: '',
-			});
+				id: null,
+				tool_calls: [],
+				additional_kwargs: {},
+			};
+			messages.push(aiMessage);
 			const agentMessage = messages.at(-1);
 
 			const onEvent = (response: ResponseChunk) => {
 				// Append chunk to the last message
-				if (agentMessage) {
+				if (agentMessage && agentMessage.type === 'AI') {
 					agentMessage.content += response.chunk;
 				}
 
@@ -141,8 +168,10 @@
 		} catch (error) {
 			console.error('Failed to get answer:', error);
 			messages.push({
-				role: 'system',
+				type: 'System',
 				content: 'Error: Failed to get response from server' + error,
+				id: null,
+				additional_kwargs: {},
 			});
 		}
 	}
@@ -162,17 +191,16 @@
 				class="w-full h-full flex flex-col gap-4 overflow-hidden"
 			>
 				{#each messages as message}
-					{#if typeof message.content === 'string'}
-						{#if message.content.length > 0}
-							<Chat.Message
-								variant={message.role === 'user' ? 'default' : 'assistant'}
-								finishRendering={() => {}}
-							>
-								<Chat.MessageContent>
-									<Katex math={message.content} finishRendering={() => {}} />
-								</Chat.MessageContent>
-							</Chat.Message>
-						{/if}
+					{@const content = getMessageContent(message)}
+					{#if content.length > 0}
+						<Chat.Message
+							variant={isUserMessage(message) ? 'default' : 'assistant'}
+							finishRendering={() => {}}
+						>
+							<Chat.MessageContent>
+								<Katex math={content} finishRendering={() => {}} />
+							</Chat.MessageContent>
+						</Chat.Message>
 					{/if}
 				{/each}
 			</Chat.Root>
