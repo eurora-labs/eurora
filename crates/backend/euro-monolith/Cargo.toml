@@ -5,7 +5,6 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-anyhow = { workspace = true }
 axum = "0.8.7"
 dotenv = "0.15"
 euro-auth = { workspace = true }
@@ -15,15 +14,12 @@ euro-prompt-service = { workspace = true }
 euro-proto = { workspace = true }
 euro-remote-db = { workspace = true }
 euro-update-service = { workspace = true }
-futures = "0.3"
-image = { workspace = true }
 prost = { workspace = true }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 tonic = { workspace = true }
 tonic-health = "0.14.2"
 tonic-web = "0.14.2"
-tower = "0.5.2"
 tower-http = { version = "0.6.7", features = ["cors"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
