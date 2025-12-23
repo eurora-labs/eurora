@@ -156,46 +156,51 @@ impl From<EuroraError> for Status {
     }
 }
 
-impl From<EuroraError> for agent_chain::Error {
+impl From<EuroraError> for agent_chain_core::Error {
     fn from(error: EuroraError) -> Self {
         match error {
-            EuroraError::Transport(e) => agent_chain::Error::Other(e.to_string()),
+            EuroraError::Transport(e) => agent_chain_core::Error::Other(e.to_string()),
             EuroraError::Status(s) => {
                 let code = s.code();
                 let message = s.message().to_string();
                 match code {
                     tonic::Code::Unauthenticated | tonic::Code::PermissionDenied => {
-                        agent_chain::Error::MissingConfig(format!(
+                        agent_chain_core::Error::MissingConfig(format!(
                             "Authentication error: {}",
                             message
                         ))
                     }
-                    tonic::Code::InvalidArgument => agent_chain::Error::InvalidConfig(message),
-                    _ => agent_chain::Error::Other(format!("gRPC error ({}): {}", code, message)),
+                    tonic::Code::InvalidArgument => agent_chain_core::Error::InvalidConfig(message),
+                    _ => agent_chain_core::Error::Other(format!(
+                        "gRPC error ({}): {}",
+                        code, message
+                    )),
                 }
             }
-            EuroraError::Serialization(e) => agent_chain::Error::Json(e),
-            EuroraError::InvalidConfig(msg) => agent_chain::Error::InvalidConfig(msg),
+            EuroraError::Serialization(e) => agent_chain_core::Error::Json(e),
+            EuroraError::InvalidConfig(msg) => agent_chain_core::Error::InvalidConfig(msg),
             EuroraError::Connection(msg) => {
-                agent_chain::Error::Other(format!("Connection error: {}", msg))
+                agent_chain_core::Error::Other(format!("Connection error: {}", msg))
             }
-            EuroraError::Timeout => agent_chain::Error::Other("Request timeout".to_string()),
+            EuroraError::Timeout => agent_chain_core::Error::Other("Request timeout".to_string()),
             EuroraError::InvalidResponse(msg) => {
-                agent_chain::Error::Other(format!("Invalid response: {}", msg))
+                agent_chain_core::Error::Other(format!("Invalid response: {}", msg))
             }
-            EuroraError::Stream(msg) => agent_chain::Error::Other(format!("Stream error: {}", msg)),
+            EuroraError::Stream(msg) => {
+                agent_chain_core::Error::Other(format!("Stream error: {}", msg))
+            }
             EuroraError::Authentication(msg) => {
-                agent_chain::Error::MissingConfig(format!("Authentication error: {}", msg))
+                agent_chain_core::Error::MissingConfig(format!("Authentication error: {}", msg))
             }
-            EuroraError::RateLimit => agent_chain::Error::Api {
+            EuroraError::RateLimit => agent_chain_core::Error::Api {
                 status: 429,
                 message: "Rate limit exceeded".to_string(),
             },
-            EuroraError::ServiceUnavailable => agent_chain::Error::Api {
+            EuroraError::ServiceUnavailable => agent_chain_core::Error::Api {
                 status: 503,
                 message: "Service unavailable".to_string(),
             },
-            EuroraError::Other(msg) => agent_chain::Error::Other(msg),
+            EuroraError::Other(msg) => agent_chain_core::Error::Other(msg),
         }
     }
 }
