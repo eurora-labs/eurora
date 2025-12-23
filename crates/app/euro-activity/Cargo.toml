@@ -1,9 +1,11 @@
 [package]
 name = "euro-activity"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 description = "Refactored activity system with enum-based type-safe design"
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde", "specta"]
 
 [dependencies]
 agent-chain-core = { workspace = true, features = ["specta"] }
@@ -19,39 +21,25 @@ euro-encrypt = { workspace = true }
 euro-focus = { workspace = true, features = ["async"] }
 euro-fs = { workspace = true }
 euro-native-messaging = { workspace = true }
-euro-proto = { workspace = true }
-euro-secret = { workspace = true }
-hex = "0.4.3"
 humantime-serde = { workspace = true }
-image.workspace = true
-lazy_static = { version = "1.5.0" }
-rand = { workspace = true }
+image = { workspace = true }
 regex = "1.12.2"
 resvg = { version = "0.45" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-sha2 = "0.10.8"
 specta = { workspace = true, features = ["derive", "function"] }
-specta-typescript = { version = "0.0.9" }
-taurpc = { version = "0.5.1" }
-tempfile = "3.23.0"
+taurpc = { version = "0.5.2" }
 thiserror = { workspace = true }
 tiny-skia = "0.11"
-tokio = { workspace = true, default-features = false, features = [
+tokio = { workspace = true, features = [
   "fs",
   "macros",
   "rt-multi-thread",
 ] }
 tokio-stream = { workspace = true }
-tonic = { workspace = true, features = [
-  "channel",
-  "router",
-  "server",
-  "tls-native-roots"
-] }
 tracing = { workspace = true }
 url = { version = "2.5.7" }
-usvg = { version = "0.45", default-features = true }
+usvg = { version = "0.45" }
 uuid = { workspace = true }
 
 [dev-dependencies]
