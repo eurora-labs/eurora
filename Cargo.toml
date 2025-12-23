@@ -4,6 +4,7 @@ members = [
   "crates/app/euro-*",
   "crates/backend/euro-*",
   "crates/common/agent-chain",
+  "crates/common/agent-chain-core",
   "crates/common/agent-chain-eurora",
   "crates/common/agent-chain-macros",
   "crates/common/agent-graph",
@@ -21,6 +22,7 @@ license-file = "LICENSE.md"
 
 [workspace.dependencies]
 agent-chain = { path = "crates/common/agent-chain" }
+agent-chain-core = { path = "crates/common/agent-chain-core" }
 agent-chain-eurora = { path = "crates/common/agent-chain-eurora" }
 agent-chain-macros = { path = "crates/common/agent-chain-macros" }
 agent-graph = { path = "crates/common/agent-graph" }

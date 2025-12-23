@@ -1,6 +1,6 @@
 //! Default asset implementation for unsupported activity types
 
-use agent_chain::{BaseMessage, HumanMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 

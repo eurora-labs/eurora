@@ -18,7 +18,7 @@
 //! # Quick Start
 //!
 //! ```ignore
-//! use agent_chain::{init_chat_model, HumanMessage};
+//! use agent_chain_core::{init_chat_model, HumanMessage};
 //!
 //! // Initialize a model - provider is inferred from name
 //! let model = init_chat_model("claude-sonnet-4-5-20250929", None)?;
@@ -48,29 +48,7 @@
 //! - `dynamic-image`: Image processing support
 //! - `specta`: Specta derive support
 
-pub mod chat_models;
-pub mod error;
-pub mod messages;
 pub mod providers;
-pub mod tools;
-
-// Re-export error types
-pub use error::{Error, Result};
-
-// Re-export core chat model types
-pub use chat_models::{
-    BoundChatModel, ChatChunk, ChatModel, ChatModelExt, ChatResult, ChatResultMetadata, ChatStream,
-    DynBoundChatModel, DynChatModelExt, LangSmithParams, ToolChoice, UsageMetadata,
-};
-
-// Re-export message types
-pub use messages::{
-    AIMessage, AnyMessage, BaseMessage, ContentPart, HasId, HumanMessage, ImageDetail, ImageSource,
-    MessageContent, SystemMessage, ToolCall, ToolMessage,
-};
-
-// Re-export tool types
-pub use tools::{Tool, ToolDefinition, tool};
 
 // Re-export providers
 pub use providers::*;
@@ -79,6 +57,8 @@ pub use providers::*;
 pub use async_trait::async_trait;
 
 use std::sync::Arc;
+
+pub use agent_chain_core::*;
 
 /// Initialize a chat model from the model name with automatic provider inference.
 ///
@@ -107,7 +87,7 @@ use std::sync::Arc;
 /// # Examples
 ///
 /// ```ignore
-/// use agent_chain::init_chat_model;
+/// use agent_chain_core::init_chat_model;
 ///
 /// // Provider inferred from model name
 /// let claude = init_chat_model("claude-sonnet-4-5-20250929", None)?;
@@ -156,7 +136,7 @@ pub fn init_chat_model(
 /// # Example
 ///
 /// ```ignore
-/// use agent_chain::ChatModelBuilder;
+/// use agent_chain_core::ChatModelBuilder;
 ///
 /// let model = ChatModelBuilder::new("claude-sonnet-4-5-20250929")
 ///     .provider("anthropic")

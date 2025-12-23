@@ -7,11 +7,11 @@ description = "Agent graph library"
 license = "MIT"
 
 [dependencies]
-agent-chain = "0.0.1"
-agent-graph-macros = "0.0.1"
+agent-chain-core = { workspace = true }
+agent-graph-macros = { workspace = true }
 async-trait = { workspace = true }
-futures.workspace = true
+futures = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
-thiserror.workspace = true
+serde_json = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

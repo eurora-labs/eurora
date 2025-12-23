@@ -1,4 +1,4 @@
-use agent_chain::{AIMessage, BaseMessage, HumanMessage};
+use agent_chain_core::{AIMessage, BaseMessage, HumanMessage};
 use euro_activity::AssetFunctionality;
 use euro_personal_db::{Conversation, NewAsset, PersonalDatabaseManager, UpdateConversation};
 use euro_timeline::TimelineManager;

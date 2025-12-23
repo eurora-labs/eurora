@@ -4,7 +4,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum PromptKitError {
     #[error("{0}")]
-    AgentChainError(#[from] agent_chain::Error),
+    AgentChainError(#[from] agent_chain_core::Error),
 
     #[error("{0}")]
     EuroraError(EuroraError),
