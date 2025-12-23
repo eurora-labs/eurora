@@ -7,23 +7,13 @@ description = "Timeline storage for capturing system state over time"
 [dependencies]
 agent-chain-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
-async-trait = { workspace = true }
-base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-dirs = { workspace = true }
 euro-activity = { workspace = true }
 euro-focus = { workspace = true, features = ["async"] }
-euro-fs = { workspace = true }
-euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true }
-euro-proto = { workspace = true }
 image = { workspace = true }
 keyring = { workspace = true }
-orion = "0.17.11"
-parking_lot = { workspace = true }
-rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = [
   "macros",
@@ -31,11 +21,7 @@ tokio = { workspace = true, features = [
   "sync",
   "time",
 ] }
-tokio-stream = { workspace = true }
-tonic = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
-x11rb = "0.13.2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.61.2", features = [
