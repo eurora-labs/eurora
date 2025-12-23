@@ -1,6 +1,6 @@
 //! Twitter snapshot implementation
 
-use agent_chain::{BaseMessage, HumanMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use euro_native_messaging::types::NativeTwitterSnapshot;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

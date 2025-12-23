@@ -1,4 +1,4 @@
-use agent_chain::BaseMessage;
+use agent_chain_core::BaseMessage;
 use chrono::Utc;
 
 use crate::{NewChatMessage, db::PersonalDatabaseManager, types::ChatMessage};
