@@ -28,7 +28,7 @@ resvg = { version = "0.45" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
-taurpc = { version = "0.5.1" }
+taurpc = { version = "0.5.2" }
 thiserror = { workspace = true }
 tiny-skia = "0.11"
 tokio = { workspace = true, features = [
