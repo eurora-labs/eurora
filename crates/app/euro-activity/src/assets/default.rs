@@ -1,7 +1,7 @@
 //! Default asset implementation for unsupported activity types
 
+use agent_chain::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
-use euro_llm::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -99,7 +99,7 @@ impl AssetFunctionality for DefaultAsset {
     }
 
     /// Construct a message for LLM interaction
-    fn construct_messages(&self) -> Vec<Message> {
+    fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = format!("I am working with an application called '{}'", self.name);
 
         if let Some(description) = &self.description {
@@ -115,10 +115,7 @@ impl AssetFunctionality for DefaultAsset {
 
         content.push_str(" and have a question about it.");
 
-        vec![Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }]
+        vec![HumanMessage::new(content).into()]
     }
 
     /// Get context chip for UI integration (returns None for default assets)
@@ -226,18 +223,14 @@ mod tests {
         .with_metadata("version".to_string(), "1.0.0".to_string())
         .with_metadata("status".to_string(), "active".to_string());
 
-        let message = asset.construct_messages();
-        let message = message[0].clone();
+        let messages = asset.construct_messages();
+        let message = messages[0].clone();
 
-        match message.content {
-            MessageContent::Text(text) => {
-                assert!(text.contains("Test App"));
-                assert!(text.contains("A test application"));
-                assert!(text.contains("version: 1.0.0"));
-                assert!(text.contains("status: active"));
-            }
-            _ => panic!("Expected text content"),
-        }
+        let text = message.content();
+        assert!(text.contains("Test App"));
+        assert!(text.contains("A test application"));
+        assert!(text.contains("version: 1.0.0"));
+        assert!(text.contains("status: active"));
     }
 
     #[test]
@@ -268,10 +261,10 @@ mod tests {
         )
         .with_metadata("version".to_string(), "1.0.0".to_string())
         .with_metadata("status".to_string(), "active".to_string());
-        let msg = AssetFunctionality::construct_messages(&asset);
-        let msg = msg[0].clone();
+        let messages = AssetFunctionality::construct_messages(&asset);
+        let msg = messages[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(matches!(msg, BaseMessage::Human(_)));
         assert!(chip.is_none());
     }
 }
