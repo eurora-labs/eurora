@@ -9,7 +9,7 @@
 //! Images can be provided as URLs or base64-encoded data.
 //!
 //! ```ignore
-//! use agent_chain::messages::{HumanMessage, ContentPart, ImageSource};
+//! use agent_chain_core::messages::{HumanMessage, ContentPart, ImageSource};
 //!
 //! // Simple text message
 //! let msg = HumanMessage::new("Hello!");
@@ -267,7 +267,7 @@ impl HumanMessage {
     /// # Example
     ///
     /// ```ignore
-    /// use agent_chain::messages::{HumanMessage, ContentPart, ImageSource};
+    /// use agent_chain_core::messages::{HumanMessage, ContentPart, ImageSource};
     ///
     /// let msg = HumanMessage::with_content(vec![
     ///     ContentPart::Text { text: "What's in this image?".into() },
