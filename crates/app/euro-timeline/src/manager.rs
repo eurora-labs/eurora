@@ -2,7 +2,7 @@
 
 use std::{path::PathBuf, sync::Arc};
 
-use agent_chain::BaseMessage;
+use agent_chain_core::BaseMessage;
 use euro_activity::{ActivityAsset, SavedAssetInfo, types::SnapshotFunctionality};
 use tokio::sync::Mutex;
 use tracing::debug;

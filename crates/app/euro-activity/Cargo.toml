@@ -6,7 +6,7 @@ edition = "2024"
 description = "Refactored activity system with enum-based type-safe design"
 
 [dependencies]
-agent-chain = { workspace = true, features = ["specta"] }
+agent-chain-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
