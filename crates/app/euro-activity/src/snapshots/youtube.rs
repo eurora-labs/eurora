@@ -1,6 +1,6 @@
 //! YouTube snapshot implementation
 
-use euro_llm::{ContentPart, ImageSource, Message, MessageContent, Role};
+use agent_chain::{BaseMessage, ContentPart, HumanMessage, ImageSource};
 use euro_native_messaging::types::NativeYoutubeSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -134,7 +134,7 @@ impl YoutubeSnapshot {
 
 impl SnapshotFunctionality for YoutubeSnapshot {
     /// Construct a message for LLM interaction
-    fn construct_messages(&self) -> Vec<Message> {
+    fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content_parts = vec![ContentPart::Text {
             text: format!(
                 "This is a frame from a YouTube video at {}s{}{}",
@@ -155,15 +155,14 @@ impl SnapshotFunctionality for YoutubeSnapshot {
         // Add image if available
         if let Some(image) = &self.video_frame {
             content_parts.push(ContentPart::Image {
-                image_source: ImageSource::Url(format!("data:image/png;base64,{}", image.clone())),
+                source: ImageSource::Url {
+                    url: format!("data:image/png;base64,{}", image.clone()),
+                },
                 detail: None,
             });
         }
 
-        vec![Message {
-            role: Role::User,
-            content: MessageContent::Multimodal(content_parts),
-        }]
+        vec![HumanMessage::with_content(content_parts).into()]
     }
 
     fn get_updated_at(&self) -> u64 {

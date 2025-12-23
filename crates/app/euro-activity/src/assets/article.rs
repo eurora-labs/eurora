@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 
+use agent_chain::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
-use euro_llm::{Message, MessageContent, Role};
 use euro_native_messaging::NativeArticleAsset;
 use serde::{Deserialize, Serialize};
 
@@ -106,7 +106,7 @@ impl AssetFunctionality for ArticleAsset {
     }
 
     /// Construct a message for LLM interaction
-    fn construct_messages(&self) -> Vec<Message> {
+    fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = format!(
             "I am reading an article titled '{}' and have a question about it.",
             self.title
@@ -121,10 +121,7 @@ impl AssetFunctionality for ArticleAsset {
             self.content
         ));
 
-        vec![Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }]
+        vec![HumanMessage::new(content).into()]
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
@@ -311,10 +308,10 @@ mod tests {
             Some("Test Author".to_string()),
             Some("2024-01-01".to_string()),
         );
-        let msg = AssetFunctionality::construct_messages(&asset);
-        let msg = msg[0].clone();
+        let messages = AssetFunctionality::construct_messages(&asset);
+        let msg = messages[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(matches!(msg, BaseMessage::Human(_)));
         assert!(chip.is_some());
     }
 }
