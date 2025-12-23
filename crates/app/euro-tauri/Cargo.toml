@@ -29,7 +29,7 @@ dotenv = "0.15.0"
 euro-activity = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
-euro-personal-db = { workspace = true }
+euro-personal-db = { workspace = true, features = ["specta"] }
 euro-prompt-kit = { workspace = true }
 euro-proto = { workspace = true }
 euro-proto-client = { workspace = true }
