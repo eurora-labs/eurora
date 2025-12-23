@@ -3,7 +3,7 @@
 //! This crate provides:
 //! - Message types for LLM conversations (human, AI, system, tool)
 //! - Tool trait and `#[tool]` macro for function calling
-//! - Chat model abstractions and provider integrations
+//! - Chat model abstractions
 //! - Support for multiple providers (Anthropic, OpenAI, etc.)
 //!
 //! # Architecture
@@ -13,22 +13,6 @@
 //! - **Core layer** ([`chat_model`]): Base `ChatModel` trait that all providers implement
 //! - **Message layer** ([`messages`]): Message types for conversations
 //! - **Tools layer** ([`tools`]): Tool definitions and the `#[tool]` macro
-//!
-//! # Quick Start
-//!
-//! ```ignore
-//! use agent_chain_core::{init_chat_model, HumanMessage};
-//!
-//! // Initialize a model - provider is inferred from name
-//! let model = init_chat_model("claude-sonnet-4-5-20250929", None)?;
-//!
-//! // Or specify explicitly
-//! let model = init_chat_model("my-custom-model", Some("openai"))?;
-//!
-//! // Use the model
-//! let messages = vec![HumanMessage::new("Hello!").into()];
-//! let response = model.generate(messages, None).await?;
-//! ```
 //!
 //! # Feature Flags
 //!
