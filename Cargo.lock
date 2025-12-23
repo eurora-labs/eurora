@@ -3192,6 +3192,7 @@ dependencies = [
 name = "euro-activity"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "anyhow",
  "async-trait",
  "base64 0.22.1",
@@ -3203,7 +3204,6 @@ dependencies = [
  "euro-encrypt",
  "euro-focus",
  "euro-fs",
- "euro-llm",
  "euro-native-messaging",
  "euro-proto",
  "euro-secret",
@@ -3465,10 +3465,10 @@ dependencies = [
 name = "euro-personal-db"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "anyhow",
  "base64 0.22.1",
  "chrono",
- "euro-llm",
  "euro-secret",
  "futures",
  "image",
@@ -3494,7 +3494,6 @@ dependencies = [
  "agent-graph",
  "anyhow",
  "async_from",
- "euro-llm",
  "serde",
  "thiserror 2.0.17",
  "tokio-stream",
@@ -3627,7 +3626,6 @@ dependencies = [
  "dotenv",
  "euro-activity",
  "euro-encrypt",
- "euro-llm",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-prompt-kit",
@@ -3688,6 +3686,7 @@ dependencies = [
 name = "euro-timeline"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "anyhow",
  "async-trait",
  "base64 0.22.1",
@@ -3696,7 +3695,6 @@ dependencies = [
  "euro-activity",
  "euro-focus",
  "euro-fs",
- "euro-llm",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-proto",

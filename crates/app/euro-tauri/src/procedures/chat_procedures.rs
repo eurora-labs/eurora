@@ -1,5 +1,5 @@
+use agent_chain::{AIMessage, BaseMessage, HumanMessage};
 use euro_activity::AssetFunctionality;
-use euro_llm::{Message, MessageContent, Role};
 use euro_personal_db::{Conversation, NewAsset, PersonalDatabaseManager, UpdateConversation};
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
@@ -62,7 +62,7 @@ impl ChatApi for ChatApiImpl {
             });
         });
 
-        let mut messages: Vec<Message> = Vec::new();
+        let mut messages: Vec<BaseMessage> = Vec::new();
 
         // Add previous messages from this conversation
         if let Ok(previous_messages) = personal_db.get_chat_messages(&conversation.id).await {
@@ -91,7 +91,7 @@ impl ChatApi for ChatApiImpl {
             let previous_messages = previous_messages
                 .into_iter()
                 .map(|message| message.into())
-                .collect::<Vec<Message>>();
+                .collect::<Vec<BaseMessage>>();
 
             messages.extend(previous_messages);
         }
@@ -111,10 +111,7 @@ impl ChatApi for ChatApiImpl {
             );
         }
 
-        let user_message = Message {
-            role: Role::User,
-            content: MessageContent::Text(query.text.clone()),
-        };
+        let user_message: BaseMessage = HumanMessage::new(query.text.clone()).into();
 
         // Save chat message into db
         let chat_message = personal_db
@@ -225,10 +222,7 @@ impl ChatApi for ChatApiImpl {
         personal_db
             .insert_chat_message_from_message(
                 &conversation.id,
-                Message {
-                    role: Role::Assistant,
-                    content: MessageContent::Text(complete_response.clone()),
-                },
+                AIMessage::new(complete_response.clone()).into(),
                 false,
             )
             .await

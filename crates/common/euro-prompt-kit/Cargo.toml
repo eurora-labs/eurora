@@ -10,7 +10,6 @@ agent-chain-eurora = { workspace = true }
 agent-graph = { workspace = true }
 anyhow = { workspace = true }
 async_from = { workspace = true }
-euro-llm = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tokio-stream = { workspace = true }
