@@ -7,7 +7,7 @@ description = "Agent chain library"
 license = "MIT"
 
 [dependencies]
-agent-chain-macros = { workspace = true }
+agent-chain-macros = "0.0.1"
 async-stream = "0.3"
 async-trait = { workspace = true }
 futures.workspace = true
