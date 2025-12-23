@@ -1,8 +1,8 @@
 use std::pin::Pin;
 
-use agent_chain::chat_models::ChatModel;
-use agent_chain::messages::BaseMessage;
 use agent_chain::providers::openai::ChatOpenAI;
+use agent_chain_core::chat_models::ChatModel;
+use agent_chain_core::messages::BaseMessage;
 use agent_chain_eurora::proto::chat::{
     ProtoAiMessage, ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
@@ -95,7 +95,7 @@ impl ProtoChatService for PromptService {
         debug!("Received chat_stream request");
         let request_inner = request.into_inner();
 
-        // Convert ProtoBaseMessage to agent_chain::BaseMessage
+        // Convert ProtoBaseMessage to agent_chain_core::BaseMessage
         let messages: Vec<BaseMessage> = request_inner
             .messages
             .into_iter()

@@ -8,7 +8,7 @@
 //!
 //! ```ignore
 //! use agent_chain_eurora::{ChatEurora, EuroraConfig};
-//! use agent_chain::{ChatModel, HumanMessage};
+//! use agent_chain_core::{ChatModel, HumanMessage};
 //! use url::Url;
 //!
 //! #[tokio::main]
@@ -34,7 +34,7 @@
 //!
 //! ```ignore
 //! use agent_chain_eurora::{ChatEurora, EuroraConfig};
-//! use agent_chain::{ChatModel, HumanMessage};
+//! use agent_chain_core::{ChatModel, HumanMessage};
 //! use futures::StreamExt;
 //! use url::Url;
 //!
@@ -75,7 +75,7 @@ pub use error::EuroraError;
 pub use provider::ChatEurora;
 
 // Re-export agent-chain types that users will need
-pub use agent_chain::{ChatModel, ChatResult, ChatStream};
+pub use agent_chain_core::{ChatModel, ChatResult, ChatStream};
 
 #[cfg(test)]
 mod tests {
