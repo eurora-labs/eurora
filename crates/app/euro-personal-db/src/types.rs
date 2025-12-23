@@ -1,5 +1,5 @@
+use agent_chain::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
 use chrono::{DateTime, Utc};
-use euro_llm::{Message, MessageContent, Role};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use sqlx::FromRow;
@@ -70,15 +70,12 @@ pub struct ChatMessageAsset {
     pub created_at: String,
 }
 
-impl From<ChatMessage> for Message {
+impl From<ChatMessage> for BaseMessage {
     fn from(value: ChatMessage) -> Self {
-        Message {
-            role: match value.role.as_str() {
-                "user" => Role::User,
-                "assistant" => Role::Assistant,
-                _ => Role::System,
-            },
-            content: MessageContent::Text(value.content),
+        match value.role.as_str() {
+            "user" => HumanMessage::new(value.content).into(),
+            "assistant" => AIMessage::new(value.content).into(),
+            _ => SystemMessage::new(value.content).into(),
         }
     }
 }

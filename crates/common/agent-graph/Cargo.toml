@@ -1,14 +1,14 @@
 [package]
 name = "agent-graph"
-version = "0.0.0"
+version = "0.0.1"
 authors.workspace = true
 edition.workspace = true
 description = "Agent graph library"
 license = "MIT"
 
 [dependencies]
-agent-chain = { workspace = true }
-agent-graph-macros = { workspace = true }
+agent-chain = "0.0.1"
+agent-graph-macros = "0.0.1"
 async-trait = { workspace = true }
 futures.workspace = true
 serde = { workspace = true, features = ["derive"] }

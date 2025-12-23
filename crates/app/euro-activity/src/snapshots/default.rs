@@ -1,6 +1,6 @@
 //! Default snapshot implementation for unsupported activity types
 
-use euro_llm::{Message, MessageContent, Role};
+use agent_chain::{BaseMessage, HumanMessage};
 use serde::{Deserialize, Serialize};
 
 use crate::types::SnapshotFunctionality;
@@ -112,7 +112,7 @@ impl DefaultSnapshot {
 
 impl SnapshotFunctionality for DefaultSnapshot {
     /// Construct a message for LLM interaction
-    fn construct_messages(&self) -> Vec<Message> {
+    fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = format!("Current application state: {}", self.state);
 
         if !self.metadata.is_empty() {
@@ -122,10 +122,7 @@ impl SnapshotFunctionality for DefaultSnapshot {
             }
         }
 
-        vec![Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }]
+        vec![HumanMessage::new(content).into()]
     }
 
     fn get_updated_at(&self) -> u64 {
@@ -283,28 +280,20 @@ mod tests {
         snapshot.add_metadata("mode".to_string(), "debug".to_string());
 
         let message = snapshot.construct_messages()[0].clone();
+        let text = message.content();
 
-        match message.content {
-            MessageContent::Text(text) => {
-                assert!(text.contains("Application running"));
-                assert!(text.contains("version: 1.0.0"));
-                assert!(text.contains("mode: debug"));
-                assert!(text.contains("additional context"));
-            }
-            _ => panic!("Expected text content"),
-        }
+        assert!(text.contains("Application running"));
+        assert!(text.contains("version: 1.0.0"));
+        assert!(text.contains("mode: debug"));
+        assert!(text.contains("additional context"));
     }
 
     #[test]
     fn test_message_construction_no_metadata() {
         let snapshot = DefaultSnapshot::new("Simple state".to_string());
         let message = snapshot.construct_messages()[0].clone();
+        let text = message.content();
 
-        match message.content {
-            MessageContent::Text(text) => {
-                assert_eq!(text, "Current application state: Simple state");
-            }
-            _ => panic!("Expected text content"),
-        }
+        assert_eq!(text, "Current application state: Simple state");
     }
 }
