@@ -6,8 +6,8 @@
 //! # Example
 //!
 //! ```ignore
-//! use agent_chain::ollama::ChatOllama;
-//! use agent_chain::tools::tool;
+//! use agent_chain_core::ollama::ChatOllama;
+//! use agent_chain_core::tools::tool;
 //!
 //! #[tool]
 //! fn multiply(a: i64, b: i64) -> i64 {
@@ -51,7 +51,7 @@ const DEFAULT_API_BASE: &str = "http://localhost:11434";
 /// # Example
 ///
 /// ```ignore
-/// use agent_chain::ollama::ChatOllama;
+/// use agent_chain_core::ollama::ChatOllama;
 ///
 /// let model = ChatOllama::new("llama3.1")
 ///     .temperature(0.7)
