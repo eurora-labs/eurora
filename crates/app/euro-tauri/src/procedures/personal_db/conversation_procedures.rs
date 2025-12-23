@@ -1,4 +1,4 @@
-use euro_llm::Message;
+use agent_chain::BaseMessage;
 use euro_personal_db::{Conversation, PersonalDatabaseManager};
 use tauri::{Manager, Runtime};
 
@@ -20,7 +20,7 @@ pub trait ConversationApi {
     async fn get_messages<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         conversation_id: String,
-    ) -> Result<Vec<Message>, String>;
+    ) -> Result<Vec<BaseMessage>, String>;
 }
 
 #[derive(Clone)]
@@ -67,7 +67,7 @@ impl ConversationApi for ConversationApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         conversation_id: String,
-    ) -> Result<Vec<Message>, String> {
+    ) -> Result<Vec<BaseMessage>, String> {
         let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
         let chat_messages = personal_db
@@ -78,6 +78,6 @@ impl ConversationApi for ConversationApiImpl {
         Ok(chat_messages
             .into_iter()
             .map(|message| message.into())
-            .collect::<Vec<Message>>())
+            .collect::<Vec<BaseMessage>>())
     }
 }

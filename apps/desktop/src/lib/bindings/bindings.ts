@@ -4,6 +4,27 @@ import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurp
 type TAURI_CHANNEL<T> = (response: T) => void
 
 
+/**
+ * An AI message in the conversation.
+ */
+export type AIMessage = { 
+/**
+ * The message content
+ */
+content: string; 
+/**
+ * Optional unique identifier
+ */
+id: string | null; 
+/**
+ * Tool calls made by the AI
+ */
+tool_calls?: ToolCall[]; 
+/**
+ * Additional metadata
+ */
+additional_kwargs?: Partial<{ [key in string]: JsonValue }> }
+
 export type AppSettings = { 
 /**
  * General settings
@@ -23,21 +44,40 @@ export type BackendSettings = { backendType: BackendType }
 export type BackendType = "None" | "Ollama" | "Eurora" | "OpenAI" | "Anthropic"
 
 /**
- * A part of multimodal message content.
+ * A unified message type that can represent any message role.
+ */
+export type BaseMessage = 
+/**
+ * A human message
+ */
+({ type: "Human" } & HumanMessage) | 
+/**
+ * A system message
+ */
+({ type: "System" } & SystemMessage) | 
+/**
+ * An AI message
+ */
+({ type: "AI" } & AIMessage) | 
+/**
+ * A tool result message
+ */
+({ type: "Tool" } & ToolMessage)
+
+/**
+ * A content part in a multimodal message.
+ * 
+ * Messages can contain multiple content parts, allowing for mixed text and images.
  */
 export type ContentPart = 
 /**
- * Text content
+ * Text content.
  */
 { type: "text"; text: string } | 
 /**
- * Image content
+ * Image content.
  */
-{ type: "image"; image_source: ImageSource; detail: string | null } | 
-/**
- * Audio content
- */
-{ type: "audio"; audio_url: string; format: string | null }
+{ type: "image"; source: ImageSource; detail?: ImageDetail | null }
 
 /**
  * Context chip for UI integration
@@ -46,87 +86,93 @@ export type ContextChip = { id: string; extension_id: string; name: string; attr
 
 export type Conversation = { id: string; title: string | null; created_at: string; updated_at: string }
 
-/**
- * A function call within a tool call.
- */
-export type FunctionCall = { 
-/**
- * Name of the function to call
- */
-name: string; 
-/**
- * Arguments to pass to the function (JSON string)
- */
-arguments: string }
-
 export type GeneralSettings = { 
 /**
  * Whether to start the app on autostart
  */
 autostart: boolean }
 
+/**
+ * A human message in the conversation.
+ * 
+ * Human messages support both simple text content and multimodal content
+ * with images. Use [`HumanMessage::new`] for simple text messages and
+ * [`HumanMessage::with_content`] for multimodal messages.
+ */
+export type HumanMessage = { 
+/**
+ * The message content (text or multipart)
+ */
+content: MessageContent; 
+/**
+ * Optional unique identifier
+ */
+id: string | null; 
+/**
+ * Additional metadata
+ */
+additional_kwargs?: Partial<{ [key in string]: JsonValue }> }
+
+/**
+ * Image detail level for vision models.
+ * 
+ * This controls how the model processes the image:
+ * - `Low`: Faster, lower token cost, suitable for simple images
+ * - `High`: More detailed analysis, higher token cost
+ * - `Auto`: Let the model decide based on image size
+ */
+export type ImageDetail = "low" | "high" | "auto"
+
+/**
+ * Source of an image for multimodal messages.
+ */
 export type ImageSource = 
 /**
- * The URL or base64-encoded image data
+ * Image from a URL.
  */
-{ Url: string }
+{ type: "url"; url: string } | 
+/**
+ * Base64-encoded image data.
+ */
+{ type: "base_64"; media_type: string; data: string }
+
+export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
 /**
- * A message in a conversation.
- */
-export type Message = { 
-/**
- * The role of the message sender
- */
-role: Role; 
-/**
- * The content of the message
- */
-content: MessageContent }
-
-/**
- * Content of a message, which can be text or multimodal.
+ * Message content that can be either simple text or multipart.
  */
 export type MessageContent = 
 /**
- * Simple text content
+ * Simple text content.
  */
 string | 
 /**
- * Multimodal content with text and other media
+ * Multiple content parts (for multimodal messages).
  */
-ContentPart[] | 
-/**
- * Tool-related content (calls and responses)
- */
-ToolContent
+ContentPart[]
 
 export type Query = { text: string; assets: string[] }
 
 export type ResponseChunk = { chunk: string }
 
 /**
- * The role of a message sender.
+ * A system message in the conversation.
  */
-export type Role = 
+export type SystemMessage = { 
 /**
- * Message from the user
+ * The message content
  */
-"user" | 
+content: string; 
 /**
- * Message from the AI assistant
+ * Optional unique identifier
  */
-"assistant" | 
+id: string | null; 
 /**
- * System message (instructions, context)
+ * Additional metadata
  */
-"system" | 
-/**
- * Message from a tool/function call
- */
-"tool"
+additional_kwargs?: Partial<{ [key in string]: JsonValue }> }
 
 export type TelemetrySettings = { 
 /**
@@ -149,7 +195,7 @@ distinctId: string | null }
 export type TimelineAppEvent = { name: string; color: string | null; icon_base64: string | null }
 
 /**
- * A tool/function call made by the AI.
+ * A tool call made by the AI model.
  */
 export type ToolCall = { 
 /**
@@ -157,30 +203,34 @@ export type ToolCall = {
  */
 id: string; 
 /**
- * The type of tool call (usually "function")
+ * Name of the tool to call
  */
-type: string; 
+name: string; 
 /**
- * The function being called
+ * Arguments for the tool call as a JSON object
  */
-function: FunctionCall }
+args: JsonValue }
 
 /**
- * Tool-related message content.
+ * A tool message containing the result of a tool call.
  */
-export type ToolContent = { 
+export type ToolMessage = { 
 /**
- * Tool calls made by the assistant
+ * The tool result content
  */
-tool_calls: ToolCall[] | null; 
+content: string; 
 /**
- * Tool call ID if this is a tool response
+ * The ID of the tool call this message is responding to
  */
-tool_call_id: string | null; 
+tool_call_id: string; 
 /**
- * Optional text content alongside tool data
+ * Optional unique identifier
  */
-text: string | null }
+id: string | null; 
+/**
+ * Additional metadata
+ */
+additional_kwargs?: Partial<{ [key in string]: JsonValue }> }
 
 const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["conversation","channel","query"],"switch_conversation":["conversation_id"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'personal_db.conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"]}', 'personal_db.message':'{"get":["conversation_id","limit","offset"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
@@ -192,10 +242,10 @@ switch_conversation: (conversationId: string) => Promise<Conversation>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "onboarding": {get_browser_extension_download_url: () => Promise<string>},
 "personal_db.conversation": {create: () => Promise<Conversation>, 
-get_messages: (conversationId: string) => Promise<Message[]>, 
+get_messages: (conversationId: string) => Promise<BaseMessage[]>, 
 list: (limit: number, offset: number) => Promise<Conversation[]>, 
 new_conversation_added: (conversation: Conversation) => Promise<void>},
-"personal_db.message": {get: (conversationId: string, limit: number | null, offset: number | null) => Promise<Message[]>},
+"personal_db.message": {get: (conversationId: string, limit: number | null, offset: number | null) => Promise<BaseMessage[]>},
 "prompt": {disconnect: () => Promise<null>, 
 get_service_name: () => Promise<string>, 
 prompt_service_change: (serviceName: string | null) => Promise<void>, 
