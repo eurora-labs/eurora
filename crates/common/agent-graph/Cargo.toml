@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 agent-chain = { workspace = true }
-agent-graph-macros = { workspace = true }
+agent-graph-macros = "0.0.1"
 async-trait = { workspace = true }
 futures.workspace = true
 serde = { workspace = true, features = ["derive"] }
