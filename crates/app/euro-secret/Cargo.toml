@@ -1,12 +1,15 @@
 [package]
 name = "euro-secret"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 description = "Secret management for Eurora"
 
 [dependencies]
 anyhow = { workspace = true }
-keyring = { workspace = true }
+keyring = { workspace = true, features = [
+  "apple-native",
+  "crypto-rust",
+  "linux-native",
+  "windows-native",
+] }
 serde = { workspace = true, features = ["std"] }
-tracing.workspace = true

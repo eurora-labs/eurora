@@ -1,8 +1,7 @@
 [package]
 name = "euro-prompt-kit"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 agent-chain = { workspace = true, features = [
@@ -12,7 +11,6 @@ agent-chain = { workspace = true, features = [
 ] }
 agent-chain-core = { workspace = true }
 agent-chain-eurora = { workspace = true }
-agent-graph = { workspace = true }
 anyhow = { workspace = true }
 async_from = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

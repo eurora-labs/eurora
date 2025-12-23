@@ -1,17 +1,17 @@
 [package]
 name = "agent-chain-eurora"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 description = "Eurora gRPC provider for agent-chain"
 publish = false
 
+[package.metadata.cargo-machete]
+ignored = ["tonic-prost"]
+
 [dependencies]
-agent-chain = { workspace = true }
 agent-chain-core = { workspace = true }
 async-stream = "0.3.1"
 async-trait = { workspace = true }
-chrono = { workspace = true }
 euro-user = { workspace = true }
 futures = { workspace = true }
 prost = { workspace = true }
@@ -20,7 +20,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-tokio-stream = { workspace = true }
 tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
 tonic-async-interceptor = "0.14.1"
 tonic-prost = { workspace = true }

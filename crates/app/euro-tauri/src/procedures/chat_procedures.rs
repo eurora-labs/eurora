@@ -65,12 +65,15 @@ impl ChatApi for ChatApiImpl {
         let mut messages: Vec<BaseMessage> = Vec::new();
 
         // Add previous messages from this conversation
-        if let Ok(previous_messages) = personal_db.get_chat_messages(&conversation.id).await {
-            // Collect assets for all messages that have them
+        if let Ok((_, previous_messages)) = personal_db
+            .get_conversation_with_messages(&conversation.id)
+            .await
+        {
+            // Collect assets for all messages
             let mut previous_assets: Vec<euro_personal_db::Asset> = Vec::new();
             for message in &previous_messages {
-                if message.has_assets
-                    && let Ok(assets) = personal_db.get_assets_by_chat_message_id(&message.id).await
+                if let Some(id) = message.id()
+                    && let Ok(assets) = personal_db.get_assets_by_message_id(id).await
                 {
                     previous_assets.extend(assets);
                 }
@@ -87,11 +90,6 @@ impl ChatApi for ChatApiImpl {
                     error!("Failed to load assets: {}", e);
                 }
             }
-
-            let previous_messages = previous_messages
-                .into_iter()
-                .map(|message| message.into())
-                .collect::<Vec<BaseMessage>>();
 
             messages.extend(previous_messages);
         }
@@ -113,9 +111,14 @@ impl ChatApi for ChatApiImpl {
 
         let user_message: BaseMessage = HumanMessage::new(query.text.clone()).into();
 
-        // Save chat message into db
-        let chat_message = personal_db
-            .insert_chat_message_from_message(&conversation.id, user_message.clone(), has_assets)
+        // Get next sequence number and save chat message into db
+        let next_seq = personal_db
+            .get_next_sequence_num(&conversation.id)
+            .await
+            .map_err(|e| format!("Failed to get sequence number: {e}"))?;
+
+        let saved_message = personal_db
+            .insert_base_message(&conversation.id, &user_message, next_seq)
             .await
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
@@ -143,7 +146,7 @@ impl ChatApi for ChatApiImpl {
                         activity_id: None,
                         relative_path: relative,
                         absolute_path: absolute,
-                        chat_message_id: Some(chat_message.id.clone()),
+                        message_id: Some(saved_message.id.clone()),
                         created_at: Some(info.saved_at),
                         updated_at: Some(info.saved_at),
                     })
@@ -219,12 +222,14 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
+        let ai_message: BaseMessage = AIMessage::new(complete_response.clone()).into();
+        let next_seq = personal_db
+            .get_next_sequence_num(&conversation.id)
+            .await
+            .map_err(|e| format!("Failed to get sequence number: {e}"))?;
+
         personal_db
-            .insert_chat_message_from_message(
-                &conversation.id,
-                AIMessage::new(complete_response.clone()).into(),
-                false,
-            )
+            .insert_base_message(&conversation.id, &ai_message, next_seq)
             .await
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 

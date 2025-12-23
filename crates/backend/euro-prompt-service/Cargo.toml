@@ -1,7 +1,6 @@
 [package]
 name = "euro-prompt-service"
 version = "0.0.0"
-authors.workspace = true
 edition.workspace = true
 publish = false
 
@@ -10,19 +9,11 @@ agent-chain = { workspace = true, features = ["openai"] }
 agent-chain-core = { workspace = true }
 agent-chain-eurora = { workspace = true }
 anyhow = { workspace = true }
-async-trait = "0.1.89"
-chrono = { workspace = true }
-dotenv = "0.15"
 euro-auth = { workspace = true }
-euro-ocr = { workspace = true }
-futures = { workspace = true }
-image = { workspace = true }
 prost = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }

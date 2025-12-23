@@ -1,17 +1,13 @@
 [package]
 name = "euro-remote-db"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 description = "Eurora Remote DB"
 
 [dependencies]
-anyhow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-futures = { workspace = true, features = ["std"] }
 ipnet = { version = "2", features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
-serde_json = "1.0"
 sqlx = { version = "0.8.6", features = [
   "chrono",
   "ipnet",
@@ -21,7 +17,5 @@ sqlx = { version = "0.8.6", features = [
   "tls-native-tls",
   "uuid",
 ] }
-tokio = { workspace = true, features = ["full", "tracing"] }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
-zerocopy = { version = "0.8.31" }

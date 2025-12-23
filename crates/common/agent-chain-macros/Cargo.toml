@@ -1,7 +1,6 @@
 [package]
 name = "agent-chain-macros"
 version = "0.0.2"
-authors.workspace = true
 edition.workspace = true
 description = "Procedural macros for agent-chain"
 license = "MIT"
@@ -10,6 +9,5 @@ license = "MIT"
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["extra-traits", "full"] }
