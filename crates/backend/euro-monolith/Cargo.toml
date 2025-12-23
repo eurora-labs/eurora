@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 axum = "0.8.7"
-dotenv = "0.15"
+dotenv = { workspace = true }
 euro-auth = { workspace = true }
 euro-auth-service = { workspace = true }
 euro-ocr-service = { workspace = true }
