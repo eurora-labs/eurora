@@ -3,7 +3,7 @@
 //! These conversions are straightforward since the proto types are designed
 //! to mirror agent-chain's message structure directly.
 
-use agent_chain::{
+use agent_chain_core::{
     AIMessage, BaseMessage, ContentPart, HumanMessage, ImageDetail, ImageSource, MessageContent,
     SystemMessage, ToolCall, ToolMessage,
 };
