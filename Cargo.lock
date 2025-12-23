@@ -3478,8 +3478,6 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "euro-secret",
- "futures",
- "image",
  "libsqlite3-sys",
  "rand 0.9.2",
  "serde",
@@ -3490,7 +3488,6 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
- "zerocopy",
 ]
 
 [[package]]
