@@ -30,7 +30,6 @@ sqlx = { version = "0.8.6", features = [
   "sqlite",
   "uuid",
 ] }
-tokio = { workspace = true, features = ["full", "tracing"] }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
