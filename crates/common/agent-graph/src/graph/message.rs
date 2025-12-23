@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 // Re-export HasId from agent-chain
-pub use agent_chain::messages::HasId;
+pub use agent_chain_core::messages::HasId;
 
 /// Merges two lists of messages, updating existing messages by ID.
 ///
