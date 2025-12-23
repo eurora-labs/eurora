@@ -243,15 +243,16 @@ dependencies = [
 
 [[package]]
 name = "agent-chain"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
- "agent-chain-macros",
+ "agent-chain-macros 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "async-stream",
  "async-trait",
  "futures",
  "reqwest 0.12.24",
  "serde",
  "serde_json",
+ "specta",
  "thiserror 2.0.17",
  "tokio",
  "tokio-util",
@@ -286,7 +287,18 @@ dependencies = [
 
 [[package]]
 name = "agent-chain-macros"
-version = "0.0.0"
+version = "0.0.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
+
+[[package]]
+name = "agent-chain-macros"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8667e98b0f45571c8d0aadcfcf0506022967f156dcf9a915d75f1cbc49d49f82"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -295,10 +307,10 @@ dependencies = [
 
 [[package]]
 name = "agent-graph"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "agent-chain",
- "agent-graph-macros",
+ "agent-graph-macros 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "async-trait",
  "futures",
  "serde",
@@ -309,7 +321,18 @@ dependencies = [
 
 [[package]]
 name = "agent-graph-macros"
-version = "0.0.0"
+version = "0.0.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
+
+[[package]]
+name = "agent-graph-macros"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c05018d5bfc622f85a63ad14fb605816f9085e01712cbbfc6713f761fdd545f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3191,6 +3214,7 @@ dependencies = [
 name = "euro-activity"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "anyhow",
  "async-trait",
  "base64 0.22.1",
@@ -3202,7 +3226,6 @@ dependencies = [
  "euro-encrypt",
  "euro-focus",
  "euro-fs",
- "euro-llm",
  "euro-native-messaging",
  "euro-proto",
  "euro-secret",
@@ -3346,7 +3369,7 @@ dependencies = [
 
 [[package]]
 name = "euro-llm"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3464,10 +3487,10 @@ dependencies = [
 name = "euro-personal-db"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "anyhow",
  "base64 0.22.1",
  "chrono",
- "euro-llm",
  "euro-secret",
  "futures",
  "image",
@@ -3493,7 +3516,6 @@ dependencies = [
  "agent-graph",
  "anyhow",
  "async_from",
- "euro-llm",
  "serde",
  "thiserror 2.0.17",
  "tokio-stream",
@@ -3613,6 +3635,7 @@ version = "0.0.0"
 name = "euro-tauri"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "agent-chain-eurora",
  "anyhow",
  "async_from",
@@ -3625,7 +3648,6 @@ dependencies = [
  "dotenv",
  "euro-activity",
  "euro-encrypt",
- "euro-llm",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-prompt-kit",
@@ -3686,6 +3708,7 @@ dependencies = [
 name = "euro-timeline"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "anyhow",
  "async-trait",
  "base64 0.22.1",
@@ -3694,7 +3717,6 @@ dependencies = [
  "euro-activity",
  "euro-focus",
  "euro-fs",
- "euro-llm",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-proto",
