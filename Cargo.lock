@@ -287,7 +287,7 @@ dependencies = [
 
 [[package]]
 name = "agent-chain-macros"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "agent-graph-macros"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "proc-macro2",
  "quote",
