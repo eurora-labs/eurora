@@ -26,14 +26,9 @@ impl MessageApi for MessageApiImpl {
     ) -> Result<Vec<BaseMessage>, String> {
         let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
-        let chat_messages = personal_db
-            .get_chat_messages(&conversation_id)
+        personal_db
+            .get_base_messages(&conversation_id)
             .await
-            .map_err(|e| format!("Failed to get chat messages: {e}"))?;
-
-        Ok(chat_messages
-            .into_iter()
-            .map(|message| message.into())
-            .collect::<Vec<BaseMessage>>())
+            .map_err(|e| format!("Failed to get chat messages: {e}"))
     }
 }

@@ -84,6 +84,9 @@ export type ContentPart =
  */
 export type ContextChip = { id: string; extension_id: string; name: string; attrs: Partial<{ [key in string]: string }>; icon: string | null; position: number | null }
 
+/**
+ * Database representation of a conversation.
+ */
 export type Conversation = { id: string; title: string | null; created_at: string; updated_at: string }
 
 export type GeneralSettings = { 
