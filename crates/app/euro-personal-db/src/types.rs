@@ -242,11 +242,12 @@ pub struct Activity {
 }
 
 /// Activity to conversation mapping.
-#[derive(FromRow, Debug, Clone)]
+#[derive(FromRow, Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
 pub struct ActivityConversation {
     pub activity_id: String,
     pub conversation_id: String,
-    pub created_at: String,
+    pub created_at: DateTime<Utc>,
 }
 
 /// File asset (screenshots, files, etc.).
@@ -262,11 +263,12 @@ pub struct Asset {
 }
 
 /// Message to asset mapping.
-#[derive(FromRow, Debug, Clone)]
+#[derive(FromRow, Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
 pub struct MessageAsset {
     pub message_id: String,
     pub asset_id: String,
-    pub created_at: String,
+    pub created_at: DateTime<Utc>,
 }
 
 /// A conversation with its messages, ready for use with agent-chain.
