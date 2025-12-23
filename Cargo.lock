@@ -3614,6 +3614,7 @@ version = "0.0.0"
 name = "euro-tauri"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "agent-chain-eurora",
  "anyhow",
  "async_from",
