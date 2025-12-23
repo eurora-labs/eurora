@@ -42,12 +42,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+#[cfg(feature = "specta")]
+use specta::Type;
+
 /// Image detail level for vision models.
 ///
 /// This controls how the model processes the image:
 /// - `Low`: Faster, lower token cost, suitable for simple images
 /// - `High`: More detailed analysis, higher token cost
 /// - `Auto`: Let the model decide based on image size
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageDetail {
@@ -58,6 +62,7 @@ pub enum ImageDetail {
 }
 
 /// Source of an image for multimodal messages.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ImageSource {
@@ -75,6 +80,7 @@ pub enum ImageSource {
 /// A content part in a multimodal message.
 ///
 /// Messages can contain multiple content parts, allowing for mixed text and images.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentPart {
@@ -104,6 +110,7 @@ impl From<String> for ContentPart {
 }
 
 /// A tool call made by the AI model.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCall {
     /// Unique identifier for this tool call
@@ -154,6 +161,7 @@ impl ToolCall {
 }
 
 /// Message content that can be either simple text or multipart.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum MessageContent {
@@ -221,6 +229,7 @@ impl From<Vec<ContentPart>> for MessageContent {
 /// Human messages support both simple text content and multimodal content
 /// with images. Use [`HumanMessage::new`] for simple text messages and
 /// [`HumanMessage::with_content`] for multimodal messages.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HumanMessage {
     /// The message content (text or multipart)
@@ -238,6 +247,17 @@ impl HumanMessage {
         Self {
             content: MessageContent::Text(content.into()),
             id: Some(Uuid::new_v4().to_string()),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
+    /// Create a new human message with simple text content and an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            content: MessageContent::Text(content.into()),
+            id: Some(id.into()),
             additional_kwargs: HashMap::new(),
         }
     }
@@ -263,6 +283,17 @@ impl HumanMessage {
         Self {
             content: MessageContent::Parts(parts),
             id: Some(Uuid::new_v4().to_string()),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
+    /// Create a new human message with multipart content and an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id_and_content(id: impl Into<String>, parts: Vec<ContentPart>) -> Self {
+        Self {
+            content: MessageContent::Parts(parts),
+            id: Some(id.into()),
             additional_kwargs: HashMap::new(),
         }
     }
@@ -323,6 +354,7 @@ impl HumanMessage {
 }
 
 /// A system message in the conversation.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SystemMessage {
     /// The message content
@@ -344,6 +376,17 @@ impl SystemMessage {
         }
     }
 
+    /// Create a new system message with an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            content: content.into(),
+            id: Some(id.into()),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
     /// Get the message content.
     pub fn content(&self) -> &str {
         &self.content
@@ -356,6 +399,7 @@ impl SystemMessage {
 }
 
 /// An AI message in the conversation.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AIMessage {
     /// The message content
@@ -381,11 +425,39 @@ impl AIMessage {
         }
     }
 
+    /// Create a new AI message with an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            content: content.into(),
+            id: Some(id.into()),
+            tool_calls: Vec::new(),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
     /// Create a new AI message with tool calls.
     pub fn with_tool_calls(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
         Self {
             content: content.into(),
             id: Some(Uuid::new_v4().to_string()),
+            tool_calls,
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
+    /// Create a new AI message with tool calls and an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id_and_tool_calls(
+        id: impl Into<String>,
+        content: impl Into<String>,
+        tool_calls: Vec<ToolCall>,
+    ) -> Self {
+        Self {
+            content: content.into(),
+            id: Some(id.into()),
             tool_calls,
             additional_kwargs: HashMap::new(),
         }
@@ -428,6 +500,7 @@ impl AIMessage {
 }
 
 /// A tool message containing the result of a tool call.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolMessage {
     /// The tool result content
@@ -452,6 +525,22 @@ impl ToolMessage {
         }
     }
 
+    /// Create a new tool message with an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id(
+        id: impl Into<String>,
+        content: impl Into<String>,
+        tool_call_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            content: content.into(),
+            tool_call_id: tool_call_id.into(),
+            id: Some(id.into()),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
     /// Get the message content.
     pub fn content(&self) -> &str {
         &self.content
@@ -469,6 +558,7 @@ impl ToolMessage {
 }
 
 /// A unified message type that can represent any message role.
+#[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum BaseMessage {
