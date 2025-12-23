@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 
+use agent_chain::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
-use euro_llm::{Message, MessageContent, Role};
 use euro_native_messaging::NativeYoutubeAsset;
 use serde::{Deserialize, Serialize};
 
@@ -92,20 +92,18 @@ impl AssetFunctionality for YoutubeAsset {
     }
 
     /// Construct a message for LLM interaction
-    fn construct_messages(&self) -> Vec<Message> {
-        vec![Message {
-            role: Role::User,
-            content: MessageContent::Text(format!(
-                "I am watching a YouTube video titled '{}' and have a question about it. \
-                 Here's the transcript of the video: \n {}",
-                self.title,
-                self.transcript
-                    .iter()
-                    .map(|line| format!("{} ({}s)", line.text, line.start))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            )),
-        }]
+    fn construct_messages(&self) -> Vec<BaseMessage> {
+        let content = format!(
+            "I am watching a YouTube video titled '{}' and have a question about it. \
+             Here's the transcript of the video: \n {}",
+            self.title,
+            self.transcript
+                .iter()
+                .map(|line| format!("{} ({}s)", line.text, line.start))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        vec![HumanMessage::new(content).into()]
     }
 
     /// Get context chip for UI integration
@@ -267,10 +265,10 @@ mod tests {
             vec![],
             0.0,
         );
-        let msg = AssetFunctionality::construct_messages(&asset);
-        let msg = msg[0].clone();
+        let messages = AssetFunctionality::construct_messages(&asset);
+        let msg = messages[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg.content, MessageContent::Text(_)));
+        assert!(matches!(msg, BaseMessage::Human(_)));
         assert!(chip.is_some());
     }
 }
