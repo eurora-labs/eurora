@@ -7,7 +7,7 @@ description = "Agent graph library"
 license = "MIT"
 
 [dependencies]
-agent-chain = { workspace = true }
+agent-chain = "0.0.1"
 agent-graph-macros = "0.0.1"
 async-trait = { workspace = true }
 futures.workspace = true
