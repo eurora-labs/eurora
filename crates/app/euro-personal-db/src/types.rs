@@ -1,4 +1,4 @@
-use agent_chain::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
+use agent_chain_core::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use specta::Type;
