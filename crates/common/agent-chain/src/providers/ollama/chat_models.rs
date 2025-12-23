@@ -6,8 +6,8 @@
 //! # Example
 //!
 //! ```ignore
-//! use agent_chain_core::ollama::ChatOllama;
-//! use agent_chain_core::tools::tool;
+//! use agent_chain::ollama::ChatOllama;
+//! use agent_chain::tools::tool;
 //!
 //! #[tool]
 //! fn multiply(a: i64, b: i64) -> i64 {
