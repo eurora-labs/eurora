@@ -1,3 +1,6 @@
+# NOTICE: This crate is no longer maintained. It has internally been replaced by https://github.com/eurora-labs/eurora/tree/main/crates/common/agent-chain.
+# It can be found here: PLACEHOLDER
+
 # euro-llm
 
 [![Crates.io](https://img.shields.io/crates/v/euro-llm.svg)](https://crates.io/crates/euro-llm)
