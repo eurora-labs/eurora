@@ -1,10 +1,9 @@
 use agent_chain::chat_models::ChatModel;
-use agent_chain::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
-use agent_chain::{ContentPart, ImageDetail, ImageSource, ollama::ChatOllama, openai::ChatOpenAI};
+use agent_chain::messages::BaseMessage;
+use agent_chain::{ollama::ChatOllama, openai::ChatOpenAI};
 use agent_chain_eurora::{ChatEurora, EuroraConfig};
 use anyhow::Result;
 use async_from::{AsyncTryFrom, async_trait};
-use euro_llm::{Message, Role};
 use serde::{Deserialize, Serialize};
 use tokio_stream::{Stream, StreamExt};
 use tracing::info;
@@ -116,7 +115,7 @@ impl PromptKitService {
 
     pub async fn chat_stream(
         &self,
-        messages: Vec<Message>,
+        messages: Vec<BaseMessage>,
     ) -> Result<
         std::pin::Pin<Box<dyn Stream<Item = Result<String, PromptKitError>> + Send>>,
         PromptKitError,
@@ -130,7 +129,7 @@ impl PromptKitService {
 
     async fn _chat_stream_eurora(
         &self,
-        messages: Vec<Message>,
+        messages: Vec<BaseMessage>,
     ) -> Result<
         std::pin::Pin<Box<dyn Stream<Item = Result<String, PromptKitError>> + Send>>,
         PromptKitError,
@@ -138,14 +137,8 @@ impl PromptKitService {
         if let LLMProvider::Eurora(llm) = &self.provider {
             info!("Starting Eurora chat stream with agent-chain");
 
-            // Convert euro_llm::Message to agent_chain::BaseMessage
-            let base_messages: Vec<BaseMessage> = messages
-                .into_iter()
-                .map(convert_message_to_base_message)
-                .collect();
-
             let stream = llm
-                .stream(base_messages, None)
+                .stream(messages, None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
@@ -164,7 +157,7 @@ impl PromptKitService {
 
     async fn _chat_stream_openai(
         &self,
-        messages: Vec<Message>,
+        messages: Vec<BaseMessage>,
     ) -> Result<
         std::pin::Pin<Box<dyn Stream<Item = Result<String, PromptKitError>> + Send>>,
         PromptKitError,
@@ -172,14 +165,8 @@ impl PromptKitService {
         if let LLMProvider::OpenAI(llm) = &self.provider {
             info!("Starting OpenAI chat stream with agent-chain");
 
-            // Convert euro_llm::Message to agent_chain::BaseMessage
-            let base_messages: Vec<BaseMessage> = messages
-                .into_iter()
-                .map(convert_message_to_base_message)
-                .collect();
-
             let stream = llm
-                .stream(base_messages, None)
+                .stream(messages, None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
@@ -198,7 +185,7 @@ impl PromptKitService {
 
     async fn _chat_stream_ollama(
         &self,
-        messages: Vec<Message>,
+        messages: Vec<BaseMessage>,
     ) -> Result<
         std::pin::Pin<Box<dyn Stream<Item = Result<String, PromptKitError>> + Send>>,
         PromptKitError,
@@ -206,14 +193,8 @@ impl PromptKitService {
         if let LLMProvider::Ollama(llm) = &self.provider {
             info!("Starting Ollama chat stream with agent-chain");
 
-            // Convert euro_llm::Message to agent_chain::BaseMessage
-            let base_messages: Vec<BaseMessage> = messages
-                .into_iter()
-                .map(convert_message_to_base_message)
-                .collect();
-
             let stream = llm
-                .stream(base_messages, None)
+                .stream(messages, None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
@@ -228,107 +209,6 @@ impl PromptKitService {
                 service: "Ollama".to_string(),
             })
         }
-    }
-}
-
-/// Convert euro_llm::Message to agent_chain::BaseMessage
-fn convert_message_to_base_message(msg: Message) -> BaseMessage {
-    // Helper function to extract text content from MessageContent
-    fn extract_text_content(content: euro_llm::MessageContent) -> String {
-        match content {
-            euro_llm::MessageContent::Text(text) => text,
-            euro_llm::MessageContent::Multimodal(parts) => {
-                // Extract text content from multimodal parts
-                parts
-                    .into_iter()
-                    .filter_map(|part| match part {
-                        euro_llm::ContentPart::Text { text } => Some(text),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            }
-            euro_llm::MessageContent::Tool(tool_content) => tool_content.text.unwrap_or_default(),
-        }
-    }
-
-    match msg.role {
-        Role::User => match msg.content {
-            euro_llm::MessageContent::Text(text) => HumanMessage::new(text).into(),
-            euro_llm::MessageContent::Multimodal(parts) => {
-                let content_parts = parts
-                    .into_iter()
-                    .map(|part| match part {
-                        euro_llm::ContentPart::Text { text } => ContentPart::Text { text },
-                        euro_llm::ContentPart::Image {
-                            image_source,
-                            detail: _,
-                        } => convert_image_source_to_content_part(image_source),
-                        euro_llm::ContentPart::Audio { .. } => {
-                            // Audio not directly supported, skip or convert to placeholder
-                            ContentPart::Text {
-                                text: "[Audio content]".to_string(),
-                            }
-                        }
-                    })
-                    .collect();
-                HumanMessage::with_content(content_parts).into()
-            }
-            euro_llm::MessageContent::Tool(tool_content) => {
-                HumanMessage::new(tool_content.text.unwrap_or_default()).into()
-            }
-        },
-        Role::Assistant => {
-            let content = extract_text_content(msg.content);
-            AIMessage::new(content).into()
-        }
-        Role::System => {
-            let content = extract_text_content(msg.content);
-            SystemMessage::new(content).into()
-        }
-        Role::Tool => {
-            // For tool messages, we'll convert to AI message with the content
-            // In a more complete implementation, you'd use ToolMessage
-            let content = extract_text_content(msg.content);
-            AIMessage::new(content).into()
-        }
-    }
-}
-
-/// Convert euro_llm::ImageSource to agent_chain::ContentPart
-fn convert_image_source_to_content_part(image_source: euro_llm::ImageSource) -> ContentPart {
-    match image_source {
-        euro_llm::ImageSource::Url(url) => {
-            // Check if it's a data URL (base64 encoded)
-            if url.starts_with("data:") {
-                // Parse data URL: data:[<mediatype>][;base64],<data>
-                if let Some((header, data)) =
-                    url.strip_prefix("data:").and_then(|s| s.split_once(','))
-                {
-                    let media_type = header.split(';').next().unwrap_or("image/jpeg").to_string();
-                    ContentPart::Image {
-                        source: ImageSource::Base64 {
-                            media_type,
-                            data: data.to_string(),
-                        },
-                        detail: Some(ImageDetail::default()),
-                    }
-                } else {
-                    // Invalid data URL, treat as regular URL
-                    ContentPart::Image {
-                        source: ImageSource::Url { url },
-                        detail: Some(ImageDetail::default()),
-                    }
-                }
-            } else {
-                // Regular URL
-                ContentPart::Image {
-                    source: ImageSource::Url { url },
-                    detail: Some(ImageDetail::default()),
-                }
-            }
-        }
-        _ => panic!("Unsupported image source: only URL is supported"),
     }
 }
 

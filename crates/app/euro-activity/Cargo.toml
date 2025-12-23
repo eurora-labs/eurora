@@ -6,6 +6,7 @@ edition = "2024"
 description = "Refactored activity system with enum-based type-safe design"
 
 [dependencies]
+agent-chain = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
@@ -17,7 +18,6 @@ enum_dispatch = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-focus = { workspace = true, features = ["async"] }
 euro-fs = { workspace = true }
-euro-llm = { workspace = true, features = ["dynamic-image"] }
 euro-native-messaging = { workspace = true }
 euro-proto = { workspace = true }
 euro-secret = { workspace = true }

@@ -1,5 +1,5 @@
+use agent_chain::BaseMessage;
 use chrono::Utc;
-use euro_llm::{Message, MessageContent};
 
 use crate::{NewChatMessage, db::PersonalDatabaseManager, types::ChatMessage};
 
@@ -7,39 +7,22 @@ impl PersonalDatabaseManager {
     pub async fn insert_chat_message_from_message(
         &self,
         conversation_id: &str,
-        message: Message,
+        message: BaseMessage,
         has_assets: bool,
     ) -> Result<ChatMessage, sqlx::Error> {
         let timestamp = Utc::now();
 
-        // TODO: Implement other cases
-        let content = match message.content {
-            MessageContent::Text(message) => Some(message),
-            _ => None,
-        };
+        let content = message.content().to_string();
+        let role = message.message_type().to_string();
 
-        if content.is_none() {
-            return Err(sqlx::Error::InvalidArgument(
-                "Content type is not implemented".to_string(),
-            ));
-        }
-
-        self.insert_chat_message(
-            NewChatMessage {
-                conversation_id: conversation_id.to_string(),
-                role: message.role.to_string(),
-                content: content.unwrap().to_string(),
-                has_assets,
-                created_at: Some(timestamp),
-                updated_at: Some(timestamp),
-            },
-            // conversation_id,
-            // message.role.to_string().as_str(),
-            // content.unwrap().as_str(),
-            // true,
-            // timestamp,
-            // timestamp,
-        )
+        self.insert_chat_message(NewChatMessage {
+            conversation_id: conversation_id.to_string(),
+            role,
+            content,
+            has_assets,
+            created_at: Some(timestamp),
+            updated_at: Some(timestamp),
+        })
         .await
     }
 }
