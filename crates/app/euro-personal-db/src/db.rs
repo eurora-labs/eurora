@@ -132,8 +132,8 @@ impl PersonalDatabaseManager {
         )
         .bind(&id)
         .bind(&new_conversation.title)
-        .bind(created_at)
-        .bind(updated_at)
+        .bind(created_at.to_rfc3339())
+        .bind(updated_at.to_rfc3339())
         .execute(&self.pool)
         .await?;
 
@@ -160,7 +160,7 @@ impl PersonalDatabaseManager {
             "#,
         )
         .bind(&conversation.title)
-        .bind(updated_at)
+        .bind(updated_at.to_rfc3339())
         .bind(&conversation.id)
         .fetch_optional(&self.pool)
         .await?
@@ -245,8 +245,8 @@ impl PersonalDatabaseManager {
         .bind(&new_message.tool_calls)
         .bind(&additional_kwargs)
         .bind(new_message.sequence_num)
-        .bind(created_at)
-        .bind(updated_at)
+        .bind(created_at.to_rfc3339())
+        .bind(updated_at.to_rfc3339())
         .execute(&self.pool)
         .await?;
 
@@ -291,8 +291,8 @@ impl PersonalDatabaseManager {
         .bind(&db_message.tool_calls)
         .bind(&db_message.additional_kwargs)
         .bind(db_message.sequence_num)
-        .bind(db_message.created_at)
-        .bind(db_message.updated_at)
+        .bind(db_message.created_at.to_rfc3339())
+        .bind(db_message.updated_at.to_rfc3339())
         .execute(&self.pool)
         .await?;
 
@@ -340,8 +340,8 @@ impl PersonalDatabaseManager {
             .bind(&db_message.tool_calls)
             .bind(&db_message.additional_kwargs)
             .bind(db_message.sequence_num)
-            .bind(db_message.created_at)
-            .bind(db_message.updated_at)
+            .bind(db_message.created_at.to_rfc3339())
+            .bind(db_message.updated_at.to_rfc3339())
             .execute(&mut *tx)
             .await?;
         }
@@ -441,8 +441,8 @@ impl PersonalDatabaseManager {
         .bind(&activity.name)
         .bind(&activity.icon_path)
         .bind(&activity.process_name)
-        .bind(&activity.started_at)
-        .bind(&activity.ended_at)
+        .bind(activity.started_at.to_rfc3339())
+        .bind(activity.ended_at.map(|dt| dt.to_rfc3339()))
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -501,8 +501,8 @@ impl PersonalDatabaseManager {
         .bind(&na.activity_id)
         .bind(&na.relative_path)
         .bind(&na.absolute_path)
-        .bind(created_at)
-        .bind(updated_at)
+        .bind(created_at.to_rfc3339())
+        .bind(updated_at.to_rfc3339())
         .execute(&self.pool)
         .await?;
 
@@ -546,7 +546,7 @@ impl PersonalDatabaseManager {
         Ok(MessageAsset {
             message_id: nma.message_id.clone(),
             asset_id: nma.asset_id.clone(),
-            created_at: created_at.to_rfc3339(),
+            created_at,
         })
     }
 
@@ -593,8 +593,8 @@ impl PersonalDatabaseManager {
         .bind(activity_id)
         .bind(&asset.relative_path)
         .bind(&asset.absolute_path)
-        .bind(asset.created_at)
-        .bind(asset.updated_at)
+        .bind(asset.created_at.to_rfc3339())
+        .bind(asset.updated_at.to_rfc3339())
         .execute(&self.pool)
         .await?;
         Ok(())
