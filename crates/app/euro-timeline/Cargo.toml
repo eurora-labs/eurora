@@ -1,15 +1,14 @@
 [package]
 name = "euro-timeline"
 version = "0.0.0"
-authors.workspace = true
 edition.workspace = true
 description = "Timeline storage for capturing system state over time"
 
 [dependencies]
 agent-chain-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
-async-trait = "0.1"
-base64.workspace = true
+async-trait = { workspace = true }
+base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 dirs = { workspace = true }
 euro-activity = { workspace = true }
@@ -18,7 +17,7 @@ euro-fs = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true }
 euro-proto = { workspace = true }
-image.workspace = true
+image = { workspace = true }
 keyring = { workspace = true }
 orion = "0.17.11"
 parking_lot = { workspace = true }
@@ -26,7 +25,7 @@ rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, default-features = false, features = [
+tokio = { workspace = true, features = [
   "macros",
   "rt",
   "sync",

@@ -1,8 +1,7 @@
 [package]
 name = "euro-user"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
@@ -11,7 +10,7 @@ chrono = { workspace = true, features = ["serde"] }
 euro-proto = { workspace = true }
 euro-proto-client = { workspace = true }
 euro-secret = { workspace = true }
-euro-storage.workspace = true
+euro-storage = { workspace = true }
 image = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true, features = ["std"] }
