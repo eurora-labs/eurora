@@ -42,7 +42,6 @@ euro-auth-service = { path = "crates/backend/euro-auth-service" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-focus = { path = "crates/common/euro-focus" }
 euro-fs = { path = "crates/common/euro-fs" }
-euro-llm = { path = "crates/common/euro-llm" }
 euro-monolith = { path = "crates/backend/euro-monolith" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
 euro-ocr = { path = "crates/common/euro-ocr" }
