@@ -6,6 +6,11 @@ description = "Secret management for Eurora"
 
 [dependencies]
 anyhow = { workspace = true }
-keyring = { workspace = true }
+keyring = { workspace = true, features = [
+  "apple-native",
+  "crypto-rust",
+  "linux-native",
+  "windows-native",
+] }
 serde = { workspace = true, features = ["std"] }
 tracing = { workspace = true }
