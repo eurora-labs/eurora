@@ -13,4 +13,3 @@ keyring = { workspace = true, features = [
   "windows-native",
 ] }
 serde = { workspace = true, features = ["std"] }
-tracing = { workspace = true }
