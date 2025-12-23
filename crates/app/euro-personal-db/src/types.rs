@@ -237,8 +237,8 @@ pub struct Activity {
     pub name: String,
     pub icon_path: Option<String>,
     pub process_name: String,
-    pub started_at: String,
-    pub ended_at: Option<String>,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
 }
 
 /// Activity to conversation mapping.
