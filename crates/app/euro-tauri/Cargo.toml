@@ -29,7 +29,6 @@ dirs = "6.0.0"
 dotenv = "0.15.0"
 euro-activity = { workspace = true }
 euro-encrypt = { workspace = true }
-euro-llm = { workspace = true, features = ["specta"] }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true }
 euro-prompt-kit = { workspace = true }
