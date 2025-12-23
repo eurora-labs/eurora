@@ -1,8 +1,7 @@
 [package]
 name = "agent-chain-eurora"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 description = "Eurora gRPC provider for agent-chain"
 publish = false
 

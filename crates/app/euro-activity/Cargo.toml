@@ -1,8 +1,7 @@
 [package]
 name = "euro-activity"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 description = "Refactored activity system with enum-based type-safe design"
 
 [dependencies]
@@ -37,7 +36,7 @@ taurpc = { version = "0.5.1" }
 tempfile = "3.23.0"
 thiserror = { workspace = true }
 tiny-skia = "0.11"
-tokio = { workspace = true, default-features = false, features = [
+tokio = { workspace = true, features = [
   "fs",
   "macros",
   "rt-multi-thread",
@@ -51,7 +50,7 @@ tonic = { workspace = true, features = [
 ] }
 tracing = { workspace = true }
 url = { version = "2.5.7" }
-usvg = { version = "0.45", default-features = true }
+usvg = { version = "0.45" }
 uuid = { workspace = true }
 
 [dev-dependencies]
