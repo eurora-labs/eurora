@@ -302,23 +302,52 @@ impl PersonalDatabaseManager {
     /// Insert multiple agent-chain BaseMessages at once.
     ///
     /// Returns the sequence number of the last inserted message.
+    /// Uses a transaction to ensure atomicity - either all messages are inserted or none.
     pub async fn insert_base_messages(
         &self,
         conversation_id: &str,
         messages: &[BaseMessage],
     ) -> Result<i64, sqlx::Error> {
-        // Get the current max sequence number
+        // Start a transaction
+        let mut tx = self.pool.begin().await?;
+
+        // Get the current max sequence number within the transaction
         let start_seq: i64 = sqlx::query_scalar(
             "SELECT COALESCE(MAX(sequence_num), -1) + 1 FROM message WHERE conversation_id = ?",
         )
         .bind(conversation_id)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
+        // Insert all messages within the transaction
         for (i, message) in messages.iter().enumerate() {
-            self.insert_base_message(conversation_id, message, start_seq + i as i64)
-                .await?;
+            let sequence_num = start_seq + i as i64;
+            let db_message =
+                Message::from_base_message(message, conversation_id.to_string(), sequence_num)
+                    .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+
+            sqlx::query(
+                r#"
+                INSERT INTO message (id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "#,
+            )
+            .bind(&db_message.id)
+            .bind(&db_message.conversation_id)
+            .bind(&db_message.message_type)
+            .bind(&db_message.content)
+            .bind(&db_message.tool_call_id)
+            .bind(&db_message.tool_calls)
+            .bind(&db_message.additional_kwargs)
+            .bind(db_message.sequence_num)
+            .bind(db_message.created_at)
+            .bind(db_message.updated_at)
+            .execute(&mut *tx)
+            .await?;
         }
+
+        // Commit the transaction
+        tx.commit().await?;
 
         Ok(start_seq + messages.len() as i64 - 1)
     }
@@ -539,19 +568,28 @@ impl PersonalDatabaseManager {
         .await
     }
 
-    /// Insert an activity-asset link.
+    /// Insert an asset for an activity.
+    ///
+    /// Uses the provided `asset.id` to insert the asset record.
+    /// The `asset.id` must be a valid non-empty string (typically a UUID).
     pub async fn insert_activity_asset(
         &self,
         activity_id: &str,
         asset: &Asset,
     ) -> Result<(), sqlx::Error> {
+        if asset.id.is_empty() {
+            return Err(sqlx::Error::Protocol(
+                "asset.id must not be empty".to_string(),
+            ));
+        }
+
         sqlx::query(
             r#"
             INSERT INTO asset (id, activity_id, relative_path, absolute_path, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
             "#,
         )
-        .bind(Uuid::new_v4().to_string())
+        .bind(&asset.id)
         .bind(activity_id)
         .bind(&asset.relative_path)
         .bind(&asset.absolute_path)
