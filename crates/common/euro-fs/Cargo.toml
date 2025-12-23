@@ -6,7 +6,6 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
-bstr = { workspace = true }
 serde = { workspace = true, features = ["std"] }
 toml = { workspace = true }
 walkdir = "2.5.0"

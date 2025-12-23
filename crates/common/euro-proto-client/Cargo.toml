@@ -8,8 +8,5 @@ publish = false
 [dependencies]
 anyhow = { workspace = true }
 euro-proto = { workspace = true }
-euro-secret = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
-tokio-stream = { workspace = true }
 tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
 tracing = { workspace = true }

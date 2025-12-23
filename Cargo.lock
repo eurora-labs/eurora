@@ -246,17 +246,14 @@ name = "agent-chain"
 version = "0.0.2"
 dependencies = [
  "agent-chain-core",
- "agent-chain-macros 0.0.2",
  "async-stream",
  "async-trait",
  "futures",
  "reqwest 0.12.24",
  "serde",
  "serde_json",
- "thiserror 2.0.17",
  "tokio",
  "tokio-util",
- "uuid",
 ]
 
 [[package]]
@@ -264,7 +261,6 @@ name = "agent-chain-core"
 version = "0.0.2"
 dependencies = [
  "agent-chain-macros 0.0.1",
- "async-stream",
  "async-trait",
  "futures",
  "reqwest 0.12.24",
@@ -272,8 +268,6 @@ dependencies = [
  "serde_json",
  "specta",
  "thiserror 2.0.17",
- "tokio",
- "tokio-util",
  "uuid",
 ]
 
@@ -281,11 +275,9 @@ dependencies = [
 name = "agent-chain-eurora"
 version = "0.0.0"
 dependencies = [
- "agent-chain",
  "agent-chain-core",
  "async-stream",
  "async-trait",
- "chrono",
  "euro-user",
  "futures",
  "prost",
@@ -294,7 +286,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.17",
  "tokio",
- "tokio-stream",
  "tonic",
  "tonic-async-interceptor",
  "tonic-prost",
@@ -319,7 +310,6 @@ dependencies = [
 name = "agent-chain-macros"
 version = "0.0.2"
 dependencies = [
- "proc-macro2",
  "quote",
  "syn 2.0.111",
 ]
@@ -330,7 +320,6 @@ version = "0.0.2"
 dependencies = [
  "agent-chain-core",
  "agent-graph-macros",
- "async-trait",
  "futures",
  "serde",
  "serde_json",
@@ -342,7 +331,6 @@ dependencies = [
 name = "agent-graph-macros"
 version = "0.0.2"
 dependencies = [
- "proc-macro2",
  "quote",
  "syn 2.0.111",
 ]
@@ -1603,17 +1591,6 @@ checksum = "874bb8112abecc98cbd6d81ea4fa7e94fb9449648c93cc89aa40c81c24d7de03"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
-]
-
-[[package]]
-name = "bstr"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63044e1ae8e69f3b5a92c736ca6269b8d12fa7efe39bf34ddb06d102cf0e2cab"
-dependencies = [
- "memchr",
- "regex-automata",
- "serde",
 ]
 
 [[package]]
@@ -3288,7 +3265,6 @@ name = "euro-fs"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bstr",
  "serde",
  "toml 0.9.8",
  "walkdir",
@@ -3389,7 +3365,6 @@ dependencies = [
  "specta",
  "sqlite-vec",
  "sqlx",
- "tokio",
  "tracing",
  "uuid",
 ]
@@ -3401,7 +3376,6 @@ dependencies = [
  "agent-chain",
  "agent-chain-core",
  "agent-chain-eurora",
- "agent-graph",
  "anyhow",
  "async_from",
  "serde",
@@ -3444,9 +3418,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "euro-proto",
- "euro-secret",
- "tokio",
- "tokio-stream",
  "tonic",
  "tracing",
 ]
