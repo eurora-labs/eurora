@@ -6,7 +6,7 @@ description = "Eurora Personal DB"
 
 [dependencies]
 agent-chain-core = { workspace = true, features = ["specta"] }
-anyhow.workspace = true
+anyhow = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-secret = { workspace = true }
