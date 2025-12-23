@@ -546,7 +546,7 @@ impl PersonalDatabaseManager {
         Ok(MessageAsset {
             message_id: nma.message_id.clone(),
             asset_id: nma.asset_id.clone(),
-            created_at: created_at.to_rfc3339(),
+            created_at,
         })
     }
 
