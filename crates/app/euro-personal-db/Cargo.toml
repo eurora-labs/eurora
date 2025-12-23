@@ -1,8 +1,7 @@
 [package]
 name = "euro-personal-db"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 description = "Eurora Personal DB"
 
 [dependencies]
@@ -37,4 +36,4 @@ uuid = { workspace = true, features = ["v4"] }
 
 [features]
 default = []
-specta = ["dep:specta", "agent-chain-core/specta"]
+specta = ["agent-chain-core/specta", "dep:specta"]

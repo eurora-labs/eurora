@@ -1,13 +1,12 @@
 [package]
 name = "euro-vision"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 description = "Vision util for capturing screen, window and ocr'ing"
 
 [dependencies]
 anyhow = { workspace = true }
-base64.workspace = true
+base64 = { workspace = true }
 bytemuck = "1.24.0"
 euro-ocr = { workspace = true }
 futures-intrusive = "0.5.0"
