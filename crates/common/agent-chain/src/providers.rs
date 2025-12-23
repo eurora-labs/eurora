@@ -46,7 +46,7 @@ pub const SUPPORTED_PROVIDERS: &[&str] = &[
 /// # Examples
 ///
 /// ```
-/// use agent_chain_core::providers::infer_provider;
+/// use agent_chain::providers::infer_provider;
 ///
 /// assert_eq!(infer_provider("gpt-4"), Some("openai"));
 /// assert_eq!(infer_provider("claude-3-opus"), Some("anthropic"));
