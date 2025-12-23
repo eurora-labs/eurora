@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use agent_chain::BaseMessage;
+use agent_chain_core::BaseMessage;
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
 use euro_native_messaging::NativeMessage;
