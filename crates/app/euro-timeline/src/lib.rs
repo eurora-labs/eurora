@@ -1,4 +1,5 @@
 // Re-export main types for easy access
+pub use agent_chain::BaseMessage;
 pub use collector::{ActivityEvent, CollectorService, CollectorStats};
 pub use config::{CollectorConfig, FocusTrackingConfig, StorageConfig, TimelineConfig};
 pub use error::{TimelineError, TimelineResult};
@@ -8,7 +9,6 @@ pub use euro_activity::{
     ActivityStorageConfig, ActivityStrategy, AssetFunctionality, ContextChip, DisplayAsset,
     SaveableAsset,
 };
-pub use euro_llm::Message;
 pub use manager::{TimelineManager, TimelineManagerBuilder, create_timeline};
 pub use storage::{StorageStats, TimelineStorage};
 
