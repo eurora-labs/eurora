@@ -260,10 +260,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "agent-chain"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2fde399d94248a81127a2d5e958fe87da887cb0718683ea12172ae38a8696c7"
+dependencies = [
+ "agent-chain-macros 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "async-stream",
+ "async-trait",
+ "futures",
+ "reqwest 0.12.24",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
 name = "agent-chain-eurora"
 version = "0.0.0"
 dependencies = [
- "agent-chain",
+ "agent-chain 0.0.1",
  "async-stream",
  "async-trait",
  "chrono",
@@ -309,7 +328,7 @@ dependencies = [
 name = "agent-graph"
 version = "0.0.1"
 dependencies = [
- "agent-chain",
+ "agent-chain 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "agent-graph-macros 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "async-trait",
  "futures",
@@ -3214,7 +3233,7 @@ dependencies = [
 name = "euro-activity"
 version = "0.0.0"
 dependencies = [
- "agent-chain",
+ "agent-chain 0.0.1",
  "anyhow",
  "async-trait",
  "base64 0.22.1",
@@ -3487,7 +3506,7 @@ dependencies = [
 name = "euro-personal-db"
 version = "0.0.0"
 dependencies = [
- "agent-chain",
+ "agent-chain 0.0.1",
  "anyhow",
  "base64 0.22.1",
  "chrono",
@@ -3511,7 +3530,7 @@ dependencies = [
 name = "euro-prompt-kit"
 version = "0.0.0"
 dependencies = [
- "agent-chain",
+ "agent-chain 0.0.1",
  "agent-chain-eurora",
  "agent-graph",
  "anyhow",
@@ -3526,7 +3545,7 @@ dependencies = [
 name = "euro-prompt-service"
 version = "0.0.0"
 dependencies = [
- "agent-chain",
+ "agent-chain 0.0.1",
  "agent-chain-eurora",
  "anyhow",
  "async-trait",
@@ -3635,7 +3654,7 @@ version = "0.0.0"
 name = "euro-tauri"
 version = "0.0.0"
 dependencies = [
- "agent-chain",
+ "agent-chain 0.0.1",
  "agent-chain-eurora",
  "anyhow",
  "async_from",
@@ -3708,7 +3727,7 @@ dependencies = [
 name = "euro-timeline"
 version = "0.0.0"
 dependencies = [
- "agent-chain",
+ "agent-chain 0.0.1",
  "anyhow",
  "async-trait",
  "base64 0.22.1",
