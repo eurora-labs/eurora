@@ -1,7 +1,6 @@
 [package]
 name = "agent-graph"
 version = "0.0.2"
-authors.workspace = true
 edition.workspace = true
 description = "Agent graph library"
 license = "MIT"
@@ -9,7 +8,6 @@ license = "MIT"
 [dependencies]
 agent-chain-core = { workspace = true }
 agent-graph-macros = { workspace = true }
-async-trait = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
