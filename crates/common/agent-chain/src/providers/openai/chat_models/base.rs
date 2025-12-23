@@ -9,8 +9,8 @@
 //! These can be used via `ChatOpenAI::with_builtin_tools()`:
 //!
 //! ```ignore
-//! use agent_chain::providers::ChatOpenAI;
-//! use agent_chain::providers::openai::BuiltinTool;
+//! use agent_chain_core::providers::ChatOpenAI;
+//! use agent_chain_core::providers::openai::BuiltinTool;
 //!
 //! let model = ChatOpenAI::new("gpt-4o")
 //!     .with_responses_api(true)
@@ -25,8 +25,8 @@
 //! The Responses API also supports streaming for real-time token output:
 //!
 //! ```ignore
-//! use agent_chain::providers::ChatOpenAI;
-//! use agent_chain::providers::openai::BuiltinTool;
+//! use agent_chain_core::providers::ChatOpenAI;
+//! use agent_chain_core::providers::openai::BuiltinTool;
 //! use futures::StreamExt;
 //!
 //! let model = ChatOpenAI::new("gpt-4o")
@@ -145,7 +145,7 @@ pub enum ContentBlock {
 /// # Example
 ///
 /// ```ignore
-/// use agent_chain::providers::ChatOpenAI;
+/// use agent_chain_core::providers::ChatOpenAI;
 ///
 /// let model = ChatOpenAI::new("gpt-4o")
 ///     .temperature(0.7)
@@ -158,8 +158,8 @@ pub enum ContentBlock {
 /// # Using Built-in Tools (Responses API)
 ///
 /// ```ignore
-/// use agent_chain::providers::ChatOpenAI;
-/// use agent_chain::providers::openai::BuiltinTool;
+/// use agent_chain_core::providers::ChatOpenAI;
+/// use agent_chain_core::providers::openai::BuiltinTool;
 ///
 /// let model = ChatOpenAI::new("gpt-4o")
 ///     .with_responses_api(true)
@@ -323,8 +323,8 @@ impl ChatOpenAI {
     /// # Example
     ///
     /// ```ignore
-    /// use agent_chain::providers::ChatOpenAI;
-    /// use agent_chain::providers::openai::BuiltinTool;
+    /// use agent_chain_core::providers::ChatOpenAI;
+    /// use agent_chain_core::providers::openai::BuiltinTool;
     ///
     /// let model = ChatOpenAI::new("gpt-4o")
     ///     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
