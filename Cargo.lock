@@ -252,6 +252,7 @@ dependencies = [
  "reqwest 0.12.24",
  "serde",
  "serde_json",
+ "specta",
  "thiserror 2.0.17",
  "tokio",
  "tokio-util",
