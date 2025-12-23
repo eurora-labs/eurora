@@ -4,6 +4,18 @@ version = "0.0.0"
 edition.workspace = true
 publish = false
 
+[package.metadata.cargo-machete]
+ignored = [
+  "backtrace",
+  "tauri-plugin-dialog",
+  "tauri-plugin-fs",
+  "tauri-plugin-process",
+  "tauri-plugin-store",
+  "tauri-plugin-stronghold",
+  "serde",
+  "specta"
+]
+
 [lib]
 crate-type = ["cdylib", "lib", "staticlib"]
 doctest = false
@@ -19,20 +31,13 @@ agent-chain-eurora = { workspace = true }
 anyhow = { workspace = true }
 async_from = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
-base64 = "0.22.1"
-chrono = { workspace = true }
 color-thief = "0.2.2"
-defer = "0.2.1"
-dirs = "6.0.0"
 dotenv = "0.15.0"
 euro-activity = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true, features = ["specta"] }
 euro-prompt-kit = { workspace = true }
-euro-proto = { workspace = true }
-euro-proto-client = { workspace = true }
-euro-screen-position = { workspace = true }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-timeline = { workspace = true }
@@ -41,13 +46,9 @@ euro-vision = { workspace = true }
 futures = { workspace = true }
 image = { workspace = true }
 keyring = { workspace = true }
-lazy_static = "1.4.0"
 log = { workspace = true }
-open = "5"
 parking_lot = { workspace = true }
-pollster = "0.4"
 posthog-rs = { workspace = true }
-reqwest = { version = "0.12.24", features = ["json", "native-tls"] }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }
 serde = { workspace = true }
 serde_json = { version = "1.0", features = ["arbitrary_precision", "std"] }
@@ -66,22 +67,11 @@ tauri-plugin-store = "2"
 tauri-plugin-stronghold = "2.3.1"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
-tauri-specta = { version = "2.0.0-rc.21", features = [
-  "javascript",
-  "typescript",
-] }
-tauri-utils = "2.8.1"  # single entry removes second 8.6 s build
 taurpc = { version = "0.5.2" }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
-tokio-stream = { workspace = true }
-tonic = { workspace = true }
 tracing = { workspace = true }
-tracing-appender = "0.2.4"
-tracing-forest = { version = "0.3.0" }
-tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
 url = "2.5.4"
-uuid = { workspace = true }
 
 [build-dependencies]
 tauri-build = { version = "2.5.1", features = [] }

@@ -2524,12 +2524,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "defer"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "930c7171c8df9fb1782bdf9b918ed9ed2d33d1d22300abb754f9085bc48bf8e8"
-
-[[package]]
 name = "der"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3486,20 +3480,13 @@ dependencies = [
  "anyhow",
  "async_from",
  "backtrace",
- "base64 0.22.1",
- "chrono",
  "color-thief",
- "defer",
- "dirs 6.0.0",
  "dotenv",
  "euro-activity",
  "euro-encrypt",
  "euro-native-messaging",
  "euro-personal-db",
  "euro-prompt-kit",
- "euro-proto",
- "euro-proto-client",
- "euro-screen-position",
  "euro-secret",
  "euro-settings",
  "euro-timeline",
@@ -3508,13 +3495,9 @@ dependencies = [
  "futures",
  "image",
  "keyring",
- "lazy_static",
  "log",
- "open",
  "parking_lot",
- "pollster",
  "posthog-rs",
- "reqwest 0.12.24",
  "sentry",
  "serde",
  "serde_json",
@@ -3536,18 +3519,10 @@ dependencies = [
  "tauri-plugin-stronghold",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
- "tauri-specta",
- "tauri-utils",
  "taurpc",
  "tokio",
- "tokio-stream",
- "tonic",
  "tracing",
- "tracing-appender",
- "tracing-forest",
- "tracing-subscriber",
  "url",
- "uuid",
 ]
 
 [[package]]
@@ -7396,12 +7371,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pollster"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3a9f18d041e6d0e102a0a46750538147e5e8992d3b4873aaafee2520b00ce3"
-
-[[package]]
 name = "poly1305"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9470,17 +9439,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "specta-jsdoc"
-version = "0.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c80a3da00adc2aff522a6bbc2f766870ae2d3381a5c937b94c30e4fd9e82109"
-dependencies = [
- "specta",
- "specta-serde",
- "specta-typescript",
-]
-
-[[package]]
 name = "specta-macros"
 version = "2.0.0-rc.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10565,22 +10523,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-specta"
-version = "2.0.0-rc.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b23c0132dd3cf6064e5cd919b82b3f47780e9280e7b5910babfe139829b76655"
-dependencies = [
- "heck 0.5.0",
- "serde",
- "serde_json",
- "specta",
- "specta-jsdoc",
- "specta-typescript",
- "tauri",
- "thiserror 2.0.17",
-]
-
-[[package]]
 name = "tauri-utils"
 version = "2.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11200,18 +11142,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-appender"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "786d480bce6247ab75f005b14ae1624ad978d3029d9113f0a22fa1ac773faeaf"
-dependencies = [
- "crossbeam-channel",
- "thiserror 2.0.17",
- "time",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "tracing-attributes"
 version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11230,18 +11160,6 @@ checksum = "7a04e24fab5c89c6a36eb8558c9656f30d81de51dfa4d3b45f26b21d61fa0a6c"
 dependencies = [
  "once_cell",
  "valuable",
-]
-
-[[package]]
-name = "tracing-forest"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92bdb3c949c9e81b71f78ba782f956b896019d82cc2f31025d21e04adab4d695"
-dependencies = [
- "smallvec",
- "thiserror 2.0.17",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
