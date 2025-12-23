@@ -71,7 +71,7 @@ tauri-specta = { version = "2.0.0-rc.21", features = [
   "typescript",
 ] }
 tauri-utils = "2.8.1"  # single entry removes second 8.6 s build
-taurpc = { version = "0.5.1" }
+taurpc = { version = "0.5.2" }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-stream = { workspace = true }
