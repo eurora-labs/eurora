@@ -1,7 +1,6 @@
 [package]
 name = "agent-chain-core"
 version = "0.0.2"
-authors.workspace = true
 edition.workspace = true
 description = "Core library for agent-chain crate"
 license = "MIT"

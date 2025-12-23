@@ -1,8 +1,7 @@
 [package]
 name = "euro-proto"
 version = "0.0.0"
-authors.workspace = true
-edition = "2024"
+edition.workspace = true
 
 [package.metadata.cargo-machete]
 ignored = ["serde", "tonic-prost"]
