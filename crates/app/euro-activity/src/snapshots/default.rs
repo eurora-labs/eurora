@@ -1,6 +1,6 @@
 //! Default snapshot implementation for unsupported activity types
 
-use agent_chain::{BaseMessage, HumanMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use serde::{Deserialize, Serialize};
 
 use crate::types::SnapshotFunctionality;

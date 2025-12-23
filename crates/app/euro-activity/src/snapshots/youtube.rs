@@ -1,6 +1,6 @@
 //! YouTube snapshot implementation
 
-use agent_chain::{BaseMessage, ContentPart, HumanMessage, ImageSource};
+use agent_chain_core::{BaseMessage, ContentPart, HumanMessage, ImageSource};
 use euro_native_messaging::types::NativeYoutubeSnapshot;
 use serde::{Deserialize, Serialize};
 

@@ -1,5 +1,5 @@
 // Re-export main types for easy access
-pub use agent_chain::BaseMessage;
+pub use agent_chain_core::BaseMessage;
 pub use collector::{ActivityEvent, CollectorService, CollectorStats};
 pub use config::{CollectorConfig, FocusTrackingConfig, StorageConfig, TimelineConfig};
 pub use error::{TimelineError, TimelineResult};
