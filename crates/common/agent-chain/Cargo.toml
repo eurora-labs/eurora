@@ -1,6 +1,6 @@
 [package]
 name = "agent-chain"
-version = "0.0.0"
+version = "0.0.1"
 authors.workspace = true
 edition.workspace = true
 description = "Agent chain library"
@@ -27,6 +27,6 @@ uuid = { workspace = true, features = ["v4"] }
 [features]
 default = []
 anthropic = []
-openai = []
 ollama = []
+openai = []
 specta = ["dep:specta"]
