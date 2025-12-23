@@ -32,7 +32,7 @@ anyhow = { workspace = true }
 async_from = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
 color-thief = "0.2.2"
-dotenv = "0.15.0"
+dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
