@@ -63,8 +63,18 @@ impl From<&HumanMessage> for ProtoHumanMessage {
 
 impl From<ProtoHumanMessage> for HumanMessage {
     fn from(msg: ProtoHumanMessage) -> Self {
-        match msg.content {
-            Some(content) => match content.content {
+        match (msg.id, msg.content) {
+            (Some(id), Some(content)) => match content.content {
+                Some(ProtoContentVariant::Text(text)) => HumanMessage::with_id(id, text),
+                Some(ProtoContentVariant::Parts(parts)) => {
+                    let content_parts: Vec<ContentPart> =
+                        parts.parts.into_iter().map(Into::into).collect();
+                    HumanMessage::with_id_and_content(id, content_parts)
+                }
+                None => HumanMessage::with_id(id, ""),
+            },
+            (Some(id), None) => HumanMessage::with_id(id, ""),
+            (None, Some(content)) => match content.content {
                 Some(ProtoContentVariant::Text(text)) => HumanMessage::new(text),
                 Some(ProtoContentVariant::Parts(parts)) => {
                     let content_parts: Vec<ContentPart> =
@@ -73,7 +83,7 @@ impl From<ProtoHumanMessage> for HumanMessage {
                 }
                 None => HumanMessage::new(""),
             },
-            None => HumanMessage::new(""),
+            (None, None) => HumanMessage::new(""),
         }
     }
 }
@@ -93,7 +103,10 @@ impl From<&SystemMessage> for ProtoSystemMessage {
 
 impl From<ProtoSystemMessage> for SystemMessage {
     fn from(msg: ProtoSystemMessage) -> Self {
-        SystemMessage::new(msg.content)
+        match msg.id {
+            Some(id) => SystemMessage::with_id(id, msg.content),
+            None => SystemMessage::new(msg.content),
+        }
     }
 }
 
@@ -113,11 +126,12 @@ impl From<&AIMessage> for ProtoAiMessage {
 
 impl From<ProtoAiMessage> for AIMessage {
     fn from(msg: ProtoAiMessage) -> Self {
-        if msg.tool_calls.is_empty() {
-            AIMessage::new(msg.content)
-        } else {
-            let tool_calls: Vec<ToolCall> = msg.tool_calls.into_iter().map(Into::into).collect();
-            AIMessage::with_tool_calls(msg.content, tool_calls)
+        let tool_calls: Vec<ToolCall> = msg.tool_calls.into_iter().map(Into::into).collect();
+        match (msg.id, tool_calls.is_empty()) {
+            (Some(id), true) => AIMessage::with_id(id, msg.content),
+            (Some(id), false) => AIMessage::with_id_and_tool_calls(id, msg.content, tool_calls),
+            (None, true) => AIMessage::new(msg.content),
+            (None, false) => AIMessage::with_tool_calls(msg.content, tool_calls),
         }
     }
 }
@@ -138,7 +152,10 @@ impl From<&ToolMessage> for ProtoToolMessage {
 
 impl From<ProtoToolMessage> for ToolMessage {
     fn from(msg: ProtoToolMessage) -> Self {
-        ToolMessage::new(msg.content, msg.tool_call_id)
+        match msg.id {
+            Some(id) => ToolMessage::with_id(id, msg.content, msg.tool_call_id),
+            None => ToolMessage::new(msg.content, msg.tool_call_id),
+        }
     }
 }
 

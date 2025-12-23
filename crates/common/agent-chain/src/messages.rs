@@ -251,6 +251,17 @@ impl HumanMessage {
         }
     }
 
+    /// Create a new human message with simple text content and an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            content: MessageContent::Text(content.into()),
+            id: Some(id.into()),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
     /// Create a new human message with multipart content.
     ///
     /// # Example
@@ -272,6 +283,17 @@ impl HumanMessage {
         Self {
             content: MessageContent::Parts(parts),
             id: Some(Uuid::new_v4().to_string()),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
+    /// Create a new human message with multipart content and an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id_and_content(id: impl Into<String>, parts: Vec<ContentPart>) -> Self {
+        Self {
+            content: MessageContent::Parts(parts),
+            id: Some(id.into()),
             additional_kwargs: HashMap::new(),
         }
     }
@@ -354,6 +376,17 @@ impl SystemMessage {
         }
     }
 
+    /// Create a new system message with an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            content: content.into(),
+            id: Some(id.into()),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
     /// Get the message content.
     pub fn content(&self) -> &str {
         &self.content
@@ -392,11 +425,39 @@ impl AIMessage {
         }
     }
 
+    /// Create a new AI message with an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            content: content.into(),
+            id: Some(id.into()),
+            tool_calls: Vec::new(),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
     /// Create a new AI message with tool calls.
     pub fn with_tool_calls(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
         Self {
             content: content.into(),
             id: Some(Uuid::new_v4().to_string()),
+            tool_calls,
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
+    /// Create a new AI message with tool calls and an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id_and_tool_calls(
+        id: impl Into<String>,
+        content: impl Into<String>,
+        tool_calls: Vec<ToolCall>,
+    ) -> Self {
+        Self {
+            content: content.into(),
+            id: Some(id.into()),
             tool_calls,
             additional_kwargs: HashMap::new(),
         }
@@ -460,6 +521,22 @@ impl ToolMessage {
             content: content.into(),
             tool_call_id: tool_call_id.into(),
             id: Some(Uuid::new_v4().to_string()),
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
+    /// Create a new tool message with an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id(
+        id: impl Into<String>,
+        content: impl Into<String>,
+        tool_call_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            content: content.into(),
+            tool_call_id: tool_call_id.into(),
+            id: Some(id.into()),
             additional_kwargs: HashMap::new(),
         }
     }
