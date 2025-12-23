@@ -22,7 +22,7 @@ euro-proto = { workspace = true }
 euro-secret = { workspace = true }
 hex = "0.4.3"
 humantime-serde = { workspace = true }
-image.workspace = true
+image = { workspace = true }
 lazy_static = { version = "1.5.0" }
 rand = { workspace = true }
 regex = "1.12.2"
