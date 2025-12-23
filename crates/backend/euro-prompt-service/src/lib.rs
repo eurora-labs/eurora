@@ -4,7 +4,7 @@ use agent_chain::chat_models::ChatModel;
 use agent_chain::messages::BaseMessage;
 use agent_chain::providers::openai::ChatOpenAI;
 use agent_chain_eurora::proto::chat::{
-    ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse, ProtoFinishReason,
+    ProtoAiMessage, ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
 };
 use anyhow::{Result, anyhow};
@@ -73,35 +73,17 @@ impl ProtoChatService for PromptService {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
         debug!("Received send_prompt request");
-        // Return a single response
+
+        // Return a single response with the new proto structure
         Ok(Response::new(ProtoChatResponse {
-            content: "Hello, world!".to_string(),
+            message: Some(ProtoAiMessage {
+                content: "Hello, world!".to_string(),
+                id: None,
+                tool_calls: vec![],
+            }),
             usage: None,
-            finish_reason: Some(ProtoFinishReason::FinishReasonStop.into()),
-            metadata: None,
-            tool_calls: vec![],
+            stop_reason: Some("stop".to_string()),
         }))
-
-        // let request_inner = request.into_inner();
-
-        // let messages = request_inner
-        //     .messages
-        //     .iter()
-        //     .map(|msg| msg.clone().into())
-        //     .collect();
-
-        // let stream = self
-        //     .provider
-        //     .chat_stream(ChatRequest {
-        //         messages,
-        //         parameters: Default::default(),
-        //         metadata: Default::default(),
-        //     })
-        //     .await
-        //     .map_err(|e| Status::internal(e.to_string()))?;
-
-        // Ok(Response::new(stream))
-        // unimplemented!()
     }
 
     async fn chat_stream(
@@ -113,7 +95,7 @@ impl ProtoChatService for PromptService {
         debug!("Received chat_stream request");
         let request_inner = request.into_inner();
 
-        // Convert ProtoMessage to agent_chain::BaseMessage
+        // Convert ProtoBaseMessage to agent_chain::BaseMessage
         let messages: Vec<BaseMessage> = request_inner
             .messages
             .into_iter()
@@ -135,12 +117,11 @@ impl ProtoChatService for PromptService {
                         content: chunk.content,
                         is_final,
                         usage: None, // Usage info typically only available in final chunk
-                        finish_reason: if is_final {
-                            Some(ProtoFinishReason::FinishReasonStop.into())
+                        stop_reason: if is_final {
+                            Some("stop".to_string())
                         } else {
                             None
                         },
-                        metadata: None,
                         tool_calls: vec![],
                     })
                 }

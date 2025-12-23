@@ -1,6 +1,6 @@
 //! Twitter snapshot implementation
 
-use euro_llm::{Message, MessageContent, Role};
+use agent_chain::{BaseMessage, HumanMessage};
 use euro_native_messaging::types::NativeTwitterSnapshot;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -164,7 +164,7 @@ impl TwitterSnapshot {
 
 impl SnapshotFunctionality for TwitterSnapshot {
     /// Construct a message for LLM interaction
-    fn construct_messages(&self) -> Vec<Message> {
+    fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = String::new();
 
         // Add context about the page/interaction
@@ -203,10 +203,7 @@ impl SnapshotFunctionality for TwitterSnapshot {
 
         content.push_str(&tweet_texts.join("\n\n"));
 
-        vec![Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }]
+        vec![HumanMessage::new(content).into()]
     }
 
     fn get_updated_at(&self) -> u64 {

@@ -6,6 +6,7 @@ edition = "2024"
 description = "Timeline storage for capturing system state over time"
 
 [dependencies]
+agent-chain = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 async-trait = "0.1"
 base64.workspace = true
@@ -14,7 +15,6 @@ dirs = { workspace = true }
 euro-activity = { workspace = true }
 euro-focus = { workspace = true, features = ["async"] }
 euro-fs = { workspace = true }
-euro-llm = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true }
 euro-proto = { workspace = true }

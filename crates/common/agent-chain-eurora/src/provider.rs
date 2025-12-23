@@ -22,8 +22,10 @@ use tracing::{debug, error};
 use crate::{
     config::EuroraConfig,
     error::EuroraError,
-    proto::chat::{ProtoChatStreamResponse, proto_chat_service_client::ProtoChatServiceClient},
-    types::{build_proto_request, finish_reason_to_string},
+    proto::chat::{
+        ProtoChatRequest, ProtoChatStreamResponse, ProtoParameters,
+        proto_chat_service_client::ProtoChatServiceClient,
+    },
 };
 
 /// Auth interceptor for adding authentication headers to gRPC requests.
@@ -239,6 +241,29 @@ impl ChatEurora {
         self
     }
 
+    /// Build a ProtoChatRequest from agent-chain messages.
+    fn build_request(
+        &self,
+        messages: &[BaseMessage],
+        stop: Option<Vec<String>>,
+    ) -> ProtoChatRequest {
+        let proto_messages = messages.iter().map(Into::into).collect();
+        let stop_sequences = stop.unwrap_or_else(|| self.stop_sequences.clone());
+
+        ProtoChatRequest {
+            messages: proto_messages,
+            parameters: Some(ProtoParameters {
+                temperature: self.temperature,
+                max_tokens: self.max_tokens,
+                top_p: self.top_p,
+                top_k: self.top_k,
+                stop_sequences,
+                frequency_penalty: self.frequency_penalty,
+                presence_penalty: self.presence_penalty,
+            }),
+        }
+    }
+
     /// Convert the gRPC stream to a ChatStream.
     fn convert_stream(
         mut stream: Streaming<ProtoChatStreamResponse>,
@@ -249,14 +274,7 @@ impl ChatEurora {
                 match result {
                     Ok(proto_response) => {
                         let usage = proto_response.usage.map(|u| {
-                            UsageMetadata::new(u.prompt_tokens, u.completion_tokens)
-                        });
-
-                        let stop_reason = proto_response.finish_reason.map(|r| {
-                            use crate::proto::chat::ProtoFinishReason;
-                            finish_reason_to_string(
-                                ProtoFinishReason::try_from(r).unwrap_or(ProtoFinishReason::FinishReasonUnspecified)
-                            )
+                            UsageMetadata::new(u.input_tokens, u.output_tokens)
                         });
 
                         let chunk = ChatChunk {
@@ -265,7 +283,7 @@ impl ChatEurora {
                             metadata: if proto_response.is_final {
                                 Some(ChatResultMetadata {
                                     model: Some(model.clone()),
-                                    stop_reason,
+                                    stop_reason: proto_response.stop_reason,
                                     usage,
                                 })
                             } else {
@@ -298,18 +316,7 @@ impl ChatModel for ChatEurora {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
     ) -> agent_chain::Result<ChatResult> {
-        let stop_sequences = stop.unwrap_or_else(|| self.stop_sequences.clone());
-
-        let proto_request = build_proto_request(
-            &messages,
-            self.temperature,
-            self.max_tokens,
-            self.top_p,
-            self.top_k,
-            stop_sequences,
-            self.frequency_penalty,
-            self.presence_penalty,
-        );
+        let proto_request = self.build_request(&messages, stop);
 
         let mut client = self.client.clone();
         let grpc_request = Request::new(proto_request);
@@ -317,26 +324,21 @@ impl ChatModel for ChatEurora {
         let response = client.chat(grpc_request).await.map_err(EuroraError::from)?;
         let proto_response = response.into_inner();
 
-        // Convert proto response to ChatResult
-        let message: AIMessage = (&proto_response).into();
+        // Convert proto AIMessage directly to agent-chain AIMessage
+        let message: AIMessage = proto_response
+            .message
+            .map(Into::into)
+            .unwrap_or_else(|| AIMessage::new(""));
 
         let usage = proto_response
             .usage
-            .map(|u| UsageMetadata::new(u.prompt_tokens, u.completion_tokens));
-
-        let stop_reason = proto_response.finish_reason.map(|r| {
-            use crate::proto::chat::ProtoFinishReason;
-            finish_reason_to_string(
-                ProtoFinishReason::try_from(r)
-                    .unwrap_or(ProtoFinishReason::FinishReasonUnspecified),
-            )
-        });
+            .map(|u| UsageMetadata::new(u.input_tokens, u.output_tokens));
 
         Ok(ChatResult {
             message,
             metadata: ChatResultMetadata {
                 model: Some(self.model.clone()),
-                stop_reason,
+                stop_reason: proto_response.stop_reason,
                 usage,
             },
         })
@@ -361,18 +363,7 @@ impl ChatModel for ChatEurora {
         stop: Option<Vec<String>>,
     ) -> agent_chain::Result<ChatStream> {
         debug!("Sending chat stream");
-        let stop_sequences = stop.unwrap_or_else(|| self.stop_sequences.clone());
-
-        let proto_request = build_proto_request(
-            &messages,
-            self.temperature,
-            self.max_tokens,
-            self.top_p,
-            self.top_k,
-            stop_sequences,
-            self.frequency_penalty,
-            self.presence_penalty,
-        );
+        let proto_request = self.build_request(&messages, stop);
 
         let mut client = self.client.clone();
         let grpc_request = Request::new(proto_request);

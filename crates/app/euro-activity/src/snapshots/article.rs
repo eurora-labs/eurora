@@ -1,6 +1,6 @@
 //! Article snapshot implementation
 
-use euro_llm::{Message, MessageContent, Role};
+use agent_chain::{BaseMessage, HumanMessage};
 use euro_native_messaging::types::NativeArticleSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -96,7 +96,7 @@ impl ArticleSnapshot {
 
 impl SnapshotFunctionality for ArticleSnapshot {
     /// Construct a message for LLM interaction
-    fn construct_messages(&self) -> Vec<Message> {
+    fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = String::new();
 
         if let Some(title) = &self.page_title {
@@ -118,10 +118,7 @@ impl SnapshotFunctionality for ArticleSnapshot {
             content.push_str(&format!(" (from: {})", url));
         }
 
-        vec![Message {
-            role: Role::User,
-            content: MessageContent::Text(content),
-        }]
+        vec![HumanMessage::new(content).into()]
     }
 
     fn get_updated_at(&self) -> u64 {
@@ -244,15 +241,11 @@ mod tests {
         );
 
         let message = snapshot.construct_messages()[0].clone();
+        let text = message.content();
 
-        match message.content {
-            MessageContent::Text(text) => {
-                assert!(text.contains("Test Article"));
-                assert!(text.contains("Important quote"));
-                assert!(text.contains("https://example.com"));
-            }
-            _ => panic!("Expected text content"),
-        }
+        assert!(text.contains("Test Article"));
+        assert!(text.contains("Important quote"));
+        assert!(text.contains("https://example.com"));
     }
 
     #[test]
