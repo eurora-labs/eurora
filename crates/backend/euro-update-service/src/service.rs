@@ -7,7 +7,7 @@ use aws_config::BehaviorVersion;
 use aws_sdk_s3::{Client as S3Client, presigning::PresigningConfig};
 use chrono::Utc;
 use semver::Version;
-use tracing::{debug, error, instrument, warn};
+use tracing::{debug, error, instrument};
 
 use crate::{
     error::UpdateServiceError,
@@ -72,21 +72,13 @@ impl AppState {
         let prefix = format!("releases/{}/", channel);
         debug!("Listing S3 objects with prefix: {}", prefix);
 
-        let resp = self
+        let mut paginator = self
             .s3_client
             .list_objects_v2()
             .bucket(&self.bucket_name)
-            .max_keys(100)
             .prefix(&prefix)
-            .send()
-            .await
-            .context("Failed to list S3 objects")?;
-
-        let object_count = resp.contents().len();
-        debug!(
-            "Found {} objects in S3 with prefix {}",
-            object_count, prefix
-        );
+            .into_paginator()
+            .send();
 
         let mut latest_version: Option<Version> = None;
         let mut latest_version_str: Option<String> = None;
@@ -100,32 +92,51 @@ impl AppState {
 
         // Find the latest version that has files for our target platform
         let mut processed_versions = 0;
-        for object in resp.contents() {
-            if let Some(key) = object.key() {
-                debug!("Processing S3 object: {}", key);
-                // Extract version from key (format: releases/channel/version/target/arch/...)
-                if let Some(version_str) = extract_version_from_key(key, &prefix, &target, &arch) {
-                    debug!("Extracted version {} from key {}", version_str, key);
-                    if let Ok(version) = Version::parse(&version_str) {
-                        processed_versions += 1;
-                        if version > current_ver
-                            && latest_version.as_ref().is_none_or(|v| version > *v)
-                        {
-                            debug!(
-                                "Found newer version: {} (previous latest: {:?})",
-                                version, latest_version
-                            );
-                            latest_version = Some(version);
-                            latest_version_str = Some(version_str);
+        let mut total_objects = 0;
+
+        while let Some(resp) = paginator.next().await {
+            let resp = resp.context("Failed to list S3 objects")?;
+            let page_count = resp.contents().len();
+            total_objects += page_count;
+            debug!(
+                "Processing page with {} objects (total so far: {})",
+                page_count, total_objects
+            );
+
+            for object in resp.contents() {
+                if let Some(key) = object.key() {
+                    debug!("Processing S3 object: {}", key);
+                    // Extract version from key (format: releases/channel/version/target/arch/...)
+                    if let Some(version_str) =
+                        extract_version_from_key(key, &prefix, &target, &arch)
+                    {
+                        debug!("Extracted version {} from key {}", version_str, key);
+                        if let Ok(version) = Version::parse(&version_str) {
+                            processed_versions += 1;
+                            if version > current_ver
+                                && latest_version.as_ref().is_none_or(|v| version > *v)
+                            {
+                                debug!(
+                                    "Found newer version: {} (previous latest: {:?})",
+                                    version, latest_version
+                                );
+                                latest_version = Some(version);
+                                latest_version_str = Some(version_str);
+                            }
+                        } else {
+                            debug!("Failed to parse version string: {}", version_str);
                         }
                     } else {
-                        debug!("Failed to parse version string: {}", version_str);
+                        debug!("No version extracted from key: {}", key);
                     }
-                } else {
-                    debug!("No version extracted from key: {}", key);
                 }
             }
         }
+
+        debug!(
+            "Found {} total objects in S3 with prefix {}",
+            total_objects, prefix
+        );
 
         debug!(
             "Processed {} valid versions for {}/{}",
@@ -317,7 +328,7 @@ impl AppState {
                 debug!("Examining file: {}", filename);
 
                 // Skip signature and notes files
-                if filename == "signature" || filename == "notes.txt" {
+                if filename.ends_with(".sig") || filename == "notes.txt" {
                     debug!("Skipping metadata file: {}", filename);
                     continue;
                 }
@@ -340,7 +351,7 @@ impl AppState {
         for object in resp.contents() {
             if let Some(key) = object.key() {
                 let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
-                if filename != "signature" && filename != "notes.txt" && !filename.is_empty() {
+                if !filename.ends_with(".sig") && filename != "notes.txt" && !filename.is_empty() {
                     return Ok(key.to_string());
                 }
             }
