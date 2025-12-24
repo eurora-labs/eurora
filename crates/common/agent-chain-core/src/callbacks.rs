@@ -40,6 +40,7 @@ pub mod base;
 pub mod file;
 pub mod manager;
 pub mod stdout;
+pub mod usage;
 
 // Re-export base types
 pub use base::{
@@ -62,7 +63,10 @@ pub use manager::{
 pub use file::FileCallbackHandler;
 
 // Re-export stdout handlers
-pub use stdout::{StdOutCallbackHandler, StreamingStdOutCallbackHandler, colors};
+pub use stdout::{colors, StdOutCallbackHandler, StreamingStdOutCallbackHandler};
+
+// Re-export usage tracking
+pub use usage::{add_usage, UsageMetadataCallbackHandler};
 
 #[cfg(test)]
 mod tests {
