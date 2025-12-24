@@ -263,12 +263,14 @@ dependencies = [
  "agent-chain-macros",
  "async-trait",
  "futures",
+ "regex",
  "reqwest 0.12.24",
  "serde",
  "serde_json",
  "specta",
  "tempfile",
  "thiserror 2.0.17",
+ "url",
  "uuid",
 ]
 
