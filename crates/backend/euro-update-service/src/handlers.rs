@@ -9,7 +9,11 @@ use axum::{
 };
 use tracing::{debug, instrument, warn};
 
-use crate::{error::error_to_http_response, service::AppState, types::UpdateParams};
+use crate::{
+    error::error_to_http_response,
+    service::AppState,
+    types::{ReleaseParams, UpdateParams},
+};
 
 /// Handler for the update endpoint
 #[instrument(skip(state), fields(
@@ -56,6 +60,39 @@ pub async fn check_update_handler(
         }
         Err(e) => {
             warn!("Update check failed: {}", e);
+            let (status, error_response) = error_to_http_response(&e);
+            (status, error_response).into_response()
+        }
+    }
+}
+
+/// Handler for the release info endpoint
+/// Returns the latest version for a channel with all available platforms
+#[instrument(skip(state), fields(channel = %params.channel))]
+pub async fn get_release_handler(
+    State(state): State<Arc<AppState>>,
+    Path(params): Path<ReleaseParams>,
+) -> Response {
+    debug!(
+        "Processing release info request: channel={}",
+        params.channel
+    );
+
+    match state.get_latest_release(&params.channel).await {
+        Ok(Some(release_info)) => {
+            debug!(
+                "Release info found: version={}, platforms={}",
+                release_info.version,
+                release_info.platforms.len()
+            );
+            (StatusCode::OK, Json(release_info)).into_response()
+        }
+        Ok(None) => {
+            debug!("No release found for channel: {}", params.channel);
+            StatusCode::NOT_FOUND.into_response()
+        }
+        Err(e) => {
+            warn!("Release info request failed: {}", e);
             let (status, error_response) = error_to_http_response(&e);
             (status, error_response).into_response()
         }
