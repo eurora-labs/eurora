@@ -1,6 +1,6 @@
 //! Core update service logic and S3 operations
 
-use std::{collections::HashMap, time::Duration};
+use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::{Context, Result};
 use aws_config::BehaviorVersion;
@@ -525,8 +525,8 @@ impl AppState {
         &self,
         channel: &str,
         version: &str,
-    ) -> Result<(HashMap<String, PlatformInfo>, DateTime<Utc>)> {
-        let mut platforms: HashMap<String, PlatformInfo> = HashMap::new();
+    ) -> Result<(BTreeMap<String, PlatformInfo>, DateTime<Utc>)> {
+        let mut platforms: BTreeMap<String, PlatformInfo> = BTreeMap::new();
         let mut max_last_modified: Option<DateTime<Utc>> = None;
 
         // List all target directories (e.g., linux, darwin, windows)
