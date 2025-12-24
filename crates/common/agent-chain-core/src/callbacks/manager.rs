@@ -13,11 +13,7 @@ use crate::ChatResult;
 use crate::messages::BaseMessage;
 
 use super::base::{BaseCallbackHandler, BaseCallbackManager, Callbacks};
-
-/// Generate a new UUID v4 for run IDs.
-fn new_run_id() -> Uuid {
-    Uuid::new_v4()
-}
+use crate::utils::uuid::uuid7;
 
 /// Handle an event for the given handlers.
 ///
@@ -128,7 +124,7 @@ impl BaseRunManager {
     /// Return a manager that doesn't perform any operations.
     pub fn get_noop_manager() -> Self {
         Self {
-            run_id: new_run_id(),
+            run_id: uuid7(None),
             handlers: Vec::new(),
             inheritable_handlers: Vec::new(),
             parent_run_id: None,
@@ -1002,7 +998,7 @@ impl CallbackManager {
             {
                 run_id
             } else {
-                new_run_id()
+                uuid7(None)
             };
 
             handle_event(
@@ -1039,7 +1035,7 @@ impl CallbackManager {
         let mut current_run_id = run_id;
 
         for _message_list in messages {
-            let run_id = current_run_id.unwrap_or_else(new_run_id);
+            let run_id = current_run_id.unwrap_or_else(|| uuid7(None));
             current_run_id = None;
 
             handle_event(
@@ -1072,7 +1068,7 @@ impl CallbackManager {
         inputs: &HashMap<String, serde_json::Value>,
         run_id: Option<Uuid>,
     ) -> CallbackManagerForChainRun {
-        let run_id = run_id.unwrap_or_else(new_run_id);
+        let run_id = run_id.unwrap_or_else(|| uuid7(None));
 
         handle_event(
             &self.handlers,
@@ -1102,7 +1098,7 @@ impl CallbackManager {
         run_id: Option<Uuid>,
         inputs: Option<&HashMap<String, serde_json::Value>>,
     ) -> CallbackManagerForToolRun {
-        let run_id = run_id.unwrap_or_else(new_run_id);
+        let run_id = run_id.unwrap_or_else(|| uuid7(None));
 
         handle_event(
             &self.handlers,
@@ -1131,7 +1127,7 @@ impl CallbackManager {
         query: &str,
         run_id: Option<Uuid>,
     ) -> CallbackManagerForRetrieverRun {
-        let run_id = run_id.unwrap_or_else(new_run_id);
+        let run_id = run_id.unwrap_or_else(|| uuid7(None));
 
         handle_event(
             &self.handlers,
@@ -1159,7 +1155,7 @@ impl CallbackManager {
             return;
         }
 
-        let run_id = run_id.unwrap_or_else(new_run_id);
+        let run_id = run_id.unwrap_or_else(|| uuid7(None));
 
         handle_event(
             &self.handlers,
@@ -1362,7 +1358,7 @@ impl AsyncCallbackManager {
             return;
         }
 
-        let run_id = run_id.unwrap_or_else(new_run_id);
+        let run_id = run_id.unwrap_or_else(|| uuid7(None));
 
         handle_event(
             &self.inner.handlers,
