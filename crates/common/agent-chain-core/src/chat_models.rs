@@ -39,7 +39,7 @@ pub struct ChatResultMetadata {
 }
 
 /// Token usage metadata.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UsageMetadata {
     /// Number of input tokens.
     pub input_tokens: u32,
