@@ -5,7 +5,7 @@ use std::{collections::HashMap, time::Duration};
 use anyhow::{Context, Result};
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::{Client as S3Client, presigning::PresigningConfig};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use semver::Version;
 use tracing::{debug, error, instrument};
 
@@ -197,7 +197,7 @@ impl AppState {
             "Looking for download file in directory: {}",
             directory_prefix
         );
-        let file_key = self.find_download_file(&directory_prefix, target).await?;
+        let (file_key, last_modified) = self.find_download_file(&directory_prefix, target).await?;
         debug!("Found download file: {}", file_key);
 
         // Get signature file content based on the actual release file name
@@ -257,7 +257,7 @@ impl AppState {
 
         let response = UpdateResponse {
             version: version.to_string(),
-            pub_date: Utc::now().to_rfc3339(),
+            pub_date: last_modified.to_rfc3339(),
             url: download_url,
             signature,
             notes,
@@ -297,8 +297,13 @@ impl AppState {
     }
 
     /// Find the actual download file in the S3 directory
+    /// Returns the file key and the last_modified timestamp
     #[instrument(skip(self), fields(bucket = %self.bucket_name, directory_prefix, target))]
-    async fn find_download_file(&self, directory_prefix: &str, target: &str) -> Result<String> {
+    async fn find_download_file(
+        &self,
+        directory_prefix: &str,
+        target: &str,
+    ) -> Result<(String, DateTime<Utc>)> {
         debug!(
             "Searching for download file in directory: {}",
             directory_prefix
@@ -354,7 +359,8 @@ impl AppState {
                             "Found matching download file: {} (extension: {})",
                             filename, ext
                         );
-                        return Ok(key.to_string());
+                        let last_modified = self.extract_last_modified(object)?;
+                        return Ok((key.to_string(), last_modified));
                     }
                 }
                 debug!("File {} doesn't match expected extensions", filename);
@@ -366,7 +372,8 @@ impl AppState {
             if let Some(key) = object.key() {
                 let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
                 if !filename.ends_with(".sig") && filename != "notes.txt" && !filename.is_empty() {
-                    return Ok(key.to_string());
+                    let last_modified = self.extract_last_modified(object)?;
+                    return Ok((key.to_string(), last_modified));
                 }
             }
         }
@@ -374,6 +381,17 @@ impl AppState {
         Err(anyhow::Error::from(
             UpdateServiceError::DownloadFileNotFound(directory_prefix.to_string()),
         ))
+    }
+
+    /// Extract last_modified timestamp from an S3 object
+    fn extract_last_modified(&self, object: &aws_sdk_s3::types::Object) -> Result<DateTime<Utc>> {
+        let smithy_dt = object
+            .last_modified()
+            .context("S3 object missing last_modified timestamp")?;
+        let secs = smithy_dt.secs();
+        let nanos = smithy_dt.subsec_nanos();
+        DateTime::from_timestamp(secs, nanos)
+            .context("Failed to convert S3 timestamp to chrono DateTime")
     }
 
     /// Validate input parameters
@@ -481,7 +499,7 @@ impl AppState {
         );
 
         // Get all available platforms for this version
-        let platforms = self
+        let (platforms, max_pub_date) = self
             .get_platforms_for_version(channel, latest_version_str)
             .await?;
 
@@ -495,19 +513,21 @@ impl AppState {
 
         Ok(Some(ReleaseInfoResponse {
             version: latest_version_str.clone(),
-            pub_date: Utc::now().to_rfc3339(),
+            pub_date: max_pub_date.to_rfc3339(),
             platforms,
         }))
     }
 
     /// Get all available platforms for a specific version
+    /// Returns the platforms map and the maximum last_modified date across all platforms
     #[instrument(skip(self), fields(bucket = %self.bucket_name, channel, version))]
     async fn get_platforms_for_version(
         &self,
         channel: &str,
         version: &str,
-    ) -> Result<HashMap<String, PlatformInfo>> {
+    ) -> Result<(HashMap<String, PlatformInfo>, DateTime<Utc>)> {
         let mut platforms: HashMap<String, PlatformInfo> = HashMap::new();
+        let mut max_last_modified: Option<DateTime<Utc>> = None;
 
         // List all target directories (e.g., linux, darwin, windows)
         let version_prefix = format!("releases/{}/{}/", channel, version);
@@ -569,7 +589,16 @@ impl AppState {
                             format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
 
                         match self.find_download_file(&directory_prefix, &target).await {
-                            Ok(file_key) => {
+                            Ok((file_key, last_modified)) => {
+                                // Track the maximum last_modified date
+                                match &max_last_modified {
+                                    None => max_last_modified = Some(last_modified),
+                                    Some(current_max) if last_modified > *current_max => {
+                                        max_last_modified = Some(last_modified);
+                                    }
+                                    _ => {}
+                                }
+
                                 // Get signature file content
                                 let signature_key = format!("{}.sig", file_key);
                                 let signature = match self.get_file_content(&signature_key).await {
@@ -612,7 +641,9 @@ impl AppState {
             }
         }
 
-        Ok(platforms)
+        // Default to now if no files were found (shouldn't happen if platforms is not empty)
+        let pub_date = max_last_modified.unwrap_or_else(Utc::now);
+        Ok((platforms, pub_date))
     }
 
     /// Generate a presigned URL for a file
