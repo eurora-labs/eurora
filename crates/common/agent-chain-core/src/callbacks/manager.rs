@@ -4,12 +4,13 @@
 //! handle callback dispatch during LangChain operations.
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 
 use uuid::Uuid;
 
-use crate::messages::BaseMessage;
 use crate::ChatResult;
+use crate::messages::BaseMessage;
 
 use super::base::{BaseCallbackHandler, BaseCallbackManager, Callbacks};
 
@@ -29,11 +30,53 @@ pub fn handle_event<F>(
     F: FnMut(&Arc<dyn BaseCallbackHandler>),
 {
     for handler in handlers {
-        if let Some(ignore_fn) = ignore_condition && ignore_fn(handler.as_ref()) {
-                continue;
-            }
+        if let Some(ignore_fn) = ignore_condition
+            && ignore_fn(handler.as_ref())
+        {
+            continue;
+        }
         event_fn(handler);
     }
+}
+
+/// Async generic event handler for `AsyncCallbackManager`.
+///
+/// This function dispatches events to handlers asynchronously.
+/// Handlers with `run_inline = true` are run sequentially first,
+/// then non-inline handlers are run concurrently.
+pub async fn ahandle_event<F, Fut>(
+    handlers: &[Arc<dyn BaseCallbackHandler>],
+    ignore_condition: Option<fn(&dyn BaseCallbackHandler) -> bool>,
+    event_fn: F,
+) where
+    F: Fn(&Arc<dyn BaseCallbackHandler>) -> Fut + Send + Sync,
+    Fut: Future<Output = ()> + Send,
+{
+    // First, run inline handlers sequentially
+    for handler in handlers.iter().filter(|h| h.run_inline()) {
+        if let Some(ignore_fn) = ignore_condition {
+            if ignore_fn(handler.as_ref()) {
+                continue;
+            }
+        }
+        event_fn(handler).await;
+    }
+
+    // Then, run non-inline handlers concurrently
+    let non_inline_futures: Vec<_> = handlers
+        .iter()
+        .filter(|h| !h.run_inline())
+        .filter(|h| {
+            if let Some(ignore_fn) = ignore_condition {
+                !ignore_fn(h.as_ref())
+            } else {
+                true
+            }
+        })
+        .map(|h| event_fn(h))
+        .collect();
+
+    futures::future::join_all(non_inline_futures).await;
 }
 
 /// Base class for run manager (a bound callback manager).
@@ -170,6 +213,202 @@ impl RunManager {
         Self {
             inner: BaseRunManager::get_noop_manager(),
         }
+    }
+}
+
+/// Async Run Manager.
+///
+/// This is the async counterpart to `RunManager`.
+#[derive(Debug, Clone)]
+pub struct AsyncRunManager {
+    /// The base run manager.
+    inner: BaseRunManager,
+}
+
+impl AsyncRunManager {
+    /// Create a new async run manager.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        run_id: Uuid,
+        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
+        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
+        parent_run_id: Option<Uuid>,
+        tags: Option<Vec<String>>,
+        inheritable_tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
+        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
+        Self {
+            inner: BaseRunManager::new(
+                run_id,
+                handlers,
+                inheritable_handlers,
+                parent_run_id,
+                tags,
+                inheritable_tags,
+                metadata,
+                inheritable_metadata,
+            ),
+        }
+    }
+
+    /// Get the sync version of this run manager.
+    pub fn get_sync(&self) -> RunManager {
+        RunManager::new(
+            self.inner.run_id,
+            self.inner.handlers.clone(),
+            self.inner.inheritable_handlers.clone(),
+            self.inner.parent_run_id,
+            Some(self.inner.tags.clone()),
+            Some(self.inner.inheritable_tags.clone()),
+            Some(self.inner.metadata.clone()),
+            Some(self.inner.inheritable_metadata.clone()),
+        )
+    }
+
+    /// Get the run ID.
+    pub fn run_id(&self) -> Uuid {
+        self.inner.run_id
+    }
+
+    /// Get the parent run ID.
+    pub fn parent_run_id(&self) -> Option<Uuid> {
+        self.inner.parent_run_id
+    }
+
+    /// Get the handlers.
+    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
+        &self.inner.handlers
+    }
+
+    /// Get the tags.
+    pub fn tags(&self) -> &[String] {
+        &self.inner.tags
+    }
+
+    /// Run when a text is received (async).
+    pub async fn on_text(&self, text: &str) {
+        if self.inner.handlers.is_empty() {
+            return;
+        }
+        let run_id = self.inner.run_id;
+        let parent_run_id = self.inner.parent_run_id;
+        let tags = self.inner.tags.clone();
+        ahandle_event(&self.inner.handlers, None, |_handler| {
+            let _ = (text, run_id, parent_run_id, &tags);
+            async {}
+        })
+        .await;
+    }
+
+    /// Run when a retry is received (async).
+    pub async fn on_retry(&self, retry_state: &serde_json::Value) {
+        if self.inner.handlers.is_empty() {
+            return;
+        }
+        let run_id = self.inner.run_id;
+        let parent_run_id = self.inner.parent_run_id;
+        let tags = self.inner.tags.clone();
+        ahandle_event(
+            &self.inner.handlers,
+            Some(|h: &dyn BaseCallbackHandler| h.ignore_retry()),
+            |_handler| {
+                let _ = (retry_state, run_id, parent_run_id, &tags);
+                async {}
+            },
+        )
+        .await;
+    }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: BaseRunManager::get_noop_manager(),
+        }
+    }
+}
+
+/// Async Parent Run Manager.
+///
+/// This is the async counterpart to `ParentRunManager`.
+#[derive(Debug, Clone)]
+pub struct AsyncParentRunManager {
+    /// The inner async run manager.
+    inner: AsyncRunManager,
+}
+
+impl AsyncParentRunManager {
+    /// Create a new async parent run manager.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        run_id: Uuid,
+        handlers: Vec<Arc<dyn BaseCallbackHandler>>,
+        inheritable_handlers: Vec<Arc<dyn BaseCallbackHandler>>,
+        parent_run_id: Option<Uuid>,
+        tags: Option<Vec<String>>,
+        inheritable_tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
+        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
+        Self {
+            inner: AsyncRunManager::new(
+                run_id,
+                handlers,
+                inheritable_handlers,
+                parent_run_id,
+                tags,
+                inheritable_tags,
+                metadata,
+                inheritable_metadata,
+            ),
+        }
+    }
+
+    /// Get a child async callback manager.
+    pub fn get_child(&self, tag: Option<&str>) -> AsyncCallbackManager {
+        let mut manager = AsyncCallbackManager::new();
+        manager.inner.parent_run_id = Some(self.inner.run_id());
+        manager.set_handlers(self.inner.inner.inheritable_handlers.clone(), true);
+        manager.add_tags(self.inner.inner.inheritable_tags.clone(), true);
+        manager.add_metadata(self.inner.inner.inheritable_metadata.clone(), true);
+        if let Some(tag) = tag {
+            manager.add_tags(vec![tag.to_string()], false);
+        }
+        manager
+    }
+
+    /// Get the sync version.
+    pub fn get_sync(&self) -> ParentRunManager {
+        ParentRunManager::new(
+            self.inner.inner.run_id,
+            self.inner.inner.handlers.clone(),
+            self.inner.inner.inheritable_handlers.clone(),
+            self.inner.inner.parent_run_id,
+            Some(self.inner.inner.tags.clone()),
+            Some(self.inner.inner.inheritable_tags.clone()),
+            Some(self.inner.inner.metadata.clone()),
+            Some(self.inner.inner.inheritable_metadata.clone()),
+        )
+    }
+
+    /// Get the run ID.
+    pub fn run_id(&self) -> Uuid {
+        self.inner.run_id()
+    }
+
+    /// Get the parent run ID.
+    pub fn parent_run_id(&self) -> Option<Uuid> {
+        self.inner.parent_run_id()
+    }
+
+    /// Get the handlers.
+    pub fn handlers(&self) -> &[Arc<dyn BaseCallbackHandler>] {
+        self.inner.handlers()
+    }
+
+    /// Get the tags.
+    pub fn tags(&self) -> &[String] {
+        self.inner.tags()
     }
 }
 
@@ -758,7 +997,9 @@ impl CallbackManager {
         let mut managers = Vec::new();
 
         for (i, _prompt) in prompts.iter().enumerate() {
-            let run_id = if i == 0 && let Some(run_id) = run_id {
+            let run_id = if i == 0
+                && let Some(run_id) = run_id
+            {
                 run_id
             } else {
                 new_run_id()
@@ -913,12 +1154,7 @@ impl CallbackManager {
     }
 
     /// Dispatch a custom event.
-    pub fn on_custom_event(
-        &self,
-        name: &str,
-        data: &serde_json::Value,
-        run_id: Option<Uuid>,
-    ) {
+    pub fn on_custom_event(&self, name: &str, data: &serde_json::Value, run_id: Option<Uuid>) {
         if self.handlers.is_empty() {
             return;
         }
@@ -1565,7 +1801,8 @@ impl CallbackManagerForChainGroup {
         run_id: Option<Uuid>,
         inputs: Option<&HashMap<String, serde_json::Value>>,
     ) -> CallbackManagerForToolRun {
-        self.inner.on_tool_start(serialized, input_str, run_id, inputs)
+        self.inner
+            .on_tool_start(serialized, input_str, run_id, inputs)
     }
 
     /// Run when retriever starts running.
@@ -1752,7 +1989,9 @@ impl AsyncCallbackManagerForChainGroup {
         query: &str,
         run_id: Option<Uuid>,
     ) -> AsyncCallbackManagerForRetrieverRun {
-        self.inner.on_retriever_start(serialized, query, run_id).await
+        self.inner
+            .on_retriever_start(serialized, query, run_id)
+            .await
     }
 }
 
@@ -1773,11 +2012,22 @@ where
     F: FnOnce(&mut CallbackManagerForChainGroup) -> R,
 {
     let cm = callback_manager.unwrap_or_else(|| {
-        CallbackManager::configure(None, None, tags.clone(), None, metadata.clone(), None, false)
+        CallbackManager::configure(
+            None,
+            None,
+            tags.clone(),
+            None,
+            metadata.clone(),
+            None,
+            false,
+        )
     });
 
     let mut serialized = HashMap::new();
-    serialized.insert("name".to_string(), serde_json::Value::String(group_name.to_string()));
+    serialized.insert(
+        "name".to_string(),
+        serde_json::Value::String(group_name.to_string()),
+    );
 
     let run_manager = cm.on_chain_start(&serialized, &inputs.clone().unwrap_or_default(), run_id);
     let child_cm = run_manager.get_child(None);
@@ -1852,6 +2102,80 @@ pub fn dispatch_custom_event(
     );
 
     Ok(())
+}
+
+/// Get an async callback manager for a chain group in an async context.
+///
+/// Useful for grouping different async calls together as a single run even if
+/// they aren't composed in a single chain.
+///
+/// # Arguments
+///
+/// * `group_name` - The name of the chain group.
+/// * `callback_manager` - Optional async callback manager to use.
+/// * `inputs` - Optional inputs to the chain group.
+/// * `tags` - Optional inheritable tags to apply to all runs.
+/// * `metadata` - Optional metadata to apply to all runs.
+/// * `run_id` - Optional run ID.
+/// * `f` - The async function to execute with the chain group manager.
+///
+/// # Returns
+///
+/// The result of the async function.
+pub async fn atrace_as_chain_group<F, Fut, R>(
+    group_name: &str,
+    callback_manager: Option<AsyncCallbackManager>,
+    inputs: Option<HashMap<String, serde_json::Value>>,
+    tags: Option<Vec<String>>,
+    metadata: Option<HashMap<String, serde_json::Value>>,
+    run_id: Option<Uuid>,
+    f: F,
+) -> R
+where
+    F: FnOnce(AsyncCallbackManagerForChainGroup) -> Fut,
+    Fut: Future<Output = R>,
+{
+    let cm = callback_manager.unwrap_or_else(|| {
+        AsyncCallbackManager::configure(
+            None,
+            None,
+            tags.clone(),
+            None,
+            metadata.clone(),
+            None,
+            false,
+        )
+    });
+
+    let mut serialized = HashMap::new();
+    serialized.insert(
+        "name".to_string(),
+        serde_json::Value::String(group_name.to_string()),
+    );
+
+    let run_manager = cm
+        .on_chain_start(&serialized, &inputs.clone().unwrap_or_default(), run_id)
+        .await;
+    let child_cm = run_manager.get_child(None);
+
+    let group_cm = AsyncCallbackManagerForChainGroup::new(
+        child_cm.handlers().to_vec(),
+        Some(child_cm.inner.inheritable_handlers.clone()),
+        child_cm.parent_run_id(),
+        run_manager.clone(),
+        Some(child_cm.inner.tags.clone()),
+        Some(child_cm.inner.inheritable_tags.clone()),
+        Some(child_cm.inner.metadata.clone()),
+        Some(child_cm.inner.inheritable_metadata.clone()),
+    );
+
+    let result = f(group_cm.clone()).await;
+
+    if !group_cm.ended {
+        run_manager.on_chain_end(&HashMap::new()).await;
+    }
+
+    result
 }
 
 /// Dispatch an adhoc event to the handlers (async version).
