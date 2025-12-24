@@ -25,7 +25,8 @@ function info() {
 	echo "$@"
 }
 
-VERSION="$1"
+# VERSION="$1"
+VERSION="0.8.0"
 BUMP="$2"
 
 # https://semver.org/
