@@ -29,11 +29,9 @@ pub fn handle_event<F>(
     F: FnMut(&Arc<dyn BaseCallbackHandler>),
 {
     for handler in handlers {
-        if let Some(ignore_fn) = ignore_condition {
-            if ignore_fn(handler.as_ref()) {
+        if let Some(ignore_fn) = ignore_condition && ignore_fn(handler.as_ref()) {
                 continue;
             }
-        }
         event_fn(handler);
     }
 }
@@ -760,8 +758,8 @@ impl CallbackManager {
         let mut managers = Vec::new();
 
         for (i, _prompt) in prompts.iter().enumerate() {
-            let run_id = if i == 0 && run_id.is_some() {
-                run_id.unwrap()
+            let run_id = if i == 0 && let Some(run_id) = run_id {
+                run_id
             } else {
                 new_run_id()
             };
