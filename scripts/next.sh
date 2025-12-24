@@ -26,7 +26,7 @@ function info() {
 }
 
 # VERSION="$1"
-VERSION="0.8.1"
+VERSION="0.8.2"
 BUMP="$2"
 
 # https://semver.org/
