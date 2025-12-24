@@ -9,11 +9,7 @@ use chrono::Utc;
 use semver::Version;
 use tracing::{debug, error, instrument};
 
-use crate::{
-    error::UpdateServiceError,
-    types::UpdateResponse,
-    utils::{extract_version_from_key, parse_target_arch},
-};
+use crate::{error::UpdateServiceError, types::UpdateResponse, utils::parse_target_arch};
 
 /// Application state containing the S3 client and configuration
 #[derive(Clone)]
@@ -67,22 +63,6 @@ impl AppState {
         })?;
         debug!("Parsed current version: {}", current_ver);
 
-        // List objects in the S3 bucket for this channel
-        // New structure: releases/{channel}/{version}/{target}/{arch}/
-        let prefix = format!("releases/{}/", channel);
-        debug!("Listing S3 objects with prefix: {}", prefix);
-
-        let mut paginator = self
-            .s3_client
-            .list_objects_v2()
-            .bucket(&self.bucket_name)
-            .prefix(&prefix)
-            .into_paginator()
-            .send();
-
-        let mut latest_version: Option<Version> = None;
-        let mut latest_version_str: Option<String> = None;
-
         // Parse target_arch to extract target and arch components
         let (target, arch) = parse_target_arch(target_arch)?;
         debug!(
@@ -90,58 +70,88 @@ impl AppState {
             target, arch
         );
 
-        // Find the latest version that has files for our target platform
-        let mut processed_versions = 0;
-        let mut total_objects = 0;
+        // Use delimiter to efficiently list only version directories
+        // Structure: releases/{channel}/{version}/...
+        let prefix = format!("releases/{}/", channel);
+        debug!(
+            "Listing version directories with prefix: {} and delimiter: /",
+            prefix
+        );
+
+        // Collect all versions from the channel using delimiter to get only version prefixes
+        let mut all_versions: Vec<(Version, String)> = Vec::new();
+
+        let mut paginator = self
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(&prefix)
+            .delimiter("/")
+            .into_paginator()
+            .send();
 
         while let Some(resp) = paginator.next().await {
             let resp = resp.context("Failed to list S3 objects")?;
-            let page_count = resp.contents().len();
-            total_objects += page_count;
-            debug!(
-                "Processing page with {} objects (total so far: {})",
-                page_count, total_objects
-            );
 
-            for object in resp.contents() {
-                if let Some(key) = object.key() {
-                    debug!("Processing S3 object: {}", key);
-                    // Extract version from key (format: releases/channel/version/target/arch/...)
-                    if let Some(version_str) =
-                        extract_version_from_key(key, &prefix, &target, &arch)
+            // common_prefixes contains the version directories (e.g., "releases/nightly/1.0.0/")
+            for common_prefix in resp.common_prefixes() {
+                if let Some(prefix_str) = common_prefix.prefix() {
+                    // Extract version from prefix (format: releases/channel/version/)
+                    let version_str = prefix_str
+                        .strip_prefix(&prefix)
+                        .and_then(|s| s.strip_suffix('/'))
+                        .unwrap_or("");
+
+                    if let Ok(version) = Version::parse(version_str)
+                        && version > current_ver
                     {
-                        debug!("Extracted version {} from key {}", version_str, key);
-                        if let Ok(version) = Version::parse(&version_str) {
-                            processed_versions += 1;
-                            if version > current_ver
-                                && latest_version.as_ref().is_none_or(|v| version > *v)
-                            {
-                                debug!(
-                                    "Found newer version: {} (previous latest: {:?})",
-                                    version, latest_version
-                                );
-                                latest_version = Some(version);
-                                latest_version_str = Some(version_str);
-                            }
-                        } else {
-                            debug!("Failed to parse version string: {}", version_str);
-                        }
-                    } else {
-                        debug!("No version extracted from key: {}", key);
+                        debug!("Found candidate version: {}", version_str);
+                        all_versions.push((version, version_str.to_string()));
                     }
                 }
             }
         }
 
         debug!(
-            "Found {} total objects in S3 with prefix {}",
-            total_objects, prefix
+            "Found {} candidate versions newer than {}",
+            all_versions.len(),
+            current_version
         );
 
-        debug!(
-            "Processed {} valid versions for {}/{}",
-            processed_versions, target, arch
-        );
+        // Sort versions in descending order (newest first)
+        all_versions.sort_by(|a, b| b.0.cmp(&a.0));
+
+        // Find the latest version that has files for our target platform
+        let mut latest_version: Option<Version> = None;
+        let mut latest_version_str: Option<String> = None;
+
+        for (version, version_str) in all_versions {
+            // Check if this version has files for our target/arch
+            let target_prefix =
+                format!("releases/{}/{}/{}/{}/", channel, version_str, target, arch);
+
+            let resp = self
+                .s3_client
+                .list_objects_v2()
+                .bucket(&self.bucket_name)
+                .prefix(&target_prefix)
+                .max_keys(1) // We only need to know if any file exists
+                .send()
+                .await
+                .context("Failed to check version availability")?;
+
+            if !resp.contents().is_empty() {
+                debug!("Version {} has files for {}/{}", version_str, target, arch);
+                latest_version = Some(version);
+                latest_version_str = Some(version_str);
+                break; // Found the latest version with files for our platform
+            } else {
+                debug!(
+                    "Version {} has no files for {}/{}, checking older versions",
+                    version_str, target, arch
+                );
+            }
+        }
 
         if let (Some(latest_ver), Some(latest_ver_str)) = (latest_version, latest_version_str) {
             debug!(
