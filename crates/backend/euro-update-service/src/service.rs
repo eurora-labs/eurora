@@ -528,14 +528,13 @@ impl AppState {
             let resp = resp.context("Failed to list target directories")?;
 
             for common_prefix in resp.common_prefixes() {
-                if let Some(prefix_str) = common_prefix.prefix() {
-                    if let Some(target) = prefix_str
+                if let Some(prefix_str) = common_prefix.prefix()
+                    && let Some(target) = prefix_str
                         .strip_prefix(&version_prefix)
                         .and_then(|s| s.strip_suffix('/'))
-                    {
-                        debug!("Found target: {}", target);
-                        targets.push(target.to_string());
-                    }
+                {
+                    debug!("Found target: {}", target);
+                    targets.push(target.to_string());
                 }
             }
         }
@@ -558,58 +557,54 @@ impl AppState {
                 let resp = resp.context("Failed to list arch directories")?;
 
                 for common_prefix in resp.common_prefixes() {
-                    if let Some(prefix_str) = common_prefix.prefix() {
-                        if let Some(arch) = prefix_str
+                    if let Some(prefix_str) = common_prefix.prefix()
+                        && let Some(arch) = prefix_str
                             .strip_prefix(&target_prefix)
                             .and_then(|s| s.strip_suffix('/'))
-                        {
-                            debug!("Found arch: {} for target: {}", arch, target);
+                    {
+                        debug!("Found arch: {} for target: {}", arch, target);
 
-                            // Find the download file and generate presigned URL
-                            let directory_prefix =
-                                format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
+                        // Find the download file and generate presigned URL
+                        let directory_prefix =
+                            format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
 
-                            match self.find_download_file(&directory_prefix, &target).await {
-                                Ok(file_key) => {
-                                    // Get signature file content
-                                    let signature_key = format!("{}.sig", file_key);
-                                    let signature =
-                                        match self.get_file_content(&signature_key).await {
-                                            Ok(sig) => sig,
-                                            Err(e) => {
-                                                debug!(
-                                                    "Failed to get signature for {}/{}: {}",
-                                                    target, arch, e
-                                                );
-                                                continue; // Skip platforms without signatures
-                                            }
-                                        };
+                        match self.find_download_file(&directory_prefix, &target).await {
+                            Ok(file_key) => {
+                                // Get signature file content
+                                let signature_key = format!("{}.sig", file_key);
+                                let signature = match self.get_file_content(&signature_key).await {
+                                    Ok(sig) => sig,
+                                    Err(e) => {
+                                        debug!(
+                                            "Failed to get signature for {}/{}: {}",
+                                            target, arch, e
+                                        );
+                                        continue; // Skip platforms without signatures
+                                    }
+                                };
 
-                                    // Generate presigned URL
-                                    match self.generate_presigned_url(&file_key).await {
-                                        Ok(url) => {
-                                            let platform_key = format!("{}-{}", target, arch);
-                                            debug!(
-                                                "Adding platform {} with URL length {}",
-                                                platform_key,
-                                                url.len()
-                                            );
-                                            platforms.insert(
-                                                platform_key,
-                                                PlatformInfo { url, signature },
-                                            );
-                                        }
-                                        Err(e) => {
-                                            debug!(
-                                                "Failed to generate presigned URL for {}/{}: {}",
-                                                target, arch, e
-                                            );
-                                        }
+                                // Generate presigned URL
+                                match self.generate_presigned_url(&file_key).await {
+                                    Ok(url) => {
+                                        let platform_key = format!("{}-{}", target, arch);
+                                        debug!(
+                                            "Adding platform {} with URL length {}",
+                                            platform_key,
+                                            url.len()
+                                        );
+                                        platforms
+                                            .insert(platform_key, PlatformInfo { url, signature });
+                                    }
+                                    Err(e) => {
+                                        debug!(
+                                            "Failed to generate presigned URL for {}/{}: {}",
+                                            target, arch, e
+                                        );
                                     }
                                 }
-                                Err(e) => {
-                                    debug!("No download file found for {}/{}: {}", target, arch, e);
-                                }
+                            }
+                            Err(e) => {
+                                debug!("No download file found for {}/{}: {}", target, arch, e);
                             }
                         }
                     }
