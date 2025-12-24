@@ -256,7 +256,7 @@ impl AppState {
         };
 
         let response = UpdateResponse {
-            version: version.to_string(),
+            version: Self::strip_build_metadata(version),
             pub_date: last_modified.to_rfc3339(),
             url: download_url,
             signature,
@@ -512,7 +512,7 @@ impl AppState {
         }
 
         Ok(Some(ReleaseInfoResponse {
-            version: latest_version_str.clone(),
+            version: Self::strip_build_metadata(latest_version_str),
             pub_date: max_pub_date.to_rfc3339(),
             platforms,
         }))
@@ -674,5 +674,20 @@ impl AppState {
             url.len()
         );
         Ok(url)
+    }
+
+    /// Strip build metadata (e.g., "-622" run number) from version string
+    /// Converts "0.8.2-622" to "0.8.2"
+    fn strip_build_metadata(version_str: &str) -> String {
+        if let Ok(v) = Version::parse(version_str) {
+            format!("{}.{}.{}", v.major, v.minor, v.patch)
+        } else {
+            // Fallback: strip everything after first dash
+            version_str
+                .split('-')
+                .next()
+                .unwrap_or(version_str)
+                .to_string()
+        }
     }
 }
