@@ -51,10 +51,11 @@ pub use base::{
 
 // Re-export manager types
 pub use manager::{
-    adispatch_custom_event, dispatch_custom_event, trace_as_chain_group,
-    AsyncCallbackManager, AsyncCallbackManagerForChainGroup, AsyncCallbackManagerForChainRun,
-    AsyncCallbackManagerForLLMRun, AsyncCallbackManagerForRetrieverRun,
-    AsyncCallbackManagerForToolRun, BaseRunManager, CallbackManager, CallbackManagerForChainGroup,
+    adispatch_custom_event, ahandle_event, atrace_as_chain_group, dispatch_custom_event,
+    handle_event, trace_as_chain_group, AsyncCallbackManager, AsyncCallbackManagerForChainGroup,
+    AsyncCallbackManagerForChainRun, AsyncCallbackManagerForLLMRun,
+    AsyncCallbackManagerForRetrieverRun, AsyncCallbackManagerForToolRun, AsyncParentRunManager,
+    AsyncRunManager, BaseRunManager, CallbackManager, CallbackManagerForChainGroup,
     CallbackManagerForChainRun, CallbackManagerForLLMRun, CallbackManagerForRetrieverRun,
     CallbackManagerForToolRun, ParentRunManager, RunManager,
 };
@@ -66,7 +67,7 @@ pub use file::FileCallbackHandler;
 pub use stdout::{colors, StdOutCallbackHandler, StreamingStdOutCallbackHandler};
 
 // Re-export usage tracking
-pub use usage::{add_usage, UsageMetadataCallbackHandler};
+pub use usage::{add_usage, get_usage_metadata_callback, UsageMetadataCallbackGuard, UsageMetadataCallbackHandler};
 
 #[cfg(test)]
 mod tests {

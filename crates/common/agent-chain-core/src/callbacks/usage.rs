@@ -4,6 +4,7 @@
 //! across chat model calls, following the Python LangChain UsageMetadataCallbackHandler pattern.
 
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
@@ -134,6 +135,117 @@ impl BaseCallbackHandler for UsageMetadataCallbackHandler {
     fn name(&self) -> &str {
         "UsageMetadataCallbackHandler"
     }
+}
+
+/// Guard type for the `get_usage_metadata_callback` function.
+///
+/// This guard provides access to the underlying `UsageMetadataCallbackHandler`
+/// and can be used with a callback manager to track usage metadata.
+///
+/// When the guard is dropped, any cleanup is performed automatically.
+///
+/// # Example
+///
+/// ```ignore
+/// use agent_chain_core::callbacks::get_usage_metadata_callback;
+///
+/// let callback_guard = get_usage_metadata_callback();
+/// // Use callback_guard.handler() with your callback manager
+/// // The handler can be cloned and added to managers
+///
+/// let usage = callback_guard.usage_metadata();
+/// for (model, metadata) in usage.iter() {
+///     println!("{}: {} tokens", model, metadata.total_tokens);
+/// }
+/// ```
+pub struct UsageMetadataCallbackGuard {
+    handler: UsageMetadataCallbackHandler,
+}
+
+impl UsageMetadataCallbackGuard {
+    /// Create a new usage metadata callback guard.
+    fn new() -> Self {
+        Self {
+            handler: UsageMetadataCallbackHandler::new(),
+        }
+    }
+
+    /// Get a reference to the underlying handler.
+    pub fn handler(&self) -> &UsageMetadataCallbackHandler {
+        &self.handler
+    }
+
+    /// Get a mutable reference to the underlying handler.
+    pub fn handler_mut(&mut self) -> &mut UsageMetadataCallbackHandler {
+        &mut self.handler
+    }
+
+    /// Get the collected usage metadata.
+    pub fn usage_metadata(&self) -> HashMap<String, UsageMetadata> {
+        self.handler.usage_metadata()
+    }
+
+    /// Get usage metadata for a specific model.
+    pub fn get_model_usage(&self, model_name: &str) -> Option<UsageMetadata> {
+        self.handler.get_model_usage(model_name)
+    }
+
+    /// Get total usage across all models.
+    pub fn total_usage(&self) -> UsageMetadata {
+        self.handler.total_usage()
+    }
+
+    /// Get an Arc-wrapped handler suitable for use with callback managers.
+    pub fn as_arc_handler(&self) -> Arc<dyn BaseCallbackHandler> {
+        Arc::new(self.handler.clone()) as Arc<dyn BaseCallbackHandler>
+    }
+}
+
+impl Deref for UsageMetadataCallbackGuard {
+    type Target = UsageMetadataCallbackHandler;
+
+    fn deref(&self) -> &Self::Target {
+        &self.handler
+    }
+}
+
+impl DerefMut for UsageMetadataCallbackGuard {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.handler
+    }
+}
+
+/// Get a usage metadata callback handler.
+///
+/// This function creates a `UsageMetadataCallbackGuard` that provides access
+/// to a `UsageMetadataCallbackHandler` for tracking token usage across chat
+/// model calls.
+///
+/// The returned guard implements `Deref` and `DerefMut` to the underlying
+/// handler, making it easy to use.
+///
+/// # Example
+///
+/// ```ignore
+/// use agent_chain_core::callbacks::{get_usage_metadata_callback, CallbackManager};
+/// use std::sync::Arc;
+///
+/// let callback = get_usage_metadata_callback();
+///
+/// // Add to a callback manager
+/// let mut manager = CallbackManager::new();
+/// manager.add_handler(callback.as_arc_handler(), true);
+///
+/// // After LLM calls complete
+/// let usage = callback.usage_metadata();
+/// for (model, metadata) in usage.iter() {
+///     println!("{}: {} tokens", model, metadata.total_tokens);
+/// }
+/// ```
+///
+/// This is the Rust equivalent of Python's `get_usage_metadata_callback()` context manager.
+pub fn get_usage_metadata_callback() -> UsageMetadataCallbackGuard {
+    UsageMetadataCallbackGuard::new()
 }
 
 #[cfg(test)]
