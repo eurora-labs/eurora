@@ -37,6 +37,7 @@
 //! ```
 
 pub mod base;
+pub mod file;
 pub mod manager;
 pub mod stdout;
 
@@ -49,11 +50,16 @@ pub use base::{
 
 // Re-export manager types
 pub use manager::{
-    AsyncCallbackManager, AsyncCallbackManagerForChainRun, AsyncCallbackManagerForLLMRun,
-    AsyncCallbackManagerForRetrieverRun, AsyncCallbackManagerForToolRun, BaseRunManager,
-    CallbackManager, CallbackManagerForChainRun, CallbackManagerForLLMRun,
-    CallbackManagerForRetrieverRun, CallbackManagerForToolRun, ParentRunManager, RunManager,
+    adispatch_custom_event, dispatch_custom_event, trace_as_chain_group,
+    AsyncCallbackManager, AsyncCallbackManagerForChainGroup, AsyncCallbackManagerForChainRun,
+    AsyncCallbackManagerForLLMRun, AsyncCallbackManagerForRetrieverRun,
+    AsyncCallbackManagerForToolRun, BaseRunManager, CallbackManager, CallbackManagerForChainGroup,
+    CallbackManagerForChainRun, CallbackManagerForLLMRun, CallbackManagerForRetrieverRun,
+    CallbackManagerForToolRun, ParentRunManager, RunManager,
 };
+
+// Re-export file handler
+pub use file::FileCallbackHandler;
 
 // Re-export stdout handlers
 pub use stdout::{StdOutCallbackHandler, StreamingStdOutCallbackHandler, colors};
