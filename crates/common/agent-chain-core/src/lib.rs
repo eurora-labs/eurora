@@ -47,10 +47,10 @@ pub use tools::{Tool, ToolDefinition, tool};
 
 // Re-export callback types
 pub use callbacks::{
-    AsyncCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainRun,
+    add_usage, AsyncCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainRun,
     AsyncCallbackManagerForLLMRun, BaseCallbackHandler, BaseCallbackManager, CallbackManager,
     CallbackManagerForChainRun, CallbackManagerForLLMRun, Callbacks, StdOutCallbackHandler,
-    StreamingStdOutCallbackHandler,
+    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler,
 };
 
 // Re-export async_trait for use in generated code
