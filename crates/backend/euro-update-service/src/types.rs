@@ -32,6 +32,7 @@ pub struct ReleaseParams {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PlatformInfo {
     pub url: String,
+    pub signature: String,
 }
 
 /// Response for the releases/{channel} endpoint
