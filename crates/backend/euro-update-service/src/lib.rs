@@ -17,12 +17,13 @@ pub mod service;
 pub mod types;
 pub mod utils;
 
-use handlers::check_update_handler;
+use handlers::{check_update_handler, get_release_handler};
 use service::AppState;
 
 /// Create the axum router
 pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
+        .route("/releases/{channel}", get(get_release_handler))
         .route(
             "/releases/{channel}/{target_arch}/{current_version}",
             get(check_update_handler),
@@ -52,4 +53,4 @@ pub async fn init_update_service(bucket_name: String) -> Result<Router> {
 
 // Re-export commonly used types
 pub use error::{ErrorResponse, NoUpdateResponse, UpdateServiceError};
-pub use types::{UpdateParams, UpdateResponse};
+pub use types::{PlatformInfo, ReleaseInfoResponse, ReleaseParams, UpdateParams, UpdateResponse};
