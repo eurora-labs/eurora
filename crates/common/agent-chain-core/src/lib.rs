@@ -26,6 +26,7 @@ pub mod chat_models;
 pub mod error;
 pub mod messages;
 pub mod tools;
+pub mod utils;
 
 // Re-export error types
 pub use error::{Error, Result};
