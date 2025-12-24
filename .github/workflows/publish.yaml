@@ -66,18 +66,25 @@ jobs:
             - name: Calculate next version
               shell: bash
               run: |
-                  # Default to 0.1.0 if no version is found
-                  CURRENT_VERSION="0.1.0"
-                  if [ -f "apps/desktop/package.json" ]; then
-                    CURRENT_VERSION=$(grep -o '"version": *"[^"]*"' apps/desktop/package.json | cut -d'"' -f4)
-                  fi
+                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${{ env.channel }}" | jq -r '.version')"
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
-                  {
-                    echo "version<<EOF"
-                    echo "$NEXT_VERSION"
-                    echo "EOF"
-                  } >> $GITHUB_ENV
+                  echo "version=$NEXT_VERSION" >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
+            # - name: Calculate next version
+            #   shell: bash
+            #   run: |
+            #       # Default to 0.1.0 if no version is found
+            #       CURRENT_VERSION="0.1.0"
+            #       if [ -f "apps/desktop/package.json" ]; then
+            #         CURRENT_VERSION=$(grep -o '"version": *"[^"]*"' apps/desktop/package.json | cut -d'"' -f4)
+            #       fi
+            #       NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
+            #       {
+            #         echo "version<<EOF"
+            #         echo "$NEXT_VERSION"
+            #         echo "EOF"
+            #       } >> $GITHUB_ENV
+            #       mkdir -p release && echo "$NEXT_VERSION" > release/version
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
@@ -179,29 +186,29 @@ jobs:
                   echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
                   echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
 
-            - name: Calculate next version
-              shell: bash
-              run: |
-                  # Default to 0.1.0 if no version is found
-                  CURRENT_VERSION="0.1.0"
-                  if [ -f "apps/desktop/package.json" ]; then
-                    CURRENT_VERSION=$(grep -o '"version": *"[^"]*"' apps/desktop/package.json | cut -d'"' -f4)
-                  fi
-                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
-                  {
-                    echo "version<<EOF"
-                    echo "$NEXT_VERSION"
-                    echo "EOF"
-                  } >> $GITHUB_ENV
-                  mkdir -p release && echo "$NEXT_VERSION" > release/version
-
             # - name: Calculate next version
             #   shell: bash
             #   run: |
-            #       CURRENT_VERSION="$(curl --silent "https://app.eurora-labs.com/releases/${{ env.channel }}" | jq -r '.version')"
+            #       # Default to 0.1.0 if no version is found
+            #       CURRENT_VERSION="0.1.0"
+            #       if [ -f "apps/desktop/package.json" ]; then
+            #         CURRENT_VERSION=$(grep -o '"version": *"[^"]*"' apps/desktop/package.json | cut -d'"' -f4)
+            #       fi
             #       NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
-            #       echo "version=$NEXT_VERSION" >> $GITHUB_ENV
+            #       {
+            #         echo "version<<EOF"
+            #         echo "$NEXT_VERSION"
+            #         echo "EOF"
+            #       } >> $GITHUB_ENV
             #       mkdir -p release && echo "$NEXT_VERSION" > release/version
+
+            - name: Calculate next version
+              shell: bash
+              run: |
+                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${{ env.channel }}" | jq -r '.version')"
+                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
+                  echo "version=$NEXT_VERSION" >> $GITHUB_ENV
+                  mkdir -p release && echo "$NEXT_VERSION" > release/version
 
             # - name: Import GPG key
             #   if: runner.os == 'Linux'
