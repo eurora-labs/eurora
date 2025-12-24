@@ -571,6 +571,20 @@ impl AppState {
 
                             match self.find_download_file(&directory_prefix, &target).await {
                                 Ok(file_key) => {
+                                    // Get signature file content
+                                    let signature_key = format!("{}.sig", file_key);
+                                    let signature =
+                                        match self.get_file_content(&signature_key).await {
+                                            Ok(sig) => sig,
+                                            Err(e) => {
+                                                debug!(
+                                                    "Failed to get signature for {}/{}: {}",
+                                                    target, arch, e
+                                                );
+                                                continue; // Skip platforms without signatures
+                                            }
+                                        };
+
                                     // Generate presigned URL
                                     match self.generate_presigned_url(&file_key).await {
                                         Ok(url) => {
@@ -580,7 +594,10 @@ impl AppState {
                                                 platform_key,
                                                 url.len()
                                             );
-                                            platforms.insert(platform_key, PlatformInfo { url });
+                                            platforms.insert(
+                                                platform_key,
+                                                PlatformInfo { url, signature },
+                                            );
                                         }
                                         Err(e) => {
                                             debug!(
