@@ -1,6 +1,6 @@
 //! Data types and structures for the update service
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -42,5 +42,6 @@ pub struct ReleaseInfoResponse {
     pub version: String,
     pub pub_date: String,
     /// Map of platform identifiers (e.g., "windows-x86_64", "linux-x86_64") to their download info
-    pub platforms: HashMap<String, PlatformInfo>,
+    /// Sorted alphabetically by platform name
+    pub platforms: BTreeMap<String, PlatformInfo>,
 }
