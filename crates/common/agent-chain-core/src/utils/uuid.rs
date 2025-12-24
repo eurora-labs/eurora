@@ -77,9 +77,7 @@ pub fn uuid7(timestamp_millis: Option<u64>) -> Uuid {
             let ts = Timestamp::from_unix(uuid::NoContext, secs, nanos);
             Uuid::new_v7(ts)
         }
-        None => {
-            Uuid::now_v7()
-        }
+        None => Uuid::now_v7(),
     }
 }
 
