@@ -1,6 +1,6 @@
 //! Core update service logic and S3 operations
 
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::{Context, Result};
 use aws_config::BehaviorVersion;
@@ -9,7 +9,11 @@ use chrono::Utc;
 use semver::Version;
 use tracing::{debug, error, instrument};
 
-use crate::{error::UpdateServiceError, types::UpdateResponse, utils::parse_target_arch};
+use crate::{
+    error::UpdateServiceError,
+    types::{PlatformInfo, ReleaseInfoResponse, UpdateResponse},
+    utils::parse_target_arch,
+};
 
 /// Application state containing the S3 client and configuration
 #[derive(Clone)]
@@ -403,5 +407,229 @@ impl AppState {
         }
 
         Ok(())
+    }
+
+    /// Validate channel parameter only
+    #[instrument(skip(self), fields(channel))]
+    fn validate_channel(&self, channel: &str) -> Result<()> {
+        debug!("Validating channel parameter");
+        if !matches!(channel, "nightly" | "release" | "beta") {
+            return Err(anyhow::Error::from(UpdateServiceError::InvalidChannel(
+                channel.to_string(),
+            )));
+        }
+        Ok(())
+    }
+
+    /// Get the latest release info for a channel with all available platforms
+    #[instrument(skip(self), fields(bucket = %self.bucket_name, channel))]
+    pub async fn get_latest_release(&self, channel: &str) -> Result<Option<ReleaseInfoResponse>> {
+        debug!("Getting latest release for channel: {}", channel);
+
+        // Validate channel
+        self.validate_channel(channel)?;
+
+        // List all version directories in the channel
+        let prefix = format!("releases/{}/", channel);
+        debug!(
+            "Listing version directories with prefix: {} and delimiter: /",
+            prefix
+        );
+
+        let mut all_versions: Vec<(Version, String)> = Vec::new();
+
+        let mut paginator = self
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(&prefix)
+            .delimiter("/")
+            .into_paginator()
+            .send();
+
+        while let Some(resp) = paginator.next().await {
+            let resp = resp.context("Failed to list S3 objects")?;
+
+            for common_prefix in resp.common_prefixes() {
+                if let Some(prefix_str) = common_prefix.prefix() {
+                    let version_str = prefix_str
+                        .strip_prefix(&prefix)
+                        .and_then(|s| s.strip_suffix('/'))
+                        .unwrap_or("");
+
+                    if let Ok(version) = Version::parse(version_str) {
+                        debug!("Found version: {}", version_str);
+                        all_versions.push((version, version_str.to_string()));
+                    }
+                }
+            }
+        }
+
+        if all_versions.is_empty() {
+            debug!("No versions found for channel: {}", channel);
+            return Ok(None);
+        }
+
+        // Sort versions in descending order (newest first)
+        all_versions.sort_by(|a, b| b.0.cmp(&a.0));
+
+        // Get the latest version
+        let (_, latest_version_str) = &all_versions[0];
+        debug!(
+            "Latest version for channel {}: {}",
+            channel, latest_version_str
+        );
+
+        // Get all available platforms for this version
+        let platforms = self
+            .get_platforms_for_version(channel, latest_version_str)
+            .await?;
+
+        if platforms.is_empty() {
+            debug!(
+                "No platforms found for version {} in channel {}",
+                latest_version_str, channel
+            );
+            return Ok(None);
+        }
+
+        Ok(Some(ReleaseInfoResponse {
+            version: latest_version_str.clone(),
+            pub_date: Utc::now().to_rfc3339(),
+            platforms,
+        }))
+    }
+
+    /// Get all available platforms for a specific version
+    #[instrument(skip(self), fields(bucket = %self.bucket_name, channel, version))]
+    async fn get_platforms_for_version(
+        &self,
+        channel: &str,
+        version: &str,
+    ) -> Result<HashMap<String, PlatformInfo>> {
+        let mut platforms: HashMap<String, PlatformInfo> = HashMap::new();
+
+        // List all target directories (e.g., linux, darwin, windows)
+        let version_prefix = format!("releases/{}/{}/", channel, version);
+        debug!("Listing target directories with prefix: {}", version_prefix);
+
+        let mut target_paginator = self
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(&version_prefix)
+            .delimiter("/")
+            .into_paginator()
+            .send();
+
+        let mut targets: Vec<String> = Vec::new();
+
+        while let Some(resp) = target_paginator.next().await {
+            let resp = resp.context("Failed to list target directories")?;
+
+            for common_prefix in resp.common_prefixes() {
+                if let Some(prefix_str) = common_prefix.prefix() {
+                    if let Some(target) = prefix_str
+                        .strip_prefix(&version_prefix)
+                        .and_then(|s| s.strip_suffix('/'))
+                    {
+                        debug!("Found target: {}", target);
+                        targets.push(target.to_string());
+                    }
+                }
+            }
+        }
+
+        // For each target, list all arch directories
+        for target in targets {
+            let target_prefix = format!("{}{}/", version_prefix, target);
+            debug!("Listing arch directories with prefix: {}", target_prefix);
+
+            let mut arch_paginator = self
+                .s3_client
+                .list_objects_v2()
+                .bucket(&self.bucket_name)
+                .prefix(&target_prefix)
+                .delimiter("/")
+                .into_paginator()
+                .send();
+
+            while let Some(resp) = arch_paginator.next().await {
+                let resp = resp.context("Failed to list arch directories")?;
+
+                for common_prefix in resp.common_prefixes() {
+                    if let Some(prefix_str) = common_prefix.prefix() {
+                        if let Some(arch) = prefix_str
+                            .strip_prefix(&target_prefix)
+                            .and_then(|s| s.strip_suffix('/'))
+                        {
+                            debug!("Found arch: {} for target: {}", arch, target);
+
+                            // Find the download file and generate presigned URL
+                            let directory_prefix =
+                                format!("releases/{}/{}/{}/{}/", channel, version, target, arch);
+
+                            match self.find_download_file(&directory_prefix, &target).await {
+                                Ok(file_key) => {
+                                    // Generate presigned URL
+                                    match self.generate_presigned_url(&file_key).await {
+                                        Ok(url) => {
+                                            let platform_key = format!("{}-{}", target, arch);
+                                            debug!(
+                                                "Adding platform {} with URL length {}",
+                                                platform_key,
+                                                url.len()
+                                            );
+                                            platforms.insert(platform_key, PlatformInfo { url });
+                                        }
+                                        Err(e) => {
+                                            debug!(
+                                                "Failed to generate presigned URL for {}/{}: {}",
+                                                target, arch, e
+                                            );
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    debug!("No download file found for {}/{}: {}", target, arch, e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(platforms)
+    }
+
+    /// Generate a presigned URL for a file
+    #[instrument(skip(self), fields(bucket = %self.bucket_name, file_key))]
+    async fn generate_presigned_url(&self, file_key: &str) -> Result<String> {
+        debug!("Generating presigned URL for file: {}", file_key);
+        let presigning_config =
+            PresigningConfig::expires_in(Duration::from_secs(3600)).map_err(|e| {
+                error!("Failed to create presigning config: {}", e);
+                anyhow::Error::from(UpdateServiceError::PresignedUrlError(e.to_string()))
+            })?;
+
+        let presigned_request = self
+            .s3_client
+            .get_object()
+            .bucket(&self.bucket_name)
+            .key(file_key)
+            .presigned(presigning_config)
+            .await
+            .map_err(|e| {
+                error!("Failed to generate presigned URL for {}: {}", file_key, e);
+                anyhow::Error::from(UpdateServiceError::PresignedUrlError(e.to_string()))
+            })?;
+
+        let url = presigned_request.uri().to_string();
+        debug!(
+            "Generated presigned URL successfully (length: {})",
+            url.len()
+        );
+        Ok(url)
     }
 }
