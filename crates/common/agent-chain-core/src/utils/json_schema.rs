@@ -225,30 +225,24 @@ fn retrieve_ref(path: &str, schema: &Value) -> Value {
 ///
 /// A new schema with title fields removed.
 pub fn remove_titles(schema: &Value) -> Value {
-    remove_titles_helper(schema, "")
+    remove_titles_helper(schema)
 }
 
-fn remove_titles_helper(kv: &Value, prev_key: &str) -> Value {
+fn remove_titles_helper(kv: &Value) -> Value {
     match kv {
         Value::Object(map) => {
             let mut new_map = Map::new();
             for (k, v) in map {
-                if k == "title"
-                    && let Value::Object(_) = v
-                    && prev_key == "properties"
-                {
-                    new_map.insert(k.clone(), remove_titles_helper(v, k));
-                } else if let Value::Object(_) = v {
-                    new_map.insert(k.clone(), remove_titles_helper(v, k));
-                } else {
-                    new_map.insert(k.clone(), v.clone());
+                // Skip title keys entirely
+                if k == "title" {
+                    continue;
                 }
+                // Recursively process nested objects and arrays
+                new_map.insert(k.clone(), remove_titles_helper(v));
             }
             Value::Object(new_map)
         }
-        Value::Array(arr) => {
-            Value::Array(arr.iter().map(|v| remove_titles_helper(v, "")).collect())
-        }
+        Value::Array(arr) => Value::Array(arr.iter().map(remove_titles_helper).collect()),
         _ => kv.clone(),
     }
 }
