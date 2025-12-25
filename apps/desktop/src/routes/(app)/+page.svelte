@@ -1,31 +1,29 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
-	import Katex from '$lib/components/katex.svelte';
-	import { onMount } from 'svelte';
 	import {
 		type ResponseChunk,
 		type Query,
 		type BaseMessage,
 		type Conversation,
 	} from '$lib/bindings/bindings.js';
-
-	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
-	import * as Launcher from '@eurora/prosemirror-view/launcher';
-	import * as Chat from '@eurora/ui/custom-components/chat/index';
-	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
-	import { executeCommand } from '$lib/commands.js';
-	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
-	import { inject } from '@eurora/shared/context';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-
+	import { executeCommand } from '$lib/commands.js';
+	import Katex from '$lib/components/katex.svelte';
 	import {
 		Editor as ProsemirrorEditor,
 		type SveltePMExtension,
 	} from '@eurora/prosemirror-core/index';
+	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
+	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
+	import * as Launcher from '@eurora/prosemirror-view/launcher';
+	import { inject } from '@eurora/shared/context';
+	import { ScrollArea } from '@eurora/ui/components/scroll-area/index';
+	import * as Chat from '@eurora/ui/custom-components/chat/index';
+	import { onMount } from 'svelte';
 
 	let conversation = $state<Conversation | null>(null);
 	let messages = $state<BaseMessage[]>([]);
-	let status = $state<string>('');
+	// let status = $state<string>('');
 	let taurpc = inject(TAURPC_SERVICE);
 
 	let editorRef: ProsemirrorEditor | undefined = $state();
@@ -48,7 +46,7 @@
 			.get_service_name()
 			.then((name: string) => {
 				if (name) {
-					status = 'ready';
+					// status = 'ready';
 				}
 			})
 			.catch(() => {
@@ -57,11 +55,11 @@
 
 		taurpc.chat.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
-			console.log('New conversation changed: ', conversation);
+			// console.log('New conversation changed: ', conversation);
 
 			taurpc.personal_db.message.get(conversation.id, 5, 0).then((response) => {
 				messages = response;
-				console.log('messages: ', messages);
+				// console.log('messages: ', messages);
 			});
 		});
 
@@ -77,7 +75,7 @@
 	function handleEscapeKey(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
 			messages.splice(0, messages.length);
-			console.log('Escape pressed: cleared messages and set conversation to NEW');
+			// console.log('Escape pressed: cleared messages and set conversation to NEW');
 		}
 	}
 
@@ -118,7 +116,7 @@
 					id: null,
 					additional_kwargs: {},
 				});
-				console.log('query', query);
+				// console.log('query', query);
 				searchQuery.text = '';
 				clearQuery(editorRef);
 				await askQuestion(query);
@@ -130,7 +128,7 @@
 	}
 
 	async function askQuestion(query: QueryAssets): Promise<void> {
-		console.log('askQuestion', query);
+		// console.log('askQuestion', query);
 		try {
 			// Convert QueryAssets to Query type expected by TauRPC
 			const tauRpcQuery: Query = {
@@ -147,20 +145,19 @@
 			};
 			messages.push(aiMessage);
 			const agentMessage = messages.at(-1);
-
-			const onEvent = (response: ResponseChunk) => {
+			function onEvent(response: ResponseChunk) {
 				// Append chunk to the last message
 				if (agentMessage && agentMessage.type === 'AI') {
 					agentMessage.content += response.chunk;
 				}
 
 				chatRef?.scrollToBottom();
-			};
+			}
 
 			// If no conversation is selected create a new one
 			if (!conversation) {
 				conversation = await taurpc.personal_db.conversation.create();
-				console.log('conversation', conversation);
+				// console.log('conversation', conversation);
 			}
 
 			// Use TauRPC send_query procedure
@@ -212,7 +209,7 @@
 	>
 		<Launcher.Input
 			placeholder="What can I help you with?"
-			class="min-h-[100px] h-fit w-full text-[24px]"
+			class="min-h-25 h-fit w-full text-[24px]"
 			bind:query={searchQuery}
 			bind:editorRef
 			onkeydown={handleKeydown}
