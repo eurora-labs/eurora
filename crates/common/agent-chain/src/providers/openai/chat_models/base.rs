@@ -359,12 +359,10 @@ impl ChatOpenAI {
         messages
             .iter()
             .filter_map(|msg| match msg {
-                BaseMessage::System(m) => {
-                    Some(serde_json::json!({
-                        "role": "system",
-                        "content": m.content()
-                    }))
-                }
+                BaseMessage::System(m) => Some(serde_json::json!({
+                    "role": "system",
+                    "content": m.content()
+                })),
                 BaseMessage::Human(m) => {
                     let content = match m.message_content() {
                         MessageContent::Text(text) => serde_json::json!(text),
@@ -437,30 +435,24 @@ impl ChatOpenAI {
 
                     Some(message)
                 }
-                BaseMessage::Tool(m) => {
-                    Some(serde_json::json!({
-                        "role": "tool",
-                        "tool_call_id": m.tool_call_id(),
-                        "content": m.content()
-                    }))
-                }
+                BaseMessage::Tool(m) => Some(serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": m.tool_call_id(),
+                    "content": m.content()
+                })),
                 BaseMessage::Remove(_) => {
                     // RemoveMessage is used for message management, not sent to API
                     None
                 }
-                BaseMessage::Chat(m) => {
-                    Some(serde_json::json!({
-                        "role": m.role(),
-                        "content": m.content()
-                    }))
-                }
-                BaseMessage::Function(m) => {
-                    Some(serde_json::json!({
-                        "role": "function",
-                        "name": m.name(),
-                        "content": m.content()
-                    }))
-                }
+                BaseMessage::Chat(m) => Some(serde_json::json!({
+                    "role": m.role(),
+                    "content": m.content()
+                })),
+                BaseMessage::Function(m) => Some(serde_json::json!({
+                    "role": "function",
+                    "name": m.name(),
+                    "content": m.content()
+                })),
             })
             .collect()
     }

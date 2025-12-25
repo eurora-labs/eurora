@@ -87,7 +87,7 @@ impl FileCallbackHandler {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!("Unsupported file mode: {}", mode),
-                ))
+                ));
             }
         };
 
@@ -223,16 +223,13 @@ impl CallbackManagerMixin for FileCallbackHandler {
             .and_then(|v| v.as_str())
             .or_else(|| {
                 if !serialized.is_empty() {
-                    serialized
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .or_else(|| {
-                            serialized.get("id").and_then(|v| {
-                                v.as_array()
-                                    .and_then(|arr| arr.last())
-                                    .and_then(|v| v.as_str())
-                            })
+                    serialized.get("name").and_then(|v| v.as_str()).or_else(|| {
+                        serialized.get("id").and_then(|v| {
+                            v.as_array()
+                                .and_then(|arr| arr.last())
+                                .and_then(|v| v.as_str())
                         })
+                    })
                 } else {
                     None
                 }

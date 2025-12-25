@@ -35,6 +35,11 @@ impl From<&BaseMessage> for ProtoBaseMessage {
                 // If this is reached, it indicates a logic error in the caller.
                 unreachable!("Remove messages should be filtered before proto conversion")
             }
+            BaseMessage::Chat(_) | BaseMessage::Function(_) => {
+                // Chat and Function messages are deprecated/legacy types
+                // and should not be serialized to proto format.
+                unreachable!("Chat and Function messages are not supported in proto conversion")
+            }
         };
         ProtoBaseMessage {
             message: Some(message),

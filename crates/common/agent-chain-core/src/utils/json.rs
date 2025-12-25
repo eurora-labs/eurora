@@ -102,7 +102,8 @@ pub fn parse_partial_json(s: &str, strict: bool) -> Result<Value, JsonParseError
 }
 
 fn contains_control_chars(s: &str) -> bool {
-    s.chars().any(|c| c.is_control() && c != '\n' && c != '\r' && c != '\t')
+    s.chars()
+        .any(|c| c.is_control() && c != '\n' && c != '\r' && c != '\t')
 }
 
 /// Parse a JSON string from a Markdown string.

@@ -11,8 +11,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::messages::BaseMessage;
 use crate::ChatResult;
+use crate::messages::BaseMessage;
 
 /// Mixin for Retriever callbacks.
 pub trait RetrieverManagerMixin {
@@ -51,12 +51,7 @@ pub trait LLMManagerMixin {
     }
 
     /// Run when LLM ends running.
-    fn on_llm_end(
-        &mut self,
-        response: &ChatResult,
-        run_id: Uuid,
-        parent_run_id: Option<Uuid>,
-    ) {
+    fn on_llm_end(&mut self, response: &ChatResult, run_id: Uuid, parent_run_id: Option<Uuid>) {
         let _ = (response, run_id, parent_run_id);
     }
 
@@ -128,7 +123,14 @@ pub trait ToolManagerMixin {
         observation_prefix: Option<&str>,
         llm_prefix: Option<&str>,
     ) {
-        let _ = (output, run_id, parent_run_id, color, observation_prefix, llm_prefix);
+        let _ = (
+            output,
+            run_id,
+            parent_run_id,
+            color,
+            observation_prefix,
+            llm_prefix,
+        );
     }
 
     /// Run when tool errors.

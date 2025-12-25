@@ -80,19 +80,11 @@ where
         match self.size {
             Some(size) => {
                 let batch: Vec<T> = self.iter.by_ref().take(size).collect();
-                if batch.is_empty() {
-                    None
-                } else {
-                    Some(batch)
-                }
+                if batch.is_empty() { None } else { Some(batch) }
             }
             None => {
                 let batch: Vec<T> = self.iter.by_ref().collect();
-                if batch.is_empty() {
-                    None
-                } else {
-                    Some(batch)
-                }
+                if batch.is_empty() { None } else { Some(batch) }
             }
         }
     }

@@ -231,7 +231,8 @@ mod tests {
     fn test_extract_placeholders() {
         let formatter = StrictFormatter::new();
 
-        let placeholders = formatter.extract_placeholders("Hello, {name}! You are {age} years old.");
+        let placeholders =
+            formatter.extract_placeholders("Hello, {name}! You are {age} years old.");
         assert!(placeholders.contains("name"));
         assert!(placeholders.contains("age"));
         assert_eq!(placeholders.len(), 2);
@@ -249,8 +250,7 @@ mod tests {
     fn test_validate_input_variables() {
         let formatter = StrictFormatter::new();
 
-        let result = formatter
-            .validate_input_variables("Hello, {name}!", &["name".to_string()]);
+        let result = formatter.validate_input_variables("Hello, {name}!", &["name".to_string()]);
         assert!(result.is_ok());
 
         let result = formatter.validate_input_variables("Hello, {name}!", &[]);

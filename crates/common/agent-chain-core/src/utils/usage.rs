@@ -67,8 +67,7 @@ where
     }
 
     let mut combined = HashMap::new();
-    let all_keys: std::collections::HashSet<_> =
-        left.keys().chain(right.keys()).cloned().collect();
+    let all_keys: std::collections::HashSet<_> = left.keys().chain(right.keys()).cloned().collect();
 
     for k in all_keys {
         let left_val = left.get(&k);
@@ -302,7 +301,10 @@ mod tests {
                 m
             } else {
                 let mut m = HashMap::new();
-                m.insert("nested".to_string(), UsageValue::Dict(create_nested(depth - 1)));
+                m.insert(
+                    "nested".to_string(),
+                    UsageValue::Dict(create_nested(depth - 1)),
+                );
                 m
             }
         }
