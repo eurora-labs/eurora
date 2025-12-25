@@ -448,6 +448,19 @@ impl ChatOpenAI {
                     // RemoveMessage is used for message management, not sent to API
                     None
                 }
+                BaseMessage::Chat(m) => {
+                    Some(serde_json::json!({
+                        "role": m.role(),
+                        "content": m.content()
+                    }))
+                }
+                BaseMessage::Function(m) => {
+                    Some(serde_json::json!({
+                        "role": "function",
+                        "name": m.name(),
+                        "content": m.content()
+                    }))
+                }
             })
             .collect()
     }
@@ -875,6 +888,19 @@ impl ChatOpenAI {
                 BaseMessage::Remove(_) => {
                     // RemoveMessage is used for message management, not sent to API
                     continue;
+                }
+                BaseMessage::Chat(m) => {
+                    input.push(serde_json::json!({
+                        "role": m.role(),
+                        "content": m.content()
+                    }));
+                }
+                BaseMessage::Function(m) => {
+                    input.push(serde_json::json!({
+                        "type": "function_call_output",
+                        "name": m.name(),
+                        "output": m.content()
+                    }));
                 }
             }
         }

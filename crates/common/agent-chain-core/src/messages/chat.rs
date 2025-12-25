@@ -1,7 +1,7 @@
-//! System message type.
+//! Chat message type.
 //!
-//! This module contains the `SystemMessage` and `SystemMessageChunk` types which represent
-//! system instructions for priming AI behavior. Mirrors `langchain_core.messages.system`.
+//! This module contains the `ChatMessage` and `ChatMessageChunk` types which represent
+//! messages with an arbitrary speaker role. Mirrors `langchain_core.messages.chat`.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -12,17 +12,19 @@ use specta::Type;
 
 use super::base::merge_content;
 
-/// A system message in the conversation.
+/// A chat message that can be assigned an arbitrary speaker (role).
 ///
-/// The system message is usually passed in as the first of a sequence
-/// of input messages. It's used to prime AI behavior with instructions.
+/// Use this when you need to specify a custom role that isn't covered
+/// by the standard message types (Human, AI, System, Tool).
 ///
-/// This corresponds to `SystemMessage` in LangChain Python.
+/// This corresponds to `ChatMessage` in LangChain Python.
 #[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SystemMessage {
+pub struct ChatMessage {
     /// The message content
     content: String,
+    /// The speaker / role of the message
+    role: String,
     /// Optional unique identifier
     id: Option<String>,
     /// Optional name for the message
@@ -31,28 +33,39 @@ pub struct SystemMessage {
     /// Additional metadata
     #[serde(default)]
     additional_kwargs: HashMap<String, serde_json::Value>,
+    /// Response metadata
+    #[serde(default)]
+    response_metadata: HashMap<String, serde_json::Value>,
 }
 
-impl SystemMessage {
-    /// Create a new system message.
-    pub fn new(content: impl Into<String>) -> Self {
+impl ChatMessage {
+    /// Create a new chat message with the given role.
+    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
             content: content.into(),
+            role: role.into(),
             id: Some(Uuid::new_v4().to_string()),
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
-    /// Create a new system message with an explicit ID.
+    /// Create a new chat message with an explicit ID.
     ///
     /// Use this when deserializing or reconstructing messages where the ID must be preserved.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn with_id(
+        id: impl Into<String>,
+        role: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self {
             content: content.into(),
+            role: role.into(),
             id: Some(id.into()),
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -65,6 +78,11 @@ impl SystemMessage {
     /// Get the message content.
     pub fn content(&self) -> &str {
         &self.content
+    }
+
+    /// Get the message role.
+    pub fn role(&self) -> &str {
+        &self.role
     }
 
     /// Get the message ID.
@@ -81,16 +99,32 @@ impl SystemMessage {
     pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
         &self.additional_kwargs
     }
+
+    /// Get response metadata.
+    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
+
+    /// Set response metadata.
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
+        self
+    }
 }
 
-/// System message chunk (yielded when streaming).
+/// Chat message chunk (yielded when streaming).
 ///
-/// This corresponds to `SystemMessageChunk` in LangChain Python.
+/// This corresponds to `ChatMessageChunk` in LangChain Python.
 #[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SystemMessageChunk {
+pub struct ChatMessageChunk {
     /// The message content (may be partial during streaming)
     content: String,
+    /// The speaker / role of the message
+    role: String,
     /// Optional unique identifier
     id: Option<String>,
     /// Optional name for the message
@@ -104,11 +138,12 @@ pub struct SystemMessageChunk {
     response_metadata: HashMap<String, serde_json::Value>,
 }
 
-impl SystemMessageChunk {
-    /// Create a new system message chunk.
-    pub fn new(content: impl Into<String>) -> Self {
+impl ChatMessageChunk {
+    /// Create a new chat message chunk with the given role.
+    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
             content: content.into(),
+            role: role.into(),
             id: None,
             name: None,
             additional_kwargs: HashMap::new(),
@@ -116,10 +151,15 @@ impl SystemMessageChunk {
         }
     }
 
-    /// Create a new system message chunk with an ID.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+    /// Create a new chat message chunk with an ID.
+    pub fn with_id(
+        id: impl Into<String>,
+        role: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self {
             content: content.into(),
+            role: role.into(),
             id: Some(id.into()),
             name: None,
             additional_kwargs: HashMap::new(),
@@ -130,6 +170,11 @@ impl SystemMessageChunk {
     /// Get the message content.
     pub fn content(&self) -> &str {
         &self.content
+    }
+
+    /// Get the message role.
+    pub fn role(&self) -> &str {
+        &self.role
     }
 
     /// Get the message ID.
@@ -153,7 +198,15 @@ impl SystemMessageChunk {
     }
 
     /// Concatenate this chunk with another chunk.
-    pub fn concat(&self, other: &SystemMessageChunk) -> SystemMessageChunk {
+    ///
+    /// # Panics
+    ///
+    /// Panics if the roles are different.
+    pub fn concat(&self, other: &ChatMessageChunk) -> ChatMessageChunk {
+        if self.role != other.role {
+            panic!("Cannot concatenate ChatMessageChunks with different roles");
+        }
+
         let content = merge_content(&self.content, &other.content);
 
         // Merge additional_kwargs
@@ -168,8 +221,9 @@ impl SystemMessageChunk {
             response_metadata.insert(k.clone(), v.clone());
         }
 
-        SystemMessageChunk {
+        ChatMessageChunk {
             content,
+            role: self.role.clone(),
             id: self.id.clone().or_else(|| other.id.clone()),
             name: self.name.clone().or_else(|| other.name.clone()),
             additional_kwargs,
@@ -177,21 +231,23 @@ impl SystemMessageChunk {
         }
     }
 
-    /// Convert this chunk to a complete SystemMessage.
-    pub fn to_message(&self) -> SystemMessage {
-        SystemMessage {
+    /// Convert this chunk to a complete ChatMessage.
+    pub fn to_message(&self) -> ChatMessage {
+        ChatMessage {
             content: self.content.clone(),
+            role: self.role.clone(),
             id: self.id.clone(),
             name: self.name.clone(),
             additional_kwargs: self.additional_kwargs.clone(),
+            response_metadata: self.response_metadata.clone(),
         }
     }
 }
 
-impl std::ops::Add for SystemMessageChunk {
-    type Output = SystemMessageChunk;
+impl std::ops::Add for ChatMessageChunk {
+    type Output = ChatMessageChunk;
 
-    fn add(self, other: SystemMessageChunk) -> SystemMessageChunk {
+    fn add(self, other: ChatMessageChunk) -> ChatMessageChunk {
         self.concat(&other)
     }
 }
