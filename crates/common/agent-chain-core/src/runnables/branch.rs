@@ -290,7 +290,7 @@ where
     {
         let config = ensure_config(config);
 
-        for (_idx, (condition, runnable)) in self.branches.iter().enumerate() {
+        for (condition, runnable) in self.branches.iter() {
             let expression_value = condition
                 .ainvoke(input.clone(), Some(config.clone()))
                 .await?;
@@ -312,7 +312,7 @@ where
 
         Box::pin(async_stream::stream! {
             'outer: {
-                for (_idx, (condition, runnable)) in self.branches.iter().enumerate() {
+                for (condition, runnable) in self.branches.iter() {
                     let expression_value = match condition.invoke(input.clone(), Some(config.clone())) {
                         Ok(v) => v,
                         Err(e) => {
@@ -350,7 +350,7 @@ where
 
         Box::pin(async_stream::stream! {
             'outer: {
-                for (_idx, (condition, runnable)) in self.branches.iter().enumerate() {
+                for (condition, runnable) in self.branches.iter() {
                     let expression_value = match condition.ainvoke(input.clone(), Some(config.clone())).await {
                         Ok(v) => v,
                         Err(e) => {
