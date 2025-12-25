@@ -35,7 +35,7 @@ pub fn stringify_value(val: &Value) -> String {
         }
         Value::Array(arr) => arr
             .iter()
-            .map(|v| stringify_value(v))
+            .map(stringify_value)
             .collect::<Vec<_>>()
             .join("\n"),
         Value::Null => "null".to_string(),
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_stringify_value_number() {
         assert_eq!(stringify_value(&json!(42)), "42");
-        assert_eq!(stringify_value(&json!(3.14)), "3.14");
+        assert_eq!(stringify_value(&json!(1.23)), "1.23");
     }
 
     #[test]

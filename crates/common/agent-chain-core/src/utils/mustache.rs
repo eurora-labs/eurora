@@ -199,14 +199,14 @@ fn tokenize(template: &str, l_del: &str, r_del: &str) -> Result<Vec<Token>, Must
                     }
                     '/' => {
                         let key = tag[1..].trim().to_string();
-                        if let Some((expected, _)) = open_sections.pop() {
-                            if expected != key {
-                                return Err(MustacheError::MismatchedSection {
-                                    expected,
-                                    got: key,
-                                    line: current_line,
-                                });
-                            }
+                        if let Some((expected, _)) = open_sections.pop()
+                            && expected != key
+                        {
+                            return Err(MustacheError::MismatchedSection {
+                                expected,
+                                got: key,
+                                line: current_line,
+                            });
                         }
                         (TokenType::End, key)
                     }
@@ -214,9 +214,8 @@ fn tokenize(template: &str, l_del: &str, r_del: &str) -> Result<Vec<Token>, Must
                     '&' => (TokenType::NoEscape, tag[1..].trim().to_string()),
                     '{' => {
                         let tag = tag[1..].trim();
-                        let tag = if tag.ends_with('}') {
-                            remaining = &remaining[..];
-                            tag[..tag.len() - 1].trim()
+                        let tag = if let Some(stripped) = tag.strip_suffix('}') {
+                            stripped.trim()
                         } else {
                             if remaining.starts_with('}') {
                                 remaining = &remaining[1..];
@@ -414,8 +413,7 @@ fn render_tokens(
                 i = end_index;
             }
             TokenType::Partial => {
-                if let Some(partials_map) = partials {
-                    if let Some(partial_template) = partials_map.get(&token.key) {
+                if let Some(partials_map) = partials && let Some(partial_template) = partials_map.get(&token.key) {
                         output.push_str(&render_with_delimiters(
                             partial_template,
                             scopes[0],
@@ -423,7 +421,6 @@ fn render_tokens(
                             l_del,
                             r_del,
                         )?);
-                    }
                 }
             }
             TokenType::End | TokenType::Comment => {}
@@ -437,12 +434,12 @@ fn render_tokens(
 
 fn find_section_end(tokens: &[Token], start: usize, key: &str) -> usize {
     let mut depth = 1;
-    for i in (start + 1)..tokens.len() {
-        match &tokens[i].token_type {
-            TokenType::Section | TokenType::InvertedSection if tokens[i].key == key => {
+    for (i, token) in tokens.iter().enumerate().skip(start + 1) {
+        match &token.token_type {
+            TokenType::Section | TokenType::InvertedSection if token.key == key => {
                 depth += 1;
             }
-            TokenType::End if tokens[i].key == key => {
+            TokenType::End if token.key == key => {
                 depth -= 1;
                 if depth == 0 {
                     return i;
@@ -510,7 +507,7 @@ mod tests {
 
     #[test]
     fn test_list() {
-        let items = vec![
+        let items = [
             make_data(&[("name", "Alice".into())]),
             make_data(&[("name", "Bob".into())]),
         ];
