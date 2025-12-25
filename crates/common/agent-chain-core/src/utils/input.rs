@@ -88,10 +88,7 @@ pub fn get_color_mapping(
 /// // Returns text with ANSI color codes
 /// ```
 pub fn get_colored_text(text: &str, color: &str) -> String {
-    let color_str = TEXT_COLOR_MAPPING
-        .get(color)
-        .copied()
-        .unwrap_or("0");
+    let color_str = TEXT_COLOR_MAPPING.get(color).copied().unwrap_or("0");
 
     format!("\x1b[{}m\x1b[1;3m{}\x1b[0m", color_str, text)
 }
@@ -134,12 +131,7 @@ pub fn get_bolded_text(text: &str) -> String {
 ///
 /// print_text("Hello, World!", Some("blue"), "", None);
 /// ```
-pub fn print_text(
-    text: &str,
-    color: Option<&str>,
-    end: &str,
-    writer: Option<&mut dyn Write>,
-) {
+pub fn print_text(text: &str, color: Option<&str>, end: &str, writer: Option<&mut dyn Write>) {
     let text_to_print = if let Some(c) = color {
         get_colored_text(text, c)
     } else {

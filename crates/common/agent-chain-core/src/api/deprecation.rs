@@ -177,11 +177,13 @@ impl DeprecationParams {
         if self.alternative.is_some() && self.alternative_import.is_some() {
             return Err("Cannot specify both alternative and alternative_import".to_string());
         }
-        if let Some(ref alt_import) = self.alternative_import && !alt_import.contains("::") {
-                return Err(format!(
-                    "alternative_import must be a fully qualified module path. Got {}",
-                    alt_import
-                ));
+        if let Some(ref alt_import) = self.alternative_import
+            && !alt_import.contains("::")
+        {
+            return Err(format!(
+                "alternative_import must be a fully qualified module path. Got {}",
+                alt_import
+            ));
         }
         Ok(())
     }
@@ -334,9 +336,7 @@ pub fn warn_deprecated(params: DeprecationParams, caller_module: &str) {
         msg
     } else {
         let name = params.name.unwrap_or_else(|| "unknown".to_string());
-        let package = params
-            .package
-            .unwrap_or_else(|| "agent-chain".to_string());
+        let package = params.package.unwrap_or_else(|| "agent-chain".to_string());
 
         let mut msg = if let Some(ref obj_type) = params.obj_type {
             format!("The {} `{}`", obj_type, name)
@@ -479,8 +479,15 @@ macro_rules! renamed_parameter {
         new = $new_name:expr => $new_value:expr,
         func = $func_name:expr
     ) => {{
-        let params = $crate::api::RenameParameterParams::new($since, $removal, $old_name, $new_name);
-        $crate::api::handle_renamed_parameter(&params, $old_value, $new_value, $func_name, module_path!())
+        let params =
+            $crate::api::RenameParameterParams::new($since, $removal, $old_name, $new_name);
+        $crate::api::handle_renamed_parameter(
+            &params,
+            $old_value,
+            $new_value,
+            $func_name,
+            module_path!(),
+        )
     }};
 }
 
@@ -683,9 +690,11 @@ mod tests {
             "external_crate::module",
         );
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("got multiple values for argument"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("got multiple values for argument")
+        );
     }
 
     #[test]

@@ -24,7 +24,10 @@ use std::path::{Path, PathBuf};
 /// let relative = get_relative_path(file, base);
 /// assert_eq!(relative, Some("src/main.rs".into()));
 /// ```
-pub fn get_relative_path<P: AsRef<Path>, B: AsRef<Path>>(file: P, relative_to: B) -> Option<String> {
+pub fn get_relative_path<P: AsRef<Path>, B: AsRef<Path>>(
+    file: P,
+    relative_to: B,
+) -> Option<String> {
     let file = file.as_ref();
     let base = relative_to.as_ref();
 
