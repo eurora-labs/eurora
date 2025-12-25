@@ -196,7 +196,7 @@ impl RunLog {
     /// Apply a patch to the run log.
     pub fn apply_patch(&mut self, patch: RunLogPatch) {
         self.ops.extend(patch.ops.clone());
-        
+
         // Apply the operations to the state
         if let Some(ref mut state) = self.state {
             for op in patch.ops {
@@ -207,7 +207,7 @@ impl RunLog {
 
     fn apply_op_to_state(state: &mut RunState, op: &JsonPatchOp) {
         let path_parts: Vec<&str> = op.path.split('/').filter(|s| !s.is_empty()).collect();
-        
+
         match op.op.as_str() {
             "replace" => {
                 if op.path.is_empty() || op.path == "/" {
@@ -228,7 +228,9 @@ impl RunLog {
                             if path_parts.len() == 2 {
                                 // Adding a new log entry
                                 if let Some(value) = &op.value {
-                                    if let Ok(entry) = serde_json::from_value::<LogEntry>(value.clone()) {
+                                    if let Ok(entry) =
+                                        serde_json::from_value::<LogEntry>(value.clone())
+                                    {
                                         state.logs.insert(path_parts[1].to_string(), entry);
                                     }
                                 }
@@ -236,12 +238,16 @@ impl RunLog {
                                 // Updating an existing log entry field
                                 if let Some(entry) = state.logs.get_mut(path_parts[1]) {
                                     match path_parts[2] {
-                                        "streamed_output" if path_parts.len() == 4 && path_parts[3] == "-" => {
+                                        "streamed_output"
+                                            if path_parts.len() == 4 && path_parts[3] == "-" =>
+                                        {
                                             if let Some(value) = &op.value {
                                                 entry.streamed_output.push(value.clone());
                                             }
                                         }
-                                        "streamed_output_str" if path_parts.len() == 4 && path_parts[3] == "-" => {
+                                        "streamed_output_str"
+                                            if path_parts.len() == 4 && path_parts[3] == "-" =>
+                                        {
                                             if let Some(value) = &op.value {
                                                 if let Some(s) = value.as_str() {
                                                     entry.streamed_output_str.push(s.to_string());
@@ -252,7 +258,10 @@ impl RunLog {
                                             entry.final_output = op.value.clone();
                                         }
                                         "end_time" => {
-                                            entry.end_time = op.value.clone().and_then(|v| v.as_str().map(String::from));
+                                            entry.end_time = op
+                                                .value
+                                                .clone()
+                                                .and_then(|v| v.as_str().map(String::from));
                                         }
                                         "inputs" => {
                                             entry.inputs = op.value.clone();
@@ -449,7 +458,10 @@ impl LogStreamCallbackHandler {
                 Some(serde_json::to_value(&run.inputs).unwrap_or_default())
             }
             SchemaFormat::StreamingEvents => {
-                if run.run_type == "retriever" || run.run_type == "llm" || run.run_type == "chat_model" {
+                if run.run_type == "retriever"
+                    || run.run_type == "llm"
+                    || run.run_type == "chat_model"
+                {
                     Some(serde_json::to_value(&run.inputs).unwrap_or_default())
                 } else {
                     run.inputs.get("input").cloned()
@@ -461,7 +473,7 @@ impl LogStreamCallbackHandler {
     /// Get the standardized outputs for a run.
     fn get_standardized_outputs(&self, run: &Run) -> Option<Value> {
         let outputs = run.outputs.as_ref()?;
-        
+
         match self.config.schema_format {
             SchemaFormat::Original | SchemaFormat::OriginalChat => {
                 if run.run_type == "prompt" {
@@ -471,7 +483,10 @@ impl LogStreamCallbackHandler {
                 }
             }
             SchemaFormat::StreamingEvents => {
-                if run.run_type == "retriever" || run.run_type == "llm" || run.run_type == "chat_model" {
+                if run.run_type == "retriever"
+                    || run.run_type == "llm"
+                    || run.run_type == "chat_model"
+                {
                     Some(serde_json::to_value(outputs).unwrap_or_default())
                 } else {
                     outputs.get("output").cloned()
@@ -514,11 +529,7 @@ impl TracerCore for LogStreamCallbackHandler {
     fn on_run_create(&mut self, run: &Run) {
         if self.root_id.is_none() {
             self.root_id = Some(run.id);
-            let state = RunState::new(
-                run.id.to_string(),
-                run.name.clone(),
-                run.run_type.clone(),
-            );
+            let state = RunState::new(run.id.to_string(), run.name.clone(), run.run_type.clone());
             if !self.send(vec![JsonPatchOp::replace(
                 "",
                 serde_json::to_value(state).unwrap_or_default(),
@@ -533,7 +544,10 @@ impl TracerCore for LogStreamCallbackHandler {
 
         // Determine key name with counter
         let _lock = self.lock.lock().unwrap();
-        let count = self.counter_map_by_name.entry(run.name.clone()).or_insert(0);
+        let count = self
+            .counter_map_by_name
+            .entry(run.name.clone())
+            .or_insert(0);
         *count += 1;
         let key = if *count == 1 {
             run.name.clone()
@@ -583,12 +597,18 @@ impl TracerCore for LogStreamCallbackHandler {
 
         if self.config.schema_format == SchemaFormat::StreamingEvents {
             if let Some(inputs) = self.get_standardized_inputs(run) {
-                ops.push(JsonPatchOp::replace(format!("/logs/{}/inputs", key), inputs));
+                ops.push(JsonPatchOp::replace(
+                    format!("/logs/{}/inputs", key),
+                    inputs,
+                ));
             }
         }
 
         if let Some(outputs) = self.get_standardized_outputs(run) {
-            ops.push(JsonPatchOp::add(format!("/logs/{}/final_output", key), outputs));
+            ops.push(JsonPatchOp::add(
+                format!("/logs/{}/final_output", key),
+                outputs,
+            ));
         }
 
         if let Some(end_time) = run.end_time {
@@ -614,9 +634,12 @@ impl TracerCore for LogStreamCallbackHandler {
         let chunk_value = if let Some(chunk_any) = chunk {
             if let Some(gen_chunk) = chunk_any.downcast_ref::<crate::outputs::GenerationChunk>() {
                 serde_json::to_value(gen_chunk).unwrap_or(Value::String(token.to_string()))
-            } else if let Some(chat_chunk) = chunk_any.downcast_ref::<crate::outputs::ChatGenerationChunk>() {
+            } else if let Some(chat_chunk) =
+                chunk_any.downcast_ref::<crate::outputs::ChatGenerationChunk>()
+            {
                 // For chat chunks, include the message
-                serde_json::to_value(&chat_chunk.message).unwrap_or(Value::String(token.to_string()))
+                serde_json::to_value(&chat_chunk.message)
+                    .unwrap_or(Value::String(token.to_string()))
             } else {
                 Value::String(token.to_string())
             }
@@ -629,10 +652,7 @@ impl TracerCore for LogStreamCallbackHandler {
                 format!("/logs/{}/streamed_output_str/-", key),
                 Value::String(token.to_string()),
             ),
-            JsonPatchOp::add(
-                format!("/logs/{}/streamed_output/-", key),
-                chunk_value,
-            ),
+            JsonPatchOp::add(format!("/logs/{}/streamed_output/-", key), chunk_value),
         ]);
     }
 }
@@ -660,7 +680,7 @@ impl<T: Send + 'static> StreamingCallbackHandler<T> for LogStreamCallbackHandler
             (output, run_id, root_id, key, send_stream),
             |(mut stream, run_id, root_id, key, sender)| async move {
                 let item = stream.next().await?;
-                
+
                 // Root run is handled separately
                 // If we can't find the run key, silently ignore
                 if run_id != root_id.unwrap_or(Uuid::nil()) {
@@ -674,7 +694,7 @@ impl<T: Send + 'static> StreamingCallbackHandler<T> for LogStreamCallbackHandler
                         )]));
                     }
                 }
-                
+
                 Some((item, (stream, run_id, root_id, key, sender)))
             },
         ))
@@ -712,17 +732,19 @@ impl<T> Iterator for TappedIterator<T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let item = self.inner.next()?;
-        
+
         // Root run is handled separately
         if self.run_id != self.root_id.unwrap_or(Uuid::nil()) {
             if let Some(ref k) = self.key {
-                let _ = self.send_stream.send_nowait(RunLogPatch::new(vec![JsonPatchOp::add(
-                    format!("/logs/{}/streamed_output/-", k),
-                    Value::Null, // Placeholder
-                )]));
+                let _ = self
+                    .send_stream
+                    .send_nowait(RunLogPatch::new(vec![JsonPatchOp::add(
+                        format!("/logs/{}/streamed_output/-", k),
+                        Value::Null, // Placeholder
+                    )]));
             }
         }
-        
+
         Some(item)
     }
 }
@@ -779,7 +801,11 @@ mod tests {
     fn test_run_log_apply_patch() {
         let mut log = RunLog::new(
             vec![],
-            Some(RunState::new("id".to_string(), "test".to_string(), "chain".to_string())),
+            Some(RunState::new(
+                "id".to_string(),
+                "test".to_string(),
+                "chain".to_string(),
+            )),
         );
 
         let patch = RunLogPatch::new(vec![JsonPatchOp::add(

@@ -80,7 +80,7 @@ impl<T: Send + 'static> ReceiveStream<T> {
             if state.is_closed() {
                 return None;
             }
-            
+
             let mut receiver = state.receiver.lock().await;
             match receiver.recv().await {
                 Some(Some(item)) => {
@@ -88,7 +88,9 @@ impl<T: Send + 'static> ReceiveStream<T> {
                     Some((item, state))
                 }
                 Some(None) | None => {
-                    state.is_closed.store(true, std::sync::atomic::Ordering::SeqCst);
+                    state
+                        .is_closed
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
                     None
                 }
             }
@@ -223,7 +225,7 @@ impl<T: Send + 'static> BoundedReceiveStream<T> {
             if state.is_closed() {
                 return None;
             }
-            
+
             let mut receiver = state.receiver.lock().await;
             match receiver.recv().await {
                 Some(Some(item)) => {
@@ -231,7 +233,9 @@ impl<T: Send + 'static> BoundedReceiveStream<T> {
                     Some((item, state))
                 }
                 Some(None) | None => {
-                    state.is_closed.store(true, std::sync::atomic::Ordering::SeqCst);
+                    state
+                        .is_closed
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
                     None
                 }
             }

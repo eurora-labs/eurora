@@ -201,7 +201,10 @@ mod tests {
 
         let value = dumpd(&model).unwrap();
         assert!(value.is_object());
-        assert_eq!(value.get("type").and_then(|v| v.as_str()), Some("constructor"));
+        assert_eq!(
+            value.get("type").and_then(|v| v.as_str()),
+            Some("constructor")
+        );
     }
 
     #[test]

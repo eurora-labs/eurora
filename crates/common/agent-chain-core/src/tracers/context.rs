@@ -20,13 +20,13 @@ thread_local! {
 pub trait TracingCallback: Send + Sync {
     /// Get the project name.
     fn project_name(&self) -> Option<&str>;
-    
+
     /// Get the example ID.
     fn example_id(&self) -> Option<Uuid>;
-    
+
     /// Get the latest run.
     fn latest_run(&self) -> Option<&Run>;
-    
+
     /// Get the run URL.
     fn get_run_url(&self) -> Option<String>;
 }
@@ -73,7 +73,7 @@ pub fn tracing_v2_enabled(callback: Arc<dyn TracingCallback>) -> TracingV2Guard 
         *borrow = Some(callback);
         prev
     });
-    
+
     TracingV2Guard { previous }
 }
 
@@ -96,17 +96,22 @@ pub fn get_tracing_callback() -> Option<Arc<dyn TracingCallback>> {
 /// # Returns
 ///
 /// A guard that will reset the collector when dropped.
-pub fn collect_runs(collector: RunCollectorCallbackHandler) -> (RunCollectorGuard, Arc<std::sync::Mutex<RunCollectorCallbackHandler>>) {
+pub fn collect_runs(
+    collector: RunCollectorCallbackHandler,
+) -> (
+    RunCollectorGuard,
+    Arc<std::sync::Mutex<RunCollectorCallbackHandler>>,
+) {
     let collector = Arc::new(std::sync::Mutex::new(collector));
     let collector_clone = collector.clone();
-    
+
     let previous = RUN_COLLECTOR.with(|cell| {
         let mut borrow = cell.borrow_mut();
         let prev = borrow.take();
         *borrow = Some(collector);
         prev
     });
-    
+
     (RunCollectorGuard { previous }, collector_clone)
 }
 
@@ -127,7 +132,10 @@ pub struct ConfigureHook {
 impl ConfigureHook {
     /// Create a new configure hook.
     pub fn new(inheritable: bool, env_var: Option<String>) -> Self {
-        Self { inheritable, env_var }
+        Self {
+            inheritable,
+            env_var,
+        }
     }
 }
 
@@ -142,12 +150,12 @@ impl ConfigureHookRegistry {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Register a configure hook.
     pub fn register(&mut self, hook: ConfigureHook) {
         self.hooks.push(hook);
     }
-    
+
     /// Get all registered hooks.
     pub fn hooks(&self) -> &[ConfigureHook] {
         &self.hooks
@@ -155,7 +163,7 @@ impl ConfigureHookRegistry {
 }
 
 /// Global configure hook registry.
-static CONFIGURE_HOOKS: std::sync::LazyLock<std::sync::Mutex<ConfigureHookRegistry>> = 
+static CONFIGURE_HOOKS: std::sync::LazyLock<std::sync::Mutex<ConfigureHookRegistry>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(ConfigureHookRegistry::new()));
 
 /// Register a configure hook.
@@ -173,71 +181,71 @@ pub fn register_configure_hook(inheritable: bool, env_var: Option<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     struct TestCallback {
         project: String,
     }
-    
+
     impl TracingCallback for TestCallback {
         fn project_name(&self) -> Option<&str> {
             Some(&self.project)
         }
-        
+
         fn example_id(&self) -> Option<Uuid> {
             None
         }
-        
+
         fn latest_run(&self) -> Option<&Run> {
             None
         }
-        
+
         fn get_run_url(&self) -> Option<String> {
             None
         }
     }
-    
+
     #[test]
     fn test_tracing_v2_enabled() {
         assert!(!tracing_v2_is_enabled());
-        
+
         let callback = Arc::new(TestCallback {
             project: "test".to_string(),
         });
-        
+
         {
             let _guard = tracing_v2_enabled(callback.clone());
             assert!(tracing_v2_is_enabled());
-            
+
             let cb = get_tracing_callback().unwrap();
             assert_eq!(cb.project_name(), Some("test"));
         }
-        
+
         assert!(!tracing_v2_is_enabled());
     }
-    
+
     #[test]
     fn test_collect_runs() {
         let collector = RunCollectorCallbackHandler::new(None);
-        
+
         {
             let (_guard, collector_arc) = collect_runs(collector);
-            
+
             let current = get_run_collector();
             assert!(current.is_some());
-            
+
             // Verify it's the same collector
             let collector_locked = collector_arc.lock().unwrap();
             assert!(collector_locked.is_empty());
         }
-        
+
         assert!(get_run_collector().is_none());
     }
-    
+
     #[test]
     fn test_register_configure_hook() {
         register_configure_hook(false, None);
         register_configure_hook(true, Some("LANGCHAIN_TRACING_V2".to_string()));
-        
+
         let registry = CONFIGURE_HOOKS.lock().unwrap();
         assert!(registry.hooks().len() >= 2);
     }

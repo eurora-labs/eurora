@@ -79,8 +79,8 @@ pub use prompts::{
 // Re-export load types
 pub use load::{
     ConstructorInfo, RevivedValue, Reviver, ReviverConfig, Serializable, Serialized,
-    SerializedConstructor, SerializedNotImplemented, SerializedSecret, dumpd, dumps, load as load_json,
-    loads,
+    SerializedConstructor, SerializedNotImplemented, SerializedSecret, dumpd, dumps,
+    load as load_json, loads,
 };
 
 // Re-export tracer types
