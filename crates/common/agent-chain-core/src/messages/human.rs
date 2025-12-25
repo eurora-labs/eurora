@@ -1,6 +1,6 @@
 //! Human message type.
 //!
-//! This module contains the `HumanMessage` type which represents
+//! This module contains the `HumanMessage` and `HumanMessageChunk` types which represent
 //! messages from the user. Mirrors `langchain_core.messages.human`.
 
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ use uuid::Uuid;
 #[cfg(feature = "specta")]
 use specta::Type;
 
+use super::base::merge_content;
 use super::content::{ContentPart, ImageSource, MessageContent};
 
 /// A human message in the conversation.
@@ -164,5 +165,145 @@ impl HumanMessage {
     /// Get additional kwargs.
     pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
         &self.additional_kwargs
+    }
+}
+
+/// Human message chunk (yielded when streaming).
+///
+/// This corresponds to `HumanMessageChunk` in LangChain Python.
+#[cfg_attr(feature = "specta", derive(Type))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HumanMessageChunk {
+    /// The message content (may be partial during streaming)
+    content: MessageContent,
+    /// Optional unique identifier
+    id: Option<String>,
+    /// Optional name for the message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    /// Additional metadata
+    #[serde(default)]
+    additional_kwargs: HashMap<String, serde_json::Value>,
+    /// Response metadata
+    #[serde(default)]
+    response_metadata: HashMap<String, serde_json::Value>,
+}
+
+impl HumanMessageChunk {
+    /// Create a new human message chunk with text content.
+    pub fn new(content: impl Into<String>) -> Self {
+        Self {
+            content: MessageContent::Text(content.into()),
+            id: None,
+            name: None,
+            additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
+        }
+    }
+
+    /// Create a new human message chunk with an ID.
+    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            content: MessageContent::Text(content.into()),
+            id: Some(id.into()),
+            name: None,
+            additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
+        }
+    }
+
+    /// Get the message content as text.
+    pub fn content(&self) -> &str {
+        match &self.content {
+            MessageContent::Text(s) => s,
+            MessageContent::Parts(_) => "",
+        }
+    }
+
+    /// Get the full message content.
+    pub fn message_content(&self) -> &MessageContent {
+        &self.content
+    }
+
+    /// Get the message ID.
+    pub fn id(&self) -> Option<&str> {
+        self.id.as_deref()
+    }
+
+    /// Get the message name.
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Get additional kwargs.
+    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
+        &self.additional_kwargs
+    }
+
+    /// Get response metadata.
+    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
+
+    /// Concatenate this chunk with another chunk.
+    pub fn concat(&self, other: &HumanMessageChunk) -> HumanMessageChunk {
+        let content = match (&self.content, &other.content) {
+            (MessageContent::Text(a), MessageContent::Text(b)) => {
+                MessageContent::Text(merge_content(a, b))
+            }
+            (MessageContent::Parts(a), MessageContent::Parts(b)) => {
+                let mut parts = a.clone();
+                parts.extend(b.clone());
+                MessageContent::Parts(parts)
+            }
+            (MessageContent::Text(a), MessageContent::Parts(b)) => {
+                let mut parts = vec![ContentPart::Text { text: a.clone() }];
+                parts.extend(b.clone());
+                MessageContent::Parts(parts)
+            }
+            (MessageContent::Parts(a), MessageContent::Text(b)) => {
+                let mut parts = a.clone();
+                parts.push(ContentPart::Text { text: b.clone() });
+                MessageContent::Parts(parts)
+            }
+        };
+
+        // Merge additional_kwargs
+        let mut additional_kwargs = self.additional_kwargs.clone();
+        for (k, v) in &other.additional_kwargs {
+            additional_kwargs.insert(k.clone(), v.clone());
+        }
+
+        // Merge response_metadata
+        let mut response_metadata = self.response_metadata.clone();
+        for (k, v) in &other.response_metadata {
+            response_metadata.insert(k.clone(), v.clone());
+        }
+
+        HumanMessageChunk {
+            content,
+            id: self.id.clone().or_else(|| other.id.clone()),
+            name: self.name.clone().or_else(|| other.name.clone()),
+            additional_kwargs,
+            response_metadata,
+        }
+    }
+
+    /// Convert this chunk to a complete HumanMessage.
+    pub fn to_message(&self) -> HumanMessage {
+        HumanMessage {
+            content: self.content.clone(),
+            id: self.id.clone(),
+            name: self.name.clone(),
+            additional_kwargs: self.additional_kwargs.clone(),
+        }
+    }
+}
+
+impl std::ops::Add for HumanMessageChunk {
+    type Output = HumanMessageChunk;
+
+    fn add(self, other: HumanMessageChunk) -> HumanMessageChunk {
+        self.concat(&other)
     }
 }
