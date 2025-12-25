@@ -97,8 +97,8 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
-            #[agent_chain_core::async_trait]
-            impl agent_chain_core::tools::Tool for #struct_name {
+            #[::agent_chain::_core::async_trait]
+            impl ::agent_chain::_core::tools::Tool for #struct_name {
                 fn name(&self) -> &str {
                     #fn_name_str
                 }
@@ -123,7 +123,7 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     })
                 }
 
-                async fn invoke(&self, tool_call: agent_chain_core::messages::ToolCall) -> agent_chain_core::messages::BaseMessage {
+                async fn invoke(&self, tool_call: ::agent_chain::_core::messages::ToolCall) -> ::agent_chain::_core::messages::BaseMessage {
                     let args = tool_call.args();
 
                     #(
@@ -136,7 +136,7 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     let result_str = serde_json::to_string(&result).unwrap_or_else(|_| format!("{:?}", result));
 
-                    agent_chain_core::messages::ToolMessage::new(result_str, tool_call.id()).into()
+                    ::agent_chain::_core::messages::ToolMessage::new(result_str, tool_call.id()).into()
                 }
             }
 

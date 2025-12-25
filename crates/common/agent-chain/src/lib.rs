@@ -60,6 +60,10 @@ use std::sync::Arc;
 
 pub use agent_chain_core::*;
 
+// Re-export agent_chain_core as a module for macro-generated code
+#[doc(hidden)]
+pub use agent_chain_core as _core;
+
 /// Initialize a chat model from the model name with automatic provider inference.
 ///
 /// This function provides a convenient way to create chat models, similar to
