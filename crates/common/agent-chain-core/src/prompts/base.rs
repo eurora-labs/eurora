@@ -14,6 +14,10 @@ use crate::error::{Error, Result};
 pub type FormatOutputType = String;
 
 /// Configuration for a prompt template.
+///
+/// This struct is used for serialization/deserialization of prompt templates
+/// and matches the Python langchain_core configuration structure.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PromptTemplateConfig {
     /// A list of the names of the variables whose values are required as inputs to the prompt.
@@ -214,9 +218,9 @@ pub trait BasePromptTemplate: Send + Sync {
         let prompt_dict = self.to_dict();
 
         if prompt_dict.get("_type").is_none() {
-            return Err(Error::InvalidConfig(format!(
-                "Prompt does not support saving."
-            )));
+            return Err(Error::InvalidConfig(
+                "Prompt does not support saving.".to_string(),
+            ));
         }
 
         // Ensure parent directory exists
