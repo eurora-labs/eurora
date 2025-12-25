@@ -170,12 +170,11 @@ impl Reviver {
         }
 
         // Then check the environment
-        if self.config.secrets_from_env {
-            if let Ok(value) = env::var(key) {
-                if !value.is_empty() {
-                    return Ok(RevivedValue::String(value));
-                }
-            }
+        if self.config.secrets_from_env
+            && let Ok(value) = env::var(key)
+            && !value.is_empty()
+        {
+            return Ok(RevivedValue::String(value));
         }
 
         Ok(RevivedValue::None)
@@ -241,7 +240,7 @@ impl Reviver {
         let kwargs = obj
             .get("kwargs")
             .and_then(|v| v.as_object())
-            .map(|m| m.clone())
+            .cloned()
             .unwrap_or_default();
 
         // Return the resolved constructor info
