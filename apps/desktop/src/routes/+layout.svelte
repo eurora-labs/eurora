@@ -1,5 +1,4 @@
 <script lang="ts">
-	import '@eurora/ui/main.css';
 	import '../app.css';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
