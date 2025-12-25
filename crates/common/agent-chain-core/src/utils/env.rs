@@ -86,10 +86,12 @@ pub fn get_from_dict_or_env(
 /// use agent_chain_core::utils::env::get_from_env;
 /// use std::env;
 ///
-/// env::set_var("MY_TEST_VAR", "test_value");
+/// // SAFETY: This is a single-threaded doc test
+/// unsafe { env::set_var("MY_TEST_VAR", "test_value"); }
 /// let result = get_from_env("my_test", "MY_TEST_VAR", None);
 /// assert_eq!(result.unwrap(), "test_value");
-/// env::remove_var("MY_TEST_VAR");
+/// // SAFETY: This is a single-threaded doc test
+/// unsafe { env::remove_var("MY_TEST_VAR"); }
 /// ```
 pub fn get_from_env(key: &str, env_key: &str, default: Option<&str>) -> Result<String, EnvError> {
     if let Ok(value) = env::var(env_key)
