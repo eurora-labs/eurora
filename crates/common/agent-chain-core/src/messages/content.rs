@@ -145,3 +145,30 @@ impl From<Vec<ContentPart>> for MessageContent {
         MessageContent::Parts(parts)
     }
 }
+
+/// A reasoning content block.
+///
+/// Used to represent reasoning/thinking content from AI models that support
+/// chain-of-thought reasoning (e.g., DeepSeek, Ollama, XAI, Groq).
+///
+/// Corresponds to `ReasoningContentBlock` TypedDict in Python.
+#[cfg_attr(feature = "specta", derive(Type))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ReasoningContentBlock {
+    /// The reasoning/thinking content.
+    pub reasoning: String,
+}
+
+impl ReasoningContentBlock {
+    /// Create a new reasoning content block.
+    pub fn new(reasoning: impl Into<String>) -> Self {
+        Self {
+            reasoning: reasoning.into(),
+        }
+    }
+
+    /// Get the reasoning content.
+    pub fn reasoning(&self) -> &str {
+        &self.reasoning
+    }
+}
