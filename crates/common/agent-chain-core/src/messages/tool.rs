@@ -526,7 +526,9 @@ pub fn default_tool_chunk_parser(raw_tool_calls: &[serde_json::Value]) -> Vec<To
     for raw_tool_call in raw_tool_calls {
         let (function_name, function_args) = match raw_tool_call.get("function") {
             Some(f) => (
-                f.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()),
+                f.get("name")
+                    .and_then(|n| n.as_str())
+                    .map(|s| s.to_string()),
                 f.get("arguments")
                     .and_then(|a| a.as_str())
                     .map(|s| s.to_string()),

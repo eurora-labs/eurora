@@ -154,8 +154,10 @@ impl Add for GenerationChunk {
     fn add(self, other: GenerationChunk) -> Self::Output {
         let generation_info = match (self.generation_info, other.generation_info) {
             (Some(left), Some(right)) => {
-                let left_value = serde_json::to_value(&left).unwrap_or(Value::Object(Default::default()));
-                let right_value = serde_json::to_value(&right).unwrap_or(Value::Object(Default::default()));
+                let left_value =
+                    serde_json::to_value(&left).unwrap_or(Value::Object(Default::default()));
+                let right_value =
+                    serde_json::to_value(&right).unwrap_or(Value::Object(Default::default()));
                 match merge_dicts(left_value, vec![right_value]) {
                     Ok(Value::Object(map)) => {
                         let result: HashMap<String, Value> = map.into_iter().collect();
@@ -242,7 +244,7 @@ mod tests {
 
         let result = chunk1 + chunk2;
         assert_eq!(result.text, "Hello, world!");
-        
+
         let info = result.generation_info.unwrap();
         assert_eq!(info.get("a"), Some(&json!(1)));
         assert_eq!(info.get("b"), Some(&json!(2)));
@@ -253,7 +255,7 @@ mod tests {
         let generation = Generation::new("test");
         let json = serde_json::to_string(&generation).unwrap();
         assert!(json.contains("\"type\":\"Generation\""));
-        
+
         let deserialized: Generation = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.text, "test");
     }
