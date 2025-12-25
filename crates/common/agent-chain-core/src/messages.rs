@@ -69,7 +69,24 @@ pub use base::{
 pub use chat::{ChatMessage, ChatMessageChunk};
 
 // Re-export from content
-pub use content::{ContentPart, ImageDetail, ImageSource, MessageContent, ReasoningContentBlock};
+pub use content::{
+    // Legacy types (backwards compatibility)
+    ContentPart, ImageDetail, ImageSource, MessageContent,
+    // Standard content blocks (matching Python langchain_core.messages.content)
+    Annotation, AudioContentBlock, BlockIndex, Citation, ContentBlock, DataContentBlock,
+    FileContentBlock, ImageContentBlock, InvalidToolCallBlock, NonStandardAnnotation,
+    NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
+    ServerToolCallChunk, ServerToolResult, ServerToolStatus, TextContentBlock, ToolCallBlock,
+    ToolCallChunkBlock, ToolContentBlock, VideoContentBlock,
+    // Constants
+    KNOWN_BLOCK_TYPES,
+    // Helper functions
+    is_data_content_block,
+    // Factory functions
+    create_audio_block, create_citation, create_file_block, create_image_block,
+    create_non_standard_block, create_plaintext_block, create_reasoning_block, create_text_block,
+    create_tool_call_block, create_video_block,
+};
 
 // Re-export from function
 pub use function::{FunctionMessage, FunctionMessageChunk};
