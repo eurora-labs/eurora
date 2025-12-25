@@ -83,6 +83,10 @@
 
 	// Helper to get content from BaseMessage
 	function getMessageContent(message: BaseMessage): string {
+		// RemoveMessage doesn't have content
+		if (message.type === 'remove') {
+			return '';
+		}
 		const content = message.content;
 		if (typeof content === 'string') {
 			return content;
