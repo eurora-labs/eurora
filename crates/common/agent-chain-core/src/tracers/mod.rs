@@ -13,6 +13,9 @@
 //! - **AsyncBaseTracer trait** ([`base::AsyncBaseTracer`]): Asynchronous tracer interface.
 //! - **Concrete tracers**: Various implementations like [`run_collector::RunCollectorCallbackHandler`]
 //!   and [`stdout::ConsoleCallbackHandler`].
+//! - **Context management** ([`context`]): Thread-local context for tracers.
+//! - **Memory stream** ([`memory_stream`]): Async communication between tasks.
+//! - **Log stream** ([`log_stream`]): Run log streaming with JSON patches.
 //!
 //! # Example
 //!
@@ -37,10 +40,34 @@
 //! For streaming use cases, the [`streaming::StreamingCallbackHandler`] trait
 //! provides methods to tap into output streams.
 //!
+//! # Context Management
+//!
+//! Use the [`context`] module to manage tracer context in thread-local storage:
+//!
+//! ```ignore
+//! use agent_chain_core::tracers::context::{tracing_v2_enabled, collect_runs};
+//! use agent_chain_core::tracers::RunCollectorCallbackHandler;
+//!
+//! // Collect runs in the current context
+//! let collector = RunCollectorCallbackHandler::new(None);
+//! let (_guard, collector_arc) = collect_runs(collector);
+//!
+//! // ... run some chains ...
+//!
+//! // Access collected runs
+//! let collector = collector_arc.lock().unwrap();
+//! for run in &collector.traced_runs {
+//!     println!("Run: {}", run.name);
+//! }
+//! ```
+//!
 //! Mirrors `langchain_core.tracers`.
 
 pub mod base;
+pub mod context;
 pub mod core;
+pub mod log_stream;
+pub mod memory_stream;
 pub mod root_listeners;
 pub mod run_collector;
 pub mod schemas;
@@ -58,6 +85,25 @@ pub use base::{AsyncBaseTracer, BaseTracer};
 
 // Re-export streaming types
 pub use streaming::{PassthroughStreamingHandler, StreamingCallbackHandler};
+
+// Re-export context types
+pub use context::{
+    collect_runs, get_run_collector, get_tracing_callback, register_configure_hook,
+    tracing_v2_enabled, tracing_v2_is_enabled, ConfigureHook, ConfigureHookRegistry,
+    RunCollectorGuard, TracingCallback, TracingV2Guard,
+};
+
+// Re-export memory stream types
+pub use memory_stream::{
+    BoundedMemoryStream, BoundedReceiveStream, BoundedSendStream, MemoryStream, ReceiveStream,
+    SendStream,
+};
+
+// Re-export log stream types
+pub use log_stream::{
+    JsonPatchOp, LogEntry, LogStreamCallbackHandler, LogStreamConfig, RunLog, RunLogPatch,
+    RunState,
+};
 
 // Re-export concrete tracers
 pub use run_collector::RunCollectorCallbackHandler;
