@@ -27,6 +27,7 @@ pub mod api;
 pub mod callbacks;
 pub mod chat_models;
 pub mod error;
+pub mod load;
 pub mod messages;
 pub mod outputs;
 pub mod prompts;
@@ -72,6 +73,13 @@ pub use prompts::{
     FewShotChatMessagePromptTemplate, FewShotPromptTemplate, FewShotPromptWithTemplates,
     HumanMessagePromptTemplate, ImagePromptTemplate, MessagesPlaceholder, PromptTemplate,
     PromptTemplateFormat, StringPromptTemplate, SystemMessagePromptTemplate, load_prompt,
+};
+
+// Re-export load types
+pub use load::{
+    ConstructorInfo, RevivedValue, Reviver, ReviverConfig, Serializable, Serialized,
+    SerializedConstructor, SerializedNotImplemented, SerializedSecret, dumpd, dumps, load as load_json,
+    loads,
 };
 
 // Re-export async_trait for use in generated code
