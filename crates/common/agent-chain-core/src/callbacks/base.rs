@@ -300,6 +300,7 @@ pub trait BaseCallbackHandler:
     }
 
     /// Get a unique name for this handler.
+    /// Note: This is a Rust-specific addition for debugging purposes.
     fn name(&self) -> &str {
         "BaseCallbackHandler"
     }
@@ -345,8 +346,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
         chunk: Option<&serde_json::Value>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (token, run_id, parent_run_id, chunk);
+        let _ = (token, run_id, parent_run_id, chunk, tags);
     }
 
     /// Run when LLM ends running (async).
@@ -355,8 +357,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         response: &ChatResult,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (response, run_id, parent_run_id);
+        let _ = (response, run_id, parent_run_id, tags);
     }
 
     /// Run when LLM errors (async).
@@ -365,8 +368,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         error: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (error, run_id, parent_run_id);
+        let _ = (error, run_id, parent_run_id, tags);
     }
 
     /// Run when chain starts running (async).
@@ -389,8 +393,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         outputs: &HashMap<String, serde_json::Value>,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (outputs, run_id, parent_run_id);
+        let _ = (outputs, run_id, parent_run_id, tags);
     }
 
     /// Run when chain errors (async).
@@ -399,8 +404,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         error: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (error, run_id, parent_run_id);
+        let _ = (error, run_id, parent_run_id, tags);
     }
 
     /// Run when tool starts running (async).
@@ -427,8 +433,14 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
     }
 
     /// Run when tool ends running (async).
-    async fn on_tool_end_async(&mut self, output: &str, run_id: Uuid, parent_run_id: Option<Uuid>) {
-        let _ = (output, run_id, parent_run_id);
+    async fn on_tool_end_async(
+        &mut self,
+        output: &str,
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
+    ) {
+        let _ = (output, run_id, parent_run_id, tags);
     }
 
     /// Run when tool errors (async).
@@ -437,13 +449,20 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         error: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (error, run_id, parent_run_id);
+        let _ = (error, run_id, parent_run_id, tags);
     }
 
     /// Run on an arbitrary text (async).
-    async fn on_text_async(&mut self, text: &str, run_id: Uuid, parent_run_id: Option<Uuid>) {
-        let _ = (text, run_id, parent_run_id);
+    async fn on_text_async(
+        &mut self,
+        text: &str,
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
+    ) {
+        let _ = (text, run_id, parent_run_id, tags);
     }
 
     /// Run on a retry event (async).
@@ -462,8 +481,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         action: &serde_json::Value,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (action, run_id, parent_run_id);
+        let _ = (action, run_id, parent_run_id, tags);
     }
 
     /// Run on the agent end (async).
@@ -472,8 +492,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         finish: &serde_json::Value,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (finish, run_id, parent_run_id);
+        let _ = (finish, run_id, parent_run_id, tags);
     }
 
     /// Run on the retriever start (async).
@@ -496,8 +517,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         documents: &[serde_json::Value],
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (documents, run_id, parent_run_id);
+        let _ = (documents, run_id, parent_run_id, tags);
     }
 
     /// Run on retriever error (async).
@@ -506,8 +528,9 @@ pub trait AsyncCallbackHandler: BaseCallbackHandler {
         error: &str,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        tags: Option<&[String]>,
     ) {
-        let _ = (error, run_id, parent_run_id);
+        let _ = (error, run_id, parent_run_id, tags);
     }
 
     /// Override to define a handler for custom events (async).
@@ -572,19 +595,26 @@ impl BaseCallbackManager {
     }
 
     /// Create a new callback manager with handlers.
+    ///
+    /// This matches the Python `__init__` signature.
+    #[allow(clippy::too_many_arguments)]
     pub fn with_handlers(
         handlers: Vec<Arc<dyn BaseCallbackHandler>>,
         inheritable_handlers: Option<Vec<Arc<dyn BaseCallbackHandler>>>,
         parent_run_id: Option<Uuid>,
+        tags: Option<Vec<String>>,
+        inheritable_tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
+        inheritable_metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         Self {
             handlers,
             inheritable_handlers: inheritable_handlers.unwrap_or_default(),
             parent_run_id,
-            tags: Vec::new(),
-            inheritable_tags: Vec::new(),
-            metadata: HashMap::new(),
-            inheritable_metadata: HashMap::new(),
+            tags: tags.unwrap_or_default(),
+            inheritable_tags: inheritable_tags.unwrap_or_default(),
+            metadata: metadata.unwrap_or_default(),
+            inheritable_metadata: inheritable_metadata.unwrap_or_default(),
         }
     }
 
@@ -602,48 +632,55 @@ impl BaseCallbackManager {
     }
 
     /// Merge with another callback manager.
+    ///
+    /// Note: This matches Python's behavior which does NOT merge inheritable_metadata
+    /// (this appears to be a bug in the Python implementation, but we match it for compatibility).
     pub fn merge(&self, other: &BaseCallbackManager) -> Self {
-        let mut manager = Self::new();
-        manager.parent_run_id = self.parent_run_id.or(other.parent_run_id);
+        // Use a set-like deduplication for tags (matching Python's list(set(...)))
+        let mut tags_set: std::collections::HashSet<String> = self.tags.iter().cloned().collect();
+        tags_set.extend(other.tags.iter().cloned());
+        let tags: Vec<String> = tags_set.into_iter().collect();
 
-        // Merge tags (deduplicated)
-        let mut tags: Vec<String> = self.tags.clone();
-        for tag in &other.tags {
-            if !tags.contains(tag) {
-                tags.push(tag.clone());
-            }
-        }
-        manager.tags = tags;
-
-        let mut inheritable_tags: Vec<String> = self.inheritable_tags.clone();
-        for tag in &other.inheritable_tags {
-            if !inheritable_tags.contains(tag) {
-                inheritable_tags.push(tag.clone());
-            }
-        }
-        manager.inheritable_tags = inheritable_tags;
+        let mut inheritable_tags_set: std::collections::HashSet<String> =
+            self.inheritable_tags.iter().cloned().collect();
+        inheritable_tags_set.extend(other.inheritable_tags.iter().cloned());
+        let inheritable_tags: Vec<String> = inheritable_tags_set.into_iter().collect();
 
         // Merge metadata
         let mut metadata = self.metadata.clone();
         metadata.extend(other.metadata.clone());
-        manager.metadata = metadata;
 
-        let mut inheritable_metadata = self.inheritable_metadata.clone();
-        inheritable_metadata.extend(other.inheritable_metadata.clone());
-        manager.inheritable_metadata = inheritable_metadata;
+        // Create manager with merged values
+        // Note: Python does NOT include inheritable_metadata in the constructor
+        let mut manager = Self {
+            handlers: Vec::new(),
+            inheritable_handlers: Vec::new(),
+            parent_run_id: self.parent_run_id.or(other.parent_run_id),
+            tags,
+            inheritable_tags,
+            metadata,
+            inheritable_metadata: HashMap::new(), // Python doesn't merge this
+        };
 
         // Merge handlers
-        for handler in &self.handlers {
-            manager.add_handler(handler.clone(), false);
+        let handlers: Vec<_> = self
+            .handlers
+            .iter()
+            .chain(other.handlers.iter())
+            .cloned()
+            .collect();
+        let inheritable_handlers: Vec<_> = self
+            .inheritable_handlers
+            .iter()
+            .chain(other.inheritable_handlers.iter())
+            .cloned()
+            .collect();
+
+        for handler in handlers {
+            manager.add_handler(handler, false);
         }
-        for handler in &other.handlers {
-            manager.add_handler(handler.clone(), false);
-        }
-        for handler in &self.inheritable_handlers {
-            manager.add_handler(handler.clone(), true);
-        }
-        for handler in &other.inheritable_handlers {
-            manager.add_handler(handler.clone(), true);
+        for handler in inheritable_handlers {
+            manager.add_handler(handler, true);
         }
 
         manager
@@ -761,9 +798,15 @@ impl Callbacks {
     /// Convert to a callback manager.
     pub fn to_manager(&self) -> BaseCallbackManager {
         match self {
-            Callbacks::Handlers(handlers) => {
-                BaseCallbackManager::with_handlers(handlers.clone(), Some(handlers.clone()), None)
-            }
+            Callbacks::Handlers(handlers) => BaseCallbackManager::with_handlers(
+                handlers.clone(),
+                Some(handlers.clone()),
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
             Callbacks::Manager(manager) => manager.clone(),
         }
     }
