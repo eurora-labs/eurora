@@ -387,7 +387,12 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
         chunk: Option<&(dyn std::any::Any + Send + Sync)>,
         parent_run_id: Option<Uuid>,
     ) -> Result<Run, TracerError> {
-        let llm_run = self.llm_run_with_token_event(token, run_id, chunk.map(|c| c as &dyn std::any::Any), parent_run_id)?;
+        let llm_run = self.llm_run_with_token_event(
+            token,
+            run_id,
+            chunk.map(|c| c as &dyn std::any::Any),
+            parent_run_id,
+        )?;
         self.on_llm_new_token_async(&llm_run, token, chunk).await;
         Ok(llm_run)
     }

@@ -43,12 +43,13 @@ mod serializable;
 pub use serializable::{
     BaseSerialized, LC_VERSION, Serializable, Serialized, SerializedConstructor,
     SerializedConstructorData, SerializedNotImplemented, SerializedNotImplementedData,
-    SerializedSecret, SerializedSecretData, to_json_not_implemented,
-    to_json_not_implemented_value,
+    SerializedSecret, SerializedSecretData, to_json_not_implemented, to_json_not_implemented_value,
 };
 
 // Re-export dump functions
-pub use dump::{default_serializer, dumpd, dumpd_serialized, dumpd_value, dumps, dumps_serialized, dumps_value};
+pub use dump::{
+    default_serializer, dumpd, dumpd_serialized, dumpd_value, dumps, dumps_serialized, dumps_value,
+};
 
 // Re-export load functions and types
 pub use loader::{
@@ -119,8 +120,8 @@ mod tests {
         let json = dumps(&obj, false).unwrap();
 
         // Load with custom namespace allowed
-        let config = ReviverConfig::new()
-            .with_valid_namespaces(vec!["custom_namespace".to_string()]);
+        let config =
+            ReviverConfig::new().with_valid_namespaces(vec!["custom_namespace".to_string()]);
         let loaded = loads(&json, Some(config)).unwrap();
         assert!(loaded.is_object());
     }
