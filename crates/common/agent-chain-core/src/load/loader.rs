@@ -12,9 +12,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
 
-use super::mapping::{
-    get_all_serializable_mappings, DEFAULT_NAMESPACES, DISALLOW_LOAD_FROM_PATH,
-};
+use super::mapping::{DEFAULT_NAMESPACES, DISALLOW_LOAD_FROM_PATH, get_all_serializable_mappings};
 use super::serializable::LC_VERSION;
 use crate::error::{Error, Result};
 
@@ -210,13 +208,18 @@ impl Reviver {
 
         // Validate namespace
         let root_namespace = namespace.first().map(|s| s.as_str()).unwrap_or("");
-        
+
         // The root namespace ["langchain"] alone is not valid
         if namespace == vec!["langchain".to_string()] {
             return Err(Error::Other(format!("Invalid namespace: {:?}", id)));
         }
 
-        if !self.config.valid_namespaces.iter().any(|ns| ns == root_namespace) {
+        if !self
+            .config
+            .valid_namespaces
+            .iter()
+            .any(|ns| ns == root_namespace)
+        {
             return Err(Error::Other(format!("Invalid namespace: {:?}", id)));
         }
 
@@ -358,14 +361,15 @@ fn load_recursive(obj: &Value, reviver: &Reviver) -> Result<Value> {
             for (k, v) in map {
                 loaded_obj.insert(k.clone(), load_recursive(v, reviver)?);
             }
-            
+
             // Then revive this node
             let loaded_value = Value::Object(loaded_obj);
             let revived = reviver.revive(&loaded_value)?;
             Ok(revived.to_value())
         }
         Value::Array(arr) => {
-            let loaded: Result<Vec<Value>> = arr.iter().map(|v| load_recursive(v, reviver)).collect();
+            let loaded: Result<Vec<Value>> =
+                arr.iter().map(|v| load_recursive(v, reviver)).collect();
             Ok(Value::Array(loaded?))
         }
         _ => Ok(obj.clone()),
@@ -422,7 +426,7 @@ mod tests {
         let reviver = Reviver::with_defaults();
         let value = serde_json::json!({"key": "value"});
         let result = reviver.revive(&value).unwrap();
-        
+
         match result {
             RevivedValue::Value(v) => {
                 assert_eq!(v.get("key").and_then(|v| v.as_str()), Some("value"));
@@ -433,18 +437,18 @@ mod tests {
 
     #[test]
     fn test_revive_secret_from_map() {
-        let config = ReviverConfig::new()
-            .with_secrets_map(HashMap::from([
-                ("MY_SECRET".to_string(), "secret_value".to_string()),
-            ]));
+        let config = ReviverConfig::new().with_secrets_map(HashMap::from([(
+            "MY_SECRET".to_string(),
+            "secret_value".to_string(),
+        )]));
         let reviver = Reviver::new(config);
-        
+
         let value = serde_json::json!({
             "lc": 1,
             "type": "secret",
             "id": ["MY_SECRET"]
         });
-        
+
         let result = reviver.revive(&value).unwrap();
         match result {
             RevivedValue::String(s) => assert_eq!(s, "secret_value"),
@@ -456,13 +460,13 @@ mod tests {
     fn test_revive_missing_secret() {
         let config = ReviverConfig::new().with_secrets_from_env(false);
         let reviver = Reviver::new(config);
-        
+
         let value = serde_json::json!({
             "lc": 1,
             "type": "secret",
             "id": ["NONEXISTENT_SECRET"]
         });
-        
+
         let result = reviver.revive(&value).unwrap();
         assert!(result.is_none());
     }
@@ -470,14 +474,14 @@ mod tests {
     #[test]
     fn test_revive_not_implemented_error() {
         let reviver = Reviver::with_defaults();
-        
+
         let value = serde_json::json!({
             "lc": 1,
             "type": "not_implemented",
             "id": ["some", "type"],
             "repr": "SomeType(...)"
         });
-        
+
         let result = reviver.revive(&value);
         assert!(result.is_err());
     }
@@ -486,14 +490,14 @@ mod tests {
     fn test_revive_not_implemented_ignored() {
         let config = ReviverConfig::new().with_ignore_unserializable_fields(true);
         let reviver = Reviver::new(config);
-        
+
         let value = serde_json::json!({
             "lc": 1,
             "type": "not_implemented",
             "id": ["some", "type"],
             "repr": "SomeType(...)"
         });
-        
+
         let result = reviver.revive(&value).unwrap();
         assert!(result.is_none());
     }
@@ -501,7 +505,7 @@ mod tests {
     #[test]
     fn test_revive_constructor() {
         let reviver = Reviver::with_defaults();
-        
+
         let value = serde_json::json!({
             "lc": 1,
             "type": "constructor",
@@ -510,7 +514,7 @@ mod tests {
                 "content": "Hello, world!"
             }
         });
-        
+
         let result = reviver.revive(&value).unwrap();
         match result {
             RevivedValue::Constructor(info) => {
@@ -524,7 +528,7 @@ mod tests {
     #[test]
     fn test_revive_constructor_with_mapping() {
         let reviver = Reviver::with_defaults();
-        
+
         // Old langchain.schema path should be mapped to langchain_core
         let value = serde_json::json!({
             "lc": 1,
@@ -534,7 +538,7 @@ mod tests {
                 "content": "Hello!"
             }
         });
-        
+
         let result = reviver.revive(&value).unwrap();
         match result {
             RevivedValue::Constructor(info) => {
@@ -549,14 +553,14 @@ mod tests {
     #[test]
     fn test_revive_invalid_namespace() {
         let reviver = Reviver::with_defaults();
-        
+
         let value = serde_json::json!({
             "lc": 1,
             "type": "constructor",
             "id": ["invalid_namespace", "SomeClass"],
             "kwargs": {}
         });
-        
+
         let result = reviver.revive(&value);
         assert!(result.is_err());
     }
@@ -577,12 +581,12 @@ mod tests {
                 "id": ["TEST_KEY"]
             }
         }"#;
-        
-        let config = ReviverConfig::new()
-            .with_secrets_map(HashMap::from([
-                ("TEST_KEY".to_string(), "resolved".to_string()),
-            ]));
-        
+
+        let config = ReviverConfig::new().with_secrets_map(HashMap::from([(
+            "TEST_KEY".to_string(),
+            "resolved".to_string(),
+        )]));
+
         let result = loads(json, Some(config)).unwrap();
         assert_eq!(
             result.get("outer").and_then(|v| v.as_str()),
@@ -596,13 +600,12 @@ mod tests {
             {"lc": 1, "type": "secret", "id": ["KEY1"]},
             {"lc": 1, "type": "secret", "id": ["KEY2"]}
         ]"#;
-        
-        let config = ReviverConfig::new()
-            .with_secrets_map(HashMap::from([
-                ("KEY1".to_string(), "value1".to_string()),
-                ("KEY2".to_string(), "value2".to_string()),
-            ]));
-        
+
+        let config = ReviverConfig::new().with_secrets_map(HashMap::from([
+            ("KEY1".to_string(), "value1".to_string()),
+            ("KEY2".to_string(), "value2".to_string()),
+        ]));
+
         let result = loads(json, Some(config)).unwrap();
         let arr = result.as_array().unwrap();
         assert_eq!(arr[0].as_str(), Some("value1"));
