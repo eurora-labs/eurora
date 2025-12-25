@@ -221,7 +221,7 @@ impl BaseMessage {
     /// # Arguments
     ///
     /// * `html` - Whether to format the message with bold text (using ANSI codes).
-    ///            Named `html` for Python compatibility but actually uses terminal codes.
+    ///   Named `html` for Python compatibility but actually uses terminal codes.
     pub fn pretty_repr(&self, html: bool) -> String {
         let msg_type = self.message_type();
         let title_cased = title_case(msg_type);
@@ -237,7 +237,6 @@ impl BaseMessage {
         format!("{}{}\n\n{}", title, name_line, self.content())
     }
 }
-
 
 impl From<HumanMessage> for BaseMessage {
     fn from(msg: HumanMessage) -> Self {
