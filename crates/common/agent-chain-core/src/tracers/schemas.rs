@@ -269,14 +269,17 @@ impl Run {
 
     /// Set metadata on the run.
     pub fn set_metadata(&mut self, metadata: HashMap<String, Value>) {
-        self.extra.insert("metadata".to_string(), serde_json::to_value(metadata).unwrap_or_default());
+        self.extra.insert(
+            "metadata".to_string(),
+            serde_json::to_value(metadata).unwrap_or_default(),
+        );
     }
 
     /// Get metadata from the run.
     pub fn get_metadata(&self) -> Option<HashMap<String, Value>> {
-        self.extra.get("metadata").and_then(|v| {
-            serde_json::from_value(v.clone()).ok()
-        })
+        self.extra
+            .get("metadata")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 
     /// Check if the run has ended.
@@ -384,7 +387,11 @@ mod tests {
         run.add_tags(vec!["tag3".to_string()]);
         assert_eq!(
             run.tags,
-            Some(vec!["tag1".to_string(), "tag2".to_string(), "tag3".to_string()])
+            Some(vec![
+                "tag1".to_string(),
+                "tag2".to_string(),
+                "tag3".to_string()
+            ])
         );
     }
 
