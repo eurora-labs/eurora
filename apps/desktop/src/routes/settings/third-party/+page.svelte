@@ -1,11 +1,11 @@
 <script lang="ts">
-	import Ollama from '$lib/components/Ollama.svelte';
 	import ApiProvider from '$lib/components/ApiProvider.svelte';
+	import Ollama from '$lib/components/Ollama.svelte';
 
-	let status: 'pending' | 'finished' = $state('pending');
+	// let status: 'pending' | 'finished' = $state('pending');
 
 	async function finished() {
-		status = 'finished';
+		// status = 'finished';
 	}
 </script>
 
