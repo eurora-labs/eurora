@@ -32,6 +32,7 @@ use super::string::{
 ///
 /// ```
 /// use agent_chain_core::prompts::PromptTemplate;
+/// use agent_chain_core::BasePromptTemplate;
 /// use std::collections::HashMap;
 ///
 /// // Using from_template (recommended)
@@ -40,7 +41,7 @@ use super::string::{
 /// let mut kwargs = HashMap::new();
 /// kwargs.insert("foo".to_string(), "bar".to_string());
 ///
-/// let result = prompt.format(&kwargs).unwrap();
+/// let result = BasePromptTemplate::format(&prompt, &kwargs).unwrap();
 /// assert_eq!(result, "Say bar");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -175,13 +175,17 @@ pub fn sanitize_for_postgres(text: &str, replacement: &str) -> String {
 /// ```
 pub fn truncate(text: &str, max_length: usize, suffix: Option<&str>) -> String {
     let suffix = suffix.unwrap_or("...");
-    if text.len() <= max_length {
+    let text_char_count = text.chars().count();
+    let suffix_char_count = suffix.chars().count();
+
+    if text_char_count <= max_length {
         text.to_string()
-    } else if max_length <= suffix.len() {
-        suffix[..max_length].to_string()
+    } else if max_length <= suffix_char_count {
+        suffix.chars().take(max_length).collect()
     } else {
-        let truncate_at = max_length - suffix.len();
-        format!("{}{}", &text[..truncate_at], suffix)
+        let truncate_at = max_length - suffix_char_count;
+        let truncated: String = text.chars().take(truncate_at).collect();
+        format!("{}{}", truncated, suffix)
     }
 }
 

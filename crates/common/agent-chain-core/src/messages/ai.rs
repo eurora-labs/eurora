@@ -892,7 +892,7 @@ impl std::iter::Sum for AIMessageChunk {
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::messages::ai::{add_usage, UsageMetadata, InputTokenDetails};
+/// use agent_chain_core::messages::{add_usage, UsageMetadata, InputTokenDetails};
 ///
 /// let left = UsageMetadata {
 ///     input_tokens: 5,
@@ -943,7 +943,7 @@ pub fn add_usage(left: Option<&UsageMetadata>, right: Option<&UsageMetadata>) ->
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::messages::ai::{subtract_usage, UsageMetadata, InputTokenDetails};
+/// use agent_chain_core::messages::{subtract_usage, UsageMetadata, InputTokenDetails};
 ///
 /// let left = UsageMetadata {
 ///     input_tokens: 5,
