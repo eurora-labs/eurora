@@ -311,18 +311,18 @@ impl ChatOllama {
     fn format_messages(&self, messages: &[BaseMessage]) -> Vec<serde_json::Value> {
         messages
             .iter()
-            .map(|msg| match msg {
+            .filter_map(|msg| match msg {
                 BaseMessage::System(m) => {
-                    serde_json::json!({
+                    Some(serde_json::json!({
                         "role": "system",
                         "content": m.content()
-                    })
+                    }))
                 }
                 BaseMessage::Human(m) => {
-                    serde_json::json!({
+                    Some(serde_json::json!({
                         "role": "user",
                         "content": m.content()
-                    })
+                    }))
                 }
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
@@ -351,14 +351,18 @@ impl ChatOllama {
                         message["tool_calls"] = serde_json::Value::Array(tool_calls);
                     }
 
-                    message
+                    Some(message)
                 }
                 BaseMessage::Tool(m) => {
-                    serde_json::json!({
+                    Some(serde_json::json!({
                         "role": "tool",
                         "tool_call_id": m.tool_call_id(),
                         "content": m.content()
-                    })
+                    }))
+                }
+                BaseMessage::Remove(_) => {
+                    // RemoveMessage is used for message management, not sent to API
+                    None
                 }
             })
             .collect()
