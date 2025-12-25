@@ -1,11 +1,10 @@
 <script lang="ts">
-	import '@eurora/ui/main.css';
-	import '../app.css';
-	import { onMount } from 'svelte';
-	import { ModeWatcher, setMode } from 'mode-watcher';
+	import '$styles/styles.css';
 	import * as Alert from '@eurora/ui/components/alert/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import XIcon from '@lucide/svelte/icons/x';
+	import { ModeWatcher, setMode } from 'mode-watcher';
+	import { onMount } from 'svelte';
 
 	onMount(() => {
 		setMode('dark');
