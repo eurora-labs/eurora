@@ -24,7 +24,7 @@ use super::chat_generation::ChatGeneration;
 /// via callbacks). Please refer to the `AIMessage` and `LLMResult` schema documentation
 /// for more information.
 #[cfg_attr(feature = "specta", derive(Type))]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct ChatResult {
     /// List of the chat generations.
     ///
@@ -68,15 +68,6 @@ impl ChatResult {
     pub fn from_generation(generation: ChatGeneration) -> Self {
         Self {
             generations: vec![generation],
-            llm_output: None,
-        }
-    }
-}
-
-impl Default for ChatResult {
-    fn default() -> Self {
-        Self {
-            generations: Vec::new(),
             llm_output: None,
         }
     }

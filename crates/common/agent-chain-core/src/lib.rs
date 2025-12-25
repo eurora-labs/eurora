@@ -56,10 +56,10 @@ pub use outputs::{
 
 // Re-export callback types
 pub use callbacks::{
-    add_usage, AsyncCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainRun,
+    AsyncCallbackHandler, AsyncCallbackManager, AsyncCallbackManagerForChainRun,
     AsyncCallbackManagerForLLMRun, BaseCallbackHandler, BaseCallbackManager, CallbackManager,
     CallbackManagerForChainRun, CallbackManagerForLLMRun, Callbacks, StdOutCallbackHandler,
-    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler,
+    StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler, add_usage,
 };
 
 // Re-export async_trait for use in generated code

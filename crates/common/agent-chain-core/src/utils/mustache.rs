@@ -15,7 +15,11 @@ pub enum MustacheError {
     /// Unclosed section.
     UnclosedSection { tag: String, line: usize },
     /// Mismatched section closing tag.
-    MismatchedSection { expected: String, got: String, line: usize },
+    MismatchedSection {
+        expected: String,
+        got: String,
+        line: usize,
+    },
     /// Empty tag.
     EmptyTag { line: usize },
 }
@@ -28,7 +32,11 @@ impl std::fmt::Display for MustacheError {
             MustacheError::UnclosedSection { tag, line } => {
                 write!(f, "Unclosed section '{}' opened at line {}", tag, line)
             }
-            MustacheError::MismatchedSection { expected, got, line } => {
+            MustacheError::MismatchedSection {
+                expected,
+                got,
+                line,
+            } => {
                 write!(
                     f,
                     "Mismatched section at line {}: expected '{}', got '{}'",
@@ -269,7 +277,10 @@ fn html_escape(s: &str) -> String {
 /// Get a key from the scope stack.
 fn get_key(key: &str, scopes: &[&MustacheValue]) -> MustacheValue {
     if key == "." {
-        return scopes.first().map(|v| (*v).clone()).unwrap_or(MustacheValue::Null);
+        return scopes
+            .first()
+            .map(|v| (*v).clone())
+            .unwrap_or(MustacheValue::Null);
     }
 
     for scope in scopes {
@@ -407,20 +418,28 @@ fn render_tokens(
 
                 if !value.is_truthy() {
                     let section_tokens = &tokens[i + 1..end_index];
-                    output.push_str(&render_tokens(section_tokens, scopes, partials, l_del, r_del)?);
+                    output.push_str(&render_tokens(
+                        section_tokens,
+                        scopes,
+                        partials,
+                        l_del,
+                        r_del,
+                    )?);
                 }
 
                 i = end_index;
             }
             TokenType::Partial => {
-                if let Some(partials_map) = partials && let Some(partial_template) = partials_map.get(&token.key) {
-                        output.push_str(&render_with_delimiters(
-                            partial_template,
-                            scopes[0],
-                            partials,
-                            l_del,
-                            r_del,
-                        )?);
+                if let Some(partials_map) = partials
+                    && let Some(partial_template) = partials_map.get(&token.key)
+                {
+                    output.push_str(&render_with_delimiters(
+                        partial_template,
+                        scopes[0],
+                        partials,
+                        l_del,
+                        r_del,
+                    )?);
                 }
             }
             TokenType::End | TokenType::Comment => {}
@@ -511,10 +530,10 @@ mod tests {
             make_data(&[("name", "Alice".into())]),
             make_data(&[("name", "Bob".into())]),
         ];
-        let data = make_data(&[("items", MustacheValue::List(vec![
-            items[0].clone(),
-            items[1].clone(),
-        ]))]);
+        let data = make_data(&[(
+            "items",
+            MustacheValue::List(vec![items[0].clone(), items[1].clone()]),
+        )]);
         let result = render("{{#items}}{{name}} {{/items}}", &data, None).unwrap();
         assert_eq!(result, "Alice Bob ");
     }

@@ -1,4 +1,3 @@
-
 //! Helper functions for managing the Agent Chain API.
 //!
 //! This module is only relevant for Agent Chain developers, not for users.
@@ -12,13 +11,13 @@ mod internal;
 mod path;
 
 pub use beta::{
-    suppress_beta_warnings, surface_beta_warnings, warn_beta, AgentChainBetaWarning, BetaParams,
-    SuppressBetaWarnings,
+    AgentChainBetaWarning, BetaParams, SuppressBetaWarnings, suppress_beta_warnings,
+    surface_beta_warnings, warn_beta,
 };
 pub use deprecation::{
-    handle_renamed_parameter, suppress_deprecation_warnings, surface_deprecation_warnings,
-    warn_deprecated, AgentChainDeprecationWarning, AgentChainPendingDeprecationWarning,
-    DeprecationParams, RenameParameterParams, SuppressDeprecationWarnings,
+    AgentChainDeprecationWarning, AgentChainPendingDeprecationWarning, DeprecationParams,
+    RenameParameterParams, SuppressDeprecationWarnings, handle_renamed_parameter,
+    suppress_deprecation_warnings, surface_deprecation_warnings, warn_deprecated,
 };
 pub use internal::is_caller_internal;
 pub use path::{as_import_path, get_relative_path};

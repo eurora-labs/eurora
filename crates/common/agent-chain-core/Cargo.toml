@@ -17,6 +17,7 @@ specta = { workspace = true, features = [
   "derive",
   "serde",
   "serde_json",
+  "uuid",
 ], optional = true }
 thiserror = { workspace = true }
 url = "2"
