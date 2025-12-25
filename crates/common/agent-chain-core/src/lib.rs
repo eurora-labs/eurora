@@ -94,9 +94,11 @@ pub use tracers::{
 
 // Re-export runnable types
 pub use runnables::{
-    AddableDict, ConfigOrList, DynRunnable, Runnable, RunnableBinding, RunnableConfig,
-    RunnableEach, RunnableLambda, RunnableParallel, RunnablePassthrough, RunnableRetry,
-    RunnableSequence, RunnableSerializable, coerce_to_runnable, ensure_config, get_config_list,
+    AddableDict, BaseStreamEvent, CUSTOM_EVENT_TYPE, ConfigOrList, CustomStreamEvent,
+    DynRouterRunnable, DynRunnable, EventData, RouterInput, RouterRunnable, Runnable,
+    RunnableBinding, RunnableConfig, RunnableEach, RunnableLambda, RunnableParallel,
+    RunnablePassthrough, RunnableRetry, RunnableSequence, RunnableSerializable,
+    StandardStreamEvent, StreamEvent, coerce_to_runnable, ensure_config, get_config_list,
     merge_configs, patch_config, pipe, runnable_lambda, to_dyn,
 };
 

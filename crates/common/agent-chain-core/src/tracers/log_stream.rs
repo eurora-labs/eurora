@@ -212,10 +212,10 @@ impl RunLog {
             "replace" => {
                 if op.path.is_empty() || op.path == "/" {
                     // Replace entire state
-                    if let Some(value) = &op.value {
-                        if let Ok(new_state) = serde_json::from_value::<RunState>(value.clone()) {
-                            *state = new_state;
-                        }
+                    if let Some(value) = &op.value
+                        && let Ok(new_state) = serde_json::from_value::<RunState>(value.clone())
+                    {
+                        *state = new_state;
                     }
                 } else if path_parts.first() == Some(&"final_output") {
                     state.final_output = op.value.clone();
@@ -227,12 +227,11 @@ impl RunLog {
                         "logs" => {
                             if path_parts.len() == 2 {
                                 // Adding a new log entry
-                                if let Some(value) = &op.value {
-                                    if let Ok(entry) =
+                                if let Some(value) = &op.value
+                                    && let Ok(entry) =
                                         serde_json::from_value::<LogEntry>(value.clone())
-                                    {
-                                        state.logs.insert(path_parts[1].to_string(), entry);
-                                    }
+                                {
+                                    state.logs.insert(path_parts[1].to_string(), entry);
                                 }
                             } else if path_parts.len() >= 3 {
                                 // Updating an existing log entry field
@@ -248,10 +247,10 @@ impl RunLog {
                                         "streamed_output_str"
                                             if path_parts.len() == 4 && path_parts[3] == "-" =>
                                         {
-                                            if let Some(value) = &op.value {
-                                                if let Some(s) = value.as_str() {
-                                                    entry.streamed_output_str.push(s.to_string());
-                                                }
+                                            if let Some(value) = &op.value
+                                                && let Some(s) = value.as_str()
+                                            {
+                                                entry.streamed_output_str.push(s.to_string());
                                             }
                                         }
                                         "final_output" => {
@@ -595,13 +594,13 @@ impl TracerCore for LogStreamCallbackHandler {
 
         let mut ops = Vec::new();
 
-        if self.config.schema_format == SchemaFormat::StreamingEvents {
-            if let Some(inputs) = self.get_standardized_inputs(run) {
-                ops.push(JsonPatchOp::replace(
-                    format!("/logs/{}/inputs", key),
-                    inputs,
-                ));
-            }
+        if self.config.schema_format == SchemaFormat::StreamingEvents
+            && let Some(inputs) = self.get_standardized_inputs(run)
+        {
+            ops.push(JsonPatchOp::replace(
+                format!("/logs/{}/inputs", key),
+                inputs,
+            ));
         }
 
         if let Some(outputs) = self.get_standardized_outputs(run) {
@@ -683,16 +682,16 @@ impl<T: Send + 'static> StreamingCallbackHandler<T> for LogStreamCallbackHandler
 
                 // Root run is handled separately
                 // If we can't find the run key, silently ignore
-                if run_id != root_id.unwrap_or(Uuid::nil()) {
-                    if let Some(ref k) = key {
-                        // Note: We can't easily serialize generic T here
-                        // This would need a more sophisticated implementation
-                        // for real-world use with proper chunk serialization
-                        let _ = sender.send_nowait(RunLogPatch::new(vec![JsonPatchOp::add(
-                            format!("/logs/{}/streamed_output/-", k),
-                            Value::Null, // Placeholder - real implementation would serialize the chunk
-                        )]));
-                    }
+                if run_id != root_id.unwrap_or(Uuid::nil())
+                    && let Some(ref k) = key
+                {
+                    // Note: We can't easily serialize generic T here
+                    // This would need a more sophisticated implementation
+                    // for real-world use with proper chunk serialization
+                    let _ = sender.send_nowait(RunLogPatch::new(vec![JsonPatchOp::add(
+                        format!("/logs/{}/streamed_output/-", k),
+                        Value::Null, // Placeholder - real implementation would serialize the chunk
+                    )]));
                 }
 
                 Some((item, (stream, run_id, root_id, key, sender)))
@@ -734,15 +733,15 @@ impl<T> Iterator for TappedIterator<T> {
         let item = self.inner.next()?;
 
         // Root run is handled separately
-        if self.run_id != self.root_id.unwrap_or(Uuid::nil()) {
-            if let Some(ref k) = self.key {
-                let _ = self
-                    .send_stream
-                    .send_nowait(RunLogPatch::new(vec![JsonPatchOp::add(
-                        format!("/logs/{}/streamed_output/-", k),
-                        Value::Null, // Placeholder
-                    )]));
-            }
+        if self.run_id != self.root_id.unwrap_or(Uuid::nil())
+            && let Some(ref k) = self.key
+        {
+            let _ = self
+                .send_stream
+                .send_nowait(RunLogPatch::new(vec![JsonPatchOp::add(
+                    format!("/logs/{}/streamed_output/-", k),
+                    Value::Null, // Placeholder
+                )]));
         }
 
         Some(item)
@@ -833,11 +832,16 @@ mod tests {
             ..Default::default()
         });
 
-        let mut run = Run::default();
-        run.name = "allowed".to_string();
+        let run = Run {
+            name: "allowed".to_string(),
+            ..Default::default()
+        };
         assert!(handler.include_run(&run));
 
-        run.name = "not_allowed".to_string();
+        let run = Run {
+            name: "not_allowed".to_string(),
+            ..Default::default()
+        };
         assert!(!handler.include_run(&run));
     }
 
@@ -848,11 +852,16 @@ mod tests {
             ..Default::default()
         });
 
-        let mut run = Run::default();
-        run.name = "excluded".to_string();
+        let run = Run {
+            name: "excluded".to_string(),
+            ..Default::default()
+        };
         assert!(!handler.include_run(&run));
 
-        run.name = "allowed".to_string();
+        let run = Run {
+            name: "allowed".to_string(),
+            ..Default::default()
+        };
         assert!(handler.include_run(&run));
     }
 
@@ -863,11 +872,16 @@ mod tests {
             ..Default::default()
         });
 
-        let mut run = Run::default();
-        run.tags = Some(vec!["important".to_string(), "other".to_string()]);
+        let run = Run {
+            tags: Some(vec!["important".to_string(), "other".to_string()]),
+            ..Default::default()
+        };
         assert!(handler.include_run(&run));
 
-        run.tags = Some(vec!["other".to_string()]);
+        let run = Run {
+            tags: Some(vec!["other".to_string()]),
+            ..Default::default()
+        };
         assert!(!handler.include_run(&run));
     }
 }

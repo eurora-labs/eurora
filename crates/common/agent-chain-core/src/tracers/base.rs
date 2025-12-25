@@ -813,7 +813,7 @@ mod tests {
         );
 
         // Error the chain
-        let error = std::io::Error::new(std::io::ErrorKind::Other, "test error");
+        let error = std::io::Error::other("test error");
         let result = tracer.handle_chain_error(&error, run.id, None);
 
         assert!(result.is_ok());

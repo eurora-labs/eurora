@@ -223,22 +223,18 @@ where
 
     fn on_llm_start(&mut self, run: &Run) {
         let crumbs = self.get_breadcrumbs(run);
-        let inputs = if let Some(prompts) = run.inputs.get("prompts") {
-            if let Value::Array(arr) = prompts {
-                let trimmed: Vec<Value> = arr
-                    .iter()
-                    .map(|p| {
-                        if let Value::String(s) = p {
-                            Value::String(s.trim().to_string())
-                        } else {
-                            p.clone()
-                        }
-                    })
-                    .collect();
-                serde_json::json!({ "prompts": trimmed })
-            } else {
-                serde_json::to_value(&run.inputs).unwrap_or_default()
-            }
+        let inputs = if let Some(Value::Array(arr)) = run.inputs.get("prompts") {
+            let trimmed: Vec<Value> = arr
+                .iter()
+                .map(|p| {
+                    if let Value::String(s) = p {
+                        Value::String(s.trim().to_string())
+                    } else {
+                        p.clone()
+                    }
+                })
+                .collect();
+            serde_json::json!({ "prompts": trimmed })
         } else {
             serde_json::to_value(&run.inputs).unwrap_or_default()
         };
@@ -307,23 +303,23 @@ where
 
     fn on_tool_end(&mut self, run: &Run) {
         let crumbs = self.get_breadcrumbs(run);
-        if let Some(outputs) = &run.outputs {
-            if let Some(output) = outputs.get("output") {
-                let output_str = match output {
-                    Value::String(s) => s.trim().to_string(),
-                    _ => output.to_string(),
-                };
-                (self.function_callback)(&format!(
-                    "{} {}\"{}\"",
-                    get_colored_text("[tool/end]", "blue"),
-                    get_bolded_text(&format!(
-                        "[{}] [{}] Exiting Tool run with output:\n",
-                        crumbs,
-                        elapsed(run)
-                    )),
-                    output_str
-                ));
-            }
+        if let Some(outputs) = &run.outputs
+            && let Some(output) = outputs.get("output")
+        {
+            let output_str = match output {
+                Value::String(s) => s.trim().to_string(),
+                _ => output.to_string(),
+            };
+            (self.function_callback)(&format!(
+                "{} {}\"{}\"",
+                get_colored_text("[tool/end]", "blue"),
+                get_bolded_text(&format!(
+                    "[{}] [{}] Exiting Tool run with output:\n",
+                    crumbs,
+                    elapsed(run)
+                )),
+                output_str
+            ));
         }
     }
 
