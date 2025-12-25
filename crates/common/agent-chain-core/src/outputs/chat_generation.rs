@@ -150,7 +150,7 @@ impl Add for ChatGenerationChunk {
         // For message merging, we concatenate the text content
         // In a more complete implementation, this would use proper message chunk merging
         let merged_text = self.text + &other.text;
-        
+
         // Create a new AI message with the merged content
         let merged_message = crate::messages::AIMessage::new(&merged_text);
 
@@ -170,8 +170,10 @@ fn merge_generation_info(
 ) -> Option<HashMap<String, Value>> {
     match (left, right) {
         (Some(left_map), Some(right_map)) => {
-            let left_value = serde_json::to_value(&left_map).unwrap_or(Value::Object(Default::default()));
-            let right_value = serde_json::to_value(&right_map).unwrap_or(Value::Object(Default::default()));
+            let left_value =
+                serde_json::to_value(&left_map).unwrap_or(Value::Object(Default::default()));
+            let right_value =
+                serde_json::to_value(&right_map).unwrap_or(Value::Object(Default::default()));
             match merge_dicts(left_value, vec![right_value]) {
                 Ok(Value::Object(map)) => {
                     let result: HashMap<String, Value> = map.into_iter().collect();
@@ -214,7 +216,9 @@ impl From<ChatGenerationChunk> for ChatGeneration {
 /// Merge a list of `ChatGenerationChunk`s into a single `ChatGenerationChunk`.
 ///
 /// Returns `None` if the input list is empty.
-pub fn merge_chat_generation_chunks(chunks: Vec<ChatGenerationChunk>) -> Option<ChatGenerationChunk> {
+pub fn merge_chat_generation_chunks(
+    chunks: Vec<ChatGenerationChunk>,
+) -> Option<ChatGenerationChunk> {
     if chunks.is_empty() {
         return None;
     }
