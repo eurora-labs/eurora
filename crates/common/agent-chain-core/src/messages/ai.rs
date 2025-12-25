@@ -10,20 +10,14 @@ use uuid::Uuid;
 #[cfg(feature = "specta")]
 use specta::Type;
 
-use super::tool::{invalid_tool_call, tool_call, InvalidToolCall, ToolCall, ToolCallChunk};
+use super::tool::{
+    default_tool_chunk_parser, default_tool_parser, invalid_tool_call, tool_call, InvalidToolCall,
+    ToolCall, ToolCallChunk,
+};
 use crate::utils::json::parse_partial_json;
 use crate::utils::merge::{merge_dicts, merge_lists};
-
-/// LangChain auto-generated ID prefix for messages and content blocks.
-pub const LC_AUTO_PREFIX: &str = "lc_";
-
-/// Internal tracing/callback system identifier.
-///
-/// Used for:
-/// - Tracing. Every LangChain operation (LLM call, chain execution, tool use, etc.)
-///   gets a unique run_id (UUID)
-/// - Enables tracking parent-child relationships between operations
-pub const LC_ID_PREFIX: &str = "lc_run-";
+use crate::utils::usage::{dict_int_add_json, dict_int_sub_floor_json};
+use crate::utils::uuid::{LC_AUTO_PREFIX, LC_ID_PREFIX};
 
 /// Breakdown of input token counts.
 ///
@@ -903,59 +897,468 @@ impl std::iter::Sum for AIMessageChunk {
 
 /// Add two UsageMetadata objects together.
 ///
-/// This function adds the token counts from both UsageMetadata objects.
+/// This function recursively adds the token counts from both UsageMetadata objects.
+/// Uses the generic `_dict_int_op` pattern from Python.
+///
+/// # Example
+///
+/// ```
+/// use agent_chain_core::messages::ai::{add_usage, UsageMetadata, InputTokenDetails};
+///
+/// let left = UsageMetadata {
+///     input_tokens: 5,
+///     output_tokens: 0,
+///     total_tokens: 5,
+///     input_token_details: Some(InputTokenDetails {
+///         audio: None,
+///         cache_creation: None,
+///         cache_read: Some(3),
+///     }),
+///     output_token_details: None,
+/// };
+/// let right = UsageMetadata {
+///     input_tokens: 0,
+///     output_tokens: 10,
+///     total_tokens: 10,
+///     input_token_details: None,
+///     output_token_details: None,
+/// };
+///
+/// let result = add_usage(Some(&left), Some(&right));
+/// assert_eq!(result.input_tokens, 5);
+/// assert_eq!(result.output_tokens, 10);
+/// assert_eq!(result.total_tokens, 15);
+/// ```
 pub fn add_usage(left: Option<&UsageMetadata>, right: Option<&UsageMetadata>) -> UsageMetadata {
     match (left, right) {
-        (Some(l), Some(r)) => l.add(r),
+        (None, None) => UsageMetadata::default(),
         (Some(l), None) => l.clone(),
         (None, Some(r)) => r.clone(),
-        (None, None) => UsageMetadata::default(),
+        (Some(l), Some(r)) => {
+            let left_json = serde_json::to_value(l).unwrap_or_default();
+            let right_json = serde_json::to_value(r).unwrap_or_default();
+
+            match dict_int_add_json(&left_json, &right_json) {
+                Ok(merged) => serde_json::from_value(merged).unwrap_or_else(|_| l.add(r)),
+                Err(_) => l.add(r),
+            }
+        }
     }
 }
 
 /// Subtract two UsageMetadata objects.
 ///
 /// Token counts cannot be negative so the actual operation is `max(left - right, 0)`.
+/// Uses the generic `_dict_int_op` pattern from Python.
+///
+/// # Example
+///
+/// ```
+/// use agent_chain_core::messages::ai::{subtract_usage, UsageMetadata, InputTokenDetails};
+///
+/// let left = UsageMetadata {
+///     input_tokens: 5,
+///     output_tokens: 10,
+///     total_tokens: 15,
+///     input_token_details: Some(InputTokenDetails {
+///         audio: None,
+///         cache_creation: None,
+///         cache_read: Some(4),
+///     }),
+///     output_token_details: None,
+/// };
+/// let right = UsageMetadata {
+///     input_tokens: 3,
+///     output_tokens: 8,
+///     total_tokens: 11,
+///     input_token_details: None,
+///     output_token_details: None,
+/// };
+///
+/// let result = subtract_usage(Some(&left), Some(&right));
+/// assert_eq!(result.input_tokens, 2);
+/// assert_eq!(result.output_tokens, 2);
+/// assert_eq!(result.total_tokens, 4);
+/// ```
 pub fn subtract_usage(
     left: Option<&UsageMetadata>,
     right: Option<&UsageMetadata>,
 ) -> UsageMetadata {
     match (left, right) {
-        (Some(l), Some(r)) => UsageMetadata {
-            input_tokens: (l.input_tokens - r.input_tokens).max(0),
-            output_tokens: (l.output_tokens - r.output_tokens).max(0),
-            total_tokens: (l.total_tokens - r.total_tokens).max(0),
-            input_token_details: match (&l.input_token_details, &r.input_token_details) {
-                (Some(a), Some(b)) => Some(InputTokenDetails {
-                    audio: a.audio.map(|x| (x - b.audio.unwrap_or(0)).max(0)),
-                    cache_creation: a
-                        .cache_creation
-                        .map(|x| (x - b.cache_creation.unwrap_or(0)).max(0)),
-                    cache_read: a.cache_read.map(|x| (x - b.cache_read.unwrap_or(0)).max(0)),
-                }),
-                (Some(a), None) => Some(a.clone()),
-                (None, Some(b)) => Some(InputTokenDetails {
-                    audio: b.audio.map(|_| 0),
-                    cache_creation: b.cache_creation.map(|_| 0),
-                    cache_read: b.cache_read.map(|_| 0),
-                }),
-                (None, None) => None,
-            },
-            output_token_details: match (&l.output_token_details, &r.output_token_details) {
-                (Some(a), Some(b)) => Some(OutputTokenDetails {
-                    audio: a.audio.map(|x| (x - b.audio.unwrap_or(0)).max(0)),
-                    reasoning: a.reasoning.map(|x| (x - b.reasoning.unwrap_or(0)).max(0)),
-                }),
-                (Some(a), None) => Some(a.clone()),
-                (None, Some(b)) => Some(OutputTokenDetails {
-                    audio: b.audio.map(|_| 0),
-                    reasoning: b.reasoning.map(|_| 0),
-                }),
-                (None, None) => None,
-            },
-        },
+        (None, None) => UsageMetadata::default(),
         (Some(l), None) => l.clone(),
         (None, Some(_)) => UsageMetadata::default(),
-        (None, None) => UsageMetadata::default(),
+        (Some(l), Some(r)) => {
+            let left_json = serde_json::to_value(l).unwrap_or_default();
+            let right_json = serde_json::to_value(r).unwrap_or_default();
+
+            match dict_int_sub_floor_json(&left_json, &right_json) {
+                Ok(subtracted) => {
+                    serde_json::from_value(subtracted).unwrap_or_else(|_| subtract_manual(l, r))
+                }
+                Err(_) => subtract_manual(l, r),
+            }
+        }
+    }
+}
+
+/// Manual subtraction fallback for UsageMetadata.
+fn subtract_manual(l: &UsageMetadata, r: &UsageMetadata) -> UsageMetadata {
+    UsageMetadata {
+        input_tokens: (l.input_tokens - r.input_tokens).max(0),
+        output_tokens: (l.output_tokens - r.output_tokens).max(0),
+        total_tokens: (l.total_tokens - r.total_tokens).max(0),
+        input_token_details: match (&l.input_token_details, &r.input_token_details) {
+            (Some(a), Some(b)) => Some(InputTokenDetails {
+                audio: a.audio.map(|x| (x - b.audio.unwrap_or(0)).max(0)),
+                cache_creation: a
+                    .cache_creation
+                    .map(|x| (x - b.cache_creation.unwrap_or(0)).max(0)),
+                cache_read: a.cache_read.map(|x| (x - b.cache_read.unwrap_or(0)).max(0)),
+            }),
+            (Some(a), None) => Some(a.clone()),
+            (None, Some(b)) => Some(InputTokenDetails {
+                audio: b.audio.map(|_| 0),
+                cache_creation: b.cache_creation.map(|_| 0),
+                cache_read: b.cache_read.map(|_| 0),
+            }),
+            (None, None) => None,
+        },
+        output_token_details: match (&l.output_token_details, &r.output_token_details) {
+            (Some(a), Some(b)) => Some(OutputTokenDetails {
+                audio: a.audio.map(|x| (x - b.audio.unwrap_or(0)).max(0)),
+                reasoning: a.reasoning.map(|x| (x - b.reasoning.unwrap_or(0)).max(0)),
+            }),
+            (Some(a), None) => Some(a.clone()),
+            (None, Some(b)) => Some(OutputTokenDetails {
+                audio: b.audio.map(|_| 0),
+                reasoning: b.reasoning.map(|_| 0),
+            }),
+            (None, None) => None,
+        },
+    }
+}
+
+/// Parse tool calls from additional_kwargs for backwards compatibility.
+///
+/// This corresponds to `_backwards_compat_tool_calls` in LangChain Python.
+/// It checks `additional_kwargs["tool_calls"]` and parses them into
+/// either `tool_calls`/`invalid_tool_calls` (for AIMessage) or
+/// `tool_call_chunks` (for AIMessageChunk).
+///
+/// # Arguments
+///
+/// * `additional_kwargs` - The additional_kwargs HashMap to check
+/// * `is_chunk` - Whether this is for an AIMessageChunk (uses chunk parser) or AIMessage
+///
+/// # Returns
+///
+/// A tuple of (tool_calls, invalid_tool_calls, tool_call_chunks) where only
+/// the appropriate fields are populated based on `is_chunk`.
+pub fn backwards_compat_tool_calls(
+    additional_kwargs: &HashMap<String, serde_json::Value>,
+    is_chunk: bool,
+) -> (Vec<ToolCall>, Vec<InvalidToolCall>, Vec<ToolCallChunk>) {
+    let mut tool_calls = Vec::new();
+    let mut invalid_tool_calls = Vec::new();
+    let mut tool_call_chunks = Vec::new();
+
+    if let Some(raw_tool_calls) = additional_kwargs.get("tool_calls") {
+        if let Some(raw_array) = raw_tool_calls.as_array() {
+            if is_chunk {
+                tool_call_chunks = default_tool_chunk_parser(raw_array);
+            } else {
+                let (parsed_calls, parsed_invalid) = default_tool_parser(raw_array);
+                tool_calls = parsed_calls;
+                invalid_tool_calls = parsed_invalid;
+            }
+        }
+    }
+
+    (tool_calls, invalid_tool_calls, tool_call_chunks)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_add_usage_basic() {
+        let left = UsageMetadata {
+            input_tokens: 5,
+            output_tokens: 0,
+            total_tokens: 5,
+            input_token_details: Some(InputTokenDetails {
+                audio: None,
+                cache_creation: None,
+                cache_read: Some(3),
+            }),
+            output_token_details: None,
+        };
+        let right = UsageMetadata {
+            input_tokens: 0,
+            output_tokens: 10,
+            total_tokens: 10,
+            input_token_details: None,
+            output_token_details: Some(OutputTokenDetails {
+                audio: None,
+                reasoning: Some(4),
+            }),
+        };
+
+        let result = add_usage(Some(&left), Some(&right));
+
+        assert_eq!(result.input_tokens, 5);
+        assert_eq!(result.output_tokens, 10);
+        assert_eq!(result.total_tokens, 15);
+        assert!(result.input_token_details.is_some());
+        assert_eq!(result.input_token_details.as_ref().unwrap().cache_read, Some(3));
+        assert!(result.output_token_details.is_some());
+        assert_eq!(result.output_token_details.as_ref().unwrap().reasoning, Some(4));
+    }
+
+    #[test]
+    fn test_add_usage_none_cases() {
+        let usage = UsageMetadata::new(10, 20);
+
+        // Both None
+        let result = add_usage(None, None);
+        assert_eq!(result.input_tokens, 0);
+        assert_eq!(result.output_tokens, 0);
+        assert_eq!(result.total_tokens, 0);
+
+        // Left Some, Right None
+        let result = add_usage(Some(&usage), None);
+        assert_eq!(result.input_tokens, 10);
+        assert_eq!(result.output_tokens, 20);
+
+        // Left None, Right Some
+        let result = add_usage(None, Some(&usage));
+        assert_eq!(result.input_tokens, 10);
+        assert_eq!(result.output_tokens, 20);
+    }
+
+    #[test]
+    fn test_subtract_usage_basic() {
+        let left = UsageMetadata {
+            input_tokens: 5,
+            output_tokens: 10,
+            total_tokens: 15,
+            input_token_details: Some(InputTokenDetails {
+                audio: None,
+                cache_creation: None,
+                cache_read: Some(4),
+            }),
+            output_token_details: None,
+        };
+        let right = UsageMetadata {
+            input_tokens: 3,
+            output_tokens: 8,
+            total_tokens: 11,
+            input_token_details: None,
+            output_token_details: Some(OutputTokenDetails {
+                audio: None,
+                reasoning: Some(4),
+            }),
+        };
+
+        let result = subtract_usage(Some(&left), Some(&right));
+
+        assert_eq!(result.input_tokens, 2);
+        assert_eq!(result.output_tokens, 2);
+        assert_eq!(result.total_tokens, 4);
+        // cache_read should remain 4 (4 - 0 = 4)
+        assert!(result.input_token_details.is_some());
+        assert_eq!(result.input_token_details.as_ref().unwrap().cache_read, Some(4));
+        // reasoning should be 0 (0 - 4 = -4, floored to 0)
+        assert!(result.output_token_details.is_some());
+        assert_eq!(result.output_token_details.as_ref().unwrap().reasoning, Some(0));
+    }
+
+    #[test]
+    fn test_subtract_usage_floor_at_zero() {
+        let left = UsageMetadata::new(5, 5);
+        let right = UsageMetadata::new(10, 10);
+
+        let result = subtract_usage(Some(&left), Some(&right));
+
+        // Should floor at 0, not go negative
+        assert_eq!(result.input_tokens, 0);
+        assert_eq!(result.output_tokens, 0);
+        assert_eq!(result.total_tokens, 0);
+    }
+
+    #[test]
+    fn test_subtract_usage_none_cases() {
+        let usage = UsageMetadata::new(10, 20);
+
+        // Both None
+        let result = subtract_usage(None, None);
+        assert_eq!(result.input_tokens, 0);
+
+        // Left Some, Right None - should return left unchanged
+        let result = subtract_usage(Some(&usage), None);
+        assert_eq!(result.input_tokens, 10);
+        assert_eq!(result.output_tokens, 20);
+
+        // Left None, Right Some - should return default (zeroes)
+        let result = subtract_usage(None, Some(&usage));
+        assert_eq!(result.input_tokens, 0);
+        assert_eq!(result.output_tokens, 0);
+    }
+
+    #[test]
+    fn test_backwards_compat_tool_calls_for_message() {
+        let mut additional_kwargs = HashMap::new();
+        additional_kwargs.insert(
+            "tool_calls".to_string(),
+            json!([
+                {
+                    "id": "call_123",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": "{\"city\": \"London\"}"
+                    }
+                }
+            ]),
+        );
+
+        let (tool_calls, invalid_tool_calls, tool_call_chunks) =
+            backwards_compat_tool_calls(&additional_kwargs, false);
+
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].name(), "get_weather");
+        assert!(invalid_tool_calls.is_empty());
+        assert!(tool_call_chunks.is_empty());
+    }
+
+    #[test]
+    fn test_backwards_compat_tool_calls_for_chunk() {
+        let mut additional_kwargs = HashMap::new();
+        additional_kwargs.insert(
+            "tool_calls".to_string(),
+            json!([
+                {
+                    "id": "call_123",
+                    "index": 0,
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": "{\"city\":"
+                    }
+                }
+            ]),
+        );
+
+        let (tool_calls, invalid_tool_calls, tool_call_chunks) =
+            backwards_compat_tool_calls(&additional_kwargs, true);
+
+        assert!(tool_calls.is_empty());
+        assert!(invalid_tool_calls.is_empty());
+        assert_eq!(tool_call_chunks.len(), 1);
+        assert_eq!(tool_call_chunks[0].name, Some("get_weather".to_string()));
+        assert_eq!(tool_call_chunks[0].index, Some(0));
+    }
+
+    #[test]
+    fn test_backwards_compat_tool_calls_empty() {
+        let additional_kwargs = HashMap::new();
+
+        let (tool_calls, invalid_tool_calls, tool_call_chunks) =
+            backwards_compat_tool_calls(&additional_kwargs, false);
+
+        assert!(tool_calls.is_empty());
+        assert!(invalid_tool_calls.is_empty());
+        assert!(tool_call_chunks.is_empty());
+    }
+
+    #[test]
+    fn test_backwards_compat_tool_calls_invalid_json() {
+        let mut additional_kwargs = HashMap::new();
+        additional_kwargs.insert(
+            "tool_calls".to_string(),
+            json!([
+                {
+                    "id": "call_123",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": "invalid json {"
+                    }
+                }
+            ]),
+        );
+
+        let (tool_calls, invalid_tool_calls, _tool_call_chunks) =
+            backwards_compat_tool_calls(&additional_kwargs, false);
+
+        // Should be invalid because the JSON is malformed
+        assert!(tool_calls.is_empty());
+        assert_eq!(invalid_tool_calls.len(), 1);
+        assert_eq!(invalid_tool_calls[0].name, Some("get_weather".to_string()));
+    }
+
+    #[test]
+    fn test_ai_message_chunk_add() {
+        let chunk1 = AIMessageChunk::new("Hello ");
+        let chunk2 = AIMessageChunk::new("world!");
+
+        let result = chunk1 + chunk2;
+
+        assert_eq!(result.content(), "Hello world!");
+    }
+
+    #[test]
+    fn test_ai_message_chunk_sum() {
+        let chunks = vec![
+            AIMessageChunk::new("Hello "),
+            AIMessageChunk::new("beautiful "),
+            AIMessageChunk::new("world!"),
+        ];
+
+        let result: AIMessageChunk = chunks.into_iter().sum();
+
+        assert_eq!(result.content(), "Hello beautiful world!");
+    }
+
+    #[test]
+    fn test_add_ai_message_chunks_with_usage() {
+        let mut chunk1 = AIMessageChunk::new("Hello ");
+        chunk1.usage_metadata = Some(UsageMetadata::new(5, 0));
+
+        let mut chunk2 = AIMessageChunk::new("world!");
+        chunk2.usage_metadata = Some(UsageMetadata::new(0, 10));
+
+        let result = add_ai_message_chunks(chunk1, vec![chunk2]);
+
+        assert_eq!(result.content(), "Hello world!");
+        assert!(result.usage_metadata.is_some());
+        let usage = result.usage_metadata.as_ref().unwrap();
+        assert_eq!(usage.input_tokens, 5);
+        assert_eq!(usage.output_tokens, 10);
+        assert_eq!(usage.total_tokens, 15);
+    }
+
+    #[test]
+    fn test_add_ai_message_chunks_id_priority() {
+        // Provider-assigned ID should take priority
+        let chunk1 = AIMessageChunk::with_id("lc_auto123", "");
+        let chunk2 = AIMessageChunk::with_id("provider_id_456", "");
+        let chunk3 = AIMessageChunk::with_id("lc_run-789", "");
+
+        let result = add_ai_message_chunks(chunk1, vec![chunk2, chunk3]);
+
+        // Provider ID should be selected (not lc_* or lc_run-*)
+        assert_eq!(result.id(), Some("provider_id_456"));
+    }
+
+    #[test]
+    fn test_add_ai_message_chunks_lc_run_priority() {
+        // lc_run-* should take priority over lc_*
+        let chunk1 = AIMessageChunk::with_id("lc_auto123", "");
+        let chunk2 = AIMessageChunk::with_id("lc_run-789", "");
+
+        let result = add_ai_message_chunks(chunk1, vec![chunk2]);
+
+        assert_eq!(result.id(), Some("lc_run-789"));
     }
 }
