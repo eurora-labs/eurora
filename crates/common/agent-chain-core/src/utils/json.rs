@@ -129,26 +129,21 @@ fn contains_control_chars(s: &str) -> bool {
 /// assert!(result.is_ok());
 /// ```
 pub fn parse_json_markdown(json_string: &str) -> Result<Value, JsonParseError> {
+    // Try to parse directly first
     if let Ok(value) = parse_json_inner(json_string) {
         return Ok(value);
     }
 
-    let re = Regex::new(r"```(?:json)?(.*?)```").expect("Invalid regex");
-    if let Some(caps) = re.captures(json_string)
-        && let Some(content) = caps.get(1)
-    {
-        return parse_json_inner(content.as_str());
-    }
+    // Try to find JSON string within triple backticks (with (?s) for DOTALL)
+    let re = Regex::new(r"(?s)```(?:json)?(.*)").expect("Invalid regex");
 
-    let re_dotall = Regex::new(r"(?s)```(?:json)?(.*?)").expect("Invalid regex");
-    if let Some(caps) = re_dotall.captures(json_string)
-        && let Some(content) = caps.get(1)
-    {
-        let json_str = content.as_str().trim_end_matches('`');
-        return parse_json_inner(json_str);
-    }
+    let json_str = if let Some(caps) = re.captures(json_string) {
+        caps.get(1).map_or(json_string, |m| m.as_str())
+    } else {
+        json_string
+    };
 
-    parse_json_inner(json_string)
+    parse_json_inner(json_str)
 }
 
 const JSON_STRIP_CHARS: &[char] = &[' ', '\n', '\r', '\t', '`'];
@@ -162,7 +157,8 @@ fn parse_json_inner(json_str: &str) -> Result<Value, JsonParseError> {
 }
 
 fn custom_parser(multiline_string: &str) -> String {
-    let re = Regex::new(r#"("action_input"\s*:\s*")(.*?)(")"#).expect("Invalid regex");
+    // Use (?s) flag to make . match newlines (DOTALL mode)
+    let re = Regex::new(r#"(?s)("action_input"\s*:\s*")(.*?)(")"#).expect("Invalid regex");
     re.replace_all(multiline_string, |caps: &regex::Captures| {
         let prefix = caps.get(1).map_or("", |m| m.as_str());
         let value = caps.get(2).map_or("", |m| m.as_str());
@@ -171,10 +167,34 @@ fn custom_parser(multiline_string: &str) -> String {
         let value = value.replace('\n', "\\n");
         let value = value.replace('\r', "\\r");
         let value = value.replace('\t', "\\t");
+        // Escape unescaped quotes within the value
+        let value = escape_unescaped_quotes(&value);
 
         format!("{}{}{}", prefix, value, suffix)
     })
     .to_string()
+}
+
+/// Escape double quotes that are not already escaped
+fn escape_unescaped_quotes(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            result.push(c);
+            if chars.peek().is_some() {
+                result.push(chars.next().unwrap());
+            }
+        } else if c == '"' {
+            result.push('\\');
+            result.push('"');
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
 }
 
 /// Parse a JSON string and check that it contains the expected keys.

@@ -14,27 +14,25 @@ pub const SUFFIXES_TO_IGNORE: &[&str] = &[
 ];
 
 /// Default regex pattern for extracting links from HTML.
+/// This captures all href values, filtering is done in Rust code.
 pub fn default_link_regex() -> Regex {
-    let suffixes_pattern = SUFFIXES_TO_IGNORE
+    // Simple pattern to match href values - filtering is done afterwards
+    // since Rust regex doesn't support look-around assertions
+    Regex::new(r#"href=["']([^"'#]+)["'#]"#).expect("Failed to compile default link regex")
+}
+
+/// Check if a link should be ignored based on its prefix.
+fn should_ignore_prefix(link: &str) -> bool {
+    PREFIXES_TO_IGNORE
         .iter()
-        .map(|s| regex::escape(s) + r#"[\#'\"]"#)
-        .collect::<Vec<_>>()
-        .join("|");
-    let suffixes_to_ignore_regex = format!("(?!{})", suffixes_pattern);
+        .any(|prefix| link.starts_with(prefix))
+}
 
-    let prefixes_pattern = PREFIXES_TO_IGNORE
+/// Check if a link should be ignored based on its suffix.
+fn should_ignore_suffix(link: &str) -> bool {
+    SUFFIXES_TO_IGNORE
         .iter()
-        .map(|s| regex::escape(s))
-        .collect::<Vec<_>>()
-        .join("|");
-    let prefixes_to_ignore_regex = format!("(?!{})", prefixes_pattern);
-
-    let pattern = format!(
-        r#"href=[\"']{}((?:{}.*?)*?)[#'\"]"#,
-        prefixes_to_ignore_regex, suffixes_to_ignore_regex
-    );
-
-    Regex::new(&pattern).expect("Failed to compile default link regex")
+        .any(|suffix| link.ends_with(suffix))
 }
 
 /// Extract all links from a raw HTML string.
@@ -64,6 +62,7 @@ pub fn find_all_links(raw_html: &str, pattern: Option<&Regex>) -> Vec<String> {
     regex
         .captures_iter(raw_html)
         .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+        .filter(|link| !should_ignore_prefix(link) && !should_ignore_suffix(link))
         .collect::<HashSet<_>>()
         .into_iter()
         .collect()
