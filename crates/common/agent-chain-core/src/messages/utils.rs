@@ -34,11 +34,7 @@ pub type MessageLikeRepresentation = serde_json::Value;
 /// # Returns
 ///
 /// A single string concatenation of all input messages.
-pub fn get_buffer_string(
-    messages: &[BaseMessage],
-    human_prefix: &str,
-    ai_prefix: &str,
-) -> String {
+pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix: &str) -> String {
     messages
         .iter()
         .map(|m| {
@@ -91,10 +87,7 @@ pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, Str
         .get("data")
         .ok_or_else(|| "Message dict must contain 'data' key".to_string())?;
 
-    let content = data
-        .get("content")
-        .and_then(|c| c.as_str())
-        .unwrap_or("");
+    let content = data.get("content").and_then(|c| c.as_str()).unwrap_or("");
 
     let id = data.get("id").and_then(|i| i.as_str());
 
@@ -132,10 +125,7 @@ pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, Str
             Ok(BaseMessage::Tool(msg))
         }
         "chat" => {
-            let role = data
-                .get("role")
-                .and_then(|r| r.as_str())
-                .unwrap_or("chat");
+            let role = data.get("role").and_then(|r| r.as_str()).unwrap_or("chat");
             let msg = match id {
                 Some(id) => ChatMessage::with_id(id, role, content),
                 None => ChatMessage::new(role, content),
@@ -196,11 +186,15 @@ pub fn convert_to_messages(messages: &[serde_json::Value]) -> Result<Vec<BaseMes
             // 2-tuple: [role, content]
             if arr.len() == 2 {
                 let role = arr[0].as_str().ok_or("First element must be role string")?;
-                let content = arr[1].as_str().ok_or("Second element must be content string")?;
+                let content = arr[1]
+                    .as_str()
+                    .ok_or("Second element must be content string")?;
                 let msg = create_message_from_role(role, content)?;
                 result.push(msg);
             } else {
-                return Err("Array message must have exactly 2 elements [role, content]".to_string());
+                return Err(
+                    "Array message must have exactly 2 elements [role, content]".to_string()
+                );
             }
         } else {
             return Err(format!("Cannot convert to message: {:?}", message));
@@ -238,39 +232,35 @@ pub fn filter_messages(
         .iter()
         .filter(|msg| {
             // Check exclusions first
-            if let Some(exclude_names) = exclude_names {
-                if let Some(name) = msg.name() {
-                    if exclude_names.contains(&name) {
-                        return false;
-                    }
-                }
+            if let Some(exclude_names) = exclude_names
+                && let Some(name) = msg.name()
+                && exclude_names.contains(&name)
+            {
+                return false;
             }
 
-            if let Some(exclude_types) = exclude_types {
-                if exclude_types.contains(&msg.message_type()) {
-                    return false;
-                }
+            if let Some(exclude_types) = exclude_types
+                && exclude_types.contains(&msg.message_type())
+            {
+                return false;
             }
 
-            if let Some(exclude_ids) = exclude_ids {
-                if let Some(id) = msg.id() {
-                    if exclude_ids.contains(&id) {
-                        return false;
-                    }
-                }
+            if let Some(exclude_ids) = exclude_ids
+                && let Some(id) = msg.id()
+                && exclude_ids.contains(&id)
+            {
+                return false;
             }
 
             // Check inclusions (default to including if no criteria given)
-            let include_by_name = include_names.map_or(true, |names| {
-                msg.name().map_or(false, |name| names.contains(&name))
-            });
+            let include_by_name = include_names
+                .is_none_or(|names| msg.name().is_some_and(|name| names.contains(&name)));
 
-            let include_by_type = include_types
-                .map_or(true, |types| types.contains(&msg.message_type()));
+            let include_by_type =
+                include_types.is_none_or(|types| types.contains(&msg.message_type()));
 
-            let include_by_id = include_ids.map_or(true, |ids| {
-                msg.id().map_or(false, |id| ids.contains(&id))
-            });
+            let include_by_id =
+                include_ids.is_none_or(|ids| msg.id().is_some_and(|id| ids.contains(&id)));
 
             // If any inclusion criteria is specified, at least one must match
             let any_include_specified =
