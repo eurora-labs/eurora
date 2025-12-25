@@ -1,7 +1,0 @@
-*.jpg !text !filter !merge !diff
-*.svg !text !filter !merge !diff
-*.png !text !filter !merge !diff
-*.ico !text !filter !merge !diff
-*.icns !text !filter !merge !diff
-*.mp4 !text !filter !merge !diff
-*.webp !text !filter !merge !diff
