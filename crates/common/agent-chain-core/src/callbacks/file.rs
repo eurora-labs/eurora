@@ -25,17 +25,23 @@ use super::base::{
 /// ```ignore
 /// use agent_chain_core::callbacks::FileCallbackHandler;
 ///
+/// // Using with mode string (recommended, matches Python API)
+/// let handler = FileCallbackHandler::with_mode("output.txt", "a")?;
+///
+/// // Using with append boolean
 /// let handler = FileCallbackHandler::new("output.txt", false)?;
-/// // Use handler with your chain
 /// ```
 #[derive(Debug)]
 pub struct FileCallbackHandler {
-    /// The file path.
-    path: String,
-    /// The buffered writer.
-    writer: BufWriter<File>,
+    /// The file path (filename in Python).
+    filename: String,
+    /// The file open mode.
+    mode: String,
     /// The color to use for the text (not used for file output but kept for API compatibility).
     pub color: Option<String>,
+    /// The buffered writer wrapping the file.
+    /// This is an Option to support the close() method.
+    file: Option<BufWriter<File>>,
 }
 
 impl FileCallbackHandler {
@@ -43,50 +49,120 @@ impl FileCallbackHandler {
     ///
     /// # Arguments
     ///
-    /// * `path` - The path to the output file.
+    /// * `filename` - The path to the output file.
     /// * `append` - Whether to append to the file or truncate it.
     ///
     /// # Returns
     ///
     /// A Result containing the FileCallbackHandler or an IO error.
-    pub fn new<P: AsRef<Path>>(path: P, append: bool) -> io::Result<Self> {
-        let file = if append {
-            OpenOptions::new()
+    pub fn new<P: AsRef<Path>>(filename: P, append: bool) -> io::Result<Self> {
+        let mode = if append { "a" } else { "w" };
+        Self::with_mode(filename, mode)
+    }
+
+    /// Create a new FileCallbackHandler with a specific file mode.
+    ///
+    /// This matches the Python API more closely.
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - Path to the output file.
+    /// * `mode` - File open mode (e.g., "w", "a", "x"). Defaults to "a".
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the FileCallbackHandler or an IO error.
+    pub fn with_mode<P: AsRef<Path>>(filename: P, mode: &str) -> io::Result<Self> {
+        let file = match mode {
+            "w" => File::create(filename.as_ref())?,
+            "a" => OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(path.as_ref())?
-        } else {
-            File::create(path.as_ref())?
+                .open(filename.as_ref())?,
+            "x" => OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(filename.as_ref())?,
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("Unsupported file mode: {}", mode),
+                ))
+            }
         };
 
         Ok(Self {
-            path: path.as_ref().to_string_lossy().to_string(),
-            writer: BufWriter::new(file),
+            filename: filename.as_ref().to_string_lossy().to_string(),
+            mode: mode.to_string(),
             color: None,
+            file: Some(BufWriter::new(file)),
         })
     }
 
     /// Create a new FileCallbackHandler with a specific color.
-    pub fn with_color<P: AsRef<Path>>(path: P, append: bool, color: impl Into<String>) -> io::Result<Self> {
-        let mut handler = Self::new(path, append)?;
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - Path to the output file.
+    /// * `mode` - File open mode (e.g., "w", "a"). Defaults to "a".
+    /// * `color` - Default text color for output.
+    pub fn with_color<P: AsRef<Path>>(
+        filename: P,
+        mode: &str,
+        color: impl Into<String>,
+    ) -> io::Result<Self> {
+        let mut handler = Self::with_mode(filename, mode)?;
         handler.color = Some(color.into());
         Ok(handler)
     }
 
-    /// Get the file path.
-    pub fn path(&self) -> &str {
-        &self.path
+    /// Get the file path (filename).
+    pub fn filename(&self) -> &str {
+        &self.filename
+    }
+
+    /// Get the file mode.
+    pub fn mode(&self) -> &str {
+        &self.mode
+    }
+
+    /// Close the file if it's open.
+    ///
+    /// This method is safe to call multiple times and will only close
+    /// the file if it's currently open.
+    pub fn close(&mut self) {
+        if let Some(mut writer) = self.file.take() {
+            let _ = writer.flush();
+            // File will be closed when writer is dropped
+        }
     }
 
     /// Write text to the file.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The text to write to the file.
+    /// * `end` - String appended after the text.
     fn write(&mut self, text: &str, end: &str) {
-        let _ = write!(self.writer, "{}{}", text, end);
-        let _ = self.writer.flush();
+        if let Some(ref mut writer) = self.file {
+            let _ = write!(writer, "{}{}", text, end);
+            let _ = writer.flush();
+        }
     }
 
     /// Flush the writer.
     pub fn flush(&mut self) -> io::Result<()> {
-        self.writer.flush()
+        if let Some(ref mut writer) = self.file {
+            writer.flush()
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl Drop for FileCallbackHandler {
+    fn drop(&mut self) {
+        self.close();
     }
 }
 
@@ -94,12 +170,20 @@ impl LLMManagerMixin for FileCallbackHandler {}
 impl RetrieverManagerMixin for FileCallbackHandler {}
 
 impl ToolManagerMixin for FileCallbackHandler {
+    /// Handle tool end by writing the output.
+    ///
+    /// Note: The Python version also supports `observation_prefix` and `llm_prefix`
+    /// parameters, but these are not available in the current Rust trait signature.
     fn on_tool_end(&mut self, output: &str, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
         self.write(output, "");
     }
 }
 
 impl RunManagerMixin for FileCallbackHandler {
+    /// Handle text output.
+    ///
+    /// Note: The Python version also supports `color` and `end` parameters,
+    /// but these are not available in the current Rust trait signature.
     fn on_text(&mut self, text: &str, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
         self.write(text, "");
     }
@@ -141,6 +225,10 @@ impl ChainManagerMixin for FileCallbackHandler {
         self.write("\n> Finished chain.", "\n");
     }
 
+    /// Handle agent action by writing the action log.
+    ///
+    /// Note: The Python version also supports a `color` parameter,
+    /// but this is not available in the current Rust trait signature.
     fn on_agent_action(
         &mut self,
         action: &serde_json::Value,
@@ -152,6 +240,10 @@ impl ChainManagerMixin for FileCallbackHandler {
         }
     }
 
+    /// Handle agent finish by writing the finish log.
+    ///
+    /// Note: The Python version also supports a `color` parameter,
+    /// but this is not available in the current Rust trait signature.
     fn on_agent_finish(
         &mut self,
         finish: &serde_json::Value,
@@ -187,6 +279,45 @@ mod tests {
         let handler = handler.unwrap();
         assert_eq!(handler.name(), "FileCallbackHandler");
         assert!(handler.color.is_none());
+        assert_eq!(handler.mode(), "w");
+    }
+
+    #[test]
+    fn test_file_handler_with_mode() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_mode.txt");
+
+        // Test write mode
+        let handler = FileCallbackHandler::with_mode(&file_path, "w");
+        assert!(handler.is_ok());
+        let handler = handler.unwrap();
+        assert_eq!(handler.mode(), "w");
+
+        // Test append mode
+        let handler = FileCallbackHandler::with_mode(&file_path, "a");
+        assert!(handler.is_ok());
+        let handler = handler.unwrap();
+        assert_eq!(handler.mode(), "a");
+
+        // Test exclusive create mode (should fail since file exists)
+        let handler = FileCallbackHandler::with_mode(&file_path, "x");
+        assert!(handler.is_err());
+
+        // Test invalid mode
+        let handler = FileCallbackHandler::with_mode(&file_path, "r");
+        assert!(handler.is_err());
+    }
+
+    #[test]
+    fn test_file_handler_with_color() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_color.txt");
+
+        let handler = FileCallbackHandler::with_color(&file_path, "a", "green");
+        assert!(handler.is_ok());
+
+        let handler = handler.unwrap();
+        assert_eq!(handler.color, Some("green".to_string()));
     }
 
     #[test]
@@ -226,6 +357,27 @@ mod tests {
     }
 
     #[test]
+    fn test_file_handler_close() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_close.txt");
+
+        let mut handler = FileCallbackHandler::new(&file_path, false).unwrap();
+        handler.write("Before close", "\n");
+
+        // Close explicitly
+        handler.close();
+
+        // Writing after close should be a no-op (file is None)
+        handler.write("After close", "\n");
+
+        // Close is safe to call multiple times
+        handler.close();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "Before close\n");
+    }
+
+    #[test]
     fn test_file_handler_chain_callbacks() {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("test_chain.txt");
@@ -248,5 +400,60 @@ mod tests {
         let content = fs::read_to_string(&file_path).unwrap();
         assert!(content.contains("Entering new TestChain chain"));
         assert!(content.contains("Finished chain"));
+    }
+
+    #[test]
+    fn test_file_handler_agent_callbacks() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_agent.txt");
+
+        {
+            let mut handler = FileCallbackHandler::new(&file_path, false).unwrap();
+            let run_id = Uuid::new_v4();
+
+            // Test on_agent_action
+            let action = serde_json::json!({
+                "log": "Agent thinking...",
+                "tool": "search",
+                "tool_input": "query"
+            });
+            handler.on_agent_action(&action, run_id, None);
+
+            // Test on_agent_finish
+            let finish = serde_json::json!({
+                "log": "Agent finished.",
+                "return_values": {"output": "result"}
+            });
+            handler.on_agent_finish(&finish, run_id, None);
+
+            handler.flush().unwrap();
+        }
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains("Agent thinking..."));
+        assert!(content.contains("Agent finished."));
+    }
+
+    #[test]
+    fn test_file_handler_tool_and_text_callbacks() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_tool_text.txt");
+
+        {
+            let mut handler = FileCallbackHandler::new(&file_path, false).unwrap();
+            let run_id = Uuid::new_v4();
+
+            // Test on_tool_end
+            handler.on_tool_end("Tool output here", run_id, None);
+
+            // Test on_text
+            handler.on_text("Some text output", run_id, None);
+
+            handler.flush().unwrap();
+        }
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains("Tool output here"));
+        assert!(content.contains("Some text output"));
     }
 }
