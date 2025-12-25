@@ -262,6 +262,7 @@ version = "0.0.2"
 dependencies = [
  "agent-chain-macros",
  "async-trait",
+ "chrono",
  "futures",
  "regex",
  "reqwest 0.12.24",
@@ -270,6 +271,8 @@ dependencies = [
  "specta",
  "tempfile",
  "thiserror 2.0.17",
+ "tokio",
+ "tracing",
  "url",
  "uuid",
 ]
