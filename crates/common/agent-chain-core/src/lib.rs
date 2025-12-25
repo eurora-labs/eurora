@@ -31,6 +31,7 @@ pub mod load;
 pub mod messages;
 pub mod outputs;
 pub mod prompts;
+pub mod runnables;
 pub mod tools;
 pub mod tracers;
 pub mod utils;
@@ -89,6 +90,14 @@ pub use tracers::{
     FunctionCallbackHandler, Listener, PassthroughStreamingHandler, RootListenersTracer, Run,
     RunCollectorCallbackHandler, RunEvent, RunType, SchemaFormat, StreamingCallbackHandler,
     TracerCore, TracerCoreConfig, TracerError,
+};
+
+// Re-export runnable types
+pub use runnables::{
+    AddableDict, ConfigOrList, DynRunnable, Runnable, RunnableBinding, RunnableConfig,
+    RunnableEach, RunnableLambda, RunnableParallel, RunnablePassthrough, RunnableRetry,
+    RunnableSequence, RunnableSerializable, coerce_to_runnable, ensure_config, get_config_list,
+    merge_configs, patch_config, pipe, runnable_lambda, to_dyn,
 };
 
 // Re-export async_trait for use in generated code
