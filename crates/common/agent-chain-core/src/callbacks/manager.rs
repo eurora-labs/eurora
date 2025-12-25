@@ -50,10 +50,10 @@ pub async fn ahandle_event<F, Fut>(
 {
     // First, run inline handlers sequentially
     for handler in handlers.iter().filter(|h| h.run_inline()) {
-        if let Some(ignore_fn) = ignore_condition {
-            if ignore_fn(handler.as_ref()) {
-                continue;
-            }
+        if let Some(ignore_fn) = ignore_condition
+            && ignore_fn(handler.as_ref())
+        {
+            continue;
         }
         event_fn(handler).await;
     }
@@ -69,7 +69,7 @@ pub async fn ahandle_event<F, Fut>(
                 true
             }
         })
-        .map(|h| event_fn(h))
+        .map(event_fn)
         .collect();
 
     futures::future::join_all(non_inline_futures).await;
@@ -1646,6 +1646,7 @@ pub struct CallbackManagerForChainGroup {
 
 impl CallbackManagerForChainGroup {
     /// Create a new callback manager for chain group.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         handlers: Vec<Arc<dyn BaseCallbackHandler>>,
         inheritable_handlers: Option<Vec<Arc<dyn BaseCallbackHandler>>>,
@@ -1825,6 +1826,7 @@ pub struct AsyncCallbackManagerForChainGroup {
 
 impl AsyncCallbackManagerForChainGroup {
     /// Create a new async callback manager for chain group.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         handlers: Vec<Arc<dyn BaseCallbackHandler>>,
         inheritable_handlers: Option<Vec<Arc<dyn BaseCallbackHandler>>>,
