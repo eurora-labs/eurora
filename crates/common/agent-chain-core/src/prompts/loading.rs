@@ -93,7 +93,7 @@ fn load_basic_prompt(
         ));
     }
 
-    let format = PromptTemplateFormat::from_str(template_format)?;
+    let format: PromptTemplateFormat = template_format.parse()?;
     let prompt = PromptTemplate::from_template_with_format(template, format)?;
 
     Ok(Box::new(prompt))

@@ -15,6 +15,10 @@ use super::message::BaseMessagePromptTemplate;
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate, format_template};
 
+/// Type alias for async example selection future.
+pub type ExampleSelectionFuture<'a> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Vec<HashMap<String, String>>> + Send + 'a>>;
+
 /// Trait for example selectors.
 ///
 /// Example selectors dynamically select examples based on the input.
@@ -29,20 +33,23 @@ pub trait ExampleSelector: Send + Sync {
     fn aselect_examples(
         &self,
         input_variables: &HashMap<String, String>,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Vec<HashMap<String, String>>> + Send + '_>,
-    > {
+    ) -> ExampleSelectionFuture<'_> {
         let result = self.select_examples(input_variables);
         Box::pin(async move { result })
     }
 }
 
 /// A simple example selector that always returns the same examples.
+///
+/// This selector always returns the same examples regardless of input,
+/// matching the Python langchain_core implementation.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct StaticExampleSelector {
     examples: Vec<HashMap<String, String>>,
 }
 
+#[allow(dead_code)]
 impl StaticExampleSelector {
     /// Create a new static example selector.
     pub fn new(examples: Vec<HashMap<String, String>>) -> Self {
@@ -219,6 +226,7 @@ impl FewShotPromptTemplate {
     }
 
     /// Async get examples based on kwargs.
+    #[allow(dead_code)]
     async fn aget_examples(
         &self,
         kwargs: &HashMap<String, String>,
@@ -332,14 +340,17 @@ impl BasePromptTemplate for FewShotPromptTemplate {
         })
     }
 
-    fn save(&self, file_path: &Path) -> Result<()> {
+    fn save(&self, _file_path: &Path) -> Result<()> {
         if self.example_selector.is_some() {
             return Err(Error::InvalidConfig(
                 "Saving an example selector is not currently supported".to_string(),
             ));
         }
-        // Call default save implementation
-        BasePromptTemplate::save(self, file_path)
+        // Note: Cannot call default save implementation due to recursion.
+        // The save functionality for few-shot prompts is not fully supported.
+        Err(Error::InvalidConfig(
+            "Saving few-shot prompts is not currently supported".to_string(),
+        ))
     }
 }
 
@@ -454,6 +465,7 @@ impl FewShotChatMessagePromptTemplate {
     }
 
     /// Async get examples based on kwargs.
+    #[allow(dead_code)]
     async fn aget_examples(
         &self,
         kwargs: &HashMap<String, String>,

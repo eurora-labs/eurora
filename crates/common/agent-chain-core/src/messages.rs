@@ -59,10 +59,10 @@ pub use ai::{
 
 // Re-export from base
 pub use base::{
-    BaseMessage, BaseMessageChunk, HasId, MergeableContent, extract_reasoning_from_additional_kwargs,
-    get_bolded_text, get_msg_title_repr, is_interactive_env, merge_content, merge_content_complex,
-    merge_content_vec, message_to_dict as base_message_to_dict,
-    messages_to_dict as base_messages_to_dict,
+    BaseMessage, BaseMessageChunk, HasId, MergeableContent,
+    extract_reasoning_from_additional_kwargs, get_bolded_text, get_msg_title_repr,
+    is_interactive_env, merge_content, merge_content_complex, merge_content_vec,
+    message_to_dict as base_message_to_dict, messages_to_dict as base_messages_to_dict,
 };
 
 // Re-export from chat
@@ -70,22 +70,49 @@ pub use chat::{ChatMessage, ChatMessageChunk};
 
 // Re-export from content
 pub use content::{
-    // Legacy types (backwards compatibility)
-    ContentPart, ImageDetail, ImageSource, MessageContent,
     // Standard content blocks (matching Python langchain_core.messages.content)
-    Annotation, AudioContentBlock, BlockIndex, Citation, ContentBlock, DataContentBlock,
-    FileContentBlock, ImageContentBlock, InvalidToolCallBlock, NonStandardAnnotation,
-    NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-    ServerToolCallChunk, ServerToolResult, ServerToolStatus, TextContentBlock, ToolCallBlock,
-    ToolCallChunkBlock, ToolContentBlock, VideoContentBlock,
+    Annotation,
+    AudioContentBlock,
+    BlockIndex,
+    Citation,
+    ContentBlock,
+    // Legacy types (backwards compatibility)
+    ContentPart,
+    DataContentBlock,
+    FileContentBlock,
+    ImageContentBlock,
+    ImageDetail,
+    ImageSource,
+    InvalidToolCallBlock,
     // Constants
     KNOWN_BLOCK_TYPES,
+    MessageContent,
+    NonStandardAnnotation,
+    NonStandardContentBlock,
+    PlainTextContentBlock,
+    ReasoningContentBlock,
+    ServerToolCall,
+    ServerToolCallChunk,
+    ServerToolResult,
+    ServerToolStatus,
+    TextContentBlock,
+    ToolCallBlock,
+    ToolCallChunkBlock,
+    ToolContentBlock,
+    VideoContentBlock,
+    // Factory functions
+    create_audio_block,
+    create_citation,
+    create_file_block,
+    create_image_block,
+    create_non_standard_block,
+    create_plaintext_block,
+    create_reasoning_block,
+    create_text_block,
+    create_tool_call_block,
+    create_video_block,
     // Helper functions
     is_data_content_block,
-    // Factory functions
-    create_audio_block, create_citation, create_file_block, create_image_block,
-    create_non_standard_block, create_plaintext_block, create_reasoning_block, create_text_block,
-    create_tool_call_block, create_video_block,
 };
 
 // Re-export from function
