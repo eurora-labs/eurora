@@ -52,7 +52,13 @@ pub fn dereference_refs(
     let shallow = skip_keys.is_none();
     let mut processed_refs = HashSet::new();
 
-    dereference_refs_helper(schema_obj, full, &mut processed_refs, &keys_to_skip, shallow)
+    dereference_refs_helper(
+        schema_obj,
+        full,
+        &mut processed_refs,
+        &keys_to_skip,
+        shallow,
+    )
 }
 
 fn dereference_refs_helper(
@@ -119,20 +125,24 @@ fn dereference_refs_helper(
 
             Value::Object(merged_result)
         }
-        Value::Object(map) => {
-            Value::Object(process_dict_properties(
-                map,
-                full_schema,
-                processed_refs,
-                skip_keys,
-                shallow_refs,
-            ))
-        }
+        Value::Object(map) => Value::Object(process_dict_properties(
+            map,
+            full_schema,
+            processed_refs,
+            skip_keys,
+            shallow_refs,
+        )),
         Value::Array(arr) => {
             let processed: Vec<Value> = arr
                 .iter()
                 .map(|item| {
-                    dereference_refs_helper(item, full_schema, processed_refs, skip_keys, shallow_refs)
+                    dereference_refs_helper(
+                        item,
+                        full_schema,
+                        processed_refs,
+                        skip_keys,
+                        shallow_refs,
+                    )
                 })
                 .collect();
             Value::Array(processed)
@@ -262,10 +272,7 @@ mod tests {
 
         let result = dereference_refs(&schema, None, None);
 
-        assert_eq!(
-            result["properties"]["name"]["type"],
-            json!("string")
-        );
+        assert_eq!(result["properties"]["name"]["type"], json!("string"));
     }
 
     #[test]
@@ -285,7 +292,10 @@ mod tests {
         let result = dereference_refs(&schema, None, Some(&[]));
 
         assert_eq!(result["properties"]["name"]["type"], json!("string"));
-        assert_eq!(result["properties"]["name"]["description"], json!("User name"));
+        assert_eq!(
+            result["properties"]["name"]["description"],
+            json!("User name")
+        );
     }
 
     #[test]

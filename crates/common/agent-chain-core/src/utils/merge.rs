@@ -149,11 +149,11 @@ pub fn merge_lists(
                 if let Value::Object(ref e_map) = e
                     && let Some(index) = e_map.get("index")
                 {
-                        let should_merge = match index {
-                            Value::Number(n) => n.as_i64().is_some(),
-                            Value::String(s) => s.starts_with("lc_"),
-                            _ => false,
-                        };
+                    let should_merge = match index {
+                        Value::Number(n) => n.as_i64().is_some(),
+                        Value::String(s) => s.starts_with("lc_"),
+                        _ => false,
+                    };
 
                     if should_merge {
                         let to_merge: Vec<usize> = merged_vec
@@ -181,14 +181,10 @@ pub fn merge_lists(
                             let new_e: Value = if left_type.is_some() {
                                 let e_type = e_map.get("type").and_then(|t| t.as_str());
 
-                                if e_type == Some("non_standard")
-                                    && e_map.contains_key("value")
-                                {
+                                if e_type == Some("non_standard") && e_map.contains_key("value") {
                                     if left_type != Some("non_standard") {
                                         let mut extras = Map::new();
-                                        if let Some(Value::Object(value_map)) =
-                                            e_map.get("value")
-                                        {
+                                        if let Some(Value::Object(value_map)) = e_map.get("value") {
                                             for (k, v) in value_map {
                                                 if k != "type" {
                                                     extras.insert(k.clone(), v.clone());
@@ -203,8 +199,7 @@ pub fn merge_lists(
                                     } else {
                                         let mut new_map = Map::new();
                                         let mut value_map = Map::new();
-                                        if let Some(Value::Object(orig_value)) =
-                                            e_map.get("value")
+                                        if let Some(Value::Object(orig_value)) = e_map.get("value")
                                         {
                                             for (k, v) in orig_value {
                                                 if k != "type" {
@@ -212,7 +207,8 @@ pub fn merge_lists(
                                                 }
                                             }
                                         }
-                                        new_map.insert("value".to_string(), Value::Object(value_map));
+                                        new_map
+                                            .insert("value".to_string(), Value::Object(value_map));
                                         if let Some(idx) = e_map.get("index") {
                                             new_map.insert("index".to_string(), idx.clone());
                                         }

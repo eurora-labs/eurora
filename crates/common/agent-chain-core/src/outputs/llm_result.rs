@@ -209,16 +209,22 @@ mod tests {
         let generation2 = Generation::new("Second");
         let mut output = HashMap::new();
         output.insert("token_usage".to_string(), json!({"total": 100}));
-        let result = LLMResult::with_llm_output(vec![vec![generation1.into()], vec![generation2.into()]], output);
-        
+        let result = LLMResult::with_llm_output(
+            vec![vec![generation1.into()], vec![generation2.into()]],
+            output,
+        );
+
         let flattened = result.flatten();
         assert_eq!(flattened.len(), 2);
-        
+
         // First result should have the original llm_output
         assert!(flattened[0].llm_output.is_some());
         let first_output = flattened[0].llm_output.as_ref().unwrap();
-        assert_eq!(first_output.get("token_usage"), Some(&json!({"total": 100})));
-        
+        assert_eq!(
+            first_output.get("token_usage"),
+            Some(&json!({"total": 100}))
+        );
+
         // Second result should have empty token_usage
         assert!(flattened[1].llm_output.is_some());
         let second_output = flattened[1].llm_output.as_ref().unwrap();
