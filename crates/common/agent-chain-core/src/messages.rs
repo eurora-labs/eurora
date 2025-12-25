@@ -54,7 +54,7 @@ mod utils;
 // Re-export from ai
 pub use ai::{
     AIMessage, AIMessageChunk, InputTokenDetails, OutputTokenDetails, UsageMetadata, add_usage,
-    subtract_usage,
+    backwards_compat_tool_calls, subtract_usage,
 };
 
 // Re-export from base
