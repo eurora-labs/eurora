@@ -69,14 +69,43 @@ impl StdOutCallbackHandler {
 
 impl LLMManagerMixin for StdOutCallbackHandler {}
 impl RetrieverManagerMixin for StdOutCallbackHandler {}
+
 impl ToolManagerMixin for StdOutCallbackHandler {
-    fn on_tool_end(&mut self, output: &str, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
-        print_text(output, self.get_color(), "");
+    fn on_tool_end(
+        &mut self,
+        output: &str,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        color: Option<&str>,
+        observation_prefix: Option<&str>,
+        llm_prefix: Option<&str>,
+    ) {
+        // Print observation prefix if provided
+        if let Some(prefix) = observation_prefix {
+            print_text(&format!("\n{}", prefix), None, "");
+        }
+        // Print output with color override or handler's default color
+        let effective_color = color.or(self.get_color());
+        print_text(output, effective_color, "");
+        // Print LLM prefix if provided
+        if let Some(prefix) = llm_prefix {
+            print_text(&format!("\n{}", prefix), None, "");
+        }
     }
 }
+
 impl RunManagerMixin for StdOutCallbackHandler {
-    fn on_text(&mut self, text: &str, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
-        print_text(text, self.get_color(), "");
+    fn on_text(
+        &mut self,
+        text: &str,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        color: Option<&str>,
+        end: &str,
+    ) {
+        // Use color parameter if provided, otherwise use handler's default color
+        let effective_color = color.or(self.get_color());
+        print_text(text, effective_color, end);
     }
 }
 
@@ -88,17 +117,28 @@ impl CallbackManagerMixin for StdOutCallbackHandler {
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
         _tags: Option<&[String]>,
-        _metadata: Option<&HashMap<String, serde_json::Value>>,
+        metadata: Option<&HashMap<String, serde_json::Value>>,
     ) {
-        let name = serialized
-            .get("name")
+        // First check metadata for "name" (equivalent to kwargs["name"] in Python)
+        // Then fall back to serialized
+        let name = metadata
+            .and_then(|m| m.get("name"))
             .and_then(|v| v.as_str())
             .or_else(|| {
-                serialized.get("id").and_then(|v| {
-                    v.as_array()
-                        .and_then(|arr| arr.last())
+                if !serialized.is_empty() {
+                    serialized
+                        .get("name")
                         .and_then(|v| v.as_str())
-                })
+                        .or_else(|| {
+                            serialized.get("id").and_then(|v| {
+                                v.as_array()
+                                    .and_then(|arr| arr.last())
+                                    .and_then(|v| v.as_str())
+                            })
+                        })
+                } else {
+                    None
+                }
             })
             .unwrap_or("<unknown>");
 
@@ -126,9 +166,12 @@ impl ChainManagerMixin for StdOutCallbackHandler {
         action: &serde_json::Value,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
+        color: Option<&str>,
     ) {
         if let Some(log) = action.get("log").and_then(|v| v.as_str()) {
-            print_text(log, self.get_color(), "");
+            // Use color parameter if provided, otherwise use handler's default color
+            let effective_color = color.or(self.get_color());
+            print_text(log, effective_color, "");
         }
     }
 
@@ -137,9 +180,12 @@ impl ChainManagerMixin for StdOutCallbackHandler {
         finish: &serde_json::Value,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
+        color: Option<&str>,
     ) {
         if let Some(log) = finish.get("log").and_then(|v| v.as_str()) {
-            print_text(log, self.get_color(), "\n");
+            // Use color parameter if provided, otherwise use handler's default color
+            let effective_color = color.or(self.get_color());
+            print_text(log, effective_color, "\n");
         }
     }
 }

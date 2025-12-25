@@ -99,8 +99,9 @@ pub trait ChainManagerMixin {
         action: &serde_json::Value,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        color: Option<&str>,
     ) {
-        let _ = (action, run_id, parent_run_id);
+        let _ = (action, run_id, parent_run_id, color);
     }
 
     /// Run on the agent end.
@@ -109,16 +110,25 @@ pub trait ChainManagerMixin {
         finish: &serde_json::Value,
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
+        color: Option<&str>,
     ) {
-        let _ = (finish, run_id, parent_run_id);
+        let _ = (finish, run_id, parent_run_id, color);
     }
 }
 
 /// Mixin for tool callbacks.
 pub trait ToolManagerMixin {
     /// Run when the tool ends running.
-    fn on_tool_end(&mut self, output: &str, run_id: Uuid, parent_run_id: Option<Uuid>) {
-        let _ = (output, run_id, parent_run_id);
+    fn on_tool_end(
+        &mut self,
+        output: &str,
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        color: Option<&str>,
+        observation_prefix: Option<&str>,
+        llm_prefix: Option<&str>,
+    ) {
+        let _ = (output, run_id, parent_run_id, color, observation_prefix, llm_prefix);
     }
 
     /// Run when tool errors.
@@ -217,8 +227,15 @@ pub trait CallbackManagerMixin {
 /// Mixin for run manager.
 pub trait RunManagerMixin {
     /// Run on an arbitrary text.
-    fn on_text(&mut self, text: &str, run_id: Uuid, parent_run_id: Option<Uuid>) {
-        let _ = (text, run_id, parent_run_id);
+    fn on_text(
+        &mut self,
+        text: &str,
+        run_id: Uuid,
+        parent_run_id: Option<Uuid>,
+        color: Option<&str>,
+        end: &str,
+    ) {
+        let _ = (text, run_id, parent_run_id, color, end);
     }
 
     /// Run on a retry event.

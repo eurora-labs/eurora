@@ -171,21 +171,38 @@ impl RetrieverManagerMixin for FileCallbackHandler {}
 
 impl ToolManagerMixin for FileCallbackHandler {
     /// Handle tool end by writing the output.
-    ///
-    /// Note: The Python version also supports `observation_prefix` and `llm_prefix`
-    /// parameters, but these are not available in the current Rust trait signature.
-    fn on_tool_end(&mut self, output: &str, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
+    fn on_tool_end(
+        &mut self,
+        output: &str,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _color: Option<&str>,
+        observation_prefix: Option<&str>,
+        llm_prefix: Option<&str>,
+    ) {
+        // Write observation prefix if provided
+        if let Some(prefix) = observation_prefix {
+            self.write(&format!("\n{}", prefix), "");
+        }
         self.write(output, "");
+        // Write LLM prefix if provided
+        if let Some(prefix) = llm_prefix {
+            self.write(&format!("\n{}", prefix), "");
+        }
     }
 }
 
 impl RunManagerMixin for FileCallbackHandler {
     /// Handle text output.
-    ///
-    /// Note: The Python version also supports `color` and `end` parameters,
-    /// but these are not available in the current Rust trait signature.
-    fn on_text(&mut self, text: &str, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
-        self.write(text, "");
+    fn on_text(
+        &mut self,
+        text: &str,
+        _run_id: Uuid,
+        _parent_run_id: Option<Uuid>,
+        _color: Option<&str>,
+        end: &str,
+    ) {
+        self.write(text, end);
     }
 }
 
@@ -197,17 +214,28 @@ impl CallbackManagerMixin for FileCallbackHandler {
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
         _tags: Option<&[String]>,
-        _metadata: Option<&HashMap<String, serde_json::Value>>,
+        metadata: Option<&HashMap<String, serde_json::Value>>,
     ) {
-        let name = serialized
-            .get("name")
+        // First check metadata for "name" (equivalent to kwargs["name"] in Python)
+        // Then fall back to serialized
+        let name = metadata
+            .and_then(|m| m.get("name"))
             .and_then(|v| v.as_str())
             .or_else(|| {
-                serialized.get("id").and_then(|v| {
-                    v.as_array()
-                        .and_then(|arr| arr.last())
+                if !serialized.is_empty() {
+                    serialized
+                        .get("name")
                         .and_then(|v| v.as_str())
-                })
+                        .or_else(|| {
+                            serialized.get("id").and_then(|v| {
+                                v.as_array()
+                                    .and_then(|arr| arr.last())
+                                    .and_then(|v| v.as_str())
+                            })
+                        })
+                } else {
+                    None
+                }
             })
             .unwrap_or("<unknown>");
 
@@ -226,14 +254,12 @@ impl ChainManagerMixin for FileCallbackHandler {
     }
 
     /// Handle agent action by writing the action log.
-    ///
-    /// Note: The Python version also supports a `color` parameter,
-    /// but this is not available in the current Rust trait signature.
     fn on_agent_action(
         &mut self,
         action: &serde_json::Value,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
+        _color: Option<&str>,
     ) {
         if let Some(log) = action.get("log").and_then(|v| v.as_str()) {
             self.write(log, "");
@@ -241,14 +267,12 @@ impl ChainManagerMixin for FileCallbackHandler {
     }
 
     /// Handle agent finish by writing the finish log.
-    ///
-    /// Note: The Python version also supports a `color` parameter,
-    /// but this is not available in the current Rust trait signature.
     fn on_agent_finish(
         &mut self,
         finish: &serde_json::Value,
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
+        _color: Option<&str>,
     ) {
         if let Some(log) = finish.get("log").and_then(|v| v.as_str()) {
             self.write(log, "\n");
@@ -417,14 +441,14 @@ mod tests {
                 "tool": "search",
                 "tool_input": "query"
             });
-            handler.on_agent_action(&action, run_id, None);
+            handler.on_agent_action(&action, run_id, None, None);
 
             // Test on_agent_finish
             let finish = serde_json::json!({
                 "log": "Agent finished.",
                 "return_values": {"output": "result"}
             });
-            handler.on_agent_finish(&finish, run_id, None);
+            handler.on_agent_finish(&finish, run_id, None, None);
 
             handler.flush().unwrap();
         }
@@ -444,10 +468,10 @@ mod tests {
             let run_id = Uuid::new_v4();
 
             // Test on_tool_end
-            handler.on_tool_end("Tool output here", run_id, None);
+            handler.on_tool_end("Tool output here", run_id, None, None, None, None);
 
             // Test on_text
-            handler.on_text("Some text output", run_id, None);
+            handler.on_text("Some text output", run_id, None, None, "");
 
             handler.flush().unwrap();
         }

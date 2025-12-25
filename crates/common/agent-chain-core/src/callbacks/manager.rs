@@ -197,11 +197,27 @@ impl RunManager {
         }
         let run_id = self.inner.run_id;
         let parent_run_id = self.inner.parent_run_id;
+        let tags = self.inner.tags.clone();
         handle_event(&self.inner.handlers, None, |_handler| {
-            // Note: In a full implementation, we would call handler.on_text()
-            // but we need mutable access which requires different design
-            let _ = (text, run_id, parent_run_id);
+            let _ = (text, run_id, parent_run_id, &tags);
         });
+    }
+
+    /// Run when a retry is received.
+    pub fn on_retry(&self, retry_state: &serde_json::Value) {
+        if self.inner.handlers.is_empty() {
+            return;
+        }
+        let run_id = self.inner.run_id;
+        let parent_run_id = self.inner.parent_run_id;
+        let tags = self.inner.tags.clone();
+        handle_event(
+            &self.inner.handlers,
+            Some(|h: &dyn BaseCallbackHandler| h.ignore_retry()),
+            |_handler| {
+                let _ = (retry_state, run_id, parent_run_id, &tags);
+            },
+        );
     }
 
     /// Return a noop manager.
@@ -406,6 +422,13 @@ impl AsyncParentRunManager {
     pub fn tags(&self) -> &[String] {
         self.inner.tags()
     }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: AsyncRunManager::get_noop_manager(),
+        }
+    }
 }
 
 /// Sync Parent Run Manager.
@@ -474,6 +497,13 @@ impl ParentRunManager {
     pub fn tags(&self) -> &[String] {
         self.inner.tags()
     }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: RunManager::get_noop_manager(),
+        }
+    }
 }
 
 /// Callback manager for LLM run.
@@ -537,11 +567,12 @@ impl CallbackManagerForLLMRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
             |_handler| {
-                let _ = (token, run_id, parent_run_id, chunk);
+                let _ = (token, run_id, parent_run_id, chunk, &tags);
             },
         );
     }
@@ -553,11 +584,12 @@ impl CallbackManagerForLLMRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
             |_handler| {
-                let _ = (response, run_id, parent_run_id);
+                let _ = (response, run_id, parent_run_id, &tags);
             },
         );
     }
@@ -569,11 +601,12 @@ impl CallbackManagerForLLMRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_llm()),
             |_handler| {
-                let _ = (error, run_id, parent_run_id);
+                let _ = (error, run_id, parent_run_id, &tags);
             },
         );
     }
@@ -652,11 +685,12 @@ impl CallbackManagerForChainRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_chain()),
             |_handler| {
-                let _ = (outputs, run_id, parent_run_id);
+                let _ = (outputs, run_id, parent_run_id, &tags);
             },
         );
     }
@@ -668,11 +702,12 @@ impl CallbackManagerForChainRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_chain()),
             |_handler| {
-                let _ = (error, run_id, parent_run_id);
+                let _ = (error, run_id, parent_run_id, &tags);
             },
         );
     }
@@ -684,11 +719,12 @@ impl CallbackManagerForChainRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
             |_handler| {
-                let _ = (action, run_id, parent_run_id);
+                let _ = (action, run_id, parent_run_id, &tags);
             },
         );
     }
@@ -700,13 +736,21 @@ impl CallbackManagerForChainRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
             |_handler| {
-                let _ = (finish, run_id, parent_run_id);
+                let _ = (finish, run_id, parent_run_id, &tags);
             },
         );
+    }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: ParentRunManager::get_noop_manager(),
+        }
     }
 }
 
@@ -776,11 +820,12 @@ impl CallbackManagerForToolRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
             |_handler| {
-                let _ = (output, run_id, parent_run_id);
+                let _ = (output, run_id, parent_run_id, &tags);
             },
         );
     }
@@ -792,13 +837,21 @@ impl CallbackManagerForToolRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_agent()),
             |_handler| {
-                let _ = (error, run_id, parent_run_id);
+                let _ = (error, run_id, parent_run_id, &tags);
             },
         );
+    }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: ParentRunManager::get_noop_manager(),
+        }
     }
 }
 
@@ -868,11 +921,12 @@ impl CallbackManagerForRetrieverRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retriever()),
             |_handler| {
-                let _ = (documents, run_id, parent_run_id);
+                let _ = (documents, run_id, parent_run_id, &tags);
             },
         );
     }
@@ -884,13 +938,21 @@ impl CallbackManagerForRetrieverRun {
         }
         let run_id = self.inner.run_id();
         let parent_run_id = self.inner.parent_run_id();
+        let tags = self.inner.tags().to_vec();
         handle_event(
             self.inner.handlers(),
             Some(|h: &dyn BaseCallbackHandler| h.ignore_retriever()),
             |_handler| {
-                let _ = (error, run_id, parent_run_id);
+                let _ = (error, run_id, parent_run_id, &tags);
             },
         );
+    }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: ParentRunManager::get_noop_manager(),
+        }
     }
 }
 
@@ -1440,6 +1502,13 @@ impl AsyncCallbackManagerForLLMRun {
     pub async fn on_llm_error(&self, error: &dyn std::error::Error) {
         self.inner.on_llm_error(error);
     }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: CallbackManagerForLLMRun::get_noop_manager(),
+        }
+    }
 }
 
 /// Async callback manager for chain run.
@@ -1499,6 +1568,13 @@ impl AsyncCallbackManagerForChainRun {
     pub async fn on_agent_finish(&self, finish: &serde_json::Value) {
         self.inner.on_agent_finish(finish);
     }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: CallbackManagerForChainRun::get_noop_manager(),
+        }
+    }
 }
 
 /// Async callback manager for tool run.
@@ -1548,6 +1624,13 @@ impl AsyncCallbackManagerForToolRun {
     pub async fn on_tool_error(&self, error: &dyn std::error::Error) {
         self.inner.on_tool_error(error);
     }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: CallbackManagerForToolRun::get_noop_manager(),
+        }
+    }
 }
 
 /// Async callback manager for retriever run.
@@ -1596,6 +1679,13 @@ impl AsyncCallbackManagerForRetrieverRun {
     /// Run when retriever errors (async).
     pub async fn on_retriever_error(&self, error: &dyn std::error::Error) {
         self.inner.on_retriever_error(error);
+    }
+
+    /// Return a noop manager.
+    pub fn get_noop_manager() -> Self {
+        Self {
+            inner: CallbackManagerForRetrieverRun::get_noop_manager(),
+        }
     }
 }
 
