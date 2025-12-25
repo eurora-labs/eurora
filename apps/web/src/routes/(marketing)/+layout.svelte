@@ -1,13 +1,13 @@
 <script lang="ts">
-	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub';
-	import SiX from '@icons-pack/svelte-simple-icons/icons/SiX';
-	import SiDiscord from '@icons-pack/svelte-simple-icons/icons/SiDiscord';
-	import { Button } from '@eurora/ui/components/button/index';
-	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import LogInIcon from '@lucide/svelte/icons/log-in';
-	import LinkedIn from '@lucide/svelte/icons/linkedin';
 	import UserButton from '$lib/components/UserButton.svelte';
 	import { isAuthenticated } from '$lib/stores/auth.js';
+	import { Button } from '@eurora/ui/components/button/index';
+	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
+	import SiDiscord from '@icons-pack/svelte-simple-icons/icons/SiDiscord';
+	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub';
+	import SiX from '@icons-pack/svelte-simple-icons/icons/SiX';
+	import LinkedIn from '@lucide/svelte/icons/linkedin';
+	import LogInIcon from '@lucide/svelte/icons/log-in';
 
 	const { children } = $props();
 
