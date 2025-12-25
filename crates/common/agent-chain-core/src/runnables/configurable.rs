@@ -107,8 +107,8 @@ pub fn make_options_spec_multi(
 
 /// Remove a prefix from a string if it starts with that prefix.
 fn str_remove_prefix(s: &str, prefix: &str) -> String {
-    if s.starts_with(prefix) {
-        s[prefix.len()..].to_string()
+    if let Some(stripped) = s.strip_prefix(prefix) {
+        stripped.to_string()
     } else {
         s.to_string()
     }
@@ -193,7 +193,7 @@ where
     pub fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
         let mut config_specs = Vec::new();
 
-        for (_field_name, spec) in &self.fields {
+        for spec in self.fields.values() {
             match spec {
                 AnyConfigurableField::Field(field) => {
                     config_specs.push(ConfigurableFieldSpec {
@@ -260,11 +260,11 @@ where
                     }
                     AnyConfigurableField::SingleOption(opt) => {
                         // Get the value from options map
-                        if let Some(selected_key) = value.as_str() {
-                            if let Some(option_value) = opt.options.get(selected_key) {
-                                configurable_fields
-                                    .insert(field_name.to_string(), option_value.clone());
-                            }
+                        if let Some(selected_key) = value.as_str()
+                            && let Some(option_value) = opt.options.get(selected_key)
+                        {
+                            configurable_fields
+                                .insert(field_name.to_string(), option_value.clone());
                         }
                     }
                     AnyConfigurableField::MultiOption(opt) => {
@@ -360,13 +360,7 @@ where
         inputs
             .into_iter()
             .zip(prepared)
-            .map(|(input, (runnable, config))| {
-                if return_exceptions {
-                    runnable.invoke(input, Some(config))
-                } else {
-                    runnable.invoke(input, Some(config))
-                }
-            })
+            .map(|(input, (runnable, config))| runnable.invoke(input, Some(config)))
             .collect()
     }
 
