@@ -7,6 +7,7 @@ pub mod base;
 pub mod branch;
 pub mod config;
 pub mod configurable;
+pub mod fallbacks;
 pub mod router;
 pub mod schema;
 pub mod utils;
@@ -26,6 +27,7 @@ pub use configurable::{
     RunnableConfigurableFields, make_options_spec_multi, make_options_spec_single,
     prefix_config_spec,
 };
+pub use fallbacks::{RunnableWithFallbacks, RunnableWithFallbacksExt};
 pub use router::{DynRouterRunnable, RouterInput, RouterRunnable};
 pub use schema::{
     BaseStreamEvent, CUSTOM_EVENT_TYPE, CustomStreamEvent, EventData, StandardStreamEvent,
