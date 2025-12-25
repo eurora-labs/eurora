@@ -1,0 +1,1047 @@
+//! Runnable objects that can be dynamically configured.
+//!
+//! This module provides the core configurable runnable types,
+//! mirroring `langchain_core.runnables.configurable`.
+
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use futures::stream::BoxStream;
+use serde_json::Value;
+
+use crate::error::{Error, Result};
+
+use super::base::Runnable;
+use super::config::{ConfigOrList, RunnableConfig, ensure_config, get_config_list, merge_configs};
+use super::utils::{
+    AnyConfigurableField, ConfigurableField, ConfigurableFieldMultiOption,
+    ConfigurableFieldSingleOption, ConfigurableFieldSpec, gather_with_concurrency,
+    get_unique_config_specs,
+};
+
+/// Prefix the id of a `ConfigurableFieldSpec`.
+///
+/// This is useful when a `RunnableConfigurableAlternatives` is used as a
+/// `ConfigurableField` of another `RunnableConfigurableAlternatives`.
+///
+/// # Arguments
+///
+/// * `spec` - The `ConfigurableFieldSpec` to prefix.
+/// * `prefix` - The prefix to add.
+///
+/// # Returns
+///
+/// The prefixed `ConfigurableFieldSpec`.
+pub fn prefix_config_spec(spec: &ConfigurableFieldSpec, prefix: &str) -> ConfigurableFieldSpec {
+    if spec.is_shared {
+        spec.clone()
+    } else {
+        ConfigurableFieldSpec {
+            id: format!("{}/{}", prefix, spec.id),
+            annotation: spec.annotation.clone(),
+            name: spec.name.clone(),
+            description: spec.description.clone(),
+            default: spec.default.clone(),
+            is_shared: spec.is_shared,
+            dependencies: spec.dependencies.clone(),
+        }
+    }
+}
+
+/// Make a `ConfigurableFieldSpec` for a `ConfigurableFieldSingleOption` or
+/// `ConfigurableFieldMultiOption`.
+///
+/// # Arguments
+///
+/// * `spec` - The `ConfigurableFieldSingleOption` or `ConfigurableFieldMultiOption`.
+/// * `description` - The description to use if the spec does not have one.
+///
+/// # Returns
+///
+/// The `ConfigurableFieldSpec`.
+pub fn make_options_spec_single(
+    spec: &ConfigurableFieldSingleOption,
+    description: Option<&str>,
+) -> ConfigurableFieldSpec {
+    let options_str = spec.options.keys().cloned().collect::<Vec<_>>().join(", ");
+    ConfigurableFieldSpec {
+        id: spec.id.clone(),
+        annotation: format!("Enum[{}]", options_str),
+        name: spec.name.clone(),
+        description: spec
+            .description
+            .clone()
+            .or_else(|| description.map(String::from)),
+        default: Some(Value::String(spec.default.clone())),
+        is_shared: spec.is_shared,
+        dependencies: None,
+    }
+}
+
+/// Make a `ConfigurableFieldSpec` for a `ConfigurableFieldMultiOption`.
+pub fn make_options_spec_multi(
+    spec: &ConfigurableFieldMultiOption,
+    description: Option<&str>,
+) -> ConfigurableFieldSpec {
+    let options_str = spec.options.keys().cloned().collect::<Vec<_>>().join(", ");
+    ConfigurableFieldSpec {
+        id: spec.id.clone(),
+        annotation: format!("Sequence[Enum[{}]]", options_str),
+        name: spec.name.clone(),
+        description: spec
+            .description
+            .clone()
+            .or_else(|| description.map(String::from)),
+        default: Some(Value::Array(
+            spec.default
+                .iter()
+                .map(|s| Value::String(s.clone()))
+                .collect(),
+        )),
+        is_shared: spec.is_shared,
+        dependencies: None,
+    }
+}
+
+/// Remove a prefix from a string if it starts with that prefix.
+fn str_remove_prefix(s: &str, prefix: &str) -> String {
+    if s.starts_with(prefix) {
+        s[prefix.len()..].to_string()
+    } else {
+        s.to_string()
+    }
+}
+
+/// Trait for runnables that can be dynamically configured.
+///
+/// A `DynamicRunnable` should be created using the `configurable_fields` or
+/// `configurable_alternatives` methods of a `Runnable`.
+pub trait DynamicRunnable: Runnable {
+    /// Get the configuration specifications for this runnable.
+    fn config_specs(&self) -> Vec<ConfigurableFieldSpec>;
+
+    /// Prepare the runnable for invocation with the given configuration.
+    ///
+    /// Returns the prepared runnable and the configuration to use.
+    fn prepare(
+        &self,
+        config: Option<RunnableConfig>,
+    ) -> (
+        Arc<dyn Runnable<Input = Self::Input, Output = Self::Output> + Send + Sync>,
+        RunnableConfig,
+    );
+}
+
+/// A serializable runnable that can be dynamically configured.
+///
+/// This struct wraps a default runnable and allows its fields to be configured
+/// at runtime through the `configurable` section of `RunnableConfig`.
+#[derive(Debug)]
+pub struct RunnableConfigurableFields<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    /// The default runnable to use.
+    pub default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
+    /// The configurable fields.
+    pub fields: HashMap<String, AnyConfigurableField>,
+    /// Optional configuration to merge with invocation config.
+    pub config: Option<RunnableConfig>,
+}
+
+impl<I, O> Clone for RunnableConfigurableFields<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            default: Arc::clone(&self.default),
+            fields: self.fields.clone(),
+            config: self.config.clone(),
+        }
+    }
+}
+
+impl<I, O> RunnableConfigurableFields<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    /// Create a new `RunnableConfigurableFields`.
+    pub fn new(
+        default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
+        fields: HashMap<String, AnyConfigurableField>,
+    ) -> Self {
+        Self {
+            default,
+            fields,
+            config: None,
+        }
+    }
+
+    /// Set the configuration for this runnable.
+    pub fn with_config(mut self, config: RunnableConfig) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    /// Get the configuration specifications for this runnable.
+    pub fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        let mut config_specs = Vec::new();
+
+        for (_field_name, spec) in &self.fields {
+            match spec {
+                AnyConfigurableField::Field(field) => {
+                    config_specs.push(ConfigurableFieldSpec {
+                        id: field.id.clone(),
+                        annotation: field
+                            .annotation
+                            .clone()
+                            .unwrap_or_else(|| "Any".to_string()),
+                        name: field.name.clone(),
+                        description: field.description.clone(),
+                        default: None, // Would need reflection to get default from runnable
+                        is_shared: field.is_shared,
+                        dependencies: None,
+                    });
+                }
+                AnyConfigurableField::SingleOption(opt) => {
+                    config_specs.push(make_options_spec_single(opt, None));
+                }
+                AnyConfigurableField::MultiOption(opt) => {
+                    config_specs.push(make_options_spec_multi(opt, None));
+                }
+            }
+        }
+
+        get_unique_config_specs(config_specs).map_err(Error::other)
+    }
+
+    /// Prepare the runnable for invocation.
+    ///
+    /// This method resolves the configuration and returns the runnable to use
+    /// along with the resolved configuration.
+    fn prepare_internal(
+        &self,
+        config: Option<RunnableConfig>,
+    ) -> (
+        Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
+        RunnableConfig,
+    ) {
+        let merged = merge_configs(vec![self.config.clone(), config]);
+        let config = ensure_config(Some(merged));
+
+        // Build a map from spec ID to field name
+        let specs_by_id: HashMap<String, (&str, &AnyConfigurableField)> = self
+            .fields
+            .iter()
+            .map(|(key, spec)| {
+                let id = match spec {
+                    AnyConfigurableField::Field(f) => f.id.clone(),
+                    AnyConfigurableField::SingleOption(o) => o.id.clone(),
+                    AnyConfigurableField::MultiOption(o) => o.id.clone(),
+                };
+                (id, (key.as_str(), spec))
+            })
+            .collect();
+
+        // Extract configurable values from config
+        let mut configurable_fields: HashMap<String, Value> = HashMap::new();
+
+        for (key, value) in config.configurable.iter() {
+            if let Some((field_name, spec)) = specs_by_id.get(key) {
+                match spec {
+                    AnyConfigurableField::Field(_) => {
+                        configurable_fields.insert(field_name.to_string(), value.clone());
+                    }
+                    AnyConfigurableField::SingleOption(opt) => {
+                        // Get the value from options map
+                        if let Some(selected_key) = value.as_str() {
+                            if let Some(option_value) = opt.options.get(selected_key) {
+                                configurable_fields
+                                    .insert(field_name.to_string(), option_value.clone());
+                            }
+                        }
+                    }
+                    AnyConfigurableField::MultiOption(opt) => {
+                        // Get multiple values from options map
+                        if let Some(selected_keys) = value.as_array() {
+                            let values: Vec<Value> = selected_keys
+                                .iter()
+                                .filter_map(|k| k.as_str())
+                                .filter_map(|k| opt.options.get(k).cloned())
+                                .collect();
+                            configurable_fields
+                                .insert(field_name.to_string(), Value::Array(values));
+                        }
+                    }
+                }
+            }
+        }
+
+        // If no configuration changes, return the default
+        if configurable_fields.is_empty() {
+            return (Arc::clone(&self.default), config);
+        }
+
+        // For now, we cannot dynamically create a new instance with different fields
+        // in Rust without more infrastructure. Return the default with the config.
+        // In a real implementation, this would need a factory function or similar.
+        (Arc::clone(&self.default), config)
+    }
+}
+
+#[async_trait]
+impl<I, O> Runnable for RunnableConfigurableFields<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    type Input = I;
+    type Output = O;
+
+    fn name(&self) -> Option<String> {
+        self.default.name()
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let (runnable, config) = self.prepare_internal(config);
+        runnable.invoke(input, Some(config))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let (runnable, config) = self.prepare_internal(config);
+        runnable.ainvoke(input, Some(config)).await
+    }
+
+    fn batch(
+        &self,
+        inputs: Vec<Self::Input>,
+        config: Option<ConfigOrList>,
+        return_exceptions: bool,
+    ) -> Vec<Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        if inputs.is_empty() {
+            return Vec::new();
+        }
+
+        let configs = get_config_list(config, inputs.len());
+        let prepared: Vec<_> = configs
+            .iter()
+            .map(|c| self.prepare_internal(Some(c.clone())))
+            .collect();
+
+        // Check if all prepared runnables are the same as default
+        let all_default = prepared.iter().all(|(r, _)| Arc::ptr_eq(r, &self.default));
+
+        if all_default {
+            let prepared_configs: Vec<_> = prepared.into_iter().map(|(_, c)| c).collect();
+            return self.default.batch(
+                inputs,
+                Some(ConfigOrList::List(prepared_configs)),
+                return_exceptions,
+            );
+        }
+
+        // Otherwise, invoke each individually
+        inputs
+            .into_iter()
+            .zip(prepared)
+            .map(|(input, (runnable, config))| {
+                if return_exceptions {
+                    runnable.invoke(input, Some(config))
+                } else {
+                    runnable.invoke(input, Some(config))
+                }
+            })
+            .collect()
+    }
+
+    async fn abatch(
+        &self,
+        inputs: Vec<Self::Input>,
+        config: Option<ConfigOrList>,
+        return_exceptions: bool,
+    ) -> Vec<Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        if inputs.is_empty() {
+            return Vec::new();
+        }
+
+        let configs = get_config_list(config, inputs.len());
+        let prepared: Vec<_> = configs
+            .iter()
+            .map(|c| self.prepare_internal(Some(c.clone())))
+            .collect();
+
+        // Check if all prepared runnables are the same as default
+        let all_default = prepared.iter().all(|(r, _)| Arc::ptr_eq(r, &self.default));
+
+        if all_default {
+            let prepared_configs: Vec<_> = prepared.into_iter().map(|(_, c)| c).collect();
+            return self
+                .default
+                .abatch(
+                    inputs,
+                    Some(ConfigOrList::List(prepared_configs)),
+                    return_exceptions,
+                )
+                .await;
+        }
+
+        // Otherwise, invoke each individually with concurrency
+        let max_concurrency = configs.first().and_then(|c| c.max_concurrency);
+
+        let futures: Vec<_> = inputs
+            .into_iter()
+            .zip(prepared)
+            .map(|(input, (runnable, config))| {
+                Box::pin(async move { runnable.ainvoke(input, Some(config)).await })
+                    as std::pin::Pin<Box<dyn std::future::Future<Output = Result<O>> + Send>>
+            })
+            .collect();
+
+        gather_with_concurrency(max_concurrency, futures).await
+    }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        let (runnable, config) = self.prepare_internal(config);
+        // Note: This is a limitation - we need to return a stream that borrows self,
+        // but runnable doesn't live long enough. In a real implementation, we'd need
+        // to handle this differently, perhaps by storing the runnable.
+        Box::pin(async_stream::stream! {
+            let result = runnable.invoke(input, Some(config));
+            yield result;
+        })
+    }
+}
+
+/// A runnable that can be dynamically configured to choose between alternatives.
+///
+/// This struct allows selecting between different runnable implementations
+/// at runtime based on the `configurable` section of `RunnableConfig`.
+#[derive(Debug)]
+pub struct RunnableConfigurableAlternatives<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    /// The field that determines which alternative to use.
+    pub which: ConfigurableField,
+    /// The default runnable to use.
+    pub default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
+    /// The alternative runnables.
+    pub alternatives: HashMap<String, Alternative<I, O>>,
+    /// The key for the default option.
+    pub default_key: String,
+    /// Whether to prefix configurable fields of each alternative.
+    pub prefix_keys: bool,
+    /// Optional configuration to merge with invocation config.
+    pub config: Option<RunnableConfig>,
+}
+
+/// An alternative runnable - either a concrete runnable or a factory function.
+pub enum Alternative<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    /// A concrete runnable.
+    Runnable(Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>),
+    /// A factory function that creates a runnable.
+    Factory(Arc<dyn Fn() -> Arc<dyn Runnable<Input = I, Output = O> + Send + Sync> + Send + Sync>),
+}
+
+impl<I, O> Debug for Alternative<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Alternative::Runnable(_) => write!(f, "Alternative::Runnable(...)"),
+            Alternative::Factory(_) => write!(f, "Alternative::Factory(...)"),
+        }
+    }
+}
+
+impl<I, O> Clone for Alternative<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Alternative::Runnable(r) => Alternative::Runnable(Arc::clone(r)),
+            Alternative::Factory(f) => Alternative::Factory(Arc::clone(f)),
+        }
+    }
+}
+
+impl<I, O> Clone for RunnableConfigurableAlternatives<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            which: self.which.clone(),
+            default: Arc::clone(&self.default),
+            alternatives: self.alternatives.clone(),
+            default_key: self.default_key.clone(),
+            prefix_keys: self.prefix_keys,
+            config: self.config.clone(),
+        }
+    }
+}
+
+impl<I, O> RunnableConfigurableAlternatives<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    /// Create a new `RunnableConfigurableAlternatives`.
+    pub fn new(
+        which: ConfigurableField,
+        default: Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
+        alternatives: HashMap<String, Alternative<I, O>>,
+        default_key: impl Into<String>,
+        prefix_keys: bool,
+    ) -> Self {
+        Self {
+            which,
+            default,
+            alternatives,
+            default_key: default_key.into(),
+            prefix_keys,
+            config: None,
+        }
+    }
+
+    /// Set the configuration for this runnable.
+    pub fn with_config(mut self, config: RunnableConfig) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    /// Get the configuration specifications for this runnable.
+    pub fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
+        let mut all_keys: Vec<String> = self.alternatives.keys().cloned().collect();
+        all_keys.push(self.default_key.clone());
+
+        let which_spec = ConfigurableFieldSpec {
+            id: self.which.id.clone(),
+            annotation: format!("Enum[{}]", all_keys.join(", ")),
+            name: self.which.name.clone(),
+            description: self.which.description.clone(),
+            default: Some(Value::String(self.default_key.clone())),
+            is_shared: self.which.is_shared,
+            dependencies: None,
+        };
+
+        let specs = vec![which_spec];
+
+        // Note: In a full implementation, we would also add config specs from
+        // the default and alternative runnables, potentially with prefixes.
+        // This requires the runnables to implement a config_specs method.
+
+        get_unique_config_specs(specs).map_err(Error::other)
+    }
+
+    /// Prepare the runnable for invocation.
+    fn prepare_internal(
+        &self,
+        config: Option<RunnableConfig>,
+    ) -> Result<(
+        Arc<dyn Runnable<Input = I, Output = O> + Send + Sync>,
+        RunnableConfig,
+    )> {
+        let merged = merge_configs(vec![self.config.clone(), config]);
+        let config = ensure_config(Some(merged));
+
+        // Get which alternative to use
+        let which = config
+            .configurable
+            .get(&self.which.id)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| self.default_key.clone());
+
+        // Remap configurable keys if prefix_keys is enabled
+        let config = if self.prefix_keys {
+            let prefix = format!("{}=={}/", self.which.id, which);
+            let new_configurable: HashMap<String, Value> = config
+                .configurable
+                .iter()
+                .map(|(k, v)| (str_remove_prefix(k, &prefix), v.clone()))
+                .collect();
+            RunnableConfig {
+                configurable: new_configurable,
+                ..config
+            }
+        } else {
+            config
+        };
+
+        // Return the chosen alternative
+        if which == self.default_key {
+            return Ok((Arc::clone(&self.default), config));
+        }
+
+        if let Some(alt) = self.alternatives.get(&which) {
+            let runnable = match alt {
+                Alternative::Runnable(r) => Arc::clone(r),
+                Alternative::Factory(f) => f(),
+            };
+            return Ok((runnable, config));
+        }
+
+        Err(Error::other(format!("Unknown alternative: {}", which)))
+    }
+}
+
+#[async_trait]
+impl<I, O> Runnable for RunnableConfigurableAlternatives<I, O>
+where
+    I: Send + Sync + Clone + Debug + 'static,
+    O: Send + Sync + Clone + Debug + 'static,
+{
+    type Input = I;
+    type Output = O;
+
+    fn name(&self) -> Option<String> {
+        self.default.name()
+    }
+
+    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
+        let (runnable, config) = self.prepare_internal(config)?;
+        runnable.invoke(input, Some(config))
+    }
+
+    async fn ainvoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output>
+    where
+        Self: 'static,
+    {
+        let (runnable, config) = self.prepare_internal(config)?;
+        runnable.ainvoke(input, Some(config)).await
+    }
+
+    fn batch(
+        &self,
+        inputs: Vec<Self::Input>,
+        config: Option<ConfigOrList>,
+        return_exceptions: bool,
+    ) -> Vec<Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        if inputs.is_empty() {
+            return Vec::new();
+        }
+
+        let configs = get_config_list(config, inputs.len());
+        let prepared: Vec<_> = configs
+            .iter()
+            .map(|c| self.prepare_internal(Some(c.clone())))
+            .collect();
+
+        // Check if all prepared runnables are the same as default
+        let all_default = prepared.iter().all(|r| {
+            r.as_ref()
+                .map(|(runnable, _)| Arc::ptr_eq(runnable, &self.default))
+                .unwrap_or(false)
+        });
+
+        if all_default {
+            let prepared_configs: Vec<_> = prepared
+                .into_iter()
+                .filter_map(|r| r.ok())
+                .map(|(_, c)| c)
+                .collect();
+            return self.default.batch(
+                inputs,
+                Some(ConfigOrList::List(prepared_configs)),
+                return_exceptions,
+            );
+        }
+
+        // Otherwise, invoke each individually
+        inputs
+            .into_iter()
+            .zip(prepared)
+            .map(|(input, prepared_result)| match prepared_result {
+                Ok((runnable, config)) => runnable.invoke(input, Some(config)),
+                Err(e) => Err(e),
+            })
+            .collect()
+    }
+
+    async fn abatch(
+        &self,
+        inputs: Vec<Self::Input>,
+        config: Option<ConfigOrList>,
+        return_exceptions: bool,
+    ) -> Vec<Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        if inputs.is_empty() {
+            return Vec::new();
+        }
+
+        let configs = get_config_list(config, inputs.len());
+        let prepared: Vec<_> = configs
+            .iter()
+            .map(|c| self.prepare_internal(Some(c.clone())))
+            .collect();
+
+        // Check if all prepared runnables are the same as default
+        let all_default = prepared.iter().all(|r| {
+            r.as_ref()
+                .map(|(runnable, _)| Arc::ptr_eq(runnable, &self.default))
+                .unwrap_or(false)
+        });
+
+        if all_default {
+            let prepared_configs: Vec<_> = prepared
+                .into_iter()
+                .filter_map(|r| r.ok())
+                .map(|(_, c)| c)
+                .collect();
+            return self
+                .default
+                .abatch(
+                    inputs,
+                    Some(ConfigOrList::List(prepared_configs)),
+                    return_exceptions,
+                )
+                .await;
+        }
+
+        // Otherwise, invoke each individually
+        let mut results = Vec::with_capacity(inputs.len());
+        for (input, prepared_result) in inputs.into_iter().zip(prepared) {
+            let result = match prepared_result {
+                Ok((runnable, config)) => runnable.ainvoke(input, Some(config)).await,
+                Err(e) => Err(e),
+            };
+            results.push(result);
+        }
+
+        results
+    }
+
+    fn stream(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> BoxStream<'_, Result<Self::Output>> {
+        Box::pin(async_stream::stream! {
+            match self.prepare_internal(config) {
+                Ok((runnable, config)) => {
+                    let result = runnable.invoke(input, Some(config));
+                    yield result;
+                }
+                Err(e) => {
+                    yield Err(e);
+                }
+            }
+        })
+    }
+}
+
+/// Extension trait for adding configurable methods to runnables.
+pub trait ConfigurableRunnable: Runnable + Sized {
+    /// Create a configurable version of this runnable that allows configuring specific fields.
+    ///
+    /// # Arguments
+    ///
+    /// * `fields` - A map of field names to configurable field specifications.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use agent_chain_core::runnables::{ConfigurableField, ConfigurableRunnable};
+    ///
+    /// let configurable = my_runnable.configurable_fields([
+    ///     ("temperature".to_string(), AnyConfigurableField::Field(
+    ///         ConfigurableField::new("temperature")
+    ///             .with_name("LLM Temperature")
+    ///             .with_description("The temperature of the LLM")
+    ///     )),
+    /// ].into());
+    /// ```
+    fn configurable_fields(
+        self,
+        fields: HashMap<String, AnyConfigurableField>,
+    ) -> RunnableConfigurableFields<Self::Input, Self::Output>
+    where
+        Self: Send + Sync + 'static,
+    {
+        RunnableConfigurableFields::new(Arc::new(self), fields)
+    }
+
+    /// Create a configurable version of this runnable that allows selecting between alternatives.
+    ///
+    /// # Arguments
+    ///
+    /// * `which` - The configurable field that determines which alternative to use.
+    /// * `alternatives` - A map of alternative keys to runnables.
+    /// * `default_key` - The key for the default option (this runnable).
+    /// * `prefix_keys` - Whether to prefix configurable fields of each alternative.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use agent_chain_core::runnables::{ConfigurableField, ConfigurableRunnable, Alternative};
+    ///
+    /// let configurable = default_runnable.configurable_alternatives(
+    ///     ConfigurableField::new("model"),
+    ///     [("gpt4".to_string(), Alternative::Runnable(Arc::new(gpt4_runnable)))].into(),
+    ///     "default",
+    ///     false,
+    /// );
+    /// ```
+    fn configurable_alternatives(
+        self,
+        which: ConfigurableField,
+        alternatives: HashMap<String, Alternative<Self::Input, Self::Output>>,
+        default_key: impl Into<String>,
+        prefix_keys: bool,
+    ) -> RunnableConfigurableAlternatives<Self::Input, Self::Output>
+    where
+        Self: Send + Sync + 'static,
+    {
+        RunnableConfigurableAlternatives::new(
+            which,
+            Arc::new(self),
+            alternatives,
+            default_key,
+            prefix_keys,
+        )
+    }
+}
+
+// Implement ConfigurableRunnable for all Runnables
+impl<R> ConfigurableRunnable for R where R: Runnable + Sized {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runnables::base::RunnableLambda;
+
+    #[test]
+    fn test_prefix_config_spec() {
+        let spec = ConfigurableFieldSpec {
+            id: "temperature".to_string(),
+            annotation: "float".to_string(),
+            name: Some("Temperature".to_string()),
+            description: None,
+            default: Some(Value::Number(serde_json::Number::from_f64(0.7).unwrap())),
+            is_shared: false,
+            dependencies: None,
+        };
+
+        let prefixed = prefix_config_spec(&spec, "model==gpt4");
+        assert_eq!(prefixed.id, "model==gpt4/temperature");
+
+        // Shared specs should not be prefixed
+        let shared_spec = ConfigurableFieldSpec {
+            is_shared: true,
+            ..spec.clone()
+        };
+        let prefixed_shared = prefix_config_spec(&shared_spec, "model==gpt4");
+        assert_eq!(prefixed_shared.id, "temperature");
+    }
+
+    #[test]
+    fn test_str_remove_prefix() {
+        assert_eq!(
+            str_remove_prefix("model==gpt4/temperature", "model==gpt4/"),
+            "temperature"
+        );
+        assert_eq!(
+            str_remove_prefix("temperature", "model==gpt4/"),
+            "temperature"
+        );
+    }
+
+    #[test]
+    fn test_make_options_spec_single() {
+        let mut options = HashMap::new();
+        options.insert(
+            "low".to_string(),
+            Value::Number(serde_json::Number::from_f64(0.3).unwrap()),
+        );
+        options.insert(
+            "high".to_string(),
+            Value::Number(serde_json::Number::from_f64(0.9).unwrap()),
+        );
+
+        let spec = ConfigurableFieldSingleOption {
+            id: "temp_preset".to_string(),
+            options,
+            default: "low".to_string(),
+            name: Some("Temperature Preset".to_string()),
+            description: None,
+            is_shared: false,
+        };
+
+        let config_spec = make_options_spec_single(&spec, Some("Choose temperature"));
+        assert_eq!(config_spec.id, "temp_preset");
+        assert!(config_spec.annotation.contains("Enum"));
+        assert_eq!(config_spec.default, Some(Value::String("low".to_string())));
+    }
+
+    #[test]
+    fn test_configurable_fields_invoke() {
+        let runnable = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let fields = HashMap::new();
+        let configurable = runnable.configurable_fields(fields);
+
+        let result = configurable.invoke(5, None).unwrap();
+        assert_eq!(result, 10);
+    }
+
+    #[test]
+    fn test_configurable_alternatives_invoke() {
+        let default = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let alt = RunnableLambda::new(|x: i32| Ok(x * 3));
+
+        let mut alternatives = HashMap::new();
+        alternatives.insert("triple".to_string(), Alternative::Runnable(Arc::new(alt)));
+
+        let configurable = default.configurable_alternatives(
+            ConfigurableField::new("multiplier"),
+            alternatives,
+            "double",
+            false,
+        );
+
+        // Default behavior
+        let result = configurable.invoke(5, None).unwrap();
+        assert_eq!(result, 10);
+
+        // With alternative selected
+        let mut config = RunnableConfig::default();
+        config.configurable.insert(
+            "multiplier".to_string(),
+            Value::String("triple".to_string()),
+        );
+        let result = configurable.invoke(5, Some(config)).unwrap();
+        assert_eq!(result, 15);
+    }
+
+    #[test]
+    fn test_configurable_alternatives_unknown() {
+        let default = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let alternatives = HashMap::new();
+
+        let configurable = default.configurable_alternatives(
+            ConfigurableField::new("multiplier"),
+            alternatives,
+            "double",
+            false,
+        );
+
+        let mut config = RunnableConfig::default();
+        config.configurable.insert(
+            "multiplier".to_string(),
+            Value::String("unknown".to_string()),
+        );
+
+        let result = configurable.invoke(5, Some(config));
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_configurable_fields_ainvoke() {
+        let runnable = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let fields = HashMap::new();
+        let configurable = runnable.configurable_fields(fields);
+
+        let result = configurable.ainvoke(5, None).await.unwrap();
+        assert_eq!(result, 10);
+    }
+
+    #[tokio::test]
+    async fn test_configurable_alternatives_ainvoke() {
+        let default = RunnableLambda::new(|x: i32| Ok(x * 2));
+        let alt = RunnableLambda::new(|x: i32| Ok(x + 100));
+
+        let mut alternatives = HashMap::new();
+        alternatives.insert(
+            "add_hundred".to_string(),
+            Alternative::Runnable(Arc::new(alt)),
+        );
+
+        let configurable = default.configurable_alternatives(
+            ConfigurableField::new("operation"),
+            alternatives,
+            "double",
+            false,
+        );
+
+        let mut config = RunnableConfig::default();
+        config.configurable.insert(
+            "operation".to_string(),
+            Value::String("add_hundred".to_string()),
+        );
+
+        let result = configurable.ainvoke(5, Some(config)).await.unwrap();
+        assert_eq!(result, 105);
+    }
+
+    #[test]
+    fn test_configurable_with_factory() {
+        let default = RunnableLambda::new(|x: i32| Ok(x * 2));
+
+        let mut alternatives = HashMap::new();
+        alternatives.insert(
+            "triple".to_string(),
+            Alternative::Factory(Arc::new(|| {
+                Arc::new(RunnableLambda::new(|x: i32| Ok(x * 3)))
+                    as Arc<dyn Runnable<Input = i32, Output = i32> + Send + Sync>
+            })),
+        );
+
+        let configurable = default.configurable_alternatives(
+            ConfigurableField::new("multiplier"),
+            alternatives,
+            "double",
+            false,
+        );
+
+        let mut config = RunnableConfig::default();
+        config.configurable.insert(
+            "multiplier".to_string(),
+            Value::String("triple".to_string()),
+        );
+
+        let result = configurable.invoke(5, Some(config)).unwrap();
+        assert_eq!(result, 15);
+    }
+}
