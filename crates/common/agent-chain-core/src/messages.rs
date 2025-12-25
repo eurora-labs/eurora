@@ -42,7 +42,9 @@
 // Submodules - organized like langchain_core.messages
 mod ai;
 mod base;
+mod chat;
 mod content;
+mod function;
 mod human;
 mod modifier;
 mod system;
@@ -50,25 +52,45 @@ mod tool;
 mod utils;
 
 // Re-export from ai
-pub use ai::{AIMessage, InputTokenDetails, OutputTokenDetails, UsageMetadata};
+pub use ai::{
+    add_usage, subtract_usage, AIMessage, AIMessageChunk, InputTokenDetails, OutputTokenDetails,
+    UsageMetadata,
+};
 
 // Re-export from base
-pub use base::{BaseMessage, HasId};
+pub use base::{
+    merge_content, merge_content_vec, BaseMessage, BaseMessageChunk, HasId,
+    message_to_dict as base_message_to_dict, messages_to_dict as base_messages_to_dict,
+};
+
+// Re-export from chat
+pub use chat::{ChatMessage, ChatMessageChunk};
 
 // Re-export from content
 pub use content::{ContentPart, ImageDetail, ImageSource, MessageContent};
 
+// Re-export from function
+pub use function::{FunctionMessage, FunctionMessageChunk};
+
 // Re-export from human
-pub use human::HumanMessage;
+pub use human::{HumanMessage, HumanMessageChunk};
 
 // Re-export from modifier
 pub use modifier::RemoveMessage;
 
 // Re-export from system
-pub use system::SystemMessage;
+pub use system::{SystemMessage, SystemMessageChunk};
 
 // Re-export from tool
-pub use tool::{InvalidToolCall, ToolCall, ToolCallChunk, ToolMessage, ToolStatus};
+pub use tool::{
+    default_tool_chunk_parser, default_tool_parser, invalid_tool_call, tool_call, tool_call_chunk,
+    InvalidToolCall, ToolCall, ToolCallChunk, ToolMessage, ToolMessageChunk, ToolOutputMixin,
+    ToolStatus,
+};
 
 // Re-export from utils
-pub use utils::{get_buffer_string, message_to_dict, messages_to_dict, AnyMessage};
+pub use utils::{
+    convert_to_messages, filter_messages, get_buffer_string, merge_message_runs,
+    message_chunk_to_message, message_from_dict, message_to_dict, messages_from_dict,
+    messages_to_dict, AnyMessage, MessageLikeRepresentation,
+};
