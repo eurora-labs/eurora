@@ -29,6 +29,12 @@ impl From<&BaseMessage> for ProtoBaseMessage {
             BaseMessage::System(m) => ProtoMessageVariant::System(m.into()),
             BaseMessage::AI(m) => ProtoMessageVariant::Ai(m.into()),
             BaseMessage::Tool(m) => ProtoMessageVariant::Tool(m.into()),
+            BaseMessage::Remove(_) => {
+                // Remove messages are operational (for message list manipulation)
+                // and should not be serialized to proto format.
+                // If this is reached, it indicates a logic error in the caller.
+                unreachable!("Remove messages should be filtered before proto conversion")
+            }
         };
         ProtoBaseMessage {
             message: Some(message),
