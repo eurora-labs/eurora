@@ -21,9 +21,10 @@ pub enum PromptTemplateFormat {
     Jinja2,
 }
 
-impl PromptTemplateFormat {
-    /// Parse a format string into a PromptTemplateFormat.
-    pub fn from_str(s: &str) -> Result<Self> {
+impl std::str::FromStr for PromptTemplateFormat {
+    type Err = Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "f-string" | "fstring" | "f_string" => Ok(Self::FString),
             "mustache" => Ok(Self::Mustache),
@@ -34,7 +35,9 @@ impl PromptTemplateFormat {
             ))),
         }
     }
+}
 
+impl PromptTemplateFormat {
     /// Convert to a string representation.
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -65,6 +68,7 @@ impl<'de> serde::Deserialize<'de> for PromptTemplateFormat {
     where
         D: serde::Deserializer<'de>,
     {
+        use std::str::FromStr;
         let s = String::deserialize(deserializer)?;
         Self::from_str(&s).map_err(serde::de::Error::custom)
     }
@@ -444,6 +448,10 @@ pub trait StringPromptTemplate: Send + Sync {
 }
 
 /// Check if a value is a subsequence of another sequence.
+///
+/// This function checks if `child` is a prefix of `parent`.
+/// Part of the Python langchain_core API.
+#[allow(dead_code)]
 pub fn is_subsequence<T: PartialEq>(child: &[T], parent: &[T]) -> bool {
     if child.is_empty() || parent.is_empty() {
         return false;
@@ -460,6 +468,7 @@ mod tests {
 
     #[test]
     fn test_template_format_from_str() {
+        use std::str::FromStr;
         assert_eq!(
             PromptTemplateFormat::from_str("f-string").unwrap(),
             PromptTemplateFormat::FString

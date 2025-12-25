@@ -295,9 +295,7 @@ where
 
         match (left_val, right_val) {
             // Both are integers
-            (Some(Value::Number(l)), Some(Value::Number(r)))
-                if l.is_i64() && r.is_i64() =>
-            {
+            (Some(Value::Number(l)), Some(Value::Number(r))) if l.is_i64() && r.is_i64() => {
                 let l_int = l.as_i64().unwrap_or(default);
                 let r_int = r.as_i64().unwrap_or(default);
                 combined.insert(k, Value::Number(op(l_int, r_int).into()));

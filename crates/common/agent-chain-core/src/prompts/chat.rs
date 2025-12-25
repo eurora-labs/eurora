@@ -460,7 +460,7 @@ impl BaseStringMessagePromptTemplate for SystemMessagePromptTemplate {
 #[derive(Clone)]
 pub enum MessageLike {
     /// A base message.
-    Message(BaseMessage),
+    Message(Box<BaseMessage>),
     /// A message prompt template.
     Template(Box<dyn MessageLikeClone + Send + Sync>),
     /// A messages placeholder.
@@ -505,7 +505,7 @@ pub enum MessageLikeRepresentation {
     /// A string (shorthand for human message).
     String(String),
     /// A base message.
-    Message(BaseMessage),
+    Message(Box<BaseMessage>),
     /// A placeholder configuration.
     Placeholder {
         variable_name: String,

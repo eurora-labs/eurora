@@ -11,8 +11,8 @@ use uuid::Uuid;
 use specta::Type;
 
 use super::tool::{
-    default_tool_chunk_parser, default_tool_parser, invalid_tool_call, tool_call, InvalidToolCall,
-    ToolCall, ToolCallChunk,
+    InvalidToolCall, ToolCall, ToolCallChunk, default_tool_chunk_parser, default_tool_parser,
+    invalid_tool_call, tool_call,
 };
 use crate::utils::json::parse_partial_json;
 use crate::utils::merge::{merge_dicts, merge_lists};
@@ -598,14 +598,13 @@ impl AIMessageChunk {
                     .collect();
             }
             if !self.invalid_tool_calls.is_empty() {
-                self.tool_call_chunks.extend(self.invalid_tool_calls.iter().map(|tc| {
-                    ToolCallChunk {
+                self.tool_call_chunks
+                    .extend(self.invalid_tool_calls.iter().map(|tc| ToolCallChunk {
                         name: tc.name.clone(),
                         args: tc.args.clone(),
                         id: tc.id.clone(),
                         index: None,
-                    }
-                }));
+                    }));
             }
             return;
         }
@@ -760,17 +759,17 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
         match merge_lists(Some(left_chunks), other_chunks) {
             Ok(Some(merged)) => merged
                 .into_iter()
-                .filter_map(|v| {
+                .map(|v| {
                     let name = v.get("name").and_then(|n| n.as_str()).map(String::from);
                     let args = v.get("args").and_then(|a| a.as_str()).map(String::from);
                     let id = v.get("id").and_then(|i| i.as_str()).map(String::from);
                     let index = v.get("index").and_then(|i| i.as_i64()).map(|i| i as i32);
-                    Some(ToolCallChunk {
+                    ToolCallChunk {
                         name,
                         args,
                         id,
                         index,
-                    })
+                    }
                 })
                 .collect(),
             _ => {
@@ -784,17 +783,16 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
     };
 
     // Merge usage metadata
-    let usage_metadata = if left.usage_metadata.is_some()
-        || others.iter().any(|o| o.usage_metadata.is_some())
-    {
-        let mut result = left.usage_metadata.clone();
-        for other in &others {
-            result = Some(add_usage(result.as_ref(), other.usage_metadata.as_ref()));
-        }
-        result
-    } else {
-        None
-    };
+    let usage_metadata =
+        if left.usage_metadata.is_some() || others.iter().any(|o| o.usage_metadata.is_some()) {
+            let mut result = left.usage_metadata.clone();
+            for other in &others {
+                result = Some(add_usage(result.as_ref(), other.usage_metadata.as_ref()));
+            }
+            result
+        } else {
+            None
+        };
 
     // Select ID with priority: provider-assigned > lc_run-* > lc_*
     let chunk_id = {
@@ -803,60 +801,51 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
 
         // First pass: pick the first provider-assigned id (non-run-* and non-lc_*)
         let mut selected_id: Option<&str> = None;
-        for id in &candidates {
-            if let Some(id_str) = id {
-                if !id_str.starts_with(LC_ID_PREFIX) && !id_str.starts_with(LC_AUTO_PREFIX) {
-                    selected_id = Some(id_str);
-                    break;
-                }
+        for id_str in candidates.iter().flatten() {
+            if !id_str.starts_with(LC_ID_PREFIX) && !id_str.starts_with(LC_AUTO_PREFIX) {
+                selected_id = Some(id_str);
+                break;
             }
         }
 
         // Second pass: prefer lc_run-* IDs over lc_* IDs
         if selected_id.is_none() {
-            for id in &candidates {
-                if let Some(id_str) = id {
-                    if id_str.starts_with(LC_ID_PREFIX) {
-                        selected_id = Some(id_str);
-                        break;
-                    }
+            for id_str in candidates.iter().flatten() {
+                if id_str.starts_with(LC_ID_PREFIX) {
+                    selected_id = Some(id_str);
+                    break;
                 }
             }
         }
 
         // Third pass: take any remaining ID (auto-generated lc_* IDs)
-        if selected_id.is_none() {
-            for id in &candidates {
-                if let Some(id_str) = id {
-                    selected_id = Some(id_str);
-                    break;
-                }
-            }
+        if selected_id.is_none()
+            && let Some(id_str) = candidates.iter().flatten().next()
+        {
+            selected_id = Some(id_str);
         }
 
         selected_id.map(String::from)
     };
 
     // Determine chunk_position: if any chunk has "last", result is "last"
-    let chunk_position =
-        if left.chunk_position == Some(ChunkPosition::Last)
-            || others
-                .iter()
-                .any(|o| o.chunk_position == Some(ChunkPosition::Last))
-        {
-            Some(ChunkPosition::Last)
-        } else {
-            None
-        };
+    let chunk_position = if left.chunk_position == Some(ChunkPosition::Last)
+        || others
+            .iter()
+            .any(|o| o.chunk_position == Some(ChunkPosition::Last))
+    {
+        Some(ChunkPosition::Last)
+    } else {
+        None
+    };
 
     let mut result = AIMessageChunk {
         content,
         id: chunk_id,
-        name: left.name.clone().or_else(|| {
-            others
-                .iter()
-                .find_map(|o| o.name.clone())
-        }),
+        name: left
+            .name
+            .clone()
+            .or_else(|| others.iter().find_map(|o| o.name.clone())),
         tool_calls: left.tool_calls.clone(),
         invalid_tool_calls: left.invalid_tool_calls.clone(),
         tool_call_chunks,
@@ -1063,15 +1052,15 @@ pub fn backwards_compat_tool_calls(
     let mut invalid_tool_calls = Vec::new();
     let mut tool_call_chunks = Vec::new();
 
-    if let Some(raw_tool_calls) = additional_kwargs.get("tool_calls") {
-        if let Some(raw_array) = raw_tool_calls.as_array() {
-            if is_chunk {
-                tool_call_chunks = default_tool_chunk_parser(raw_array);
-            } else {
-                let (parsed_calls, parsed_invalid) = default_tool_parser(raw_array);
-                tool_calls = parsed_calls;
-                invalid_tool_calls = parsed_invalid;
-            }
+    if let Some(raw_tool_calls) = additional_kwargs.get("tool_calls")
+        && let Some(raw_array) = raw_tool_calls.as_array()
+    {
+        if is_chunk {
+            tool_call_chunks = default_tool_chunk_parser(raw_array);
+        } else {
+            let (parsed_calls, parsed_invalid) = default_tool_parser(raw_array);
+            tool_calls = parsed_calls;
+            invalid_tool_calls = parsed_invalid;
         }
     }
 
@@ -1113,9 +1102,15 @@ mod tests {
         assert_eq!(result.output_tokens, 10);
         assert_eq!(result.total_tokens, 15);
         assert!(result.input_token_details.is_some());
-        assert_eq!(result.input_token_details.as_ref().unwrap().cache_read, Some(3));
+        assert_eq!(
+            result.input_token_details.as_ref().unwrap().cache_read,
+            Some(3)
+        );
         assert!(result.output_token_details.is_some());
-        assert_eq!(result.output_token_details.as_ref().unwrap().reasoning, Some(4));
+        assert_eq!(
+            result.output_token_details.as_ref().unwrap().reasoning,
+            Some(4)
+        );
     }
 
     #[test]
@@ -1170,10 +1165,16 @@ mod tests {
         assert_eq!(result.total_tokens, 4);
         // cache_read should remain 4 (4 - 0 = 4)
         assert!(result.input_token_details.is_some());
-        assert_eq!(result.input_token_details.as_ref().unwrap().cache_read, Some(4));
+        assert_eq!(
+            result.input_token_details.as_ref().unwrap().cache_read,
+            Some(4)
+        );
         // reasoning should be 0 (0 - 4 = -4, floored to 0)
         assert!(result.output_token_details.is_some());
-        assert_eq!(result.output_token_details.as_ref().unwrap().reasoning, Some(0));
+        assert_eq!(
+            result.output_token_details.as_ref().unwrap().reasoning,
+            Some(0)
+        );
     }
 
     #[test]
