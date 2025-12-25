@@ -4,6 +4,7 @@
 //! mirroring `langchain_core.runnables`.
 
 pub mod base;
+pub mod branch;
 pub mod config;
 pub mod router;
 pub mod schema;
@@ -15,6 +16,7 @@ pub use base::{
     RunnablePassthrough, RunnableRetry, RunnableSequence, RunnableSerializable, coerce_to_runnable,
     pipe, runnable_lambda, to_dyn,
 };
+pub use branch::{RunnableBranch, RunnableBranchBuilder};
 pub use config::{
     ConfigOrList, RunnableConfig, ensure_config, get_config_list, merge_configs, patch_config,
 };
