@@ -10,7 +10,20 @@ use uuid::Uuid;
 #[cfg(feature = "specta")]
 use specta::Type;
 
-use super::tool::{InvalidToolCall, ToolCall, ToolCallChunk};
+use super::tool::{invalid_tool_call, tool_call, InvalidToolCall, ToolCall, ToolCallChunk};
+use crate::utils::json::parse_partial_json;
+use crate::utils::merge::{merge_dicts, merge_lists};
+
+/// LangChain auto-generated ID prefix for messages and content blocks.
+pub const LC_AUTO_PREFIX: &str = "lc_";
+
+/// Internal tracing/callback system identifier.
+///
+/// Used for:
+/// - Tracing. Every LangChain operation (LLM call, chain execution, tool use, etc.)
+///   gets a unique run_id (UUID)
+/// - Enables tracking parent-child relationships between operations
+pub const LC_ID_PREFIX: &str = "lc_run-";
 
 /// Breakdown of input token counts.
 ///
@@ -248,6 +261,12 @@ impl AIMessage {
         self
     }
 
+    /// Set invalid tool calls for this message.
+    pub fn with_invalid_tool_calls(mut self, invalid_tool_calls: Vec<InvalidToolCall>) -> Self {
+        self.invalid_tool_calls = invalid_tool_calls;
+        self
+    }
+
     /// Set usage metadata for this message.
     pub fn with_usage_metadata(mut self, usage_metadata: UsageMetadata) -> Self {
         self.usage_metadata = Some(usage_metadata);
@@ -326,6 +345,80 @@ impl AIMessage {
         self.additional_kwargs = additional_kwargs;
         self
     }
+
+    /// Get a pretty representation of the message.
+    ///
+    /// This corresponds to `pretty_repr` in LangChain Python.
+    pub fn pretty_repr(&self, _html: bool) -> String {
+        let title = "AI Message";
+        let sep_len = (80 - title.len() - 2) / 2;
+        let sep: String = "=".repeat(sep_len);
+        let header = format!("{} {} {}", sep, title, sep);
+
+        let mut lines = vec![header];
+
+        if let Some(name) = &self.name {
+            lines.push(format!("Name: {}", name));
+        }
+
+        lines.push(String::new());
+        lines.push(self.content.clone());
+
+        format_tool_calls_repr(&self.tool_calls, &self.invalid_tool_calls, &mut lines);
+
+        lines.join("\n").trim().to_string()
+    }
+}
+
+/// Helper function to format tool calls for pretty_repr.
+fn format_tool_calls_repr(
+    tool_calls: &[ToolCall],
+    invalid_tool_calls: &[InvalidToolCall],
+    lines: &mut Vec<String>,
+) {
+    if !tool_calls.is_empty() {
+        lines.push("Tool Calls:".to_string());
+        for tc in tool_calls {
+            lines.push(format!("  {} ({})", tc.name(), tc.id()));
+            lines.push(format!(" Call ID: {}", tc.id()));
+            lines.push("  Args:".to_string());
+            if let serde_json::Value::Object(args) = tc.args() {
+                for (arg, value) in args {
+                    lines.push(format!("    {}: {}", arg, value));
+                }
+            } else {
+                lines.push(format!("    {}", tc.args()));
+            }
+        }
+    }
+    if !invalid_tool_calls.is_empty() {
+        lines.push("Invalid Tool Calls:".to_string());
+        for itc in invalid_tool_calls {
+            let name = itc.name.as_deref().unwrap_or("Tool");
+            let id = itc.id.as_deref().unwrap_or("unknown");
+            lines.push(format!("  {} ({})", name, id));
+            lines.push(format!(" Call ID: {}", id));
+            if let Some(error) = &itc.error {
+                lines.push(format!("  Error: {}", error));
+            }
+            lines.push("  Args:".to_string());
+            if let Some(args) = &itc.args {
+                lines.push(format!("    {}", args));
+            }
+        }
+    }
+}
+
+/// Position indicator for an aggregated AIMessageChunk.
+///
+/// If a chunk with `chunk_position="last"` is aggregated into a stream,
+/// `tool_call_chunks` in message content will be parsed into `tool_calls`.
+#[cfg_attr(feature = "specta", derive(Type))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ChunkPosition {
+    /// This is the last chunk in the stream
+    Last,
 }
 
 /// AI message chunk (yielded when streaming).
@@ -362,6 +455,12 @@ pub struct AIMessageChunk {
     /// Response metadata
     #[serde(default)]
     response_metadata: HashMap<String, serde_json::Value>,
+    /// Optional span represented by an aggregated AIMessageChunk.
+    ///
+    /// If a chunk with `chunk_position=Some(ChunkPosition::Last)` is aggregated into a stream,
+    /// `tool_call_chunks` in message content will be parsed into `tool_calls`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunk_position: Option<ChunkPosition>,
 }
 
 impl AIMessageChunk {
@@ -377,6 +476,7 @@ impl AIMessageChunk {
             usage_metadata: None,
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
+            chunk_position: None,
         }
     }
 
@@ -392,6 +492,7 @@ impl AIMessageChunk {
             usage_metadata: None,
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
+            chunk_position: None,
         }
     }
 
@@ -410,6 +511,7 @@ impl AIMessageChunk {
             usage_metadata: None,
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
+            chunk_position: None,
         }
     }
 
@@ -458,47 +560,105 @@ impl AIMessageChunk {
         &self.response_metadata
     }
 
+    /// Get chunk position.
+    pub fn chunk_position(&self) -> Option<&ChunkPosition> {
+        self.chunk_position.as_ref()
+    }
+
+    /// Set chunk position.
+    pub fn set_chunk_position(&mut self, position: Option<ChunkPosition>) {
+        self.chunk_position = position;
+    }
+
+    /// Set tool calls.
+    pub fn set_tool_calls(&mut self, tool_calls: Vec<ToolCall>) {
+        self.tool_calls = tool_calls;
+    }
+
+    /// Set invalid tool calls.
+    pub fn set_invalid_tool_calls(&mut self, invalid_tool_calls: Vec<InvalidToolCall>) {
+        self.invalid_tool_calls = invalid_tool_calls;
+    }
+
+    /// Set tool call chunks.
+    pub fn set_tool_call_chunks(&mut self, tool_call_chunks: Vec<ToolCallChunk>) {
+        self.tool_call_chunks = tool_call_chunks;
+    }
+
+    /// Initialize tool calls from tool call chunks.
+    ///
+    /// This parses the tool_call_chunks and populates tool_calls and invalid_tool_calls.
+    /// This corresponds to `init_tool_calls` model validator in Python.
+    pub fn init_tool_calls(&mut self) {
+        if self.tool_call_chunks.is_empty() {
+            if !self.tool_calls.is_empty() {
+                self.tool_call_chunks = self
+                    .tool_calls
+                    .iter()
+                    .map(|tc| ToolCallChunk {
+                        name: Some(tc.name().to_string()),
+                        args: Some(tc.args().to_string()),
+                        id: Some(tc.id().to_string()),
+                        index: None,
+                    })
+                    .collect();
+            }
+            if !self.invalid_tool_calls.is_empty() {
+                self.tool_call_chunks.extend(self.invalid_tool_calls.iter().map(|tc| {
+                    ToolCallChunk {
+                        name: tc.name.clone(),
+                        args: tc.args.clone(),
+                        id: tc.id.clone(),
+                        index: None,
+                    }
+                }));
+            }
+            return;
+        }
+
+        let mut new_tool_calls = Vec::new();
+        let mut new_invalid_tool_calls = Vec::new();
+
+        for chunk in &self.tool_call_chunks {
+            let args_result = if let Some(args_str) = &chunk.args {
+                if args_str.is_empty() {
+                    Ok(serde_json::Value::Object(serde_json::Map::new()))
+                } else {
+                    parse_partial_json(args_str, false)
+                }
+            } else {
+                Ok(serde_json::Value::Object(serde_json::Map::new()))
+            };
+
+            match args_result {
+                Ok(args) if args.is_object() => {
+                    new_tool_calls.push(tool_call(
+                        chunk.name.clone().unwrap_or_default(),
+                        args,
+                        chunk.id.clone(),
+                    ));
+                }
+                _ => {
+                    new_invalid_tool_calls.push(invalid_tool_call(
+                        chunk.name.clone(),
+                        chunk.args.clone(),
+                        chunk.id.clone(),
+                        None,
+                    ));
+                }
+            }
+        }
+
+        self.tool_calls = new_tool_calls;
+        self.invalid_tool_calls = new_invalid_tool_calls;
+    }
+
     /// Concatenate this chunk with another chunk.
     ///
     /// This merges content, tool_call_chunks, and metadata.
+    /// For more sophisticated merging of multiple chunks, use `add_ai_message_chunks`.
     pub fn concat(&self, other: &AIMessageChunk) -> AIMessageChunk {
-        let mut content = self.content.clone();
-        content.push_str(&other.content);
-
-        let mut tool_call_chunks = self.tool_call_chunks.clone();
-        tool_call_chunks.extend(other.tool_call_chunks.clone());
-
-        // Merge additional_kwargs
-        let mut additional_kwargs = self.additional_kwargs.clone();
-        for (k, v) in &other.additional_kwargs {
-            additional_kwargs.insert(k.clone(), v.clone());
-        }
-
-        // Merge response_metadata
-        let mut response_metadata = self.response_metadata.clone();
-        for (k, v) in &other.response_metadata {
-            response_metadata.insert(k.clone(), v.clone());
-        }
-
-        // Merge usage metadata
-        let usage_metadata = match (&self.usage_metadata, &other.usage_metadata) {
-            (Some(a), Some(b)) => Some(a.add(b)),
-            (Some(a), None) => Some(a.clone()),
-            (None, Some(b)) => Some(b.clone()),
-            (None, None) => None,
-        };
-
-        AIMessageChunk {
-            content,
-            id: self.id.clone().or_else(|| other.id.clone()),
-            name: self.name.clone().or_else(|| other.name.clone()),
-            tool_calls: self.tool_calls.clone(),
-            invalid_tool_calls: self.invalid_tool_calls.clone(),
-            tool_call_chunks,
-            usage_metadata,
-            additional_kwargs,
-            response_metadata,
-        }
+        add_ai_message_chunks(self.clone(), vec![other.clone()])
     }
 
     /// Convert this chunk to a complete AIMessage.
@@ -514,13 +674,230 @@ impl AIMessageChunk {
             response_metadata: self.response_metadata.clone(),
         }
     }
+
+    /// Get a pretty representation of the message.
+    ///
+    /// This corresponds to `pretty_repr` in LangChain Python.
+    pub fn pretty_repr(&self, _html: bool) -> String {
+        let title = "AIMessageChunk";
+        let sep_len = (80 - title.len() - 2) / 2;
+        let sep: String = "=".repeat(sep_len);
+        let header = format!("{} {} {}", sep, title, sep);
+
+        let mut lines = vec![header];
+
+        if let Some(name) = &self.name {
+            lines.push(format!("Name: {}", name));
+        }
+
+        lines.push(String::new());
+        lines.push(self.content.clone());
+
+        format_tool_calls_repr(&self.tool_calls, &self.invalid_tool_calls, &mut lines);
+
+        lines.join("\n").trim().to_string()
+    }
+}
+
+/// Add multiple AIMessageChunks together.
+///
+/// This corresponds to `add_ai_message_chunks` in LangChain Python.
+///
+/// # Arguments
+///
+/// * `left` - The first AIMessageChunk.
+/// * `others` - Other AIMessageChunks to add.
+///
+/// # Returns
+///
+/// The resulting AIMessageChunk.
+pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) -> AIMessageChunk {
+    // Merge content (simple string concatenation for now)
+    let mut content = left.content.clone();
+    for other in &others {
+        content.push_str(&other.content);
+    }
+
+    // Merge additional_kwargs using merge_dicts
+    let additional_kwargs = {
+        let left_val = serde_json::to_value(&left.additional_kwargs).unwrap_or_default();
+        let other_vals: Vec<serde_json::Value> = others
+            .iter()
+            .map(|o| serde_json::to_value(&o.additional_kwargs).unwrap_or_default())
+            .collect();
+        match merge_dicts(left_val, other_vals) {
+            Ok(merged) => serde_json::from_value(merged).unwrap_or_default(),
+            Err(_) => left.additional_kwargs.clone(),
+        }
+    };
+
+    // Merge response_metadata using merge_dicts
+    let response_metadata = {
+        let left_val = serde_json::to_value(&left.response_metadata).unwrap_or_default();
+        let other_vals: Vec<serde_json::Value> = others
+            .iter()
+            .map(|o| serde_json::to_value(&o.response_metadata).unwrap_or_default())
+            .collect();
+        match merge_dicts(left_val, other_vals) {
+            Ok(merged) => serde_json::from_value(merged).unwrap_or_default(),
+            Err(_) => left.response_metadata.clone(),
+        }
+    };
+
+    // Merge tool_call_chunks using merge_lists
+    let tool_call_chunks = {
+        let left_chunks: Vec<serde_json::Value> = left
+            .tool_call_chunks
+            .iter()
+            .filter_map(|tc| serde_json::to_value(tc).ok())
+            .collect();
+        let other_chunks: Vec<Option<Vec<serde_json::Value>>> = others
+            .iter()
+            .map(|o| {
+                Some(
+                    o.tool_call_chunks
+                        .iter()
+                        .filter_map(|tc| serde_json::to_value(tc).ok())
+                        .collect(),
+                )
+            })
+            .collect();
+
+        match merge_lists(Some(left_chunks), other_chunks) {
+            Ok(Some(merged)) => merged
+                .into_iter()
+                .filter_map(|v| {
+                    let name = v.get("name").and_then(|n| n.as_str()).map(String::from);
+                    let args = v.get("args").and_then(|a| a.as_str()).map(String::from);
+                    let id = v.get("id").and_then(|i| i.as_str()).map(String::from);
+                    let index = v.get("index").and_then(|i| i.as_i64()).map(|i| i as i32);
+                    Some(ToolCallChunk {
+                        name,
+                        args,
+                        id,
+                        index,
+                    })
+                })
+                .collect(),
+            _ => {
+                let mut chunks = left.tool_call_chunks.clone();
+                for other in &others {
+                    chunks.extend(other.tool_call_chunks.clone());
+                }
+                chunks
+            }
+        }
+    };
+
+    // Merge usage metadata
+    let usage_metadata = if left.usage_metadata.is_some()
+        || others.iter().any(|o| o.usage_metadata.is_some())
+    {
+        let mut result = left.usage_metadata.clone();
+        for other in &others {
+            result = Some(add_usage(result.as_ref(), other.usage_metadata.as_ref()));
+        }
+        result
+    } else {
+        None
+    };
+
+    // Select ID with priority: provider-assigned > lc_run-* > lc_*
+    let chunk_id = {
+        let mut candidates = vec![left.id.as_deref()];
+        candidates.extend(others.iter().map(|o| o.id.as_deref()));
+
+        // First pass: pick the first provider-assigned id (non-run-* and non-lc_*)
+        let mut selected_id: Option<&str> = None;
+        for id in &candidates {
+            if let Some(id_str) = id {
+                if !id_str.starts_with(LC_ID_PREFIX) && !id_str.starts_with(LC_AUTO_PREFIX) {
+                    selected_id = Some(id_str);
+                    break;
+                }
+            }
+        }
+
+        // Second pass: prefer lc_run-* IDs over lc_* IDs
+        if selected_id.is_none() {
+            for id in &candidates {
+                if let Some(id_str) = id {
+                    if id_str.starts_with(LC_ID_PREFIX) {
+                        selected_id = Some(id_str);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Third pass: take any remaining ID (auto-generated lc_* IDs)
+        if selected_id.is_none() {
+            for id in &candidates {
+                if let Some(id_str) = id {
+                    selected_id = Some(id_str);
+                    break;
+                }
+            }
+        }
+
+        selected_id.map(String::from)
+    };
+
+    // Determine chunk_position: if any chunk has "last", result is "last"
+    let chunk_position =
+        if left.chunk_position == Some(ChunkPosition::Last)
+            || others
+                .iter()
+                .any(|o| o.chunk_position == Some(ChunkPosition::Last))
+        {
+            Some(ChunkPosition::Last)
+        } else {
+            None
+        };
+
+    let mut result = AIMessageChunk {
+        content,
+        id: chunk_id,
+        name: left.name.clone().or_else(|| {
+            others
+                .iter()
+                .find_map(|o| o.name.clone())
+        }),
+        tool_calls: left.tool_calls.clone(),
+        invalid_tool_calls: left.invalid_tool_calls.clone(),
+        tool_call_chunks,
+        usage_metadata,
+        additional_kwargs,
+        response_metadata,
+        chunk_position,
+    };
+
+    // Initialize tool calls from chunks if this is the last chunk
+    if result.chunk_position == Some(ChunkPosition::Last) {
+        result.init_tool_calls();
+    }
+
+    result
 }
 
 impl std::ops::Add for AIMessageChunk {
     type Output = AIMessageChunk;
 
     fn add(self, other: AIMessageChunk) -> AIMessageChunk {
-        self.concat(&other)
+        add_ai_message_chunks(self, vec![other])
+    }
+}
+
+impl std::iter::Sum for AIMessageChunk {
+    fn sum<I: Iterator<Item = AIMessageChunk>>(iter: I) -> AIMessageChunk {
+        let chunks: Vec<AIMessageChunk> = iter.collect();
+        if chunks.is_empty() {
+            AIMessageChunk::new("")
+        } else {
+            let first = chunks[0].clone();
+            let rest = chunks[1..].to_vec();
+            add_ai_message_chunks(first, rest)
+        }
     }
 }
 
