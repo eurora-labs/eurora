@@ -348,7 +348,13 @@ pub trait Serializable: Any + Send + Sync {
         Self: Sized,
     {
         let mut id = Self::get_lc_namespace();
-        id.push(std::any::type_name::<Self>().rsplit("::").next().unwrap_or("Unknown").to_string());
+        id.push(
+            std::any::type_name::<Self>()
+                .rsplit("::")
+                .next()
+                .unwrap_or("Unknown")
+                .to_string(),
+        );
         id
     }
 
@@ -403,12 +409,12 @@ pub trait Serializable: Any + Send + Sync {
 /// * `repr` - Optional string representation.
 pub fn to_json_not_implemented_value(type_name: &str, repr: Option<String>) -> Serialized {
     let id: Vec<String> = type_name.split("::").map(|s| s.to_string()).collect();
-    
+
     let mut result = SerializedNotImplemented::new(id);
     if let Some(r) = repr {
         result = result.with_repr(r);
     }
-    
+
     result.into()
 }
 
@@ -427,7 +433,7 @@ fn replace_secrets(
 ) -> HashMap<String, Value> {
     for (path, secret_id) in secrets_map {
         let parts: Vec<&str> = path.split('.').collect();
-        
+
         if parts.len() == 1 {
             if kwargs.contains_key(path) {
                 kwargs.insert(
@@ -449,7 +455,7 @@ fn replace_nested_secret(current: &mut HashMap<String, Value>, parts: &[&str], s
     }
 
     let key = parts[0];
-    
+
     if parts.len() == 1 {
         if current.contains_key(key) {
             current.insert(
@@ -458,9 +464,8 @@ fn replace_nested_secret(current: &mut HashMap<String, Value>, parts: &[&str], s
             );
         }
     } else if let Some(Value::Object(map)) = current.get_mut(key) {
-        let mut nested: HashMap<String, Value> = map.iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
+        let mut nested: HashMap<String, Value> =
+            map.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         replace_nested_secret(&mut nested, &parts[1..], secret_id);
         *map = nested.into_iter().collect();
     }
@@ -474,12 +479,16 @@ mod tests {
     fn test_serialized_constructor() {
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), Value::String("test".to_string()));
-        
+
         let constructor = SerializedConstructor::new(
-            vec!["langchain".to_string(), "llms".to_string(), "OpenAI".to_string()],
+            vec![
+                "langchain".to_string(),
+                "llms".to_string(),
+                "OpenAI".to_string(),
+            ],
             kwargs,
         );
-        
+
         assert_eq!(constructor.lc, 1);
         assert_eq!(constructor.type_, "constructor");
         assert_eq!(constructor.id.len(), 3);
@@ -488,7 +497,7 @@ mod tests {
     #[test]
     fn test_serialized_secret() {
         let secret = SerializedSecret::from_secret_id("OPENAI_API_KEY");
-        
+
         assert_eq!(secret.lc, 1);
         assert_eq!(secret.type_, "secret");
         assert_eq!(secret.id, vec!["OPENAI_API_KEY".to_string()]);
@@ -496,10 +505,10 @@ mod tests {
 
     #[test]
     fn test_serialized_not_implemented() {
-        let not_impl = SerializedNotImplemented::new(
-            vec!["my_module".to_string(), "MyClass".to_string()],
-        ).with_repr("MyClass(...)".to_string());
-        
+        let not_impl =
+            SerializedNotImplemented::new(vec!["my_module".to_string(), "MyClass".to_string()])
+                .with_repr("MyClass(...)".to_string());
+
         assert_eq!(not_impl.lc, 1);
         assert_eq!(not_impl.type_, "not_implemented");
         assert_eq!(not_impl.repr, Some("MyClass(...)".to_string()));
@@ -508,15 +517,21 @@ mod tests {
     #[test]
     fn test_replace_secrets() {
         let mut kwargs = HashMap::new();
-        kwargs.insert("api_key".to_string(), Value::String("secret_value".to_string()));
+        kwargs.insert(
+            "api_key".to_string(),
+            Value::String("secret_value".to_string()),
+        );
         kwargs.insert("model".to_string(), Value::String("gpt-4".to_string()));
-        
+
         let mut secrets = HashMap::new();
         secrets.insert("api_key".to_string(), "OPENAI_API_KEY".to_string());
-        
+
         let result = replace_secrets(kwargs, &secrets);
-        
+
         assert!(result.get("api_key").unwrap().is_object());
-        assert_eq!(result.get("model").unwrap(), &Value::String("gpt-4".to_string()));
+        assert_eq!(
+            result.get("model").unwrap(),
+            &Value::String("gpt-4".to_string())
+        );
     }
 }
