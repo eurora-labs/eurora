@@ -225,6 +225,13 @@ impl Message {
                     updated_at: now,
                 })
             }
+            BaseMessage::Remove(_) => {
+                // Remove messages are operational (for message list manipulation)
+                // and should not be stored in the database.
+                Err(serde_json::Error::custom(
+                    "Remove messages are operational and should not be persisted",
+                ))
+            }
         }
     }
 }
