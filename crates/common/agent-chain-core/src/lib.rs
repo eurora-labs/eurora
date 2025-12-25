@@ -26,6 +26,7 @@ pub mod callbacks;
 pub mod chat_models;
 pub mod error;
 pub mod messages;
+pub mod outputs;
 pub mod tools;
 pub mod utils;
 
@@ -46,6 +47,12 @@ pub use messages::{
 
 // Re-export tool types
 pub use tools::{Tool, ToolDefinition, tool};
+
+// Re-export output types
+pub use outputs::{
+    ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, Generation,
+    GenerationChunk, GenerationType, LLMResult, RunInfo, merge_chat_generation_chunks,
+};
 
 // Re-export callback types
 pub use callbacks::{
