@@ -15,20 +15,15 @@ use crate::outputs::{ChatGenerationChunk, GenerationChunk, LLMResult};
 use crate::tracers::schemas::{Run, RunEvent};
 
 /// Schema format type for tracers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SchemaFormat {
     /// Original format used by all current tracers.
+    #[default]
     Original,
     /// Streaming events format for internal usage.
     StreamingEvents,
     /// Original format with chat model support.
     OriginalChat,
-}
-
-impl Default for SchemaFormat {
-    fn default() -> Self {
-        SchemaFormat::Original
-    }
 }
 
 /// Configuration for TracerCore.
@@ -137,16 +132,16 @@ pub trait TracerCore: Send + Sync + Debug {
             .run_map()
             .get(&run_id.to_string())
             .cloned()
-            .ok_or_else(|| TracerError::RunNotFound(run_id))?;
+            .ok_or(TracerError::RunNotFound(run_id))?;
 
-        if let Some(expected_types) = run_type {
-            if !expected_types.contains(&run.run_type.as_str()) {
-                return Err(TracerError::WrongRunType {
-                    run_id,
-                    expected: expected_types.iter().map(|s| s.to_string()).collect(),
-                    actual: run.run_type.clone(),
-                });
-            }
+        if let Some(expected_types) = run_type
+            && !expected_types.contains(&run.run_type.as_str())
+        {
+            return Err(TracerError::WrongRunType {
+                run_id,
+                expected: expected_types.iter().map(|s| s.to_string()).collect(),
+                actual: run.run_type.clone(),
+            });
         }
 
         Ok(run)
@@ -158,6 +153,7 @@ pub trait TracerCore: Send + Sync + Debug {
     }
 
     /// Create a chat model run.
+    #[allow(clippy::too_many_arguments)]
     fn create_chat_model_run(
         &self,
         serialized: HashMap<String, Value>,
@@ -230,6 +226,7 @@ pub trait TracerCore: Send + Sync + Debug {
     }
 
     /// Create an LLM run.
+    #[allow(clippy::too_many_arguments)]
     fn create_llm_run(
         &self,
         serialized: HashMap<String, Value>,
@@ -367,15 +364,12 @@ pub trait TracerCore: Send + Sync + Debug {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        if !omit_outputs {
-            if let Some(outputs) = &mut run.outputs {
-                if let Ok(response_value) = serde_json::to_value(response) {
-                    if let Value::Object(map) = response_value {
-                        for (k, v) in map {
-                            outputs.insert(k, v);
-                        }
-                    }
-                }
+        if !omit_outputs
+            && let Some(outputs) = &mut run.outputs
+            && let Ok(Value::Object(map)) = serde_json::to_value(response)
+        {
+            for (k, v) in map {
+                outputs.insert(k, v);
             }
         }
 
@@ -420,15 +414,12 @@ pub trait TracerCore: Send + Sync + Debug {
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
 
-            if !omit_outputs {
-                if let Some(outputs) = &mut run.outputs {
-                    if let Ok(response_value) = serde_json::to_value(resp) {
-                        if let Value::Object(map) = response_value {
-                            for (k, v) in map {
-                                outputs.insert(k, v);
-                            }
-                        }
-                    }
+            if !omit_outputs
+                && let Some(outputs) = &mut run.outputs
+                && let Ok(Value::Object(map)) = serde_json::to_value(resp)
+            {
+                for (k, v) in map {
+                    outputs.insert(k, v);
                 }
             }
         }
@@ -441,6 +432,7 @@ pub trait TracerCore: Send + Sync + Debug {
     }
 
     /// Create a chain run.
+    #[allow(clippy::too_many_arguments)]
     fn create_chain_run(
         &self,
         serialized: HashMap<String, Value>,
@@ -537,10 +529,8 @@ pub trait TracerCore: Send + Sync + Debug {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        if !omit_outputs {
-            if let Some(outputs) = &mut run.outputs {
-                outputs.extend(processed_outputs);
-            }
+        if !omit_outputs && let Some(outputs) = &mut run.outputs {
+            outputs.extend(processed_outputs);
         }
 
         run.end_time = Some(Utc::now());
@@ -581,6 +571,7 @@ pub trait TracerCore: Send + Sync + Debug {
     }
 
     /// Create a tool run.
+    #[allow(clippy::too_many_arguments)]
     fn create_tool_run(
         &self,
         serialized: HashMap<String, Value>,
@@ -663,10 +654,8 @@ pub trait TracerCore: Send + Sync + Debug {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        if !omit_outputs {
-            if let Some(outputs) = &mut run.outputs {
-                outputs.insert("output".to_string(), output);
-            }
+        if !omit_outputs && let Some(outputs) = &mut run.outputs {
+            outputs.insert("output".to_string(), output);
         }
 
         run.end_time = Some(Utc::now());
@@ -704,6 +693,7 @@ pub trait TracerCore: Send + Sync + Debug {
     }
 
     /// Create a retrieval run.
+    #[allow(clippy::too_many_arguments)]
     fn create_retrieval_run(
         &self,
         serialized: HashMap<String, Value>,
@@ -780,10 +770,8 @@ pub trait TracerCore: Send + Sync + Debug {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        if !omit_outputs {
-            if let Some(outputs) = &mut run.outputs {
-                outputs.insert("documents".to_string(), Value::Array(documents));
-            }
+        if !omit_outputs && let Some(outputs) = &mut run.outputs {
+            outputs.insert("documents".to_string(), Value::Array(documents));
         }
 
         run.end_time = Some(Utc::now());

@@ -142,13 +142,13 @@ impl RunnableConfig {
 /// Either a single RunnableConfig or a list of them.
 #[derive(Debug, Clone)]
 pub enum ConfigOrList {
-    Single(RunnableConfig),
+    Single(Box<RunnableConfig>),
     List(Vec<RunnableConfig>),
 }
 
 impl From<RunnableConfig> for ConfigOrList {
     fn from(config: RunnableConfig) -> Self {
-        ConfigOrList::Single(config)
+        ConfigOrList::Single(Box::new(config))
     }
 }
 
@@ -178,17 +178,17 @@ pub fn get_config_list(config: Option<ConfigOrList>, length: usize) -> Vec<Runna
                     "Warning: Provided run_id will be used only for the first element of the batch."
                 );
                 let mut configs = Vec::with_capacity(length);
-                configs.push(c.clone());
+                configs.push((*c).clone());
 
                 // Create subsequent configs without run_id
-                let mut subsequent = c;
+                let mut subsequent = *c;
                 subsequent.run_id = None;
                 for _ in 1..length {
                     configs.push(subsequent.clone());
                 }
                 configs
             } else {
-                vec![c; length]
+                vec![*c; length]
             }
         }
         Some(ConfigOrList::List(list)) => {
@@ -405,7 +405,7 @@ mod tests {
         assert_eq!(configs.len(), 3);
 
         let single = RunnableConfig::new().with_recursion_limit(10);
-        let configs = get_config_list(Some(ConfigOrList::Single(single)), 3);
+        let configs = get_config_list(Some(ConfigOrList::Single(Box::new(single))), 3);
         assert_eq!(configs.len(), 3);
         assert!(configs.iter().all(|c| c.recursion_limit == 10));
     }
@@ -453,7 +453,7 @@ mod tests {
             .with_run_id(uuid::Uuid::new_v4())
             .with_recursion_limit(10);
 
-        let configs = get_config_list(Some(ConfigOrList::Single(config.clone())), 3);
+        let configs = get_config_list(Some(ConfigOrList::Single(Box::new(config.clone()))), 3);
         assert_eq!(configs.len(), 3);
         // First config should have the run_id
         assert!(configs[0].run_id.is_some());

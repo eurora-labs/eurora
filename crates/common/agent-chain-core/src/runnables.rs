@@ -5,6 +5,8 @@
 
 pub mod base;
 pub mod config;
+pub mod router;
+pub mod schema;
 pub mod utils;
 
 // Re-export commonly used types
@@ -15,6 +17,11 @@ pub use base::{
 };
 pub use config::{
     ConfigOrList, RunnableConfig, ensure_config, get_config_list, merge_configs, patch_config,
+};
+pub use router::{DynRouterRunnable, RouterInput, RouterRunnable};
+pub use schema::{
+    BaseStreamEvent, CUSTOM_EVENT_TYPE, CustomStreamEvent, EventData, StandardStreamEvent,
+    StreamEvent,
 };
 pub use utils::{
     AddableDict, AnyConfigurableField, ConfigurableField, ConfigurableFieldMultiOption,
