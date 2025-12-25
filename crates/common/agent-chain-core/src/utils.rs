@@ -30,5 +30,8 @@ pub use json_schema::{dereference_refs, remove_titles};
 pub use merge::{merge_dicts, merge_lists, merge_obj};
 pub use mustache::{MustacheValue, render as render_mustache};
 pub use strings::{comma_list, sanitize_for_postgres, stringify_dict, stringify_value};
-pub use usage::{UsageValue, dict_int_add, dict_int_op, dict_int_sub};
+pub use usage::{
+    UsageValue, dict_int_add, dict_int_add_json, dict_int_op, dict_int_op_json, dict_int_sub,
+    dict_int_sub_floor_json,
+};
 pub use uuid::{LC_AUTO_PREFIX, LC_ID_PREFIX, ensure_id, uuid4, uuid7};

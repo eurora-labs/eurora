@@ -24,7 +24,7 @@ url = "2"
 uuid = { workspace = true, features = ["v4", "v7", "serde"] }
 
 [dev-dependencies]
-tempfile = "3.15"
+tempfile = { workspace = true }
 
 [features]
 default = []
