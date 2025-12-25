@@ -21,6 +21,7 @@
 //! - `default`: Includes all providers
 //! - `specta`: Specta derive support
 
+pub mod api;
 pub mod callbacks;
 pub mod chat_models;
 pub mod error;
