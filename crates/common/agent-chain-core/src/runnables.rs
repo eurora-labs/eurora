@@ -8,6 +8,7 @@ pub mod branch;
 pub mod config;
 pub mod configurable;
 pub mod fallbacks;
+pub mod passthrough;
 pub mod router;
 pub mod schema;
 pub mod utils;
@@ -15,8 +16,8 @@ pub mod utils;
 // Re-export commonly used types
 pub use base::{
     DynRunnable, Runnable, RunnableBinding, RunnableEach, RunnableLambda, RunnableParallel,
-    RunnablePassthrough, RunnableRetry, RunnableSequence, RunnableSerializable, coerce_to_runnable,
-    pipe, runnable_lambda, to_dyn,
+    RunnableRetry, RunnableSequence, RunnableSerializable, coerce_to_runnable, pipe,
+    runnable_lambda, to_dyn,
 };
 pub use branch::{RunnableBranch, RunnableBranchBuilder};
 pub use config::{
@@ -28,6 +29,10 @@ pub use configurable::{
     prefix_config_spec,
 };
 pub use fallbacks::{RunnableWithFallbacks, RunnableWithFallbacksExt};
+pub use passthrough::{
+    PickKeys, RunnableAssign, RunnableAssignBuilder, RunnablePassthrough, RunnablePick,
+    graph_passthrough,
+};
 pub use router::{DynRouterRunnable, RouterInput, RouterRunnable};
 pub use schema::{
     BaseStreamEvent, CUSTOM_EVENT_TYPE, CustomStreamEvent, EventData, StandardStreamEvent,
