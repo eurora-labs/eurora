@@ -27,7 +27,7 @@ use std::collections::HashSet;
 ///
 /// ```
 /// use std::collections::HashMap;
-/// use agent_chain_core::utils::usage::{dict_int_op, dict_int_add};
+/// use agent_chain_core::utils::usage::{dict_int_add, UsageValue};
 ///
 /// let mut left = HashMap::new();
 /// left.insert("a".to_string(), UsageValue::Int(1));
