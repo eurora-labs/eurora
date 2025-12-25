@@ -179,6 +179,7 @@ impl FewShotPromptWithTemplates {
     }
 
     /// Async get examples based on kwargs.
+    #[allow(dead_code)]
     async fn aget_examples(
         &self,
         kwargs: &HashMap<String, String>,
@@ -315,14 +316,17 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
         })
     }
 
-    fn save(&self, file_path: &Path) -> Result<()> {
+    fn save(&self, _file_path: &Path) -> Result<()> {
         if self.example_selector.is_some() {
             return Err(Error::InvalidConfig(
                 "Saving an example selector is not currently supported".to_string(),
             ));
         }
-        // Call default save implementation
-        BasePromptTemplate::save(self, file_path)
+        // Note: Cannot call default save implementation due to recursion.
+        // The save functionality for few-shot prompts with templates is not fully supported.
+        Err(Error::InvalidConfig(
+            "Saving few-shot prompts with templates is not currently supported".to_string(),
+        ))
     }
 }
 

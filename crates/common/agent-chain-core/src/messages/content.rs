@@ -1372,42 +1372,47 @@ pub fn create_file_block(
     })
 }
 
+/// Configuration for creating a `PlainTextContentBlock`.
+#[derive(Debug, Clone, Default)]
+pub struct PlainTextBlockConfig {
+    /// The plaintext content.
+    pub text: Option<String>,
+    /// URL of the plaintext file.
+    pub url: Option<String>,
+    /// Base64-encoded plaintext data.
+    pub base64: Option<String>,
+    /// ID of the plaintext file from a file storage system.
+    pub file_id: Option<String>,
+    /// Title of the text data.
+    pub title: Option<String>,
+    /// Context or description of the text content.
+    pub context: Option<String>,
+    /// Content block identifier. Generated automatically if not provided.
+    pub id: Option<String>,
+    /// Index of block in aggregate response.
+    pub index: Option<BlockIndex>,
+    /// Provider-specific metadata.
+    pub extras: Option<HashMap<String, serde_json::Value>>,
+}
+
 /// Create a `PlainTextContentBlock`.
 ///
 /// # Arguments
 ///
-/// * `text` - The plaintext content.
-/// * `url` - URL of the plaintext file.
-/// * `base64` - Base64-encoded plaintext data.
-/// * `file_id` - ID of the plaintext file from a file storage system.
-/// * `title` - Title of the text data.
-/// * `context` - Context or description of the text content.
-/// * `id` - Content block identifier. Generated automatically if not provided.
-/// * `index` - Index of block in aggregate response.
-/// * `extras` - Provider-specific metadata.
-pub fn create_plaintext_block(
-    text: Option<String>,
-    url: Option<String>,
-    base64: Option<String>,
-    file_id: Option<String>,
-    title: Option<String>,
-    context: Option<String>,
-    id: Option<String>,
-    index: Option<BlockIndex>,
-    extras: Option<HashMap<String, serde_json::Value>>,
-) -> PlainTextContentBlock {
+/// * `config` - Configuration for the plaintext block.
+pub fn create_plaintext_block(config: PlainTextBlockConfig) -> PlainTextContentBlock {
     PlainTextContentBlock {
         block_type: "text-plain".to_string(),
         mime_type: "text/plain".to_string(),
-        id: Some(ensure_id(id)),
-        text,
-        url,
-        base64,
-        file_id,
-        title,
-        context,
-        index,
-        extras,
+        id: Some(ensure_id(config.id)),
+        text: config.text,
+        url: config.url,
+        base64: config.base64,
+        file_id: config.file_id,
+        title: config.title,
+        context: config.context,
+        index: config.index,
+        extras: config.extras,
     }
 }
 
