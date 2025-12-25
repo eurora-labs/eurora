@@ -224,6 +224,29 @@ impl ChatAnthropic {
                         }]
                     }));
                 }
+                BaseMessage::Chat(m) => {
+                    // Map chat messages based on role
+                    let role = match m.role() {
+                        "user" | "human" => "user",
+                        "assistant" | "ai" => "assistant",
+                        _ => "user", // Default to user for unknown roles
+                    };
+                    conversation.push(serde_json::json!({
+                        "role": role,
+                        "content": m.content()
+                    }));
+                }
+                BaseMessage::Function(m) => {
+                    // Function messages are legacy, treat like tool results
+                    conversation.push(serde_json::json!({
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": m.name(), // Use function name as tool_use_id
+                            "content": m.content()
+                        }]
+                    }));
+                }
                 BaseMessage::Remove(_) => {
                     // RemoveMessage is used for message management, not sent to API
                     continue;
