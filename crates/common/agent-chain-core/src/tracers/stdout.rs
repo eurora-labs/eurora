@@ -171,7 +171,10 @@ where
         (self.function_callback)(&format!(
             "{} {}{}",
             get_colored_text("[chain/start]", "green"),
-            get_bolded_text(&format!("[{}] Entering {} run with input:\n", crumbs, run_type)),
+            get_bolded_text(&format!(
+                "[{}] Entering {} run with input:\n",
+                crumbs, run_type
+            )),
             try_json_stringify(&inputs, "[inputs]")
         ));
     }

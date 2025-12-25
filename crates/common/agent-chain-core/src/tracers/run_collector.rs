@@ -103,10 +103,7 @@ impl RunCollectorCallbackHandler {
     ///
     /// * `name` - The name of runs to get.
     pub fn runs_by_name(&self, name: &str) -> Vec<&Run> {
-        self.traced_runs
-            .iter()
-            .filter(|r| r.name == name)
-            .collect()
+        self.traced_runs.iter().filter(|r| r.name == name).collect()
     }
 
     /// Get runs that have errors.
@@ -189,7 +186,8 @@ mod tests {
     #[test]
     fn test_run_collector_with_example_id_str() {
         let uuid = Uuid::new_v4();
-        let collector = RunCollectorCallbackHandler::with_example_id_str(&uuid.to_string()).unwrap();
+        let collector =
+            RunCollectorCallbackHandler::with_example_id_str(&uuid.to_string()).unwrap();
         assert_eq!(collector.example_id(), Some(uuid));
     }
 
@@ -209,7 +207,10 @@ mod tests {
         collector.persist_run_impl(&run);
 
         assert_eq!(collector.len(), 1);
-        assert_eq!(collector.traced_runs[0].reference_example_id, Some(example_id));
+        assert_eq!(
+            collector.traced_runs[0].reference_example_id,
+            Some(example_id)
+        );
     }
 
     #[test]
