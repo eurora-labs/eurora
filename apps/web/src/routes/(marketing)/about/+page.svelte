@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
-	import UsersIcon from '@lucide/svelte/icons/users';
 	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
-	import GraduationCapIcon from '@lucide/svelte/icons/graduation-cap';
-	import MailIcon from '@lucide/svelte/icons/mail';
 	import GithubIcon from '@lucide/svelte/icons/github';
+	import GraduationCapIcon from '@lucide/svelte/icons/graduation-cap';
 	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import UsersIcon from '@lucide/svelte/icons/users';
 	// Use static images instead of importing from lib
 	const laura_thommen_img = '/images/avatars/laura_thommen.jpg';
 	const andre_roelofs_img = '/images/avatars/andre_roelofs.jpg';
