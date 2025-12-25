@@ -57,13 +57,13 @@ pub fn parse_partial_json(s: &str, strict: bool) -> Result<Value, JsonParseError
             stack.push('}');
         } else if char == '[' {
             stack.push(']');
-        } else if char == '}' || char == ']' {
-            if let Some(expected) = stack.last() {
-                if *expected == char {
-                    stack.pop();
-                } else {
-                    return Err(JsonParseError::MismatchedBracket);
-                }
+        } else if (char == '}' || char == ']')
+            && let Some(expected) = stack.last()
+        {
+            if *expected == char {
+                stack.pop();
+            } else {
+                return Err(JsonParseError::MismatchedBracket);
             }
         }
 
@@ -133,18 +133,18 @@ pub fn parse_json_markdown(json_string: &str) -> Result<Value, JsonParseError> {
     }
 
     let re = Regex::new(r"```(?:json)?(.*?)```").expect("Invalid regex");
-    if let Some(caps) = re.captures(json_string) {
-        if let Some(content) = caps.get(1) {
-            return parse_json_inner(content.as_str());
-        }
+    if let Some(caps) = re.captures(json_string)
+        && let Some(content) = caps.get(1)
+    {
+        return parse_json_inner(content.as_str());
     }
 
     let re_dotall = Regex::new(r"(?s)```(?:json)?(.*?)").expect("Invalid regex");
-    if let Some(caps) = re_dotall.captures(json_string) {
-        if let Some(content) = caps.get(1) {
-            let json_str = content.as_str().trim_end_matches('`');
-            return parse_json_inner(json_str);
-        }
+    if let Some(caps) = re_dotall.captures(json_string)
+        && let Some(content) = caps.get(1)
+    {
+        let json_str = content.as_str().trim_end_matches('`');
+        return parse_json_inner(json_str);
     }
 
     parse_json_inner(json_string)

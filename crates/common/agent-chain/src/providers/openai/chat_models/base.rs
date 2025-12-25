@@ -358,12 +358,12 @@ impl ChatOpenAI {
     fn format_messages(&self, messages: &[BaseMessage]) -> Vec<serde_json::Value> {
         messages
             .iter()
-            .map(|msg| match msg {
+            .filter_map(|msg| match msg {
                 BaseMessage::System(m) => {
-                    serde_json::json!({
+                    Some(serde_json::json!({
                         "role": "system",
                         "content": m.content()
-                    })
+                    }))
                 }
                 BaseMessage::Human(m) => {
                     let content = match m.message_content() {
@@ -403,10 +403,10 @@ impl ChatOpenAI {
                             serde_json::Value::Array(content_parts)
                         }
                     };
-                    serde_json::json!({
+                    Some(serde_json::json!({
                         "role": "user",
                         "content": content
-                    })
+                    }))
                 }
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
@@ -435,14 +435,18 @@ impl ChatOpenAI {
                         message["tool_calls"] = serde_json::Value::Array(tool_calls);
                     }
 
-                    message
+                    Some(message)
                 }
                 BaseMessage::Tool(m) => {
-                    serde_json::json!({
+                    Some(serde_json::json!({
                         "role": "tool",
                         "tool_call_id": m.tool_call_id(),
                         "content": m.content()
-                    })
+                    }))
+                }
+                BaseMessage::Remove(_) => {
+                    // RemoveMessage is used for message management, not sent to API
+                    None
                 }
             })
             .collect()
@@ -867,6 +871,10 @@ impl ChatOpenAI {
                         "call_id": m.tool_call_id(),
                         "output": m.content()
                     }));
+                }
+                BaseMessage::Remove(_) => {
+                    // RemoveMessage is used for message management, not sent to API
+                    continue;
                 }
             }
         }

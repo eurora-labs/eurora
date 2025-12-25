@@ -224,6 +224,10 @@ impl ChatAnthropic {
                         }]
                     }));
                 }
+                BaseMessage::Remove(_) => {
+                    // RemoveMessage is used for message management, not sent to API
+                    continue;
+                }
             }
         }
 

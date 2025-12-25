@@ -101,10 +101,9 @@ pub fn merge_dicts(left: Value, others: Vec<Value>) -> Result<Value, MergeError>
                             );
                         } else if let (Some(left_f), Some(right_f)) =
                             (left_num.as_f64(), right_num.as_f64())
+                            && let Some(num) = serde_json::Number::from_f64(left_f + right_f)
                         {
-                            if let Some(num) = serde_json::Number::from_f64(left_f + right_f) {
-                                merged.insert(right_k, Value::Number(num));
-                            }
+                            merged.insert(right_k, Value::Number(num));
                         }
                     }
                     (left_v, right_v) if left_v == right_v => {
@@ -145,107 +144,106 @@ pub fn merge_lists(
             continue;
         };
 
-        if merged.is_none() {
-            merged = Some(other_vec);
-        } else {
-            let merged_vec = merged.as_mut().unwrap();
+        if let Some(ref mut merged_vec) = merged {
             for e in other_vec {
-                if let Value::Object(ref e_map) = e {
-                    if let Some(index) = e_map.get("index") {
+                if let Value::Object(ref e_map) = e
+                    && let Some(index) = e_map.get("index")
+                {
                         let should_merge = match index {
                             Value::Number(n) => n.as_i64().is_some(),
                             Value::String(s) => s.starts_with("lc_"),
                             _ => false,
                         };
 
-                        if should_merge {
-                            let to_merge: Vec<usize> = merged_vec
-                                .iter()
-                                .enumerate()
-                                .filter_map(|(i, e_left)| {
-                                    if let Value::Object(left_map) = e_left {
-                                        if left_map.get("index") == Some(index) {
-                                            return Some(i);
-                                        }
-                                    }
-                                    None
-                                })
-                                .collect();
+                    if should_merge {
+                        let to_merge: Vec<usize> = merged_vec
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(i, e_left)| {
+                                if let Value::Object(left_map) = e_left
+                                    && left_map.get("index") == Some(index)
+                                {
+                                    return Some(i);
+                                }
+                                None
+                            })
+                            .collect();
 
-                            if !to_merge.is_empty() {
-                                let merge_idx = to_merge[0];
-                                let left_elem = &merged_vec[merge_idx];
+                        if !to_merge.is_empty() {
+                            let merge_idx = to_merge[0];
+                            let left_elem = &merged_vec[merge_idx];
 
-                                let left_type = left_elem
-                                    .as_object()
-                                    .and_then(|m| m.get("type"))
-                                    .and_then(|t| t.as_str());
+                            let left_type = left_elem
+                                .as_object()
+                                .and_then(|m| m.get("type"))
+                                .and_then(|t| t.as_str());
 
-                                let new_e: Value = if left_type.is_some() {
-                                    let e_type = e_map.get("type").and_then(|t| t.as_str());
+                            let new_e: Value = if left_type.is_some() {
+                                let e_type = e_map.get("type").and_then(|t| t.as_str());
 
-                                    if e_type == Some("non_standard")
-                                        && e_map.contains_key("value")
-                                    {
-                                        if left_type != Some("non_standard") {
-                                            let mut extras = Map::new();
-                                            if let Some(Value::Object(value_map)) =
-                                                e_map.get("value")
-                                            {
-                                                for (k, v) in value_map {
-                                                    if k != "type" {
-                                                        extras.insert(k.clone(), v.clone());
-                                                    }
+                                if e_type == Some("non_standard")
+                                    && e_map.contains_key("value")
+                                {
+                                    if left_type != Some("non_standard") {
+                                        let mut extras = Map::new();
+                                        if let Some(Value::Object(value_map)) =
+                                            e_map.get("value")
+                                        {
+                                            for (k, v) in value_map {
+                                                if k != "type" {
+                                                    extras.insert(k.clone(), v.clone());
                                                 }
                                             }
-                                            Value::Object(
-                                                [("extras".to_string(), Value::Object(extras))]
-                                                    .into_iter()
-                                                    .collect(),
-                                            )
-                                        } else {
-                                            let mut new_map = Map::new();
-                                            let mut value_map = Map::new();
-                                            if let Some(Value::Object(orig_value)) =
-                                                e_map.get("value")
-                                            {
-                                                for (k, v) in orig_value {
-                                                    if k != "type" {
-                                                        value_map.insert(k.clone(), v.clone());
-                                                    }
-                                                }
-                                            }
-                                            new_map.insert("value".to_string(), Value::Object(value_map));
-                                            if let Some(idx) = e_map.get("index") {
-                                                new_map.insert("index".to_string(), idx.clone());
-                                            }
-                                            Value::Object(new_map)
                                         }
+                                        Value::Object(
+                                            [("extras".to_string(), Value::Object(extras))]
+                                                .into_iter()
+                                                .collect(),
+                                        )
                                     } else {
                                         let mut new_map = Map::new();
-                                        for (k, v) in e_map {
-                                            if k != "type" {
-                                                new_map.insert(k.clone(), v.clone());
+                                        let mut value_map = Map::new();
+                                        if let Some(Value::Object(orig_value)) =
+                                            e_map.get("value")
+                                        {
+                                            for (k, v) in orig_value {
+                                                if k != "type" {
+                                                    value_map.insert(k.clone(), v.clone());
+                                                }
                                             }
+                                        }
+                                        new_map.insert("value".to_string(), Value::Object(value_map));
+                                        if let Some(idx) = e_map.get("index") {
+                                            new_map.insert("index".to_string(), idx.clone());
                                         }
                                         Value::Object(new_map)
                                     }
                                 } else {
-                                    e.clone()
-                                };
-
-                                let left_val = merged_vec.remove(merge_idx);
-                                let merged_val = merge_dicts(left_val, vec![new_e])?;
-                                merged_vec.insert(merge_idx, merged_val);
+                                    let mut new_map = Map::new();
+                                    for (k, v) in e_map {
+                                        if k != "type" {
+                                            new_map.insert(k.clone(), v.clone());
+                                        }
+                                    }
+                                    Value::Object(new_map)
+                                }
                             } else {
-                                merged_vec.push(e);
-                            }
-                            continue;
+                                e.clone()
+                            };
+
+                            let left_val = merged_vec.remove(merge_idx);
+                            let merged_val = merge_dicts(left_val, vec![new_e])?;
+                            merged_vec.insert(merge_idx, merged_val);
+                        } else {
+                            merged_vec.push(e);
                         }
+                        continue;
                     }
                 }
                 merged_vec.push(e);
             }
+        } else {
+            merged = Some(other_vec);
         }
     }
 

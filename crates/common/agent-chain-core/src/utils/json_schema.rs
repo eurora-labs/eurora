@@ -223,12 +223,11 @@ fn remove_titles_helper(kv: &Value, prev_key: &str) -> Value {
         Value::Object(map) => {
             let mut new_map = Map::new();
             for (k, v) in map {
-                if k == "title" {
-                    if let Value::Object(_) = v {
-                        if prev_key == "properties" {
-                            new_map.insert(k.clone(), remove_titles_helper(v, k));
-                        }
-                    }
+                if k == "title"
+                    && let Value::Object(_) = v
+                    && prev_key == "properties"
+                {
+                    new_map.insert(k.clone(), remove_titles_helper(v, k));
                 } else if let Value::Object(_) = v {
                     new_map.insert(k.clone(), remove_titles_helper(v, k));
                 } else {

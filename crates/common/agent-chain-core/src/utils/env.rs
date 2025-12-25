@@ -53,10 +53,10 @@ pub fn get_from_dict_or_env(
     default: Option<&str>,
 ) -> Result<String, EnvError> {
     for key in keys {
-        if let Some(value) = data.get(*key) {
-            if !value.is_empty() {
-                return Ok(value.clone());
-            }
+        if let Some(value) = data.get(*key)
+            && !value.is_empty()
+        {
+            return Ok(value.clone());
         }
     }
 
@@ -92,10 +92,10 @@ pub fn get_from_dict_or_env(
 /// env::remove_var("MY_TEST_VAR");
 /// ```
 pub fn get_from_env(key: &str, env_key: &str, default: Option<&str>) -> Result<String, EnvError> {
-    if let Ok(value) = env::var(env_key) {
-        if !value.is_empty() {
-            return Ok(value);
-        }
+    if let Ok(value) = env::var(env_key)
+        && !value.is_empty()
+    {
+        return Ok(value);
     }
 
     if let Some(default_val) = default {
@@ -127,10 +127,10 @@ pub fn from_env<'a>(
 ) -> impl Fn() -> Result<String, EnvError> + 'a {
     move || {
         for key in keys {
-            if let Ok(value) = env::var(key) {
-                if !value.is_empty() {
-                    return Ok(value);
-                }
+            if let Ok(value) = env::var(key)
+                && !value.is_empty()
+            {
+                return Ok(value);
             }
         }
 
