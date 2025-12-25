@@ -88,9 +88,9 @@ pub use streaming::{PassthroughStreamingHandler, StreamingCallbackHandler};
 
 // Re-export context types
 pub use context::{
+    ConfigureHook, ConfigureHookRegistry, RunCollectorGuard, TracingCallback, TracingV2Guard,
     collect_runs, get_run_collector, get_tracing_callback, register_configure_hook,
-    tracing_v2_enabled, tracing_v2_is_enabled, ConfigureHook, ConfigureHookRegistry,
-    RunCollectorGuard, TracingCallback, TracingV2Guard,
+    tracing_v2_enabled, tracing_v2_is_enabled,
 };
 
 // Re-export memory stream types
@@ -101,13 +101,12 @@ pub use memory_stream::{
 
 // Re-export log stream types
 pub use log_stream::{
-    JsonPatchOp, LogEntry, LogStreamCallbackHandler, LogStreamConfig, RunLog, RunLogPatch,
-    RunState,
+    JsonPatchOp, LogEntry, LogStreamCallbackHandler, LogStreamConfig, RunLog, RunLogPatch, RunState,
 };
 
 // Re-export concrete tracers
-pub use run_collector::RunCollectorCallbackHandler;
 pub use root_listeners::{AsyncListener, AsyncRootListenersTracer, Listener, RootListenersTracer};
+pub use run_collector::RunCollectorCallbackHandler;
 pub use stdout::{ConsoleCallbackHandler, FunctionCallbackHandler, elapsed, try_json_stringify};
 
 #[cfg(test)]
