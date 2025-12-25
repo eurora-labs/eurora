@@ -4,6 +4,7 @@
 //! mirroring `langchain_core.messages.base`.
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 
 #[cfg(feature = "specta")]
@@ -11,11 +12,13 @@ use specta::Type;
 
 use super::ai::{AIMessage, AIMessageChunk};
 use super::chat::{ChatMessage, ChatMessageChunk};
+use super::content::ReasoningContentBlock;
 use super::function::{FunctionMessage, FunctionMessageChunk};
 use super::human::{HumanMessage, HumanMessageChunk};
 use super::modifier::RemoveMessage;
 use super::system::{SystemMessage, SystemMessageChunk};
 use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
+use crate::utils::merge::merge_lists;
 
 /// A unified message type that can represent any message role.
 ///
@@ -48,7 +51,10 @@ pub enum BaseMessage {
 }
 
 impl BaseMessage {
-    /// Get the message content.
+    /// Get the message content as a string reference.
+    ///
+    /// For messages with multimodal content, this returns the first text content
+    /// or an empty string.
     pub fn content(&self) -> &str {
         match self {
             BaseMessage::Human(m) => m.content(),
@@ -58,6 +64,22 @@ impl BaseMessage {
             BaseMessage::Chat(m) => m.content(),
             BaseMessage::Function(m) => m.content(),
             BaseMessage::Remove(_) => "",
+        }
+    }
+
+    /// Get the text content of the message as a string.
+    ///
+    /// This extracts text from both simple string content and list content
+    /// (filtering for text blocks). Corresponds to the `text` property in Python.
+    pub fn text(&self) -> String {
+        match self {
+            BaseMessage::Human(m) => m.message_content().as_text(),
+            BaseMessage::System(m) => m.content().to_string(),
+            BaseMessage::AI(m) => m.content().to_string(),
+            BaseMessage::Tool(m) => m.content().to_string(),
+            BaseMessage::Chat(m) => m.content().to_string(),
+            BaseMessage::Function(m) => m.content().to_string(),
+            BaseMessage::Remove(_) => String::new(),
         }
     }
 
@@ -195,8 +217,15 @@ impl BaseMessage {
     }
 
     /// Get a pretty representation of the message.
+    ///
+    /// # Arguments
+    ///
+    /// * `html` - Whether to format the message with bold text (using ANSI codes).
+    ///            Named `html` for Python compatibility but actually uses terminal codes.
     pub fn pretty_repr(&self, html: bool) -> String {
-        let title = format!("{} Message", self.message_type().to_uppercase());
+        let msg_type = self.message_type();
+        let title_cased = title_case(msg_type);
+        let title = format!("{} Message", title_cased);
         let title = get_msg_title_repr(&title, html);
 
         let name_line = if let Some(name) = self.name() {
@@ -208,6 +237,7 @@ impl BaseMessage {
         format!("{}{}\n\n{}", title, name_line, self.content())
     }
 }
+
 
 impl From<HumanMessage> for BaseMessage {
     fn from(msg: HumanMessage) -> Self {
@@ -377,25 +407,109 @@ impl From<FunctionMessageChunk> for BaseMessageChunk {
     }
 }
 
-/// Merge multiple message contents.
+/// Content type for merge operations.
 ///
-/// This function handles merging string contents and list contents together.
-/// If both contents are strings, they are concatenated.
-/// If one is a string and one is a list, the string is prepended/appended.
-/// If both are lists, the lists are concatenated with smart merging.
+/// Represents message content that can be either a string or a list of values.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MergeableContent {
+    /// String content.
+    Text(String),
+    /// List content (strings or dicts).
+    List(Vec<Value>),
+}
+
+impl From<String> for MergeableContent {
+    fn from(s: String) -> Self {
+        MergeableContent::Text(s)
+    }
+}
+
+impl From<&str> for MergeableContent {
+    fn from(s: &str) -> Self {
+        MergeableContent::Text(s.to_string())
+    }
+}
+
+impl From<Vec<Value>> for MergeableContent {
+    fn from(v: Vec<Value>) -> Self {
+        MergeableContent::List(v)
+    }
+}
+
+/// Merge multiple message contents (simple string version).
 ///
-/// This corresponds to `merge_content` in LangChain Python.
+/// Concatenates two strings together. This is the simple version
+/// that corresponds to the basic case of `merge_content` in LangChain Python.
+///
+/// For more complex merging with lists, use `merge_content_complex`.
 pub fn merge_content(first: &str, second: &str) -> String {
     let mut result = first.to_string();
     result.push_str(second);
     result
 }
 
+/// Merge multiple message contents with support for both strings and lists.
+///
+/// This function handles merging string contents and list contents together.
+/// If both contents are strings, they are concatenated.
+/// If one is a string and one is a list, the string is prepended/appended.
+/// If both are lists, the lists are concatenated with smart merging.
+///
+/// This corresponds to the full `merge_content` function in LangChain Python.
+///
+/// # Arguments
+///
+/// * `first_content` - The first content to merge.
+/// * `contents` - Additional contents to merge.
+///
+/// # Returns
+///
+/// The merged content.
+pub fn merge_content_complex(
+    first_content: Option<MergeableContent>,
+    contents: Vec<MergeableContent>,
+) -> MergeableContent {
+    let mut merged = first_content.unwrap_or(MergeableContent::Text(String::new()));
+
+    for content in contents {
+        merged = match (merged, content) {
+            (MergeableContent::Text(mut left), MergeableContent::Text(right)) => {
+                left.push_str(&right);
+                MergeableContent::Text(left)
+            }
+            (MergeableContent::Text(left), MergeableContent::List(right)) => {
+                let mut new_list = vec![Value::String(left)];
+                new_list.extend(right);
+                MergeableContent::List(new_list)
+            }
+            (MergeableContent::List(mut left), MergeableContent::List(right)) => {
+                if let Ok(Some(merged_list)) =
+                    merge_lists(Some(left.clone()), vec![Some(right.clone())])
+                {
+                    MergeableContent::List(merged_list)
+                } else {
+                    left.extend(right);
+                    MergeableContent::List(left)
+                }
+            }
+            (MergeableContent::List(mut left), MergeableContent::Text(right)) => {
+                if !right.is_empty() {
+                    if let Some(Value::String(last)) = left.last_mut() {
+                        last.push_str(&right);
+                    } else if !left.is_empty() {
+                        left.push(Value::String(right));
+                    }
+                }
+                MergeableContent::List(left)
+            }
+        };
+    }
+
+    merged
+}
+
 /// Merge content vectors (for multimodal content).
-pub fn merge_content_vec(
-    first: Vec<serde_json::Value>,
-    second: Vec<serde_json::Value>,
-) -> Vec<serde_json::Value> {
+pub fn merge_content_vec(first: Vec<Value>, second: Vec<Value>) -> Vec<Value> {
     let mut result = first;
     result.extend(second);
     result
@@ -404,14 +518,13 @@ pub fn merge_content_vec(
 /// Convert a Message to a dictionary.
 ///
 /// This corresponds to `message_to_dict` in LangChain Python.
-pub fn message_to_dict(message: &BaseMessage) -> serde_json::Value {
+/// The dict will have a `type` key with the message type and a `data` key
+/// with the message data as a dict (all fields serialized).
+pub fn message_to_dict(message: &BaseMessage) -> Value {
+    let data = serde_json::to_value(message).unwrap_or_default();
     serde_json::json!({
         "type": message.message_type(),
-        "data": {
-            "content": message.content(),
-            "id": message.id(),
-            "name": message.name(),
-        }
+        "data": data
     })
 }
 
@@ -423,7 +536,16 @@ pub fn messages_to_dict(messages: &[BaseMessage]) -> Vec<serde_json::Value> {
 }
 
 /// Get a title representation for a message.
-fn get_msg_title_repr(title: &str, bold: bool) -> String {
+///
+/// # Arguments
+///
+/// * `title` - The title to format.
+/// * `bold` - Whether to bold the title using ANSI escape codes.
+///
+/// # Returns
+///
+/// The formatted title representation.
+pub fn get_msg_title_repr(title: &str, bold: bool) -> String {
     let padded = format!(" {} ", title);
     let sep_len = (80 - padded.len()) / 2;
     let sep: String = "=".repeat(sep_len);
@@ -434,8 +556,68 @@ fn get_msg_title_repr(title: &str, bold: bool) -> String {
     };
 
     if bold {
-        format!("{}\x1b[1m{}\x1b[0m{}", sep, padded, second_sep)
+        let bolded = get_bolded_text(&padded);
+        format!("{}{}{}", sep, bolded, second_sep)
     } else {
         format!("{}{}{}", sep, padded, second_sep)
     }
+}
+
+/// Get bolded text using ANSI escape codes.
+///
+/// Corresponds to `get_bolded_text` in Python's `langchain_core.utils.input`.
+pub fn get_bolded_text(text: &str) -> String {
+    format!("\x1b[1m{}\x1b[0m", text)
+}
+
+/// Convert a string to title case (capitalize first letter of each word).
+fn title_case(s: &str) -> String {
+    s.split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => {
+                    let upper = first.to_uppercase().to_string();
+                    upper + &chars.as_str().to_lowercase()
+                }
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Extract `reasoning_content` from `additional_kwargs`.
+///
+/// Handles reasoning content stored in various formats:
+/// - `additional_kwargs["reasoning_content"]` (string) - Ollama, DeepSeek, XAI, Groq
+///
+/// Corresponds to `_extract_reasoning_from_additional_kwargs` in Python.
+///
+/// # Arguments
+///
+/// * `additional_kwargs` - The additional_kwargs dictionary from a message.
+///
+/// # Returns
+///
+/// A `ReasoningContentBlock` if reasoning content is found, None otherwise.
+pub fn extract_reasoning_from_additional_kwargs(
+    additional_kwargs: &HashMap<String, Value>,
+) -> Option<ReasoningContentBlock> {
+    if let Some(Value::String(reasoning_content)) = additional_kwargs.get("reasoning_content") {
+        Some(ReasoningContentBlock {
+            reasoning: reasoning_content.clone(),
+        })
+    } else {
+        None
+    }
+}
+
+/// Check if running in an interactive environment.
+///
+/// In Rust, this always returns false as we don't have the same
+/// IPython/Jupyter detection available. Applications can override
+/// behavior based on their own environment detection.
+pub fn is_interactive_env() -> bool {
+    false
 }
