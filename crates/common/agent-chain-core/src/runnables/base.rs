@@ -940,65 +940,6 @@ where
 }
 
 // =============================================================================
-// RunnablePassthrough
-// =============================================================================
-
-/// A Runnable that passes through its input unchanged.
-#[derive(Debug, Clone)]
-pub struct RunnablePassthrough<I>
-where
-    I: Send + Sync + Clone + Debug + 'static,
-{
-    name: Option<String>,
-    _phantom: std::marker::PhantomData<I>,
-}
-
-impl<I> RunnablePassthrough<I>
-where
-    I: Send + Sync + Clone + Debug + 'static,
-{
-    /// Create a new RunnablePassthrough.
-    pub fn new() -> Self {
-        Self {
-            name: None,
-            _phantom: std::marker::PhantomData,
-        }
-    }
-
-    /// Create a new RunnablePassthrough with a name.
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-}
-
-impl<I> Default for RunnablePassthrough<I>
-where
-    I: Send + Sync + Clone + Debug + 'static,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[async_trait]
-impl<I> Runnable for RunnablePassthrough<I>
-where
-    I: Send + Sync + Clone + Debug + 'static,
-{
-    type Input = I;
-    type Output = I;
-
-    fn name(&self) -> Option<String> {
-        self.name.clone()
-    }
-
-    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        Ok(input)
-    }
-}
-
-// =============================================================================
 // DynRunnable - Type-erased Runnable
 // =============================================================================
 
@@ -1030,6 +971,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runnables::passthrough::RunnablePassthrough;
     use crate::runnables::utils::AddableDict;
 
     #[test]
