@@ -10,7 +10,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::error::{Error, Result};
@@ -1027,54 +1027,10 @@ where
     RunnableLambda::new(func)
 }
 
-// =============================================================================
-// AddableDict - Helper for combining outputs
-// =============================================================================
-
-/// A HashMap that can be added together.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AddableDict(pub HashMap<String, Value>);
-
-impl AddableDict {
-    /// Create a new AddableDict.
-    pub fn new() -> Self {
-        Self(HashMap::new())
-    }
-
-    /// Create from a HashMap.
-    pub fn from_map(map: HashMap<String, Value>) -> Self {
-        Self(map)
-    }
-
-    /// Insert a key-value pair.
-    pub fn insert(&mut self, key: impl Into<String>, value: Value) {
-        self.0.insert(key.into(), value);
-    }
-
-    /// Get a value by key.
-    pub fn get(&self, key: &str) -> Option<&Value> {
-        self.0.get(key)
-    }
-}
-
-impl std::ops::Add for AddableDict {
-    type Output = Self;
-
-    fn add(mut self, other: Self) -> Self::Output {
-        self.0.extend(other.0);
-        self
-    }
-}
-
-impl std::ops::AddAssign for AddableDict {
-    fn add_assign(&mut self, other: Self) {
-        self.0.extend(other.0);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runnables::utils::AddableDict;
 
     #[test]
     fn test_runnable_lambda() {
