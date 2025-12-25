@@ -29,7 +29,7 @@ pub fn default_serializer<T: Serialize>(obj: &T) -> Value {
 ///
 /// * `obj` - The object to serialize.
 /// * `pretty` - Whether to pretty print the JSON. If `true`, the JSON will be
-///     indented with 2 spaces.
+///   indented with 2 spaces.
 ///
 /// # Returns
 ///
