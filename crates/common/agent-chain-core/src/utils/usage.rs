@@ -2,7 +2,9 @@
 //!
 //! Adapted from langchain_core/utils/usage.py
 
+use serde_json::{Map, Value};
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 /// Perform an integer operation on nested dictionaries.
 ///
@@ -234,9 +236,184 @@ impl std::fmt::Display for UsageError {
 
 impl std::error::Error for UsageError {}
 
+/// Perform an integer operation on nested JSON dictionaries.
+///
+/// This function recursively applies an operation to integer values in
+/// nested JSON objects. This matches the Python `_dict_int_op` function
+/// from `langchain_core.utils.usage`.
+///
+/// # Arguments
+///
+/// * `left` - The first JSON object.
+/// * `right` - The second JSON object.
+/// * `op` - The operation to apply (e.g., addition, subtraction).
+/// * `default` - The default value for missing keys.
+/// * `max_depth` - Maximum recursion depth (default: 100).
+///
+/// # Returns
+///
+/// A new JSON object with the operation applied, or an error if max depth exceeded.
+pub fn dict_int_op_json<F>(
+    left: &Value,
+    right: &Value,
+    op: F,
+    default: i64,
+    max_depth: usize,
+) -> Result<Value, UsageError>
+where
+    F: Fn(i64, i64) -> i64 + Copy,
+{
+    dict_int_op_json_impl(left, right, op, default, 0, max_depth)
+}
+
+fn dict_int_op_json_impl<F>(
+    left: &Value,
+    right: &Value,
+    op: F,
+    default: i64,
+    depth: usize,
+    max_depth: usize,
+) -> Result<Value, UsageError>
+where
+    F: Fn(i64, i64) -> i64 + Copy,
+{
+    if depth >= max_depth {
+        return Err(UsageError::MaxDepthExceeded(max_depth));
+    }
+
+    let empty_map = Map::new();
+    let left_obj = left.as_object().unwrap_or(&empty_map);
+    let right_obj = right.as_object().unwrap_or(&empty_map);
+
+    let all_keys: HashSet<_> = left_obj.keys().chain(right_obj.keys()).cloned().collect();
+
+    let mut combined = Map::new();
+
+    for k in all_keys {
+        let left_val = left_obj.get(&k);
+        let right_val = right_obj.get(&k);
+
+        match (left_val, right_val) {
+            // Both are integers
+            (Some(Value::Number(l)), Some(Value::Number(r)))
+                if l.is_i64() && r.is_i64() =>
+            {
+                let l_int = l.as_i64().unwrap_or(default);
+                let r_int = r.as_i64().unwrap_or(default);
+                combined.insert(k, Value::Number(op(l_int, r_int).into()));
+            }
+            // Left is int, right is missing
+            (Some(Value::Number(l)), None) if l.is_i64() => {
+                let l_int = l.as_i64().unwrap_or(default);
+                combined.insert(k, Value::Number(op(l_int, default).into()));
+            }
+            // Right is int, left is missing
+            (None, Some(Value::Number(r))) if r.is_i64() => {
+                let r_int = r.as_i64().unwrap_or(default);
+                combined.insert(k, Value::Number(op(default, r_int).into()));
+            }
+            // Both are objects
+            (Some(Value::Object(_)), Some(Value::Object(_))) => {
+                let nested = dict_int_op_json_impl(
+                    left_val.unwrap(),
+                    right_val.unwrap(),
+                    op,
+                    default,
+                    depth + 1,
+                    max_depth,
+                )?;
+                combined.insert(k, nested);
+            }
+            // Left is object, right is missing
+            (Some(Value::Object(_)), None) => {
+                let nested = dict_int_op_json_impl(
+                    left_val.unwrap(),
+                    &Value::Object(Map::new()),
+                    op,
+                    default,
+                    depth + 1,
+                    max_depth,
+                )?;
+                combined.insert(k, nested);
+            }
+            // Right is object, left is missing
+            (None, Some(Value::Object(_))) => {
+                let nested = dict_int_op_json_impl(
+                    &Value::Object(Map::new()),
+                    right_val.unwrap(),
+                    op,
+                    default,
+                    depth + 1,
+                    max_depth,
+                )?;
+                combined.insert(k, nested);
+            }
+            // Neither present (shouldn't happen due to all_keys)
+            (None, None) => {}
+            // Type mismatch or unsupported types
+            (Some(l), Some(r)) => {
+                return Err(UsageError::TypeMismatch {
+                    key: k,
+                    left_type: json_type_name(l).to_string(),
+                    right_type: json_type_name(r).to_string(),
+                });
+            }
+            // One side has unsupported type
+            (Some(v), None) | (None, Some(v)) => {
+                // Just copy over non-int/non-object values
+                combined.insert(k, v.clone());
+            }
+        }
+    }
+
+    Ok(Value::Object(combined))
+}
+
+fn json_type_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
+/// Add two JSON usage dictionaries together.
+///
+/// # Arguments
+///
+/// * `left` - The first JSON object.
+/// * `right` - The second JSON object.
+///
+/// # Returns
+///
+/// A new JSON object with values added together.
+pub fn dict_int_add_json(left: &Value, right: &Value) -> Result<Value, UsageError> {
+    dict_int_op_json(left, right, |a, b| a + b, 0, 100)
+}
+
+/// Subtract one JSON usage dictionary from another, with floor at 0.
+///
+/// Token counts cannot be negative so the actual operation is `max(left - right, 0)`.
+///
+/// # Arguments
+///
+/// * `left` - The first JSON object.
+/// * `right` - The JSON object to subtract.
+///
+/// # Returns
+///
+/// A new JSON object with values subtracted (floored at 0).
+pub fn dict_int_sub_floor_json(left: &Value, right: &Value) -> Result<Value, UsageError> {
+    dict_int_op_json(left, right, |a, b| (a - b).max(0), 0, 100)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_dict_int_add() {
@@ -314,5 +491,83 @@ mod tests {
 
         let result = dict_int_op(&left, &right, |a, b| a + b, 0, 100);
         assert!(matches!(result, Err(UsageError::MaxDepthExceeded(_))));
+    }
+
+    #[test]
+    fn test_dict_int_add_json() {
+        let left = json!({
+            "a": 1,
+            "b": 2
+        });
+
+        let right = json!({
+            "a": 3,
+            "c": 4
+        });
+
+        let result = dict_int_add_json(&left, &right).unwrap();
+
+        assert_eq!(result["a"], 4);
+        assert_eq!(result["b"], 2);
+        assert_eq!(result["c"], 4);
+    }
+
+    #[test]
+    fn test_dict_int_add_json_nested() {
+        let left = json!({
+            "input_tokens": 5,
+            "output_tokens": 0,
+            "total_tokens": 5,
+            "input_token_details": {
+                "cache_read": 3
+            }
+        });
+
+        let right = json!({
+            "input_tokens": 0,
+            "output_tokens": 10,
+            "total_tokens": 10,
+            "output_token_details": {
+                "reasoning": 4
+            }
+        });
+
+        let result = dict_int_add_json(&left, &right).unwrap();
+
+        assert_eq!(result["input_tokens"], 5);
+        assert_eq!(result["output_tokens"], 10);
+        assert_eq!(result["total_tokens"], 15);
+        assert_eq!(result["input_token_details"]["cache_read"], 3);
+        assert_eq!(result["output_token_details"]["reasoning"], 4);
+    }
+
+    #[test]
+    fn test_dict_int_sub_floor_json() {
+        let left = json!({
+            "input_tokens": 5,
+            "output_tokens": 10,
+            "total_tokens": 15,
+            "input_token_details": {
+                "cache_read": 4
+            }
+        });
+
+        let right = json!({
+            "input_tokens": 3,
+            "output_tokens": 8,
+            "total_tokens": 11,
+            "output_token_details": {
+                "reasoning": 4
+            }
+        });
+
+        let result = dict_int_sub_floor_json(&left, &right).unwrap();
+
+        assert_eq!(result["input_tokens"], 2);
+        assert_eq!(result["output_tokens"], 2);
+        assert_eq!(result["total_tokens"], 4);
+        assert_eq!(result["input_token_details"]["cache_read"], 4);
+        // reasoning should be 0 because 0 - 4 = -4, floored to 0
+        assert_eq!(result["output_token_details"]["reasoning"], 0);
     }
 }
