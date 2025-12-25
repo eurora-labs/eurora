@@ -86,16 +86,16 @@ pub trait TracerCore: Send + Sync + Debug {
 
     /// Start a trace for a run.
     fn start_trace(&mut self, run: &mut Run) {
-        let current_dotted_order = format!(
-            "{}{}",
-            run.start_time.format("%Y%m%dT%H%M%S%fZ"),
-            run.id
-        );
+        let current_dotted_order =
+            format!("{}{}", run.start_time.format("%Y%m%dT%H%M%S%fZ"), run.id);
 
         if let Some(parent_run_id) = run.parent_run_id {
-            if let Some((trace_id, parent_dotted_order)) = self.order_map().get(&parent_run_id).cloned() {
+            if let Some((trace_id, parent_dotted_order)) =
+                self.order_map().get(&parent_run_id).cloned()
+            {
                 run.trace_id = Some(trace_id);
-                run.dotted_order = Some(format!("{}.{}", parent_dotted_order, current_dotted_order));
+                run.dotted_order =
+                    Some(format!("{}.{}", parent_dotted_order, current_dotted_order));
 
                 if let Some(parent_run) = self.run_map_mut().get_mut(&parent_run_id.to_string()) {
                     let child_clone = run.clone();
@@ -121,7 +121,8 @@ pub trait TracerCore: Send + Sync + Debug {
         let trace_id = run.trace_id.unwrap_or(run.id);
         let dotted_order = run.dotted_order.clone().unwrap_or(current_dotted_order);
 
-        self.order_map_mut().insert(run.id, (trace_id, dotted_order));
+        self.order_map_mut()
+            .insert(run.id, (trace_id, dotted_order));
         self.run_map_mut().insert(run.id.to_string(), run.clone());
     }
 
@@ -169,7 +170,9 @@ pub trait TracerCore: Send + Sync + Debug {
         extra: HashMap<String, Value>,
     ) -> Result<Run, TracerError> {
         let schema_format = self.config().schema_format;
-        if schema_format != SchemaFormat::StreamingEvents && schema_format != SchemaFormat::OriginalChat {
+        if schema_format != SchemaFormat::StreamingEvents
+            && schema_format != SchemaFormat::OriginalChat
+        {
             return Err(TracerError::UnsupportedSchemaFormat(
                 "Chat model tracing is not supported in original format".to_string(),
             ));
@@ -178,7 +181,10 @@ pub trait TracerCore: Send + Sync + Debug {
         let start_time = Utc::now();
         let mut run_extra = extra;
         if let Some(meta) = metadata {
-            run_extra.insert("metadata".to_string(), serde_json::to_value(meta).unwrap_or_default());
+            run_extra.insert(
+                "metadata".to_string(),
+                serde_json::to_value(meta).unwrap_or_default(),
+            );
         }
 
         let inputs: HashMap<String, Value> = [(
@@ -238,7 +244,10 @@ pub trait TracerCore: Send + Sync + Debug {
         let start_time = Utc::now();
         let mut run_extra = extra;
         if let Some(meta) = metadata {
-            run_extra.insert("metadata".to_string(), serde_json::to_value(meta).unwrap_or_default());
+            run_extra.insert(
+                "metadata".to_string(),
+                serde_json::to_value(meta).unwrap_or_default(),
+            );
         }
 
         let inputs: HashMap<String, Value> = [(
@@ -309,7 +318,8 @@ pub trait TracerCore: Send + Sync + Debug {
             }
         }
 
-        run.events.push(RunEvent::with_kwargs("new_token", event_kwargs));
+        run.events
+            .push(RunEvent::with_kwargs("new_token", event_kwargs));
 
         Ok(run.clone())
     }
@@ -325,7 +335,8 @@ pub trait TracerCore: Send + Sync + Debug {
             .get_mut(&run_id.to_string())
             .ok_or(TracerError::RunNotFound(run_id))?;
 
-        run.events.push(RunEvent::with_kwargs("retry", retry_state.clone()));
+        run.events
+            .push(RunEvent::with_kwargs("retry", retry_state.clone()));
 
         Ok(run.clone())
     }
@@ -350,7 +361,9 @@ pub trait TracerCore: Send + Sync + Debug {
             run.outputs = Some(HashMap::new());
         }
 
-        let omit_outputs = run.extra.get("__omit_auto_outputs")
+        let omit_outputs = run
+            .extra
+            .get("__omit_auto_outputs")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -367,7 +380,8 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events.push(RunEvent::with_time("end", run.end_time.unwrap()));
+        run.events
+            .push(RunEvent::with_time("end", run.end_time.unwrap()));
 
         Ok(run.clone())
     }
@@ -400,7 +414,9 @@ pub trait TracerCore: Send + Sync + Debug {
                 run.outputs = Some(HashMap::new());
             }
 
-            let omit_outputs = run.extra.get("__omit_auto_outputs")
+            let omit_outputs = run
+                .extra
+                .get("__omit_auto_outputs")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
 
@@ -418,7 +434,8 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events.push(RunEvent::with_time("error", run.end_time.unwrap()));
+        run.events
+            .push(RunEvent::with_time("error", run.end_time.unwrap()));
 
         Ok(run.clone())
     }
@@ -439,7 +456,10 @@ pub trait TracerCore: Send + Sync + Debug {
         let start_time = Utc::now();
         let mut run_extra = extra;
         if let Some(meta) = metadata {
-            run_extra.insert("metadata".to_string(), serde_json::to_value(meta).unwrap_or_default());
+            run_extra.insert(
+                "metadata".to_string(),
+                serde_json::to_value(meta).unwrap_or_default(),
+            );
         }
 
         let processed_inputs = self.get_chain_inputs(inputs);
@@ -470,11 +490,12 @@ pub trait TracerCore: Send + Sync + Debug {
     fn get_chain_inputs(&self, inputs: HashMap<String, Value>) -> HashMap<String, Value> {
         match self.config().schema_format {
             SchemaFormat::Original | SchemaFormat::OriginalChat => inputs,
-            SchemaFormat::StreamingEvents => {
-                [("input".to_string(), serde_json::to_value(inputs).unwrap_or_default())]
-                    .into_iter()
-                    .collect()
-            }
+            SchemaFormat::StreamingEvents => [(
+                "input".to_string(),
+                serde_json::to_value(inputs).unwrap_or_default(),
+            )]
+            .into_iter()
+            .collect(),
         }
     }
 
@@ -482,11 +503,12 @@ pub trait TracerCore: Send + Sync + Debug {
     fn get_chain_outputs(&self, outputs: HashMap<String, Value>) -> HashMap<String, Value> {
         match self.config().schema_format {
             SchemaFormat::Original | SchemaFormat::OriginalChat => outputs,
-            SchemaFormat::StreamingEvents => {
-                [("output".to_string(), serde_json::to_value(outputs).unwrap_or_default())]
-                    .into_iter()
-                    .collect()
-            }
+            SchemaFormat::StreamingEvents => [(
+                "output".to_string(),
+                serde_json::to_value(outputs).unwrap_or_default(),
+            )]
+            .into_iter()
+            .collect(),
         }
     }
 
@@ -509,7 +531,9 @@ pub trait TracerCore: Send + Sync + Debug {
             run.outputs = Some(HashMap::new());
         }
 
-        let omit_outputs = run.extra.get("__omit_auto_outputs")
+        let omit_outputs = run
+            .extra
+            .get("__omit_auto_outputs")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -520,7 +544,8 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events.push(RunEvent::with_time("end", run.end_time.unwrap()));
+        run.events
+            .push(RunEvent::with_time("end", run.end_time.unwrap()));
 
         if let Some(inputs) = processed_inputs {
             run.inputs = inputs;
@@ -545,7 +570,8 @@ pub trait TracerCore: Send + Sync + Debug {
 
         run.error = Some(Self::get_stacktrace(error));
         run.end_time = Some(Utc::now());
-        run.events.push(RunEvent::with_time("error", run.end_time.unwrap()));
+        run.events
+            .push(RunEvent::with_time("error", run.end_time.unwrap()));
 
         if let Some(inputs) = processed_inputs {
             run.inputs = inputs;
@@ -570,7 +596,10 @@ pub trait TracerCore: Send + Sync + Debug {
         let start_time = Utc::now();
         let mut run_extra = extra;
         if let Some(meta) = metadata {
-            run_extra.insert("metadata".to_string(), serde_json::to_value(meta).unwrap_or_default());
+            run_extra.insert(
+                "metadata".to_string(),
+                serde_json::to_value(meta).unwrap_or_default(),
+            );
         }
 
         let processed_inputs = match self.config().schema_format {
@@ -579,11 +608,12 @@ pub trait TracerCore: Send + Sync + Debug {
                     .into_iter()
                     .collect()
             }
-            SchemaFormat::StreamingEvents => {
-                [("input".to_string(), serde_json::to_value(inputs).unwrap_or_default())]
-                    .into_iter()
-                    .collect()
-            }
+            SchemaFormat::StreamingEvents => [(
+                "input".to_string(),
+                serde_json::to_value(inputs).unwrap_or_default(),
+            )]
+            .into_iter()
+            .collect(),
         };
 
         Run {
@@ -627,7 +657,9 @@ pub trait TracerCore: Send + Sync + Debug {
             run.outputs = Some(HashMap::new());
         }
 
-        let omit_outputs = run.extra.get("__omit_auto_outputs")
+        let omit_outputs = run
+            .extra
+            .get("__omit_auto_outputs")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -638,7 +670,8 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events.push(RunEvent::with_time("end", run.end_time.unwrap()));
+        run.events
+            .push(RunEvent::with_time("end", run.end_time.unwrap()));
 
         Ok(run.clone())
     }
@@ -664,7 +697,8 @@ pub trait TracerCore: Send + Sync + Debug {
 
         run.error = Some(Self::get_stacktrace(error));
         run.end_time = Some(Utc::now());
-        run.events.push(RunEvent::with_time("error", run.end_time.unwrap()));
+        run.events
+            .push(RunEvent::with_time("error", run.end_time.unwrap()));
 
         Ok(run.clone())
     }
@@ -684,12 +718,16 @@ pub trait TracerCore: Send + Sync + Debug {
         let start_time = Utc::now();
         let mut run_extra = extra;
         if let Some(meta) = metadata {
-            run_extra.insert("metadata".to_string(), serde_json::to_value(meta).unwrap_or_default());
+            run_extra.insert(
+                "metadata".to_string(),
+                serde_json::to_value(meta).unwrap_or_default(),
+            );
         }
 
-        let inputs: HashMap<String, Value> = [("query".to_string(), Value::String(query.to_string()))]
-            .into_iter()
-            .collect();
+        let inputs: HashMap<String, Value> =
+            [("query".to_string(), Value::String(query.to_string()))]
+                .into_iter()
+                .collect();
 
         Run {
             id: run_id,
@@ -736,7 +774,9 @@ pub trait TracerCore: Send + Sync + Debug {
             run.outputs = Some(HashMap::new());
         }
 
-        let omit_outputs = run.extra.get("__omit_auto_outputs")
+        let omit_outputs = run
+            .extra
+            .get("__omit_auto_outputs")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -747,7 +787,8 @@ pub trait TracerCore: Send + Sync + Debug {
         }
 
         run.end_time = Some(Utc::now());
-        run.events.push(RunEvent::with_time("end", run.end_time.unwrap()));
+        run.events
+            .push(RunEvent::with_time("end", run.end_time.unwrap()));
 
         Ok(run.clone())
     }
@@ -773,7 +814,8 @@ pub trait TracerCore: Send + Sync + Debug {
 
         run.error = Some(Self::get_stacktrace(error));
         run.end_time = Some(Utc::now());
-        run.events.push(RunEvent::with_time("error", run.end_time.unwrap()));
+        run.events
+            .push(RunEvent::with_time("error", run.end_time.unwrap()));
 
         Ok(run.clone())
     }

@@ -20,609 +20,1893 @@ pub type NamespaceMapping = HashMap<Vec<String>, Vec<String>>;
 /// First value is what it's serialized as, second is where to load it from.
 pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
-    
+
     // Message types
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "AIMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "ai".into(), "AIMessage".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "AIMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ai".into(),
+            "AIMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "AIMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "ai".into(), "AIMessageChunk".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "AIMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ai".into(),
+            "AIMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "BaseMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "base".into(), "BaseMessage".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "BaseMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "base".into(),
+            "BaseMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "BaseMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "base".into(), "BaseMessageChunk".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "BaseMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "base".into(),
+            "BaseMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "ChatMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "chat".into(), "ChatMessage".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "ChatMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "chat".into(),
+            "ChatMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "FunctionMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "function".into(), "FunctionMessage".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "FunctionMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "function".into(),
+            "FunctionMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "HumanMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "human".into(), "HumanMessage".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "HumanMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "human".into(),
+            "HumanMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "SystemMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "system".into(), "SystemMessage".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "SystemMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "system".into(),
+            "SystemMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "ToolMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "tool".into(), "ToolMessage".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "ToolMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "tool".into(),
+            "ToolMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "RemoveMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "modifier".into(), "RemoveMessage".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "RemoveMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "modifier".into(),
+            "RemoveMessage".into(),
+        ],
     );
-    
+
     // Agent types
     map.insert(
-        vec!["langchain".into(), "schema".into(), "agent".into(), "AgentAction".into()],
-        vec!["langchain_core".into(), "agents".into(), "AgentAction".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "agent".into(),
+            "AgentAction".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "agents".into(),
+            "AgentAction".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "agent".into(), "AgentFinish".into()],
-        vec!["langchain_core".into(), "agents".into(), "AgentFinish".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "agent".into(),
+            "AgentFinish".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "agents".into(),
+            "AgentFinish".into(),
+        ],
     );
-    
+
     // Prompt types
     map.insert(
-        vec!["langchain".into(), "schema".into(), "prompt_template".into(), "BasePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "base".into(), "BasePromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "prompt_template".into(),
+            "BasePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "base".into(),
+            "BasePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "prompt".into(), "PromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "prompt".into(), "PromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "prompt".into(),
+            "PromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "prompt".into(),
+            "PromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "MessagesPlaceholder".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "MessagesPlaceholder".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "MessagesPlaceholder".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "MessagesPlaceholder".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "ChatPromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "ChatPromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatPromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatPromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "HumanMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "HumanMessagePromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "HumanMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "HumanMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "SystemMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "SystemMessagePromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "SystemMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "SystemMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "image".into(), "ImagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "image".into(), "ImagePromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "image".into(),
+            "ImagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "image".into(),
+            "ImagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "AIMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "AIMessagePromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "AIMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "AIMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "BaseMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "BaseMessagePromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "agent".into(), "AgentActionMessageLog".into()],
-        vec!["langchain_core".into(), "agents".into(), "AgentActionMessageLog".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "agent".into(),
+            "AgentActionMessageLog".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "agents".into(),
+            "AgentActionMessageLog".into(),
+        ],
     );
-    
+
     // Output types
     map.insert(
-        vec!["langchain".into(), "schema".into(), "output".into(), "ChatGeneration".into()],
-        vec!["langchain_core".into(), "outputs".into(), "chat_generation".into(), "ChatGeneration".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "output".into(),
+            "ChatGeneration".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "chat_generation".into(),
+            "ChatGeneration".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "output".into(), "Generation".into()],
-        vec!["langchain_core".into(), "outputs".into(), "generation".into(), "Generation".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "output".into(),
+            "Generation".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "generation".into(),
+            "Generation".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "output".into(), "ChatGenerationChunk".into()],
-        vec!["langchain_core".into(), "outputs".into(), "chat_generation".into(), "ChatGenerationChunk".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "output".into(),
+            "ChatGenerationChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "chat_generation".into(),
+            "ChatGenerationChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "output".into(), "GenerationChunk".into()],
-        vec!["langchain_core".into(), "outputs".into(), "generation".into(), "GenerationChunk".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "output".into(),
+            "GenerationChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "generation".into(),
+            "GenerationChunk".into(),
+        ],
     );
-    
+
     // Document types
     map.insert(
-        vec!["langchain".into(), "schema".into(), "document".into(), "Document".into()],
-        vec!["langchain_core".into(), "documents".into(), "base".into(), "Document".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "document".into(),
+            "Document".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "documents".into(),
+            "base".into(),
+            "Document".into(),
+        ],
     );
-    
+
     // Runnable types
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "DynamicRunnable".into()],
-        vec!["langchain_core".into(), "runnables".into(), "configurable".into(), "DynamicRunnable".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "DynamicRunnable".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "configurable".into(),
+            "DynamicRunnable".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "prompt".into(), "PromptValue".into()],
-        vec!["langchain_core".into(), "prompt_values".into(), "PromptValue".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "prompt".into(),
+            "PromptValue".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "PromptValue".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RunnableBinding".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableBinding".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RunnableBinding".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableBinding".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RunnableBranch".into()],
-        vec!["langchain_core".into(), "runnables".into(), "branch".into(), "RunnableBranch".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RunnableBranch".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "branch".into(),
+            "RunnableBranch".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RunnableWithFallbacks".into()],
-        vec!["langchain_core".into(), "runnables".into(), "fallbacks".into(), "RunnableWithFallbacks".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RunnableWithFallbacks".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "fallbacks".into(),
+            "RunnableWithFallbacks".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RunnableParallel".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableParallel".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RunnableParallel".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableParallel".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RunnableSequence".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableSequence".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RunnableSequence".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableSequence".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RunnablePassthrough".into()],
-        vec!["langchain_core".into(), "runnables".into(), "passthrough".into(), "RunnablePassthrough".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RunnablePassthrough".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "passthrough".into(),
+            "RunnablePassthrough".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RunnableAssign".into()],
-        vec!["langchain_core".into(), "runnables".into(), "passthrough".into(), "RunnableAssign".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RunnableAssign".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "passthrough".into(),
+            "RunnableAssign".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RunnableEach".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableEach".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RunnableEach".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableEach".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RunnableRetry".into()],
-        vec!["langchain_core".into(), "runnables".into(), "retry".into(), "RunnableRetry".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RunnableRetry".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "retry".into(),
+            "RunnableRetry".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "runnable".into(), "RouterRunnable".into()],
-        vec!["langchain_core".into(), "runnables".into(), "router".into(), "RouterRunnable".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "runnable".into(),
+            "RouterRunnable".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "router".into(),
+            "RouterRunnable".into(),
+        ],
     );
-    
+
     // Output parser types
     map.insert(
-        vec!["langchain".into(), "schema".into(), "output_parser".into(), "StrOutputParser".into()],
-        vec!["langchain_core".into(), "output_parsers".into(), "string".into(), "StrOutputParser".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "output_parser".into(),
+            "StrOutputParser".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "output_parsers".into(),
+            "string".into(),
+            "StrOutputParser".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "output_parsers".into(), "list".into(), "CommaSeparatedListOutputParser".into()],
-        vec!["langchain_core".into(), "output_parsers".into(), "list".into(), "CommaSeparatedListOutputParser".into()],
+        vec![
+            "langchain".into(),
+            "output_parsers".into(),
+            "list".into(),
+            "CommaSeparatedListOutputParser".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "output_parsers".into(),
+            "list".into(),
+            "CommaSeparatedListOutputParser".into(),
+        ],
     );
-    
+
     // Message chunk types
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "ChatMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "chat".into(), "ChatMessageChunk".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "ChatMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "chat".into(),
+            "ChatMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "HumanMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "human".into(), "HumanMessageChunk".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "HumanMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "human".into(),
+            "HumanMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "FunctionMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "function".into(), "FunctionMessageChunk".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "FunctionMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "function".into(),
+            "FunctionMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "SystemMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "system".into(), "SystemMessageChunk".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "SystemMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "system".into(),
+            "SystemMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "messages".into(), "ToolMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "tool".into(), "ToolMessageChunk".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "messages".into(),
+            "ToolMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "tool".into(),
+            "ToolMessageChunk".into(),
+        ],
     );
-    
+
     // Prompt value types
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "base".into(), "StringPromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "string".into(), "StringPromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "base".into(),
+            "StringPromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "string".into(),
+            "StringPromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "base".into(), "StringPromptValue".into()],
-        vec!["langchain_core".into(), "prompt_values".into(), "StringPromptValue".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "base".into(),
+            "StringPromptValue".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "StringPromptValue".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "ChatPromptValue".into()],
-        vec!["langchain_core".into(), "prompt_values".into(), "ChatPromptValue".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatPromptValue".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "ChatPromptValue".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "ChatPromptValueConcrete".into()],
-        vec!["langchain_core".into(), "prompt_values".into(), "ChatPromptValueConcrete".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatPromptValueConcrete".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "ChatPromptValueConcrete".into(),
+        ],
     );
-    
+
     // Chat prompt types
     map.insert(
-        vec!["langchain".into(), "schema".into(), "prompt_template".into(), "BaseChatPromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "BaseChatPromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "prompt_template".into(),
+            "BaseChatPromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseChatPromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "ChatMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "ChatMessagePromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "chat".into(), "BaseStringMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "BaseStringMessagePromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseStringMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseStringMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "prompts".into(), "few_shot_with_templates".into(), "FewShotPromptWithTemplates".into()],
-        vec!["langchain_core".into(), "prompts".into(), "few_shot_with_templates".into(), "FewShotPromptWithTemplates".into()],
+        vec![
+            "langchain".into(),
+            "prompts".into(),
+            "few_shot_with_templates".into(),
+            "FewShotPromptWithTemplates".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "few_shot_with_templates".into(),
+            "FewShotPromptWithTemplates".into(),
+        ],
     );
-    
+
     // Structured prompt
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "structured".into(), "StructuredPrompt".into()],
-        vec!["langchain_core".into(), "prompts".into(), "structured".into(), "StructuredPrompt".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "structured".into(),
+            "StructuredPrompt".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "structured".into(),
+            "StructuredPrompt".into(),
+        ],
     );
-    
+
     // Dict prompt template
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "message".into(), "_DictMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "dict".into(), "DictPromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "message".into(),
+            "_DictMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "dict".into(),
+            "DictPromptTemplate".into(),
+        ],
     );
-    
+
     map
 });
 
 /// Mapping for old LangChain versions where things were in different places.
 pub static OG_SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
-    
+
     map.insert(
         vec!["langchain".into(), "schema".into(), "AIMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "ai".into(), "AIMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ai".into(),
+            "AIMessage".into(),
+        ],
     );
     map.insert(
         vec!["langchain".into(), "schema".into(), "ChatMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "chat".into(), "ChatMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "chat".into(),
+            "ChatMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "FunctionMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "function".into(), "FunctionMessage".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "FunctionMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "function".into(),
+            "FunctionMessage".into(),
+        ],
     );
     map.insert(
         vec!["langchain".into(), "schema".into(), "HumanMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "human".into(), "HumanMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "human".into(),
+            "HumanMessage".into(),
+        ],
     );
     map.insert(
         vec!["langchain".into(), "schema".into(), "SystemMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "system".into(), "SystemMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "system".into(),
+            "SystemMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain".into(), "schema".into(), "prompt_template".into(), "ImagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "image".into(), "ImagePromptTemplate".into()],
+        vec![
+            "langchain".into(),
+            "schema".into(),
+            "prompt_template".into(),
+            "ImagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "image".into(),
+            "ImagePromptTemplate".into(),
+        ],
     );
-    
+
     map
 });
 
 /// Mapping for old core namespaces for backwards compatibility.
 pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
-    
+
     // Message types with langchain_core prefix
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "ai".into(), "AIMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "ai".into(), "AIMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ai".into(),
+            "AIMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ai".into(),
+            "AIMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "ai".into(), "AIMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "ai".into(), "AIMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ai".into(),
+            "AIMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ai".into(),
+            "AIMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "base".into(), "BaseMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "base".into(), "BaseMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "base".into(),
+            "BaseMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "base".into(),
+            "BaseMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "base".into(), "BaseMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "base".into(), "BaseMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "base".into(),
+            "BaseMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "base".into(),
+            "BaseMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "chat".into(), "ChatMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "chat".into(), "ChatMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "chat".into(),
+            "ChatMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "chat".into(),
+            "ChatMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "function".into(), "FunctionMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "function".into(), "FunctionMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "function".into(),
+            "FunctionMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "function".into(),
+            "FunctionMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "human".into(), "HumanMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "human".into(), "HumanMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "human".into(),
+            "HumanMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "human".into(),
+            "HumanMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "system".into(), "SystemMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "system".into(), "SystemMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "system".into(),
+            "SystemMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "system".into(),
+            "SystemMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "tool".into(), "ToolMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "tool".into(), "ToolMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "tool".into(),
+            "ToolMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "tool".into(),
+            "ToolMessage".into(),
+        ],
     );
-    
+
     // Agent types
     map.insert(
-        vec!["langchain_core".into(), "agents".into(), "AgentAction".into()],
-        vec!["langchain_core".into(), "agents".into(), "AgentAction".into()],
+        vec![
+            "langchain_core".into(),
+            "agents".into(),
+            "AgentAction".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "agents".into(),
+            "AgentAction".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "agents".into(), "AgentFinish".into()],
-        vec!["langchain_core".into(), "agents".into(), "AgentFinish".into()],
+        vec![
+            "langchain_core".into(),
+            "agents".into(),
+            "AgentFinish".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "agents".into(),
+            "AgentFinish".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "agents".into(), "AgentActionMessageLog".into()],
-        vec!["langchain_core".into(), "agents".into(), "AgentActionMessageLog".into()],
+        vec![
+            "langchain_core".into(),
+            "agents".into(),
+            "AgentActionMessageLog".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "agents".into(),
+            "AgentActionMessageLog".into(),
+        ],
     );
-    
+
     // Prompt types
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "base".into(), "BasePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "base".into(), "BasePromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "base".into(),
+            "BasePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "base".into(),
+            "BasePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "prompt".into(), "PromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "prompt".into(), "PromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "prompt".into(),
+            "PromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "prompt".into(),
+            "PromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "MessagesPlaceholder".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "MessagesPlaceholder".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "MessagesPlaceholder".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "MessagesPlaceholder".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "ChatPromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "ChatPromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatPromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatPromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "HumanMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "HumanMessagePromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "HumanMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "HumanMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "SystemMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "SystemMessagePromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "SystemMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "SystemMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "AIMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "AIMessagePromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "AIMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "AIMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "BaseMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "BaseMessagePromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "BaseChatPromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "BaseChatPromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseChatPromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseChatPromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "ChatMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "ChatMessagePromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "ChatMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "BaseStringMessagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "chat".into(), "BaseStringMessagePromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseStringMessagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "chat".into(),
+            "BaseStringMessagePromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "string".into(), "StringPromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "string".into(), "StringPromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "string".into(),
+            "StringPromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "string".into(),
+            "StringPromptTemplate".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "few_shot_with_templates".into(), "FewShotPromptWithTemplates".into()],
-        vec!["langchain_core".into(), "prompts".into(), "few_shot_with_templates".into(), "FewShotPromptWithTemplates".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "few_shot_with_templates".into(),
+            "FewShotPromptWithTemplates".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "few_shot_with_templates".into(),
+            "FewShotPromptWithTemplates".into(),
+        ],
     );
-    
+
     // Output types
     map.insert(
-        vec!["langchain_core".into(), "outputs".into(), "chat_generation".into(), "ChatGeneration".into()],
-        vec!["langchain_core".into(), "outputs".into(), "chat_generation".into(), "ChatGeneration".into()],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "chat_generation".into(),
+            "ChatGeneration".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "chat_generation".into(),
+            "ChatGeneration".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "outputs".into(), "generation".into(), "Generation".into()],
-        vec!["langchain_core".into(), "outputs".into(), "generation".into(), "Generation".into()],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "generation".into(),
+            "Generation".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "generation".into(),
+            "Generation".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "outputs".into(), "chat_generation".into(), "ChatGenerationChunk".into()],
-        vec!["langchain_core".into(), "outputs".into(), "chat_generation".into(), "ChatGenerationChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "chat_generation".into(),
+            "ChatGenerationChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "chat_generation".into(),
+            "ChatGenerationChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "outputs".into(), "generation".into(), "GenerationChunk".into()],
-        vec!["langchain_core".into(), "outputs".into(), "generation".into(), "GenerationChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "generation".into(),
+            "GenerationChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "outputs".into(),
+            "generation".into(),
+            "GenerationChunk".into(),
+        ],
     );
-    
+
     // Document types
     map.insert(
-        vec!["langchain_core".into(), "documents".into(), "base".into(), "Document".into()],
-        vec!["langchain_core".into(), "documents".into(), "base".into(), "Document".into()],
+        vec![
+            "langchain_core".into(),
+            "documents".into(),
+            "base".into(),
+            "Document".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "documents".into(),
+            "base".into(),
+            "Document".into(),
+        ],
     );
-    
+
     // Prompt value types
     map.insert(
-        vec!["langchain_core".into(), "prompt_values".into(), "PromptValue".into()],
-        vec!["langchain_core".into(), "prompt_values".into(), "PromptValue".into()],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "PromptValue".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "PromptValue".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompt_values".into(), "StringPromptValue".into()],
-        vec!["langchain_core".into(), "prompt_values".into(), "StringPromptValue".into()],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "StringPromptValue".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "StringPromptValue".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompt_values".into(), "ChatPromptValue".into()],
-        vec!["langchain_core".into(), "prompt_values".into(), "ChatPromptValue".into()],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "ChatPromptValue".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "ChatPromptValue".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompt_values".into(), "ChatPromptValueConcrete".into()],
-        vec!["langchain_core".into(), "prompt_values".into(), "ChatPromptValueConcrete".into()],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "ChatPromptValueConcrete".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompt_values".into(),
+            "ChatPromptValueConcrete".into(),
+        ],
     );
-    
+
     // Runnable types
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "configurable".into(), "DynamicRunnable".into()],
-        vec!["langchain_core".into(), "runnables".into(), "configurable".into(), "DynamicRunnable".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "configurable".into(),
+            "DynamicRunnable".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "configurable".into(),
+            "DynamicRunnable".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableBinding".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableBinding".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableBinding".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableBinding".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "branch".into(), "RunnableBranch".into()],
-        vec!["langchain_core".into(), "runnables".into(), "branch".into(), "RunnableBranch".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "branch".into(),
+            "RunnableBranch".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "branch".into(),
+            "RunnableBranch".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "fallbacks".into(), "RunnableWithFallbacks".into()],
-        vec!["langchain_core".into(), "runnables".into(), "fallbacks".into(), "RunnableWithFallbacks".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "fallbacks".into(),
+            "RunnableWithFallbacks".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "fallbacks".into(),
+            "RunnableWithFallbacks".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableParallel".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableParallel".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableParallel".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableParallel".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableSequence".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableSequence".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableSequence".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableSequence".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableBindingBase".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableBindingBase".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableBindingBase".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableBindingBase".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableEach".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableEach".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableEach".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableEach".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableEachBase".into()],
-        vec!["langchain_core".into(), "runnables".into(), "base".into(), "RunnableEachBase".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableEachBase".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "base".into(),
+            "RunnableEachBase".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "passthrough".into(), "RunnablePassthrough".into()],
-        vec!["langchain_core".into(), "runnables".into(), "passthrough".into(), "RunnablePassthrough".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "passthrough".into(),
+            "RunnablePassthrough".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "passthrough".into(),
+            "RunnablePassthrough".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "passthrough".into(), "RunnableAssign".into()],
-        vec!["langchain_core".into(), "runnables".into(), "passthrough".into(), "RunnableAssign".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "passthrough".into(),
+            "RunnableAssign".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "passthrough".into(),
+            "RunnableAssign".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "router".into(), "RouterRunnable".into()],
-        vec!["langchain_core".into(), "runnables".into(), "router".into(), "RouterRunnable".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "router".into(),
+            "RouterRunnable".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "router".into(),
+            "RouterRunnable".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "retry".into(), "RunnableRetry".into()],
-        vec!["langchain_core".into(), "runnables".into(), "retry".into(), "RunnableRetry".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "retry".into(),
+            "RunnableRetry".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "retry".into(),
+            "RunnableRetry".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "configurable".into(), "RunnableConfigurableAlternatives".into()],
-        vec!["langchain_core".into(), "runnables".into(), "configurable".into(), "RunnableConfigurableAlternatives".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "configurable".into(),
+            "RunnableConfigurableAlternatives".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "configurable".into(),
+            "RunnableConfigurableAlternatives".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "configurable".into(), "RunnableConfigurableFields".into()],
-        vec!["langchain_core".into(), "runnables".into(), "configurable".into(), "RunnableConfigurableFields".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "configurable".into(),
+            "RunnableConfigurableFields".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "configurable".into(),
+            "RunnableConfigurableFields".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "runnables".into(), "history".into(), "RunnableWithMessageHistory".into()],
-        vec!["langchain_core".into(), "runnables".into(), "history".into(), "RunnableWithMessageHistory".into()],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "history".into(),
+            "RunnableWithMessageHistory".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "runnables".into(),
+            "history".into(),
+            "RunnableWithMessageHistory".into(),
+        ],
     );
-    
+
     // Output parser types
     map.insert(
-        vec!["langchain_core".into(), "output_parsers".into(), "string".into(), "StrOutputParser".into()],
-        vec!["langchain_core".into(), "output_parsers".into(), "string".into(), "StrOutputParser".into()],
+        vec![
+            "langchain_core".into(),
+            "output_parsers".into(),
+            "string".into(),
+            "StrOutputParser".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "output_parsers".into(),
+            "string".into(),
+            "StrOutputParser".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "output_parsers".into(), "list".into(), "CommaSeparatedListOutputParser".into()],
-        vec!["langchain_core".into(), "output_parsers".into(), "list".into(), "CommaSeparatedListOutputParser".into()],
+        vec![
+            "langchain_core".into(),
+            "output_parsers".into(),
+            "list".into(),
+            "CommaSeparatedListOutputParser".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "output_parsers".into(),
+            "list".into(),
+            "CommaSeparatedListOutputParser".into(),
+        ],
     );
-    
+
     // Message chunk types
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "chat".into(), "ChatMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "chat".into(), "ChatMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "chat".into(),
+            "ChatMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "chat".into(),
+            "ChatMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "human".into(), "HumanMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "human".into(), "HumanMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "human".into(),
+            "HumanMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "human".into(),
+            "HumanMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "function".into(), "FunctionMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "function".into(), "FunctionMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "function".into(),
+            "FunctionMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "function".into(),
+            "FunctionMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "system".into(), "SystemMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "system".into(), "SystemMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "system".into(),
+            "SystemMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "system".into(),
+            "SystemMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "tool".into(), "ToolMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "tool".into(), "ToolMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "tool".into(),
+            "ToolMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "tool".into(),
+            "ToolMessageChunk".into(),
+        ],
     );
-    
+
     map
 });
 
 /// Mapping for JavaScript serialization compatibility.
 pub static JS_SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
     let mut map = HashMap::new();
-    
+
     // Message types (JS often serializes without the submodule)
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "AIMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "ai".into(), "AIMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "AIMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ai".into(),
+            "AIMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "AIMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "ai".into(), "AIMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "AIMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ai".into(),
+            "AIMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "BaseMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "base".into(), "BaseMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "BaseMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "base".into(),
+            "BaseMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "BaseMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "base".into(), "BaseMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "BaseMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "base".into(),
+            "BaseMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "ChatMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "chat".into(), "ChatMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ChatMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "chat".into(),
+            "ChatMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "ChatMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "chat".into(), "ChatMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ChatMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "chat".into(),
+            "ChatMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "FunctionMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "function".into(), "FunctionMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "FunctionMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "function".into(),
+            "FunctionMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "FunctionMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "function".into(), "FunctionMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "FunctionMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "function".into(),
+            "FunctionMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "HumanMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "human".into(), "HumanMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "HumanMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "human".into(),
+            "HumanMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "HumanMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "human".into(), "HumanMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "HumanMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "human".into(),
+            "HumanMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "SystemMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "system".into(), "SystemMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "SystemMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "system".into(),
+            "SystemMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "SystemMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "system".into(), "SystemMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "SystemMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "system".into(),
+            "SystemMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "ToolMessage".into()],
-        vec!["langchain_core".into(), "messages".into(), "tool".into(), "ToolMessage".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ToolMessage".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "tool".into(),
+            "ToolMessage".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "messages".into(), "ToolMessageChunk".into()],
-        vec!["langchain_core".into(), "messages".into(), "tool".into(), "ToolMessageChunk".into()],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "ToolMessageChunk".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "messages".into(),
+            "tool".into(),
+            "ToolMessageChunk".into(),
+        ],
     );
     map.insert(
-        vec!["langchain_core".into(), "prompts".into(), "image".into(), "ImagePromptTemplate".into()],
-        vec!["langchain_core".into(), "prompts".into(), "image".into(), "ImagePromptTemplate".into()],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "image".into(),
+            "ImagePromptTemplate".into(),
+        ],
+        vec![
+            "langchain_core".into(),
+            "prompts".into(),
+            "image".into(),
+            "ImagePromptTemplate".into(),
+        ],
     );
-    
+
     map
 });
 
@@ -656,10 +1940,7 @@ pub const DEFAULT_NAMESPACES: &[&str] = &[
 
 /// Namespaces for which only deserializing via the SERIALIZABLE_MAPPING is allowed.
 /// Load by path is not allowed.
-pub const DISALLOW_LOAD_FROM_PATH: &[&str] = &[
-    "langchain_community",
-    "langchain",
-];
+pub const DISALLOW_LOAD_FROM_PATH: &[&str] = &["langchain_community", "langchain"];
 
 #[cfg(test)]
 mod tests {
