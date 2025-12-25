@@ -24,8 +24,12 @@
 //! - `specta`: Specta derive support
 
 pub mod api;
+pub mod caches;
 pub mod callbacks;
+pub mod chat_history;
+pub mod chat_loaders;
 pub mod chat_models;
+pub mod chat_sessions;
 pub mod error;
 pub mod load;
 pub mod messages;
@@ -53,6 +57,20 @@ pub use messages::{
 
 // Re-export tool types
 pub use tools::{Tool, ToolDefinition, tool};
+
+// Re-export chat history types
+pub use chat_history::{
+    AIMessageInput, BaseChatMessageHistory, HumanMessageInput, InMemoryChatMessageHistory,
+};
+
+// Re-export chat session types
+pub use chat_sessions::ChatSession;
+
+// Re-export chat loader types
+pub use chat_loaders::BaseChatLoader;
+
+// Re-export cache types
+pub use caches::{BaseCache, CacheReturnValue, InMemoryCache};
 
 // Re-export output types
 pub use outputs::{
