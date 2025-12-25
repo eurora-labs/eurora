@@ -13,7 +13,7 @@ use futures::stream::BoxStream;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::load::{Serializable, Serialized};
 
 use super::config::{
@@ -273,11 +273,19 @@ pub trait Runnable: Send + Sync + Debug {
     }
 
     /// Create a new Runnable that retries on failure.
-    fn with_retry(self, max_attempts: usize, wait_exponential_jitter: bool) -> RunnableRetry<Self>
+    ///
+    /// This is a convenience method that uses the `RunnableRetryExt` trait.
+    /// For more control over retry behavior, use `RunnableRetryExt::with_retry`
+    /// with a `RunnableRetryConfig`.
+    fn with_retry(
+        self,
+        max_attempts: usize,
+        wait_exponential_jitter: bool,
+    ) -> super::retry::RunnableRetry<Self>
     where
         Self: Sized,
     {
-        RunnableRetry::new(self, max_attempts, wait_exponential_jitter)
+        super::retry::RunnableRetry::with_simple(self, max_attempts, wait_exponential_jitter)
     }
 
     /// Return a new Runnable that maps a list of inputs to a list of outputs.
@@ -837,109 +845,6 @@ where
 }
 
 // =============================================================================
-// RunnableRetry
-// =============================================================================
-
-/// A Runnable that retries on failure.
-pub struct RunnableRetry<R>
-where
-    R: Runnable,
-{
-    bound: R,
-    max_attempts: usize,
-    wait_exponential_jitter: bool,
-}
-
-impl<R> Debug for RunnableRetry<R>
-where
-    R: Runnable,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RunnableRetry")
-            .field("bound", &self.bound)
-            .field("max_attempts", &self.max_attempts)
-            .field("wait_exponential_jitter", &self.wait_exponential_jitter)
-            .finish()
-    }
-}
-
-impl<R> RunnableRetry<R>
-where
-    R: Runnable,
-{
-    /// Create a new RunnableRetry.
-    pub fn new(bound: R, max_attempts: usize, wait_exponential_jitter: bool) -> Self {
-        Self {
-            bound,
-            max_attempts,
-            wait_exponential_jitter,
-        }
-    }
-}
-
-#[async_trait]
-impl<R> Runnable for RunnableRetry<R>
-where
-    R: Runnable + 'static,
-{
-    type Input = R::Input;
-    type Output = R::Output;
-
-    fn name(&self) -> Option<String> {
-        self.bound.name()
-    }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let mut last_error = None;
-
-        for attempt in 0..self.max_attempts {
-            match self.bound.invoke(input.clone(), config.clone()) {
-                Ok(output) => return Ok(output),
-                Err(e) => {
-                    last_error = Some(e);
-                    if attempt + 1 < self.max_attempts {
-                        // In a real implementation, we would wait here
-                        // with exponential backoff and jitter
-                    }
-                }
-            }
-        }
-
-        Err(last_error.unwrap_or_else(|| Error::Other("Max retries exceeded".to_string())))
-    }
-
-    async fn ainvoke(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
-        let mut last_error = None;
-
-        for attempt in 0..self.max_attempts {
-            match self.bound.ainvoke(input.clone(), config.clone()).await {
-                Ok(output) => return Ok(output),
-                Err(e) => {
-                    last_error = Some(e);
-                    if attempt + 1 < self.max_attempts && self.wait_exponential_jitter {
-                        // In a real implementation, we would wait here
-                        // with exponential backoff and jitter
-                        tokio::time::sleep(tokio::time::Duration::from_millis(
-                            (2u64.pow(attempt as u32)) * 100,
-                        ))
-                        .await;
-                    }
-                }
-            }
-        }
-
-        Err(last_error.unwrap_or_else(|| Error::Other("Max retries exceeded".to_string())))
-    }
-}
-
-// =============================================================================
 // DynRunnable - Type-erased Runnable
 // =============================================================================
 
@@ -1026,8 +931,10 @@ mod tests {
     #[test]
     fn test_runnable_retry() {
         // Test that retry works with a successful function
+        use crate::runnables::retry::RunnableRetry;
+
         let runnable = RunnableLambda::new(|x: i32| Ok(x + 1));
-        let retry = RunnableRetry::new(runnable, 3, false);
+        let retry = RunnableRetry::with_simple(runnable, 3, false);
 
         let result = retry.invoke(1, None).unwrap();
         assert_eq!(result, 2);

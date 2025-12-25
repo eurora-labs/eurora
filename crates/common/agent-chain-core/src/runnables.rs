@@ -9,6 +9,7 @@ pub mod config;
 pub mod configurable;
 pub mod fallbacks;
 pub mod passthrough;
+pub mod retry;
 pub mod router;
 pub mod schema;
 pub mod utils;
@@ -16,8 +17,7 @@ pub mod utils;
 // Re-export commonly used types
 pub use base::{
     DynRunnable, Runnable, RunnableBinding, RunnableEach, RunnableLambda, RunnableParallel,
-    RunnableRetry, RunnableSequence, RunnableSerializable, coerce_to_runnable, pipe,
-    runnable_lambda, to_dyn,
+    RunnableSequence, RunnableSerializable, coerce_to_runnable, pipe, runnable_lambda, to_dyn,
 };
 pub use branch::{RunnableBranch, RunnableBranchBuilder};
 pub use config::{
@@ -32,6 +32,10 @@ pub use fallbacks::{RunnableWithFallbacks, RunnableWithFallbacksExt};
 pub use passthrough::{
     PickKeys, RunnableAssign, RunnableAssignBuilder, RunnablePassthrough, RunnablePick,
     graph_passthrough,
+};
+pub use retry::{
+    ExponentialJitterParams, RetryCallState, RetryErrorPredicate, RunnableRetry,
+    RunnableRetryConfig, RunnableRetryExt,
 };
 pub use router::{DynRouterRunnable, RouterInput, RouterRunnable};
 pub use schema::{
