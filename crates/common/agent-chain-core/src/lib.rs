@@ -32,6 +32,7 @@ pub mod messages;
 pub mod outputs;
 pub mod prompts;
 pub mod tools;
+pub mod tracers;
 pub mod utils;
 
 // Re-export error types
@@ -80,6 +81,14 @@ pub use load::{
     ConstructorInfo, RevivedValue, Reviver, ReviverConfig, Serializable, Serialized,
     SerializedConstructor, SerializedNotImplemented, SerializedSecret, dumpd, dumps, load as load_json,
     loads,
+};
+
+// Re-export tracer types
+pub use tracers::{
+    AsyncBaseTracer, AsyncListener, AsyncRootListenersTracer, BaseTracer, ConsoleCallbackHandler,
+    FunctionCallbackHandler, Listener, PassthroughStreamingHandler, RootListenersTracer, Run,
+    RunCollectorCallbackHandler, RunEvent, RunType, SchemaFormat, StreamingCallbackHandler,
+    TracerCore, TracerCoreConfig, TracerError,
 };
 
 // Re-export async_trait for use in generated code

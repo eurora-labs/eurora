@@ -8,6 +8,7 @@ license = "MIT"
 [dependencies]
 agent-chain-macros = { workspace = true }
 async-trait = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
 futures = { workspace = true }
 regex = "1"
 reqwest = { version = "0.12", features = ["json", "stream"] }
@@ -20,11 +21,13 @@ specta = { workspace = true, features = [
   "uuid",
 ], optional = true }
 thiserror = { workspace = true }
+tracing = "0.1"
 url = "2"
 uuid = { workspace = true, features = ["v4", "v7", "serde"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+tokio = { version = "1", features = ["rt", "macros"] }
 
 [features]
 default = []
