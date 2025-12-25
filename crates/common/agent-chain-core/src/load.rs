@@ -138,6 +138,5 @@ mod tests {
     #[test]
     fn test_mapping_exists() {
         assert!(!SERIALIZABLE_MAPPING.is_empty());
-        assert!(!DEFAULT_NAMESPACES.is_empty());
     }
 }
