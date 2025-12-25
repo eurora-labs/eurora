@@ -5,6 +5,7 @@
 //! - Tool trait and `#[tool]` macro for function calling
 //! - Chat model abstractions
 //! - Callback system for tracking and monitoring operations
+//! - Prompt templates for flexible prompt construction
 //! - Support for multiple providers (Anthropic, OpenAI, etc.)
 //!
 //! # Architecture
@@ -13,6 +14,7 @@
 //!
 //! - **Core layer** ([`chat_models`]): Base `ChatModel` trait that all providers implement
 //! - **Message layer** ([`messages`]): Message types for conversations
+//! - **Prompts layer** ([`prompts`]): Prompt templates for constructing prompts
 //! - **Tools layer** ([`tools`]): Tool definitions and the `#[tool]` macro
 //! - **Callbacks layer** ([`callbacks`]): Callback handlers and managers for monitoring
 //!
@@ -27,6 +29,7 @@ pub mod chat_models;
 pub mod error;
 pub mod messages;
 pub mod outputs;
+pub mod prompts;
 pub mod tools;
 pub mod utils;
 
@@ -60,6 +63,15 @@ pub use callbacks::{
     AsyncCallbackManagerForLLMRun, BaseCallbackHandler, BaseCallbackManager, CallbackManager,
     CallbackManagerForChainRun, CallbackManagerForLLMRun, Callbacks, StdOutCallbackHandler,
     StreamingStdOutCallbackHandler, UsageMetadataCallbackHandler, add_usage,
+};
+
+// Re-export prompt types
+pub use prompts::{
+    AIMessagePromptTemplate, BaseChatPromptTemplate, BaseMessagePromptTemplate, BasePromptTemplate,
+    ChatMessagePromptTemplate, ChatPromptTemplate, DictPromptTemplate,
+    FewShotChatMessagePromptTemplate, FewShotPromptTemplate, FewShotPromptWithTemplates,
+    HumanMessagePromptTemplate, ImagePromptTemplate, MessagesPlaceholder, PromptTemplate,
+    PromptTemplateFormat, StringPromptTemplate, SystemMessagePromptTemplate, load_prompt,
 };
 
 // Re-export async_trait for use in generated code
