@@ -261,6 +261,7 @@ name = "agent-chain-core"
 version = "0.0.2"
 dependencies = [
  "agent-chain-macros",
+ "async-stream",
  "async-trait",
  "chrono",
  "futures",
