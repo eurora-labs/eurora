@@ -225,8 +225,7 @@ mod tests {
             <a href="https://example.com/page2">Link 2</a>
         "#;
 
-        let links =
-            extract_sub_links(html, "https://example.com", None, None, true, &[]);
+        let links = extract_sub_links(html, "https://example.com", None, None, true, &[]);
 
         for link in &links {
             assert!(link.starts_with("https://example.com"));
@@ -240,8 +239,7 @@ mod tests {
             <a href="https://other.com/page">External</a>
         "#;
 
-        let links =
-            extract_sub_links(html, "https://example.com", None, None, true, &[]);
+        let links = extract_sub_links(html, "https://example.com", None, None, true, &[]);
 
         assert!(links.iter().any(|l| l.contains("example.com")));
         assert!(!links.iter().any(|l| l.contains("other.com")));

@@ -34,7 +34,7 @@ pub use generation::{Generation, GenerationChunk};
 pub use run_info::RunInfo;
 
 // Re-export from chat_generation
-pub use chat_generation::{merge_chat_generation_chunks, ChatGeneration, ChatGenerationChunk};
+pub use chat_generation::{ChatGeneration, ChatGenerationChunk, merge_chat_generation_chunks};
 
 // Re-export from chat_result
 pub use chat_result::ChatResult;

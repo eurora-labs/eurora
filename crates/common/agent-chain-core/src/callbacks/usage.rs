@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
 
-use crate::chat_models::UsageMetadata;
 use crate::ChatResult;
+use crate::chat_models::UsageMetadata;
 
 use super::base::{
     BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
@@ -43,7 +43,7 @@ pub fn add_usage(left: &UsageMetadata, right: &UsageMetadata) -> UsageMetadata {
 /// use std::sync::Arc;
 ///
 /// let handler = UsageMetadataCallbackHandler::new();
-/// 
+///
 /// // Use with a callback manager
 /// let mut manager = CallbackManager::new();
 /// manager.add_handler(Arc::new(handler.clone()), true);
@@ -89,12 +89,7 @@ impl fmt::Display for UsageMetadataCallbackHandler {
 }
 
 impl LLMManagerMixin for UsageMetadataCallbackHandler {
-    fn on_llm_end(
-        &mut self,
-        response: &ChatResult,
-        _run_id: Uuid,
-        _parent_run_id: Option<Uuid>,
-    ) {
+    fn on_llm_end(&mut self, response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
         // Extract usage metadata from the response
         let usage_metadata = response.metadata.usage.as_ref();
         let model_name = response.metadata.model.as_deref();

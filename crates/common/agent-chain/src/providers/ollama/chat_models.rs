@@ -312,18 +312,14 @@ impl ChatOllama {
         messages
             .iter()
             .filter_map(|msg| match msg {
-                BaseMessage::System(m) => {
-                    Some(serde_json::json!({
-                        "role": "system",
-                        "content": m.content()
-                    }))
-                }
-                BaseMessage::Human(m) => {
-                    Some(serde_json::json!({
-                        "role": "user",
-                        "content": m.content()
-                    }))
-                }
+                BaseMessage::System(m) => Some(serde_json::json!({
+                    "role": "system",
+                    "content": m.content()
+                })),
+                BaseMessage::Human(m) => Some(serde_json::json!({
+                    "role": "user",
+                    "content": m.content()
+                })),
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
                         "role": "assistant",
@@ -353,30 +349,24 @@ impl ChatOllama {
 
                     Some(message)
                 }
-                BaseMessage::Tool(m) => {
-                    Some(serde_json::json!({
-                        "role": "tool",
-                        "tool_call_id": m.tool_call_id(),
-                        "content": m.content()
-                    }))
-                }
+                BaseMessage::Tool(m) => Some(serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": m.tool_call_id(),
+                    "content": m.content()
+                })),
                 BaseMessage::Remove(_) => {
                     // RemoveMessage is used for message management, not sent to API
                     None
                 }
-                BaseMessage::Chat(m) => {
-                    Some(serde_json::json!({
-                        "role": m.role(),
-                        "content": m.content()
-                    }))
-                }
-                BaseMessage::Function(m) => {
-                    Some(serde_json::json!({
-                        "role": "function",
-                        "name": m.name(),
-                        "content": m.content()
-                    }))
-                }
+                BaseMessage::Chat(m) => Some(serde_json::json!({
+                    "role": m.role(),
+                    "content": m.content()
+                })),
+                BaseMessage::Function(m) => Some(serde_json::json!({
+                    "role": "function",
+                    "name": m.name(),
+                    "content": m.content()
+                })),
             })
             .collect()
     }
