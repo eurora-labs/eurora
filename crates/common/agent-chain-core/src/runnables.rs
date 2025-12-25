@@ -6,6 +6,7 @@
 pub mod base;
 pub mod branch;
 pub mod config;
+pub mod configurable;
 pub mod router;
 pub mod schema;
 pub mod utils;
@@ -19,6 +20,11 @@ pub use base::{
 pub use branch::{RunnableBranch, RunnableBranchBuilder};
 pub use config::{
     ConfigOrList, RunnableConfig, ensure_config, get_config_list, merge_configs, patch_config,
+};
+pub use configurable::{
+    Alternative, ConfigurableRunnable, DynamicRunnable, RunnableConfigurableAlternatives,
+    RunnableConfigurableFields, make_options_spec_multi, make_options_spec_single,
+    prefix_config_spec,
 };
 pub use router::{DynRouterRunnable, RouterInput, RouterRunnable};
 pub use schema::{

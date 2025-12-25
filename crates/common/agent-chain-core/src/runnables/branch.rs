@@ -15,9 +15,7 @@ use crate::error::{Error, Result};
 use crate::load::{Serializable, Serialized, SerializedConstructorData};
 
 use super::base::{DynRunnable, Runnable, RunnableLambda, RunnableSerializable};
-use super::config::{
-    RunnableConfig, ensure_config, get_callback_manager_for_config, patch_config,
-};
+use super::config::{RunnableConfig, ensure_config, get_callback_manager_for_config, patch_config};
 use super::utils::{ConfigurableFieldSpec, get_unique_config_specs};
 
 /// A `Runnable` that selects which branch to run based on a condition.
@@ -130,9 +128,7 @@ where
         let specs = self
             .branches
             .iter()
-            .flat_map(|(_condition, _runnable)| {
-                Vec::<ConfigurableFieldSpec>::new()
-            })
+            .flat_map(|(_condition, _runnable)| Vec::<ConfigurableFieldSpec>::new())
             .collect::<Vec<_>>();
 
         get_unique_config_specs(specs)
@@ -219,7 +215,9 @@ where
     type Output = O;
 
     fn name(&self) -> Option<String> {
-        self.name.clone().or_else(|| Some("RunnableBranch".to_string()))
+        self.name
+            .clone()
+            .or_else(|| Some("RunnableBranch".to_string()))
     }
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
@@ -293,7 +291,9 @@ where
         let config = ensure_config(config);
 
         for (_idx, (condition, runnable)) in self.branches.iter().enumerate() {
-            let expression_value = condition.ainvoke(input.clone(), Some(config.clone())).await?;
+            let expression_value = condition
+                .ainvoke(input.clone(), Some(config.clone()))
+                .await?;
 
             if expression_value {
                 return runnable.ainvoke(input.clone(), Some(config.clone())).await;
@@ -421,14 +421,8 @@ mod tests {
     #[test]
     fn test_runnable_branch_invoke_first_condition() {
         let branch = RunnableBranchBuilder::new()
-            .branch(
-                |x: i32| Ok(x > 0),
-                |x: i32| Ok(format!("positive: {}", x)),
-            )
-            .branch(
-                |x: i32| Ok(x < 0),
-                |x: i32| Ok(format!("negative: {}", x)),
-            )
+            .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
+            .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
             .default(|_: i32| Ok("zero".to_string()))
             .unwrap();
 
@@ -439,14 +433,8 @@ mod tests {
     #[test]
     fn test_runnable_branch_invoke_second_condition() {
         let branch = RunnableBranchBuilder::new()
-            .branch(
-                |x: i32| Ok(x > 0),
-                |x: i32| Ok(format!("positive: {}", x)),
-            )
-            .branch(
-                |x: i32| Ok(x < 0),
-                |x: i32| Ok(format!("negative: {}", x)),
-            )
+            .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
+            .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
             .default(|_: i32| Ok("zero".to_string()))
             .unwrap();
 
@@ -457,14 +445,8 @@ mod tests {
     #[test]
     fn test_runnable_branch_invoke_default() {
         let branch = RunnableBranchBuilder::new()
-            .branch(
-                |x: i32| Ok(x > 0),
-                |x: i32| Ok(format!("positive: {}", x)),
-            )
-            .branch(
-                |x: i32| Ok(x < 0),
-                |x: i32| Ok(format!("negative: {}", x)),
-            )
+            .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
+            .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
             .default(|_: i32| Ok("zero".to_string()))
             .unwrap();
 
@@ -474,11 +456,16 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_requires_at_least_one_branch() {
-        let result: Result<RunnableBranch<i32, String>> = RunnableBranchBuilder::new()
-            .default(|_: i32| Ok("default".to_string()));
+        let result: Result<RunnableBranch<i32, String>> =
+            RunnableBranchBuilder::new().default(|_: i32| Ok("default".to_string()));
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("at least one condition branch"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("at least one condition branch")
+        );
     }
 
     #[test]
@@ -504,8 +491,7 @@ mod tests {
 
     #[test]
     fn test_runnable_branch_with_arc_runnables() {
-        let condition: DynRunnable<i32, bool> =
-            Arc::new(RunnableLambda::new(|x: i32| Ok(x > 10)));
+        let condition: DynRunnable<i32, bool> = Arc::new(RunnableLambda::new(|x: i32| Ok(x > 10)));
         let branch_runnable: DynRunnable<i32, String> =
             Arc::new(RunnableLambda::new(|x: i32| Ok(format!("big: {}", x))));
         let default: DynRunnable<i32, String> =
@@ -520,14 +506,8 @@ mod tests {
     #[tokio::test]
     async fn test_runnable_branch_ainvoke() {
         let branch = RunnableBranchBuilder::new()
-            .branch(
-                |x: i32| Ok(x > 0),
-                |x: i32| Ok(format!("positive: {}", x)),
-            )
-            .branch(
-                |x: i32| Ok(x < 0),
-                |x: i32| Ok(format!("negative: {}", x)),
-            )
+            .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
+            .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
             .default(|_: i32| Ok("zero".to_string()))
             .unwrap();
 
