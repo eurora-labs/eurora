@@ -4,6 +4,7 @@
 //! across chat model calls, following the Python LangChain UsageMetadataCallbackHandler pattern.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 
@@ -79,25 +80,11 @@ impl UsageMetadataCallbackHandler {
     pub fn usage_metadata(&self) -> HashMap<String, UsageMetadata> {
         self.usage_metadata.lock().unwrap().clone()
     }
+}
 
-    /// Get usage metadata for a specific model.
-    pub fn get_model_usage(&self, model_name: &str) -> Option<UsageMetadata> {
-        self.usage_metadata.lock().unwrap().get(model_name).cloned()
-    }
-
-    /// Get total usage across all models.
-    pub fn total_usage(&self) -> UsageMetadata {
-        let guard = self.usage_metadata.lock().unwrap();
-        let mut total = UsageMetadata::new(0, 0);
-        for usage in guard.values() {
-            total = add_usage(&total, usage);
-        }
-        total
-    }
-
-    /// Clear all collected usage metadata.
-    pub fn clear(&self) {
-        self.usage_metadata.lock().unwrap().clear();
+impl fmt::Display for UsageMetadataCallbackHandler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.usage_metadata.lock().unwrap())
     }
 }
 
@@ -183,16 +170,6 @@ impl UsageMetadataCallbackGuard {
     /// Get the collected usage metadata.
     pub fn usage_metadata(&self) -> HashMap<String, UsageMetadata> {
         self.handler.usage_metadata()
-    }
-
-    /// Get usage metadata for a specific model.
-    pub fn get_model_usage(&self, model_name: &str) -> Option<UsageMetadata> {
-        self.handler.get_model_usage(model_name)
-    }
-
-    /// Get total usage across all models.
-    pub fn total_usage(&self) -> UsageMetadata {
-        self.handler.total_usage()
     }
 
     /// Get an Arc-wrapped handler suitable for use with callback managers.
@@ -363,76 +340,6 @@ mod tests {
 
         let claude_usage = usage.get("claude-3").unwrap();
         assert_eq!(claude_usage.total_tokens, 33);
-    }
-
-    #[test]
-    fn test_total_usage() {
-        let mut handler = UsageMetadataCallbackHandler::new();
-
-        let result1 = ChatResult {
-            message: AIMessage::new("Hello"),
-            metadata: ChatResultMetadata {
-                model: Some("gpt-4".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(10, 20)),
-            },
-        };
-
-        let result2 = ChatResult {
-            message: AIMessage::new("Hello"),
-            metadata: ChatResultMetadata {
-                model: Some("claude-3".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(8, 25)),
-            },
-        };
-
-        handler.on_llm_end(&result1, Uuid::new_v4(), None);
-        handler.on_llm_end(&result2, Uuid::new_v4(), None);
-
-        let total = handler.total_usage();
-        assert_eq!(total.input_tokens, 18);
-        assert_eq!(total.output_tokens, 45);
-        assert_eq!(total.total_tokens, 63);
-    }
-
-    #[test]
-    fn test_clear_usage() {
-        let mut handler = UsageMetadataCallbackHandler::new();
-
-        let result = ChatResult {
-            message: AIMessage::new("Hello"),
-            metadata: ChatResultMetadata {
-                model: Some("gpt-4".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(10, 20)),
-            },
-        };
-
-        handler.on_llm_end(&result, Uuid::new_v4(), None);
-        assert!(!handler.usage_metadata().is_empty());
-
-        handler.clear();
-        assert!(handler.usage_metadata().is_empty());
-    }
-
-    #[test]
-    fn test_get_model_usage() {
-        let mut handler = UsageMetadataCallbackHandler::new();
-
-        let result = ChatResult {
-            message: AIMessage::new("Hello"),
-            metadata: ChatResultMetadata {
-                model: Some("gpt-4".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(10, 20)),
-            },
-        };
-
-        handler.on_llm_end(&result, Uuid::new_v4(), None);
-
-        assert!(handler.get_model_usage("gpt-4").is_some());
-        assert!(handler.get_model_usage("claude-3").is_none());
     }
 
     #[test]
