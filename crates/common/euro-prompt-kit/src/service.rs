@@ -86,7 +86,7 @@ impl Default for OllamaConfig {
 
 #[derive(Debug, Clone)]
 enum LLMProvider {
-    OpenAI(ChatOpenAI),
+    OpenAI(Box<ChatOpenAI>),
     Ollama(ChatOllama),
     Eurora(ChatEurora),
 }
@@ -99,7 +99,7 @@ pub struct PromptKitService {
 impl Default for PromptKitService {
     fn default() -> Self {
         Self {
-            provider: LLMProvider::OpenAI(ChatOpenAI::new("gpt-4o")),
+            provider: LLMProvider::OpenAI(Box::new(ChatOpenAI::new("gpt-4o"))),
         }
     }
 }
@@ -233,7 +233,7 @@ impl From<OpenAIConfig> for PromptKitService {
         }
 
         Self {
-            provider: LLMProvider::OpenAI(llm),
+            provider: LLMProvider::OpenAI(Box::new(llm)),
         }
     }
 }

@@ -120,7 +120,7 @@ impl BaseLanguageModel for FakeMessagesListChatModel {
                 result
                     .generations
                     .into_iter()
-                    .map(|g| GenerationType::ChatGeneration(g))
+                    .map(GenerationType::ChatGeneration)
                     .collect(),
             );
         }
@@ -293,7 +293,7 @@ impl BaseLanguageModel for FakeListChatModel {
                 result
                     .generations
                     .into_iter()
-                    .map(|g| GenerationType::ChatGeneration(g))
+                    .map(GenerationType::ChatGeneration)
                     .collect(),
             );
         }
@@ -352,13 +352,13 @@ impl BaseChatModel for FakeListChatModel {
                 }
 
                 // Check if we should error on this chunk
-                if let Some(error_chunk) = error_on_chunk {
-                    if i_c == error_chunk {
-                        yield Err(crate::error::Error::Other(
-                            "FakeListChatModelError".to_string()
-                        ));
-                        return;
-                    }
+                if let Some(error_chunk) = error_on_chunk
+                    && i_c == error_chunk
+                {
+                    yield Err(crate::error::Error::Other(
+                        "FakeListChatModelError".to_string()
+                    ));
+                    return;
                 }
 
                 // Create chunk with proper chunk_position
@@ -368,7 +368,7 @@ impl BaseChatModel for FakeListChatModel {
                     None
                 };
 
-                let mut ai_chunk = AIMessageChunk::new(&c.to_string());
+                let mut ai_chunk = AIMessageChunk::new(c.to_string());
                 ai_chunk.set_chunk_position(chunk_position);
 
                 let chunk = ChatGenerationChunk::new(ai_chunk.to_message().into());
@@ -382,11 +382,13 @@ impl BaseChatModel for FakeListChatModel {
 
 /// Fake Chat Model wrapper for testing purposes.
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct FakeChatModel {
     /// Chat model configuration.
     config: ChatModelConfig,
 }
 
+#[allow(dead_code)]
 impl FakeChatModel {
     /// Create a new FakeChatModel.
     pub fn new() -> Self {
@@ -437,7 +439,7 @@ impl BaseLanguageModel for FakeChatModel {
                 result
                     .generations
                     .into_iter()
-                    .map(|g| GenerationType::ChatGeneration(g))
+                    .map(GenerationType::ChatGeneration)
                     .collect(),
             );
         }
@@ -559,7 +561,7 @@ impl BaseLanguageModel for GenericFakeChatModel {
                 result
                     .generations
                     .into_iter()
-                    .map(|g| GenerationType::ChatGeneration(g))
+                    .map(GenerationType::ChatGeneration)
                     .collect(),
             );
         }
@@ -778,7 +780,7 @@ impl BaseLanguageModel for ParrotFakeChatModel {
                 result
                     .generations
                     .into_iter()
-                    .map(|g| GenerationType::ChatGeneration(g))
+                    .map(GenerationType::ChatGeneration)
                     .collect(),
             );
         }
