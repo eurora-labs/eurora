@@ -691,10 +691,10 @@ impl ChatOpenAI {
             payload["stop"] = serde_json::json!(stop);
         }
 
-        if let Some(tools) = tools {
-            if !tools.is_empty() {
-                payload["tools"] = serde_json::Value::Array(tools.to_vec());
-            }
+        if let Some(tools) = tools
+            && !tools.is_empty()
+        {
+            payload["tools"] = serde_json::Value::Array(tools.to_vec());
         }
 
         if stream {
@@ -945,13 +945,13 @@ impl ChatOpenAI {
                                         }
                                         "response.completed" | "response.incomplete" => {
                                             // Response complete - extract usage from the response
-                                            if let Some(resp) = event.response {
-                                                if let Some(resp_usage) = resp.usage {
-                                                    usage = Some(UsageMetadata::new(
-                                                        resp_usage.input_tokens,
-                                                        resp_usage.output_tokens,
-                                                    ));
-                                                }
+                                            if let Some(resp) = event.response
+                                                && let Some(resp_usage) = resp.usage
+                                            {
+                                                usage = Some(UsageMetadata::new(
+                                                    resp_usage.input_tokens,
+                                                    resp_usage.output_tokens,
+                                                ));
                                             }
                                             // Final chunk
                                             yield Ok(ChatChunk {
@@ -1099,7 +1099,7 @@ impl ChatOpenAI {
     /// Parse the API response into an OutputChatResult.
     fn parse_response(&self, response: OpenAIResponse) -> OutputChatResult {
         // Extract finish_reason before consuming choices
-        let finish_reason = response
+        let _finish_reason = response
             .choices
             .first()
             .and_then(|c| c.finish_reason.clone());
@@ -1704,6 +1704,7 @@ impl ChatOpenAI {
 
 /// OpenAI API response structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIResponse {
     model: String,
     choices: Vec<OpenAIChoice>,
@@ -1771,6 +1772,7 @@ struct OpenAIDelta {
 
 /// OpenAI Responses API response structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ResponsesApiResponse {
     model: String,
     output: Vec<ResponsesOutput>,
