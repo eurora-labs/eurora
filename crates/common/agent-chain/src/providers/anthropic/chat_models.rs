@@ -385,7 +385,9 @@ impl BaseLanguageModel for ChatAnthropic {
         let mut all_generations = Vec::new();
         for prompt in prompts {
             let messages = prompt.to_messages();
-            let result = self._generate_internal(messages, stop.clone(), None).await?;
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
             all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
         }
         Ok(LLMResult::new(all_generations))
