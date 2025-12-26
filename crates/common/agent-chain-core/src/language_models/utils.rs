@@ -37,51 +37,51 @@ pub fn is_openai_data_block(block: &serde_json::Value, filter: Option<DataBlockF
 
     match block_type {
         Some("image_url") => {
-            if let Some(f) = filter {
-                if f != DataBlockFilter::Image {
-                    return false;
-                }
+            if let Some(f) = filter
+                && f != DataBlockFilter::Image
+            {
+                return false;
             }
 
             // Check for valid image_url structure
-            if let Some(image_url) = block.get("image_url") {
-                if let Some(obj) = image_url.as_object() {
-                    return obj.get("url").and_then(|u| u.as_str()).is_some();
-                }
+            if let Some(image_url) = block.get("image_url")
+                && let Some(obj) = image_url.as_object()
+            {
+                return obj.get("url").and_then(|u| u.as_str()).is_some();
             }
             false
         }
         Some("input_audio") => {
-            if let Some(f) = filter {
-                if f != DataBlockFilter::Audio {
-                    return false;
-                }
+            if let Some(f) = filter
+                && f != DataBlockFilter::Audio
+            {
+                return false;
             }
 
             // Check for valid input_audio structure
-            if let Some(audio) = block.get("input_audio") {
-                if let Some(obj) = audio.as_object() {
-                    let has_data = obj.get("data").and_then(|d| d.as_str()).is_some();
-                    let has_format = obj.get("format").and_then(|f| f.as_str()).is_some();
-                    return has_data && has_format;
-                }
+            if let Some(audio) = block.get("input_audio")
+                && let Some(obj) = audio.as_object()
+            {
+                let has_data = obj.get("data").and_then(|d| d.as_str()).is_some();
+                let has_format = obj.get("format").and_then(|f| f.as_str()).is_some();
+                return has_data && has_format;
             }
             false
         }
         Some("file") => {
-            if let Some(f) = filter {
-                if f != DataBlockFilter::File {
-                    return false;
-                }
+            if let Some(f) = filter
+                && f != DataBlockFilter::File
+            {
+                return false;
             }
 
             // Check for valid file structure
-            if let Some(file) = block.get("file") {
-                if let Some(obj) = file.as_object() {
-                    let has_file_data = obj.get("file_data").and_then(|d| d.as_str()).is_some();
-                    let has_file_id = obj.get("file_id").and_then(|d| d.as_str()).is_some();
-                    return has_file_data || has_file_id;
-                }
+            if let Some(file) = block.get("file")
+                && let Some(obj) = file.as_object()
+            {
+                let has_file_data = obj.get("file_data").and_then(|d| d.as_str()).is_some();
+                let has_file_id = obj.get("file_id").and_then(|d| d.as_str()).is_some();
+                return has_file_data || has_file_id;
             }
             false
         }
@@ -163,7 +163,7 @@ pub fn estimate_token_count(text: &str) -> usize {
     // Rule of thumb: ~4 characters per token for English text
     // This is a very rough estimate
     let char_count = text.chars().count();
-    (char_count + 3) / 4 // Ceiling division by 4
+    char_count.div_ceil(4)
 }
 
 /// Convert a v0 content block format to v1 format.
@@ -468,6 +468,6 @@ mod tests {
         assert_eq!(result.get("type").unwrap(), "image");
         assert_eq!(result.get("base64").unwrap(), "base64data");
         assert_eq!(result.get("mime_type").unwrap(), "image/png");
-        assert!(result.get("source_type").is_none());
+        assert!(!result.contains_key("source_type"));
     }
 }

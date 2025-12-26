@@ -16,7 +16,6 @@ use crate::callbacks::Callbacks;
 use crate::error::Result;
 use crate::messages::{AIMessage, BaseMessage};
 use crate::outputs::LLMResult;
-use crate::prompt_values::PromptValue;
 
 /// Parameters for LangSmith tracing.
 ///
@@ -160,20 +159,24 @@ impl LanguageModelInput {
             LanguageModelInput::Messages(m) => m.clone(),
         }
     }
+}
 
-    /// Convert the input to a string.
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for LanguageModelInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use crate::prompt_values::PromptValue;
         match self {
-            LanguageModelInput::Text(s) => s.clone(),
-            LanguageModelInput::StringPrompt(p) => p.to_string(),
-            LanguageModelInput::ChatPrompt(p) => p.to_string(),
-            LanguageModelInput::ImagePrompt(p) => p.to_string(),
-            LanguageModelInput::Messages(m) => m
-                .iter()
-                .map(|msg| format!("{}: {}", msg.message_type(), msg.content()))
-                .collect::<Vec<_>>()
-                .join("\n"),
+            LanguageModelInput::Text(s) => write!(f, "{}", s),
+            LanguageModelInput::StringPrompt(p) => write!(f, "{}", PromptValue::to_string(p)),
+            LanguageModelInput::ChatPrompt(p) => write!(f, "{}", PromptValue::to_string(p)),
+            LanguageModelInput::ImagePrompt(p) => write!(f, "{}", PromptValue::to_string(p)),
+            LanguageModelInput::Messages(m) => {
+                let joined = m
+                    .iter()
+                    .map(|msg| format!("{}: {}", msg.message_type(), msg.content()))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                write!(f, "{}", joined)
+            }
         }
     }
 }
@@ -184,14 +187,14 @@ impl LanguageModelInput {
 #[derive(Debug, Clone)]
 pub enum LanguageModelOutput {
     /// A message output (from chat models).
-    Message(AIMessage),
+    Message(Box<AIMessage>),
     /// A string output (from LLMs).
     Text(String),
 }
 
 impl From<AIMessage> for LanguageModelOutput {
     fn from(m: AIMessage) -> Self {
-        LanguageModelOutput::Message(m)
+        LanguageModelOutput::Message(Box::new(m))
     }
 }
 
@@ -216,6 +219,11 @@ impl LanguageModelOutput {
             LanguageModelOutput::Message(m) => m.content().to_string(),
             LanguageModelOutput::Text(s) => s,
         }
+    }
+
+    /// Create a Message variant from an AIMessage.
+    pub fn message(m: AIMessage) -> Self {
+        LanguageModelOutput::Message(Box::new(m))
     }
 }
 
@@ -419,6 +427,7 @@ pub trait BaseLanguageModel: Send + Sync {
 }
 
 /// Type alias for a boxed language model output stream.
+#[allow(dead_code)]
 pub type LanguageModelOutputStream =
     Pin<Box<dyn Stream<Item = Result<LanguageModelOutput>> + Send>>;
 
