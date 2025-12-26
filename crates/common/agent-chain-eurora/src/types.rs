@@ -7,11 +7,12 @@ use agent_chain_core::{
     AIMessage, BaseMessage, ContentPart, HumanMessage, ImageDetail, ImageSource, MessageContent,
     SystemMessage, ToolCall, ToolMessage,
 };
+use serde_json;
 
 use crate::proto::chat::{
     ProtoAiMessage, ProtoBase64Image, ProtoBaseMessage, ProtoContentPart, ProtoContentParts,
-    ProtoHumanMessage, ProtoImagePart, ProtoImageSource, ProtoMessageContent, ProtoSystemMessage,
-    ProtoTextPart, ProtoToolCall, ProtoToolMessage,
+    ProtoHumanMessage, ProtoImageDetail, ProtoImagePart, ProtoImageSource, ProtoMessageContent,
+    ProtoSystemMessage, ProtoTextPart, ProtoToolCall, ProtoToolMessage, ProtoToolStatus,
     proto_base_message::Message as ProtoMessageVariant,
     proto_content_part::Part as ProtoPartVariant,
     proto_image_source::Source as ProtoImageSourceVariant,
@@ -54,6 +55,13 @@ impl From<ProtoBaseMessage> for BaseMessage {
             Some(ProtoMessageVariant::System(m)) => BaseMessage::System(m.into()),
             Some(ProtoMessageVariant::Ai(m)) => BaseMessage::AI(m.into()),
             Some(ProtoMessageVariant::Tool(m)) => BaseMessage::Tool(m.into()),
+            Some(ProtoMessageVariant::Chat(_))
+            | Some(ProtoMessageVariant::Function(_))
+            | Some(ProtoMessageVariant::Remove(_)) => {
+                // These message types are not supported in agent-chain conversion.
+                // Return a default human message as a fallback.
+                BaseMessage::Human(HumanMessage::new(""))
+            }
             None => BaseMessage::Human(HumanMessage::new("")),
         }
     }
@@ -68,6 +76,8 @@ impl From<&HumanMessage> for ProtoHumanMessage {
         ProtoHumanMessage {
             content: Some(msg.message_content().into()),
             id: msg.id().map(String::from),
+            name: None,
+            additional_kwargs: None,
         }
     }
 }
@@ -108,6 +118,8 @@ impl From<&SystemMessage> for ProtoSystemMessage {
         ProtoSystemMessage {
             content: msg.content().to_string(),
             id: msg.id().map(String::from),
+            name: None,
+            additional_kwargs: None,
         }
     }
 }
@@ -130,7 +142,12 @@ impl From<&AIMessage> for ProtoAiMessage {
         ProtoAiMessage {
             content: msg.content().to_string(),
             id: msg.id().map(String::from),
+            name: None,
             tool_calls: msg.tool_calls().iter().map(Into::into).collect(),
+            invalid_tool_calls: Vec::new(),
+            usage_metadata: None,
+            additional_kwargs: None,
+            response_metadata: None,
         }
     }
 }
@@ -157,6 +174,11 @@ impl From<&ToolMessage> for ProtoToolMessage {
             content: msg.content().to_string(),
             tool_call_id: msg.tool_call_id().to_string(),
             id: msg.id().map(String::from),
+            name: None,
+            status: ProtoToolStatus::ToolStatusUnspecified as i32,
+            artifact: None,
+            additional_kwargs: None,
+            response_metadata: None,
         }
     }
 }
@@ -201,9 +223,9 @@ impl From<&ContentPart> for ProtoContentPart {
             ContentPart::Image { source, detail } => ProtoPartVariant::Image(ProtoImagePart {
                 source: Some(source.into()),
                 detail: detail.as_ref().map(|d| match d {
-                    ImageDetail::Low => "low".to_string(),
-                    ImageDetail::High => "high".to_string(),
-                    ImageDetail::Auto => "auto".to_string(),
+                    ImageDetail::Low => ProtoImageDetail::ImageDetailLow as i32,
+                    ImageDetail::High => ProtoImageDetail::ImageDetailHigh as i32,
+                    ImageDetail::Auto => ProtoImageDetail::ImageDetailAuto as i32,
                 }),
             }),
         };
@@ -222,12 +244,14 @@ impl From<ProtoContentPart> for ContentPart {
                     .source
                     .map(Into::into)
                     .unwrap_or(ImageSource::Url { url: String::new() });
-                let detail = img.detail.and_then(|d| match d.as_str() {
-                    "low" => Some(ImageDetail::Low),
-                    "high" => Some(ImageDetail::High),
-                    "auto" => Some(ImageDetail::Auto),
-                    _ => None,
-                });
+                let detail = img
+                    .detail
+                    .and_then(|d| match ProtoImageDetail::try_from(d) {
+                        Ok(ProtoImageDetail::ImageDetailLow) => Some(ImageDetail::Low),
+                        Ok(ProtoImageDetail::ImageDetailHigh) => Some(ImageDetail::High),
+                        Ok(ProtoImageDetail::ImageDetailAuto) => Some(ImageDetail::Auto),
+                        Ok(ProtoImageDetail::ImageDetailUnspecified) | Err(_) => None,
+                    });
                 ContentPart::Image { source, detail }
             }
             None => ContentPart::Text {
