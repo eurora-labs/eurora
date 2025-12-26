@@ -28,14 +28,15 @@ pub mod caches;
 pub mod callbacks;
 pub mod chat_history;
 pub mod chat_loaders;
-pub mod chat_models;
 pub mod chat_sessions;
 pub mod documents;
 pub mod env;
 pub mod error;
 pub mod globals;
+pub mod language_models;
 pub mod load;
 pub mod messages;
+pub mod output_parsers;
 pub mod outputs;
 pub mod prompt_values;
 pub mod prompts;
@@ -49,16 +50,83 @@ pub mod tools;
 pub mod tracers;
 pub mod utils;
 
+// Keep chat_models as a backward-compatible re-export
+pub mod chat_models {
+    //! Re-export of language_models types for backward compatibility.
+    //!
+    //! This module re-exports types from [`language_models`] to maintain
+    //! backward compatibility with code using the old `chat_models` module.
+    //!
+    //! New code should use [`language_models`] directly.
+
+    pub use crate::language_models::{
+        BaseChatModel, BoundChatModel, ChatChunk, ChatModel, ChatModelConfig, ChatModelExt,
+        ChatResult, ChatResultMetadata, ChatStream, DynBoundChatModel, DynChatModel,
+        DynChatModelExt, LangSmithParams, ToolChoice, UsageMetadata,
+    };
+}
+
 // Re-export env types
 pub use env::{VERSION, get_runtime_environment};
 
 // Re-export error types
 pub use error::{Error, Result};
 
-// Re-export core chat model types
-pub use chat_models::{
-    BoundChatModel, ChatChunk, ChatModel, ChatModelExt, ChatResult, ChatResultMetadata, ChatStream,
-    DynBoundChatModel, DynChatModelExt, LangSmithParams, ToolChoice, UsageMetadata,
+// Re-export core language model types
+pub use language_models::{
+    // Chat model types
+    BaseChatModel,
+    BaseChatModelExt,
+    // LLM types
+    BaseLLM,
+    // Base types
+    BaseLanguageModel,
+    BoundChatModel,
+    ChatChunk,
+    ChatGenerationStream,
+    ChatModel,
+    ChatModelConfig,
+    ChatModelExt,
+    ChatResult,
+    ChatResultMetadata,
+    ChatStream,
+    DynBaseChatModel,
+    DynBoundChatModel,
+    DynChatModel,
+    DynChatModelExt,
+    FakeListChatModel,
+    FakeListChatModelError,
+    // Fake implementations for testing
+    FakeListLLM,
+    FakeListLLMError,
+    FakeMessagesListChatModel,
+    FakeStreamingListLLM,
+    GenericFakeChatModel,
+    LLM,
+    LLMConfig,
+    LangSmithParams,
+    LanguageModelConfig,
+    LanguageModelInput,
+    LanguageModelOutput,
+
+    // Model profile types
+    ModelProfile,
+    ModelProfileRegistry,
+
+    OpenAiDataBlockFilter,
+    ParrotFakeChatModel,
+
+    ParsedDataUri,
+    SimpleChatModel,
+    ToolChoice,
+    UsageMetadata,
+    generate_from_stream,
+
+    get_prompts_from_cache,
+    // Utility functions
+    is_openai_data_block,
+    parse_data_uri,
+    update_cache,
 };
 
 // Re-export message types
@@ -86,6 +154,15 @@ pub use caches::{BaseCache, CacheReturnValue, InMemoryCache};
 
 // Re-export global functions
 pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cache, set_verbose};
+
+// Re-export output parser types
+pub use output_parsers::{
+    BaseCumulativeTransformOutputParser, BaseLLMOutputParser, BaseOutputParser,
+    BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser,
+    LanguageModelInput as OutputParserInput, ListOutputParser, MarkdownListOutputParser,
+    NumberedListOutputParser, OutputParserError, SimpleJsonOutputParser, StrOutputParser,
+    XMLOutputParser,
+};
 
 // Re-export output types
 pub use outputs::{

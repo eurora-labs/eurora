@@ -11,12 +11,15 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde::Deserialize;
 
+use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{
-    ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream, LangSmithParams, ToolChoice,
-    UsageMetadata,
+    ChatChunk, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
+    LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{AIMessage, BaseMessage, ToolCall};
+use crate::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
 use crate::tools::ToolDefinition;
 
 /// Default API base URL for Anthropic.
@@ -71,6 +74,10 @@ pub struct ChatAnthropic {
     max_retries: u32,
     /// Additional model kwargs.
     model_kwargs: HashMap<String, serde_json::Value>,
+    /// Chat model configuration.
+    chat_model_config: ChatModelConfig,
+    /// Language model configuration.
+    language_model_config: LanguageModelConfig,
     /// HTTP client.
     #[allow(dead_code)]
     client: reqwest::Client,
@@ -96,6 +103,8 @@ impl ChatAnthropic {
             timeout: None,
             max_retries: 2,
             model_kwargs: HashMap::new(),
+            chat_model_config: ChatModelConfig::new(),
+            language_model_config: LanguageModelConfig::new(),
             client: reqwest::Client::new(),
         }
     }
@@ -309,8 +318,8 @@ impl ChatAnthropic {
         payload
     }
 
-    /// Parse the API response into a ChatResult.
-    fn parse_response(&self, response: AnthropicResponse) -> ChatResult {
+    /// Parse the API response into an OutputChatResult.
+    fn parse_response(&self, response: AnthropicResponse) -> OutputChatResult {
         let mut text_content = String::new();
         let mut tool_calls = Vec::new();
 
@@ -325,29 +334,36 @@ impl ChatAnthropic {
             }
         }
 
-        let message = if tool_calls.is_empty() {
-            AIMessage::new(text_content)
+        let message: BaseMessage = if tool_calls.is_empty() {
+            AIMessage::new(text_content).into()
         } else {
-            AIMessage::with_tool_calls(text_content, tool_calls)
+            AIMessage::with_tool_calls(text_content, tool_calls).into()
         };
 
-        let usage = response
-            .usage
-            .map(|u| UsageMetadata::new(u.input_tokens, u.output_tokens));
+        let generation = ChatGeneration::new(message);
+        OutputChatResult::new(vec![generation])
+    }
 
-        ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(response.model),
-                stop_reason: response.stop_reason,
-                usage,
-            },
+    /// Convert OutputChatResult to ChatResult for generate_with_tools return type.
+    fn convert_to_chat_result(&self, output: OutputChatResult) -> Result<ChatResult> {
+        if output.generations.is_empty() {
+            return Err(Error::other("No generations returned"));
         }
+
+        let message = match output.generations[0].message.clone() {
+            BaseMessage::AI(msg) => msg,
+            _ => return Err(Error::other("Expected AI message")),
+        };
+
+        Ok(ChatResult {
+            message,
+            metadata: ChatResultMetadata::default(),
+        })
     }
 }
 
 #[async_trait]
-impl ChatModel for ChatAnthropic {
+impl BaseLanguageModel for ChatAnthropic {
     fn llm_type(&self) -> &str {
         "anthropic-chat"
     }
@@ -356,15 +372,127 @@ impl ChatModel for ChatAnthropic {
         &self.model
     }
 
-    async fn generate(
+    fn config(&self) -> &LanguageModelConfig {
+        &self.language_model_config
+    }
+
+    async fn generate_prompt(
+        &self,
+        prompts: Vec<LanguageModelInput>,
+        stop: Option<Vec<String>>,
+        _callbacks: Option<Callbacks>,
+    ) -> Result<LLMResult> {
+        let mut all_generations = Vec::new();
+        for prompt in prompts {
+            let messages = prompt.to_messages();
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
+            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
+        }
+        Ok(LLMResult::new(all_generations))
+    }
+
+    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
+        LangSmithParams {
+            ls_provider: Some("anthropic".to_string()),
+            ls_model_name: Some(self.model.clone()),
+            ls_model_type: Some("chat".to_string()),
+            ls_temperature: self.temperature,
+            ls_max_tokens: Some(self.max_tokens),
+            ls_stop: stop.map(|s| s.to_vec()),
+        }
+    }
+}
+
+#[async_trait]
+impl ChatModel for ChatAnthropic {
+    fn chat_config(&self) -> &ChatModelConfig {
+        &self.chat_model_config
+    }
+
+    async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
-        self.generate_with_tools(messages, &[], None, stop).await
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<OutputChatResult> {
+        self._generate_internal(messages, stop, None).await
     }
 
     async fn generate_with_tools(
+        &self,
+        messages: Vec<BaseMessage>,
+        tools: &[ToolDefinition],
+        tool_choice: Option<&ToolChoice>,
+        stop: Option<Vec<String>>,
+    ) -> Result<ChatResult> {
+        self.generate_with_tools_internal(messages, tools, tool_choice, stop)
+            .await
+    }
+}
+
+impl ChatAnthropic {
+    /// Internal generate implementation.
+    async fn _generate_internal(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<OutputChatResult> {
+        let api_key = self.get_api_key()?;
+        let client = self.build_client();
+        let payload = self.build_request_payload(&messages, stop, None);
+
+        let mut last_error = None;
+        for _ in 0..=self.max_retries {
+            let response = client
+                .post(format!("{}/messages", self.api_base))
+                .header("x-api-key", &api_key)
+                .header("anthropic-version", &self.api_version)
+                .header("content-type", "application/json")
+                .json(&payload)
+                .send()
+                .await;
+
+            match response {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        match resp.json::<AnthropicResponse>().await {
+                            Ok(anthropic_resp) => {
+                                return Ok(self.parse_response(anthropic_resp));
+                            }
+                            Err(e) => {
+                                return Err(Error::Json(serde_json::Error::io(
+                                    std::io::Error::new(
+                                        std::io::ErrorKind::InvalidData,
+                                        e.to_string(),
+                                    ),
+                                )));
+                            }
+                        }
+                    } else {
+                        let status = resp.status().as_u16();
+                        let error_text = resp.text().await.unwrap_or_default();
+                        last_error = Some(Error::api(status, error_text));
+
+                        // Don't retry 4xx errors (client errors)
+                        if (400..500).contains(&status) {
+                            break;
+                        }
+                    }
+                }
+                Err(e) => {
+                    last_error = Some(Error::Http(e));
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
+    }
+
+    /// Internal generate with tools implementation.
+    async fn generate_with_tools_internal(
         &self,
         messages: Vec<BaseMessage>,
         tools: &[ToolDefinition],
@@ -427,7 +555,8 @@ impl ChatModel for ChatAnthropic {
                     if resp.status().is_success() {
                         match resp.json::<AnthropicResponse>().await {
                             Ok(anthropic_resp) => {
-                                return Ok(self.parse_response(anthropic_resp));
+                                let output = self.parse_response(anthropic_resp);
+                                return self.convert_to_chat_result(output);
                             }
                             Err(e) => {
                                 return Err(Error::Json(serde_json::Error::io(
@@ -455,10 +584,15 @@ impl ChatModel for ChatAnthropic {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
+        match last_error {
+            Some(e) => Err(e),
+            None => Err(Error::other("Unknown error")),
+        }
     }
 
-    async fn stream(
+    /// Internal stream implementation.
+    #[allow(dead_code)]
+    async fn stream_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
@@ -563,32 +697,11 @@ impl ChatModel for ChatAnthropic {
 
         Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
     }
-
-    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        LangSmithParams {
-            ls_provider: Some("anthropic".to_string()),
-            ls_model_name: Some(self.model.clone()),
-            ls_model_type: Some("chat".to_string()),
-            ls_temperature: self.temperature,
-            ls_max_tokens: Some(self.max_tokens),
-            ls_stop: stop.map(|s| s.to_vec()),
-        }
-    }
-
-    fn identifying_params(&self) -> serde_json::Value {
-        serde_json::json!({
-            "_type": self.llm_type(),
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "top_k": self.top_k,
-            "top_p": self.top_p,
-        })
-    }
 }
 
 /// Anthropic API response structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicResponse {
     content: Vec<AnthropicContent>,
     model: String,
@@ -612,6 +725,7 @@ enum AnthropicContent {
 
 /// Anthropic usage information.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicUsage {
     input_tokens: u32,
     output_tokens: u32,
