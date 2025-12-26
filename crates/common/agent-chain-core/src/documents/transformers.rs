@@ -183,7 +183,9 @@ mod tests {
         ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
             Ok(documents
                 .into_iter()
-                .map(|doc| Document::new(doc.page_content.to_uppercase()).with_metadata(doc.metadata))
+                .map(|doc| {
+                    Document::new(doc.page_content.to_uppercase()).with_metadata(doc.metadata)
+                })
                 .collect())
         }
     }
@@ -191,10 +193,7 @@ mod tests {
     #[tokio::test]
     async fn test_transform_documents() {
         let transformer = UppercaseTransformer;
-        let documents = vec![
-            Document::new("hello world"),
-            Document::new("goodbye world"),
-        ];
+        let documents = vec![Document::new("hello world"), Document::new("goodbye world")];
 
         let result = transformer
             .transform_documents(documents, HashMap::new())

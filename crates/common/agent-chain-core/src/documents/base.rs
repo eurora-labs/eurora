@@ -31,7 +31,7 @@ use crate::load::Serializable;
 /// For multimodal content in **chat messages** (images, audio sent to/from LLMs),
 /// use the `messages` module content blocks instead.
 #[cfg_attr(feature = "specta", derive(Type))]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct BaseMedia {
     /// An optional identifier for the document.
     ///
@@ -43,15 +43,6 @@ pub struct BaseMedia {
     /// Arbitrary metadata associated with the content.
     #[serde(default)]
     pub metadata: HashMap<String, Value>,
-}
-
-impl Default for BaseMedia {
-    fn default() -> Self {
-        Self {
-            id: None,
-            metadata: HashMap::new(),
-        }
-    }
 }
 
 impl BaseMedia {
@@ -306,10 +297,10 @@ impl Blob {
                     let file = fs::File::open(path)?;
                     Ok(Box::new(std::io::BufReader::new(file)))
                 } else {
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Unable to convert blob {:?}", self),
-                    ))
+                    Err(io::Error::other(format!(
+                        "Unable to convert blob {:?}",
+                        self
+                    )))
                 }
             }
         }

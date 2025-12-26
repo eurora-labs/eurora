@@ -108,9 +108,9 @@ struct InMemoryRateLimiterState {
 /// Current limitations:
 ///
 /// - The rate limiter is not designed to work across different processes. It is
-///     an in-memory rate limiter, but it is thread safe.
+///   an in-memory rate limiter, but it is thread safe.
 /// - The rate limiter only supports time-based rate limiting. It does not take
-///     into account the size of the request or any other factors.
+///   into account the size of the request or any other factors.
 ///
 /// # Example
 ///
