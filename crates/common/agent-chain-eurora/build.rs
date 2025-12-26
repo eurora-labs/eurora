@@ -2,11 +2,7 @@ use std::{io::Result, path::PathBuf};
 
 fn main() -> Result<()> {
     let proto_dir = PathBuf::from("../../../proto");
-    let proto_files = std::fs::read_dir(&proto_dir)?
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "proto"))
-        .map(|entry| entry.path())
-        .collect::<Vec<_>>();
+    let proto_files = vec![PathBuf::from("chat.proto")];
 
     #[cfg(target_os = "windows")]
     {

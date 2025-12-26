@@ -51,14 +51,21 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 
+use crate::callbacks::AsyncCallbackManagerForLLMRun;
+use crate::callbacks::CallbackManagerForLLMRun;
+use crate::callbacks::Callbacks;
 use crate::chat_models::{
-    ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream, LangSmithParams, ToolChoice,
-    UsageMetadata,
+    ChatChunk, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
+    LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::ChatGenerationStream;
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{
     AIMessage, BaseMessage, ContentPart, ImageDetail, ImageSource, MessageContent, ToolCall,
 };
+use crate::outputs::ChatGenerationChunk;
+use crate::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
 use crate::tools::ToolDefinition;
 
 /// Default API base URL for OpenAI.
@@ -199,10 +206,44 @@ pub struct ChatOpenAI {
     model_kwargs: HashMap<String, serde_json::Value>,
     /// Whether to stream responses.
     streaming: bool,
+    /// Seed for generation.
+    seed: Option<i32>,
+    /// Whether to return logprobs.
+    logprobs: Option<bool>,
+    /// Number of most likely tokens to return at each position.
+    top_logprobs: Option<u32>,
+    /// Modify likelihood of specified tokens.
+    logit_bias: Option<HashMap<i32, i32>>,
+    /// Number of chat completions to generate.
+    n: Option<u32>,
+    /// Reasoning effort for reasoning models (Chat Completions API).
+    reasoning_effort: Option<String>,
+    /// Reasoning parameters for reasoning models (Responses API).
+    reasoning: Option<HashMap<String, serde_json::Value>>,
+    /// Verbosity level for reasoning models (Responses API).
+    verbosity: Option<String>,
+    /// Whether to include usage metadata in streaming output.
+    stream_usage: Option<bool>,
+    /// Additional fields to include in Responses API generations.
+    include: Option<Vec<String>>,
+    /// Latency tier for request ('auto', 'default', or 'flex').
+    service_tier: Option<String>,
+    /// Whether OpenAI may store response data.
+    store: Option<bool>,
+    /// Truncation strategy for Responses API ('auto' or 'disabled').
+    truncation: Option<String>,
     /// Whether to use the Responses API instead of Chat Completions API.
-    use_responses_api: bool,
+    use_responses_api: Option<bool>,
+    /// Whether to pass previous_response_id automatically.
+    use_previous_response_id: bool,
+    /// Version of AIMessage output format.
+    output_version: Option<String>,
     /// Built-in tools to use with the Responses API.
     builtin_tools: Vec<BuiltinTool>,
+    /// Chat model configuration.
+    chat_model_config: ChatModelConfig,
+    /// Language model configuration.
+    language_model_config: LanguageModelConfig,
     /// HTTP client.
     #[allow(dead_code)]
     client: reqwest::Client,
@@ -215,9 +256,18 @@ impl ChatOpenAI {
     ///
     /// * `model` - The model name (e.g., "gpt-4o", "gpt-4-turbo").
     pub fn new(model: impl Into<String>) -> Self {
+        let model_name = model.into();
+
+        // Validate and set temperature for o1 models (match Python behavior)
+        let temperature = if model_name.to_lowercase().starts_with("o1") {
+            Some(1.0)
+        } else {
+            None
+        };
+
         Self {
-            model: model.into(),
-            temperature: None,
+            model: model_name,
+            temperature,
             max_tokens: None,
             api_key: None,
             api_base: DEFAULT_API_BASE.to_string(),
@@ -230,8 +280,25 @@ impl ChatOpenAI {
             max_retries: 2,
             model_kwargs: HashMap::new(),
             streaming: false,
-            use_responses_api: false,
+            seed: None,
+            logprobs: None,
+            top_logprobs: None,
+            logit_bias: None,
+            n: None,
+            reasoning_effort: None,
+            reasoning: None,
+            verbosity: None,
+            stream_usage: None,
+            include: None,
+            service_tier: None,
+            store: None,
+            truncation: None,
+            use_responses_api: None,
+            use_previous_response_id: false,
+            output_version: None,
             builtin_tools: Vec::new(),
+            chat_model_config: ChatModelConfig::new(),
+            language_model_config: LanguageModelConfig::new(),
             client: reqwest::Client::new(),
         }
     }
@@ -308,11 +375,101 @@ impl ChatOpenAI {
         self
     }
 
+    /// Set the seed for generation.
+    pub fn seed(mut self, seed: i32) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
+    /// Set whether to return logprobs.
+    pub fn logprobs(mut self, enabled: bool) -> Self {
+        self.logprobs = Some(enabled);
+        self
+    }
+
+    /// Set number of most likely tokens to return at each position.
+    pub fn top_logprobs(mut self, count: u32) -> Self {
+        self.top_logprobs = Some(count);
+        self
+    }
+
+    /// Set logit bias for specified tokens.
+    pub fn logit_bias(mut self, bias: HashMap<i32, i32>) -> Self {
+        self.logit_bias = Some(bias);
+        self
+    }
+
+    /// Set number of completions to generate.
+    pub fn n(mut self, count: u32) -> Self {
+        self.n = Some(count);
+        self
+    }
+
+    /// Set reasoning effort for reasoning models (Chat Completions API).
+    pub fn reasoning_effort(mut self, effort: impl Into<String>) -> Self {
+        self.reasoning_effort = Some(effort.into());
+        self
+    }
+
+    /// Set reasoning parameters for reasoning models (Responses API).
+    pub fn reasoning(mut self, params: HashMap<String, serde_json::Value>) -> Self {
+        self.reasoning = Some(params);
+        self
+    }
+
+    /// Set verbosity level for reasoning models (Responses API).
+    pub fn verbosity(mut self, level: impl Into<String>) -> Self {
+        self.verbosity = Some(level.into());
+        self
+    }
+
+    /// Set whether to include usage metadata in streaming output.
+    pub fn stream_usage(mut self, enabled: bool) -> Self {
+        self.stream_usage = Some(enabled);
+        self
+    }
+
+    /// Set additional fields to include in Responses API generations.
+    pub fn include(mut self, fields: Vec<String>) -> Self {
+        self.include = Some(fields);
+        self
+    }
+
+    /// Set latency tier for request.
+    pub fn service_tier(mut self, tier: impl Into<String>) -> Self {
+        self.service_tier = Some(tier.into());
+        self
+    }
+
+    /// Set whether OpenAI may store response data.
+    pub fn store(mut self, enabled: bool) -> Self {
+        self.store = Some(enabled);
+        self
+    }
+
+    /// Set truncation strategy for Responses API.
+    pub fn truncation(mut self, strategy: impl Into<String>) -> Self {
+        self.truncation = Some(strategy.into());
+        self
+    }
+
+    /// Set whether to pass previous_response_id automatically.
+    pub fn use_previous_response_id(mut self, enabled: bool) -> Self {
+        self.use_previous_response_id = enabled;
+        self
+    }
+
+    /// Set AIMessage output format version.
+    pub fn output_version(mut self, version: impl Into<String>) -> Self {
+        self.output_version = Some(version.into());
+        self
+    }
+
     /// Enable or disable the Responses API.
     ///
     /// The Responses API is required for built-in tools like web search.
     pub fn with_responses_api(mut self, enabled: bool) -> Self {
-        self.use_responses_api = enabled;
+        self.use_responses_api = Some(enabled);
         self
     }
 
@@ -332,9 +489,46 @@ impl ChatOpenAI {
     pub fn with_builtin_tools(mut self, tools: Vec<BuiltinTool>) -> Self {
         self.builtin_tools = tools;
         if !self.builtin_tools.is_empty() {
-            self.use_responses_api = true;
+            self.use_responses_api = Some(true);
         }
         self
+    }
+
+    /// Helper function to determine if Responses API should be used.
+    /// Matches Python's _use_responses_api logic.
+    fn should_use_responses_api(&self, has_builtin_tools: bool) -> bool {
+        // Explicit setting takes precedence
+        if let Some(use_api) = self.use_responses_api {
+            return use_api;
+        }
+
+        // Check if we have parameters that require Responses API
+        if has_builtin_tools
+            || self.reasoning.is_some()
+            || self.verbosity.is_some()
+            || self.truncation.is_some()
+            || self.include.is_some()
+            || self.use_previous_response_id
+        {
+            return true;
+        }
+
+        // Check if model prefers Responses API (gpt-5.2-pro and similar)
+        if self.model.to_lowercase().contains("gpt-5.2-pro") {
+            return true;
+        }
+
+        false
+    }
+
+    /// Helper to check if a tool is a built-in tool (not a function).
+    #[allow(dead_code)]
+    fn is_builtin_tool(tool: &serde_json::Value) -> bool {
+        if let Some(tool_type) = tool.get("type").and_then(|t| t.as_str()) {
+            tool_type != "function"
+        } else {
+            false
+        }
     }
 
     /// Get the API key, checking environment variable if not set directly.
@@ -751,11 +945,13 @@ impl ChatOpenAI {
                                         }
                                         "response.completed" | "response.incomplete" => {
                                             // Response complete - extract usage from the response
-                                            if let Some(resp) = event.response && let Some(resp_usage) = resp.usage {
-                                                    usage = Some(UsageMetadata::new(
-                                                        resp_usage.input_tokens,
-                                                        resp_usage.output_tokens,
-                                                    ));
+                                            if let Some(resp) = event.response
+                                                && let Some(resp_usage) = resp.usage
+                                            {
+                                                usage = Some(UsageMetadata::new(
+                                                    resp_usage.input_tokens,
+                                                    resp_usage.output_tokens,
+                                                ));
                                             }
                                             // Final chunk
                                             yield Ok(ChatChunk {
@@ -900,10 +1096,10 @@ impl ChatOpenAI {
         input
     }
 
-    /// Parse the API response into a ChatResult.
-    fn parse_response(&self, response: OpenAIResponse) -> ChatResult {
+    /// Parse the API response into an OutputChatResult.
+    fn parse_response(&self, response: OpenAIResponse) -> OutputChatResult {
         // Extract finish_reason before consuming choices
-        let finish_reason = response
+        let _finish_reason = response
             .choices
             .first()
             .and_then(|c| c.finish_reason.clone());
@@ -929,28 +1125,18 @@ impl ChatOpenAI {
             None => (String::new(), Vec::new()),
         };
 
-        let message = if tool_calls.is_empty() {
-            AIMessage::new(content)
+        let message: BaseMessage = if tool_calls.is_empty() {
+            AIMessage::new(content).into()
         } else {
-            AIMessage::with_tool_calls(content, tool_calls)
+            AIMessage::with_tool_calls(content, tool_calls).into()
         };
 
-        let usage = response
-            .usage
-            .map(|u| UsageMetadata::new(u.prompt_tokens, u.completion_tokens));
-
-        ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(response.model),
-                stop_reason: finish_reason,
-                usage,
-            },
-        }
+        let generation = ChatGeneration::new(message);
+        OutputChatResult::new(vec![generation])
     }
 
-    /// Parse the Responses API response into a ChatResult.
-    fn parse_responses_api_response(&self, response: ResponsesApiResponse) -> ChatResult {
+    /// Parse the Responses API response into an OutputChatResult.
+    fn parse_responses_api_response(&self, response: ResponsesApiResponse) -> OutputChatResult {
         let mut text_content = String::new();
         let mut tool_calls = Vec::new();
         let mut annotations: Vec<TextAnnotation> = Vec::new();
@@ -987,30 +1173,36 @@ impl ChatOpenAI {
             }
         }
 
-        let message = if tool_calls.is_empty() {
+        let message: BaseMessage = if tool_calls.is_empty() {
             let mut msg = AIMessage::new(text_content);
             if !annotations.is_empty() {
                 // Store annotations in additional_kwargs for access
                 msg = msg.with_annotations(annotations);
             }
-            msg
+            msg.into()
         } else {
-            AIMessage::with_tool_calls(text_content, tool_calls)
+            AIMessage::with_tool_calls(text_content, tool_calls).into()
         };
 
-        let usage = response
-            .usage
-            .as_ref()
-            .map(|u| UsageMetadata::new(u.input_tokens, u.output_tokens));
+        let generation = ChatGeneration::new(message);
+        OutputChatResult::new(vec![generation])
+    }
 
-        ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(response.model.clone()),
-                stop_reason: response.status.clone(),
-                usage,
-            },
+    /// Convert OutputChatResult to ChatResult for generate_with_tools return type.
+    fn convert_to_chat_result(&self, output: OutputChatResult) -> Result<ChatResult> {
+        if output.generations.is_empty() {
+            return Err(Error::other("No generations returned"));
         }
+
+        let message = match output.generations[0].message.clone() {
+            BaseMessage::AI(msg) => msg,
+            _ => return Err(Error::other("Expected AI message")),
+        };
+
+        Ok(ChatResult {
+            message,
+            metadata: ChatResultMetadata::default(),
+        })
     }
 
     /// Generate using the Responses API.
@@ -1018,7 +1210,7 @@ impl ChatOpenAI {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
+    ) -> Result<OutputChatResult> {
         let api_key = self.get_api_key()?;
         let client = self.build_client();
         let payload = self.build_responses_api_payload(&messages, stop, None, false);
@@ -1074,7 +1266,7 @@ impl ChatOpenAI {
 }
 
 #[async_trait]
-impl ChatModel for ChatOpenAI {
+impl BaseLanguageModel for ChatOpenAI {
     fn llm_type(&self) -> &str {
         "openai-chat"
     }
@@ -1083,13 +1275,118 @@ impl ChatModel for ChatOpenAI {
         &self.model
     }
 
-    async fn generate(
+    fn config(&self) -> &LanguageModelConfig {
+        &self.language_model_config
+    }
+
+    async fn generate_prompt(
+        &self,
+        prompts: Vec<LanguageModelInput>,
+        stop: Option<Vec<String>>,
+        _callbacks: Option<Callbacks>,
+    ) -> Result<LLMResult> {
+        // Convert prompts to message batches and generate
+        let mut all_generations = Vec::new();
+        for prompt in prompts {
+            let messages = prompt.to_messages();
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
+            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
+        }
+        Ok(LLMResult::new(all_generations))
+    }
+
+    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
+        LangSmithParams {
+            ls_provider: Some("openai".to_string()),
+            ls_model_name: Some(self.model.clone()),
+            ls_model_type: Some("chat".to_string()),
+            ls_temperature: self.temperature,
+            ls_max_tokens: self.max_tokens,
+            ls_stop: stop.map(|s| s.to_vec()),
+        }
+    }
+}
+
+#[async_trait]
+impl ChatModel for ChatOpenAI {
+    fn chat_config(&self) -> &ChatModelConfig {
+        &self.chat_model_config
+    }
+
+    /// Indicate that async streaming is implemented.
+    fn has_astream_impl(&self) -> bool {
+        true
+    }
+
+    async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<OutputChatResult> {
+        self._generate_internal(messages, stop, None).await
+    }
+
+    /// Async streaming implementation that calls the internal stream method
+    /// and converts ChatChunk to ChatGenerationChunk.
+    async fn _astream(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+    ) -> Result<ChatGenerationStream> {
+        // Call the internal stream implementation
+        let chat_stream = self.stream_internal(messages, stop).await?;
+
+        // Convert ChatChunk stream to ChatGenerationChunk stream
+        let generation_stream = async_stream::stream! {
+            use futures::StreamExt;
+
+            let mut pinned_stream = chat_stream;
+
+            while let Some(result) = pinned_stream.next().await {
+                match result {
+                    Ok(chat_chunk) => {
+                        // Convert ChatChunk to ChatGenerationChunk
+                        let message = AIMessage::new(&chat_chunk.content);
+                        let generation_chunk = ChatGenerationChunk::new(message.into());
+                        yield Ok(generation_chunk);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(generation_stream) as ChatGenerationStream)
+    }
+
+    async fn generate_with_tools(
+        &self,
+        messages: Vec<BaseMessage>,
+        tools: &[ToolDefinition],
+        tool_choice: Option<&ToolChoice>,
+        stop: Option<Vec<String>>,
     ) -> Result<ChatResult> {
+        self.generate_with_tools_internal(messages, tools, tool_choice, stop)
+            .await
+    }
+}
+
+impl ChatOpenAI {
+    /// Internal generate implementation.
+    async fn _generate_internal(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<OutputChatResult> {
         // Use Responses API if enabled or if using built-in tools
-        if self.use_responses_api || !self.builtin_tools.is_empty() {
+        if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             return self.generate_responses_api(messages, stop).await;
         }
 
@@ -1146,7 +1443,8 @@ impl ChatModel for ChatOpenAI {
         Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
     }
 
-    async fn generate_with_tools(
+    /// Internal generate with tools implementation.
+    async fn generate_with_tools_internal(
         &self,
         messages: Vec<BaseMessage>,
         tools: &[ToolDefinition],
@@ -1169,7 +1467,7 @@ impl ChatModel for ChatOpenAI {
             .collect();
 
         // Use Responses API if enabled or if using built-in tools
-        if self.use_responses_api || !self.builtin_tools.is_empty() {
+        if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             let api_key = self.get_api_key()?;
             let client = self.build_client();
             let payload =
@@ -1193,7 +1491,8 @@ impl ChatModel for ChatOpenAI {
                         if resp.status().is_success() {
                             match resp.json::<ResponsesApiResponse>().await {
                                 Ok(responses_resp) => {
-                                    return Ok(self.parse_responses_api_response(responses_resp));
+                                    let output = self.parse_responses_api_response(responses_resp);
+                                    return self.convert_to_chat_result(output);
                                 }
                                 Err(e) => {
                                     return Err(Error::Json(serde_json::Error::io(
@@ -1267,7 +1566,8 @@ impl ChatModel for ChatOpenAI {
                     if resp.status().is_success() {
                         match resp.json::<OpenAIResponse>().await {
                             Ok(openai_resp) => {
-                                return Ok(self.parse_response(openai_resp));
+                                let output = self.parse_response(openai_resp);
+                                return self.convert_to_chat_result(output);
                             }
                             Err(e) => {
                                 return Err(Error::Json(serde_json::Error::io(
@@ -1297,13 +1597,15 @@ impl ChatModel for ChatOpenAI {
         Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
     }
 
-    async fn stream(
+    /// Internal stream implementation.
+    #[allow(dead_code)]
+    async fn stream_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<ChatStream> {
         // Use Responses API if enabled or if using built-in tools
-        if self.use_responses_api || !self.builtin_tools.is_empty() {
+        if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             return self.stream_responses_api(messages, stop).await;
         }
 
@@ -1398,33 +1700,11 @@ impl ChatModel for ChatOpenAI {
 
         Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
     }
-
-    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        LangSmithParams {
-            ls_provider: Some("openai".to_string()),
-            ls_model_name: Some(self.model.clone()),
-            ls_model_type: Some("chat".to_string()),
-            ls_temperature: self.temperature,
-            ls_max_tokens: self.max_tokens,
-            ls_stop: stop.map(|s| s.to_vec()),
-        }
-    }
-
-    fn identifying_params(&self) -> serde_json::Value {
-        serde_json::json!({
-            "_type": self.llm_type(),
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-            "frequency_penalty": self.frequency_penalty,
-            "presence_penalty": self.presence_penalty,
-        })
-    }
 }
 
 /// OpenAI API response structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIResponse {
     model: String,
     choices: Vec<OpenAIChoice>,
@@ -1492,6 +1772,7 @@ struct OpenAIDelta {
 
 /// OpenAI Responses API response structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ResponsesApiResponse {
     model: String,
     output: Vec<ResponsesOutput>,
@@ -1636,6 +1917,7 @@ mod tests {
 
     #[test]
     fn test_llm_type() {
+        use crate::language_models::BaseLanguageModel;
         let model = ChatOpenAI::new("gpt-4o");
         assert_eq!(model.llm_type(), "openai-chat");
     }
