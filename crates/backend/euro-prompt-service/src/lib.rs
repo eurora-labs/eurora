@@ -110,7 +110,7 @@ impl ProtoChatService for PromptService {
 
         let openai_stream = self
             .provider
-            .stream(messages, None, None)
+            .stream(messages.into(), None)
             .await
             .map_err(|e| {
                 debug!("Error in chat_stream: {}", e);
@@ -119,9 +119,9 @@ impl ProtoChatService for PromptService {
 
         let output_stream = openai_stream.map(|result| match result {
             Ok(chunk) => {
-                // ChatGenerationChunk has text field for content
-                // There's no is_final field - we determine finality by empty text or generation_info
-                let content = chunk.text;
+                // AIMessageChunk has content() method for getting the text content
+                // We determine finality by empty content or chunk_position
+                let content = chunk.content().to_string();
                 let is_final = content.is_empty();
 
                 Ok(ProtoChatStreamResponse {
