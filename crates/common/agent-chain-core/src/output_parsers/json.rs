@@ -117,7 +117,7 @@ impl BaseOutputParser for JsonOutputParser {
         }
     }
 
-    fn get_format_instructions(&self) -> Option<String> {
+    fn get_format_instructions(&self) -> Result<String> {
         match self.get_schema() {
             Some(schema) => {
                 // Copy schema to avoid altering original
@@ -132,9 +132,9 @@ impl BaseOutputParser for JsonOutputParser {
                 let schema_str =
                     serde_json::to_string(&schema_copy).unwrap_or_else(|_| "{}".to_string());
 
-                Some(format_json_instructions(&schema_str))
+                Ok(format_json_instructions(&schema_str))
             }
-            None => Some("Return a JSON object.".to_string()),
+            None => Ok("Return a JSON object.".to_string()),
         }
     }
 
@@ -267,7 +267,9 @@ mod tests {
     #[test]
     fn test_json_output_parser_format_instructions_no_schema() {
         let parser = JsonOutputParser::new();
-        let instructions = parser.get_format_instructions().unwrap();
+        let instructions = parser
+            .get_format_instructions()
+            .expect("should return format instructions");
         assert_eq!(instructions, "Return a JSON object.");
     }
 
@@ -282,7 +284,9 @@ mod tests {
             }
         });
         let parser = JsonOutputParser::with_schema(schema);
-        let instructions = parser.get_format_instructions().unwrap();
+        let instructions = parser
+            .get_format_instructions()
+            .expect("should return format instructions");
         assert!(instructions.contains("properties"));
         assert!(instructions.contains("name"));
     }
