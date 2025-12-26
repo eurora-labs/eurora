@@ -1,5 +1,6 @@
 //! Utilities for getting information about the runtime environment.
 
+use rustc_version_runtime::version;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -41,9 +42,7 @@ fn get_platform_string() -> String {
 
 /// Gets the Rust version used to compile this crate.
 fn get_rust_version() -> String {
-    env!("CARGO_PKG_RUST_VERSION")
-        .parse::<String>()
-        .unwrap_or_else(|_| "unknown".to_string())
+    version().to_string()
 }
 
 #[cfg(test)]
