@@ -127,12 +127,12 @@ pub trait BaseLLM: BaseLanguageModel {
             .await?;
 
         // Get the first generation
-        if let Some(generations) = result.generations.first() {
-            if let Some(generation) = generations.first() {
-                let text = extract_text(generation);
-                let chunk = GenerationChunk::new(text);
-                return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
-            }
+        if let Some(generations) = result.generations.first()
+            && let Some(generation) = generations.first()
+        {
+            let text = extract_text(generation);
+            let chunk = GenerationChunk::new(text);
+            return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
         // Empty result
@@ -171,10 +171,10 @@ pub trait BaseLLM: BaseLanguageModel {
         let result = self.generate_prompts(vec![prompt], None, None).await?;
 
         // Get the first generation's text
-        if let Some(generations) = result.generations.first() {
-            if let Some(generation) = generations.first() {
-                return Ok(extract_text(generation));
-            }
+        if let Some(generations) = result.generations.first()
+            && let Some(generation) = generations.first()
+        {
+            return Ok(extract_text(generation));
         }
 
         Ok(String::new())
