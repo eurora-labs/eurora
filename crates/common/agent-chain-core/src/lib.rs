@@ -60,9 +60,8 @@ pub mod chat_models {
     //! New code should use [`language_models`] directly.
 
     pub use crate::language_models::{
-        BaseChatModel, BoundChatModel, ChatChunk, ChatModel, ChatModelConfig, ChatModelExt,
-        ChatResult, ChatResultMetadata, ChatStream, DynBoundChatModel, DynChatModel,
-        DynChatModelExt, LangSmithParams, ToolChoice, UsageMetadata,
+        BaseChatModel, BoundChatModel, ChatChunk, ChatModelConfig, ChatResult, ChatResultMetadata,
+        ChatStream, DynBoundChatModel, LangSmithParams, ToolChoice, UsageMetadata,
     };
 }
 
@@ -76,7 +75,6 @@ pub use error::{Error, Result};
 pub use language_models::{
     // Chat model types
     BaseChatModel,
-    BaseChatModelExt,
     // LLM types
     BaseLLM,
     // Base types
@@ -84,16 +82,11 @@ pub use language_models::{
     BoundChatModel,
     ChatChunk,
     ChatGenerationStream,
-    ChatModel,
     ChatModelConfig,
-    ChatModelExt,
     ChatResult,
     ChatResultMetadata,
     ChatStream,
-    DynBaseChatModel,
     DynBoundChatModel,
-    DynChatModel,
-    DynChatModelExt,
     FakeListChatModel,
     FakeListChatModelError,
     // Fake implementations for testing
