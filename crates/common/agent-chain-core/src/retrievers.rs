@@ -107,10 +107,7 @@ impl LangSmithRetrieverParams {
     pub fn to_metadata(&self) -> HashMap<String, Value> {
         let mut metadata = HashMap::new();
         if let Some(ref name) = self.ls_retriever_name {
-            metadata.insert(
-                "ls_retriever_name".to_string(),
-                Value::String(name.clone()),
-            );
+            metadata.insert("ls_retriever_name".to_string(), Value::String(name.clone()));
         }
         if let Some(ref provider) = self.ls_vector_store_provider {
             metadata.insert(
@@ -219,10 +216,10 @@ pub trait BaseRetriever: Send + Sync + Debug {
     /// Get standard params for tracing.
     fn get_ls_params(&self) -> LangSmithRetrieverParams {
         let name = self.get_name();
-        let default_name = if name.starts_with("Retriever") {
-            name[9..].to_lowercase()
-        } else if name.ends_with("Retriever") {
-            name[..name.len() - 9].to_lowercase()
+        let default_name = if let Some(stripped) = name.strip_prefix("Retriever") {
+            stripped.to_lowercase()
+        } else if let Some(stripped) = name.strip_suffix("Retriever") {
+            stripped.to_lowercase()
         } else {
             name.to_lowercase()
         };
@@ -300,11 +297,8 @@ pub trait BaseRetriever: Send + Sync + Debug {
         );
 
         // Start retriever run
-        let run_manager = callback_manager.on_retriever_start(
-            &HashMap::new(),
-            input,
-            config.run_id,
-        );
+        let run_manager =
+            callback_manager.on_retriever_start(&HashMap::new(), input, config.run_id);
 
         // Get the run name
         let _run_name = config.run_name.clone().unwrap_or_else(|| self.get_name());
@@ -363,8 +357,10 @@ pub trait BaseRetriever: Send + Sync + Debug {
             .await;
 
         // Execute retrieval
-        let result = self.aget_relevant_documents(input, Some(&run_manager)).await;
-        
+        let result = self
+            .aget_relevant_documents(input, Some(&run_manager))
+            .await;
+
         match &result {
             Ok(docs) => {
                 // Convert documents to JSON values for callback
@@ -379,7 +375,7 @@ pub trait BaseRetriever: Send + Sync + Debug {
                 run_manager.get_sync().on_retriever_error(e);
             }
         }
-        
+
         result
     }
 
@@ -595,9 +591,7 @@ mod tests {
 
         let retriever = SimpleRetriever::new(docs.clone()).with_k(2);
 
-        let result = retriever
-            .get_relevant_documents("test", None)
-            .unwrap();
+        let result = retriever.get_relevant_documents("test", None).unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].page_content, "Hello world");
@@ -606,10 +600,7 @@ mod tests {
 
     #[test]
     fn test_simple_retriever_invoke() {
-        let docs = vec![
-            Document::new("Hello world"),
-            Document::new("Goodbye world"),
-        ];
+        let docs = vec![Document::new("Hello world"), Document::new("Goodbye world")];
 
         let retriever = SimpleRetriever::new(docs).with_k(5);
 
@@ -635,9 +626,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.len(), 2);
-        assert!(result
-            .iter()
-            .all(|doc| doc.page_content.contains("Hello")));
+        assert!(result.iter().all(|doc| doc.page_content.contains("Hello")));
     }
 
     #[test]
@@ -647,18 +636,12 @@ mod tests {
             .with_embedding_provider("openai")
             .with_embedding_model("text-embedding-3-small");
 
-        assert_eq!(
-            params.ls_retriever_name,
-            Some("my_retriever".to_string())
-        );
+        assert_eq!(params.ls_retriever_name, Some("my_retriever".to_string()));
         assert_eq!(
             params.ls_vector_store_provider,
             Some("pinecone".to_string())
         );
-        assert_eq!(
-            params.ls_embedding_provider,
-            Some("openai".to_string())
-        );
+        assert_eq!(params.ls_embedding_provider, Some("openai".to_string()));
         assert_eq!(
             params.ls_embedding_model,
             Some("text-embedding-3-small".to_string())
@@ -670,10 +653,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_retriever_ainvoke() {
-        let docs = vec![
-            Document::new("Hello world"),
-            Document::new("Goodbye world"),
-        ];
+        let docs = vec![Document::new("Hello world"), Document::new("Goodbye world")];
 
         let retriever = SimpleRetriever::new(docs).with_k(5);
 
@@ -684,10 +664,7 @@ mod tests {
 
     #[test]
     fn test_batch() {
-        let docs = vec![
-            Document::new("Hello world"),
-            Document::new("Goodbye world"),
-        ];
+        let docs = vec![Document::new("Hello world"), Document::new("Goodbye world")];
 
         let retriever = SimpleRetriever::new(docs);
 
