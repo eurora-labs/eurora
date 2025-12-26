@@ -73,15 +73,40 @@ impl ProtoChatService for PromptService {
     async fn chat(&self, request: Request<ProtoChatRequest>) -> ChatResult<ProtoChatResponse> {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
-        debug!("Received send_prompt request");
+        debug!("Received chat request");
 
-        // Return a single response with the new proto structure
+        let request_inner = request.into_inner();
+
+        // Convert ProtoBaseMessage to agent_chain_core::BaseMessage
+        let messages: Vec<BaseMessage> = request_inner
+            .messages
+            .into_iter()
+            .map(|msg| msg.into())
+            .collect();
+
+        // Call the provider to generate a response
+        let ai_message = self.provider.invoke(messages.into()).await.map_err(|e| {
+            debug!("Error in chat: {}", e);
+            Status::internal(e.to_string())
+        })?;
+
+        // Convert AIMessage to ProtoAiMessage
+        let tool_calls: Vec<_> = ai_message
+            .tool_calls()
+            .iter()
+            .map(|tc| agent_chain_eurora::proto::chat::ProtoToolCall {
+                id: tc.id().to_string(),
+                name: tc.name().to_string(),
+                args: tc.args().to_string(),
+            })
+            .collect();
+
         Ok(Response::new(ProtoChatResponse {
             message: Some(ProtoAiMessage {
-                content: "Hello, world!".to_string(),
-                id: None,
-                name: None,
-                tool_calls: vec![],
+                content: ai_message.content().to_string(),
+                id: ai_message.id().map(|s| s.to_string()),
+                name: ai_message.name().map(|s| s.to_string()),
+                tool_calls,
                 invalid_tool_calls: vec![],
                 usage_metadata: None,
                 additional_kwargs: None,
