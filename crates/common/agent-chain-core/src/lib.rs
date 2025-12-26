@@ -36,6 +36,7 @@ pub mod error;
 pub mod globals;
 pub mod load;
 pub mod messages;
+pub mod output_parsers;
 pub mod outputs;
 pub mod prompt_values;
 pub mod prompts;
@@ -86,6 +87,14 @@ pub use caches::{BaseCache, CacheReturnValue, InMemoryCache};
 
 // Re-export global functions
 pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cache, set_verbose};
+
+// Re-export output parser types
+pub use output_parsers::{
+    BaseCumulativeTransformOutputParser, BaseLLMOutputParser, BaseOutputParser,
+    BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser,
+    LanguageModelInput, ListOutputParser, MarkdownListOutputParser, NumberedListOutputParser,
+    OutputParserError, SimpleJsonOutputParser, StrOutputParser, XMLOutputParser,
+};
 
 // Re-export output types
 pub use outputs::{
