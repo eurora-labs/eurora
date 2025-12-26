@@ -56,17 +56,9 @@ pub use base::{
 // Re-export chat model types
 pub use chat_models::{
     BaseChatModel, BoundChatModel, ChatChunk, ChatGenerationStream, ChatModelConfig, ChatModelExt,
-    ChatResult, ChatResultMetadata, ChatStream, DynBoundChatModel, DynChatModelExt,
-    SimpleChatModel, ToolChoice, UsageMetadata, generate_from_stream,
+    ChatResult, ChatResultMetadata, ChatStream, DynBoundChatModel, SimpleChatModel, ToolChoice,
+    UsageMetadata, generate_from_stream,
 };
-
-// Type alias for backward compatibility
-pub use BaseChatModel as ChatModel;
-pub use ChatModelExt as BaseChatModelExt;
-pub use DynChatModelExt as DynBaseChatModel;
-
-// Re-export type for Arc<dyn BaseChatModel>
-pub type DynChatModel = std::sync::Arc<dyn BaseChatModel>;
 
 // Re-export LLM types
 pub use llms::{BaseLLM, LLM, LLMConfig, get_prompts_from_cache, update_cache};

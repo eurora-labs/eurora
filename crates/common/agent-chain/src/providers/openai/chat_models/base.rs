@@ -55,7 +55,7 @@ use crate::callbacks::AsyncCallbackManagerForLLMRun;
 use crate::callbacks::CallbackManagerForLLMRun;
 use crate::callbacks::Callbacks;
 use crate::chat_models::{
-    ChatChunk, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
+    BaseChatModel, ChatChunk, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
     LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
@@ -1310,7 +1310,7 @@ impl BaseLanguageModel for ChatOpenAI {
 }
 
 #[async_trait]
-impl ChatModel for ChatOpenAI {
+impl BaseChatModel for ChatOpenAI {
     fn chat_config(&self) -> &ChatModelConfig {
         &self.chat_model_config
     }
