@@ -1,5 +1,5 @@
 use agent_chain::{ollama::ChatOllama, openai::ChatOpenAI};
-use agent_chain_core::chat_models::ChatModel;
+use agent_chain_core::language_models::BaseChatModel;
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_eurora::{ChatEurora, EuroraConfig};
 use anyhow::Result;
@@ -138,12 +138,12 @@ impl PromptKitService {
             info!("Starting Eurora chat stream with agent-chain");
 
             let stream = llm
-                .stream(messages, None)
+                .stream(messages, None, None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
                     result
-                        .map(|chunk| chunk.content)
+                        .map(|chunk| chunk.text)
                         .map_err(PromptKitError::AgentChainError)
                 });
 
@@ -166,12 +166,12 @@ impl PromptKitService {
             info!("Starting OpenAI chat stream with agent-chain");
 
             let stream = llm
-                .stream(messages, None)
+                .stream(messages, None, None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
                     result
-                        .map(|chunk| chunk.content)
+                        .map(|chunk| chunk.text)
                         .map_err(PromptKitError::AgentChainError)
                 });
 
@@ -194,12 +194,12 @@ impl PromptKitService {
             info!("Starting Ollama chat stream with agent-chain");
 
             let stream = llm
-                .stream(messages, None)
+                .stream(messages, None, None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
                     result
-                        .map(|chunk| chunk.content)
+                        .map(|chunk| chunk.text)
                         .map_err(PromptKitError::AgentChainError)
                 });
 
