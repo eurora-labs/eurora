@@ -10,28 +10,29 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
+use regex::Regex;
 use serde_json::Value;
 
 use super::base::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
-use super::chat_models::{
-    BaseChatModel, ChatGenerationStream, ChatModelConfig, ChatResult, ChatResultMetadata,
-};
+use super::chat_models::{BaseChatModel, ChatGenerationStream, ChatModelConfig};
 use crate::caches::BaseCache;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
-use crate::messages::{AIMessage, BaseMessage};
-use crate::outputs::{ChatGeneration, ChatGenerationChunk, GenerationType, LLMResult};
+use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
+use crate::outputs::{
+    ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, GenerationType, LLMResult,
+};
 
-/// Fake chat model that returns messages from a list.
+/// Fake chat model for testing purposes.
 ///
-/// Cycles through responses in order.
+/// Cycles through BaseMessage responses in order.
 #[derive(Debug)]
 pub struct FakeMessagesListChatModel {
     /// List of responses to cycle through.
     responses: Vec<BaseMessage>,
-    /// Sleep time between responses.
+    /// Sleep time in seconds between responses.
     sleep: Option<Duration>,
-    /// Current index.
+    /// Internally incremented after every model invocation.
     index: AtomicUsize,
     /// Chat model configuration.
     config: ChatModelConfig,
@@ -80,25 +81,6 @@ impl FakeMessagesListChatModel {
     pub fn reset(&self) {
         self.index.store(0, Ordering::SeqCst);
     }
-
-    /// Get the next response.
-    fn get_next_response(&self) -> BaseMessage {
-        let i = self.index.load(Ordering::SeqCst);
-        let response = self
-            .responses
-            .get(i)
-            .cloned()
-            .unwrap_or_else(|| BaseMessage::AI(AIMessage::new("")));
-
-        let next_i = if i + 1 < self.responses.len() {
-            i + 1
-        } else {
-            0
-        };
-        self.index.store(next_i, Ordering::SeqCst);
-
-        response
-    }
 }
 
 #[async_trait]
@@ -133,9 +115,14 @@ impl BaseLanguageModel for FakeMessagesListChatModel {
 
         for prompt in prompts {
             let messages = prompt.to_messages();
-            let result = self.generate(messages, stop.clone(), None).await?;
-            let generation = ChatGeneration::new(result.message.into());
-            generations.push(vec![GenerationType::ChatGeneration(generation)]);
+            let result = self._generate(messages, stop.clone(), None).await?;
+            generations.push(
+                result
+                    .generations
+                    .into_iter()
+                    .map(|g| GenerationType::ChatGeneration(g))
+                    .collect(),
+            );
         }
 
         Ok(LLMResult::new(generations))
@@ -148,46 +135,54 @@ impl BaseChatModel for FakeMessagesListChatModel {
         &self.config
     }
 
-    async fn generate(
+    async fn _generate(
         &self,
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<ChatResult> {
+    ) -> Result<OutputChatResult> {
         if let Some(duration) = self.sleep {
             tokio::time::sleep(duration).await;
         }
 
-        let response = self.get_next_response();
+        let i = self.index.load(Ordering::SeqCst);
+        let response = self
+            .responses
+            .get(i)
+            .cloned()
+            .unwrap_or_else(|| BaseMessage::AI(AIMessage::new("")));
 
-        // Convert response to AIMessage
-        let ai_message = match response {
-            BaseMessage::AI(m) => m,
-            other => AIMessage::new(other.content()),
+        // Update index
+        let next_i = if i < self.responses.len() - 1 {
+            i + 1
+        } else {
+            0
         };
+        self.index.store(next_i, Ordering::SeqCst);
 
-        Ok(ChatResult {
-            message: ai_message,
-            metadata: ChatResultMetadata::default(),
-        })
+        // Create ChatGeneration with the original message type preserved
+        let generation = ChatGeneration::new(response);
+        Ok(OutputChatResult::new(vec![generation]))
     }
 }
 
-/// Error raised by FakeListChatModel during streaming.
+/// Fake error for testing purposes.
 #[derive(Debug, Clone, thiserror::Error)]
-#[error("FakeListChatModel error on chunk {0}")]
-pub struct FakeListChatModelError(pub usize);
+#[error("FakeListChatModelError")]
+pub struct FakeListChatModelError;
 
-/// Fake chat model that returns string responses from a list.
+/// Fake chat model for testing purposes.
+///
+/// Cycles through string responses in order.
 #[derive(Debug)]
 pub struct FakeListChatModel {
     /// List of string responses to cycle through.
     responses: Vec<String>,
-    /// Sleep time between responses.
+    /// Sleep time in seconds between responses.
     sleep: Option<Duration>,
-    /// Current index.
+    /// Internally incremented after every model invocation.
     index: AtomicUsize,
-    /// If set, raise an error on the specified chunk during streaming.
+    /// If set, raise an error on the specified chunk number during streaming.
     error_on_chunk_number: Option<usize>,
     /// Chat model configuration.
     config: ChatModelConfig,
@@ -245,12 +240,12 @@ impl FakeListChatModel {
         self.index.store(0, Ordering::SeqCst);
     }
 
-    /// Get the next response.
+    /// Get the next response and update index.
     fn get_next_response(&self) -> String {
         let i = self.index.load(Ordering::SeqCst);
         let response = self.responses.get(i).cloned().unwrap_or_default();
 
-        let next_i = if i + 1 < self.responses.len() {
+        let next_i = if i < self.responses.len() - 1 {
             i + 1
         } else {
             0
@@ -293,9 +288,14 @@ impl BaseLanguageModel for FakeListChatModel {
 
         for prompt in prompts {
             let messages = prompt.to_messages();
-            let result = self.generate(messages, stop.clone(), None).await?;
-            let generation = ChatGeneration::new(result.message.into());
-            generations.push(vec![GenerationType::ChatGeneration(generation)]);
+            let result = self._generate(messages, stop.clone(), None).await?;
+            generations.push(
+                result
+                    .generations
+                    .into_iter()
+                    .map(|g| GenerationType::ChatGeneration(g))
+                    .collect(),
+            );
         }
 
         Ok(LLMResult::new(generations))
@@ -303,10 +303,6 @@ impl BaseLanguageModel for FakeListChatModel {
 
     fn identifying_params(&self) -> HashMap<String, Value> {
         let mut params = HashMap::new();
-        params.insert(
-            "_type".to_string(),
-            Value::String("fake-list-chat-model".to_string()),
-        );
         params.insert(
             "responses".to_string(),
             serde_json::to_value(&self.responses).unwrap_or_default(),
@@ -321,25 +317,23 @@ impl BaseChatModel for FakeListChatModel {
         &self.config
     }
 
-    async fn generate(
+    async fn _generate(
         &self,
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<ChatResult> {
+    ) -> Result<OutputChatResult> {
         if let Some(duration) = self.sleep {
             tokio::time::sleep(duration).await;
         }
 
         let response = self.get_next_response();
-
-        Ok(ChatResult {
-            message: AIMessage::new(&response),
-            metadata: ChatResultMetadata::default(),
-        })
+        let message = AIMessage::new(&response);
+        let generation = ChatGeneration::new(message.into());
+        Ok(OutputChatResult::new(vec![generation]))
     }
 
-    async fn stream(
+    fn _stream(
         &self,
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
@@ -351,26 +345,33 @@ impl BaseChatModel for FakeListChatModel {
         let response_len = response.len();
 
         let stream = async_stream::stream! {
-            for (i, c) in response.chars().enumerate() {
+            for (i_c, c) in response.chars().enumerate() {
+                // Sleep first if configured
+                if let Some(duration) = sleep {
+                    tokio::time::sleep(duration).await;
+                }
+
+                // Check if we should error on this chunk
                 if let Some(error_chunk) = error_on_chunk {
-                    if i == error_chunk {
+                    if i_c == error_chunk {
                         yield Err(crate::error::Error::Other(
-                            format!("FakeListChatModel error on chunk {}", i)
+                            "FakeListChatModelError".to_string()
                         ));
                         return;
                     }
                 }
 
-                if let Some(duration) = sleep {
-                    tokio::time::sleep(duration).await;
-                }
+                // Create chunk with proper chunk_position
+                let chunk_position = if i_c == response_len - 1 {
+                    Some(ChunkPosition::Last)
+                } else {
+                    None
+                };
 
-                let is_last = i == response_len - 1;
-                let ai_message = AIMessage::new(&c.to_string());
-                let chunk = ChatGenerationChunk::new(ai_message.into());
-                // Note: chunk_position would need to be set separately if needed
-                let _ = is_last; // suppress unused warning
+                let mut ai_chunk = AIMessageChunk::new(&c.to_string());
+                ai_chunk.set_chunk_position(chunk_position);
 
+                let chunk = ChatGenerationChunk::new(ai_chunk.to_message().into());
                 yield Ok(chunk);
             }
         };
@@ -379,12 +380,105 @@ impl BaseChatModel for FakeListChatModel {
     }
 }
 
+/// Fake Chat Model wrapper for testing purposes.
+#[derive(Debug, Clone, Default)]
+pub struct FakeChatModel {
+    /// Chat model configuration.
+    config: ChatModelConfig,
+}
+
+impl FakeChatModel {
+    /// Create a new FakeChatModel.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the configuration.
+    pub fn with_config(mut self, config: ChatModelConfig) -> Self {
+        self.config = config;
+        self
+    }
+}
+
+#[async_trait]
+impl BaseLanguageModel for FakeChatModel {
+    fn llm_type(&self) -> &str {
+        "fake-chat-model"
+    }
+
+    fn model_name(&self) -> &str {
+        "fake-chat"
+    }
+
+    fn config(&self) -> &LanguageModelConfig {
+        &self.config.base
+    }
+
+    fn cache(&self) -> Option<&dyn BaseCache> {
+        None
+    }
+
+    fn callbacks(&self) -> Option<&Callbacks> {
+        None
+    }
+
+    async fn generate_prompt(
+        &self,
+        prompts: Vec<LanguageModelInput>,
+        stop: Option<Vec<String>>,
+        _callbacks: Option<Callbacks>,
+    ) -> Result<LLMResult> {
+        let mut generations = Vec::new();
+
+        for prompt in prompts {
+            let messages = prompt.to_messages();
+            let result = self._generate(messages, stop.clone(), None).await?;
+            generations.push(
+                result
+                    .generations
+                    .into_iter()
+                    .map(|g| GenerationType::ChatGeneration(g))
+                    .collect(),
+            );
+        }
+
+        Ok(LLMResult::new(generations))
+    }
+
+    fn identifying_params(&self) -> HashMap<String, Value> {
+        let mut params = HashMap::new();
+        params.insert("key".to_string(), Value::String("fake".to_string()));
+        params
+    }
+}
+
+#[async_trait]
+impl BaseChatModel for FakeChatModel {
+    fn chat_config(&self) -> &ChatModelConfig {
+        &self.config
+    }
+
+    async fn _generate(
+        &self,
+        _messages: Vec<BaseMessage>,
+        _stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<OutputChatResult> {
+        let message = AIMessage::new("fake response");
+        let generation = ChatGeneration::new(message.into());
+        Ok(OutputChatResult::new(vec![generation]))
+    }
+}
+
 /// Generic fake chat model that can be used to test the chat model interface.
 ///
-/// Can be used in both sync and async tests, invokes callbacks for new tokens,
-/// and breaks messages into chunks for streaming.
+/// * Chat model should be usable in both sync and async tests
+/// * Invokes `on_llm_new_token` to allow for testing of callback related code for new tokens.
+/// * Includes logic to break messages into message chunks to facilitate testing of streaming.
 pub struct GenericFakeChatModel {
     /// Iterator over messages to return.
+    ///
+    /// If you want to pass a list, you can use `into_iter()` to convert it to an iterator.
     messages: std::sync::Mutex<Box<dyn Iterator<Item = AIMessage> + Send>>,
     /// Chat model configuration.
     config: ChatModelConfig,
@@ -460,9 +554,14 @@ impl BaseLanguageModel for GenericFakeChatModel {
 
         for prompt in prompts {
             let messages = prompt.to_messages();
-            let result = self.generate(messages, stop.clone(), None).await?;
-            let generation = ChatGeneration::new(result.message.into());
-            generations.push(vec![GenerationType::ChatGeneration(generation)]);
+            let result = self._generate(messages, stop.clone(), None).await?;
+            generations.push(
+                result
+                    .generations
+                    .into_iter()
+                    .map(|g| GenerationType::ChatGeneration(g))
+                    .collect(),
+            );
         }
 
         Ok(LLMResult::new(generations))
@@ -475,46 +574,143 @@ impl BaseChatModel for GenericFakeChatModel {
         &self.config
     }
 
-    async fn generate(
+    async fn _generate(
         &self,
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<ChatResult> {
+    ) -> Result<OutputChatResult> {
         let message = {
             let mut guard = self.messages.lock().unwrap();
             guard.next().unwrap_or_else(|| AIMessage::new(""))
         };
 
-        Ok(ChatResult {
-            message,
-            metadata: ChatResultMetadata::default(),
-        })
+        let generation = ChatGeneration::new(message.into());
+        Ok(OutputChatResult::new(vec![generation]))
     }
 
-    async fn stream(
+    fn _stream(
         &self,
-        messages: Vec<BaseMessage>,
-        stop: Option<Vec<String>>,
-        run_manager: Option<&CallbackManagerForLLMRun>,
+        _messages: Vec<BaseMessage>,
+        _stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        let result = self.generate(messages, stop, run_manager).await?;
-        let content = result.message.content().to_string();
+        // Get the message via _generate
+        let message = {
+            let mut guard = self.messages.lock().unwrap();
+            guard.next().unwrap_or_else(|| AIMessage::new(""))
+        };
 
-        // Split content by whitespace, preserving whitespace
+        let content = message.content().to_string();
+        let message_id = message.id().map(String::from);
+        let additional_kwargs = message.additional_kwargs().clone();
+
         let stream = async_stream::stream! {
-            let mut chars = content.chars().peekable();
-            let mut current_token = String::new();
+            if !content.is_empty() {
+                // Use a regular expression to split on whitespace with a capture group
+                // so that we can preserve the whitespace in the output.
+                let re = Regex::new(r"(\s)").unwrap();
 
-            while let Some(c) = chars.next() {
-                current_token.push(c);
+                // Split content preserving whitespace using regex
+                let all_parts: Vec<String> = {
+                    let mut parts = Vec::new();
+                    let mut last = 0;
+                    for m in re.find_iter(&content) {
+                        if m.start() > last {
+                            parts.push(content[last..m.start()].to_string());
+                        }
+                        parts.push(m.as_str().to_string());
+                        last = m.end();
+                    }
+                    if last < content.len() {
+                        parts.push(content[last..].to_string());
+                    }
+                    parts
+                };
 
-                // Yield when we hit whitespace or end of string
-                if c.is_whitespace() || chars.peek().is_none() {
-                    let ai_message = AIMessage::new(&current_token);
-                    let chunk = ChatGenerationChunk::new(ai_message.into());
+                let num_chunks = all_parts.len();
+
+                for (idx, token) in all_parts.into_iter().enumerate() {
+                    let mut chunk_msg = AIMessageChunk::new(&token);
+
+                    // Set message ID if available
+                    if let Some(ref id) = message_id {
+                        chunk_msg = AIMessageChunk::with_id(id.clone(), &token);
+                    }
+
+                    // Set chunk_position on the last chunk if no additional_kwargs
+                    if idx == num_chunks - 1 && additional_kwargs.is_empty() {
+                        chunk_msg.set_chunk_position(Some(ChunkPosition::Last));
+                    }
+
+                    let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+
+                    // TODO: call run_manager.on_llm_new_token(token, chunk=chunk) if run_manager is provided
+
                     yield Ok(chunk);
-                    current_token.clear();
+                }
+            }
+
+            // Handle additional_kwargs
+            if !additional_kwargs.is_empty() {
+                for (key, value) in additional_kwargs.iter() {
+                    // Special case for function_call
+                    if key == "function_call" {
+                        if let Some(obj) = value.as_object() {
+                            for (fkey, fvalue) in obj.iter() {
+                                if let Some(fvalue_str) = fvalue.as_str() {
+                                    // Break function call by `,`
+                                    let fvalue_chunks: Vec<&str> = fvalue_str.split(',').collect();
+                                    let num_fchunks = fvalue_chunks.len();
+                                    for (fi, fvalue_chunk) in fvalue_chunks.into_iter().enumerate() {
+                                        // Add comma back except for last
+                                        let chunk_content = if fi < num_fchunks - 1 {
+                                            format!("{},", fvalue_chunk)
+                                        } else {
+                                            fvalue_chunk.to_string()
+                                        };
+
+                                        let mut kwargs: HashMap<String, Value> = HashMap::new();
+                                        let mut fc: HashMap<String, Value> = HashMap::new();
+                                        fc.insert(fkey.clone(), Value::String(chunk_content));
+                                        kwargs.insert("function_call".to_string(), Value::Object(fc.into_iter().collect()));
+
+                                        let mut chunk_msg = AIMessageChunk::new("");
+                                        if let Some(ref id) = message_id {
+                                            chunk_msg = AIMessageChunk::with_id(id.clone(), "");
+                                        }
+
+                                        let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                                        yield Ok(chunk);
+                                    }
+                                } else {
+                                    let mut kwargs: HashMap<String, Value> = HashMap::new();
+                                    let mut fc: HashMap<String, Value> = HashMap::new();
+                                    fc.insert(fkey.clone(), fvalue.clone());
+                                    kwargs.insert("function_call".to_string(), Value::Object(fc.into_iter().collect()));
+
+                                    let mut chunk_msg = AIMessageChunk::new("");
+                                    if let Some(ref id) = message_id {
+                                        chunk_msg = AIMessageChunk::with_id(id.clone(), "");
+                                    }
+
+                                    let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                                    yield Ok(chunk);
+                                }
+                            }
+                        }
+                    } else {
+                        let mut kwargs: HashMap<String, Value> = HashMap::new();
+                        kwargs.insert(key.clone(), value.clone());
+
+                        let mut chunk_msg = AIMessageChunk::new("");
+                        if let Some(ref id) = message_id {
+                            chunk_msg = AIMessageChunk::with_id(id.clone(), "");
+                        }
+
+                        let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
+                        yield Ok(chunk);
+                    }
                 }
             }
         };
@@ -523,7 +719,9 @@ impl BaseChatModel for GenericFakeChatModel {
     }
 }
 
-/// Parrot fake chat model that returns the last message.
+/// Generic fake chat model that echoes the last message.
+///
+/// * Chat model should be usable in both sync and async tests
 #[derive(Debug, Clone, Default)]
 pub struct ParrotFakeChatModel {
     /// Chat model configuration.
@@ -575,9 +773,14 @@ impl BaseLanguageModel for ParrotFakeChatModel {
 
         for prompt in prompts {
             let messages = prompt.to_messages();
-            let result = self.generate(messages, stop.clone(), None).await?;
-            let generation = ChatGeneration::new(result.message.into());
-            generations.push(vec![GenerationType::ChatGeneration(generation)]);
+            let result = self._generate(messages, stop.clone(), None).await?;
+            generations.push(
+                result
+                    .generations
+                    .into_iter()
+                    .map(|g| GenerationType::ChatGeneration(g))
+                    .collect(),
+            );
         }
 
         Ok(LLMResult::new(generations))
@@ -590,22 +793,20 @@ impl BaseChatModel for ParrotFakeChatModel {
         &self.config
     }
 
-    async fn generate(
+    async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<ChatResult> {
-        // Return the last message content as an AI message
-        let last_content = messages
+    ) -> Result<OutputChatResult> {
+        // Return the last message as-is, preserving its type
+        let last_message = messages
             .last()
-            .map(|m| m.content().to_string())
-            .unwrap_or_default();
+            .cloned()
+            .unwrap_or_else(|| BaseMessage::AI(AIMessage::new("")));
 
-        Ok(ChatResult {
-            message: AIMessage::new(&last_content),
-            metadata: ChatResultMetadata::default(),
-        })
+        let generation = ChatGeneration::new(last_message);
+        Ok(OutputChatResult::new(vec![generation]))
     }
 }
 
@@ -621,26 +822,26 @@ mod tests {
             BaseMessage::AI(AIMessage::new("Response 2")),
         ]);
 
-        let result = llm.generate(vec![], None, None).await.unwrap();
-        assert_eq!(result.message.content(), "Response 1");
+        let result = llm._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result.generations[0].message.content(), "Response 1");
 
-        let result = llm.generate(vec![], None, None).await.unwrap();
-        assert_eq!(result.message.content(), "Response 2");
+        let result = llm._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result.generations[0].message.content(), "Response 2");
 
         // Cycles back
-        let result = llm.generate(vec![], None, None).await.unwrap();
-        assert_eq!(result.message.content(), "Response 1");
+        let result = llm._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result.generations[0].message.content(), "Response 1");
     }
 
     #[tokio::test]
     async fn test_fake_list_chat_model() {
         let llm = FakeListChatModel::new(vec!["Response 1".to_string(), "Response 2".to_string()]);
 
-        let result = llm.generate(vec![], None, None).await.unwrap();
-        assert_eq!(result.message.content(), "Response 1");
+        let result = llm._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result.generations[0].message.content(), "Response 1");
 
-        let result = llm.generate(vec![], None, None).await.unwrap();
-        assert_eq!(result.message.content(), "Response 2");
+        let result = llm._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result.generations[0].message.content(), "Response 2");
     }
 
     #[tokio::test]
@@ -649,7 +850,7 @@ mod tests {
 
         let llm = FakeListChatModel::new(vec!["Hello".to_string()]);
 
-        let mut stream = llm.stream(vec![], None, None).await.unwrap();
+        let mut stream = llm._stream(vec![], None, None).unwrap();
 
         let mut result = String::new();
         while let Some(chunk) = stream.next().await {
@@ -661,17 +862,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_fake_chat_model() {
+        let llm = FakeChatModel::new();
+
+        let result = llm._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result.generations[0].message.content(), "fake response");
+    }
+
+    #[tokio::test]
     async fn test_generic_fake_chat_model() {
         let llm = GenericFakeChatModel::from_strings(vec![
             "First response".to_string(),
             "Second response".to_string(),
         ]);
 
-        let result = llm.generate(vec![], None, None).await.unwrap();
-        assert_eq!(result.message.content(), "First response");
+        let result = llm._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result.generations[0].message.content(), "First response");
 
-        let result = llm.generate(vec![], None, None).await.unwrap();
-        assert_eq!(result.message.content(), "Second response");
+        let result = llm._generate(vec![], None, None).await.unwrap();
+        assert_eq!(result.generations[0].message.content(), "Second response");
     }
 
     #[tokio::test]
@@ -680,8 +889,9 @@ mod tests {
 
         let messages = vec![BaseMessage::Human(HumanMessage::new("Hello, parrot!"))];
 
-        let result = llm.generate(messages, None, None).await.unwrap();
-        assert_eq!(result.message.content(), "Hello, parrot!");
+        let result = llm._generate(messages, None, None).await.unwrap();
+        // ParrotFakeChatModel should return the last message as-is
+        assert_eq!(result.generations[0].message.content(), "Hello, parrot!");
     }
 
     #[test]
@@ -689,7 +899,14 @@ mod tests {
         let llm = FakeListChatModel::new(vec!["Response".to_string()]);
         let params = llm.identifying_params();
 
-        assert_eq!(params.get("_type").unwrap(), "fake-list-chat-model");
         assert!(params.contains_key("responses"));
+    }
+
+    #[test]
+    fn test_fake_chat_model_identifying_params() {
+        let llm = FakeChatModel::new();
+        let params = llm.identifying_params();
+
+        assert_eq!(params.get("key").unwrap(), "fake");
     }
 }
