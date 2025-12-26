@@ -195,13 +195,13 @@ impl BaseOutputParser for XMLOutputParser {
         self.parse(&result[0].text)
     }
 
-    fn get_format_instructions(&self) -> Option<String> {
+    fn get_format_instructions(&self) -> Result<String> {
         match &self.tags {
             Some(tags) => {
                 let tags_str = format!("{:?}", tags);
-                Some(format_xml_instructions(&tags_str))
+                Ok(format_xml_instructions(&tags_str))
             }
-            None => Some(format_xml_instructions("[]")),
+            None => Ok(format_xml_instructions("[]")),
         }
     }
 
@@ -279,7 +279,9 @@ mod tests {
     #[test]
     fn test_xml_parser_format_instructions() {
         let parser = XMLOutputParser::with_tags(vec!["foo".to_string(), "bar".to_string()]);
-        let instructions = parser.get_format_instructions().unwrap();
+        let instructions = parser
+            .get_format_instructions()
+            .expect("should return format instructions");
         assert!(instructions.contains("foo"));
         assert!(instructions.contains("bar"));
         assert!(instructions.contains("XML"));
