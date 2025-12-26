@@ -701,6 +701,7 @@ impl ChatAnthropic {
 
 /// Anthropic API response structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicResponse {
     content: Vec<AnthropicContent>,
     model: String,
@@ -724,6 +725,7 @@ enum AnthropicContent {
 
 /// Anthropic usage information.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicUsage {
     input_tokens: u32,
     output_tokens: u32,
