@@ -363,7 +363,11 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         // Check if streaming has been disabled on this instance
-        if self.chat_config().disable_streaming.should_disable(has_tools) {
+        if self
+            .chat_config()
+            .disable_streaming
+            .should_disable(has_tools)
+        {
             return false;
         }
 
