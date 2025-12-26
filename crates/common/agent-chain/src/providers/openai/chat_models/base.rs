@@ -52,20 +52,18 @@ use futures::Stream;
 use serde::{Deserialize, Serialize};
 
 use crate::callbacks::CallbackManagerForLLMRun;
+use crate::callbacks::Callbacks;
 use crate::chat_models::{
     ChatChunk, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
     LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
-use crate::language_models::{
-    BaseLanguageModel, LanguageModelConfig, LanguageModelInput,
-};
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{
     AIMessage, BaseMessage, ContentPart, ImageDetail, ImageSource, MessageContent, ToolCall,
 };
 use crate::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
 use crate::tools::ToolDefinition;
-use crate::callbacks::Callbacks;
 
 /// Default API base URL for OpenAI.
 const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
@@ -1288,7 +1286,9 @@ impl BaseLanguageModel for ChatOpenAI {
         let mut all_generations = Vec::new();
         for prompt in prompts {
             let messages = prompt.to_messages();
-            let result = self._generate_internal(messages, stop.clone(), None).await?;
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
             all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
         }
         Ok(LLMResult::new(all_generations))
@@ -1328,7 +1328,8 @@ impl ChatModel for ChatOpenAI {
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
     ) -> Result<ChatResult> {
-        self.generate_with_tools_internal(messages, tools, tool_choice, stop).await
+        self.generate_with_tools_internal(messages, tools, tool_choice, stop)
+            .await
     }
 }
 
