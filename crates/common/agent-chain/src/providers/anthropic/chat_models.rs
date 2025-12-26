@@ -13,7 +13,7 @@ use serde::Deserialize;
 
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{
-    ChatChunk, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
+    BaseChatModel, ChatChunk, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
     LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
@@ -406,7 +406,7 @@ impl BaseLanguageModel for ChatAnthropic {
 }
 
 #[async_trait]
-impl ChatModel for ChatAnthropic {
+impl BaseChatModel for ChatAnthropic {
     fn chat_config(&self) -> &ChatModelConfig {
         &self.chat_model_config
     }
