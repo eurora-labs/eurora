@@ -32,12 +32,15 @@ use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio_util::io::StreamReader;
 
+use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{
-    ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream, LangSmithParams, ToolChoice,
-    UsageMetadata,
+    ChatChunk, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
+    LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{AIMessage, BaseMessage, ToolCall};
+use crate::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
 use crate::tools::{Tool, ToolDefinition};
 
 /// Default API base URL for Ollama.
@@ -107,6 +110,10 @@ pub struct ChatOllama {
     /// Additional client kwargs.
     #[allow(dead_code)]
     client_kwargs: HashMap<String, serde_json::Value>,
+    /// Chat model configuration.
+    chat_model_config: ChatModelConfig,
+    /// Language model configuration.
+    language_model_config: LanguageModelConfig,
     /// HTTP client.
     #[allow(dead_code)]
     client: reqwest::Client,
@@ -154,6 +161,8 @@ impl ChatOllama {
             keep_alive: None,
             reasoning: None,
             client_kwargs: HashMap::new(),
+            chat_model_config: ChatModelConfig::new(),
+            language_model_config: LanguageModelConfig::new(),
             client: reqwest::Client::new(),
         }
     }
@@ -538,7 +547,7 @@ impl ChatOllama {
 }
 
 #[async_trait]
-impl ChatModel for ChatOllama {
+impl BaseLanguageModel for ChatOllama {
     fn llm_type(&self) -> &str {
         "chat-ollama"
     }
@@ -547,37 +556,52 @@ impl ChatModel for ChatOllama {
         &self.model
     }
 
-    async fn generate(
+    fn config(&self) -> &LanguageModelConfig {
+        &self.language_model_config
+    }
+
+    async fn generate_prompt(
+        &self,
+        prompts: Vec<LanguageModelInput>,
+        stop: Option<Vec<String>>,
+        _callbacks: Option<Callbacks>,
+    ) -> Result<LLMResult> {
+        let mut all_generations = Vec::new();
+        for prompt in prompts {
+            let messages = prompt.to_messages();
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
+            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
+        }
+        Ok(LLMResult::new(all_generations))
+    }
+
+    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
+        LangSmithParams {
+            ls_provider: Some("ollama".to_string()),
+            ls_model_name: Some(self.model.clone()),
+            ls_model_type: Some("chat".to_string()),
+            ls_temperature: self.temperature,
+            ls_max_tokens: self.num_predict.map(|n| n as u32),
+            ls_stop: stop.map(|s| s.to_vec()),
+        }
+    }
+}
+
+#[async_trait]
+impl ChatModel for ChatOllama {
+    fn chat_config(&self) -> &ChatModelConfig {
+        &self.chat_model_config
+    }
+
+    async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
-        let client = self.build_client();
-        let payload = self.build_request_payload(&messages, stop, None, false);
-        let base_url = self.get_base_url();
-
-        let response = client
-            .post(format!("{}/api/chat", base_url))
-            .header("Content-Type", "application/json")
-            .json(&payload)
-            .send()
-            .await
-            .map_err(Error::Http)?;
-
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(Error::api(status, error_text));
-        }
-
-        let ollama_resp: OllamaResponse = response.json().await.map_err(|e| {
-            Error::Json(serde_json::Error::io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            )))
-        })?;
-
-        Ok(self.parse_response(ollama_resp))
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<OutputChatResult> {
+        self._generate_internal(messages, stop, None).await
     }
 
     async fn generate_with_tools(
@@ -629,8 +653,90 @@ impl ChatModel for ChatOllama {
 
         Ok(self.parse_response(ollama_resp))
     }
+}
 
-    async fn stream(
+impl ChatOllama {
+    /// Internal generate implementation.
+    async fn _generate_internal(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<OutputChatResult> {
+        let client = self.build_client();
+        let payload = self.build_request_payload(&messages, stop, None, false);
+        let base_url = self.get_base_url();
+
+        let response = client
+            .post(format!("{}/api/chat", base_url))
+            .header("Content-Type", "application/json")
+            .json(&payload)
+            .send()
+            .await
+            .map_err(Error::Http)?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(Error::api(status, error_text));
+        }
+
+        let ollama_resp: OllamaResponse = response.json().await.map_err(|e| {
+            Error::Json(serde_json::Error::io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )))
+        })?;
+
+        self.parse_response_to_output(ollama_resp)
+    }
+
+    /// Parse the API response into an OutputChatResult.
+    fn parse_response_to_output(&self, response: OllamaResponse) -> Result<OutputChatResult> {
+        let content = response
+            .message
+            .as_ref()
+            .and_then(|m| m.content.clone())
+            .unwrap_or_default();
+
+        let tool_calls: Vec<ToolCall> = response
+            .message
+            .as_ref()
+            .and_then(|m| m.tool_calls.as_ref())
+            .map(|tcs| {
+                tcs.iter()
+                    .filter_map(|tc| {
+                        tc.function.as_ref().map(|f| {
+                            let args = if let Some(args) = &f.arguments {
+                                match args {
+                                    serde_json::Value::String(s) => {
+                                        serde_json::from_str(s).unwrap_or_default()
+                                    }
+                                    other => other.clone(),
+                                }
+                            } else {
+                                serde_json::json!({})
+                            };
+                            ToolCall::new(&f.name, args)
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let message: BaseMessage = if tool_calls.is_empty() {
+            AIMessage::new(content).into()
+        } else {
+            AIMessage::with_tool_calls(content, tool_calls).into()
+        };
+
+        let generation = ChatGeneration::new(message);
+        Ok(OutputChatResult::new(vec![generation]))
+    }
+
+    /// Internal stream implementation.
+    #[allow(dead_code)]
+    async fn stream_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
@@ -713,27 +819,6 @@ impl ChatModel for ChatOllama {
         };
 
         Ok(Box::pin(stream))
-    }
-
-    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        LangSmithParams {
-            ls_provider: Some("ollama".to_string()),
-            ls_model_name: Some(self.model.clone()),
-            ls_model_type: Some("chat".to_string()),
-            ls_temperature: self.temperature,
-            ls_max_tokens: self.num_predict.map(|n| n as u32),
-            ls_stop: stop.map(|s| s.to_vec()),
-        }
-    }
-
-    fn identifying_params(&self) -> serde_json::Value {
-        serde_json::json!({
-            "_type": self.llm_type(),
-            "model": self.model,
-            "temperature": self.temperature,
-            "num_ctx": self.num_ctx,
-            "num_predict": self.num_predict,
-        })
     }
 }
 
@@ -852,6 +937,7 @@ impl BoundChatOllama {
 
     /// Internal async implementation.
     async fn invoke_async_internal(&self, messages: Vec<BaseMessage>) -> Box<dyn MessageWithAny> {
+        use crate::language_models::BaseChatModel;
         let tool_definitions = self.tool_definitions();
         match self
             .model
@@ -925,6 +1011,7 @@ mod tests {
 
     #[test]
     fn test_llm_type() {
+        use crate::language_models::BaseLanguageModel;
         let model = ChatOllama::new("llama3.1");
         assert_eq!(model.llm_type(), "chat-ollama");
     }
