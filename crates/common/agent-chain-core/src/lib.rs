@@ -158,10 +158,9 @@ pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cach
 // Re-export output parser types
 pub use output_parsers::{
     BaseCumulativeTransformOutputParser, BaseLLMOutputParser, BaseOutputParser,
-    BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser,
-    LanguageModelInput as OutputParserInput, ListOutputParser, MarkdownListOutputParser,
-    NumberedListOutputParser, OutputParserError, SimpleJsonOutputParser, StrOutputParser,
-    XMLOutputParser,
+    BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser, ListOutputParser,
+    MarkdownListOutputParser, NumberedListOutputParser, OutputParserError, SimpleJsonOutputParser,
+    StrOutputParser, XMLOutputParser,
 };
 
 // Re-export output types
