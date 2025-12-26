@@ -138,7 +138,7 @@ impl PromptKitService {
             info!("Starting Eurora chat stream with agent-chain");
 
             let stream = llm
-                .stream(messages.into(), None)
+                .astream(messages.into(), None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
@@ -166,7 +166,7 @@ impl PromptKitService {
             info!("Starting OpenAI chat stream with agent-chain");
 
             let stream = llm
-                .stream(messages.into(), None)
+                .astream(messages.into(), None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
@@ -194,7 +194,7 @@ impl PromptKitService {
             info!("Starting Ollama chat stream with agent-chain");
 
             let stream = llm
-                .stream(messages.into(), None)
+                .astream(messages.into(), None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
