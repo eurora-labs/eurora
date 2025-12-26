@@ -30,15 +30,20 @@ pub mod chat_history;
 pub mod chat_loaders;
 pub mod chat_models;
 pub mod chat_sessions;
+pub mod env;
 pub mod error;
 pub mod load;
 pub mod messages;
 pub mod outputs;
+pub mod prompt_values;
 pub mod prompts;
 pub mod runnables;
 pub mod tools;
 pub mod tracers;
 pub mod utils;
+
+// Re-export env types
+pub use env::{VERSION, get_runtime_environment};
 
 // Re-export error types
 pub use error::{Error, Result};
@@ -100,6 +105,12 @@ pub use load::{
     ConstructorInfo, RevivedValue, Reviver, ReviverConfig, Serializable, Serialized,
     SerializedConstructor, SerializedNotImplemented, SerializedSecret, dumpd, dumps,
     load as load_json, loads,
+};
+
+// Re-export prompt value types
+pub use prompt_values::{
+    ChatPromptValue, ChatPromptValueConcrete, ImageDetailLevel, ImagePromptValue, ImageURL,
+    PromptValue, StringPromptValue,
 };
 
 // Re-export tracer types
