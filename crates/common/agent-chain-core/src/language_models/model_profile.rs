@@ -220,11 +220,13 @@ impl ModelProfile {
 pub type ModelProfileRegistry = HashMap<String, ModelProfile>;
 
 /// Create a new empty model profile registry.
+#[allow(dead_code)]
 pub fn new_registry() -> ModelProfileRegistry {
     HashMap::new()
 }
 
 /// Create a registry with some common model profiles.
+#[allow(dead_code)]
 pub fn default_registry() -> ModelProfileRegistry {
     let mut registry = HashMap::new();
 
