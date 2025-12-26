@@ -135,7 +135,7 @@ impl ProtoChatService for PromptService {
 
         let openai_stream = self
             .provider
-            .stream(messages.into(), None)
+            .astream(messages.into(), None)
             .await
             .map_err(|e| {
                 debug!("Error in chat_stream: {}", e);
