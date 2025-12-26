@@ -42,6 +42,9 @@ pub mod prompts;
 pub mod rate_limiters;
 pub mod retrievers;
 pub mod runnables;
+pub mod stores;
+pub mod structured_query;
+pub mod sys_info;
 pub mod tools;
 pub mod tracers;
 pub mod utils;
@@ -143,6 +146,11 @@ pub use retrievers::{
     RetrieverOutput, SimpleRetriever,
 };
 
+// Re-export store types
+pub use stores::{
+    BaseStore, InMemoryBaseStore, InMemoryByteStore, InMemoryStore, InvalidKeyException,
+};
+
 // Re-export runnable types
 pub use runnables::{
     AddableDict, BaseStreamEvent, CUSTOM_EVENT_TYPE, ConfigOrList, CustomStreamEvent,
@@ -153,6 +161,15 @@ pub use runnables::{
     ensure_config, get_config_list, graph_passthrough, merge_configs, patch_config, pipe,
     runnable_lambda, to_dyn,
 };
+
+// Re-export structured query types
+pub use structured_query::{
+    Comparator, Comparison, Expr, FilterDirective, FilterDirectiveEnum, Operation, Operator,
+    OperatorOrComparator, StructuredQuery, Visitor,
+};
+
+// Re-export sys_info types
+pub use sys_info::{PackageInfo, SystemInfo, get_sys_info, get_sys_info_map, print_sys_info};
 
 // Re-export async_trait for use in generated code
 pub use async_trait::async_trait;
