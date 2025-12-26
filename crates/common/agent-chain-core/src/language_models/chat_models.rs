@@ -19,11 +19,10 @@ use super::model_profile::ModelProfile;
 use crate::GenerationType;
 use crate::callbacks::{AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun, Callbacks};
 use crate::error::{Error, Result};
-use crate::messages::{AIMessage, BaseMessage};
+use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
 use crate::outputs::{
     ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, LLMResult,
 };
-use crate::prompt_values::PromptValue;
 use crate::rate_limiters::BaseRateLimiter;
 use crate::tools::{Tool, ToolDefinition};
 
@@ -90,6 +89,9 @@ pub type ChatStream = Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>;
 
 /// Type alias for a streaming chat generation output.
 pub type ChatGenerationStream = Pin<Box<dyn Stream<Item = Result<ChatGenerationChunk>> + Send>>;
+
+/// Type alias for streaming AIMessageChunk output.
+pub type AIMessageChunkStream = Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>;
 
 /// Configuration for tool choice.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -284,7 +286,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<OutputChatResult> {
         // Default: call sync version (suboptimal but provides fallback)
         self._generate(messages, stop, None).await
@@ -299,7 +301,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        Err(Error::Other("Streaming not implemented".into()))
+        Err(Error::NotImplemented("Streaming not implemented".into()))
     }
 
     /// Async stream the output of the model.
@@ -309,10 +311,63 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+        _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         // Default: call sync version
         self._stream(messages, stop, None)
+    }
+
+    /// Check if `_stream` is implemented (not the default).
+    ///
+    /// This is used by `_should_stream` to determine if streaming is available.
+    /// Implementations that override `_stream` should also override this to return `true`.
+    fn has_stream_impl(&self) -> bool {
+        false
+    }
+
+    /// Check if `_astream` is implemented (not the default).
+    ///
+    /// This is used by `_should_stream` to determine if async streaming is available.
+    /// Implementations that override `_astream` should also override this to return `true`.
+    fn has_astream_impl(&self) -> bool {
+        false
+    }
+
+    /// Determine if a given model call should hit the streaming API.
+    ///
+    /// This method checks:
+    /// 1. If streaming is implemented (either sync or async)
+    /// 2. If streaming has been disabled on this instance
+    /// 3. If streaming is disabled for tool calling and tools are present
+    ///
+    /// # Arguments
+    ///
+    /// * `async_api` - Whether this is an async API call
+    /// * `has_tools` - Whether tools are present in the call
+    ///
+    /// # Returns
+    ///
+    /// `true` if streaming should be used, `false` otherwise.
+    fn _should_stream(&self, async_api: bool, has_tools: bool) -> bool {
+        // Check if streaming is implemented
+        let sync_not_implemented = !self.has_stream_impl();
+        let async_not_implemented = !self.has_astream_impl();
+
+        // Check if streaming is implemented
+        if !async_api && sync_not_implemented {
+            return false;
+        }
+        // Note: since async falls back to sync, we check both here
+        if async_api && async_not_implemented && sync_not_implemented {
+            return false;
+        }
+
+        // Check if streaming has been disabled on this instance
+        if self.chat_config().disable_streaming.should_disable(has_tools) {
+            return false;
+        }
+
+        true
     }
 
     /// Generate from a batch of message lists.
@@ -332,7 +387,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<Vec<BaseMessage>>,
         stop: Option<Vec<String>>,
-        callbacks: Option<Callbacks>,
+        _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut all_generations: Vec<Vec<GenerationType>> = Vec::new();
 
@@ -349,7 +404,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<Vec<BaseMessage>>,
         stop: Option<Vec<String>>,
-        callbacks: Option<Callbacks>,
+        _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut all_generations: Vec<Vec<GenerationType>> = Vec::new();
 
@@ -440,8 +495,171 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     /// Generate a streaming response from the model.
     ///
-    /// Default implementation calls `_generate` and wraps the result in a stream.
-    /// Providers should override this for native streaming support.
+    /// This is the main streaming API. It yields `AIMessageChunk`s.
+    /// Providers should override `_stream` for native streaming support.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input to the model (string, messages, or PromptValue).
+    /// * `stop` - Optional stop sequences.
+    ///
+    /// # Returns
+    ///
+    /// A stream of `AIMessageChunk`s.
+    async fn stream(
+        &self,
+        input: LanguageModelInput,
+        stop: Option<Vec<String>>,
+    ) -> Result<AIMessageChunkStream> {
+        let messages = self.convert_input(input)?;
+        let has_tools = false; // In real implementation, check kwargs for tools
+
+        // Check if streaming should be used
+        if !self._should_stream(false, has_tools) {
+            // Model doesn't implement streaming or streaming is disabled,
+            // fall back to invoke and yield the result as a single chunk
+            let result = self._generate(messages, stop, None).await?;
+            if result.generations.is_empty() {
+                return Err(Error::Other("No generations returned".into()));
+            }
+
+            let message = match result.generations[0].message.clone() {
+                BaseMessage::AI(ai_msg) => ai_msg,
+                other => AIMessage::new(other.content()),
+            };
+            let chunk = AIMessageChunk::new(message.content());
+            return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
+        }
+
+        // Acquire rate limiter if configured (blocking until token available)
+        if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
+            rate_limiter.acquire(true);
+        }
+
+        // Use the _stream method and convert ChatGenerationChunk to AIMessageChunk
+        let generation_stream = self._stream(messages, stop, None)?;
+
+        // Transform the stream to yield AIMessageChunk instead of ChatGenerationChunk
+        let chunk_stream = async_stream::stream! {
+            use futures::StreamExt;
+
+            let mut pinned_stream = generation_stream;
+            let mut yielded = false;
+
+            while let Some(result) = pinned_stream.next().await {
+                match result {
+                    Ok(generation_chunk) => {
+                        // Extract AIMessageChunk from the generation chunk
+                        let ai_chunk = match generation_chunk.message {
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::new(ai_msg.content()),
+                            other => AIMessageChunk::new(other.content()),
+                        };
+                        yielded = true;
+                        yield Ok(ai_chunk);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+
+            // Yield a final empty chunk with chunk_position="last" if not yet yielded
+            if yielded {
+                let mut final_chunk = AIMessageChunk::new("");
+                final_chunk.set_chunk_position(Some(ChunkPosition::Last));
+                yield Ok(final_chunk);
+            }
+        };
+
+        Ok(Box::pin(chunk_stream))
+    }
+
+    /// Async stream the model output.
+    ///
+    /// This is the async version of `stream`. It yields `AIMessageChunk`s.
+    /// Providers should override `_astream` for native async streaming support.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input to the model (string, messages, or PromptValue).
+    /// * `stop` - Optional stop sequences.
+    ///
+    /// # Returns
+    ///
+    /// A stream of `AIMessageChunk`s.
+    async fn astream(
+        &self,
+        input: LanguageModelInput,
+        stop: Option<Vec<String>>,
+    ) -> Result<AIMessageChunkStream> {
+        let messages = self.convert_input(input)?;
+        let has_tools = false; // In real implementation, check kwargs for tools
+
+        // Check if streaming should be used
+        if !self._should_stream(true, has_tools) {
+            // No async or sync stream is implemented, fall back to ainvoke
+            let result = self._agenerate(messages, stop, None).await?;
+            if result.generations.is_empty() {
+                return Err(Error::Other("No generations returned".into()));
+            }
+
+            let message = match result.generations[0].message.clone() {
+                BaseMessage::AI(ai_msg) => ai_msg,
+                other => AIMessage::new(other.content()),
+            };
+            let chunk = AIMessageChunk::new(message.content());
+            return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
+        }
+
+        // Acquire rate limiter if configured (blocking until token available)
+        if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
+            rate_limiter.aacquire(true).await;
+        }
+
+        // Use the _astream method
+        let generation_stream = self._astream(messages, stop, None).await?;
+
+        // Transform the stream to yield AIMessageChunk instead of ChatGenerationChunk
+        let chunk_stream = async_stream::stream! {
+            use futures::StreamExt;
+
+            let mut pinned_stream = generation_stream;
+            let mut yielded = false;
+
+            while let Some(result) = pinned_stream.next().await {
+                match result {
+                    Ok(generation_chunk) => {
+                        // Extract AIMessageChunk from the generation chunk
+                        let ai_chunk = match generation_chunk.message {
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::new(ai_msg.content()),
+                            other => AIMessageChunk::new(other.content()),
+                        };
+                        yielded = true;
+                        yield Ok(ai_chunk);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+
+            // Yield a final empty chunk with chunk_position="last" if not yet yielded
+            if yielded {
+                let mut final_chunk = AIMessageChunk::new("");
+                final_chunk.set_chunk_position(Some(ChunkPosition::Last));
+                yield Ok(final_chunk);
+            }
+        };
+
+        Ok(Box::pin(chunk_stream))
+    }
+
+    /// Stream ChatGenerationChunk objects from the model.
+    ///
+    /// This is a lower-level streaming API that yields `ChatGenerationChunk`s directly.
+    /// Most users should use `stream()` or `astream()` instead.
     ///
     /// # Arguments
     ///
@@ -452,19 +670,16 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// # Returns
     ///
     /// A stream of `ChatGenerationChunk`s.
-    async fn stream(
+    async fn stream_generations(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
+        let has_tools = false;
+
         // Check if streaming should be used
-        let has_tools = false; // In real implementation, check kwargs for tools
-        if self
-            .chat_config()
-            .disable_streaming
-            .should_disable(has_tools)
-        {
+        if !self._should_stream(false, has_tools) {
             // Fall back to non-streaming
             let result = self._generate(messages, stop, run_manager).await?;
             if result.generations.is_empty() {
@@ -472,7 +687,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             }
 
             let message = result.generations[0].message.clone();
-            let chunk = ChatGenerationChunk::new(message.into());
+            let chunk = ChatGenerationChunk::new(message);
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -705,31 +920,100 @@ impl DynChatModelExt for Arc<dyn BaseChatModel> {
 /// Generate from a stream of chunks.
 ///
 /// Collects all chunks from the stream and generates a final ChatResult.
-pub async fn generate_from_stream(
-    mut stream: impl futures::StreamExt<Item = Result<ChatGenerationChunk>> + Unpin,
+///
+/// This corresponds to `generate_from_stream` in LangChain Python.
+///
+/// # Arguments
+///
+/// * `stream` - An iterator of `ChatGenerationChunk` objects.
+///
+/// # Returns
+///
+/// A `ChatResult` containing the merged generation.
+///
+/// # Errors
+///
+/// Returns an error if no generations are found in the stream.
+pub fn generate_from_stream<I>(mut stream: I) -> Result<OutputChatResult>
+where
+    I: Iterator<Item = ChatGenerationChunk>,
+{
+    let first = stream.next();
+    if first.is_none() {
+        return Err(Error::Other("No generations found in stream.".into()));
+    }
+
+    let mut generation = first.unwrap();
+
+    // Merge remaining chunks
+    for chunk in stream {
+        generation = generation + chunk;
+    }
+
+    // Convert ChatGenerationChunk to ChatGeneration
+    let chat_generation: ChatGeneration = generation.into();
+    Ok(OutputChatResult::new(vec![chat_generation]))
+}
+
+/// Async generate from a stream of chunks.
+///
+/// Collects all chunks from an async stream and generates a final ChatResult.
+///
+/// This corresponds to `agenerate_from_stream` in LangChain Python.
+///
+/// # Arguments
+///
+/// * `stream` - An async stream of `ChatGenerationChunk` objects.
+///
+/// # Returns
+///
+/// A `ChatResult` containing the merged generation.
+///
+/// # Errors
+///
+/// Returns an error if no generations are found in the stream.
+pub async fn agenerate_from_stream(
+    stream: impl futures::Stream<Item = Result<ChatGenerationChunk>> + Unpin,
 ) -> Result<OutputChatResult> {
     use futures::StreamExt;
 
+    let chunks: Vec<ChatGenerationChunk> = stream
+        .filter_map(|result| async { result.ok() })
+        .collect()
+        .await;
+
+    if chunks.is_empty() {
+        return Err(Error::Other("No generations found in stream.".into()));
+    }
+
+    generate_from_stream(chunks.into_iter())
+}
+
+/// Collect a stream of ChatGenerationChunks and merge them.
+///
+/// This is a convenience function that collects all chunks from a stream
+/// and returns the merged result.
+///
+/// # Arguments
+///
+/// * `stream` - An async stream of `ChatGenerationChunk` results.
+///
+/// # Returns
+///
+/// The merged `ChatGenerationChunk`, or `None` if the stream was empty.
+pub async fn collect_and_merge_stream(
+    mut stream: impl futures::StreamExt<Item = Result<ChatGenerationChunk>> + Unpin,
+) -> Result<Option<ChatGenerationChunk>> {
     let mut chunks = Vec::new();
     while let Some(chunk_result) = stream.next().await {
         chunks.push(chunk_result?);
     }
 
     if chunks.is_empty() {
-        return Err(Error::Other("No generations found in stream.".into()));
+        return Ok(None);
     }
 
-    // Merge all chunks
-    let merged = crate::outputs::merge_chat_generation_chunks(chunks);
-
-    match merged {
-        Some(generation_chunk) => {
-            // Convert ChatGenerationChunk to ChatGeneration
-            let chat_generation: ChatGeneration = generation_chunk.into();
-            Ok(OutputChatResult::new(vec![chat_generation]))
-        }
-        None => Err(Error::Other("Failed to merge chunks.".into())),
-    }
+    Ok(crate::outputs::merge_chat_generation_chunks(chunks))
 }
 
 #[cfg(test)]
@@ -798,5 +1082,60 @@ mod tests {
         let tool_calling = DisableStreaming::ToolCalling;
         assert!(tool_calling.should_disable(true));
         assert!(!tool_calling.should_disable(false));
+    }
+
+    #[test]
+    fn test_generate_from_stream() {
+        let chunks = vec![
+            ChatGenerationChunk::new(AIMessage::new("Hello, ").into()),
+            ChatGenerationChunk::new(AIMessage::new("world!").into()),
+        ];
+
+        let result = generate_from_stream(chunks.into_iter()).unwrap();
+        assert_eq!(result.generations.len(), 1);
+        assert_eq!(result.generations[0].message.content(), "Hello, world!");
+    }
+
+    #[test]
+    fn test_generate_from_stream_empty() {
+        let chunks: Vec<ChatGenerationChunk> = vec![];
+        let result = generate_from_stream(chunks.into_iter());
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_agenerate_from_stream() {
+        let chunks = vec![
+            Ok(ChatGenerationChunk::new(AIMessage::new("Hello, ").into())),
+            Ok(ChatGenerationChunk::new(AIMessage::new("world!").into())),
+        ];
+
+        let stream = futures::stream::iter(chunks);
+        let result = agenerate_from_stream(stream).await.unwrap();
+        assert_eq!(result.generations.len(), 1);
+        assert_eq!(result.generations[0].message.content(), "Hello, world!");
+    }
+
+    #[tokio::test]
+    async fn test_collect_and_merge_stream() {
+        let chunks = vec![
+            Ok(ChatGenerationChunk::new(AIMessage::new("a").into())),
+            Ok(ChatGenerationChunk::new(AIMessage::new("b").into())),
+            Ok(ChatGenerationChunk::new(AIMessage::new("c").into())),
+        ];
+
+        let stream = futures::stream::iter(chunks);
+        let merged = collect_and_merge_stream(stream).await.unwrap();
+
+        assert!(merged.is_some());
+        assert_eq!(merged.unwrap().text, "abc");
+    }
+
+    #[tokio::test]
+    async fn test_collect_and_merge_stream_empty() {
+        let chunks: Vec<Result<ChatGenerationChunk>> = vec![];
+        let stream = futures::stream::iter(chunks);
+        let merged = collect_and_merge_stream(stream).await.unwrap();
+        assert!(merged.is_none());
     }
 }
