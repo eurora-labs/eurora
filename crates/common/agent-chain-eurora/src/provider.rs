@@ -5,11 +5,15 @@
 
 use std::pin::Pin;
 
-use agent_chain_core::callbacks::{CallbackManagerForLLMRun, Callbacks};
-use agent_chain_core::language_models::{
-    BaseLanguageModel, LanguageModelConfig, LanguageModelInput,
+use agent_chain_core::callbacks::{
+    AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun, Callbacks,
 };
-use agent_chain_core::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
+use agent_chain_core::language_models::{
+    BaseLanguageModel, ChatGenerationStream, LanguageModelConfig, LanguageModelInput,
+};
+use agent_chain_core::outputs::{
+    ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, LLMResult,
+};
 use agent_chain_core::{
     AIMessage, BaseMessage, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata,
     LangSmithParams, ToolCall, ToolChoice, ToolDefinition,
@@ -321,6 +325,53 @@ impl BaseLanguageModel for ChatEurora {
 impl ChatModel for ChatEurora {
     fn chat_config(&self) -> &ChatModelConfig {
         &self.chat_model_config
+    }
+
+    fn has_astream_impl(&self) -> bool {
+        true
+    }
+
+    async fn _astream(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+    ) -> agent_chain_core::Result<ChatGenerationStream> {
+        let proto_request = self.build_request(&messages, stop);
+
+        let mut client = self.client.clone();
+        let grpc_request = Request::new(proto_request);
+
+        // Use streaming API
+        let response = client
+            .chat_stream(grpc_request)
+            .await
+            .map_err(EuroraError::from)?;
+        let grpc_stream = response.into_inner();
+
+        // Create an async stream that yields ChatGenerationChunk for each gRPC chunk
+        let chunk_stream = async_stream::stream! {
+            let mut stream = grpc_stream;
+
+            while let Some(chunk_result) = stream.next().await {
+                match chunk_result {
+                    Ok(stream_response) => {
+                        if let Some(chunk) = stream_response.chunk {
+                            // Create an AIMessage from the chunk content
+                            let ai_message = AIMessage::new(&chunk.content);
+                            let generation_chunk = ChatGenerationChunk::new(ai_message.into());
+                            yield Ok(generation_chunk);
+                        }
+                    }
+                    Err(e) => {
+                        yield Err(agent_chain_core::Error::Other(format!("Stream error: {}", e)));
+                        return;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(chunk_stream))
     }
 
     async fn _generate(

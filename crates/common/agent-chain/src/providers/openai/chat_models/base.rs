@@ -51,6 +51,7 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 
+use crate::callbacks::AsyncCallbackManagerForLLMRun;
 use crate::callbacks::CallbackManagerForLLMRun;
 use crate::callbacks::Callbacks;
 use crate::chat_models::{
@@ -58,10 +59,12 @@ use crate::chat_models::{
     LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::ChatGenerationStream;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{
     AIMessage, BaseMessage, ContentPart, ImageDetail, ImageSource, MessageContent, ToolCall,
 };
+use crate::outputs::ChatGenerationChunk;
 use crate::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
 use crate::tools::ToolDefinition;
 
@@ -1312,6 +1315,11 @@ impl ChatModel for ChatOpenAI {
         &self.chat_model_config
     }
 
+    /// Indicate that async streaming is implemented.
+    fn has_astream_impl(&self) -> bool {
+        true
+    }
+
     async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
@@ -1319,6 +1327,42 @@ impl ChatModel for ChatOpenAI {
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<OutputChatResult> {
         self._generate_internal(messages, stop, None).await
+    }
+
+    /// Async streaming implementation that calls the internal stream method
+    /// and converts ChatChunk to ChatGenerationChunk.
+    async fn _astream(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+    ) -> Result<ChatGenerationStream> {
+        // Call the internal stream implementation
+        let chat_stream = self.stream_internal(messages, stop).await?;
+
+        // Convert ChatChunk stream to ChatGenerationChunk stream
+        let generation_stream = async_stream::stream! {
+            use futures::StreamExt;
+
+            let mut pinned_stream = chat_stream;
+
+            while let Some(result) = pinned_stream.next().await {
+                match result {
+                    Ok(chat_chunk) => {
+                        // Convert ChatChunk to ChatGenerationChunk
+                        let message = AIMessage::new(&chat_chunk.content);
+                        let generation_chunk = ChatGenerationChunk::new(message.into());
+                        yield Ok(generation_chunk);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(generation_stream) as ChatGenerationStream)
     }
 
     async fn generate_with_tools(
