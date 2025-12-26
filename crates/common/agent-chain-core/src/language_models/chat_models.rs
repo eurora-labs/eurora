@@ -976,6 +976,7 @@ where
 /// # Errors
 ///
 /// Returns an error if no generations are found in the stream.
+#[allow(dead_code)]
 pub async fn agenerate_from_stream(
     stream: impl futures::Stream<Item = Result<ChatGenerationChunk>> + Unpin,
 ) -> Result<OutputChatResult> {
@@ -1005,6 +1006,7 @@ pub async fn agenerate_from_stream(
 /// # Returns
 ///
 /// The merged `ChatGenerationChunk`, or `None` if the stream was empty.
+#[allow(dead_code)]
 pub async fn collect_and_merge_stream(
     mut stream: impl futures::StreamExt<Item = Result<ChatGenerationChunk>> + Unpin,
 ) -> Result<Option<ChatGenerationChunk>> {
