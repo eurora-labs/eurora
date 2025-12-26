@@ -12,9 +12,10 @@ use agent_chain_core::language_models::{
 use agent_chain_core::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
 use agent_chain_core::{
     AIMessage, BaseMessage, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata,
-    LangSmithParams, ToolChoice, ToolDefinition,
+    LangSmithParams, ToolCall, ToolChoice, ToolDefinition,
 };
 use async_trait::async_trait;
+use futures::StreamExt;
 use tonic::{
     Request, Status,
     transport::{Channel, ClientTlsConfig, Endpoint},
@@ -27,8 +28,7 @@ use crate::{
     config::EuroraConfig,
     error::EuroraError,
     proto::chat::{
-        ProtoChatRequest, ProtoChatStreamResponse, ProtoParameters,
-        proto_chat_service_client::ProtoChatServiceClient,
+        ProtoChatRequest, ProtoParameters, proto_chat_service_client::ProtoChatServiceClient,
     },
 };
 
@@ -334,14 +334,54 @@ impl ChatModel for ChatEurora {
         let mut client = self.client.clone();
         let grpc_request = Request::new(proto_request);
 
-        let response = client.chat(grpc_request).await.map_err(EuroraError::from)?;
-        let proto_response = response.into_inner();
+        // Use streaming API and accumulate chunks
+        let response = client
+            .chat_stream(grpc_request)
+            .await
+            .map_err(EuroraError::from)?;
+        let mut stream = response.into_inner();
 
-        // Convert proto AIMessage directly to agent-chain AIMessage
-        let message: AIMessage = proto_response
-            .message
-            .map(Into::into)
-            .unwrap_or_else(|| AIMessage::new(""));
+        // Accumulate content from all chunks
+        let mut accumulated_content = String::new();
+        let mut accumulated_tool_calls: Vec<ToolCall> = Vec::new();
+        let mut message_id: Option<String> = None;
+
+        while let Some(chunk_result) = stream.next().await {
+            let stream_response = chunk_result.map_err(EuroraError::from)?;
+
+            if let Some(chunk) = stream_response.chunk {
+                // Accumulate content
+                accumulated_content.push_str(&chunk.content);
+
+                // Capture message ID from first chunk that has it
+                if message_id.is_none() && chunk.id.is_some() {
+                    message_id = chunk.id;
+                }
+
+                // Accumulate tool calls (only from complete tool calls, not chunks)
+                for proto_tool_call in chunk.tool_calls {
+                    let args: serde_json::Value =
+                        serde_json::from_str(&proto_tool_call.args).unwrap_or_default();
+                    accumulated_tool_calls.push(ToolCall::with_id(
+                        proto_tool_call.id,
+                        proto_tool_call.name,
+                        args,
+                    ));
+                }
+            }
+        }
+
+        // Build the final AIMessage from accumulated data
+        let message = match (message_id, accumulated_tool_calls.is_empty()) {
+            (Some(id), true) => AIMessage::with_id(id, accumulated_content),
+            (Some(id), false) => {
+                AIMessage::with_id_and_tool_calls(id, accumulated_content, accumulated_tool_calls)
+            }
+            (None, true) => AIMessage::new(accumulated_content),
+            (None, false) => {
+                AIMessage::with_tool_calls(accumulated_content, accumulated_tool_calls)
+            }
+        };
 
         let generation = ChatGeneration::new(message.into());
         Ok(OutputChatResult::new(vec![generation]))
