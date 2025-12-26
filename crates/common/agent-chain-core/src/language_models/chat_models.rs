@@ -17,7 +17,6 @@ use serde_json::Value;
 use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
 use super::model_profile::ModelProfile;
 use crate::GenerationType;
-use crate::caches::BaseCache;
 use crate::callbacks::{AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun, Callbacks};
 use crate::error::{Error, Result};
 use crate::messages::{AIMessage, BaseMessage};
