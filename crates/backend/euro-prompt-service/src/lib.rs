@@ -4,7 +4,8 @@ use agent_chain::providers::openai::ChatOpenAI;
 use agent_chain_core::chat_models::ChatModel;
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_eurora::proto::chat::{
-    ProtoAiMessage, ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse,
+    ProtoAiMessage, ProtoAiMessageChunk, ProtoChatRequest, ProtoChatResponse,
+    ProtoChatStreamResponse,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
 };
 use anyhow::{Result, anyhow};
@@ -79,7 +80,12 @@ impl ProtoChatService for PromptService {
             message: Some(ProtoAiMessage {
                 content: "Hello, world!".to_string(),
                 id: None,
+                name: None,
                 tool_calls: vec![],
+                invalid_tool_calls: vec![],
+                usage_metadata: None,
+                additional_kwargs: None,
+                response_metadata: None,
             }),
             usage: None,
             stop_reason: Some("stop".to_string()),
@@ -102,31 +108,39 @@ impl ProtoChatService for PromptService {
             .map(|msg| msg.into())
             .collect();
 
-        let openai_stream = self.provider.stream(messages, None).await.map_err(|e| {
-            debug!("Error in chat_stream: {}", e);
-            Status::internal(e.to_string())
-        })?;
+        let openai_stream = self
+            .provider
+            .stream(messages, None, None)
+            .await
+            .map_err(|e| {
+                debug!("Error in chat_stream: {}", e);
+                Status::internal(e.to_string())
+            })?;
 
-        let output_stream = openai_stream.map(|result| {
-            match result {
-                Ok(chunk) => {
-                    // Check if this is the final chunk
-                    let is_final = chunk.is_final;
+        let output_stream = openai_stream.map(|result| match result {
+            Ok(chunk) => {
+                // ChatGenerationChunk has text field for content
+                // There's no is_final field - we determine finality by empty text or generation_info
+                let content = chunk.text;
+                let is_final = content.is_empty();
 
-                    Ok(ProtoChatStreamResponse {
-                        content: chunk.content,
-                        is_final,
-                        usage: None, // Usage info typically only available in final chunk
-                        stop_reason: if is_final {
-                            Some("stop".to_string())
-                        } else {
-                            None
-                        },
+                Ok(ProtoChatStreamResponse {
+                    chunk: Some(ProtoAiMessageChunk {
+                        content,
+                        id: None,
+                        name: None,
                         tool_calls: vec![],
-                    })
-                }
-                Err(e) => Err(Status::internal(e.to_string())),
+                        invalid_tool_calls: vec![],
+                        tool_call_chunks: vec![],
+                        usage_metadata: None,
+                        additional_kwargs: None,
+                        response_metadata: None,
+                        chunk_position: None,
+                    }),
+                    is_final,
+                })
             }
+            Err(e) => Err(Status::internal(e.to_string())),
         });
 
         Ok(Response::new(
