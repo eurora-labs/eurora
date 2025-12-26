@@ -147,7 +147,6 @@ impl ProtoChatService for PromptService {
                 // AIMessageChunk has content() method for getting the text content
                 // We determine finality by empty content or chunk_position
                 let content = chunk.content().to_string();
-                debug!("Received chunk: {}", content);
                 let is_final = content.is_empty();
 
                 Ok(ProtoChatStreamResponse {
