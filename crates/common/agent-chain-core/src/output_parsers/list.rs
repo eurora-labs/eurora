@@ -1,0 +1,406 @@
+//! Parsers for list output.
+//!
+//! This module contains output parsers that parse LLM output into lists.
+//! Mirrors `langchain_core.output_parsers.list`.
+
+use std::collections::VecDeque;
+use std::fmt::Debug;
+
+use regex::Regex;
+
+use crate::error::Result;
+
+use super::base::BaseOutputParser;
+use super::transform::BaseTransformOutputParser;
+
+/// Parse the output of a model to a list.
+///
+/// This is a base trait for list output parsers.
+pub trait ListOutputParser: BaseOutputParser<Output = Vec<String>> {
+    /// Parse the output iteratively, yielding strings.
+    ///
+    /// Returns a vector of matched strings. Used for streaming parsing.
+    /// The default implementation returns an empty vector.
+    fn parse_iter(&self, _text: &str) -> Vec<String> {
+        Vec::new()
+    }
+}
+
+/// Parse the output of a model to a comma-separated list.
+///
+/// # Example
+///
+/// ```ignore
+/// use agent_chain_core::output_parsers::CommaSeparatedListOutputParser;
+///
+/// let parser = CommaSeparatedListOutputParser::new();
+/// let result = parser.parse("apple, banana, cherry").unwrap();
+/// assert_eq!(result, vec!["apple", "banana", "cherry"]);
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct CommaSeparatedListOutputParser {
+    _private: (),
+}
+
+impl CommaSeparatedListOutputParser {
+    /// Create a new `CommaSeparatedListOutputParser`.
+    pub fn new() -> Self {
+        Self { _private: () }
+    }
+
+    /// Returns `true` as this class is serializable.
+    pub fn is_lc_serializable() -> bool {
+        true
+    }
+
+    /// Get the namespace of the LangChain object.
+    pub fn get_lc_namespace() -> Vec<&'static str> {
+        vec!["langchain", "output_parsers", "list"]
+    }
+}
+
+impl BaseOutputParser for CommaSeparatedListOutputParser {
+    type Output = Vec<String>;
+
+    fn parse(&self, text: &str) -> Result<Vec<String>> {
+        // Try to parse as CSV first
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .flexible(true)
+            .trim(csv::Trim::All)
+            .from_reader(text.as_bytes());
+
+        let mut result = Vec::new();
+        for record in reader.records() {
+            match record {
+                Ok(rec) => {
+                    for field in rec.iter() {
+                        if !field.is_empty() {
+                            result.push(field.to_string());
+                        }
+                    }
+                }
+                Err(_) => {
+                    // Fallback to simple split
+                    return Ok(text
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect());
+                }
+            }
+        }
+
+        if result.is_empty() {
+            // Fallback to simple split
+            Ok(text
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect())
+        } else {
+            Ok(result)
+        }
+    }
+
+    fn get_format_instructions(&self) -> Result<String> {
+        Ok("Your response should be a list of comma separated values, \
+             eg: `foo, bar, baz` or `foo,bar,baz`"
+            .to_string())
+    }
+
+    fn parser_type(&self) -> &str {
+        "comma-separated-list"
+    }
+}
+
+impl BaseTransformOutputParser for CommaSeparatedListOutputParser {}
+
+impl ListOutputParser for CommaSeparatedListOutputParser {}
+
+/// Parse a numbered list.
+///
+/// # Example
+///
+/// ```ignore
+/// use agent_chain_core::output_parsers::NumberedListOutputParser;
+///
+/// let parser = NumberedListOutputParser::new();
+/// let result = parser.parse("1. apple\n2. banana\n3. cherry").unwrap();
+/// assert_eq!(result, vec!["apple", "banana", "cherry"]);
+/// ```
+#[derive(Debug, Clone)]
+pub struct NumberedListOutputParser {
+    /// The regex pattern to match numbered list items.
+    pub pattern: String,
+}
+
+impl NumberedListOutputParser {
+    /// Create a new `NumberedListOutputParser`.
+    pub fn new() -> Self {
+        Self {
+            pattern: r"\d+\.\s*([^\n]+)".to_string(),
+        }
+    }
+
+    /// Create a parser with a custom pattern.
+    pub fn with_pattern(pattern: impl Into<String>) -> Self {
+        Self {
+            pattern: pattern.into(),
+        }
+    }
+
+    fn get_regex(&self) -> Regex {
+        Regex::new(&self.pattern).expect("Invalid regex pattern")
+    }
+}
+
+impl Default for NumberedListOutputParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BaseOutputParser for NumberedListOutputParser {
+    type Output = Vec<String>;
+
+    fn parse(&self, text: &str) -> Result<Vec<String>> {
+        let re = self.get_regex();
+        Ok(re
+            .captures_iter(text)
+            .filter_map(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+            .collect())
+    }
+
+    fn get_format_instructions(&self) -> Result<String> {
+        Ok(
+            "Your response should be a numbered list with each item on a new line. \
+             For example: \n\n1. foo\n\n2. bar\n\n3. baz"
+                .to_string(),
+        )
+    }
+
+    fn parser_type(&self) -> &str {
+        "numbered-list"
+    }
+}
+
+impl BaseTransformOutputParser for NumberedListOutputParser {}
+
+impl ListOutputParser for NumberedListOutputParser {
+    fn parse_iter(&self, text: &str) -> Vec<String> {
+        let re = self.get_regex();
+        re.captures_iter(text)
+            .filter_map(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+            .collect()
+    }
+}
+
+/// Parse a Markdown list.
+///
+/// # Example
+///
+/// ```ignore
+/// use agent_chain_core::output_parsers::MarkdownListOutputParser;
+///
+/// let parser = MarkdownListOutputParser::new();
+/// let result = parser.parse("- apple\n- banana\n- cherry").unwrap();
+/// assert_eq!(result, vec!["apple", "banana", "cherry"]);
+/// ```
+#[derive(Debug, Clone)]
+pub struct MarkdownListOutputParser {
+    /// The regex pattern to match Markdown list items.
+    pub pattern: String,
+}
+
+impl MarkdownListOutputParser {
+    /// Create a new `MarkdownListOutputParser`.
+    pub fn new() -> Self {
+        Self {
+            pattern: r"^\s*[-*]\s+([^\n]+)$".to_string(),
+        }
+    }
+
+    /// Create a parser with a custom pattern.
+    pub fn with_pattern(pattern: impl Into<String>) -> Self {
+        Self {
+            pattern: pattern.into(),
+        }
+    }
+
+    fn get_regex(&self) -> Regex {
+        Regex::new(&self.pattern).expect("Invalid regex pattern")
+    }
+}
+
+impl Default for MarkdownListOutputParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BaseOutputParser for MarkdownListOutputParser {
+    type Output = Vec<String>;
+
+    fn parse(&self, text: &str) -> Result<Vec<String>> {
+        let re = self.get_regex();
+        Ok(text
+            .lines()
+            .filter_map(|line| {
+                re.captures(line)
+                    .and_then(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+            })
+            .collect())
+    }
+
+    fn get_format_instructions(&self) -> Result<String> {
+        Ok("Your response should be a markdown list, eg: `- foo\n- bar\n- baz`".to_string())
+    }
+
+    fn parser_type(&self) -> &str {
+        "markdown-list"
+    }
+}
+
+impl BaseTransformOutputParser for MarkdownListOutputParser {}
+
+impl ListOutputParser for MarkdownListOutputParser {
+    fn parse_iter(&self, text: &str) -> Vec<String> {
+        let re = self.get_regex();
+        text.lines()
+            .filter_map(|line| {
+                re.captures(line)
+                    .and_then(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+            })
+            .collect()
+    }
+}
+
+/// Drop the last n elements of an iterator.
+///
+/// This is useful for streaming list parsing where we want to avoid
+/// yielding incomplete items.
+pub fn drop_last_n<T, I: Iterator<Item = T>>(iter: I, n: usize) -> impl Iterator<Item = T> {
+    let mut buffer: VecDeque<T> = VecDeque::with_capacity(n);
+
+    iter.filter_map(move |item| {
+        buffer.push_back(item);
+        if buffer.len() > n {
+            buffer.pop_front()
+        } else {
+            None
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_comma_separated_list() {
+        let parser = CommaSeparatedListOutputParser::new();
+        let result = parser.parse("apple, banana, cherry").unwrap();
+        assert_eq!(result, vec!["apple", "banana", "cherry"]);
+    }
+
+    #[test]
+    fn test_comma_separated_list_no_spaces() {
+        let parser = CommaSeparatedListOutputParser::new();
+        let result = parser.parse("apple,banana,cherry").unwrap();
+        assert_eq!(result, vec!["apple", "banana", "cherry"]);
+    }
+
+    #[test]
+    fn test_comma_separated_list_quoted() {
+        let parser = CommaSeparatedListOutputParser::new();
+        let result = parser.parse(r#""hello, world", foo, bar"#).unwrap();
+        assert_eq!(result, vec!["hello, world", "foo", "bar"]);
+    }
+
+    #[test]
+    fn test_comma_separated_list_empty() {
+        let parser = CommaSeparatedListOutputParser::new();
+        let result = parser.parse("").unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_numbered_list() {
+        let parser = NumberedListOutputParser::new();
+        let result = parser.parse("1. apple\n2. banana\n3. cherry").unwrap();
+        assert_eq!(result, vec!["apple", "banana", "cherry"]);
+    }
+
+    #[test]
+    fn test_numbered_list_with_spaces() {
+        let parser = NumberedListOutputParser::new();
+        let result = parser.parse("1.  apple\n2.  banana").unwrap();
+        assert_eq!(result, vec!["apple", "banana"]);
+    }
+
+    #[test]
+    fn test_numbered_list_empty() {
+        let parser = NumberedListOutputParser::new();
+        let result = parser.parse("").unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_markdown_list_dash() {
+        let parser = MarkdownListOutputParser::new();
+        let result = parser.parse("- apple\n- banana\n- cherry").unwrap();
+        assert_eq!(result, vec!["apple", "banana", "cherry"]);
+    }
+
+    #[test]
+    fn test_markdown_list_asterisk() {
+        let parser = MarkdownListOutputParser::new();
+        let result = parser.parse("* apple\n* banana").unwrap();
+        assert_eq!(result, vec!["apple", "banana"]);
+    }
+
+    #[test]
+    fn test_markdown_list_indented() {
+        let parser = MarkdownListOutputParser::new();
+        let result = parser.parse("  - apple\n  - banana").unwrap();
+        assert_eq!(result, vec!["apple", "banana"]);
+    }
+
+    #[test]
+    fn test_markdown_list_empty() {
+        let parser = MarkdownListOutputParser::new();
+        let result = parser.parse("").unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_format_instructions() {
+        let parser = CommaSeparatedListOutputParser::new();
+        let instructions = parser
+            .get_format_instructions()
+            .expect("should return format instructions");
+        assert!(instructions.contains("comma separated"));
+    }
+
+    #[test]
+    fn test_drop_last_n() {
+        let items = vec![1, 2, 3, 4, 5];
+        let result: Vec<_> = drop_last_n(items.into_iter(), 2).collect();
+        assert_eq!(result, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_drop_last_n_empty() {
+        let items: Vec<i32> = vec![];
+        let result: Vec<_> = drop_last_n(items.into_iter(), 2).collect();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_drop_last_n_less_than_n() {
+        let items = vec![1, 2];
+        let result: Vec<_> = drop_last_n(items.into_iter(), 5).collect();
+        assert!(result.is_empty());
+    }
+}
