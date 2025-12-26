@@ -15,7 +15,7 @@ use agent_chain_core::outputs::{
     ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, LLMResult,
 };
 use agent_chain_core::{
-    AIMessage, BaseMessage, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata,
+    AIMessage, BaseChatModel, BaseMessage, ChatModelConfig, ChatResult, ChatResultMetadata,
     LangSmithParams, ToolCall, ToolChoice, ToolDefinition,
 };
 use async_trait::async_trait;
@@ -322,7 +322,7 @@ impl BaseLanguageModel for ChatEurora {
 }
 
 #[async_trait]
-impl ChatModel for ChatEurora {
+impl BaseChatModel for ChatEurora {
     fn chat_config(&self) -> &ChatModelConfig {
         &self.chat_model_config
     }
