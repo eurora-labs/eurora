@@ -51,15 +51,21 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 
+use crate::callbacks::CallbackManagerForLLMRun;
 use crate::chat_models::{
-    ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream, LangSmithParams, ToolChoice,
-    UsageMetadata,
+    ChatChunk, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
+    LangSmithParams, ToolChoice, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::{
+    BaseLanguageModel, LanguageModelConfig, LanguageModelInput,
+};
 use crate::messages::{
     AIMessage, BaseMessage, ContentPart, ImageDetail, ImageSource, MessageContent, ToolCall,
 };
+use crate::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
 use crate::tools::ToolDefinition;
+use crate::callbacks::Callbacks;
 
 /// Default API base URL for OpenAI.
 const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
@@ -233,6 +239,10 @@ pub struct ChatOpenAI {
     output_version: Option<String>,
     /// Built-in tools to use with the Responses API.
     builtin_tools: Vec<BuiltinTool>,
+    /// Chat model configuration.
+    chat_model_config: ChatModelConfig,
+    /// Language model configuration.
+    language_model_config: LanguageModelConfig,
     /// HTTP client.
     #[allow(dead_code)]
     client: reqwest::Client,
@@ -286,6 +296,8 @@ impl ChatOpenAI {
             use_previous_response_id: false,
             output_version: None,
             builtin_tools: Vec::new(),
+            chat_model_config: ChatModelConfig::new(),
+            language_model_config: LanguageModelConfig::new(),
             client: reqwest::Client::new(),
         }
     }
@@ -509,6 +521,7 @@ impl ChatOpenAI {
     }
 
     /// Helper to check if a tool is a built-in tool (not a function).
+    #[allow(dead_code)]
     fn is_builtin_tool(tool: &serde_json::Value) -> bool {
         if let Some(tool_type) = tool.get("type").and_then(|t| t.as_str()) {
             tool_type != "function"
@@ -677,10 +690,10 @@ impl ChatOpenAI {
             payload["stop"] = serde_json::json!(stop);
         }
 
-        if let Some(tools) = tools
-            && !tools.is_empty()
-        {
-            payload["tools"] = serde_json::Value::Array(tools.to_vec());
+        if let Some(tools) = tools {
+            if !tools.is_empty() {
+                payload["tools"] = serde_json::Value::Array(tools.to_vec());
+            }
         }
 
         if stream {
@@ -931,11 +944,13 @@ impl ChatOpenAI {
                                         }
                                         "response.completed" | "response.incomplete" => {
                                             // Response complete - extract usage from the response
-                                            if let Some(resp) = event.response && let Some(resp_usage) = resp.usage {
+                                            if let Some(resp) = event.response {
+                                                if let Some(resp_usage) = resp.usage {
                                                     usage = Some(UsageMetadata::new(
                                                         resp_usage.input_tokens,
                                                         resp_usage.output_tokens,
                                                     ));
+                                                }
                                             }
                                             // Final chunk
                                             yield Ok(ChatChunk {
@@ -1080,8 +1095,8 @@ impl ChatOpenAI {
         input
     }
 
-    /// Parse the API response into a ChatResult.
-    fn parse_response(&self, response: OpenAIResponse) -> ChatResult {
+    /// Parse the API response into an OutputChatResult.
+    fn parse_response(&self, response: OpenAIResponse) -> OutputChatResult {
         // Extract finish_reason before consuming choices
         let finish_reason = response
             .choices
@@ -1109,28 +1124,18 @@ impl ChatOpenAI {
             None => (String::new(), Vec::new()),
         };
 
-        let message = if tool_calls.is_empty() {
-            AIMessage::new(content)
+        let message: BaseMessage = if tool_calls.is_empty() {
+            AIMessage::new(content).into()
         } else {
-            AIMessage::with_tool_calls(content, tool_calls)
+            AIMessage::with_tool_calls(content, tool_calls).into()
         };
 
-        let usage = response
-            .usage
-            .map(|u| UsageMetadata::new(u.prompt_tokens, u.completion_tokens));
-
-        ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(response.model),
-                stop_reason: finish_reason,
-                usage,
-            },
-        }
+        let generation = ChatGeneration::new(message);
+        OutputChatResult::new(vec![generation])
     }
 
-    /// Parse the Responses API response into a ChatResult.
-    fn parse_responses_api_response(&self, response: ResponsesApiResponse) -> ChatResult {
+    /// Parse the Responses API response into an OutputChatResult.
+    fn parse_responses_api_response(&self, response: ResponsesApiResponse) -> OutputChatResult {
         let mut text_content = String::new();
         let mut tool_calls = Vec::new();
         let mut annotations: Vec<TextAnnotation> = Vec::new();
@@ -1167,30 +1172,36 @@ impl ChatOpenAI {
             }
         }
 
-        let message = if tool_calls.is_empty() {
+        let message: BaseMessage = if tool_calls.is_empty() {
             let mut msg = AIMessage::new(text_content);
             if !annotations.is_empty() {
                 // Store annotations in additional_kwargs for access
                 msg = msg.with_annotations(annotations);
             }
-            msg
+            msg.into()
         } else {
-            AIMessage::with_tool_calls(text_content, tool_calls)
+            AIMessage::with_tool_calls(text_content, tool_calls).into()
         };
 
-        let usage = response
-            .usage
-            .as_ref()
-            .map(|u| UsageMetadata::new(u.input_tokens, u.output_tokens));
+        let generation = ChatGeneration::new(message);
+        OutputChatResult::new(vec![generation])
+    }
 
-        ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(response.model.clone()),
-                stop_reason: response.status.clone(),
-                usage,
-            },
+    /// Convert OutputChatResult to ChatResult for generate_with_tools return type.
+    fn convert_to_chat_result(&self, output: OutputChatResult) -> Result<ChatResult> {
+        if output.generations.is_empty() {
+            return Err(Error::other("No generations returned"));
         }
+
+        let message = match output.generations[0].message.clone() {
+            BaseMessage::AI(msg) => msg,
+            _ => return Err(Error::other("Expected AI message")),
+        };
+
+        Ok(ChatResult {
+            message,
+            metadata: ChatResultMetadata::default(),
+        })
     }
 
     /// Generate using the Responses API.
@@ -1198,7 +1209,7 @@ impl ChatOpenAI {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
+    ) -> Result<OutputChatResult> {
         let api_key = self.get_api_key()?;
         let client = self.build_client();
         let payload = self.build_responses_api_payload(&messages, stop, None, false);
@@ -1254,11 +1265,7 @@ impl ChatOpenAI {
 }
 
 #[async_trait]
-impl ChatModel for ChatOpenAI {
-    fn chat_config(&self) -> &ChatModelConfig {
-        todo!()
-    }
-
+impl BaseLanguageModel for ChatOpenAI {
     fn llm_type(&self) -> &str {
         "openai-chat"
     }
@@ -1267,11 +1274,72 @@ impl ChatModel for ChatOpenAI {
         &self.model
     }
 
-    async fn generate(
+    fn config(&self) -> &LanguageModelConfig {
+        &self.language_model_config
+    }
+
+    async fn generate_prompt(
+        &self,
+        prompts: Vec<LanguageModelInput>,
+        stop: Option<Vec<String>>,
+        _callbacks: Option<Callbacks>,
+    ) -> Result<LLMResult> {
+        // Convert prompts to message batches and generate
+        let mut all_generations = Vec::new();
+        for prompt in prompts {
+            let messages = prompt.to_messages();
+            let result = self._generate_internal(messages, stop.clone(), None).await?;
+            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
+        }
+        Ok(LLMResult::new(all_generations))
+    }
+
+    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
+        LangSmithParams {
+            ls_provider: Some("openai".to_string()),
+            ls_model_name: Some(self.model.clone()),
+            ls_model_type: Some("chat".to_string()),
+            ls_temperature: self.temperature,
+            ls_max_tokens: self.max_tokens,
+            ls_stop: stop.map(|s| s.to_vec()),
+        }
+    }
+}
+
+#[async_trait]
+impl ChatModel for ChatOpenAI {
+    fn chat_config(&self) -> &ChatModelConfig {
+        &self.chat_model_config
+    }
+
+    async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<OutputChatResult> {
+        self._generate_internal(messages, stop, None).await
+    }
+
+    async fn generate_with_tools(
+        &self,
+        messages: Vec<BaseMessage>,
+        tools: &[ToolDefinition],
+        tool_choice: Option<&ToolChoice>,
+        stop: Option<Vec<String>>,
     ) -> Result<ChatResult> {
+        self.generate_with_tools_internal(messages, tools, tool_choice, stop).await
+    }
+}
+
+impl ChatOpenAI {
+    /// Internal generate implementation.
+    async fn _generate_internal(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<OutputChatResult> {
         // Use Responses API if enabled or if using built-in tools
         if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             return self.generate_responses_api(messages, stop).await;
@@ -1330,7 +1398,8 @@ impl ChatModel for ChatOpenAI {
         Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
     }
 
-    async fn generate_with_tools(
+    /// Internal generate with tools implementation.
+    async fn generate_with_tools_internal(
         &self,
         messages: Vec<BaseMessage>,
         tools: &[ToolDefinition],
@@ -1377,7 +1446,8 @@ impl ChatModel for ChatOpenAI {
                         if resp.status().is_success() {
                             match resp.json::<ResponsesApiResponse>().await {
                                 Ok(responses_resp) => {
-                                    return Ok(self.parse_responses_api_response(responses_resp));
+                                    let output = self.parse_responses_api_response(responses_resp);
+                                    return self.convert_to_chat_result(output);
                                 }
                                 Err(e) => {
                                     return Err(Error::Json(serde_json::Error::io(
@@ -1451,7 +1521,8 @@ impl ChatModel for ChatOpenAI {
                     if resp.status().is_success() {
                         match resp.json::<OpenAIResponse>().await {
                             Ok(openai_resp) => {
-                                return Ok(self.parse_response(openai_resp));
+                                let output = self.parse_response(openai_resp);
+                                return self.convert_to_chat_result(output);
                             }
                             Err(e) => {
                                 return Err(Error::Json(serde_json::Error::io(
@@ -1481,7 +1552,9 @@ impl ChatModel for ChatOpenAI {
         Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
     }
 
-    async fn stream(
+    /// Internal stream implementation.
+    #[allow(dead_code)]
+    async fn stream_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
@@ -1581,29 +1654,6 @@ impl ChatModel for ChatOpenAI {
         };
 
         Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
-    }
-
-    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        LangSmithParams {
-            ls_provider: Some("openai".to_string()),
-            ls_model_name: Some(self.model.clone()),
-            ls_model_type: Some("chat".to_string()),
-            ls_temperature: self.temperature,
-            ls_max_tokens: self.max_tokens,
-            ls_stop: stop.map(|s| s.to_vec()),
-        }
-    }
-
-    fn identifying_params(&self) -> serde_json::Value {
-        serde_json::json!({
-            "_type": self.llm_type(),
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-            "frequency_penalty": self.frequency_penalty,
-            "presence_penalty": self.presence_penalty,
-        })
     }
 }
 
@@ -1820,6 +1870,7 @@ mod tests {
 
     #[test]
     fn test_llm_type() {
+        use crate::language_models::BaseLanguageModel;
         let model = ChatOpenAI::new("gpt-4o");
         assert_eq!(model.llm_type(), "openai-chat");
     }
