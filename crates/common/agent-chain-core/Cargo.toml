@@ -9,6 +9,7 @@ license = "MIT"
 agent-chain-macros = { workspace = true }
 async-stream = "0.3"
 async-trait = { workspace = true }
+csv = "1.3"
 rustc_version_runtime = "0.3.0"
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
