@@ -9,6 +9,7 @@ license = "MIT"
 agent-chain-macros = { workspace = true }
 async-stream = "0.3"
 async-trait = { workspace = true }
+base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 futures = { workspace = true }
 rand = "0.9"

@@ -30,13 +30,17 @@ pub mod chat_history;
 pub mod chat_loaders;
 pub mod chat_models;
 pub mod chat_sessions;
+pub mod documents;
 pub mod env;
 pub mod error;
+pub mod globals;
 pub mod load;
 pub mod messages;
 pub mod outputs;
 pub mod prompt_values;
 pub mod prompts;
+pub mod rate_limiters;
+pub mod retrievers;
 pub mod runnables;
 pub mod tools;
 pub mod tracers;
@@ -76,6 +80,9 @@ pub use chat_loaders::BaseChatLoader;
 
 // Re-export cache types
 pub use caches::{BaseCache, CacheReturnValue, InMemoryCache};
+
+// Re-export global functions
+pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cache, set_verbose};
 
 // Re-export output types
 pub use outputs::{
@@ -119,6 +126,21 @@ pub use tracers::{
     FunctionCallbackHandler, Listener, PassthroughStreamingHandler, RootListenersTracer, Run,
     RunCollectorCallbackHandler, RunEvent, RunType, SchemaFormat, StreamingCallbackHandler,
     TracerCore, TracerCoreConfig, TracerError,
+};
+
+// Re-export rate limiter types
+pub use rate_limiters::{BaseRateLimiter, InMemoryRateLimiter, InMemoryRateLimiterConfig};
+
+// Re-export document types
+pub use documents::{
+    BaseDocumentCompressor, BaseDocumentTransformer, BaseMedia, Blob, BlobBuilder, BlobData,
+    Document, FilterTransformer, FunctionTransformer,
+};
+
+// Re-export retriever types
+pub use retrievers::{
+    BaseRetriever, DynRetriever, FilterRetriever, LangSmithRetrieverParams, RetrieverInput,
+    RetrieverOutput, SimpleRetriever,
 };
 
 // Re-export runnable types
