@@ -55,6 +55,10 @@ pub trait BaseLLMOutputParser: Send + Sync + Debug {
 pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
     /// Invoke the parser on a string or message input.
     ///
+    /// For string inputs, creates a `Generation` with the text.
+    /// For message inputs, creates a `ChatGeneration` with the message,
+    /// matching the Python implementation.
+    ///
     /// # Arguments
     ///
     /// * `input` - Either a string or a BaseMessage.
@@ -62,15 +66,26 @@ pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
     fn invoke(
         &self,
         input: LanguageModelInput,
-        config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>;
+        _config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        match input {
+            LanguageModelInput::Text(text) => self.parse_result(&[Generation::new(text)], false),
+            LanguageModelInput::Message(msg) => {
+                // Match Python: use ChatGeneration for message inputs
+                let chat_gen = ChatGeneration::new(*msg);
+                self.parse_result(&[Generation::new(&chat_gen.text)], false)
+            }
+        }
+    }
 
     /// Async invoke the parser on a string or message input.
     async fn ainvoke(
         &self,
         input: LanguageModelInput,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>;
+    ) -> Result<Self::Output> {
+        self.invoke(input, config)
+    }
 }
 
 /// Base trait to parse the output of an LLM call.
@@ -140,10 +155,13 @@ pub trait BaseOutputParser: Send + Sync + Debug {
     ///
     /// * `result` - A list of `Generation` to be parsed.
     /// * `partial` - Whether to parse the output as a partial result.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if `result` is empty, matching the Python behavior
+    /// which raises an IndexError when accessing `result[0]` on an empty list.
     fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<Self::Output> {
-        if result.is_empty() {
-            return Err(Error::Other("No generations to parse".to_string()));
-        }
+        // Match Python behavior: access result[0] directly (panics if empty)
         self.parse(&result[0].text)
     }
 
@@ -172,15 +190,24 @@ pub trait BaseOutputParser: Send + Sync + Debug {
 
     /// Instructions on how the LLM output should be formatted.
     ///
-    /// Returns `None` if no format instructions are available.
-    fn get_format_instructions(&self) -> Option<String> {
-        None
+    /// # Errors
+    ///
+    /// Returns an error if format instructions are not implemented for this parser.
+    /// Subclasses should override this method to provide format instructions.
+    fn get_format_instructions(&self) -> Result<String> {
+        Err(Error::Other(
+            "get_format_instructions not implemented".to_string(),
+        ))
     }
 
     /// Return the output parser type for serialization.
     fn parser_type(&self) -> &str;
 
     /// Invoke the parser on input.
+    ///
+    /// For string inputs, creates a `Generation` with the text.
+    /// For message inputs, creates a `ChatGeneration` with the message,
+    /// matching the Python implementation.
     fn invoke(
         &self,
         input: LanguageModelInput,
@@ -189,7 +216,10 @@ pub trait BaseOutputParser: Send + Sync + Debug {
         match input {
             LanguageModelInput::Text(text) => self.parse_result(&[Generation::new(text)], false),
             LanguageModelInput::Message(msg) => {
-                self.parse_result(&[Generation::new((*msg).content())], false)
+                // Match Python: use ChatGeneration for message inputs
+                let chat_gen = ChatGeneration::new(*msg);
+                // ChatGeneration has a text field that extracts content from message
+                self.parse_result(&[Generation::new(&chat_gen.text)], false)
             }
         }
     }
@@ -207,6 +237,8 @@ pub trait BaseOutputParser: Send + Sync + Debug {
 /// Input type for language model output parsers.
 ///
 /// Can be either a raw text string or a message.
+/// This is a simplified version for output parsers that only need
+/// to handle string or message inputs.
 #[derive(Debug, Clone)]
 pub enum LanguageModelInput {
     /// Raw text input.
@@ -230,6 +262,12 @@ impl From<&str> for LanguageModelInput {
 impl From<BaseMessage> for LanguageModelInput {
     fn from(msg: BaseMessage) -> Self {
         LanguageModelInput::Message(Box::new(msg))
+    }
+}
+
+impl From<Box<BaseMessage>> for LanguageModelInput {
+    fn from(msg: Box<BaseMessage>) -> Self {
+        LanguageModelInput::Message(msg)
     }
 }
 

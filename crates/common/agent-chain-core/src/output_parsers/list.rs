@@ -103,12 +103,10 @@ impl BaseOutputParser for CommaSeparatedListOutputParser {
         }
     }
 
-    fn get_format_instructions(&self) -> Option<String> {
-        Some(
-            "Your response should be a list of comma separated values, \
+    fn get_format_instructions(&self) -> Result<String> {
+        Ok("Your response should be a list of comma separated values, \
              eg: `foo, bar, baz` or `foo,bar,baz`"
-                .to_string(),
-        )
+            .to_string())
     }
 
     fn parser_type(&self) -> &str {
@@ -174,8 +172,8 @@ impl BaseOutputParser for NumberedListOutputParser {
             .collect())
     }
 
-    fn get_format_instructions(&self) -> Option<String> {
-        Some(
+    fn get_format_instructions(&self) -> Result<String> {
+        Ok(
             "Your response should be a numbered list with each item on a new line. \
              For example: \n\n1. foo\n\n2. bar\n\n3. baz"
                 .to_string(),
@@ -255,8 +253,8 @@ impl BaseOutputParser for MarkdownListOutputParser {
             .collect())
     }
 
-    fn get_format_instructions(&self) -> Option<String> {
-        Some("Your response should be a markdown list, eg: `- foo\n- bar\n- baz`".to_string())
+    fn get_format_instructions(&self) -> Result<String> {
+        Ok("Your response should be a markdown list, eg: `- foo\n- bar\n- baz`".to_string())
     }
 
     fn parser_type(&self) -> &str {
@@ -379,7 +377,9 @@ mod tests {
     #[test]
     fn test_format_instructions() {
         let parser = CommaSeparatedListOutputParser::new();
-        let instructions = parser.get_format_instructions().unwrap();
+        let instructions = parser
+            .get_format_instructions()
+            .expect("should return format instructions");
         assert!(instructions.contains("comma separated"));
     }
 
