@@ -199,8 +199,38 @@ pub struct ChatOpenAI {
     model_kwargs: HashMap<String, serde_json::Value>,
     /// Whether to stream responses.
     streaming: bool,
+    /// Seed for generation.
+    seed: Option<i32>,
+    /// Whether to return logprobs.
+    logprobs: Option<bool>,
+    /// Number of most likely tokens to return at each position.
+    top_logprobs: Option<u32>,
+    /// Modify likelihood of specified tokens.
+    logit_bias: Option<HashMap<i32, i32>>,
+    /// Number of chat completions to generate.
+    n: Option<u32>,
+    /// Reasoning effort for reasoning models (Chat Completions API).
+    reasoning_effort: Option<String>,
+    /// Reasoning parameters for reasoning models (Responses API).
+    reasoning: Option<HashMap<String, serde_json::Value>>,
+    /// Verbosity level for reasoning models (Responses API).
+    verbosity: Option<String>,
+    /// Whether to include usage metadata in streaming output.
+    stream_usage: Option<bool>,
+    /// Additional fields to include in Responses API generations.
+    include: Option<Vec<String>>,
+    /// Latency tier for request ('auto', 'default', or 'flex').
+    service_tier: Option<String>,
+    /// Whether OpenAI may store response data.
+    store: Option<bool>,
+    /// Truncation strategy for Responses API ('auto' or 'disabled').
+    truncation: Option<String>,
     /// Whether to use the Responses API instead of Chat Completions API.
-    use_responses_api: bool,
+    use_responses_api: Option<bool>,
+    /// Whether to pass previous_response_id automatically.
+    use_previous_response_id: bool,
+    /// Version of AIMessage output format.
+    output_version: Option<String>,
     /// Built-in tools to use with the Responses API.
     builtin_tools: Vec<BuiltinTool>,
     /// HTTP client.
@@ -215,9 +245,18 @@ impl ChatOpenAI {
     ///
     /// * `model` - The model name (e.g., "gpt-4o", "gpt-4-turbo").
     pub fn new(model: impl Into<String>) -> Self {
+        let model_name = model.into();
+
+        // Validate and set temperature for o1 models (match Python behavior)
+        let temperature = if model_name.to_lowercase().starts_with("o1") {
+            Some(1.0)
+        } else {
+            None
+        };
+
         Self {
-            model: model.into(),
-            temperature: None,
+            model: model_name,
+            temperature,
             max_tokens: None,
             api_key: None,
             api_base: DEFAULT_API_BASE.to_string(),
@@ -230,7 +269,22 @@ impl ChatOpenAI {
             max_retries: 2,
             model_kwargs: HashMap::new(),
             streaming: false,
-            use_responses_api: false,
+            seed: None,
+            logprobs: None,
+            top_logprobs: None,
+            logit_bias: None,
+            n: None,
+            reasoning_effort: None,
+            reasoning: None,
+            verbosity: None,
+            stream_usage: None,
+            include: None,
+            service_tier: None,
+            store: None,
+            truncation: None,
+            use_responses_api: None,
+            use_previous_response_id: false,
+            output_version: None,
             builtin_tools: Vec::new(),
             client: reqwest::Client::new(),
         }
@@ -308,11 +362,101 @@ impl ChatOpenAI {
         self
     }
 
+    /// Set the seed for generation.
+    pub fn seed(mut self, seed: i32) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
+    /// Set whether to return logprobs.
+    pub fn logprobs(mut self, enabled: bool) -> Self {
+        self.logprobs = Some(enabled);
+        self
+    }
+
+    /// Set number of most likely tokens to return at each position.
+    pub fn top_logprobs(mut self, count: u32) -> Self {
+        self.top_logprobs = Some(count);
+        self
+    }
+
+    /// Set logit bias for specified tokens.
+    pub fn logit_bias(mut self, bias: HashMap<i32, i32>) -> Self {
+        self.logit_bias = Some(bias);
+        self
+    }
+
+    /// Set number of completions to generate.
+    pub fn n(mut self, count: u32) -> Self {
+        self.n = Some(count);
+        self
+    }
+
+    /// Set reasoning effort for reasoning models (Chat Completions API).
+    pub fn reasoning_effort(mut self, effort: impl Into<String>) -> Self {
+        self.reasoning_effort = Some(effort.into());
+        self
+    }
+
+    /// Set reasoning parameters for reasoning models (Responses API).
+    pub fn reasoning(mut self, params: HashMap<String, serde_json::Value>) -> Self {
+        self.reasoning = Some(params);
+        self
+    }
+
+    /// Set verbosity level for reasoning models (Responses API).
+    pub fn verbosity(mut self, level: impl Into<String>) -> Self {
+        self.verbosity = Some(level.into());
+        self
+    }
+
+    /// Set whether to include usage metadata in streaming output.
+    pub fn stream_usage(mut self, enabled: bool) -> Self {
+        self.stream_usage = Some(enabled);
+        self
+    }
+
+    /// Set additional fields to include in Responses API generations.
+    pub fn include(mut self, fields: Vec<String>) -> Self {
+        self.include = Some(fields);
+        self
+    }
+
+    /// Set latency tier for request.
+    pub fn service_tier(mut self, tier: impl Into<String>) -> Self {
+        self.service_tier = Some(tier.into());
+        self
+    }
+
+    /// Set whether OpenAI may store response data.
+    pub fn store(mut self, enabled: bool) -> Self {
+        self.store = Some(enabled);
+        self
+    }
+
+    /// Set truncation strategy for Responses API.
+    pub fn truncation(mut self, strategy: impl Into<String>) -> Self {
+        self.truncation = Some(strategy.into());
+        self
+    }
+
+    /// Set whether to pass previous_response_id automatically.
+    pub fn use_previous_response_id(mut self, enabled: bool) -> Self {
+        self.use_previous_response_id = enabled;
+        self
+    }
+
+    /// Set AIMessage output format version.
+    pub fn output_version(mut self, version: impl Into<String>) -> Self {
+        self.output_version = Some(version.into());
+        self
+    }
+
     /// Enable or disable the Responses API.
     ///
     /// The Responses API is required for built-in tools like web search.
     pub fn with_responses_api(mut self, enabled: bool) -> Self {
-        self.use_responses_api = enabled;
+        self.use_responses_api = Some(enabled);
         self
     }
 
@@ -332,9 +476,45 @@ impl ChatOpenAI {
     pub fn with_builtin_tools(mut self, tools: Vec<BuiltinTool>) -> Self {
         self.builtin_tools = tools;
         if !self.builtin_tools.is_empty() {
-            self.use_responses_api = true;
+            self.use_responses_api = Some(true);
         }
         self
+    }
+
+    /// Helper function to determine if Responses API should be used.
+    /// Matches Python's _use_responses_api logic.
+    fn should_use_responses_api(&self, has_builtin_tools: bool) -> bool {
+        // Explicit setting takes precedence
+        if let Some(use_api) = self.use_responses_api {
+            return use_api;
+        }
+
+        // Check if we have parameters that require Responses API
+        if has_builtin_tools
+            || self.reasoning.is_some()
+            || self.verbosity.is_some()
+            || self.truncation.is_some()
+            || self.include.is_some()
+            || self.use_previous_response_id
+        {
+            return true;
+        }
+
+        // Check if model prefers Responses API (gpt-5.2-pro and similar)
+        if self.model.to_lowercase().contains("gpt-5.2-pro") {
+            return true;
+        }
+
+        false
+    }
+
+    /// Helper to check if a tool is a built-in tool (not a function).
+    fn is_builtin_tool(tool: &serde_json::Value) -> bool {
+        if let Some(tool_type) = tool.get("type").and_then(|t| t.as_str()) {
+            tool_type != "function"
+        } else {
+            false
+        }
     }
 
     /// Get the API key, checking environment variable if not set directly.
@@ -1075,6 +1255,10 @@ impl ChatOpenAI {
 
 #[async_trait]
 impl ChatModel for ChatOpenAI {
+    fn chat_config(&self) -> &ChatModelConfig {
+        todo!()
+    }
+
     fn llm_type(&self) -> &str {
         "openai-chat"
     }
@@ -1089,7 +1273,7 @@ impl ChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
     ) -> Result<ChatResult> {
         // Use Responses API if enabled or if using built-in tools
-        if self.use_responses_api || !self.builtin_tools.is_empty() {
+        if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             return self.generate_responses_api(messages, stop).await;
         }
 
@@ -1169,7 +1353,7 @@ impl ChatModel for ChatOpenAI {
             .collect();
 
         // Use Responses API if enabled or if using built-in tools
-        if self.use_responses_api || !self.builtin_tools.is_empty() {
+        if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             let api_key = self.get_api_key()?;
             let client = self.build_client();
             let payload =
@@ -1303,7 +1487,7 @@ impl ChatModel for ChatOpenAI {
         stop: Option<Vec<String>>,
     ) -> Result<ChatStream> {
         // Use Responses API if enabled or if using built-in tools
-        if self.use_responses_api || !self.builtin_tools.is_empty() {
+        if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             return self.stream_responses_api(messages, stop).await;
         }
 
