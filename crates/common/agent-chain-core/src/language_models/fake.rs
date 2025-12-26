@@ -306,13 +306,13 @@ impl BaseLLM for FakeStreamingListLLM {
         let stream = async_stream::stream! {
             for (i, c) in response.chars().enumerate() {
                 // Check if we should error on this chunk
-                if let Some(error_chunk) = error_on_chunk {
-                    if i == error_chunk {
-                        yield Err(crate::error::Error::Other(
-                            format!("FakeListLLM error on chunk {}", i)
-                        ));
-                        return;
-                    }
+                if let Some(error_chunk) = error_on_chunk
+                    && i == error_chunk
+                {
+                    yield Err(crate::error::Error::Other(
+                        format!("FakeListLLM error on chunk {}", i)
+                    ));
+                    return;
                 }
 
                 // Sleep if configured
