@@ -5,14 +5,18 @@
 
 use std::pin::Pin;
 
+use agent_chain_core::callbacks::{CallbackManagerForLLMRun, Callbacks};
+use agent_chain_core::language_models::{
+    BaseLanguageModel, LanguageModelConfig, LanguageModelInput,
+};
+use agent_chain_core::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
 use agent_chain_core::{
-    AIMessage, BaseMessage, ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream,
-    LangSmithParams, ToolChoice, ToolDefinition, UsageMetadata,
+    AIMessage, BaseMessage, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata,
+    LangSmithParams, ToolChoice, ToolDefinition,
 };
 use async_trait::async_trait;
-use futures::Stream;
 use tonic::{
-    Request, Status, Streaming,
+    Request, Status,
     transport::{Channel, ClientTlsConfig, Endpoint},
 };
 use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
@@ -108,6 +112,10 @@ pub struct ChatEurora {
     frequency_penalty: Option<f32>,
     /// Presence penalty
     presence_penalty: Option<f32>,
+    /// Chat model configuration
+    chat_model_config: ChatModelConfig,
+    /// Language model configuration
+    language_model_config: LanguageModelConfig,
 }
 
 impl ChatEurora {
@@ -134,6 +142,8 @@ impl ChatEurora {
             stop_sequences: Vec::new(),
             frequency_penalty: None,
             presence_penalty: None,
+            chat_model_config: ChatModelConfig::new(),
+            language_model_config: LanguageModelConfig::new(),
         })
     }
 
@@ -263,46 +273,10 @@ impl ChatEurora {
             }),
         }
     }
-
-    /// Convert the gRPC stream to a ChatStream.
-    fn convert_stream(
-        mut stream: Streaming<ProtoChatStreamResponse>,
-        model: String,
-    ) -> impl Stream<Item = agent_chain_core::Result<ChatChunk>> + Send + 'static {
-        async_stream::stream! {
-            while let Some(result) = stream.message().await.transpose() {
-                match result {
-                    Ok(proto_response) => {
-                        let usage = proto_response.usage.map(|u| {
-                            UsageMetadata::new(u.input_tokens, u.output_tokens)
-                        });
-
-                        let chunk = ChatChunk {
-                            content: proto_response.content,
-                            is_final: proto_response.is_final,
-                            metadata: if proto_response.is_final {
-                                Some(ChatResultMetadata {
-                                    model: Some(model.clone()),
-                                    stop_reason: proto_response.stop_reason,
-                                    usage,
-                                })
-                            } else {
-                                None
-                            },
-                        };
-                        yield Ok(chunk);
-                    }
-                    Err(e) => {
-                        yield Err(EuroraError::Status(e).into());
-                    }
-                }
-            }
-        }
-    }
 }
 
 #[async_trait]
-impl ChatModel for ChatEurora {
+impl BaseLanguageModel for ChatEurora {
     fn llm_type(&self) -> &str {
         "eurora-chat"
     }
@@ -311,11 +285,50 @@ impl ChatModel for ChatEurora {
         &self.model
     }
 
-    async fn generate(
+    fn config(&self) -> &LanguageModelConfig {
+        &self.language_model_config
+    }
+
+    async fn generate_prompt(
+        &self,
+        prompts: Vec<LanguageModelInput>,
+        stop: Option<Vec<String>>,
+        _callbacks: Option<Callbacks>,
+    ) -> agent_chain_core::Result<LLMResult> {
+        // Convert prompts to message batches and generate
+        let mut all_generations = Vec::new();
+        for prompt in prompts {
+            let messages = prompt.to_messages();
+            let result = self._generate(messages, stop.clone(), None).await?;
+            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
+        }
+        Ok(LLMResult::new(all_generations))
+    }
+
+    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
+        LangSmithParams {
+            ls_provider: Some("eurora".to_string()),
+            ls_model_name: Some(self.model.clone()),
+            ls_model_type: Some("chat".to_string()),
+            ls_temperature: self.temperature.map(|t| t as f64),
+            ls_max_tokens: self.max_tokens,
+            ls_stop: stop.map(|s| s.to_vec()),
+        }
+    }
+}
+
+#[async_trait]
+impl ChatModel for ChatEurora {
+    fn chat_config(&self) -> &ChatModelConfig {
+        &self.chat_model_config
+    }
+
+    async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-    ) -> agent_chain_core::Result<ChatResult> {
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> agent_chain_core::Result<OutputChatResult> {
         let proto_request = self.build_request(&messages, stop);
 
         let mut client = self.client.clone();
@@ -330,18 +343,8 @@ impl ChatModel for ChatEurora {
             .map(Into::into)
             .unwrap_or_else(|| AIMessage::new(""));
 
-        let usage = proto_response
-            .usage
-            .map(|u| UsageMetadata::new(u.input_tokens, u.output_tokens));
-
-        Ok(ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(self.model.clone()),
-                stop_reason: proto_response.stop_reason,
-                usage,
-            },
-        })
+        let generation = ChatGeneration::new(message.into());
+        Ok(OutputChatResult::new(vec![generation]))
     }
 
     async fn generate_with_tools(
@@ -352,56 +355,24 @@ impl ChatModel for ChatEurora {
         stop: Option<Vec<String>>,
     ) -> agent_chain_core::Result<ChatResult> {
         // For now, we don't have tool support in the proto definition
-        // Just call the regular generate method
+        // Just call the regular _generate method
         // TODO: Add tool support to the proto definition and implement here
-        self.generate(messages, stop).await
-    }
+        let result = self._generate(messages, stop, None).await?;
 
-    async fn stream(
-        &self,
-        messages: Vec<BaseMessage>,
-        stop: Option<Vec<String>>,
-    ) -> agent_chain_core::Result<ChatStream> {
-        debug!("Sending chat stream");
-        let proto_request = self.build_request(&messages, stop);
-
-        let mut client = self.client.clone();
-        let grpc_request = Request::new(proto_request);
-
-        let response = client
-            .chat_stream(grpc_request)
-            .await
-            .map_err(EuroraError::from)?;
-        let stream = response.into_inner();
-
-        let converted_stream = Self::convert_stream(stream, self.model.clone());
-        Ok(Box::pin(converted_stream)
-            as Pin<
-                Box<dyn Stream<Item = agent_chain_core::Result<ChatChunk>> + Send>,
-            >)
-    }
-
-    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        LangSmithParams {
-            ls_provider: Some("eurora".to_string()),
-            ls_model_name: Some(self.model.clone()),
-            ls_model_type: Some("chat".to_string()),
-            ls_temperature: self.temperature.map(|t| t as f64),
-            ls_max_tokens: self.max_tokens,
-            ls_stop: stop.map(|s| s.to_vec()),
+        if result.generations.is_empty() {
+            return Err(agent_chain_core::Error::Other(
+                "No generations returned".into(),
+            ));
         }
-    }
 
-    fn identifying_params(&self) -> serde_json::Value {
-        serde_json::json!({
-            "_type": self.llm_type(),
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-            "top_k": self.top_k,
-            "frequency_penalty": self.frequency_penalty,
-            "presence_penalty": self.presence_penalty,
+        let message = match result.generations[0].message.clone() {
+            BaseMessage::AI(msg) => msg,
+            _ => return Err(agent_chain_core::Error::Other("Expected AI message".into())),
+        };
+
+        Ok(ChatResult {
+            message,
+            metadata: ChatResultMetadata::default(),
         })
     }
 }
