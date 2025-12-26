@@ -909,18 +909,6 @@ impl DynBoundChatModel {
     }
 }
 
-/// Extension methods for `Arc<dyn BaseChatModel>`.
-pub trait DynChatModelExt {
-    /// Bind tools to this chat model, returning a dynamically-typed bound model.
-    fn bind_tools(self, tools: Vec<Arc<dyn Tool + Send + Sync>>) -> DynBoundChatModel;
-}
-
-impl DynChatModelExt for Arc<dyn BaseChatModel> {
-    fn bind_tools(self, tools: Vec<Arc<dyn Tool + Send + Sync>>) -> DynBoundChatModel {
-        DynBoundChatModel::new(self, tools)
-    }
-}
-
 /// Generate from a stream of chunks.
 ///
 /// Collects all chunks from the stream and generates a final ChatResult.

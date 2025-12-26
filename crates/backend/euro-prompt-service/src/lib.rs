@@ -1,7 +1,7 @@
 use std::pin::Pin;
 
 use agent_chain::providers::openai::ChatOpenAI;
-use agent_chain_core::chat_models::ChatModel;
+use agent_chain_core::chat_models::BaseChatModel;
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_eurora::proto::chat::{
     ProtoAiMessage, ProtoAiMessageChunk, ProtoChatRequest, ProtoChatResponse,
