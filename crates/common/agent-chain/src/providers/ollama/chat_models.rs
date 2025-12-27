@@ -32,13 +32,16 @@ use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio_util::io::StreamReader;
 
+use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{
-    ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream, LangSmithParams, ToolChoice,
+    BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams, ToolChoice,
     UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{AIMessage, BaseMessage, ToolCall};
-use crate::tools::{Tool, ToolDefinition};
+use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
+use crate::tools::{BaseTool, ToolDefinition};
 
 /// Default API base URL for Ollama.
 const DEFAULT_API_BASE: &str = "http://localhost:11434";
@@ -107,6 +110,10 @@ pub struct ChatOllama {
     /// Additional client kwargs.
     #[allow(dead_code)]
     client_kwargs: HashMap<String, serde_json::Value>,
+    /// Chat model configuration.
+    chat_model_config: ChatModelConfig,
+    /// Language model configuration.
+    language_model_config: LanguageModelConfig,
     /// HTTP client.
     #[allow(dead_code)]
     client: reqwest::Client,
@@ -154,6 +161,8 @@ impl ChatOllama {
             keep_alive: None,
             reasoning: None,
             client_kwargs: HashMap::new(),
+            chat_model_config: ChatModelConfig::new(),
+            language_model_config: LanguageModelConfig::new(),
             client: reqwest::Client::new(),
         }
     }
@@ -287,8 +296,8 @@ impl ChatOllama {
     /// Bind tools to this chat model.
     ///
     /// Returns a `BoundChatOllama` that includes the tools.
-    pub fn bind_tools<T: Tool + 'static>(self, tools: Vec<T>) -> BoundChatOllama {
-        let tools: Vec<Arc<dyn Tool + Send + Sync>> =
+    pub fn bind_tools<T: BaseTool + 'static>(self, tools: Vec<T>) -> BoundChatOllama {
+        let tools: Vec<Arc<dyn BaseTool + Send + Sync>> =
             tools.into_iter().map(|t| Arc::new(t) as _).collect();
         BoundChatOllama::new(self, tools)
     }
@@ -311,19 +320,15 @@ impl ChatOllama {
     fn format_messages(&self, messages: &[BaseMessage]) -> Vec<serde_json::Value> {
         messages
             .iter()
-            .map(|msg| match msg {
-                BaseMessage::System(m) => {
-                    serde_json::json!({
-                        "role": "system",
-                        "content": m.content()
-                    })
-                }
-                BaseMessage::Human(m) => {
-                    serde_json::json!({
-                        "role": "user",
-                        "content": m.content()
-                    })
-                }
+            .filter_map(|msg| match msg {
+                BaseMessage::System(m) => Some(serde_json::json!({
+                    "role": "system",
+                    "content": m.content()
+                })),
+                BaseMessage::Human(m) => Some(serde_json::json!({
+                    "role": "user",
+                    "content": m.content()
+                })),
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
                         "role": "assistant",
@@ -351,15 +356,26 @@ impl ChatOllama {
                         message["tool_calls"] = serde_json::Value::Array(tool_calls);
                     }
 
-                    message
+                    Some(message)
                 }
-                BaseMessage::Tool(m) => {
-                    serde_json::json!({
-                        "role": "tool",
-                        "tool_call_id": m.tool_call_id(),
-                        "content": m.content()
-                    })
+                BaseMessage::Tool(m) => Some(serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": m.tool_call_id(),
+                    "content": m.content()
+                })),
+                BaseMessage::Remove(_) => {
+                    // RemoveMessage is used for message management, not sent to API
+                    None
                 }
+                BaseMessage::Chat(m) => Some(serde_json::json!({
+                    "role": m.role(),
+                    "content": m.content()
+                })),
+                BaseMessage::Function(m) => Some(serde_json::json!({
+                    "role": "function",
+                    "name": m.name(),
+                    "content": m.content()
+                })),
             })
             .collect()
     }
@@ -472,8 +488,8 @@ impl ChatOllama {
         payload
     }
 
-    /// Parse the API response into a ChatResult.
-    fn parse_response(&self, response: OllamaResponse) -> ChatResult {
+    /// Parse the API response into an AIMessage.
+    fn parse_response_to_ai_message(&self, response: OllamaResponse) -> AIMessage {
         let content = response
             .message
             .as_ref()
@@ -505,33 +521,28 @@ impl ChatOllama {
             })
             .unwrap_or_default();
 
-        let message = if tool_calls.is_empty() {
+        let ai_message = if tool_calls.is_empty() {
             AIMessage::new(content)
         } else {
             AIMessage::with_tool_calls(content, tool_calls)
         };
 
-        let usage = if let (Some(prompt_eval_count), Some(eval_count)) =
+        // Add usage metadata if available
+        if let (Some(prompt_eval_count), Some(eval_count)) =
             (response.prompt_eval_count, response.eval_count)
         {
-            Some(UsageMetadata::new(prompt_eval_count, eval_count))
+            ai_message.with_usage_metadata(UsageMetadata::new(
+                prompt_eval_count as i64,
+                eval_count as i64,
+            ))
         } else {
-            None
-        };
-
-        ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(response.model.unwrap_or_else(|| self.model.clone())),
-                stop_reason: response.done_reason,
-                usage,
-            },
+            ai_message
         }
     }
 }
 
 #[async_trait]
-impl ChatModel for ChatOllama {
+impl BaseLanguageModel for ChatOllama {
     fn llm_type(&self) -> &str {
         "chat-ollama"
     }
@@ -540,37 +551,52 @@ impl ChatModel for ChatOllama {
         &self.model
     }
 
-    async fn generate(
+    fn config(&self) -> &LanguageModelConfig {
+        &self.language_model_config
+    }
+
+    async fn generate_prompt(
+        &self,
+        prompts: Vec<LanguageModelInput>,
+        stop: Option<Vec<String>>,
+        _callbacks: Option<Callbacks>,
+    ) -> Result<LLMResult> {
+        let mut all_generations = Vec::new();
+        for prompt in prompts {
+            let messages = prompt.to_messages();
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
+            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
+        }
+        Ok(LLMResult::new(all_generations))
+    }
+
+    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
+        LangSmithParams {
+            ls_provider: Some("ollama".to_string()),
+            ls_model_name: Some(self.model.clone()),
+            ls_model_type: Some("chat".to_string()),
+            ls_temperature: self.temperature,
+            ls_max_tokens: self.num_predict.map(|n| n as u32),
+            ls_stop: stop.map(|s| s.to_vec()),
+        }
+    }
+}
+
+#[async_trait]
+impl BaseChatModel for ChatOllama {
+    fn chat_config(&self) -> &ChatModelConfig {
+        &self.chat_model_config
+    }
+
+    async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let client = self.build_client();
-        let payload = self.build_request_payload(&messages, stop, None, false);
-        let base_url = self.get_base_url();
-
-        let response = client
-            .post(format!("{}/api/chat", base_url))
-            .header("Content-Type", "application/json")
-            .json(&payload)
-            .send()
-            .await
-            .map_err(Error::Http)?;
-
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(Error::api(status, error_text));
-        }
-
-        let ollama_resp: OllamaResponse = response.json().await.map_err(|e| {
-            Error::Json(serde_json::Error::io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            )))
-        })?;
-
-        Ok(self.parse_response(ollama_resp))
+        self._generate_internal(messages, stop, None).await
     }
 
     async fn generate_with_tools(
@@ -579,7 +605,7 @@ impl ChatModel for ChatOllama {
         tools: &[ToolDefinition],
         _tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
+    ) -> Result<AIMessage> {
         // Convert tool definitions to Ollama format
         let ollama_tools: Vec<serde_json::Value> = tools
             .iter()
@@ -620,10 +646,51 @@ impl ChatModel for ChatOllama {
             )))
         })?;
 
-        Ok(self.parse_response(ollama_resp))
+        Ok(self.parse_response_to_ai_message(ollama_resp))
+    }
+}
+
+impl ChatOllama {
+    /// Internal generate implementation.
+    async fn _generate_internal(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<ChatResult> {
+        let client = self.build_client();
+        let payload = self.build_request_payload(&messages, stop, None, false);
+        let base_url = self.get_base_url();
+
+        let response = client
+            .post(format!("{}/api/chat", base_url))
+            .header("Content-Type", "application/json")
+            .json(&payload)
+            .send()
+            .await
+            .map_err(Error::Http)?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(Error::api(status, error_text));
+        }
+
+        let ollama_resp: OllamaResponse = response.json().await.map_err(|e| {
+            Error::Json(serde_json::Error::io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e.to_string(),
+            )))
+        })?;
+
+        let ai_message = self.parse_response_to_ai_message(ollama_resp);
+        let generation = ChatGeneration::new(ai_message.into());
+        Ok(ChatResult::new(vec![generation]))
     }
 
-    async fn stream(
+    /// Internal stream implementation.
+    #[allow(dead_code)]
+    async fn stream_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
@@ -631,7 +698,6 @@ impl ChatModel for ChatOllama {
         let client = self.build_client();
         let payload = self.build_request_payload(&messages, stop, None, true);
         let base_url = self.get_base_url();
-        let model_name = self.model.clone();
 
         let response = client
             .post(format!("{}/api/chat", base_url))
@@ -679,60 +745,31 @@ impl ChatModel for ChatOllama {
                     continue;
                 }
 
-                let metadata = if is_done {
+                if is_done {
+                    // Final chunk - include usage metadata and finish reason
                     let usage = if let (Some(prompt_eval_count), Some(eval_count)) =
                         (stream_resp.prompt_eval_count, stream_resp.eval_count)
                     {
-                        Some(UsageMetadata::new(prompt_eval_count, eval_count))
+                        Some(UsageMetadata::new(prompt_eval_count as i64, eval_count as i64))
                     } else {
                         None
                     };
-
-                    Some(ChatResultMetadata {
-                        model: stream_resp.model.or_else(|| Some(model_name.clone())),
-                        stop_reason: stream_resp.done_reason,
-                        usage,
-                    })
+                    let finish_reason = stream_resp.done_reason;
+                    yield ChatChunk::final_chunk(usage, finish_reason);
                 } else {
-                    None
-                };
-
-                yield ChatChunk {
-                    content,
-                    is_final: is_done,
-                    metadata,
-                };
+                    yield ChatChunk::new(content);
+                }
             }
         };
 
         Ok(Box::pin(stream))
-    }
-
-    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        LangSmithParams {
-            ls_provider: Some("ollama".to_string()),
-            ls_model_name: Some(self.model.clone()),
-            ls_model_type: Some("chat".to_string()),
-            ls_temperature: self.temperature,
-            ls_max_tokens: self.num_predict.map(|n| n as u32),
-            ls_stop: stop.map(|s| s.to_vec()),
-        }
-    }
-
-    fn identifying_params(&self) -> serde_json::Value {
-        serde_json::json!({
-            "_type": self.llm_type(),
-            "model": self.model,
-            "temperature": self.temperature,
-            "num_ctx": self.num_ctx,
-            "num_predict": self.num_predict,
-        })
     }
 }
 
 /// Ollama API response structure.
 #[derive(Debug, Deserialize)]
 struct OllamaResponse {
+    #[allow(dead_code)]
     model: Option<String>,
     message: Option<OllamaMessage>,
     #[allow(dead_code)]
@@ -778,14 +815,14 @@ pub struct BoundChatOllama {
     /// The underlying chat model.
     model: ChatOllama,
     /// Tools bound to this model.
-    tools: Vec<Arc<dyn Tool + Send + Sync>>,
+    tools: Vec<Arc<dyn BaseTool + Send + Sync>>,
     /// Tool choice configuration.
     tool_choice: Option<ToolChoice>,
 }
 
 impl BoundChatOllama {
     /// Create a new bound chat model.
-    pub fn new(model: ChatOllama, tools: Vec<Arc<dyn Tool + Send + Sync>>) -> Self {
+    pub fn new(model: ChatOllama, tools: Vec<Arc<dyn BaseTool + Send + Sync>>) -> Self {
         Self {
             model,
             tools,
@@ -810,7 +847,7 @@ impl BoundChatOllama {
     }
 
     /// Get the tools.
-    pub fn tools(&self) -> &[Arc<dyn Tool + Send + Sync>] {
+    pub fn tools(&self) -> &[Arc<dyn BaseTool + Send + Sync>] {
         &self.tools
     }
 
@@ -845,13 +882,14 @@ impl BoundChatOllama {
 
     /// Internal async implementation.
     async fn invoke_async_internal(&self, messages: Vec<BaseMessage>) -> Box<dyn MessageWithAny> {
+        use crate::language_models::BaseChatModel;
         let tool_definitions = self.tool_definitions();
         match self
             .model
             .generate_with_tools(messages, &tool_definitions, self.tool_choice.as_ref(), None)
             .await
         {
-            Ok(result) => Box::new(result.message),
+            Ok(ai_message) => Box::new(ai_message),
             Err(e) => Box::new(AIMessage::new(format!("Error: {}", e))),
         }
     }
@@ -918,6 +956,7 @@ mod tests {
 
     #[test]
     fn test_llm_type() {
+        use crate::language_models::BaseLanguageModel;
         let model = ChatOllama::new("llama3.1");
         assert_eq!(model.llm_type(), "chat-ollama");
     }

@@ -1,10 +1,11 @@
 use std::pin::Pin;
 
 use agent_chain::providers::openai::ChatOpenAI;
-use agent_chain_core::chat_models::ChatModel;
+use agent_chain_core::chat_models::BaseChatModel;
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_eurora::proto::chat::{
-    ProtoAiMessage, ProtoChatRequest, ProtoChatResponse, ProtoChatStreamResponse,
+    ProtoAiMessage, ProtoAiMessageChunk, ProtoChatRequest, ProtoChatResponse,
+    ProtoChatStreamResponse,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
 };
 use anyhow::{Result, anyhow};
@@ -72,14 +73,44 @@ impl ProtoChatService for PromptService {
     async fn chat(&self, request: Request<ProtoChatRequest>) -> ChatResult<ProtoChatResponse> {
         authenticate_request(&request, &self.jwt_config)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
-        debug!("Received send_prompt request");
+        debug!("Received chat request");
 
-        // Return a single response with the new proto structure
+        let request_inner = request.into_inner();
+
+        // Convert ProtoBaseMessage to agent_chain_core::BaseMessage
+        let messages: Vec<BaseMessage> = request_inner
+            .messages
+            .into_iter()
+            .map(|msg| msg.into())
+            .collect();
+
+        // Call the provider to generate a response
+        let ai_message = self.provider.invoke(messages.into()).await.map_err(|e| {
+            debug!("Error in chat: {}", e);
+            Status::internal(e.to_string())
+        })?;
+
+        // Convert AIMessage to ProtoAiMessage
+        let tool_calls: Vec<_> = ai_message
+            .tool_calls()
+            .iter()
+            .map(|tc| agent_chain_eurora::proto::chat::ProtoToolCall {
+                id: tc.id().to_string(),
+                name: tc.name().to_string(),
+                args: tc.args().to_string(),
+            })
+            .collect();
+
         Ok(Response::new(ProtoChatResponse {
             message: Some(ProtoAiMessage {
-                content: "Hello, world!".to_string(),
-                id: None,
-                tool_calls: vec![],
+                content: ai_message.content().to_string(),
+                id: ai_message.id().map(|s| s.to_string()),
+                name: ai_message.name().map(|s| s.to_string()),
+                tool_calls,
+                invalid_tool_calls: vec![],
+                usage_metadata: None,
+                additional_kwargs: None,
+                response_metadata: None,
             }),
             usage: None,
             stop_reason: Some("stop".to_string()),
@@ -102,31 +133,39 @@ impl ProtoChatService for PromptService {
             .map(|msg| msg.into())
             .collect();
 
-        let openai_stream = self.provider.stream(messages, None).await.map_err(|e| {
-            debug!("Error in chat_stream: {}", e);
-            Status::internal(e.to_string())
-        })?;
+        let openai_stream = self
+            .provider
+            .astream(messages.into(), None)
+            .await
+            .map_err(|e| {
+                debug!("Error in chat_stream: {}", e);
+                Status::internal(e.to_string())
+            })?;
 
-        let output_stream = openai_stream.map(|result| {
-            match result {
-                Ok(chunk) => {
-                    // Check if this is the final chunk
-                    let is_final = chunk.is_final;
+        let output_stream = openai_stream.map(|result| match result {
+            Ok(chunk) => {
+                // AIMessageChunk has content() method for getting the text content
+                // We determine finality by empty content or chunk_position
+                let content = chunk.content().to_string();
+                let is_final = content.is_empty();
 
-                    Ok(ProtoChatStreamResponse {
-                        content: chunk.content,
-                        is_final,
-                        usage: None, // Usage info typically only available in final chunk
-                        stop_reason: if is_final {
-                            Some("stop".to_string())
-                        } else {
-                            None
-                        },
+                Ok(ProtoChatStreamResponse {
+                    chunk: Some(ProtoAiMessageChunk {
+                        content,
+                        id: None,
+                        name: None,
                         tool_calls: vec![],
-                    })
-                }
-                Err(e) => Err(Status::internal(e.to_string())),
+                        invalid_tool_calls: vec![],
+                        tool_call_chunks: vec![],
+                        usage_metadata: None,
+                        additional_kwargs: None,
+                        response_metadata: None,
+                        chunk_position: None,
+                    }),
+                    is_final,
+                })
             }
+            Err(e) => Err(Status::internal(e.to_string())),
         });
 
         Ok(Response::new(
