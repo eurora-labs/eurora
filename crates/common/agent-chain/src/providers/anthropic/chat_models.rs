@@ -13,7 +13,9 @@ use serde::Deserialize;
 
 use crate::ToolChoice;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
-use crate::chat_models::{BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams};
+use crate::chat_models::{
+    BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams, UsageMetadata,
+};
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{AIMessage, BaseMessage, ToolCall};
@@ -622,6 +624,8 @@ impl ChatAnthropic {
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
+            let mut usage: Option<UsageMetadata> = None;
+            let mut stop_reason: Option<String> = None;
 
             use futures::StreamExt;
 
@@ -646,17 +650,20 @@ impl ChatAnthropic {
                                         match event {
                                             AnthropicStreamEvent::ContentBlockDelta { delta, .. } => {
                                                 if let Some(text) = delta.text {
-                                                    yield Ok(ChatChunk {
-                                                        content: text,
-                                                        is_final: false,
-                                                    });
+                                                    yield Ok(ChatChunk::new(text));
+                                                }
+                                            }
+                                            AnthropicStreamEvent::MessageDelta { delta, usage: u } => {
+                                                stop_reason = delta.stop_reason;
+                                                if let Some(u) = u {
+                                                    usage = Some(UsageMetadata::new(
+                                                        u.input_tokens.unwrap_or(0) as i64,
+                                                        u.output_tokens as i64,
+                                                    ));
                                                 }
                                             }
                                             AnthropicStreamEvent::MessageStop => {
-                                                yield Ok(ChatChunk {
-                                                    content: String::new(),
-                                                    is_final: true,
-                                                });
+                                                yield Ok(ChatChunk::final_chunk(usage.take(), stop_reason.take()));
                                             }
                                             _ => {}
                                         }
