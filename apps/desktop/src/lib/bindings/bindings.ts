@@ -6,6 +6,13 @@ type TAURI_CHANNEL<T> = (response: T) => void
 
 /**
  * An AI message in the conversation.
+ * 
+ * An `AIMessage` is returned from a chat model as a response to a prompt.
+ * This message represents the output of the model and consists of both
+ * the raw output as returned by the model and standardized fields
+ * (e.g., tool calls, usage metadata).
+ * 
+ * This corresponds to `AIMessage` in LangChain Python.
  */
 export type AIMessage = { 
 /**
@@ -17,13 +24,29 @@ content: string;
  */
 id: string | null; 
 /**
+ * Optional name for the message
+ */
+name?: string | null; 
+/**
  * Tool calls made by the AI
  */
 tool_calls?: ToolCall[]; 
 /**
+ * Tool calls with parsing errors associated with the message
+ */
+invalid_tool_calls?: InvalidToolCall[]; 
+/**
+ * If present, usage metadata for a message, such as token counts.
+ */
+usage_metadata?: UsageMetadata | null; 
+/**
  * Additional metadata
  */
-additional_kwargs?: Partial<{ [key in string]: JsonValue }> }
+additional_kwargs?: Partial<{ [key in string]: JsonValue }>; 
+/**
+ * Response metadata (e.g., response headers, logprobs, token counts, model name)
+ */
+response_metadata?: Partial<{ [key in string]: JsonValue }> }
 
 export type AppSettings = { 
 /**
@@ -45,29 +68,78 @@ export type BackendType = "None" | "Ollama" | "Eurora" | "OpenAI" | "Anthropic"
 
 /**
  * A unified message type that can represent any message role.
+ * 
+ * This corresponds to `BaseMessage` in LangChain Python.
  */
 export type BaseMessage = 
 /**
  * A human message
  */
-({ type: "Human" } & HumanMessage) | 
+({ type: "human" } & HumanMessage) | 
 /**
  * A system message
  */
-({ type: "System" } & SystemMessage) | 
+({ type: "system" } & SystemMessage) | 
 /**
  * An AI message
  */
-({ type: "AI" } & AIMessage) | 
+({ type: "ai" } & AIMessage) | 
 /**
  * A tool result message
  */
-({ type: "Tool" } & ToolMessage)
+({ type: "tool" } & ToolMessage) | 
+/**
+ * A chat message with arbitrary role
+ */
+({ type: "chat" } & ChatMessage) | 
+/**
+ * A function message (deprecated, use Tool)
+ */
+({ type: "function" } & FunctionMessage) | 
+/**
+ * A remove message (for message deletion)
+ */
+({ type: "remove" } & RemoveMessage)
+
+/**
+ * A chat message that can be assigned an arbitrary speaker (role).
+ * 
+ * Use this when you need to specify a custom role that isn't covered
+ * by the standard message types (Human, AI, System, Tool).
+ * 
+ * This corresponds to `ChatMessage` in LangChain Python.
+ */
+export type ChatMessage = { 
+/**
+ * The message content
+ */
+content: string; 
+/**
+ * The speaker / role of the message
+ */
+role: string; 
+/**
+ * Optional unique identifier
+ */
+id: string | null; 
+/**
+ * Optional name for the message
+ */
+name?: string | null; 
+/**
+ * Additional metadata
+ */
+additional_kwargs?: Partial<{ [key in string]: JsonValue }>; 
+/**
+ * Response metadata
+ */
+response_metadata?: Partial<{ [key in string]: JsonValue }> }
 
 /**
  * A content part in a multimodal message.
  * 
  * Messages can contain multiple content parts, allowing for mixed text and images.
+ * This corresponds to content blocks in LangChain Python's `langchain_core.messages.content`.
  */
 export type ContentPart = 
 /**
@@ -89,6 +161,40 @@ export type ContextChip = { id: string; extension_id: string; name: string; attr
  */
 export type Conversation = { id: string; title: string | null; created_at: string; updated_at: string }
 
+/**
+ * A function message in the conversation.
+ * 
+ * `FunctionMessage` objects are an older version of the `ToolMessage` schema, and
+ * do not contain the `tool_call_id` field.
+ * 
+ * The `tool_call_id` field is used to associate the tool call request with the
+ * tool call response. Useful in situations where a chat model is able
+ * to request multiple tool calls in parallel.
+ * 
+ * This corresponds to `FunctionMessage` in LangChain Python.
+ */
+export type FunctionMessage = { 
+/**
+ * The message content (result of the function)
+ */
+content: string; 
+/**
+ * The name of the function that was executed
+ */
+name: string; 
+/**
+ * Optional unique identifier
+ */
+id: string | null; 
+/**
+ * Additional metadata
+ */
+additional_kwargs?: Partial<{ [key in string]: JsonValue }>; 
+/**
+ * Response metadata
+ */
+response_metadata?: Partial<{ [key in string]: JsonValue }> }
+
 export type GeneralSettings = { 
 /**
  * Whether to start the app on autostart
@@ -101,6 +207,8 @@ autostart: boolean }
  * Human messages support both simple text content and multimodal content
  * with images. Use [`HumanMessage::new`] for simple text messages and
  * [`HumanMessage::with_content`] for multimodal messages.
+ * 
+ * This corresponds to `HumanMessage` in LangChain Python.
  */
 export type HumanMessage = { 
 /**
@@ -111,6 +219,10 @@ content: MessageContent;
  * Optional unique identifier
  */
 id: string | null; 
+/**
+ * Optional name for the message
+ */
+name?: string | null; 
 /**
  * Additional metadata
  */
@@ -139,12 +251,58 @@ export type ImageSource =
  */
 { type: "base_64"; media_type: string; data: string }
 
+/**
+ * Breakdown of input token counts.
+ * 
+ * Does *not* need to sum to full input token count. Does *not* need to have all keys.
+ */
+export type InputTokenDetails = { 
+/**
+ * Audio input tokens.
+ */
+audio?: bigint | null; 
+/**
+ * Input tokens that were cached and there was a cache miss.
+ */
+cache_creation?: bigint | null; 
+/**
+ * Input tokens that were cached and there was a cache hit.
+ */
+cache_read?: bigint | null }
+
+/**
+ * Represents an invalid tool call that failed parsing.
+ * 
+ * Here we add an `error` key to surface errors made during generation
+ * (e.g., invalid JSON arguments.)
+ */
+export type InvalidToolCall = { 
+/**
+ * The name of the tool to be called
+ */
+name?: string | null; 
+/**
+ * The arguments to the tool call (unparsed string)
+ */
+args?: string | null; 
+/**
+ * An identifier associated with the tool call
+ */
+id?: string | null; 
+/**
+ * An error message associated with the tool call
+ */
+error?: string | null }
+
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
 /**
  * Message content that can be either simple text or multipart.
+ * 
+ * This represents the content field of messages and can be either
+ * a simple string or a list of content parts for multimodal messages.
  */
 export type MessageContent = 
 /**
@@ -156,12 +314,44 @@ string |
  */
 ContentPart[]
 
+/**
+ * Breakdown of output token counts.
+ * 
+ * Does *not* need to sum to full output token count. Does *not* need to have all keys.
+ */
+export type OutputTokenDetails = { 
+/**
+ * Audio output tokens.
+ */
+audio?: bigint | null; 
+/**
+ * Reasoning output tokens.
+ */
+reasoning?: bigint | null }
+
 export type Query = { text: string; assets: string[] }
+
+/**
+ * Message responsible for deleting other messages.
+ * 
+ * This is used to remove messages from a conversation history by their ID.
+ * This corresponds to `RemoveMessage` in LangChain Python.
+ */
+export type RemoveMessage = { 
+/**
+ * The ID of the message to remove
+ */
+id: string }
 
 export type ResponseChunk = { chunk: string }
 
 /**
  * A system message in the conversation.
+ * 
+ * The system message is usually passed in as the first of a sequence
+ * of input messages. It's used to prime AI behavior with instructions.
+ * 
+ * This corresponds to `SystemMessage` in LangChain Python.
  */
 export type SystemMessage = { 
 /**
@@ -172,6 +362,10 @@ content: string;
  * Optional unique identifier
  */
 id: string | null; 
+/**
+ * Optional name for the message
+ */
+name?: string | null; 
 /**
  * Additional metadata
  */
@@ -199,6 +393,9 @@ export type TimelineAppEvent = { name: string; color: string | null; icon_base64
 
 /**
  * A tool call made by the AI model.
+ * 
+ * Represents an AI's request to call a tool. This corresponds to
+ * `ToolCall` in LangChain Python.
  */
 export type ToolCall = { 
 /**
@@ -216,6 +413,11 @@ args: JsonValue }
 
 /**
  * A tool message containing the result of a tool call.
+ * 
+ * `ToolMessage` objects contain the result of a tool invocation. Typically, the result
+ * is encoded inside the `content` field.
+ * 
+ * This corresponds to `ToolMessage` in LangChain Python.
  */
 export type ToolMessage = { 
 /**
@@ -231,9 +433,61 @@ tool_call_id: string;
  */
 id: string | null; 
 /**
+ * Optional name for the tool
+ */
+name?: string | null; 
+/**
+ * Status of the tool invocation
+ */
+status?: ToolStatus; 
+/**
+ * Artifact of the tool execution which is not meant to be sent to the model.
+ * 
+ * Should only be specified if it is different from the message content, e.g. if only
+ * a subset of the full tool output is being passed as message content but the full
+ * output is needed in other parts of the code.
+ */
+artifact?: JsonValue | null; 
+/**
  * Additional metadata
  */
-additional_kwargs?: Partial<{ [key in string]: JsonValue }> }
+additional_kwargs?: Partial<{ [key in string]: JsonValue }>; 
+/**
+ * Response metadata
+ */
+response_metadata?: Partial<{ [key in string]: JsonValue }> }
+
+/**
+ * Status of a tool invocation.
+ */
+export type ToolStatus = "success" | "error"
+
+/**
+ * Usage metadata for a message, such as token counts.
+ * 
+ * This is a standard representation of token usage that is consistent across models.
+ */
+export type UsageMetadata = { 
+/**
+ * Count of input (or prompt) tokens. Sum of all input token types.
+ */
+input_tokens: bigint; 
+/**
+ * Count of output (or completion) tokens. Sum of all output token types.
+ */
+output_tokens: bigint; 
+/**
+ * Total token count. Sum of `input_tokens` + `output_tokens`.
+ */
+total_tokens: bigint; 
+/**
+ * Breakdown of input token counts.
+ */
+input_token_details?: InputTokenDetails | null; 
+/**
+ * Breakdown of output token counts.
+ */
+output_token_details?: OutputTokenDetails | null }
 
 const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["conversation","channel","query"],"switch_conversation":["conversation_id"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'personal_db.conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"]}', 'personal_db.message':'{"get":["conversation_id","limit","offset"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 

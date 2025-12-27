@@ -1,13 +1,13 @@
 <script lang="ts">
-	import VideoSection from './video-section.svelte';
+	import StaticLauncher from '$components/marketing/static-launcher.svelte';
+	import VideoSection from '$components/marketing/video-section.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { type Icon as IconType } from '@lucide/svelte';
 
 	import EyeIcon from '@lucide/svelte/icons/eye';
-	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
-	import StaticLauncher from './static-launcher.svelte';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 
 	interface CardItem {
 		icon: typeof IconType;
@@ -66,14 +66,14 @@
 				>
 			</div>
 			<StaticLauncher
-				class="backdrop-blur-2xl bg-white/20 rounded-2xl mx-auto w-[50%] min-w-[850px]"
+				class="backdrop-blur-2xl bg-white/20 rounded-2xl mx-auto w-[50%] min-w-212.5"
 			/>
 
 			<div class="flex flex-1 flex-row w-full justify-center align-start px-4 gap-4 mt-16">
 				{#each cards as card}
 					{@const Icon = card.icon}
 					<Card.Root
-						class="card-content flex flex-col bg-white/20 backdrop-blur-2xl border-none w-[20%] min-w-[280px] h-[250px] py-8 justify-start"
+						class="card-content flex flex-col bg-white/20 backdrop-blur-2xl border-none w-[20%] min-w-70 h-62.5 py-8 justify-start"
 					>
 						<Card.Header class="flex flex-col  items-start justify-center">
 							<Card.Title

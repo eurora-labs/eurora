@@ -10,6 +10,7 @@ const config = {
 	kit: {
 		alias: {
 			$styles: './src/styles',
+			$components: './src/components',
 		},
 
 		// adapter-auto only supports some environments, see https://kit.svelte.dev/docs/adapter-auto for a list.

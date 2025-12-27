@@ -81,6 +81,10 @@
 
 	// Helper to get content from BaseMessage
 	function getMessageContent(message: BaseMessage): string {
+		// RemoveMessage doesn't have content
+		if (message.type === 'remove') {
+			return '';
+		}
 		const content = message.content;
 		if (typeof content === 'string') {
 			return content;
@@ -97,7 +101,7 @@
 
 	// Helper to check if message is from user/human
 	function isUserMessage(message: BaseMessage): boolean {
-		return message.type === 'Human';
+		return message.type === 'human';
 	}
 
 	async function handleKeydown(event: KeyboardEvent) {
@@ -111,7 +115,7 @@
 				}
 				const query = processQuery(editorRef);
 				messages.push({
-					type: 'Human',
+					type: 'human',
 					content: query.text,
 					id: null,
 					additional_kwargs: {},
@@ -137,7 +141,7 @@
 			};
 			// Create an AI message placeholder for streaming response
 			const aiMessage: BaseMessage = {
-				type: 'AI',
+				type: 'ai',
 				content: '',
 				id: null,
 				tool_calls: [],
@@ -147,7 +151,7 @@
 			const agentMessage = messages.at(-1);
 			function onEvent(response: ResponseChunk) {
 				// Append chunk to the last message
-				if (agentMessage && agentMessage.type === 'AI') {
+				if (agentMessage && agentMessage.type === 'ai') {
 					agentMessage.content += response.chunk;
 				}
 
@@ -165,7 +169,7 @@
 		} catch (error) {
 			console.error('Failed to get answer:', error);
 			messages.push({
-				type: 'System',
+				type: 'system',
 				content: 'Error: Failed to get response from server' + error,
 				id: null,
 				additional_kwargs: {},

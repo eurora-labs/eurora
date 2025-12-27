@@ -51,14 +51,21 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 
+use crate::ToolChoice;
+use crate::callbacks::AsyncCallbackManagerForLLMRun;
+use crate::callbacks::CallbackManagerForLLMRun;
+use crate::callbacks::Callbacks;
 use crate::chat_models::{
-    ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream, LangSmithParams, ToolChoice,
-    UsageMetadata,
+    BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::ChatGenerationStream;
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{
     AIMessage, BaseMessage, ContentPart, ImageDetail, ImageSource, MessageContent, ToolCall,
 };
+use crate::outputs::ChatGenerationChunk;
+use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
 use crate::tools::ToolDefinition;
 
 /// Default API base URL for OpenAI.
@@ -199,10 +206,44 @@ pub struct ChatOpenAI {
     model_kwargs: HashMap<String, serde_json::Value>,
     /// Whether to stream responses.
     streaming: bool,
+    /// Seed for generation.
+    seed: Option<i32>,
+    /// Whether to return logprobs.
+    logprobs: Option<bool>,
+    /// Number of most likely tokens to return at each position.
+    top_logprobs: Option<u32>,
+    /// Modify likelihood of specified tokens.
+    logit_bias: Option<HashMap<i32, i32>>,
+    /// Number of chat completions to generate.
+    n: Option<u32>,
+    /// Reasoning effort for reasoning models (Chat Completions API).
+    reasoning_effort: Option<String>,
+    /// Reasoning parameters for reasoning models (Responses API).
+    reasoning: Option<HashMap<String, serde_json::Value>>,
+    /// Verbosity level for reasoning models (Responses API).
+    verbosity: Option<String>,
+    /// Whether to include usage metadata in streaming output.
+    stream_usage: Option<bool>,
+    /// Additional fields to include in Responses API generations.
+    include: Option<Vec<String>>,
+    /// Latency tier for request ('auto', 'default', or 'flex').
+    service_tier: Option<String>,
+    /// Whether OpenAI may store response data.
+    store: Option<bool>,
+    /// Truncation strategy for Responses API ('auto' or 'disabled').
+    truncation: Option<String>,
     /// Whether to use the Responses API instead of Chat Completions API.
-    use_responses_api: bool,
+    use_responses_api: Option<bool>,
+    /// Whether to pass previous_response_id automatically.
+    use_previous_response_id: bool,
+    /// Version of AIMessage output format.
+    output_version: Option<String>,
     /// Built-in tools to use with the Responses API.
     builtin_tools: Vec<BuiltinTool>,
+    /// Chat model configuration.
+    chat_model_config: ChatModelConfig,
+    /// Language model configuration.
+    language_model_config: LanguageModelConfig,
     /// HTTP client.
     #[allow(dead_code)]
     client: reqwest::Client,
@@ -215,9 +256,18 @@ impl ChatOpenAI {
     ///
     /// * `model` - The model name (e.g., "gpt-4o", "gpt-4-turbo").
     pub fn new(model: impl Into<String>) -> Self {
+        let model_name = model.into();
+
+        // Validate and set temperature for o1 models (match Python behavior)
+        let temperature = if model_name.to_lowercase().starts_with("o1") {
+            Some(1.0)
+        } else {
+            None
+        };
+
         Self {
-            model: model.into(),
-            temperature: None,
+            model: model_name,
+            temperature,
             max_tokens: None,
             api_key: None,
             api_base: DEFAULT_API_BASE.to_string(),
@@ -230,8 +280,25 @@ impl ChatOpenAI {
             max_retries: 2,
             model_kwargs: HashMap::new(),
             streaming: false,
-            use_responses_api: false,
+            seed: None,
+            logprobs: None,
+            top_logprobs: None,
+            logit_bias: None,
+            n: None,
+            reasoning_effort: None,
+            reasoning: None,
+            verbosity: None,
+            stream_usage: None,
+            include: None,
+            service_tier: None,
+            store: None,
+            truncation: None,
+            use_responses_api: None,
+            use_previous_response_id: false,
+            output_version: None,
             builtin_tools: Vec::new(),
+            chat_model_config: ChatModelConfig::new(),
+            language_model_config: LanguageModelConfig::new(),
             client: reqwest::Client::new(),
         }
     }
@@ -308,11 +375,101 @@ impl ChatOpenAI {
         self
     }
 
+    /// Set the seed for generation.
+    pub fn seed(mut self, seed: i32) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
+    /// Set whether to return logprobs.
+    pub fn logprobs(mut self, enabled: bool) -> Self {
+        self.logprobs = Some(enabled);
+        self
+    }
+
+    /// Set number of most likely tokens to return at each position.
+    pub fn top_logprobs(mut self, count: u32) -> Self {
+        self.top_logprobs = Some(count);
+        self
+    }
+
+    /// Set logit bias for specified tokens.
+    pub fn logit_bias(mut self, bias: HashMap<i32, i32>) -> Self {
+        self.logit_bias = Some(bias);
+        self
+    }
+
+    /// Set number of completions to generate.
+    pub fn n(mut self, count: u32) -> Self {
+        self.n = Some(count);
+        self
+    }
+
+    /// Set reasoning effort for reasoning models (Chat Completions API).
+    pub fn reasoning_effort(mut self, effort: impl Into<String>) -> Self {
+        self.reasoning_effort = Some(effort.into());
+        self
+    }
+
+    /// Set reasoning parameters for reasoning models (Responses API).
+    pub fn reasoning(mut self, params: HashMap<String, serde_json::Value>) -> Self {
+        self.reasoning = Some(params);
+        self
+    }
+
+    /// Set verbosity level for reasoning models (Responses API).
+    pub fn verbosity(mut self, level: impl Into<String>) -> Self {
+        self.verbosity = Some(level.into());
+        self
+    }
+
+    /// Set whether to include usage metadata in streaming output.
+    pub fn stream_usage(mut self, enabled: bool) -> Self {
+        self.stream_usage = Some(enabled);
+        self
+    }
+
+    /// Set additional fields to include in Responses API generations.
+    pub fn include(mut self, fields: Vec<String>) -> Self {
+        self.include = Some(fields);
+        self
+    }
+
+    /// Set latency tier for request.
+    pub fn service_tier(mut self, tier: impl Into<String>) -> Self {
+        self.service_tier = Some(tier.into());
+        self
+    }
+
+    /// Set whether OpenAI may store response data.
+    pub fn store(mut self, enabled: bool) -> Self {
+        self.store = Some(enabled);
+        self
+    }
+
+    /// Set truncation strategy for Responses API.
+    pub fn truncation(mut self, strategy: impl Into<String>) -> Self {
+        self.truncation = Some(strategy.into());
+        self
+    }
+
+    /// Set whether to pass previous_response_id automatically.
+    pub fn use_previous_response_id(mut self, enabled: bool) -> Self {
+        self.use_previous_response_id = enabled;
+        self
+    }
+
+    /// Set AIMessage output format version.
+    pub fn output_version(mut self, version: impl Into<String>) -> Self {
+        self.output_version = Some(version.into());
+        self
+    }
+
     /// Enable or disable the Responses API.
     ///
     /// The Responses API is required for built-in tools like web search.
     pub fn with_responses_api(mut self, enabled: bool) -> Self {
-        self.use_responses_api = enabled;
+        self.use_responses_api = Some(enabled);
         self
     }
 
@@ -332,9 +489,46 @@ impl ChatOpenAI {
     pub fn with_builtin_tools(mut self, tools: Vec<BuiltinTool>) -> Self {
         self.builtin_tools = tools;
         if !self.builtin_tools.is_empty() {
-            self.use_responses_api = true;
+            self.use_responses_api = Some(true);
         }
         self
+    }
+
+    /// Helper function to determine if Responses API should be used.
+    /// Matches Python's _use_responses_api logic.
+    fn should_use_responses_api(&self, has_builtin_tools: bool) -> bool {
+        // Explicit setting takes precedence
+        if let Some(use_api) = self.use_responses_api {
+            return use_api;
+        }
+
+        // Check if we have parameters that require Responses API
+        if has_builtin_tools
+            || self.reasoning.is_some()
+            || self.verbosity.is_some()
+            || self.truncation.is_some()
+            || self.include.is_some()
+            || self.use_previous_response_id
+        {
+            return true;
+        }
+
+        // Check if model prefers Responses API (gpt-5.2-pro and similar)
+        if self.model.to_lowercase().contains("gpt-5.2-pro") {
+            return true;
+        }
+
+        false
+    }
+
+    /// Helper to check if a tool is a built-in tool (not a function).
+    #[allow(dead_code)]
+    fn is_builtin_tool(tool: &serde_json::Value) -> bool {
+        if let Some(tool_type) = tool.get("type").and_then(|t| t.as_str()) {
+            tool_type != "function"
+        } else {
+            false
+        }
     }
 
     /// Get the API key, checking environment variable if not set directly.
@@ -358,13 +552,11 @@ impl ChatOpenAI {
     fn format_messages(&self, messages: &[BaseMessage]) -> Vec<serde_json::Value> {
         messages
             .iter()
-            .map(|msg| match msg {
-                BaseMessage::System(m) => {
-                    serde_json::json!({
-                        "role": "system",
-                        "content": m.content()
-                    })
-                }
+            .filter_map(|msg| match msg {
+                BaseMessage::System(m) => Some(serde_json::json!({
+                    "role": "system",
+                    "content": m.content()
+                })),
                 BaseMessage::Human(m) => {
                     let content = match m.message_content() {
                         MessageContent::Text(text) => serde_json::json!(text),
@@ -403,10 +595,10 @@ impl ChatOpenAI {
                             serde_json::Value::Array(content_parts)
                         }
                     };
-                    serde_json::json!({
+                    Some(serde_json::json!({
                         "role": "user",
                         "content": content
-                    })
+                    }))
                 }
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
@@ -435,15 +627,26 @@ impl ChatOpenAI {
                         message["tool_calls"] = serde_json::Value::Array(tool_calls);
                     }
 
-                    message
+                    Some(message)
                 }
-                BaseMessage::Tool(m) => {
-                    serde_json::json!({
-                        "role": "tool",
-                        "tool_call_id": m.tool_call_id(),
-                        "content": m.content()
-                    })
+                BaseMessage::Tool(m) => Some(serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": m.tool_call_id(),
+                    "content": m.content()
+                })),
+                BaseMessage::Remove(_) => {
+                    // RemoveMessage is used for message management, not sent to API
+                    None
                 }
+                BaseMessage::Chat(m) => Some(serde_json::json!({
+                    "role": m.role(),
+                    "content": m.content()
+                })),
+                BaseMessage::Function(m) => Some(serde_json::json!({
+                    "role": "function",
+                    "name": m.name(),
+                    "content": m.content()
+                })),
             })
             .collect()
     }
@@ -679,12 +882,12 @@ impl ChatOpenAI {
             return Err(Error::api(status, error_text));
         }
 
-        let model = self.model.clone();
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
             let mut accumulated_text = String::new();
             let mut usage: Option<UsageMetadata> = None;
+            let mut finish_reason: Option<String> = None;
             let mut annotations: Vec<TextAnnotation> = Vec::new();
 
             use futures::StreamExt;
@@ -708,15 +911,7 @@ impl ChatOpenAI {
                             if let Some(data) = line.strip_prefix("data: ") {
                                 if data == "[DONE]" {
                                     // Final chunk with metadata
-                                    yield Ok(ChatChunk {
-                                        content: String::new(),
-                                        is_final: true,
-                                        metadata: Some(ChatResultMetadata {
-                                            model: Some(model.clone()),
-                                            stop_reason: Some("stop".to_string()),
-                                            usage: usage.clone(),
-                                        }),
-                                    });
+                                    yield Ok(ChatChunk::final_chunk(usage.take(), finish_reason.take()));
                                     continue;
                                 }
 
@@ -727,11 +922,7 @@ impl ChatOpenAI {
                                             // Text content delta
                                             if let Some(delta) = event.delta {
                                                 accumulated_text.push_str(&delta);
-                                                yield Ok(ChatChunk {
-                                                    content: delta,
-                                                    is_final: false,
-                                                    metadata: None,
-                                                });
+                                                yield Ok(ChatChunk::new(delta));
                                             }
                                         }
                                         "response.output_text.annotation.added" => {
@@ -741,23 +932,19 @@ impl ChatOpenAI {
                                             }
                                         }
                                         "response.completed" | "response.incomplete" => {
-                                            // Response complete - extract usage from the response
-                                            if let Some(resp) = event.response && let Some(resp_usage) = resp.usage {
+                                            // Response complete - extract usage and status from the response
+                                            if let Some(resp) = event.response {
+                                                if let Some(resp_usage) = resp.usage {
                                                     usage = Some(UsageMetadata::new(
-                                                        resp_usage.input_tokens,
-                                                        resp_usage.output_tokens,
+                                                        resp_usage.input_tokens as i64,
+                                                        resp_usage.output_tokens as i64,
                                                     ));
+                                                }
+                                                // Set finish_reason based on status
+                                                finish_reason = resp.status;
                                             }
-                                            // Final chunk
-                                            yield Ok(ChatChunk {
-                                                content: String::new(),
-                                                is_final: true,
-                                                metadata: Some(ChatResultMetadata {
-                                                    model: Some(model.clone()),
-                                                    stop_reason: Some("stop".to_string()),
-                                                    usage: usage.clone(),
-                                                }),
-                                            });
+                                            // Final chunk with metadata
+                                            yield Ok(ChatChunk::final_chunk(usage.take(), finish_reason.take()));
                                         }
                                         _ => {
                                             // Other event types (response.created, response.output_item.added, etc.)
@@ -868,6 +1055,23 @@ impl ChatOpenAI {
                         "output": m.content()
                     }));
                 }
+                BaseMessage::Remove(_) => {
+                    // RemoveMessage is used for message management, not sent to API
+                    continue;
+                }
+                BaseMessage::Chat(m) => {
+                    input.push(serde_json::json!({
+                        "role": m.role(),
+                        "content": m.content()
+                    }));
+                }
+                BaseMessage::Function(m) => {
+                    input.push(serde_json::json!({
+                        "type": "function_call_output",
+                        "name": m.name(),
+                        "output": m.content()
+                    }));
+                }
             }
         }
 
@@ -877,7 +1081,7 @@ impl ChatOpenAI {
     /// Parse the API response into a ChatResult.
     fn parse_response(&self, response: OpenAIResponse) -> ChatResult {
         // Extract finish_reason before consuming choices
-        let finish_reason = response
+        let _finish_reason = response
             .choices
             .first()
             .and_then(|c| c.finish_reason.clone());
@@ -903,24 +1107,22 @@ impl ChatOpenAI {
             None => (String::new(), Vec::new()),
         };
 
-        let message = if tool_calls.is_empty() {
+        let mut ai_message = if tool_calls.is_empty() {
             AIMessage::new(content)
         } else {
             AIMessage::with_tool_calls(content, tool_calls)
         };
 
-        let usage = response
-            .usage
-            .map(|u| UsageMetadata::new(u.prompt_tokens, u.completion_tokens));
-
-        ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(response.model),
-                stop_reason: finish_reason,
-                usage,
-            },
+        // Set usage metadata if available from response
+        if let Some(usage) = response.usage {
+            ai_message = ai_message.with_usage_metadata(UsageMetadata::new(
+                usage.prompt_tokens as i64,
+                usage.completion_tokens as i64,
+            ));
         }
+
+        let generation = ChatGeneration::new(ai_message.into());
+        ChatResult::new(vec![generation])
     }
 
     /// Parse the Responses API response into a ChatResult.
@@ -961,10 +1163,9 @@ impl ChatOpenAI {
             }
         }
 
-        let message = if tool_calls.is_empty() {
+        let mut ai_message = if tool_calls.is_empty() {
             let mut msg = AIMessage::new(text_content);
             if !annotations.is_empty() {
-                // Store annotations in additional_kwargs for access
                 msg = msg.with_annotations(annotations);
             }
             msg
@@ -972,19 +1173,16 @@ impl ChatOpenAI {
             AIMessage::with_tool_calls(text_content, tool_calls)
         };
 
-        let usage = response
-            .usage
-            .as_ref()
-            .map(|u| UsageMetadata::new(u.input_tokens, u.output_tokens));
-
-        ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(response.model.clone()),
-                stop_reason: response.status.clone(),
-                usage,
-            },
+        // Set usage metadata if available from response
+        if let Some(usage) = response.usage {
+            ai_message = ai_message.with_usage_metadata(UsageMetadata::new(
+                usage.input_tokens as i64,
+                usage.output_tokens as i64,
+            ));
         }
+
+        let generation = ChatGeneration::new(ai_message.into());
+        ChatResult::new(vec![generation])
     }
 
     /// Generate using the Responses API.
@@ -1048,7 +1246,7 @@ impl ChatOpenAI {
 }
 
 #[async_trait]
-impl ChatModel for ChatOpenAI {
+impl BaseLanguageModel for ChatOpenAI {
     fn llm_type(&self) -> &str {
         "openai-chat"
     }
@@ -1057,13 +1255,118 @@ impl ChatModel for ChatOpenAI {
         &self.model
     }
 
-    async fn generate(
+    fn config(&self) -> &LanguageModelConfig {
+        &self.language_model_config
+    }
+
+    async fn generate_prompt(
+        &self,
+        prompts: Vec<LanguageModelInput>,
+        stop: Option<Vec<String>>,
+        _callbacks: Option<Callbacks>,
+    ) -> Result<LLMResult> {
+        // Convert prompts to message batches and generate
+        let mut all_generations = Vec::new();
+        for prompt in prompts {
+            let messages = prompt.to_messages();
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
+            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
+        }
+        Ok(LLMResult::new(all_generations))
+    }
+
+    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
+        LangSmithParams {
+            ls_provider: Some("openai".to_string()),
+            ls_model_name: Some(self.model.clone()),
+            ls_model_type: Some("chat".to_string()),
+            ls_temperature: self.temperature,
+            ls_max_tokens: self.max_tokens,
+            ls_stop: stop.map(|s| s.to_vec()),
+        }
+    }
+}
+
+#[async_trait]
+impl BaseChatModel for ChatOpenAI {
+    fn chat_config(&self) -> &ChatModelConfig {
+        &self.chat_model_config
+    }
+
+    /// Indicate that async streaming is implemented.
+    fn has_astream_impl(&self) -> bool {
+        true
+    }
+
+    async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<ChatResult> {
+        self._generate_internal(messages, stop, None).await
+    }
+
+    /// Async streaming implementation that calls the internal stream method
+    /// and converts ChatChunk to ChatGenerationChunk.
+    async fn _astream(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+    ) -> Result<ChatGenerationStream> {
+        // Call the internal stream implementation
+        let chat_stream = self.stream_internal(messages, stop).await?;
+
+        // Convert ChatChunk stream to ChatGenerationChunk stream
+        let generation_stream = async_stream::stream! {
+            use futures::StreamExt;
+
+            let mut pinned_stream = chat_stream;
+
+            while let Some(result) = pinned_stream.next().await {
+                match result {
+                    Ok(chat_chunk) => {
+                        // Convert ChatChunk to ChatGenerationChunk
+                        let message = AIMessage::new(&chat_chunk.content);
+                        let generation_chunk = ChatGenerationChunk::new(message.into());
+                        yield Ok(generation_chunk);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(generation_stream) as ChatGenerationStream)
+    }
+
+    async fn generate_with_tools(
+        &self,
+        messages: Vec<BaseMessage>,
+        tools: &[ToolDefinition],
+        tool_choice: Option<&ToolChoice>,
+        stop: Option<Vec<String>>,
+    ) -> Result<AIMessage> {
+        self.generate_with_tools_internal(messages, tools, tool_choice, stop)
+            .await
+    }
+}
+
+impl ChatOpenAI {
+    /// Internal generate implementation.
+    async fn _generate_internal(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         // Use Responses API if enabled or if using built-in tools
-        if self.use_responses_api || !self.builtin_tools.is_empty() {
+        if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             return self.generate_responses_api(messages, stop).await;
         }
 
@@ -1120,13 +1423,14 @@ impl ChatModel for ChatOpenAI {
         Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
     }
 
-    async fn generate_with_tools(
+    /// Internal generate with tools implementation.
+    async fn generate_with_tools_internal(
         &self,
         messages: Vec<BaseMessage>,
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
+    ) -> Result<AIMessage> {
         // Convert tool definitions to OpenAI format
         let openai_tools: Vec<serde_json::Value> = tools
             .iter()
@@ -1143,7 +1447,7 @@ impl ChatModel for ChatOpenAI {
             .collect();
 
         // Use Responses API if enabled or if using built-in tools
-        if self.use_responses_api || !self.builtin_tools.is_empty() {
+        if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             let api_key = self.get_api_key()?;
             let client = self.build_client();
             let payload =
@@ -1167,7 +1471,8 @@ impl ChatModel for ChatOpenAI {
                         if resp.status().is_success() {
                             match resp.json::<ResponsesApiResponse>().await {
                                 Ok(responses_resp) => {
-                                    return Ok(self.parse_responses_api_response(responses_resp));
+                                    let result = self.parse_responses_api_response(responses_resp);
+                                    return Self::extract_ai_message(result);
                                 }
                                 Err(e) => {
                                     return Err(Error::Json(serde_json::Error::io(
@@ -1204,23 +1509,20 @@ impl ChatModel for ChatOpenAI {
 
         // Add tool_choice if specified
         if let Some(choice) = tool_choice {
-            match choice {
-                ToolChoice::Auto => {
-                    payload["tool_choice"] = serde_json::json!("auto");
+            let choice_json = match choice {
+                ToolChoice::String(s) => serde_json::json!(s),
+                ToolChoice::Structured { choice_type, name } => {
+                    if choice_type == "tool" || choice_type == "function" {
+                        serde_json::json!({
+                            "type": "function",
+                            "function": {"name": name}
+                        })
+                    } else {
+                        serde_json::json!(choice_type)
+                    }
                 }
-                ToolChoice::Any => {
-                    payload["tool_choice"] = serde_json::json!("required");
-                }
-                ToolChoice::Tool { name } => {
-                    payload["tool_choice"] = serde_json::json!({
-                        "type": "function",
-                        "function": {"name": name}
-                    });
-                }
-                ToolChoice::None => {
-                    payload["tool_choice"] = serde_json::json!("none");
-                }
-            }
+            };
+            payload["tool_choice"] = choice_json;
         }
 
         let mut last_error = None;
@@ -1241,7 +1543,8 @@ impl ChatModel for ChatOpenAI {
                     if resp.status().is_success() {
                         match resp.json::<OpenAIResponse>().await {
                             Ok(openai_resp) => {
-                                return Ok(self.parse_response(openai_resp));
+                                let result = self.parse_response(openai_resp);
+                                return Self::extract_ai_message(result);
                             }
                             Err(e) => {
                                 return Err(Error::Json(serde_json::Error::io(
@@ -1271,13 +1574,26 @@ impl ChatModel for ChatOpenAI {
         Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
     }
 
-    async fn stream(
+    /// Extract AIMessage from ChatResult
+    fn extract_ai_message(result: ChatResult) -> Result<AIMessage> {
+        if result.generations.is_empty() {
+            return Err(Error::other("No generations returned"));
+        }
+        match result.generations[0].message.clone() {
+            BaseMessage::AI(msg) => Ok(msg),
+            _ => Err(Error::other("Expected AI message")),
+        }
+    }
+
+    /// Internal stream implementation.
+    #[allow(dead_code)]
+    async fn stream_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<ChatStream> {
         // Use Responses API if enabled or if using built-in tools
-        if self.use_responses_api || !self.builtin_tools.is_empty() {
+        if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             return self.stream_responses_api(messages, stop).await;
         }
 
@@ -1303,7 +1619,6 @@ impl ChatModel for ChatOpenAI {
         }
 
         // Create a stream from the SSE response
-        let model = self.model.clone();
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
@@ -1326,26 +1641,15 @@ impl ChatModel for ChatOpenAI {
                             for line in event_data.lines() {
                                 if let Some(data) = line.strip_prefix("data: ") {
                                     if data == "[DONE]" {
-                                        yield Ok(ChatChunk {
-                                            content: String::new(),
-                                            is_final: true,
-                                            metadata: Some(ChatResultMetadata {
-                                                model: Some(model.clone()),
-                                                stop_reason: finish_reason.clone(),
-                                                usage: usage.clone(),
-                                            }),
-                                        });
+                                        // Final chunk with collected metadata
+                                        yield Ok(ChatChunk::final_chunk(usage.take(), finish_reason.take()));
                                         continue;
                                     }
 
                                     if let Ok(chunk) = serde_json::from_str::<OpenAIStreamChunk>(data) {
                                         if let Some(choice) = chunk.choices.first() {
                                             if let Some(ref content) = choice.delta.content {
-                                                yield Ok(ChatChunk {
-                                                    content: content.clone(),
-                                                    is_final: false,
-                                                    metadata: None,
-                                                });
+                                                yield Ok(ChatChunk::new(content.clone()));
                                             }
                                             if let Some(ref reason) = choice.finish_reason {
                                                 finish_reason = Some(reason.clone());
@@ -1353,8 +1657,8 @@ impl ChatModel for ChatOpenAI {
                                         }
                                         if let Some(ref u) = chunk.usage {
                                             usage = Some(UsageMetadata::new(
-                                                u.prompt_tokens,
-                                                u.completion_tokens,
+                                                u.prompt_tokens as i64,
+                                                u.completion_tokens as i64,
                                             ));
                                         }
                                     }
@@ -1372,37 +1676,15 @@ impl ChatModel for ChatOpenAI {
 
         Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
     }
-
-    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        LangSmithParams {
-            ls_provider: Some("openai".to_string()),
-            ls_model_name: Some(self.model.clone()),
-            ls_model_type: Some("chat".to_string()),
-            ls_temperature: self.temperature,
-            ls_max_tokens: self.max_tokens,
-            ls_stop: stop.map(|s| s.to_vec()),
-        }
-    }
-
-    fn identifying_params(&self) -> serde_json::Value {
-        serde_json::json!({
-            "_type": self.llm_type(),
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-            "frequency_penalty": self.frequency_penalty,
-            "presence_penalty": self.presence_penalty,
-        })
-    }
 }
 
 /// OpenAI API response structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAIResponse {
     model: String,
     choices: Vec<OpenAIChoice>,
-    usage: Option<OpenAIUsage>,
+    pub usage: Option<OpenAIUsage>,
 }
 
 /// OpenAI choice in response.
@@ -1466,6 +1748,7 @@ struct OpenAIDelta {
 
 /// OpenAI Responses API response structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ResponsesApiResponse {
     model: String,
     output: Vec<ResponsesOutput>,
@@ -1610,6 +1893,7 @@ mod tests {
 
     #[test]
     fn test_llm_type() {
+        use crate::language_models::BaseLanguageModel;
         let model = ChatOpenAI::new("gpt-4o");
         assert_eq!(model.llm_type(), "openai-chat");
     }
