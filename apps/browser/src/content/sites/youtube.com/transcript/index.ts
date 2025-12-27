@@ -16,7 +16,7 @@ export async function getCurrentVideoTranscript(
 	}
 
 	const api = new YouTubeTranscriptApi();
-	return api.fetch(videoId, languages, preserveFormatting);
+	return await api.fetch(videoId, languages, preserveFormatting);
 }
 
 // Convenience function to list available transcripts for current video
@@ -29,7 +29,7 @@ export async function getCurrentVideoTranscriptList() {
 	}
 
 	const api = new YouTubeTranscriptApi();
-	return api.list(videoId);
+	return await api.list(videoId);
 }
 
 // Utility function to extract video ID from YouTube URL

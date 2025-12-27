@@ -1,6 +1,6 @@
 import { getCurrentTabIcon } from './tabs.js';
-import browser from 'webextension-polyfill';
 import { NativeMetadata, Frame } from '../content/bindings.js';
+import browser from 'webextension-polyfill';
 
 const lastUrl = new Map();
 

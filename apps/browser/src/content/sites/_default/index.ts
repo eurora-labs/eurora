@@ -1,13 +1,13 @@
+import { ArticleBrowserMessage, type WatcherParams } from './types.js';
+import {
+	createArticleAsset,
+	createArticleSnapshot,
+} from '@eurora/browser-shared/content/extensions/article/util';
 import {
 	Watcher,
 	type WatcherResponse,
 } from '@eurora/browser-shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
-import {
-	createArticleAsset,
-	createArticleSnapshot,
-} from '@eurora/browser-shared/content/extensions/article/util';
-import { ArticleBrowserMessage, type WatcherParams } from './types.js';
 
 export class ArticleWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {

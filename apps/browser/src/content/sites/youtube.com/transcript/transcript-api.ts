@@ -207,7 +207,7 @@ export class YouTubeTranscriptApi {
 	): Promise<FetchedTranscript> {
 		const transcriptList = await this.list(videoId);
 		const transcript = transcriptList.findTranscript(languages);
-		return transcript.fetch(preserveFormatting);
+		return await transcript.fetch(preserveFormatting);
 	}
 
 	async list(videoId: string): Promise<TranscriptList> {

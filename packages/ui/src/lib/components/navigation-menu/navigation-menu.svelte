@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { NavigationMenu as NavigationMenuPrimitive } from 'bits-ui';
+	import NavigationMenuViewport from '$lib/components/navigation-menu/navigation-menu-viewport.svelte';
 	import { cn } from '$lib/utils.js';
-	import NavigationMenuViewport from './navigation-menu-viewport.svelte';
+	import { NavigationMenu as NavigationMenuPrimitive } from 'bits-ui';
 
 	let {
 		ref = $bindable(null),
