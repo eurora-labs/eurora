@@ -62,9 +62,6 @@
 </script>
 
 <script lang="ts">
-	import { Input } from '@eurora/ui/components/input/index';
-	import { Label } from '@eurora/ui/components/label/index';
-	import * as Popover from '@eurora/ui/components/popover/index';
 	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
 	export interface Props extends SvelteNodeViewProps<PdfAttrs> {
@@ -75,11 +72,6 @@
 	let { ref, attrs }: Props = $props();
 
 	export { ref, attrs, pdfAttrs, pdfSchema };
-
-	function handleClick(event: MouseEvent) {
-		alert('some longer script');
-		event.preventDefault();
-	}
 
 	function handleKeyDown(event: KeyboardEvent) {
 		event.preventDefault();
