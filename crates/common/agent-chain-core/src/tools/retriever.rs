@@ -5,7 +5,6 @@
 
 use std::collections::HashMap;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -14,7 +13,6 @@ use serde_json::Value;
 use crate::documents::Document;
 use crate::error::Result;
 use crate::retrievers::BaseRetriever;
-use crate::runnables::RunnableConfig;
 
 use super::base::{ArgsSchema, ResponseFormat};
 use super::structured::StructuredTool;
@@ -110,11 +108,11 @@ where
     let name = name.into();
     let description = description.into();
     let separator = document_separator.to_string();
-    
+
     let retriever_clone = retriever.clone();
     let separator_clone = separator.clone();
     let response_format_clone = response_format;
-    
+
     // Sync function
     let func = {
         let retriever = retriever_clone.clone();
@@ -125,34 +123,32 @@ where
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            
+
             // Note: In a real implementation, we'd call the retriever synchronously
             // For now, we return a placeholder since retrievers are typically async
             let docs: Vec<Document> = Vec::new();
             let content = format_documents(&docs, &separator);
-            
+
             match response_format_clone {
                 ResponseFormat::Content => Ok(Value::String(content)),
                 ResponseFormat::ContentAndArtifact => {
-                    let docs_json: Vec<Value> = docs.iter().map(|d| {
-                        serde_json::json!({
-                            "page_content": d.page_content,
-                            "metadata": d.metadata
+                    let docs_json: Vec<Value> = docs
+                        .iter()
+                        .map(|d| {
+                            serde_json::json!({
+                                "page_content": d.page_content,
+                                "metadata": d.metadata
+                            })
                         })
-                    }).collect();
+                        .collect();
                     Ok(serde_json::json!([content, docs_json]))
                 }
             }
         }
     };
-    
-    StructuredTool::from_function(
-        func,
-        name.clone(),
-        description,
-        retriever_args_schema(),
-    )
-    .with_response_format(response_format)
+
+    StructuredTool::from_function(func, name.clone(), description, retriever_args_schema())
+        .with_response_format(response_format)
 }
 
 /// Format documents into a single string.
@@ -179,10 +175,10 @@ where
 {
     let name = name.into();
     let description = description.into();
-    
+
     let retriever_clone = retriever.clone();
     let retrieve_fn = Arc::new(retrieve_fn);
-    
+
     // Async version - wrapped as a sync function that returns a placeholder
     // In practice, you'd use the async invoke
     let func = move |args: HashMap<String, Value>| -> Result<Value> {
@@ -191,20 +187,15 @@ where
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        
+
         // Return the query as placeholder - actual retrieval happens async
         Ok(Value::String(format!(
             "Retrieval for query '{}' (use async invoke for actual results)",
             query
         )))
     };
-    
-    StructuredTool::from_function(
-        func,
-        name,
-        description,
-        retriever_args_schema(),
-    )
+
+    StructuredTool::from_function(func, name, description, retriever_args_schema())
 }
 
 /// Builder for creating retriever tools with full configuration.
@@ -271,11 +262,11 @@ where
         let name = self.name.ok_or_else(|| {
             crate::error::Error::InvalidConfig("Retriever tool name is required".to_string())
         })?;
-        
+
         let description = self.description.ok_or_else(|| {
             crate::error::Error::InvalidConfig("Retriever tool description is required".to_string())
         })?;
-        
+
         Ok(create_retriever_tool_with_options(
             self.retriever,
             name,
@@ -302,7 +293,7 @@ mod tests {
     fn test_retriever_args_schema() {
         let schema = retriever_args_schema();
         let json = schema.to_json_schema();
-        
+
         assert_eq!(json["type"], "object");
         assert!(json["properties"]["query"].is_object());
     }
@@ -313,7 +304,7 @@ mod tests {
             Document::new("First document"),
             Document::new("Second document"),
         ];
-        
+
         let formatted = format_documents(&docs, "\n\n");
         assert_eq!(formatted, "First document\n\nSecond document");
     }
@@ -325,7 +316,7 @@ mod tests {
             Document::new("Doc 2"),
             Document::new("Doc 3"),
         ];
-        
+
         let formatted = format_documents(&docs, " | ");
         assert_eq!(formatted, "Doc 1 | Doc 2 | Doc 3");
     }
