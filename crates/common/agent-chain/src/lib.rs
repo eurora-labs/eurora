@@ -64,6 +64,19 @@ pub use agent_chain_core::*;
 #[doc(hidden)]
 pub use agent_chain_core as _core;
 
+// Re-export the tool macro
+pub mod tools {
+    //! Tool types and macros for defining tools.
+    //!
+    //! This module re-exports all tool types from agent-chain-core
+    //! and adds the `#[tool]` attribute macro.
+
+    pub use agent_chain_core::tools::*;
+
+    // Re-export the tool attribute macro
+    pub use agent_chain_macros::tool;
+}
+
 /// Initialize a chat model from the model name with automatic provider inference.
 ///
 /// This function provides a convenient way to create chat models, similar to
