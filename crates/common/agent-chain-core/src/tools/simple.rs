@@ -1,0 +1,549 @@
+//! Tool that takes in function or coroutine directly.
+//!
+//! This module provides the `Tool` struct for creating simple single-input tools,
+//! mirroring `langchain_core.tools.simple`.
+
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use serde_json::Value;
+
+use crate::callbacks::{CallbackManagerForToolRun, AsyncCallbackManagerForToolRun};
+use crate::error::{Error, Result};
+use crate::messages::ToolCall;
+use crate::runnables::RunnableConfig;
+
+use super::base::{
+    ArgsSchema, BaseTool, HandleToolError, HandleValidationError, ResponseFormat,
+    ToolException, ToolInput, ToolOutput, ToolDefinition,
+};
+
+/// Type alias for sync tool function.
+pub type ToolFunc = Arc<dyn Fn(String) -> Result<String> + Send + Sync>;
+
+/// Type alias for async tool function.
+pub type AsyncToolFunc = Arc<
+    dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Send + Sync,
+>;
+
+/// Tool that takes in a function or coroutine directly.
+///
+/// This is the simplest form of tool that takes a single string input
+/// and returns a string output.
+pub struct Tool {
+    /// The unique name of the tool.
+    name: String,
+    /// A description of what the tool does.
+    description: String,
+    /// The function to run when the tool is called.
+    func: Option<ToolFunc>,
+    /// The asynchronous version of the function.
+    coroutine: Option<AsyncToolFunc>,
+    /// Optional schema for the tool's input arguments.
+    args_schema: Option<ArgsSchema>,
+    /// Whether to return the tool's output directly.
+    return_direct: bool,
+    /// Whether to log the tool's progress.
+    verbose: bool,
+    /// How to handle tool errors.
+    handle_tool_error: HandleToolError,
+    /// How to handle validation errors.
+    handle_validation_error: HandleValidationError,
+    /// The tool response format.
+    response_format: ResponseFormat,
+    /// Optional tags for the tool.
+    tags: Option<Vec<String>>,
+    /// Optional metadata for the tool.
+    metadata: Option<HashMap<String, Value>>,
+    /// Optional provider-specific extras.
+    extras: Option<HashMap<String, Value>>,
+}
+
+impl Debug for Tool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Tool")
+            .field("name", &self.name)
+            .field("description", &self.description)
+            .field("return_direct", &self.return_direct)
+            .field("response_format", &self.response_format)
+            .finish()
+    }
+}
+
+impl Tool {
+    /// Create a new Tool.
+    pub fn new(
+        name: impl Into<String>,
+        func: Option<ToolFunc>,
+        description: impl Into<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            func,
+            coroutine: None,
+            args_schema: None,
+            return_direct: false,
+            verbose: false,
+            handle_tool_error: HandleToolError::Bool(false),
+            handle_validation_error: HandleValidationError::Bool(false),
+            response_format: ResponseFormat::Content,
+            tags: None,
+            metadata: None,
+            extras: None,
+        }
+    }
+
+    /// Set the coroutine (async function).
+    pub fn with_coroutine(mut self, coroutine: AsyncToolFunc) -> Self {
+        self.coroutine = Some(coroutine);
+        self
+    }
+
+    /// Set the args schema.
+    pub fn with_args_schema(mut self, schema: ArgsSchema) -> Self {
+        self.args_schema = Some(schema);
+        self
+    }
+
+    /// Set whether to return directly.
+    pub fn with_return_direct(mut self, return_direct: bool) -> Self {
+        self.return_direct = return_direct;
+        self
+    }
+
+    /// Set the response format.
+    pub fn with_response_format(mut self, format: ResponseFormat) -> Self {
+        self.response_format = format;
+        self
+    }
+
+    /// Set tags.
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = Some(tags);
+        self
+    }
+
+    /// Set metadata.
+    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+
+    /// Set extras.
+    pub fn with_extras(mut self, extras: HashMap<String, Value>) -> Self {
+        self.extras = Some(extras);
+        self
+    }
+
+    /// Create a Tool from a function.
+    pub fn from_function<F>(
+        func: F,
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self
+    where
+        F: Fn(String) -> Result<String> + Send + Sync + 'static,
+    {
+        Self::new(name, Some(Arc::new(func)), description)
+    }
+
+    /// Create a Tool from a sync and async function pair.
+    pub fn from_function_with_async<F, AF, Fut>(
+        func: F,
+        coroutine: AF,
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self
+    where
+        F: Fn(String) -> Result<String> + Send + Sync + 'static,
+        AF: Fn(String) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<String>> + Send + 'static,
+    {
+        Self::new(name, Some(Arc::new(func)), description)
+            .with_coroutine(Arc::new(move |input| Box::pin(coroutine(input))))
+    }
+
+    /// Extract the single input from the tool input.
+    fn extract_single_input(&self, input: ToolInput) -> Result<String> {
+        match input {
+            ToolInput::String(s) => Ok(s),
+            ToolInput::Dict(d) => {
+                // For backwards compatibility, if run_input is a dict,
+                // extract the single value
+                let all_args: Vec<_> = d.values().collect();
+                if all_args.len() != 1 {
+                    return Err(Error::ToolInvocation(format!(
+                        "Too many arguments to single-input tool {}. Consider using StructuredTool instead. Args: {:?}",
+                        self.name,
+                        all_args
+                    )));
+                }
+                match all_args[0] {
+                    Value::String(s) => Ok(s.clone()),
+                    other => Ok(other.to_string()),
+                }
+            }
+            ToolInput::ToolCall(tc) => {
+                let args = tc.args();
+                if let Some(obj) = args.as_object() {
+                    let values: Vec<_> = obj.values().collect();
+                        if values.len() != 1 {
+                            return Err(Error::ToolInvocation(format!(
+                                "Too many arguments to single-input tool {}. Consider using StructuredTool instead.",
+                                self.name,
+                            )));
+                        }
+                    match &values[0] {
+                        Value::String(s) => Ok(s.clone()),
+                        other => Ok(other.to_string()),
+                    }
+                } else if let Some(s) = args.as_str() {
+                    Ok(s.to_string())
+                } else {
+                    Ok(args.to_string())
+                }
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl BaseTool for Tool {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn description(&self) -> &str {
+        &self.description
+    }
+
+    fn args_schema(&self) -> Option<&ArgsSchema> {
+        self.args_schema.as_ref()
+    }
+
+    fn return_direct(&self) -> bool {
+        self.return_direct
+    }
+
+    fn verbose(&self) -> bool {
+        self.verbose
+    }
+
+    fn tags(&self) -> Option<&[String]> {
+        self.tags.as_deref()
+    }
+
+    fn metadata(&self) -> Option<&HashMap<String, Value>> {
+        self.metadata.as_ref()
+    }
+
+    fn handle_tool_error(&self) -> &HandleToolError {
+        &self.handle_tool_error
+    }
+
+    fn handle_validation_error(&self) -> &HandleValidationError {
+        &self.handle_validation_error
+    }
+
+    fn response_format(&self) -> ResponseFormat {
+        self.response_format
+    }
+
+    fn extras(&self) -> Option<&HashMap<String, Value>> {
+        self.extras.as_ref()
+    }
+
+    fn args(&self) -> HashMap<String, Value> {
+        // For backwards compatibility, if the function signature is ambiguous,
+        // assume it takes a single string input.
+        if self.args_schema.is_some() {
+            return self.args_schema.as_ref().unwrap().properties();
+        }
+        let mut props = HashMap::new();
+        props.insert(
+            "tool_input".to_string(),
+            serde_json::json!({"type": "string"}),
+        );
+        props
+    }
+
+    fn run(
+        &self,
+        input: ToolInput,
+        _config: Option<RunnableConfig>,
+    ) -> Result<ToolOutput> {
+        let string_input = self.extract_single_input(input)?;
+        
+        if let Some(ref func) = self.func {
+            match func(string_input) {
+                Ok(result) => Ok(ToolOutput::String(result)),
+                Err(e) => {
+                    // Check if we should handle the error
+                    if let Error::ToolInvocation(msg) = &e {
+                        let exc = ToolException::new(msg.clone());
+                        if let Some(handled) = super::base::handle_tool_error_impl(&exc, &self.handle_tool_error) {
+                            return Ok(ToolOutput::String(handled));
+                        }
+                    }
+                    Err(e)
+                }
+            }
+        } else {
+            Err(Error::ToolInvocation("Tool does not support sync invocation.".to_string()))
+        }
+    }
+
+    async fn arun(
+        &self,
+        input: ToolInput,
+        config: Option<RunnableConfig>,
+    ) -> Result<ToolOutput> {
+        let string_input = self.extract_single_input(input.clone())?;
+        
+        if let Some(ref coroutine) = self.coroutine {
+            match coroutine(string_input).await {
+                Ok(result) => Ok(ToolOutput::String(result)),
+                Err(e) => {
+                    if let Error::ToolInvocation(msg) = &e {
+                        let exc = ToolException::new(msg.clone());
+                        if let Some(handled) = super::base::handle_tool_error_impl(&exc, &self.handle_tool_error) {
+                            return Ok(ToolOutput::String(handled));
+                        }
+                    }
+                    Err(e)
+                }
+            }
+        } else {
+            // Fall back to sync implementation
+            self.run(input, config)
+        }
+    }
+}
+
+/// Builder for creating Tool instances.
+pub struct ToolBuilder {
+    name: Option<String>,
+    description: Option<String>,
+    func: Option<ToolFunc>,
+    coroutine: Option<AsyncToolFunc>,
+    args_schema: Option<ArgsSchema>,
+    return_direct: bool,
+    response_format: ResponseFormat,
+    tags: Option<Vec<String>>,
+    metadata: Option<HashMap<String, Value>>,
+    extras: Option<HashMap<String, Value>>,
+}
+
+impl ToolBuilder {
+    /// Create a new ToolBuilder.
+    pub fn new() -> Self {
+        Self {
+            name: None,
+            description: None,
+            func: None,
+            coroutine: None,
+            args_schema: None,
+            return_direct: false,
+            response_format: ResponseFormat::Content,
+            tags: None,
+            metadata: None,
+            extras: None,
+        }
+    }
+
+    /// Set the name.
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Set the description.
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    /// Set the sync function.
+    pub fn func<F>(mut self, func: F) -> Self
+    where
+        F: Fn(String) -> Result<String> + Send + Sync + 'static,
+    {
+        self.func = Some(Arc::new(func));
+        self
+    }
+
+    /// Set the async function.
+    pub fn coroutine<AF, Fut>(mut self, coroutine: AF) -> Self
+    where
+        AF: Fn(String) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<String>> + Send + 'static,
+    {
+        self.coroutine = Some(Arc::new(move |input| Box::pin(coroutine(input))));
+        self
+    }
+
+    /// Set the args schema.
+    pub fn args_schema(mut self, schema: ArgsSchema) -> Self {
+        self.args_schema = Some(schema);
+        self
+    }
+
+    /// Set return_direct.
+    pub fn return_direct(mut self, return_direct: bool) -> Self {
+        self.return_direct = return_direct;
+        self
+    }
+
+    /// Set the response format.
+    pub fn response_format(mut self, format: ResponseFormat) -> Self {
+        self.response_format = format;
+        self
+    }
+
+    /// Set tags.
+    pub fn tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = Some(tags);
+        self
+    }
+
+    /// Set metadata.
+    pub fn metadata(mut self, metadata: HashMap<String, Value>) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+
+    /// Set extras.
+    pub fn extras(mut self, extras: HashMap<String, Value>) -> Self {
+        self.extras = Some(extras);
+        self
+    }
+
+    /// Build the Tool.
+    pub fn build(self) -> Result<Tool> {
+        let name = self.name.ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
+        let description = self.description.unwrap_or_default();
+        
+        if self.func.is_none() && self.coroutine.is_none() {
+            return Err(Error::InvalidConfig("Function and/or coroutine must be provided".to_string()));
+        }
+        
+        Ok(Tool {
+            name,
+            description,
+            func: self.func,
+            coroutine: self.coroutine,
+            args_schema: self.args_schema,
+            return_direct: self.return_direct,
+            verbose: false,
+            handle_tool_error: HandleToolError::Bool(false),
+            handle_validation_error: HandleValidationError::Bool(false),
+            response_format: self.response_format,
+            tags: self.tags,
+            metadata: self.metadata,
+            extras: self.extras,
+        })
+    }
+}
+
+impl Default for ToolBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tool_creation() {
+        let tool = Tool::from_function(
+            |input| Ok(format!("Echo: {}", input)),
+            "echo",
+            "Echoes the input",
+        );
+        
+        assert_eq!(tool.name(), "echo");
+        assert_eq!(tool.description(), "Echoes the input");
+    }
+
+    #[test]
+    fn test_tool_run() {
+        let tool = Tool::from_function(
+            |input| Ok(format!("Hello, {}!", input)),
+            "greet",
+            "Greets the user",
+        );
+        
+        let result = tool.run(ToolInput::String("World".to_string()), None).unwrap();
+        match result {
+            ToolOutput::String(s) => assert_eq!(s, "Hello, World!"),
+            _ => panic!("Expected String output"),
+        }
+    }
+
+    #[test]
+    fn test_tool_run_with_dict() {
+        let tool = Tool::from_function(
+            |input| Ok(format!("Got: {}", input)),
+            "process",
+            "Processes input",
+        );
+        
+        let mut dict = HashMap::new();
+        dict.insert("query".to_string(), Value::String("test".to_string()));
+        
+        let result = tool.run(ToolInput::Dict(dict), None).unwrap();
+        match result {
+            ToolOutput::String(s) => assert_eq!(s, "Got: test"),
+            _ => panic!("Expected String output"),
+        }
+    }
+
+    #[test]
+    fn test_tool_args() {
+        let tool = Tool::from_function(
+            |input| Ok(input),
+            "identity",
+            "Returns input unchanged",
+        );
+        
+        let args = tool.args();
+        assert!(args.contains_key("tool_input"));
+    }
+
+    #[test]
+    fn test_tool_builder() {
+        let tool = ToolBuilder::new()
+            .name("test_tool")
+            .description("A test tool")
+            .func(|input| Ok(input))
+            .return_direct(true)
+            .build()
+            .unwrap();
+        
+        assert_eq!(tool.name(), "test_tool");
+        assert!(tool.return_direct());
+    }
+
+    #[tokio::test]
+    async fn test_tool_arun() {
+        let tool = Tool::from_function(
+            |input| Ok(format!("Sync: {}", input)),
+            "sync_tool",
+            "A sync tool",
+        );
+        
+        // Should fall back to sync implementation
+        let result = tool.arun(ToolInput::String("test".to_string()), None).await.unwrap();
+        match result {
+            ToolOutput::String(s) => assert_eq!(s, "Sync: test"),
+            _ => panic!("Expected String output"),
+        }
+    }
+}

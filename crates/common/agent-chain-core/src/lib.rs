@@ -60,8 +60,8 @@ pub mod chat_models {
     //! New code should use [`language_models`] directly.
 
     pub use crate::language_models::{
-        BaseChatModel, BoundChatModel, ChatChunk, ChatModelConfig, ChatResult, ChatResultMetadata,
-        ChatStream, DynBoundChatModel, LangSmithParams, ToolChoice, UsageMetadata,
+        BaseChatModel, ChatChunk, ChatModelConfig, ChatResult, ChatResultMetadata,
+        ChatStream, DisableStreaming, LangSmithParams, ToolChoice, UsageMetadata,
     };
 }
 
@@ -74,19 +74,19 @@ pub use error::{Error, Result};
 // Re-export core language model types
 pub use language_models::{
     // Chat model types
+    AIMessageChunkStream,
     BaseChatModel,
     // LLM types
     BaseLLM,
     // Base types
     BaseLanguageModel,
-    BoundChatModel,
     ChatChunk,
     ChatGenerationStream,
     ChatModelConfig,
     ChatResult,
     ChatResultMetadata,
     ChatStream,
-    DynBoundChatModel,
+    DisableStreaming,
     FakeListChatModel,
     FakeListChatModelError,
     // Fake implementations for testing
@@ -113,6 +113,8 @@ pub use language_models::{
     SimpleChatModel,
     ToolChoice,
     UsageMetadata,
+    agenerate_from_stream,
+    collect_and_merge_stream,
     generate_from_stream,
 
     get_prompts_from_cache,
@@ -129,7 +131,7 @@ pub use messages::{
 };
 
 // Re-export tool types
-pub use tools::{Tool, ToolDefinition, tool};
+pub use tools::{BaseTool, Tool, ToolDefinition};
 
 // Re-export chat history types
 pub use chat_history::{
