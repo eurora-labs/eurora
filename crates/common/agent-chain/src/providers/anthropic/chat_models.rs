@@ -12,15 +12,13 @@ use futures::Stream;
 use serde::Deserialize;
 
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
-use crate::chat_models::{
-    BaseChatModel, ChatChunk, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
-    LangSmithParams, ToolChoice, UsageMetadata,
-};
+use crate::chat_models::{BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams};
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{AIMessage, BaseMessage, ToolCall};
-use crate::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
+use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
 use crate::tools::ToolDefinition;
+use crate::ToolChoice;
 
 /// Default API base URL for Anthropic.
 const DEFAULT_API_BASE: &str = "https://api.anthropic.com/v1";
@@ -318,8 +316,8 @@ impl ChatAnthropic {
         payload
     }
 
-    /// Parse the API response into an OutputChatResult.
-    fn parse_response(&self, response: AnthropicResponse) -> OutputChatResult {
+    /// Parse the API response into a ChatResult.
+    fn parse_response(&self, response: AnthropicResponse) -> ChatResult {
         let mut text_content = String::new();
         let mut tool_calls = Vec::new();
 
@@ -341,24 +339,18 @@ impl ChatAnthropic {
         };
 
         let generation = ChatGeneration::new(message);
-        OutputChatResult::new(vec![generation])
+        ChatResult::new(vec![generation])
     }
 
-    /// Convert OutputChatResult to ChatResult for generate_with_tools return type.
-    fn convert_to_chat_result(&self, output: OutputChatResult) -> Result<ChatResult> {
-        if output.generations.is_empty() {
+    /// Extract AIMessage from ChatResult.
+    fn extract_ai_message(result: ChatResult) -> Result<AIMessage> {
+        if result.generations.is_empty() {
             return Err(Error::other("No generations returned"));
         }
-
-        let message = match output.generations[0].message.clone() {
-            BaseMessage::AI(msg) => msg,
-            _ => return Err(Error::other("Expected AI message")),
-        };
-
-        Ok(ChatResult {
-            message,
-            metadata: ChatResultMetadata::default(),
-        })
+        match result.generations[0].message.clone() {
+            BaseMessage::AI(msg) => Ok(msg),
+            _ => Err(Error::other("Expected AI message")),
+        }
     }
 }
 
@@ -416,7 +408,7 @@ impl BaseChatModel for ChatAnthropic {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         self._generate_internal(messages, stop, None).await
     }
 
@@ -426,7 +418,7 @@ impl BaseChatModel for ChatAnthropic {
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
+    ) -> Result<AIMessage> {
         self.generate_with_tools_internal(messages, tools, tool_choice, stop)
             .await
     }
@@ -439,7 +431,7 @@ impl ChatAnthropic {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         let api_key = self.get_api_key()?;
         let client = self.build_client();
         let payload = self.build_request_payload(&messages, stop, None);
@@ -498,7 +490,7 @@ impl ChatAnthropic {
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
+    ) -> Result<AIMessage> {
         let api_key = self.get_api_key()?;
         let client = self.build_client();
 
@@ -524,17 +516,22 @@ impl ChatAnthropic {
         // Add tool_choice if specified
         if let Some(choice) = tool_choice {
             match choice {
-                ToolChoice::Auto => {
-                    payload["tool_choice"] = serde_json::json!({"type": "auto"});
+                ToolChoice::String(s) => {
+                    match s.as_str() {
+                        "auto" => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
+                        "any" => payload["tool_choice"] = serde_json::json!({"type": "any"}),
+                        "none" => {
+                            // Don't send tool_choice for None
+                        }
+                        _ => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
+                    }
                 }
-                ToolChoice::Any => {
-                    payload["tool_choice"] = serde_json::json!({"type": "any"});
-                }
-                ToolChoice::Tool { name } => {
-                    payload["tool_choice"] = serde_json::json!({"type": "tool", "name": name});
-                }
-                ToolChoice::None => {
-                    // Don't send tool_choice for None, or could send {"type": "none"} if supported
+                ToolChoice::Structured { choice_type, name } => {
+                    if choice_type == "tool" || choice_type == "function" {
+                        if let Some(tool_name) = name {
+                            payload["tool_choice"] = serde_json::json!({"type": "tool", "name": tool_name});
+                        }
+                    }
                 }
             }
         }
@@ -555,8 +552,8 @@ impl ChatAnthropic {
                     if resp.status().is_success() {
                         match resp.json::<AnthropicResponse>().await {
                             Ok(anthropic_resp) => {
-                                let output = self.parse_response(anthropic_resp);
-                                return self.convert_to_chat_result(output);
+                                let result = self.parse_response(anthropic_resp);
+                                return Self::extract_ai_message(result);
                             }
                             Err(e) => {
                                 return Err(Error::Json(serde_json::Error::io(
@@ -621,13 +618,9 @@ impl ChatAnthropic {
         }
 
         // Create a stream from the SSE response
-        let model = self.model.clone();
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
-            let mut accumulated_content = String::new();
-            let mut usage: Option<UsageMetadata> = None;
-            let mut stop_reason: Option<String> = None;
 
             use futures::StreamExt;
 
@@ -652,32 +645,16 @@ impl ChatAnthropic {
                                         match event {
                                             AnthropicStreamEvent::ContentBlockDelta { delta, .. } => {
                                                 if let Some(text) = delta.text {
-                                                    accumulated_content.push_str(&text);
                                                     yield Ok(ChatChunk {
                                                         content: text,
                                                         is_final: false,
-                                                        metadata: None,
                                                     });
-                                                }
-                                            }
-                                            AnthropicStreamEvent::MessageDelta { delta, usage: u } => {
-                                                stop_reason = delta.stop_reason;
-                                                if let Some(u) = u {
-                                                    usage = Some(UsageMetadata::new(
-                                                        u.input_tokens.unwrap_or(0),
-                                                        u.output_tokens,
-                                                    ));
                                                 }
                                             }
                                             AnthropicStreamEvent::MessageStop => {
                                                 yield Ok(ChatChunk {
                                                     content: String::new(),
                                                     is_final: true,
-                                                    metadata: Some(ChatResultMetadata {
-                                                        model: Some(model.clone()),
-                                                        stop_reason: stop_reason.clone(),
-                                                        usage: usage.clone(),
-                                                    }),
                                                 });
                                             }
                                             _ => {}
