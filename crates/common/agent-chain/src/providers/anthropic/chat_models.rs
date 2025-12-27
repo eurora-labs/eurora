@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde::Deserialize;
 
+use crate::ToolChoice;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams};
 use crate::error::{Error, Result};
@@ -18,7 +19,6 @@ use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageMod
 use crate::messages::{AIMessage, BaseMessage, ToolCall};
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
 use crate::tools::ToolDefinition;
-use crate::ToolChoice;
 
 /// Default API base URL for Anthropic.
 const DEFAULT_API_BASE: &str = "https://api.anthropic.com/v1";
@@ -527,10 +527,11 @@ impl ChatAnthropic {
                     }
                 }
                 ToolChoice::Structured { choice_type, name } => {
-                    if choice_type == "tool" || choice_type == "function" {
-                        if let Some(tool_name) = name {
-                            payload["tool_choice"] = serde_json::json!({"type": "tool", "name": tool_name});
-                        }
+                    if (choice_type == "tool" || choice_type == "function")
+                        && let Some(tool_name) = name
+                    {
+                        payload["tool_choice"] =
+                            serde_json::json!({"type": "tool", "name": tool_name});
                     }
                 }
             }
@@ -737,7 +738,9 @@ enum AnthropicStreamEvent {
     },
     #[serde(rename = "message_delta")]
     MessageDelta {
+        #[allow(dead_code)]
         delta: MessageDelta,
+        #[allow(dead_code)]
         usage: Option<StreamUsage>,
     },
     #[serde(rename = "message_stop")]
@@ -758,12 +761,14 @@ struct ContentDelta {
 
 /// Message delta in streaming.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MessageDelta {
     stop_reason: Option<String>,
 }
 
 /// Stream usage information.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct StreamUsage {
     input_tokens: Option<u32>,
     output_tokens: u32,

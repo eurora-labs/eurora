@@ -27,46 +27,8 @@ use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, Generation
 use crate::rate_limiters::BaseRateLimiter;
 use crate::tools::{BaseTool, ToolDefinition};
 
-/// LangChain ID prefix for run IDs.
-pub const LC_ID_PREFIX: &str = "lc";
-
 /// Type alias for streaming output.
 pub type ChatStream = Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>;
-
-/// Get generation info and message metadata from a generation.
-///
-/// This helper function extracts metadata from a ChatGeneration or ChatGenerationChunk,
-/// merging generation_info with the message's response_metadata.
-///
-/// Mirrors Python's `_gen_info_and_msg_metadata`.
-pub fn gen_info_and_msg_metadata(generation: &ChatGeneration) -> HashMap<String, Value> {
-    let mut result = generation.generation_info.clone().unwrap_or_default();
-
-    // Merge response_metadata from the message
-    if let Some(metadata) = generation.message.response_metadata() {
-        for (key, value) in metadata.iter() {
-            result.insert(key.clone(), value.clone());
-        }
-    }
-
-    result
-}
-
-/// Get generation info and message metadata from a generation chunk.
-///
-/// Mirrors Python's `_gen_info_and_msg_metadata` for chunks.
-pub fn gen_info_and_msg_metadata_chunk(generation: &ChatGenerationChunk) -> HashMap<String, Value> {
-    let mut result = generation.generation_info.clone().unwrap_or_default();
-
-    // Merge response_metadata from the message
-    if let Some(metadata) = generation.message.response_metadata() {
-        for (key, value) in metadata.iter() {
-            result.insert(key.clone(), value.clone());
-        }
-    }
-
-    result
-}
 
 /// Type alias for a streaming chat generation output.
 pub type ChatGenerationStream = Pin<Box<dyn Stream<Item = Result<ChatGenerationChunk>> + Send>>;
@@ -562,7 +524,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<Vec<BaseMessage>>,
         stop: Option<Vec<String>>,
-        callbacks: Option<Callbacks>,
+        _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut all_generations: Vec<Vec<GenerationType>> = Vec::new();
 
@@ -579,7 +541,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         messages: Vec<Vec<BaseMessage>>,
         stop: Option<Vec<String>>,
-        callbacks: Option<Callbacks>,
+        _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut all_generations: Vec<Vec<GenerationType>> = Vec::new();
 
