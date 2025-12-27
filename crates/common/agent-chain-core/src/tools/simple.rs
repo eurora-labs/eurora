@@ -12,23 +12,20 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::callbacks::{CallbackManagerForToolRun, AsyncCallbackManagerForToolRun};
 use crate::error::{Error, Result};
-use crate::messages::ToolCall;
 use crate::runnables::RunnableConfig;
 
 use super::base::{
     ArgsSchema, BaseTool, HandleToolError, HandleValidationError, ResponseFormat,
-    ToolException, ToolInput, ToolOutput, ToolDefinition,
+    ToolException, ToolInput, ToolOutput,
 };
 
 /// Type alias for sync tool function.
 pub type ToolFunc = Arc<dyn Fn(String) -> Result<String> + Send + Sync>;
 
 /// Type alias for async tool function.
-pub type AsyncToolFunc = Arc<
-    dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Send + Sync,
->;
+pub type AsyncToolFunc =
+    Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Send + Sync>;
 
 /// Tool that takes in a function or coroutine directly.
 ///
@@ -179,8 +176,7 @@ impl Tool {
                 if all_args.len() != 1 {
                     return Err(Error::ToolInvocation(format!(
                         "Too many arguments to single-input tool {}. Consider using StructuredTool instead. Args: {:?}",
-                        self.name,
-                        all_args
+                        self.name, all_args
                     )));
                 }
                 match all_args[0] {
@@ -192,12 +188,12 @@ impl Tool {
                 let args = tc.args();
                 if let Some(obj) = args.as_object() {
                     let values: Vec<_> = obj.values().collect();
-                        if values.len() != 1 {
-                            return Err(Error::ToolInvocation(format!(
-                                "Too many arguments to single-input tool {}. Consider using StructuredTool instead.",
-                                self.name,
-                            )));
-                        }
+                    if values.len() != 1 {
+                        return Err(Error::ToolInvocation(format!(
+                            "Too many arguments to single-input tool {}. Consider using StructuredTool instead.",
+                            self.name,
+                        )));
+                    }
                     match &values[0] {
                         Value::String(s) => Ok(s.clone()),
                         other => Ok(other.to_string()),
@@ -272,13 +268,9 @@ impl BaseTool for Tool {
         props
     }
 
-    fn run(
-        &self,
-        input: ToolInput,
-        _config: Option<RunnableConfig>,
-    ) -> Result<ToolOutput> {
+    fn run(&self, input: ToolInput, _config: Option<RunnableConfig>) -> Result<ToolOutput> {
         let string_input = self.extract_single_input(input)?;
-        
+
         if let Some(ref func) = self.func {
             match func(string_input) {
                 Ok(result) => Ok(ToolOutput::String(result)),
@@ -286,7 +278,9 @@ impl BaseTool for Tool {
                     // Check if we should handle the error
                     if let Error::ToolInvocation(msg) = &e {
                         let exc = ToolException::new(msg.clone());
-                        if let Some(handled) = super::base::handle_tool_error_impl(&exc, &self.handle_tool_error) {
+                        if let Some(handled) =
+                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
+                        {
                             return Ok(ToolOutput::String(handled));
                         }
                     }
@@ -294,24 +288,24 @@ impl BaseTool for Tool {
                 }
             }
         } else {
-            Err(Error::ToolInvocation("Tool does not support sync invocation.".to_string()))
+            Err(Error::ToolInvocation(
+                "Tool does not support sync invocation.".to_string(),
+            ))
         }
     }
 
-    async fn arun(
-        &self,
-        input: ToolInput,
-        config: Option<RunnableConfig>,
-    ) -> Result<ToolOutput> {
+    async fn arun(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput> {
         let string_input = self.extract_single_input(input.clone())?;
-        
+
         if let Some(ref coroutine) = self.coroutine {
             match coroutine(string_input).await {
                 Ok(result) => Ok(ToolOutput::String(result)),
                 Err(e) => {
                     if let Error::ToolInvocation(msg) = &e {
                         let exc = ToolException::new(msg.clone());
-                        if let Some(handled) = super::base::handle_tool_error_impl(&exc, &self.handle_tool_error) {
+                        if let Some(handled) =
+                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
+                        {
                             return Ok(ToolOutput::String(handled));
                         }
                     }
@@ -425,13 +419,17 @@ impl ToolBuilder {
 
     /// Build the Tool.
     pub fn build(self) -> Result<Tool> {
-        let name = self.name.ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
+        let name = self
+            .name
+            .ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
         let description = self.description.unwrap_or_default();
-        
+
         if self.func.is_none() && self.coroutine.is_none() {
-            return Err(Error::InvalidConfig("Function and/or coroutine must be provided".to_string()));
+            return Err(Error::InvalidConfig(
+                "Function and/or coroutine must be provided".to_string(),
+            ));
         }
-        
+
         Ok(Tool {
             name,
             description,
@@ -467,7 +465,7 @@ mod tests {
             "echo",
             "Echoes the input",
         );
-        
+
         assert_eq!(tool.name(), "echo");
         assert_eq!(tool.description(), "Echoes the input");
     }
@@ -479,8 +477,10 @@ mod tests {
             "greet",
             "Greets the user",
         );
-        
-        let result = tool.run(ToolInput::String("World".to_string()), None).unwrap();
+
+        let result = tool
+            .run(ToolInput::String("World".to_string()), None)
+            .unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "Hello, World!"),
             _ => panic!("Expected String output"),
@@ -494,10 +494,10 @@ mod tests {
             "process",
             "Processes input",
         );
-        
+
         let mut dict = HashMap::new();
         dict.insert("query".to_string(), Value::String("test".to_string()));
-        
+
         let result = tool.run(ToolInput::Dict(dict), None).unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "Got: test"),
@@ -507,12 +507,8 @@ mod tests {
 
     #[test]
     fn test_tool_args() {
-        let tool = Tool::from_function(
-            |input| Ok(input),
-            "identity",
-            "Returns input unchanged",
-        );
-        
+        let tool = Tool::from_function(|input| Ok(input), "identity", "Returns input unchanged");
+
         let args = tool.args();
         assert!(args.contains_key("tool_input"));
     }
@@ -526,7 +522,7 @@ mod tests {
             .return_direct(true)
             .build()
             .unwrap();
-        
+
         assert_eq!(tool.name(), "test_tool");
         assert!(tool.return_direct());
     }
@@ -538,9 +534,12 @@ mod tests {
             "sync_tool",
             "A sync tool",
         );
-        
+
         // Should fall back to sync implementation
-        let result = tool.arun(ToolInput::String("test".to_string()), None).await.unwrap();
+        let result = tool
+            .arun(ToolInput::String("test".to_string()), None)
+            .await
+            .unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "Sync: test"),
             _ => panic!("Expected String output"),
