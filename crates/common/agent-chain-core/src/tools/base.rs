@@ -3,7 +3,6 @@
 //! This module provides the core tool abstractions, mirroring
 //! `langchain_core.tools.base`.
 
-use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -12,15 +11,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
-use uuid::Uuid;
 
-use crate::callbacks::{
-    AsyncCallbackManager, AsyncCallbackManagerForToolRun, CallbackManager, CallbackManagerForToolRun,
-    Callbacks,
-};
 use crate::error::Result;
 use crate::messages::{BaseMessage, ToolCall, ToolMessage};
-use crate::runnables::{RunnableConfig, ensure_config, patch_config};
+use crate::runnables::{RunnableConfig, ensure_config};
 
 /// Arguments that are filtered out from tool schemas.
 pub const FILTERED_ARGS: &[&str] = &["run_manager", "callbacks"];
@@ -113,12 +107,11 @@ impl ArgsSchema {
     /// Get properties from the schema.
     pub fn properties(&self) -> HashMap<String, Value> {
         match self {
-            ArgsSchema::JsonSchema(schema) => {
-                schema.get("properties")
-                    .and_then(|p| p.as_object())
-                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                    .unwrap_or_default()
-            }
+            ArgsSchema::JsonSchema(schema) => schema
+                .get("properties")
+                .and_then(|p| p.as_object())
+                .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                .unwrap_or_default(),
             ArgsSchema::TypeName(_) => HashMap::new(),
         }
     }
@@ -153,7 +146,9 @@ impl Debug for HandleToolError {
         match self {
             HandleToolError::None => write!(f, "HandleToolError::None"),
             HandleToolError::Bool(b) => f.debug_tuple("HandleToolError::Bool").field(b).finish(),
-            HandleToolError::Message(m) => f.debug_tuple("HandleToolError::Message").field(m).finish(),
+            HandleToolError::Message(m) => {
+                f.debug_tuple("HandleToolError::Message").field(m).finish()
+            }
             HandleToolError::Handler(_) => write!(f, "HandleToolError::Handler(<function>)"),
         }
     }
@@ -182,9 +177,17 @@ impl Debug for HandleValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             HandleValidationError::None => write!(f, "HandleValidationError::None"),
-            HandleValidationError::Bool(b) => f.debug_tuple("HandleValidationError::Bool").field(b).finish(),
-            HandleValidationError::Message(m) => f.debug_tuple("HandleValidationError::Message").field(m).finish(),
-            HandleValidationError::Handler(_) => write!(f, "HandleValidationError::Handler(<function>)"),
+            HandleValidationError::Bool(b) => f
+                .debug_tuple("HandleValidationError::Bool")
+                .field(b)
+                .finish(),
+            HandleValidationError::Message(m) => f
+                .debug_tuple("HandleValidationError::Message")
+                .field(m)
+                .finish(),
+            HandleValidationError::Handler(_) => {
+                write!(f, "HandleValidationError::Handler(<function>)")
+            }
         }
     }
 }
@@ -362,9 +365,7 @@ pub trait BaseTool: Send + Sync + Debug {
 
     /// Get the schema for tool calls, excluding injected arguments.
     fn tool_call_schema(&self) -> ArgsSchema {
-        self.args_schema()
-            .cloned()
-            .unwrap_or_default()
+        self.args_schema().cloned().unwrap_or_default()
     }
 
     /// Get the tool definition for LLM function calling.
@@ -372,7 +373,8 @@ pub trait BaseTool: Send + Sync + Debug {
         ToolDefinition {
             name: self.name().to_string(),
             description: self.description().to_string(),
-            parameters: self.args_schema()
+            parameters: self
+                .args_schema()
                 .map(|s| s.to_json_schema())
                 .unwrap_or_else(|| serde_json::json!({"type": "object", "properties": {}})),
         }
@@ -384,18 +386,10 @@ pub trait BaseTool: Send + Sync + Debug {
     }
 
     /// Run the tool synchronously.
-    fn run(
-        &self,
-        input: ToolInput,
-        config: Option<RunnableConfig>,
-    ) -> Result<ToolOutput>;
+    fn run(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput>;
 
     /// Run the tool asynchronously.
-    async fn arun(
-        &self,
-        input: ToolInput,
-        config: Option<RunnableConfig>,
-    ) -> Result<ToolOutput> {
+    async fn arun(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput> {
         // Default implementation uses sync run
         self.run(input, config)
     }
@@ -405,24 +399,14 @@ pub trait BaseTool: Send + Sync + Debug {
         let input = ToolInput::ToolCall(tool_call.clone());
         match self.arun(input, None).await {
             Ok(output) => match output {
-                ToolOutput::String(s) => {
-                    ToolMessage::new(s, tool_call.id()).into()
-                }
+                ToolOutput::String(s) => ToolMessage::new(s, tool_call.id()).into(),
                 ToolOutput::Message(m) => m.into(),
                 ToolOutput::ContentAndArtifact { content, artifact } => {
-                    ToolMessage::with_artifact(
-                        content.to_string(),
-                        tool_call.id(),
-                        artifact,
-                    ).into()
+                    ToolMessage::with_artifact(content.to_string(), tool_call.id(), artifact).into()
                 }
-                ToolOutput::Json(v) => {
-                    ToolMessage::new(v.to_string(), tool_call.id()).into()
-                }
+                ToolOutput::Json(v) => ToolMessage::new(v.to_string(), tool_call.id()).into(),
             },
-            Err(e) => {
-                ToolMessage::error(e.to_string(), tool_call.id()).into()
-            }
+            Err(e) => ToolMessage::error(e.to_string(), tool_call.id()).into(),
         }
     }
 
@@ -454,32 +438,22 @@ pub fn is_tool_call(input: &Value) -> bool {
 }
 
 /// Handle a tool exception based on the configured flag.
-pub fn handle_tool_error_impl(
-    e: &ToolException,
-    flag: &HandleToolError,
-) -> Option<String> {
+pub fn handle_tool_error_impl(e: &ToolException, flag: &HandleToolError) -> Option<String> {
     match flag {
         HandleToolError::None => None,
         HandleToolError::Bool(false) => None,
-        HandleToolError::Bool(true) => {
-            Some(e.0.clone())
-        }
+        HandleToolError::Bool(true) => Some(e.0.clone()),
         HandleToolError::Message(msg) => Some(msg.clone()),
         HandleToolError::Handler(f) => Some(f(e)),
     }
 }
 
 /// Handle a validation error based on the configured flag.
-pub fn handle_validation_error_impl(
-    e: &str,
-    flag: &HandleValidationError,
-) -> Option<String> {
+pub fn handle_validation_error_impl(e: &str, flag: &HandleValidationError) -> Option<String> {
     match flag {
         HandleValidationError::None => None,
         HandleValidationError::Bool(false) => None,
-        HandleValidationError::Bool(true) => {
-            Some("Tool input validation error".to_string())
-        }
+        HandleValidationError::Bool(true) => Some("Tool input validation error".to_string()),
         HandleValidationError::Message(msg) => Some(msg.clone()),
         HandleValidationError::Handler(f) => Some(f(e)),
     }
@@ -495,11 +469,7 @@ pub fn format_output(
 ) -> ToolOutput {
     if let Some(tool_call_id) = tool_call_id {
         let msg = if let Some(artifact) = artifact {
-            ToolMessage::with_artifact(
-                stringify_content(&content),
-                tool_call_id,
-                artifact,
-            )
+            ToolMessage::with_artifact(stringify_content(&content), tool_call_id, artifact)
         } else {
             ToolMessage::new(stringify_content(&content), tool_call_id)
         };
@@ -525,12 +495,11 @@ pub fn is_message_content_type(obj: &Value) -> bool {
 pub fn is_message_content_block(obj: &Value) -> bool {
     match obj {
         Value::String(_) => true,
-        Value::Object(map) => {
-            map.get("type")
-                .and_then(|t| t.as_str())
-                .map(|t| TOOL_MESSAGE_BLOCK_TYPES.contains(&t))
-                .unwrap_or(false)
-        }
+        Value::Object(map) => map
+            .get("type")
+            .and_then(|t| t.as_str())
+            .map(|t| TOOL_MESSAGE_BLOCK_TYPES.contains(&t))
+            .unwrap_or(false),
         _ => false,
     }
 }
@@ -549,7 +518,7 @@ pub fn prep_run_args(
     config: Option<RunnableConfig>,
 ) -> (ToolInput, Option<String>, RunnableConfig) {
     let config = ensure_config(config);
-    
+
     match &value {
         ToolInput::ToolCall(tc) => {
             let tool_call_id = Some(tc.id().to_string());
@@ -557,7 +526,7 @@ pub fn prep_run_args(
                 tc.args()
                     .as_object()
                     .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
             );
             (input, tool_call_id, config)
         }
@@ -636,13 +605,13 @@ mod tests {
     #[test]
     fn test_handle_tool_error() {
         let exc = ToolException::new("test error");
-        
+
         let result = handle_tool_error_impl(&exc, &HandleToolError::Bool(false));
         assert!(result.is_none());
-        
+
         let result = handle_tool_error_impl(&exc, &HandleToolError::Bool(true));
         assert_eq!(result, Some("test error".to_string()));
-        
+
         let result = handle_tool_error_impl(&exc, &HandleToolError::Message("custom".to_string()));
         assert_eq!(result, Some("custom".to_string()));
     }

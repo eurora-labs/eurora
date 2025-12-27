@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use crate::ChatResult;
 use crate::messages::BaseMessage;
+use crate::outputs::ChatResult;
 
 use super::base::{BaseCallbackHandler, BaseCallbackManager, Callbacks};
 use crate::utils::uuid::uuid7;
