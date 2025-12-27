@@ -745,10 +745,20 @@ impl ChatOllama {
                     continue;
                 }
 
-                yield ChatChunk {
-                    content,
-                    is_final: is_done,
-                };
+                if is_done {
+                    // Final chunk - include usage metadata and finish reason
+                    let usage = if let (Some(prompt_eval_count), Some(eval_count)) =
+                        (stream_resp.prompt_eval_count, stream_resp.eval_count)
+                    {
+                        Some(UsageMetadata::new(prompt_eval_count as i64, eval_count as i64))
+                    } else {
+                        None
+                    };
+                    let finish_reason = stream_resp.done_reason;
+                    yield ChatChunk::final_chunk(usage, finish_reason);
+                } else {
+                    yield ChatChunk::new(content);
+                }
             }
         };
 
