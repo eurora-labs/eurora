@@ -3,6 +3,7 @@
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
+	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import { open } from '@tauri-apps/plugin-shell';
 	import { onMount } from 'svelte';
 
@@ -33,7 +34,8 @@
 </script>
 
 <div class="relative flex h-full w-full flex-col px-8">
-	<div class="flex flex-col justify-center items-center h-full w-full gap-8">
+	<div class="flex flex-row justify-center items-center h-full w-full gap-4">
+		<Spinner class="w-8 h-8" />
 		<h1 class="text-4xl font-bold drop-shadow-lg">Waiting for you to log in...</h1>
 	</div>
 	<div class="mb-8">
