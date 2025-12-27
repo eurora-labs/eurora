@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::error::{Error, Result};
 use crate::runnables::Runnable;
 
-use super::base::{ArgsSchema, BaseTool, ResponseFormat};
+use super::base::{ArgsSchema, ResponseFormat};
 use super::simple::Tool;
 use super::structured::{StructuredTool, create_args_schema};
 
@@ -210,6 +210,9 @@ where
     StructuredTool::from_function(func, name, description, schema)
 }
 
+/// Type alias for the tool function used in tool_from_schema.
+pub type ToolFromSchemaFn = Box<dyn Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync>;
+
 /// Helper macro-like function to define a tool with a schema.
 ///
 /// In Rust, we can't use decorators like Python's @tool,
@@ -218,8 +221,7 @@ pub fn tool_from_schema(
     name: impl Into<String>,
     description: impl Into<String>,
     properties: Vec<(&str, &str, &str, bool)>, // (name, type, description, required)
-) -> impl FnOnce(Box<dyn Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync>) -> StructuredTool
-{
+) -> impl FnOnce(ToolFromSchemaFn) -> StructuredTool {
     let name = name.into();
     let description = description.into();
 
@@ -241,7 +243,7 @@ pub fn tool_from_schema(
 
     let schema = create_args_schema(&name, props, required, Some(&description));
 
-    move |func| StructuredTool::from_function(move |args| func(args), name, description, schema)
+    move |func| StructuredTool::from_function(func, name, description, schema)
 }
 
 /// Generate a placeholder description for a runnable.
@@ -255,6 +257,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::base::BaseTool;
 
     #[test]
     fn test_create_simple_tool() {
