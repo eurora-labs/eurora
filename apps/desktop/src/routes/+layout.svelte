@@ -1,8 +1,8 @@
 <script lang="ts">
-	import '../app.css';
+	import '$styles/styles.css';
+	import { initDependencies } from '$lib/bootstrap/deps.js';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
-	import { initDependencies } from '$lib/bootstrap/deps.js';
 
 	let { children } = $props();
 

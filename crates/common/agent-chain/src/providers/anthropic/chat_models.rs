@@ -11,12 +11,15 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde::Deserialize;
 
+use crate::ToolChoice;
+use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{
-    ChatChunk, ChatModel, ChatResult, ChatResultMetadata, ChatStream, LangSmithParams, ToolChoice,
-    UsageMetadata,
+    BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams, UsageMetadata,
 };
 use crate::error::{Error, Result};
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::messages::{AIMessage, BaseMessage, ToolCall};
+use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
 use crate::tools::ToolDefinition;
 
 /// Default API base URL for Anthropic.
@@ -71,6 +74,10 @@ pub struct ChatAnthropic {
     max_retries: u32,
     /// Additional model kwargs.
     model_kwargs: HashMap<String, serde_json::Value>,
+    /// Chat model configuration.
+    chat_model_config: ChatModelConfig,
+    /// Language model configuration.
+    language_model_config: LanguageModelConfig,
     /// HTTP client.
     #[allow(dead_code)]
     client: reqwest::Client,
@@ -96,6 +103,8 @@ impl ChatAnthropic {
             timeout: None,
             max_retries: 2,
             model_kwargs: HashMap::new(),
+            chat_model_config: ChatModelConfig::new(),
+            language_model_config: LanguageModelConfig::new(),
             client: reqwest::Client::new(),
         }
     }
@@ -224,6 +233,33 @@ impl ChatAnthropic {
                         }]
                     }));
                 }
+                BaseMessage::Chat(m) => {
+                    // Map chat messages based on role
+                    let role = match m.role() {
+                        "user" | "human" => "user",
+                        "assistant" | "ai" => "assistant",
+                        _ => "user", // Default to user for unknown roles
+                    };
+                    conversation.push(serde_json::json!({
+                        "role": role,
+                        "content": m.content()
+                    }));
+                }
+                BaseMessage::Function(m) => {
+                    // Function messages are legacy, treat like tool results
+                    conversation.push(serde_json::json!({
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": m.name(), // Use function name as tool_use_id
+                            "content": m.content()
+                        }]
+                    }));
+                }
+                BaseMessage::Remove(_) => {
+                    // RemoveMessage is used for message management, not sent to API
+                    continue;
+                }
             }
         }
 
@@ -298,29 +334,30 @@ impl ChatAnthropic {
             }
         }
 
-        let message = if tool_calls.is_empty() {
-            AIMessage::new(text_content)
+        let message: BaseMessage = if tool_calls.is_empty() {
+            AIMessage::new(text_content).into()
         } else {
-            AIMessage::with_tool_calls(text_content, tool_calls)
+            AIMessage::with_tool_calls(text_content, tool_calls).into()
         };
 
-        let usage = response
-            .usage
-            .map(|u| UsageMetadata::new(u.input_tokens, u.output_tokens));
+        let generation = ChatGeneration::new(message);
+        ChatResult::new(vec![generation])
+    }
 
-        ChatResult {
-            message,
-            metadata: ChatResultMetadata {
-                model: Some(response.model),
-                stop_reason: response.stop_reason,
-                usage,
-            },
+    /// Extract AIMessage from ChatResult.
+    fn extract_ai_message(result: ChatResult) -> Result<AIMessage> {
+        if result.generations.is_empty() {
+            return Err(Error::other("No generations returned"));
+        }
+        match result.generations[0].message.clone() {
+            BaseMessage::AI(msg) => Ok(msg),
+            _ => Err(Error::other("Expected AI message")),
         }
     }
 }
 
 #[async_trait]
-impl ChatModel for ChatAnthropic {
+impl BaseLanguageModel for ChatAnthropic {
     fn llm_type(&self) -> &str {
         "anthropic-chat"
     }
@@ -329,12 +366,52 @@ impl ChatModel for ChatAnthropic {
         &self.model
     }
 
-    async fn generate(
+    fn config(&self) -> &LanguageModelConfig {
+        &self.language_model_config
+    }
+
+    async fn generate_prompt(
+        &self,
+        prompts: Vec<LanguageModelInput>,
+        stop: Option<Vec<String>>,
+        _callbacks: Option<Callbacks>,
+    ) -> Result<LLMResult> {
+        let mut all_generations = Vec::new();
+        for prompt in prompts {
+            let messages = prompt.to_messages();
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
+            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
+        }
+        Ok(LLMResult::new(all_generations))
+    }
+
+    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
+        LangSmithParams {
+            ls_provider: Some("anthropic".to_string()),
+            ls_model_name: Some(self.model.clone()),
+            ls_model_type: Some("chat".to_string()),
+            ls_temperature: self.temperature,
+            ls_max_tokens: Some(self.max_tokens),
+            ls_stop: stop.map(|s| s.to_vec()),
+        }
+    }
+}
+
+#[async_trait]
+impl BaseChatModel for ChatAnthropic {
+    fn chat_config(&self) -> &ChatModelConfig {
+        &self.chat_model_config
+    }
+
+    async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        self.generate_with_tools(messages, &[], None, stop).await
+        self._generate_internal(messages, stop, None).await
     }
 
     async fn generate_with_tools(
@@ -343,46 +420,23 @@ impl ChatModel for ChatAnthropic {
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
+    ) -> Result<AIMessage> {
+        self.generate_with_tools_internal(messages, tools, tool_choice, stop)
+            .await
+    }
+}
+
+impl ChatAnthropic {
+    /// Internal generate implementation.
+    async fn _generate_internal(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         let api_key = self.get_api_key()?;
         let client = self.build_client();
-
-        // Convert tool definitions to Anthropic format
-        let anthropic_tools: Vec<serde_json::Value> = tools
-            .iter()
-            .map(|t| {
-                serde_json::json!({
-                    "name": t.name,
-                    "description": t.description,
-                    "input_schema": t.parameters
-                })
-            })
-            .collect();
-
-        let tools_option = if anthropic_tools.is_empty() {
-            None
-        } else {
-            Some(anthropic_tools.as_slice())
-        };
-        let mut payload = self.build_request_payload(&messages, stop, tools_option);
-
-        // Add tool_choice if specified
-        if let Some(choice) = tool_choice {
-            match choice {
-                ToolChoice::Auto => {
-                    payload["tool_choice"] = serde_json::json!({"type": "auto"});
-                }
-                ToolChoice::Any => {
-                    payload["tool_choice"] = serde_json::json!({"type": "any"});
-                }
-                ToolChoice::Tool { name } => {
-                    payload["tool_choice"] = serde_json::json!({"type": "tool", "name": name});
-                }
-                ToolChoice::None => {
-                    // Don't send tool_choice for None, or could send {"type": "none"} if supported
-                }
-            }
-        }
+        let payload = self.build_request_payload(&messages, stop, None);
 
         let mut last_error = None;
         for _ in 0..=self.max_retries {
@@ -431,7 +485,114 @@ impl ChatModel for ChatAnthropic {
         Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
     }
 
-    async fn stream(
+    /// Internal generate with tools implementation.
+    async fn generate_with_tools_internal(
+        &self,
+        messages: Vec<BaseMessage>,
+        tools: &[ToolDefinition],
+        tool_choice: Option<&ToolChoice>,
+        stop: Option<Vec<String>>,
+    ) -> Result<AIMessage> {
+        let api_key = self.get_api_key()?;
+        let client = self.build_client();
+
+        // Convert tool definitions to Anthropic format
+        let anthropic_tools: Vec<serde_json::Value> = tools
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "name": t.name,
+                    "description": t.description,
+                    "input_schema": t.parameters
+                })
+            })
+            .collect();
+
+        let tools_option = if anthropic_tools.is_empty() {
+            None
+        } else {
+            Some(anthropic_tools.as_slice())
+        };
+        let mut payload = self.build_request_payload(&messages, stop, tools_option);
+
+        // Add tool_choice if specified
+        if let Some(choice) = tool_choice {
+            match choice {
+                ToolChoice::String(s) => {
+                    match s.as_str() {
+                        "auto" => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
+                        "any" => payload["tool_choice"] = serde_json::json!({"type": "any"}),
+                        "none" => {
+                            // Don't send tool_choice for None
+                        }
+                        _ => payload["tool_choice"] = serde_json::json!({"type": "auto"}),
+                    }
+                }
+                ToolChoice::Structured { choice_type, name } => {
+                    if (choice_type == "tool" || choice_type == "function")
+                        && let Some(tool_name) = name
+                    {
+                        payload["tool_choice"] =
+                            serde_json::json!({"type": "tool", "name": tool_name});
+                    }
+                }
+            }
+        }
+
+        let mut last_error = None;
+        for _ in 0..=self.max_retries {
+            let response = client
+                .post(format!("{}/messages", self.api_base))
+                .header("x-api-key", &api_key)
+                .header("anthropic-version", &self.api_version)
+                .header("content-type", "application/json")
+                .json(&payload)
+                .send()
+                .await;
+
+            match response {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        match resp.json::<AnthropicResponse>().await {
+                            Ok(anthropic_resp) => {
+                                let result = self.parse_response(anthropic_resp);
+                                return Self::extract_ai_message(result);
+                            }
+                            Err(e) => {
+                                return Err(Error::Json(serde_json::Error::io(
+                                    std::io::Error::new(
+                                        std::io::ErrorKind::InvalidData,
+                                        e.to_string(),
+                                    ),
+                                )));
+                            }
+                        }
+                    } else {
+                        let status = resp.status().as_u16();
+                        let error_text = resp.text().await.unwrap_or_default();
+                        last_error = Some(Error::api(status, error_text));
+
+                        // Don't retry 4xx errors (client errors)
+                        if (400..500).contains(&status) {
+                            break;
+                        }
+                    }
+                }
+                Err(e) => {
+                    last_error = Some(Error::Http(e));
+                }
+            }
+        }
+
+        match last_error {
+            Some(e) => Err(e),
+            None => Err(Error::other("Unknown error")),
+        }
+    }
+
+    /// Internal stream implementation.
+    #[allow(dead_code)]
+    async fn stream_internal(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
@@ -460,11 +621,9 @@ impl ChatModel for ChatAnthropic {
         }
 
         // Create a stream from the SSE response
-        let model = self.model.clone();
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
-            let mut accumulated_content = String::new();
             let mut usage: Option<UsageMetadata> = None;
             let mut stop_reason: Option<String> = None;
 
@@ -491,33 +650,20 @@ impl ChatModel for ChatAnthropic {
                                         match event {
                                             AnthropicStreamEvent::ContentBlockDelta { delta, .. } => {
                                                 if let Some(text) = delta.text {
-                                                    accumulated_content.push_str(&text);
-                                                    yield Ok(ChatChunk {
-                                                        content: text,
-                                                        is_final: false,
-                                                        metadata: None,
-                                                    });
+                                                    yield Ok(ChatChunk::new(text));
                                                 }
                                             }
                                             AnthropicStreamEvent::MessageDelta { delta, usage: u } => {
                                                 stop_reason = delta.stop_reason;
                                                 if let Some(u) = u {
                                                     usage = Some(UsageMetadata::new(
-                                                        u.input_tokens.unwrap_or(0),
-                                                        u.output_tokens,
+                                                        u.input_tokens.unwrap_or(0) as i64,
+                                                        u.output_tokens as i64,
                                                     ));
                                                 }
                                             }
                                             AnthropicStreamEvent::MessageStop => {
-                                                yield Ok(ChatChunk {
-                                                    content: String::new(),
-                                                    is_final: true,
-                                                    metadata: Some(ChatResultMetadata {
-                                                        model: Some(model.clone()),
-                                                        stop_reason: stop_reason.clone(),
-                                                        usage: usage.clone(),
-                                                    }),
-                                                });
+                                                yield Ok(ChatChunk::final_chunk(usage.take(), stop_reason.take()));
                                             }
                                             _ => {}
                                         }
@@ -536,32 +682,11 @@ impl ChatModel for ChatAnthropic {
 
         Ok(Box::pin(stream) as Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>)
     }
-
-    fn get_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
-        LangSmithParams {
-            ls_provider: Some("anthropic".to_string()),
-            ls_model_name: Some(self.model.clone()),
-            ls_model_type: Some("chat".to_string()),
-            ls_temperature: self.temperature,
-            ls_max_tokens: Some(self.max_tokens),
-            ls_stop: stop.map(|s| s.to_vec()),
-        }
-    }
-
-    fn identifying_params(&self) -> serde_json::Value {
-        serde_json::json!({
-            "_type": self.llm_type(),
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "top_k": self.top_k,
-            "top_p": self.top_p,
-        })
-    }
 }
 
 /// Anthropic API response structure.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicResponse {
     content: Vec<AnthropicContent>,
     model: String,
@@ -585,6 +710,7 @@ enum AnthropicContent {
 
 /// Anthropic usage information.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicUsage {
     input_tokens: u32,
     output_tokens: u32,
@@ -619,7 +745,9 @@ enum AnthropicStreamEvent {
     },
     #[serde(rename = "message_delta")]
     MessageDelta {
+        #[allow(dead_code)]
         delta: MessageDelta,
+        #[allow(dead_code)]
         usage: Option<StreamUsage>,
     },
     #[serde(rename = "message_stop")]
@@ -640,12 +768,14 @@ struct ContentDelta {
 
 /// Message delta in streaming.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct MessageDelta {
     stop_reason: Option<String>,
 }
 
 /// Stream usage information.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct StreamUsage {
     input_tokens: Option<u32>,
     output_tokens: u32,

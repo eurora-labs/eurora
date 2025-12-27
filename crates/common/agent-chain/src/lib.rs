@@ -60,6 +60,10 @@ use std::sync::Arc;
 
 pub use agent_chain_core::*;
 
+// Re-export agent_chain_core as a module for macro-generated code
+#[doc(hidden)]
+pub use agent_chain_core as _core;
+
 /// Initialize a chat model from the model name with automatic provider inference.
 ///
 /// This function provides a convenient way to create chat models, similar to
@@ -115,7 +119,7 @@ pub use agent_chain_core::*;
 pub fn init_chat_model(
     model: impl Into<String>,
     model_provider: Option<&str>,
-) -> Result<Arc<dyn ChatModel>> {
+) -> Result<Arc<dyn BaseChatModel>> {
     let model = model.into();
     let (model_name, provider) = parse_model(&model, model_provider)?;
 
@@ -199,7 +203,7 @@ impl ChatModelBuilder {
     }
 
     /// Build the chat model.
-    pub fn build(self) -> Result<Arc<dyn ChatModel>> {
+    pub fn build(self) -> Result<Arc<dyn BaseChatModel>> {
         let (model_name, provider) = parse_model(&self.model, self.provider.as_deref())?;
 
         match provider.as_str() {

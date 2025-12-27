@@ -1,0 +1,446 @@
+//! Schema types for Runnables.
+//!
+//! This module contains typedefs that are used with `Runnable` objects,
+//! mirroring `langchain_core.runnables.schema`.
+
+use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// Data associated with a streaming event.
+///
+/// This struct contains optional fields that may be present depending
+/// on the event type (start, stream, end).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EventData {
+    /// The input passed to the `Runnable` that generated the event.
+    ///
+    /// Inputs will sometimes be available at the *START* of the `Runnable`, and
+    /// sometimes at the *END* of the `Runnable`.
+    ///
+    /// If a `Runnable` is able to stream its inputs, then its input by definition
+    /// won't be known until the *END* of the `Runnable` when it has finished streaming
+    /// its inputs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<Value>,
+
+    /// The error that occurred during the execution of the `Runnable`.
+    ///
+    /// This field is only available if the `Runnable` raised an exception.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+
+    /// The output of the `Runnable` that generated the event.
+    ///
+    /// Outputs will only be available at the *END* of the `Runnable`.
+    ///
+    /// For most `Runnable` objects, this field can be inferred from the `chunk` field,
+    /// though there might be some exceptions for special a cased `Runnable` (e.g., like
+    /// chat models), which may return more information.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<Value>,
+
+    /// A streaming chunk from the output that generated the event.
+    ///
+    /// Chunks support addition in general, and adding them up should result
+    /// in the output of the `Runnable` that generated the event.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunk: Option<Value>,
+}
+
+impl EventData {
+    /// Create a new empty EventData.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create EventData with an input value.
+    pub fn with_input(mut self, input: Value) -> Self {
+        self.input = Some(input);
+        self
+    }
+
+    /// Create EventData with an error.
+    pub fn with_error(mut self, error: impl Into<String>) -> Self {
+        self.error = Some(error.into());
+        self
+    }
+
+    /// Create EventData with an output value.
+    pub fn with_output(mut self, output: Value) -> Self {
+        self.output = Some(output);
+        self
+    }
+
+    /// Create EventData with a chunk value.
+    pub fn with_chunk(mut self, chunk: Value) -> Self {
+        self.chunk = Some(chunk);
+        self
+    }
+}
+
+/// Base streaming event.
+///
+/// Schema of a streaming event which is produced from the `astream_events` method.
+///
+/// Event names are of the format: `on_[runnable_type]_(start|stream|end)`.
+///
+/// Runnable types are one of:
+/// - **llm** - used by non chat models
+/// - **chat_model** - used by chat models
+/// - **prompt** - e.g., `ChatPromptTemplate`
+/// - **tool** - from tools defined via `@tool` decorator or inheriting from `Tool`/`BaseTool`
+/// - **chain** - most `Runnable` objects are of this type
+///
+/// Further, the events are categorized as one of:
+/// - **start** - when the `Runnable` starts
+/// - **stream** - when the `Runnable` is streaming
+/// - **end** - when the `Runnable` ends
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaseStreamEvent {
+    /// Event names are of the format: `on_[runnable_type]_(start|stream|end)`.
+    pub event: String,
+
+    /// A randomly generated ID to keep track of the execution of the given `Runnable`.
+    ///
+    /// Each child `Runnable` that gets invoked as part of the execution of a parent
+    /// `Runnable` is assigned its own unique ID.
+    pub run_id: String,
+
+    /// Tags associated with the `Runnable` that generated this event.
+    ///
+    /// Tags are always inherited from parent `Runnable` objects.
+    ///
+    /// Tags can either be bound to a `Runnable` using `.with_config({"tags": ["hello"]})`
+    /// or passed at run time using `.astream_events(..., {"tags": ["hello"]})`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+
+    /// Metadata associated with the `Runnable` that generated this event.
+    ///
+    /// Metadata can either be bound to a `Runnable` using
+    /// `.with_config({"metadata": { "foo": "bar" }})`
+    /// or passed at run time using
+    /// `.astream_events(..., {"metadata": {"foo": "bar"}})`.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub metadata: HashMap<String, Value>,
+
+    /// A list of the parent IDs associated with this event.
+    ///
+    /// Root Events will have an empty list.
+    ///
+    /// For example, if a `Runnable` A calls `Runnable` B, then the event generated by
+    /// `Runnable` B will have `Runnable` A's ID in the `parent_ids` field.
+    ///
+    /// The order of the parent IDs is from the root parent to the immediate parent.
+    ///
+    /// Only supported as of v2 of the astream events API. v1 will return an empty list.
+    #[serde(default)]
+    pub parent_ids: Vec<String>,
+}
+
+impl BaseStreamEvent {
+    /// Create a new BaseStreamEvent.
+    pub fn new(event: impl Into<String>, run_id: impl Into<String>) -> Self {
+        Self {
+            event: event.into(),
+            run_id: run_id.into(),
+            tags: Vec::new(),
+            metadata: HashMap::new(),
+            parent_ids: Vec::new(),
+        }
+    }
+
+    /// Set the tags for this event.
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+
+    /// Set the metadata for this event.
+    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
+    /// Set the parent IDs for this event.
+    pub fn with_parent_ids(mut self, parent_ids: Vec<String>) -> Self {
+        self.parent_ids = parent_ids;
+        self
+    }
+}
+
+/// A standard stream event that follows LangChain convention for event data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StandardStreamEvent {
+    /// The base event fields.
+    #[serde(flatten)]
+    pub base: BaseStreamEvent,
+
+    /// Event data.
+    ///
+    /// The contents of the event data depend on the event type.
+    pub data: EventData,
+
+    /// The name of the `Runnable` that generated the event.
+    pub name: String,
+}
+
+impl StandardStreamEvent {
+    /// Create a new StandardStreamEvent.
+    pub fn new(
+        event: impl Into<String>,
+        run_id: impl Into<String>,
+        name: impl Into<String>,
+    ) -> Self {
+        Self {
+            base: BaseStreamEvent::new(event, run_id),
+            data: EventData::new(),
+            name: name.into(),
+        }
+    }
+
+    /// Set the data for this event.
+    pub fn with_data(mut self, data: EventData) -> Self {
+        self.data = data;
+        self
+    }
+
+    /// Set the tags for this event.
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.base.tags = tags;
+        self
+    }
+
+    /// Set the metadata for this event.
+    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
+        self.base.metadata = metadata;
+        self
+    }
+
+    /// Set the parent IDs for this event.
+    pub fn with_parent_ids(mut self, parent_ids: Vec<String>) -> Self {
+        self.base.parent_ids = parent_ids;
+        self
+    }
+}
+
+/// The literal event type for custom events.
+pub const CUSTOM_EVENT_TYPE: &str = "on_custom_event";
+
+/// Custom stream event created by the user.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomStreamEvent {
+    /// The base event fields.
+    #[serde(flatten)]
+    pub base: BaseStreamEvent,
+
+    /// User defined name for the event.
+    pub name: String,
+
+    /// The data associated with the event. Free form and can be anything.
+    pub data: Value,
+}
+
+impl CustomStreamEvent {
+    /// Create a new CustomStreamEvent.
+    ///
+    /// The event type is automatically set to "on_custom_event".
+    pub fn new(run_id: impl Into<String>, name: impl Into<String>, data: Value) -> Self {
+        Self {
+            base: BaseStreamEvent::new(CUSTOM_EVENT_TYPE, run_id),
+            name: name.into(),
+            data,
+        }
+    }
+
+    /// Set the tags for this event.
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.base.tags = tags;
+        self
+    }
+
+    /// Set the metadata for this event.
+    pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
+        self.base.metadata = metadata;
+        self
+    }
+
+    /// Set the parent IDs for this event.
+    pub fn with_parent_ids(mut self, parent_ids: Vec<String>) -> Self {
+        self.base.parent_ids = parent_ids;
+        self
+    }
+}
+
+/// Union type for stream events.
+///
+/// A stream event can be either a standard event following LangChain conventions,
+/// or a custom event created by the user.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum StreamEvent {
+    /// A standard stream event.
+    Standard(StandardStreamEvent),
+    /// A custom stream event.
+    Custom(CustomStreamEvent),
+}
+
+impl StreamEvent {
+    /// Get the event type string.
+    pub fn event(&self) -> &str {
+        match self {
+            StreamEvent::Standard(e) => &e.base.event,
+            StreamEvent::Custom(e) => &e.base.event,
+        }
+    }
+
+    /// Get the run ID.
+    pub fn run_id(&self) -> &str {
+        match self {
+            StreamEvent::Standard(e) => &e.base.run_id,
+            StreamEvent::Custom(e) => &e.base.run_id,
+        }
+    }
+
+    /// Get the name.
+    pub fn name(&self) -> &str {
+        match self {
+            StreamEvent::Standard(e) => &e.name,
+            StreamEvent::Custom(e) => &e.name,
+        }
+    }
+
+    /// Get the tags.
+    pub fn tags(&self) -> &[String] {
+        match self {
+            StreamEvent::Standard(e) => &e.base.tags,
+            StreamEvent::Custom(e) => &e.base.tags,
+        }
+    }
+
+    /// Get the metadata.
+    pub fn metadata(&self) -> &HashMap<String, Value> {
+        match self {
+            StreamEvent::Standard(e) => &e.base.metadata,
+            StreamEvent::Custom(e) => &e.base.metadata,
+        }
+    }
+
+    /// Get the parent IDs.
+    pub fn parent_ids(&self) -> &[String] {
+        match self {
+            StreamEvent::Standard(e) => &e.base.parent_ids,
+            StreamEvent::Custom(e) => &e.base.parent_ids,
+        }
+    }
+
+    /// Check if this is a custom event.
+    pub fn is_custom(&self) -> bool {
+        matches!(self, StreamEvent::Custom(_))
+    }
+
+    /// Check if this is a standard event.
+    pub fn is_standard(&self) -> bool {
+        matches!(self, StreamEvent::Standard(_))
+    }
+}
+
+impl From<StandardStreamEvent> for StreamEvent {
+    fn from(event: StandardStreamEvent) -> Self {
+        StreamEvent::Standard(event)
+    }
+}
+
+impl From<CustomStreamEvent> for StreamEvent {
+    fn from(event: CustomStreamEvent) -> Self {
+        StreamEvent::Custom(event)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_event_data() {
+        let data = EventData::new()
+            .with_input(serde_json::json!("hello"))
+            .with_output(serde_json::json!("world"));
+
+        assert_eq!(data.input, Some(serde_json::json!("hello")));
+        assert_eq!(data.output, Some(serde_json::json!("world")));
+        assert!(data.error.is_none());
+        assert!(data.chunk.is_none());
+    }
+
+    #[test]
+    fn test_standard_stream_event() {
+        let event = StandardStreamEvent::new("on_chain_start", "run-123", "my_chain")
+            .with_tags(vec!["tag1".to_string()])
+            .with_data(EventData::new().with_input(serde_json::json!({"key": "value"})));
+
+        assert_eq!(event.base.event, "on_chain_start");
+        assert_eq!(event.base.run_id, "run-123");
+        assert_eq!(event.name, "my_chain");
+        assert_eq!(event.base.tags, vec!["tag1"]);
+        assert!(event.data.input.is_some());
+    }
+
+    #[test]
+    fn test_custom_stream_event() {
+        let event = CustomStreamEvent::new(
+            "run-456",
+            "my_custom_event",
+            serde_json::json!({
+                "custom_field": "custom_value"
+            }),
+        );
+
+        assert_eq!(event.base.event, CUSTOM_EVENT_TYPE);
+        assert_eq!(event.base.run_id, "run-456");
+        assert_eq!(event.name, "my_custom_event");
+        assert_eq!(
+            event.data,
+            serde_json::json!({"custom_field": "custom_value"})
+        );
+    }
+
+    #[test]
+    fn test_stream_event_enum() {
+        let standard =
+            StreamEvent::Standard(StandardStreamEvent::new("on_chain_end", "run-1", "chain"));
+        let custom = StreamEvent::Custom(CustomStreamEvent::new(
+            "run-2",
+            "custom",
+            serde_json::json!(null),
+        ));
+
+        assert!(standard.is_standard());
+        assert!(!standard.is_custom());
+        assert_eq!(standard.event(), "on_chain_end");
+        assert_eq!(standard.name(), "chain");
+
+        assert!(custom.is_custom());
+        assert!(!custom.is_standard());
+        assert_eq!(custom.event(), CUSTOM_EVENT_TYPE);
+        assert_eq!(custom.name(), "custom");
+    }
+
+    #[test]
+    fn test_stream_event_serialization() {
+        let event = StandardStreamEvent::new("on_chain_start", "run-123", "test_chain")
+            .with_data(EventData::new().with_input(serde_json::json!("input")));
+
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("on_chain_start"));
+        assert!(json.contains("run-123"));
+        assert!(json.contains("test_chain"));
+
+        let deserialized: StandardStreamEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.base.event, "on_chain_start");
+        assert_eq!(deserialized.base.run_id, "run-123");
+        assert_eq!(deserialized.name, "test_chain");
+    }
+}
