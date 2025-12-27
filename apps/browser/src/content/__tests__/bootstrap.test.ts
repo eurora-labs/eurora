@@ -26,7 +26,6 @@ describe('bootstrap', () => {
 	});
 
 	it('should handle SITE_LOAD message type', async () => {
-		const mockSendResponse = vi.fn();
 		const mockGetURL = vi.fn((path: string) => `chrome-extension://mock/${path}`);
 
 		(global as any).browser = {
