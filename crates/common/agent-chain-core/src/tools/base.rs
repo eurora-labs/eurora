@@ -239,14 +239,14 @@ impl From<Value> for ToolInput {
             Value::String(s) => ToolInput::String(s),
             Value::Object(obj) => {
                 // Check if this is a tool call
-                if obj.get("type").and_then(|t| t.as_str()) == Some("tool_call") {
-                    if let (Some(id), Some(name), Some(args)) = (
+                if obj.get("type").and_then(|t| t.as_str()) == Some("tool_call")
+                    && let (Some(id), Some(name), Some(args)) = (
                         obj.get("id").and_then(|i| i.as_str()),
                         obj.get("name").and_then(|n| n.as_str()),
                         obj.get("args"),
-                    ) {
-                        return ToolInput::ToolCall(ToolCall::with_id(id, name, args.clone()));
-                    }
+                    )
+                {
+                    return ToolInput::ToolCall(ToolCall::with_id(id, name, args.clone()));
                 }
                 ToolInput::Dict(obj.into_iter().collect())
             }
@@ -465,7 +465,7 @@ pub fn format_output(
     artifact: Option<Value>,
     tool_call_id: Option<&str>,
     name: &str,
-    status: &str,
+    _status: &str,
 ) -> ToolOutput {
     if let Some(tool_call_id) = tool_call_id {
         let msg = if let Some(artifact) = artifact {

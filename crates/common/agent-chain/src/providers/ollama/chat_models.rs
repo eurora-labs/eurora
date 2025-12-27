@@ -759,6 +759,7 @@ impl ChatOllama {
 /// Ollama API response structure.
 #[derive(Debug, Deserialize)]
 struct OllamaResponse {
+    #[allow(dead_code)]
     model: Option<String>,
     message: Option<OllamaMessage>,
     #[allow(dead_code)]
