@@ -19,6 +19,7 @@ function buildStyles() {
 	}
 
 	isBuilding = true;
+	// eslint-disable-next-line no-console
 	console.log('[watch-styles] Building styles...');
 
 	const build = spawn(
@@ -34,6 +35,7 @@ function buildStyles() {
 	build.on('close', (code) => {
 		isBuilding = false;
 		if (code === 0) {
+			// eslint-disable-next-line no-console
 			console.log('[watch-styles] Styles built successfully');
 		} else {
 			console.error(`[watch-styles] Build failed with code ${code}`);
@@ -50,21 +52,24 @@ function buildStyles() {
 buildStyles();
 
 // Watch source files
+// eslint-disable-next-line no-console
 console.log('[watch-styles] Watching src/styles/ for changes...');
 watch(join(projectRoot, 'src', 'styles'), { recursive: true }, (eventType, filename) => {
 	if (filename && filename.endsWith('.css')) {
+		// eslint-disable-next-line no-console
 		console.log(`[watch-styles] Detected change in ${filename}`);
 		buildStyles();
 	}
 });
 
 // Watch dist directory for deletion/recreation
+// eslint-disable-next-line no-console
 console.log('[watch-styles] Watching dist/styles/...');
-const distDir = join(projectRoot, 'dist');
 
 // Check periodically if the styles file exists, rebuild if missing
 setInterval(() => {
 	if (!existsSync(distStylesFile)) {
+		// eslint-disable-next-line no-console
 		console.log('[watch-styles] Styles file missing, rebuilding...');
 		// Ensure directory exists
 		if (!existsSync(distStylesDir)) {
@@ -74,4 +79,5 @@ setInterval(() => {
 	}
 }, 1000); // Check every second
 
+// eslint-disable-next-line no-console
 console.log('[watch-styles] Style watcher started');
