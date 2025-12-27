@@ -158,7 +158,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		if (window.location.href.includes('/watch?v=')) {
 			return await this.generateVideoAsset();
 		} else {
-			const articleAsset = await createArticleAsset(document);
+			const articleAsset = createArticleAsset(document);
 			return articleAsset;
 		}
 	}

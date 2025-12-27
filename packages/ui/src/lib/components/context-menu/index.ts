@@ -1,4 +1,3 @@
-
 import CheckboxItem from '$lib/components/context-menu/context-menu-checkbox-item.svelte';
 import Content from '$lib/components/context-menu/context-menu-content.svelte';
 import GroupHeading from '$lib/components/context-menu/context-menu-group-heading.svelte';

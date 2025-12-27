@@ -12,9 +12,6 @@
 			"types": "./dist/*.d.ts"
 		}
 	},
-	"files": [
-		"dist"
-	],
 	"scripts": {
 		"dev": "vite dev",
 		"check": "svelte-check --tsconfig ./tsconfig.json",

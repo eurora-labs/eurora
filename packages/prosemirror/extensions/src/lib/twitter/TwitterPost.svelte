@@ -112,7 +112,7 @@
 				const tweets = JSON.parse(attrs.tweets) as Tweet[];
 				const tweetTexts = tweets.map((tweet) => tweet.text).join('\n\n');
 				alert(`Twitter Content:\n\n${tweetTexts}`);
-			} catch (e) {
+			} catch (_e) {
 				alert('Twitter content available');
 			}
 		}
@@ -138,7 +138,7 @@
 						? tweets[0].text.substring(0, 50) + '...'
 						: tweets[0].text;
 				}
-			} catch (e) {
+			} catch (_e) {
 				// Fall through to default
 			}
 		}
@@ -152,7 +152,7 @@
 			try {
 				const tweets = JSON.parse(attrs.tweets) as Tweet[];
 				return tweets.length;
-			} catch (e) {
+			} catch (_e) {
 				return 0;
 			}
 		}

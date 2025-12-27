@@ -9,11 +9,10 @@
 
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
+	import { Button } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import { cn } from '@eurora/ui/utils';
 	import BoltIcon from '@lucide/svelte/icons/bolt';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
