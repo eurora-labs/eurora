@@ -16,8 +16,8 @@ use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
 use super::base::{
-    ArgsSchema, BaseTool, HandleToolError, HandleValidationError, ResponseFormat,
-    ToolException, ToolInput, ToolOutput,
+    ArgsSchema, BaseTool, HandleToolError, HandleValidationError, ResponseFormat, ToolException,
+    ToolInput, ToolOutput,
 };
 
 /// Type alias for sync tool function.
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn test_tool_args() {
-        let tool = Tool::from_function(|input| Ok(input), "identity", "Returns input unchanged");
+        let tool = Tool::from_function(Ok, "identity", "Returns input unchanged");
 
         let args = tool.args();
         assert!(args.contains_key("tool_input"));
@@ -518,7 +518,7 @@ mod tests {
         let tool = ToolBuilder::new()
             .name("test_tool")
             .description("A test tool")
-            .func(|input| Ok(input))
+            .func(Ok)
             .return_direct(true)
             .build()
             .unwrap();

@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_render_tool() {
-        let tool = Tool::from_function(|input| Ok(input), "test", "A test tool");
+        let tool = Tool::from_function(Ok, "test", "A test tool");
 
         let rendered = render_tool(&tool);
 
