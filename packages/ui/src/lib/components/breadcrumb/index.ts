@@ -1,10 +1,10 @@
-import Root from './breadcrumb.svelte';
-import Ellipsis from './breadcrumb-ellipsis.svelte';
-import Item from './breadcrumb-item.svelte';
-import Separator from './breadcrumb-separator.svelte';
-import Link from './breadcrumb-link.svelte';
-import List from './breadcrumb-list.svelte';
-import Page from './breadcrumb-page.svelte';
+import Ellipsis from '$lib/components/breadcrumb/breadcrumb-ellipsis.svelte';
+import Item from '$lib/components/breadcrumb/breadcrumb-item.svelte';
+import Link from '$lib/components/breadcrumb/breadcrumb-link.svelte';
+import List from '$lib/components/breadcrumb/breadcrumb-list.svelte';
+import Page from '$lib/components/breadcrumb/breadcrumb-page.svelte';
+import Separator from '$lib/components/breadcrumb/breadcrumb-separator.svelte';
+import Root from '$lib/components/breadcrumb/breadcrumb.svelte';
 
 export {
 	Root,

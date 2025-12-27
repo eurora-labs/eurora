@@ -1,4 +1,4 @@
-import { extensionFactory, type SveltePMExtension } from './factory.js';
+import { extensionFactory, type SveltePMExtension } from '$lib/factory.js';
 
 /**
  * Get extensions by name pattern
