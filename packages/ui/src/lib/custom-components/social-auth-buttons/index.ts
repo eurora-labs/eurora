@@ -1,4 +1,4 @@
-import Root from './social-auth-buttons.svelte';
+import Root from '$lib/custom-components/social-auth-buttons/social-auth-buttons.svelte';
 
 export {
 	Root,

@@ -1,5 +1,5 @@
-import Root from './radio-group.svelte';
-import Item from './radio-group-item.svelte';
+import Item from '$lib/components/radio-group/radio-group-item.svelte';
+import Root from '$lib/components/radio-group/radio-group.svelte';
 
 export {
 	Root,

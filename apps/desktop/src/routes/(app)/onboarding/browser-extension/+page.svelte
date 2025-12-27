@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Button } from '@eurora/ui/components/button/index';
 	import { goto } from '$app/navigation';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
+	import { Button } from '@eurora/ui/components/button/index';
 	import { open } from '@tauri-apps/plugin-shell';
 
 	const taurpc = inject(TAURPC_SERVICE);

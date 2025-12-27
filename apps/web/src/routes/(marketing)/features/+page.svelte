@@ -1,14 +1,14 @@
 <script lang="ts">
-	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import * as Card from '@eurora/ui/components/card/index';
 	import BrainIcon from '@lucide/svelte/icons/brain';
-	import ShieldIcon from '@lucide/svelte/icons/shield';
-	import ZapIcon from '@lucide/svelte/icons/zap';
+	import CodeIcon from '@lucide/svelte/icons/code';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
-	import CodeIcon from '@lucide/svelte/icons/code';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import ZapIcon from '@lucide/svelte/icons/zap';
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">

@@ -1,22 +1,22 @@
 <script lang="ts">
-	import { create } from '@bufbuild/protobuf';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
-	import * as Form from '@eurora/ui/components/form/index';
+	import { page } from '$app/state';
+	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
+	import { create } from '@bufbuild/protobuf';
+	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
+	import { authService } from '@eurora/shared/services/auth-service';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
+	import * as Form from '@eurora/ui/components/form/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Separator from '@eurora/ui/components/separator/index';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import { authService } from '@eurora/shared/services/auth-service';
-	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
+	import { onMount } from 'svelte';
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
-	import { page } from '$app/state';
-	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 	// import { auth } from '$lib/stores/auth.js';
 
 	onMount(() => {

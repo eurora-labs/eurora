@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { cn, type WithElementRef } from '$lib/utils.js';
-	import type { HTMLAttributes } from 'svelte/elements';
 	import { Button, type ButtonProps } from '$lib/components/button/index.js';
+	import { cn } from '$lib/utils.js';
 	let { ref = $bindable(null), class: className, children, ...restProps }: ButtonProps = $props();
 </script>
 

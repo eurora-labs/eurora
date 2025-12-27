@@ -11,19 +11,19 @@
 </script>
 
 <script lang="ts">
-	import * as Card from '$lib/components/card/index.js';
-	import { SocialAuthButtons } from '$lib/custom-components/social-auth-buttons/index.js';
-	import * as Separator from '$lib/components/separator/index.js';
-	import * as Form from '$lib/components/form/index.js';
 	import { Button } from '$lib/components/button/index.js';
+	import * as Card from '$lib/components/card/index.js';
+	import * as Form from '$lib/components/form/index.js';
 	import { Input } from '$lib/components/input/index.js';
+	import * as Separator from '$lib/components/separator/index.js';
+	import { SocialAuthButtons } from '$lib/custom-components/social-auth-buttons/index.js';
+	import { cn } from '$lib/utils.js';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
-	import { cn } from '$lib/utils.js';
 	let {
 		class: className,
 		onsubmit,
@@ -47,7 +47,7 @@
 		},
 	);
 
-	const { form: formData, enhance, errors, submitting } = form;
+	const { form: formData, enhance, submitting } = form;
 
 	let showPassword = $state(false);
 

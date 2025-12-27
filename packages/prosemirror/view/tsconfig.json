@@ -15,8 +15,14 @@
 		"declaration": true,
 		"composite": true,
 		"declarationMap": true,
-		"mapRoot": "../../dist"
+		"mapRoot": "../../dist",
 	},
-	"include": ["src/**/*"],
-	"exclude": ["node_modules"]
+	"include": [
+		"src/**/*",
+		"postcss.config.mjs",
+		"svelte.config.js",
+		"vite.config.js",
+		"vite.config.ts",
+	],
+	"exclude": ["node_modules"],
 }

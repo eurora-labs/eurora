@@ -67,7 +67,7 @@ class YouTubeTranscriptExtractor {
 	private getCurrentVideoId(): string | null {
 		// Method 1: Extract from URL
 		const urlParams = new URLSearchParams(window.location.search);
-		let videoId = urlParams.get('v');
+		const videoId = urlParams.get('v');
 
 		if (videoId) {
 			return videoId;

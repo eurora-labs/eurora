@@ -1,10 +1,10 @@
 <script lang="ts">
-	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import MonitorIcon from '@lucide/svelte/icons/monitor';
-	import LaptopIcon from '@lucide/svelte/icons/laptop';
-	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import * as Card from '@eurora/ui/components/card/index';
 	import DownloadIcon from '@lucide/svelte/icons/download';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import LaptopIcon from '@lucide/svelte/icons/laptop';
+	import MonitorIcon from '@lucide/svelte/icons/monitor';
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Button } from '@eurora/ui/components/button/index';
-	import Ollama from '$lib/components/Ollama.svelte';
-	import ApiProvider from '$lib/components/ApiProvider.svelte';
 	import { goto } from '$app/navigation';
+	import ApiProvider from '$lib/components/ApiProvider.svelte';
+	import Ollama from '$lib/components/Ollama.svelte';
+	import { Button } from '@eurora/ui/components/button/index';
 
 	async function finished() {
 		goto('browser-extension');
