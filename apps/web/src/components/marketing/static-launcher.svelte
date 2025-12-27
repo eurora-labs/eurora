@@ -10,8 +10,8 @@
 </script>
 
 <script lang="ts">
-	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { processQuery, clearQuery } from '@eurora/prosemirror-core/util';
+	import * as Launcher from '@eurora/prosemirror-view/launcher';
 
 	import * as Chat from '@eurora/ui/custom-components/chat/index';
 	import { cn } from '@eurora/ui/utils';
@@ -37,7 +37,7 @@
 	let { class: className } = $props();
 
 	onMount(() => {
-		console.log('EditorRef:', launcherInputRef);
+		// console.log('EditorRef:', launcherInputRef);
 	});
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -66,7 +66,7 @@
 </script>
 
 <div class={cn('', className)}>
-	<Launcher.Root class="h-[100px] py-4">
+	<Launcher.Root class="h-25 py-4">
 		<Launcher.Input
 			{placeholder}
 			bind:query={searchQuery}
@@ -76,7 +76,7 @@
 			disabled={placeholder.length > 0}
 		/>
 	</Launcher.Root>
-	<Chat.Root class="w-full min-h-[265px]">
+	<Chat.Root class="w-full min-h-66.25">
 		{#each messages as message}
 			<Chat.Message
 				variant={message.role === 'user' ? 'default' : 'assistant'}
