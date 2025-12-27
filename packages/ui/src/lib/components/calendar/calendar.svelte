@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Calendar as CalendarPrimitive } from 'bits-ui';
-	import * as Calendar from './index.js';
+	import * as Calendar from '$lib/components/calendar/index.js';
 	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+	import { Calendar as CalendarPrimitive } from 'bits-ui';
 
 	let {
 		ref = $bindable(null),

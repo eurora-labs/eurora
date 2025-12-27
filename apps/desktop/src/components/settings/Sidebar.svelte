@@ -8,14 +8,14 @@
 </script>
 
 <script lang="ts">
+	import { page } from '$app/state';
+	import { Button } from '@eurora/ui/components/button/index';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import BoltIcon from '@lucide/svelte/icons/bolt';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronsLeftRightEllipsis from '@lucide/svelte/icons/chevrons-left-right-ellipsis';
-	import WebhookIcon from '@lucide/svelte/icons/webhook';
 	import MailIcon from '@lucide/svelte/icons/mail';
-	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import { Button } from '@eurora/ui/components/button/index';
-	import { page } from '$app/state';
+	import WebhookIcon from '@lucide/svelte/icons/webhook';
 
 	let items: MenuItem[] = [
 		{

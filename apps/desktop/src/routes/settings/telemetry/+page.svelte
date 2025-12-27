@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Switch } from '@eurora/ui/components/switch/index';
-	import { Label } from '@eurora/ui/components/label/index';
-
 	import { createTauRPCProxy, type TelemetrySettings } from '$lib/bindings/bindings.js';
+	import { Label } from '@eurora/ui/components/label/index';
+	import { Switch } from '@eurora/ui/components/switch/index';
+
 	import { onMount } from 'svelte';
 
 	const taurpc = createTauRPCProxy();

@@ -1,5 +1,5 @@
-import browser from 'webextension-polyfill';
 import { getCurrentTab } from './tabs.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Sends a message to a tab with retry logic to handle content script initialization delays
