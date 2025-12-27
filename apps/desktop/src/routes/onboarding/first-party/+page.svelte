@@ -5,6 +5,7 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { open } from '@tauri-apps/plugin-shell';
+	import { onMount } from 'svelte';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	async function openLogin() {
@@ -26,12 +27,14 @@
 			clearInterval(interval);
 		}, 5000);
 	}
+
+	onMount(() => {
+		// openLogin();
+	});
 </script>
 
-<Card.Root class="flex group cursor-pointer w-1/2" onclick={openLogin}>
-	<Card.Header class="pb-6 text-left ">
-		<Card.Title class="mb-2 text-2xl font-semibold">Get started with Eurora</Card.Title>
-		<Card.Description class="">Fastest way to get started.</Card.Description>
-	</Card.Header>
-	<!-- <Card.Content class="flex justify-center">Easiest and fastest way to get started.</Card.Content> -->
-</Card.Root>
+<div class="relative flex h-full w-full flex-col">
+	<div class="flex flex-col justify-center items-center h-full w-full gap-8 px-8">
+		<h1 class="text-4xl font-bold drop-shadow-lg">Welcome to Eurora!</h1>
+	</div>
+</div>
