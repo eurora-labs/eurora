@@ -60,9 +60,12 @@ pub mod chat_models {
     //! New code should use [`language_models`] directly.
 
     pub use crate::language_models::{
-        BaseChatModel, ChatChunk, ChatModelConfig, ChatResult, ChatResultMetadata,
-        ChatStream, DisableStreaming, LangSmithParams, ToolChoice, UsageMetadata,
+        BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, DisableStreaming, LangSmithParams,
+        ToolChoice, UsageMetadata,
     };
+
+    // Re-export ChatResult from outputs for backward compatibility
+    pub use crate::outputs::ChatResult;
 }
 
 // Re-export env types
@@ -83,8 +86,6 @@ pub use language_models::{
     ChatChunk,
     ChatGenerationStream,
     ChatModelConfig,
-    ChatResult,
-    ChatResultMetadata,
     ChatStream,
     DisableStreaming,
     FakeListChatModel,
@@ -160,8 +161,8 @@ pub use output_parsers::{
 
 // Re-export output types
 pub use outputs::{
-    ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, Generation,
-    GenerationChunk, GenerationType, LLMResult, RunInfo, merge_chat_generation_chunks,
+    ChatGeneration, ChatGenerationChunk, ChatResult, Generation, GenerationChunk, GenerationType,
+    LLMResult, RunInfo, merge_chat_generation_chunks,
 };
 
 // Re-export callback types
