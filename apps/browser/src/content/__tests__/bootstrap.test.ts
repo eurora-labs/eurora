@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 describe('bootstrap', () => {
@@ -19,6 +20,7 @@ describe('bootstrap', () => {
 		};
 
 		// Import bootstrap to trigger listener registration
+		// @ts-ignore
 		await import('../bootstrap.js');
 
 		expect(mockAddListener).toHaveBeenCalled();
