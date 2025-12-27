@@ -20,7 +20,7 @@ test.describe('Content Script Basic Tests', () => {
 	test('should be able to query DOM elements', async ({ page }) => {
 		await page.goto('https://example.com');
 
-		const heading = await page.locator('h1').first();
+		const heading = page.locator('h1').first();
 		await expect(heading).toBeVisible();
 	});
 

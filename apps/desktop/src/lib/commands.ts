@@ -3,12 +3,10 @@ import type { ContextChip } from '$lib/bindings/bindings.js';
 
 export function executeCommand(editorRef: Editor, command: ContextChip) {
 	if (!editorRef) return;
-	console.log('command', command);
 	editorRef.cmd((state, dispatch) => {
 		const tr = state.tr;
 		const { schema } = state;
 		const nodes = schema.nodes;
-		console.log('position', command.position);
 		const position = Math.max(command.position ?? 1, 1);
 		tr.insert(
 			position,

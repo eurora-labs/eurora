@@ -12,5 +12,13 @@
 		"module": "NodeNext",
 		"moduleResolution": "nodenext",
 		"target": "ES6"
-	}
+	},
+	"include": [
+		"playwright.config.ts",
+		"postcss.config.mjs",
+		"svelte.config.js",
+		"vite.config.ts",
+		"vitest-setup-client.ts",
+		"src/**/*"
+	]
 }

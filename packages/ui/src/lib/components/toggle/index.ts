@@ -1,4 +1,4 @@
-import Root from './toggle.svelte';
+import Root from '$lib/components/toggle/toggle.svelte';
 export {
 	toggleVariants,
 	type ToggleSize,

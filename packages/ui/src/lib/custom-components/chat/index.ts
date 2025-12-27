@@ -1,4 +1,8 @@
-import Root from './chat.svelte';
+import Content from '$lib/custom-components/chat/chat-message-content.svelte';
+import Footer from '$lib/custom-components/chat/chat-message-footer.svelte';
+import Source from '$lib/custom-components/chat/chat-message-source.svelte';
+import Message, { type MessageProps } from '$lib/custom-components/chat/chat-message.svelte';
+import Root from '$lib/custom-components/chat/chat.svelte';
 
 export {
 	Root,
@@ -15,8 +19,3 @@ export {
 	Source as MessageSource,
 	Footer as MessageFooter,
 };
-
-import Message, { type MessageProps } from './chat-message.svelte';
-import Content from './chat-message-content.svelte';
-import Source from './chat-message-source.svelte';
-import Footer from './chat-message-footer.svelte';

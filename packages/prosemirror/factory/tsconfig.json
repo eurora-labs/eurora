@@ -17,6 +17,12 @@
 		"declarationMap": true,
 		"mapRoot": "../../dist"
 	},
-	"include": ["src/**/*"],
+	"include": [
+		"src/**/*",
+		"postcss.config.mjs",
+		"svelte.config.js",
+		"vite.config.js",
+		"vite.config.ts"
+	],
 	"exclude": ["node_modules"]
 }
