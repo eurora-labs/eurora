@@ -1,13 +1,9 @@
-import { PdfBrowserMessage, type WatcherParams } from './types.js';
-import {
-	createArticleAsset,
-	createArticleSnapshot,
-} from '@eurora/browser-shared/content/extensions/article/util';
 import {
 	Watcher,
 	type WatcherResponse,
 } from '@eurora/browser-shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
+import type { PdfBrowserMessage, WatcherParams } from './types.js';
 import type { NativePdfAsset, NativePdfSnapshot } from '@eurora/browser-shared/content/bindings';
 
 export class PdfWatcher extends Watcher<WatcherParams> {
@@ -56,7 +52,7 @@ export class PdfWatcher extends Watcher<WatcherParams> {
 		_obj: PdfBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		console.log('PDF Watcher: New PDF detected');
+		return { kind: 'Ok', data: null };
 	}
 
 	public async handleGenerateAssets(

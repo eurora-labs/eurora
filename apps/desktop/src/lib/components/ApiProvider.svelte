@@ -50,7 +50,7 @@
 			await tauRPC.prompt.switch_to_remote(apiProvider, apiKey, model);
 			connectionStatus = 'success';
 			finished?.();
-		} catch (error) {
+		} catch (_error) {
 			connectionStatus = 'error';
 		} finally {
 			isConnecting = false;

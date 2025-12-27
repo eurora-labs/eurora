@@ -1,5 +1,5 @@
-import noRelativeImportPaths from '@gitbutler/no-relative-imports';
 import js from '@eslint/js';
+import noRelativeImportPaths from '@gitbutler/no-relative-imports';
 import prettier from 'eslint-config-prettier';
 import { createNextImportResolver } from 'eslint-import-resolver-next';
 import pluginImportX from 'eslint-plugin-import-x';

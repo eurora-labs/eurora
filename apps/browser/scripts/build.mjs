@@ -1,11 +1,11 @@
+import { writeManifest } from '../manifest/targets.js';
+import { backgroundConfig } from '../vite/presets/background.js';
+import { contentConfig } from '../vite/presets/content.js';
 import { build } from 'vite';
 import { execSync } from 'node:child_process';
 import fs, { createWriteStream } from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { contentConfig } from '../vite/presets/content.js';
-import { backgroundConfig } from '../vite/presets/background.js';
-import { writeManifest } from '../manifest/targets.js';
 
 const PDFJS_CACHE_DIR = '.pdfjs-viewer';
 const PDFJS_TEMP_DIR = '.pdfjs-temp';

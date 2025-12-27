@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"target": "esnext",
+		"module": "esnext",
+		"moduleResolution": "node",
+		"allowJs": true,
+		"checkJs": true,
+		"noEmit": true,
+		"skipLibCheck": true,
+		"esModuleInterop": true
+	},
+	"include": [
+		"eslint.config.js",
+		"commitlint.config.cjs",
+		"e2e/**/*.ts",
+		"apps/browser/scripts/**/*.mjs"
+	],
+	"exclude": ["**/.svelte-kit/", "**/build/", "**/dist/", "**/node_modules/", "**/target/"]
+}

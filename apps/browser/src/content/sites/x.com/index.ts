@@ -68,8 +68,8 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleNew(
-		obj: TwitterBrowserMessage,
-		sender: browser.Runtime.MessageSender,
+		_obj: TwitterBrowserMessage,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		// Update current URL and page info
 		this.params.currentUrl = window.location.href;
@@ -78,16 +78,12 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		// Get initial tweet data
 		this.params.tweets = this.getTweetTexts();
 
-		console.log('Twitter watcher initialized:', {
-			url: this.params.currentUrl,
-			title: this.params.pageTitle,
-			tweetCount: this.params.tweets.length,
-		});
+		return { kind: 'Ok', data: null };
 	}
 
 	public async handleGenerateAssets(
-		obj: TwitterBrowserMessage,
-		sender: browser.Runtime.MessageSender,
+		_obj: TwitterBrowserMessage,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
 			// Get current tweet texts
@@ -119,8 +115,8 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleGenerateSnapshot(
-		obj: TwitterBrowserMessage,
-		sender: browser.Runtime.MessageSender,
+		_obj: TwitterBrowserMessage,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
 			const currentTweets = this.getTweetTexts();

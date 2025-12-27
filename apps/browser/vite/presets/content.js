@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
-import path from 'node:path';
 import { readdirSync } from 'node:fs';
+import path from 'node:path';
 
 const sitesDir = path.resolve(import.meta.dirname, '../../src/content/sites');
 
