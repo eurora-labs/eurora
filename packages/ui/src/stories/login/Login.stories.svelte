@@ -1,7 +1,8 @@
 <script module lang="ts">
 	import { Login } from '$lib/custom-components/login/index.js';
-	import { defineMeta, type StoryContext, type Args } from '@storybook/addon-svelte-csf';
+	import { defineMeta, type StoryContext } from '@storybook/addon-svelte-csf';
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const { Story } = defineMeta({
 		title: 'Components / Login',
 		component: Login,
@@ -27,6 +28,7 @@
 </script>
 
 <!-- Interactive Login Form -->
+<!-- eslint-disable-next-line @typescript-eslint/no-unused-vars -->
 {#snippet template(args: { submitError: string | undefined }, _context: StoryContext<typeof Story>)}
 	<div class="w-full max-w-md">
 		<Login

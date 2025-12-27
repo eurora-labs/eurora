@@ -4,7 +4,7 @@
 		type CarouselProps,
 		type EmblaContext,
 		setEmblaContext,
-	} from './context.js';
+	} from '$lib/components/carousel/context.js';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 
 	let {

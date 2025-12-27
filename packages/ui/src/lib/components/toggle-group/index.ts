@@ -1,5 +1,5 @@
-import Root from './toggle-group.svelte';
-import Item from './toggle-group-item.svelte';
+import Item from '$lib/components/toggle-group/toggle-group-item.svelte';
+import Root from '$lib/components/toggle-group/toggle-group.svelte';
 
 export {
 	Root,
