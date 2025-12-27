@@ -22,7 +22,7 @@ use crate::callbacks::{
     AsyncCallbackManagerForLLMRun, BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks,
 };
 use crate::error::{Error, Result};
-use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
+use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, UsageMetadata};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, Generation, LLMResult};
 use crate::rate_limiters::BaseRateLimiter;
 use crate::tools::{BaseTool, ToolDefinition};
@@ -37,12 +37,59 @@ pub type ChatGenerationStream = Pin<Box<dyn Stream<Item = Result<ChatGenerationC
 pub type AIMessageChunkStream = Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>;
 
 /// A chunk of output from streaming.
+///
+/// This struct carries content deltas during streaming, along with optional
+/// metadata that is typically attached to the final chunk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatChunk {
     /// The content delta.
     pub content: String,
     /// Whether this is the final chunk.
     pub is_final: bool,
+    /// Usage metadata (token counts) - typically present on the final chunk.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage_metadata: Option<UsageMetadata>,
+    /// The reason the model stopped generating (e.g., "stop", "length", "tool_calls").
+    /// Typically present on the final chunk.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finish_reason: Option<String>,
+}
+
+impl ChatChunk {
+    /// Create a new content chunk (non-final).
+    pub fn new(content: impl Into<String>) -> Self {
+        Self {
+            content: content.into(),
+            is_final: false,
+            usage_metadata: None,
+            finish_reason: None,
+        }
+    }
+
+    /// Create a final chunk with optional metadata.
+    pub fn final_chunk(
+        usage_metadata: Option<UsageMetadata>,
+        finish_reason: Option<String>,
+    ) -> Self {
+        Self {
+            content: String::new(),
+            is_final: true,
+            usage_metadata,
+            finish_reason,
+        }
+    }
+
+    /// Set usage metadata on this chunk.
+    pub fn with_usage_metadata(mut self, usage: UsageMetadata) -> Self {
+        self.usage_metadata = Some(usage);
+        self
+    }
+
+    /// Set finish reason on this chunk.
+    pub fn with_finish_reason(mut self, reason: impl Into<String>) -> Self {
+        self.finish_reason = Some(reason.into());
+        self
+    }
 }
 
 /// Configuration for tool choice.
