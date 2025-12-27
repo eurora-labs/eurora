@@ -4,7 +4,8 @@
 	import { onMount } from 'svelte';
 	import { Elements, PaymentElement, LinkAuthenticationElement, Address } from 'svelte-stripe';
 	import type { Stripe, StripeError, StripeElements } from '@stripe/stripe-js';
-	import { PUBLIC_STRIPE_KEY } from '$env/static/public';
+	// import { PUBLIC_STRIPE_KEY } from '$env/static/public';
+	const PUBLIC_STRIPE_KEY = 'sk-test-';
 
 	let stripe: Stripe | null = null;
 	let clientSecret: string | null = null;
@@ -87,7 +88,7 @@
 			<PaymentElement />
 			<Address mode="billing" />
 
-			<button disabled={processing}>
+			<button type="button" disabled={processing}>
 				{#if processing}
 					Processing...
 				{:else}
