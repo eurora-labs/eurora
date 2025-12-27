@@ -54,7 +54,7 @@ export interface SveltePMNode<T> {
 	selectors?: string[];
 	schema: NodeSpec;
 	// component?: Component<NodeProps<T>>;
-	component?: Component<NodeProps<T>, {}, ''>;
+	component?: Component<NodeProps<T>, Record<string, never>, ''>;
 	nodeView?: (editor: Editor) => NodeViewConstructor;
 
 	// component?: Component;

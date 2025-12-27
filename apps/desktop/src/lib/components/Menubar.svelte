@@ -3,8 +3,6 @@
 	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
-	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import { onMount } from 'svelte';
 	import type { UnlistenFn } from '@tauri-apps/api/event';
