@@ -22,7 +22,7 @@ export function processQuery(editorRef: Editor): QueryAssets {
 	const stateJson = view.state.toJSON();
 
 	// Recursive function to process nodes based on the JSON structure
-	const processNodeJson = (node: any) => {
+	function processNodeJson(node: any) {
 		// If it's a text node, add its text content to the query
 		if (node.type === 'text' && node.text) {
 			query.text += ' ' + node.text + ' ';
@@ -41,7 +41,7 @@ export function processQuery(editorRef: Editor): QueryAssets {
 		if (node.content && Array.isArray(node.content)) {
 			node.content.forEach(processNodeJson);
 		}
-	};
+	}
 
 	// Process the document content
 	if (stateJson.doc?.content) {

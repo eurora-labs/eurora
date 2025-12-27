@@ -36,8 +36,7 @@
 			}
 			loginToken = sessionStorage.getItem('loginToken');
 			challengeMethod = sessionStorage.getItem('challengeMethod');
-		} catch (error) {
-			console.error('Invalid login token or challenge method');
+		} catch (_error) {
 			goto('/login?error=invalid_login_token');
 			return;
 		}
@@ -56,7 +55,7 @@
 		},
 	);
 
-	const { form: formData, enhance, errors, submitting } = form;
+	const { form: formData, enhance, submitting } = form;
 
 	let showPassword = $state(false);
 	let success = $state(false);
@@ -76,12 +75,8 @@
 				},
 			});
 
-			console.log('Logging in user:', loginData);
-
 			// Call the auth service to login the user
-			const tokens = await authService.login(loginData);
-
-			console.log('Login successful, tokens:', tokens);
+			await authService.login(loginData);
 
 			// Store tokens in auth store
 			// auth.login(tokens);
@@ -106,7 +101,6 @@
 		try {
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
 			window.location.href = url;
-			console.log('Google login clicked');
 		} catch (err) {
 			console.error('Google login error:', err);
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
@@ -117,7 +111,6 @@
 		try {
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
 			window.location.href = url;
-			console.log('GitHub login clicked');
 		} catch (err) {
 			console.error('GitHub login error:', err);
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';

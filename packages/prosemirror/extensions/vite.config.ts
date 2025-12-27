@@ -4,8 +4,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
 	plugins: [sveltekit()],
 	test: {
-		include: ['src/**/*.{test,spec}.{js,ts,mjs,mts,jsx,tsx}'],
-		environment: 'jsdom',
+		include: ['src/**/*.(test|spec).?(m)[jt]s?(x)'],
 	},
 	build: {
 		sourcemap: 'inline',
