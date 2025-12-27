@@ -882,12 +882,12 @@ impl ChatOpenAI {
             return Err(Error::api(status, error_text));
         }
 
-        let _model = self.model.clone();
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
             let mut accumulated_text = String::new();
-            let mut _usage: Option<UsageMetadata> = None;
+            let mut usage: Option<UsageMetadata> = None;
+            let mut finish_reason: Option<String> = None;
             let mut annotations: Vec<TextAnnotation> = Vec::new();
 
             use futures::StreamExt;
@@ -911,10 +911,7 @@ impl ChatOpenAI {
                             if let Some(data) = line.strip_prefix("data: ") {
                                 if data == "[DONE]" {
                                     // Final chunk with metadata
-                                    yield Ok(ChatChunk {
-                                        content: String::new(),
-                                        is_final: true,
-                                    });
+                                    yield Ok(ChatChunk::final_chunk(usage.take(), finish_reason.take()));
                                     continue;
                                 }
 
@@ -925,10 +922,7 @@ impl ChatOpenAI {
                                             // Text content delta
                                             if let Some(delta) = event.delta {
                                                 accumulated_text.push_str(&delta);
-                                                    yield Ok(ChatChunk {
-                                                        content: delta,
-                                                        is_final: false,
-                                                    });
+                                                yield Ok(ChatChunk::new(delta));
                                             }
                                         }
                                         "response.output_text.annotation.added" => {
@@ -938,20 +932,19 @@ impl ChatOpenAI {
                                             }
                                         }
                                         "response.completed" | "response.incomplete" => {
-                                            // Response complete - extract usage from the response
-                                            if let Some(resp) = event.response
-                                                && let Some(resp_usage) = resp.usage
-                                            {
-                                                _usage = Some(UsageMetadata::new(
-                                                    resp_usage.input_tokens as i64,
-                                                    resp_usage.output_tokens as i64,
-                                                ));
+                                            // Response complete - extract usage and status from the response
+                                            if let Some(resp) = event.response {
+                                                if let Some(resp_usage) = resp.usage {
+                                                    usage = Some(UsageMetadata::new(
+                                                        resp_usage.input_tokens as i64,
+                                                        resp_usage.output_tokens as i64,
+                                                    ));
+                                                }
+                                                // Set finish_reason based on status
+                                                finish_reason = resp.status;
                                             }
-                                            // Final chunk
-                                            yield Ok(ChatChunk {
-                                                content: String::new(),
-                                                is_final: true,
-                                            });
+                                            // Final chunk with metadata
+                                            yield Ok(ChatChunk::final_chunk(usage.take(), finish_reason.take()));
                                         }
                                         _ => {
                                             // Other event types (response.created, response.output_item.added, etc.)
@@ -1626,12 +1619,11 @@ impl ChatOpenAI {
         }
 
         // Create a stream from the SSE response
-        let _model = self.model.clone();
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
-            let mut _usage: Option<UsageMetadata> = None;
-            let mut _finish_reason: Option<String> = None;
+            let mut usage: Option<UsageMetadata> = None;
+            let mut finish_reason: Option<String> = None;
 
             use futures::StreamExt;
 
@@ -1649,27 +1641,22 @@ impl ChatOpenAI {
                             for line in event_data.lines() {
                                 if let Some(data) = line.strip_prefix("data: ") {
                                     if data == "[DONE]" {
-                                        yield Ok(ChatChunk {
-                                                        content: String::new(),
-                                                        is_final: true,
-                                                    });
+                                        // Final chunk with collected metadata
+                                        yield Ok(ChatChunk::final_chunk(usage.take(), finish_reason.take()));
                                         continue;
                                     }
 
                                     if let Ok(chunk) = serde_json::from_str::<OpenAIStreamChunk>(data) {
                                         if let Some(choice) = chunk.choices.first() {
                                             if let Some(ref content) = choice.delta.content {
-                                                yield Ok(ChatChunk {
-                                                    content: content.clone(),
-                                                    is_final: false,
-                                                });
+                                                yield Ok(ChatChunk::new(content.clone()));
                                             }
                                             if let Some(ref reason) = choice.finish_reason {
-                                                _finish_reason = Some(reason.clone());
+                                                finish_reason = Some(reason.clone());
                                             }
                                         }
                                         if let Some(ref u) = chunk.usage {
-                                            _usage = Some(UsageMetadata::new(
+                                            usage = Some(UsageMetadata::new(
                                                 u.prompt_tokens as i64,
                                                 u.completion_tokens as i64,
                                             ));
