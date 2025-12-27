@@ -19,6 +19,10 @@
 		"declarationMap": true,
 		"outDir": "dist"
 	},
-	"include": ["src/**/*"],
-	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+	"include": [
+		"vite.config.ts",
+		"src/**/*.ts",
+		"src/**/*.js"
+	],
+	"exclude": ["node_modules", "dist"]
 }

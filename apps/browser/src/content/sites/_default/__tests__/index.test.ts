@@ -46,9 +46,6 @@ describe('_default site handler', () => {
 	});
 
 	it('should handle NEW message type', async () => {
-		const mockResponse = vi.fn();
-		const mockSender = {} as any;
-
 		const message = {
 			type: 'NEW',
 		};

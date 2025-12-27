@@ -1,6 +1,6 @@
+import { base } from './base.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { base } from './base.js';
 
 function deepMerge(a, b) {
 	if (Array.isArray(a) || Array.isArray(b)) return b ?? a;
