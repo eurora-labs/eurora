@@ -11,12 +11,10 @@ use agent_chain_core::callbacks::{
 use agent_chain_core::language_models::{
     BaseLanguageModel, ChatGenerationStream, LanguageModelConfig, LanguageModelInput,
 };
-use agent_chain_core::outputs::{
-    ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, LLMResult,
-};
+use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult};
 use agent_chain_core::{
-    AIMessage, BaseMessage, ChatModel, ChatModelConfig, ChatResult, ChatResultMetadata,
-    LangSmithParams, ToolCall, ToolChoice, ToolDefinition,
+    AIMessage, BaseChatModel, BaseMessage, ChatModelConfig, LangSmithParams, ToolCall, ToolChoice,
+    ToolDefinition,
 };
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -303,7 +301,9 @@ impl BaseLanguageModel for ChatEurora {
         let mut all_generations = Vec::new();
         for prompt in prompts {
             let messages = prompt.to_messages();
-            let result = self._generate(messages, stop.clone(), None).await?;
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
             all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
         }
         Ok(LLMResult::new(all_generations))
@@ -322,7 +322,7 @@ impl BaseLanguageModel for ChatEurora {
 }
 
 #[async_trait]
-impl ChatModel for ChatEurora {
+impl BaseChatModel for ChatEurora {
     fn chat_config(&self) -> &ChatModelConfig {
         &self.chat_model_config
     }
@@ -379,7 +379,30 @@ impl ChatModel for ChatEurora {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> agent_chain_core::Result<OutputChatResult> {
+    ) -> agent_chain_core::Result<ChatResult> {
+        self._generate_internal(messages, stop, None).await
+    }
+
+    async fn generate_with_tools(
+        &self,
+        messages: Vec<BaseMessage>,
+        tools: &[ToolDefinition],
+        tool_choice: Option<&ToolChoice>,
+        stop: Option<Vec<String>>,
+    ) -> agent_chain_core::Result<AIMessage> {
+        self.generate_with_tools_internal(messages, tools, tool_choice, stop)
+            .await
+    }
+}
+
+impl ChatEurora {
+    /// Internal generate implementation.
+    async fn _generate_internal(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> agent_chain_core::Result<ChatResult> {
         let proto_request = self.build_request(&messages, stop);
 
         let mut client = self.client.clone();
@@ -435,36 +458,35 @@ impl ChatModel for ChatEurora {
         };
 
         let generation = ChatGeneration::new(message.into());
-        Ok(OutputChatResult::new(vec![generation]))
+        Ok(ChatResult::new(vec![generation]))
     }
 
-    async fn generate_with_tools(
+    /// Internal generate with tools implementation.
+    async fn generate_with_tools_internal(
         &self,
         messages: Vec<BaseMessage>,
         _tools: &[ToolDefinition],
         _tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
-    ) -> agent_chain_core::Result<ChatResult> {
+    ) -> agent_chain_core::Result<AIMessage> {
         // For now, we don't have tool support in the proto definition
         // Just call the regular _generate method
         // TODO: Add tool support to the proto definition and implement here
-        let result = self._generate(messages, stop, None).await?;
+        let result = self._generate_internal(messages, stop, None).await?;
+        Self::extract_ai_message(result)
+    }
 
+    /// Extract AIMessage from ChatResult.
+    fn extract_ai_message(result: ChatResult) -> agent_chain_core::Result<AIMessage> {
         if result.generations.is_empty() {
             return Err(agent_chain_core::Error::Other(
                 "No generations returned".into(),
             ));
         }
-
-        let message = match result.generations[0].message.clone() {
-            BaseMessage::AI(msg) => msg,
-            _ => return Err(agent_chain_core::Error::Other("Expected AI message".into())),
-        };
-
-        Ok(ChatResult {
-            message,
-            metadata: ChatResultMetadata::default(),
-        })
+        match result.generations[0].message.clone() {
+            BaseMessage::AI(msg) => Ok(msg),
+            _ => Err(agent_chain_core::Error::Other("Expected AI message".into())),
+        }
     }
 }
 

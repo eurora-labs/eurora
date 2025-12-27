@@ -11,8 +11,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::ChatResult;
 use crate::messages::BaseMessage;
+use crate::outputs::ChatResult;
 
 /// Mixin for Retriever callbacks.
 pub trait RetrieverManagerMixin {
