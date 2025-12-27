@@ -33,7 +33,7 @@
 	</Button>
 	<Alert.Title>Development Notice</Alert.Title>
 	<Alert.Description>
-		This website is still under active development. All the information avalaible is subject to
+		This website is still under active development. All the information available is subject to
 		change. Until this notice is lifted, all content of the website is to be considered
 		placeholder.
 	</Alert.Description>

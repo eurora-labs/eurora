@@ -10,6 +10,10 @@ const config = {
 	preprocess: [vitePreprocess({ script: true })],
 
 	kit: {
+		alias: {
+			$styles: './src/styles',
+			$components: './src/components',
+		},
 		adapter: adapter({
 			pages: 'build',
 			assets: 'build',
