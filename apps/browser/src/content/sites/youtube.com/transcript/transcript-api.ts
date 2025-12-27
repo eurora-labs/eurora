@@ -1,15 +1,16 @@
 import {
-	TranscriptSnippet,
-	FetchedTranscript,
-	TranscriptInfo,
-	TranslationLanguage,
-	CaptionsJson,
-	InnertubeData,
 	YouTubeTranscriptError,
 	TranscriptsDisabledError,
 	NoTranscriptFoundError,
 	VideoUnavailableError,
 	RequestBlockedError,
+} from './types.js';
+import type {
+	TranscriptSnippet,
+	FetchedTranscript,
+	TranslationLanguage,
+	CaptionsJson,
+	InnertubeData,
 } from './types.js';
 
 export class Transcript {

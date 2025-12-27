@@ -1,16 +1,17 @@
 import { YouTubeTranscriptApi } from './transcript/index.js';
-import { YoutubeBrowserMessage, type WatcherParams } from './types.js';
 import { createArticleAsset } from '@eurora/browser-shared/content/extensions/article/util';
 import {
 	Watcher,
 	type WatcherResponse,
 } from '@eurora/browser-shared/content/extensions/watchers/watcher';
-import { ProtoImage, ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
+import { ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import browser from 'webextension-polyfill';
+import type { YoutubeBrowserMessage, WatcherParams } from './types.js';
 import type {
 	NativeYoutubeAsset,
 	NativeYoutubeSnapshot,
 } from '@eurora/browser-shared/content/bindings';
+import type { ProtoImage } from '@eurora/shared/proto/shared_pb.js';
 
 interface EurImage extends Partial<ProtoImage> {
 	dataBase64: string;
@@ -69,7 +70,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 
 	public async handlePlay(
 		obj: YoutubeBrowserMessage,
-		sender: browser.Runtime.MessageSender,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<any> {
 		const { value } = obj;
 		if (this.params.youtubePlayer) {
@@ -78,14 +79,14 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleNew(
-		obj: YoutubeBrowserMessage,
-		sender: browser.Runtime.MessageSender,
+		_obj: YoutubeBrowserMessage,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		const currentVideoId = getCurrentVideoId();
 		if (!currentVideoId) {
 			this.params.videoId = undefined;
 			this.params.videoTranscript = undefined;
-			return;
+			return { kind: 'Ok', data: null };
 		}
 		this.params.videoId = currentVideoId;
 
@@ -103,6 +104,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 				},
 			});
 		}
+		return { kind: 'Ok', data: null };
 	}
 
 	private async generateVideoAsset(): Promise<any> {
@@ -150,8 +152,8 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleGenerateAssets(
-		obj: YoutubeBrowserMessage,
-		sender: browser.Runtime.MessageSender,
+		_obj: YoutubeBrowserMessage,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		if (window.location.href.includes('/watch?v=')) {
 			return await this.generateVideoAsset();
@@ -162,8 +164,8 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 
 	public async handleGenerateSnapshot(
-		obj: YoutubeBrowserMessage,
-		sender: browser.Runtime.MessageSender,
+		_obj: YoutubeBrowserMessage,
+		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		const currentTime = this.getCurrentVideoTime();
 		const videoFrame = this.getCurrentVideoFrame();
