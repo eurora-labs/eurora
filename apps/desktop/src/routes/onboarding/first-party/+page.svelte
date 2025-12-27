@@ -3,8 +3,9 @@
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
-	import * as Card from '@eurora/ui/components/card/index';
+	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import { open } from '@tauri-apps/plugin-shell';
+	import { onMount } from 'svelte';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	async function openLogin() {
@@ -26,12 +27,18 @@
 			clearInterval(interval);
 		}, 5000);
 	}
+
+	onMount(() => {
+		openLogin();
+	});
 </script>
 
-<Card.Root class="flex group cursor-pointer w-1/2" onclick={openLogin}>
-	<Card.Header class="pb-6 text-left ">
-		<Card.Title class="mb-2 text-2xl font-semibold">Get started with Eurora</Card.Title>
-		<Card.Description class="">Fastest way to get started.</Card.Description>
-	</Card.Header>
-	<!-- <Card.Content class="flex justify-center">Easiest and fastest way to get started.</Card.Content> -->
-</Card.Root>
+<div class="relative flex h-full w-full flex-col px-8">
+	<div class="flex flex-row justify-center items-center h-full w-full gap-4">
+		<Spinner class="w-8 h-8" />
+		<h1 class="text-4xl font-bold drop-shadow-lg">Waiting for you to log in...</h1>
+	</div>
+	<div class="mb-8">
+		<Button variant="outline" size="default" onclick={() => goto('/onboarding')}>Cancel</Button>
+	</div>
+</div>
