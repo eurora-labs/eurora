@@ -1,5 +1,5 @@
 use agent_chain::{ollama::ChatOllama, openai::ChatOpenAI};
-use agent_chain_core::chat_models::ChatModel;
+use agent_chain_core::language_models::BaseChatModel;
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_eurora::{ChatEurora, EuroraConfig};
 use anyhow::Result;
@@ -86,7 +86,7 @@ impl Default for OllamaConfig {
 
 #[derive(Debug, Clone)]
 enum LLMProvider {
-    OpenAI(ChatOpenAI),
+    OpenAI(Box<ChatOpenAI>),
     Ollama(ChatOllama),
     Eurora(ChatEurora),
 }
@@ -99,7 +99,7 @@ pub struct PromptKitService {
 impl Default for PromptKitService {
     fn default() -> Self {
         Self {
-            provider: LLMProvider::OpenAI(ChatOpenAI::new("gpt-4o")),
+            provider: LLMProvider::OpenAI(Box::new(ChatOpenAI::new("gpt-4o"))),
         }
     }
 }
@@ -138,12 +138,12 @@ impl PromptKitService {
             info!("Starting Eurora chat stream with agent-chain");
 
             let stream = llm
-                .stream(messages, None)
+                .astream(messages.into(), None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
                     result
-                        .map(|chunk| chunk.content)
+                        .map(|chunk| chunk.content().to_string())
                         .map_err(PromptKitError::AgentChainError)
                 });
 
@@ -166,12 +166,12 @@ impl PromptKitService {
             info!("Starting OpenAI chat stream with agent-chain");
 
             let stream = llm
-                .stream(messages, None)
+                .astream(messages.into(), None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
                     result
-                        .map(|chunk| chunk.content)
+                        .map(|chunk| chunk.content().to_string())
                         .map_err(PromptKitError::AgentChainError)
                 });
 
@@ -194,12 +194,12 @@ impl PromptKitService {
             info!("Starting Ollama chat stream with agent-chain");
 
             let stream = llm
-                .stream(messages, None)
+                .astream(messages.into(), None)
                 .await
                 .map_err(PromptKitError::AgentChainError)?
                 .map(|result| {
                     result
-                        .map(|chunk| chunk.content)
+                        .map(|chunk| chunk.content().to_string())
                         .map_err(PromptKitError::AgentChainError)
                 });
 
@@ -233,7 +233,7 @@ impl From<OpenAIConfig> for PromptKitService {
         }
 
         Self {
-            provider: LLMProvider::OpenAI(llm),
+            provider: LLMProvider::OpenAI(Box::new(llm)),
         }
     }
 }
