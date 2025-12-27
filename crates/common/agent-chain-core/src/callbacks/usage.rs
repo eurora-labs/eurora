@@ -259,7 +259,10 @@ mod tests {
         output_tokens: u32,
     ) -> ChatResult {
         let mut ai_msg = AIMessage::new(content);
-        ai_msg.set_usage_metadata(Some(UsageMetadata::new(input_tokens, output_tokens)));
+        ai_msg = ai_msg.with_usage_metadata(UsageMetadata::new(
+            input_tokens as i64,
+            output_tokens as i64,
+        ));
 
         let generation = ChatGeneration::new(ai_msg.into());
 
