@@ -5,11 +5,11 @@
 </script>
 
 <script lang="ts">
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
-	import { Button } from '@eurora/ui/components/button/index';
-	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import CheckIcon from '@lucide/svelte/icons/check';
 
 	let { finished }: OllamaProps = $props();

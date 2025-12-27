@@ -1,7 +1,7 @@
-import Root from './input-otp.svelte';
-import Group from './input-otp-group.svelte';
-import Slot from './input-otp-slot.svelte';
-import Separator from './input-otp-separator.svelte';
+import Group from '$lib/components/input-otp/input-otp-group.svelte';
+import Separator from '$lib/components/input-otp/input-otp-separator.svelte';
+import Slot from '$lib/components/input-otp/input-otp-slot.svelte';
+import Root from '$lib/components/input-otp/input-otp.svelte';
 
 export {
 	Root,

@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Button } from '@eurora/ui/components/button/index';
-	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
-	import { open } from '@tauri-apps/plugin-shell';
-	import * as Card from '@eurora/ui/components/card/index';
 	import { goto } from '$app/navigation';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import { Button } from '@eurora/ui/components/button/index';
+	import * as Card from '@eurora/ui/components/card/index';
+	import { open } from '@tauri-apps/plugin-shell';
 
 	const taurrpc = createTauRPCProxy();
 	async function openLogin() {
@@ -19,10 +19,8 @@
 
 			const isLoginSuccess = await taurrpc.auth.poll_for_login();
 			if (!isLoginSuccess) {
-				console.log('Login not successful');
 				return;
 			}
-			console.log('Login successful');
 			goto('/');
 			clearInterval(interval);
 		}, 5000);

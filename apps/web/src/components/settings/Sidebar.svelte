@@ -8,16 +8,15 @@
 </script>
 
 <script lang="ts">
+	import { page } from '$app/state';
+	import { Button } from '@eurora/ui/components/button/index';
+	import * as Dialog from '@eurora/ui/components/dialog/index';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import BoltIcon from '@lucide/svelte/icons/bolt';
-	import MailIcon from '@lucide/svelte/icons/mail';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
-	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import * as Dialog from '@eurora/ui/components/dialog/index';
-	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
-	import { page } from '$app/state';
 	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
-	import { cn } from '@eurora/ui/utils';
+	import MailIcon from '@lucide/svelte/icons/mail';
 
 	let generalItems: MenuItem[] = [
 		{

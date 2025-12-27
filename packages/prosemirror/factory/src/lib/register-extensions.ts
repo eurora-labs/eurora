@@ -1,13 +1,13 @@
-import { extensionFactory } from './factory.js';
+import { extensionFactory } from '$lib/factory.js';
 
 // Import extensions
 import { articleExtension, articleExtensionID } from '@eurora/prosemirror-extensions/article/index';
+import { pdfExtension, pdfExtensionID } from '@eurora/prosemirror-extensions/pdf/index';
+import { twitterExtension, twitterExtensionID } from '@eurora/prosemirror-extensions/twitter/index';
 import {
 	youtubeVideoExtension,
 	youtubeVideoExtensionID,
 } from '@eurora/prosemirror-extensions/youtube/index';
-import { twitterExtension, twitterExtensionID } from '@eurora/prosemirror-extensions/twitter/index';
-import { pdfExtension, pdfExtensionID } from '@eurora/prosemirror-extensions/pdf/index';
 
 /**
  * Register all known core extensions

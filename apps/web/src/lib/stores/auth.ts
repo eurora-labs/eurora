@@ -1,9 +1,9 @@
-import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
-import type { TokenResponse } from '@eurora/shared/services/auth-service';
-import { authService } from '@eurora/shared/services/auth-service';
 import { create } from '@bufbuild/protobuf';
 import { RefreshTokenRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
+import { authService } from '@eurora/shared/services/auth-service';
+import { writable, derived, get } from 'svelte/store';
+import type { TokenResponse } from '@eurora/shared/services/auth-service';
 
 export interface User {
 	id: string;
@@ -61,8 +61,8 @@ function initializeAuthState(): AuthState {
 				expiresAt: expiresAtNum,
 			};
 		}
-	} catch (error) {
-		console.error('Error initializing auth state:', error);
+	} catch (_error) {
+		console.error('Error initializing auth state:', _error);
 		// Clear corrupted data
 		clearStoredTokens();
 	}
@@ -113,8 +113,8 @@ function decodeJWTPayload(token: string): any {
 				.join(''),
 		);
 		return JSON.parse(jsonPayload);
-	} catch (error) {
-		console.error('Error decoding JWT:', error);
+	} catch (_error) {
+		console.error('Error decoding JWT:', _error);
 		return null;
 	}
 }
@@ -151,8 +151,6 @@ export const auth = {
 				refreshToken: tokens.refreshToken,
 				expiresAt: Date.now() + Number(tokens.expiresIn) * 1000,
 			});
-
-			console.log('User logged in successfully:', user);
 		} catch (error) {
 			console.error('Error during login:', error);
 			throw error;
@@ -169,7 +167,6 @@ export const auth = {
 			refreshToken: null,
 			expiresAt: null,
 		});
-		console.log('User logged out');
 	},
 
 	// Refresh token
@@ -222,7 +219,7 @@ export const auth = {
 			try {
 				await auth.refreshToken();
 				return true;
-			} catch (error) {
+			} catch (_error) {
 				return false;
 			}
 		}

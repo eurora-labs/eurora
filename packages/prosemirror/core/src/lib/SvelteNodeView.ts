@@ -1,6 +1,6 @@
+import { default as Editor } from '$lib/Editor.svelte';
 import { type Attrs, DOMSerializer, Node as PMNode } from 'prosemirror-model';
 import { mount, type Component } from 'svelte';
-import { default as Editor } from './Editor.svelte';
 import type {
 	Decoration,
 	DecorationSource,

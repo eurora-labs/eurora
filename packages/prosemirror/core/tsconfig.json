@@ -17,6 +17,6 @@
 		"declarationMap": true,
 		"mapRoot": "../../dist"
 	},
-	"include": ["src/**/*"],
+	"include": ["svelte.config.js", "vite.config.ts", "src/**/*"],
 	"exclude": ["node_modules"]
 }

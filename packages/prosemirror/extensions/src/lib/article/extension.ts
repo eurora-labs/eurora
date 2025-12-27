@@ -1,4 +1,4 @@
-import { default as Article, articleAttrs, articleSchema } from './Article.svelte';
+import { default as Article, articleAttrs, articleSchema } from '$lib/article/Article.svelte';
 import { Editor, type SveltePMExtension, SvelteNodeView } from '@eurora/prosemirror-core/index';
 import type { Component } from 'svelte';
 

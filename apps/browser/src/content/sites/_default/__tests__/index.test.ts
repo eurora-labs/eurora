@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { main } from '../index.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
@@ -46,9 +46,6 @@ describe('_default site handler', () => {
 	});
 
 	it('should handle NEW message type', async () => {
-		const mockResponse = vi.fn();
-		const mockSender = {} as any;
-
 		const message = {
 			type: 'NEW',
 		};

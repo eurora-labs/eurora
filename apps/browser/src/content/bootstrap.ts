@@ -1,12 +1,12 @@
 let loaded = false;
-// @ts-ignore
+// @ts-expect-error - browser is not available in all contexts
 const browserAny = typeof browser !== 'undefined' ? browser : (chrome as typeof browser);
 
 browserAny.runtime.onMessage.addListener(
 	(msg: any, sender: any, sendResponse: (response?: any) => void) => {
-		listener(msg, sender, sendResponse)
-			.then((result) => console.log(result))
-			.catch((error) => console.error('Error in listener:', error));
+		listener(msg, sender, sendResponse).catch((error) =>
+			console.error('Error in listener:', error),
+		);
 		return true;
 	},
 );
@@ -16,15 +16,17 @@ async function listener(msg: any, sender: any, sendResponse: (response?: any) =>
 	loaded = true;
 	document.documentElement.setAttribute('eurora-ext-ready', '1');
 
-	const imp = (p: string) => import(browserAny.runtime.getURL(p));
-	const runDefault = async () => {
+	async function imp(p: string) {
+		return await import(browserAny.runtime.getURL(p));
+	}
+	async function runDefault() {
 		try {
 			const def = await imp(msg.defaultChunk);
 			def?.mainDefault?.();
 		} catch (error) {
 			console.error('Error loading default script:', error);
 		}
-	};
+	}
 
 	try {
 		const mod = await imp(msg.chunk);

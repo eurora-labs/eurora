@@ -5,12 +5,12 @@
 </script>
 
 <script lang="ts">
-	import * as Select from '@eurora/ui/components/select/index';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import Button from '@eurora/ui/components/button/button.svelte';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
-	import Button from '@eurora/ui/components/button/button.svelte';
-	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import * as Select from '@eurora/ui/components/select/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
 
 	let { finished }: ApiProviderProps = $props();
@@ -50,7 +50,7 @@
 			await tauRPC.prompt.switch_to_remote(apiProvider, apiKey, model);
 			connectionStatus = 'success';
 			finished?.();
-		} catch (error) {
+		} catch (_error) {
 			connectionStatus = 'error';
 		} finally {
 			isConnecting = false;

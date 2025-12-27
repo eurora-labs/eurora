@@ -1,4 +1,4 @@
-import { default as Pdf, pdfAttrs, pdfSchema } from './Pdf.svelte';
+import { default as Pdf, pdfAttrs, pdfSchema } from '$lib/pdf/Pdf.svelte';
 import { Editor, type SveltePMExtension, SvelteNodeView } from '@eurora/prosemirror-core/index';
 import type { Component } from 'svelte';
 

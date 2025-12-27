@@ -1,5 +1,5 @@
-import browser from 'webextension-polyfill';
 import { getCurrentTab } from './tabs.js';
+import browser from 'webextension-polyfill';
 
 /**
  * Sends a message to a tab with retry logic to handle content script initialization delays
@@ -21,7 +21,6 @@ export async function sendMessageWithRetry(
 				browser.runtime.lastError?.message?.includes('Receiving end does not exist');
 
 			if (isConnectionError && !isLastAttempt) {
-				console.log(`Content script not ready, retrying (${attempt + 1}/${maxRetries})...`);
 				await new Promise((resolve) => setTimeout(resolve, delayMs));
 				continue;
 			}

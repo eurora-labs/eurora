@@ -1,11 +1,12 @@
+/* eslint-disable no-console, @typescript-eslint/no-unused-vars, @typescript-eslint/ban-ts-comment */
+import { writeManifest } from '../manifest/targets.js';
+import { backgroundConfig } from '../vite/presets/background.js';
+import { contentConfig } from '../vite/presets/content.js';
 import { build } from 'vite';
 import { execSync } from 'node:child_process';
 import fs, { createWriteStream } from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { contentConfig } from '../vite/presets/content.js';
-import { backgroundConfig } from '../vite/presets/background.js';
-import { writeManifest } from '../manifest/targets.js';
 
 const PDFJS_CACHE_DIR = '.pdfjs-viewer';
 const PDFJS_TEMP_DIR = '.pdfjs-temp';
@@ -44,9 +45,11 @@ async function main() {
 
 	// Build content and background scripts
 	console.log('Building content script...');
+	// @ts-ignore
 	await build(contentConfig({ browser, outDir, emptyOutDir: false }));
 
 	console.log('Building background script...');
+	// @ts-ignore
 	await build(backgroundConfig({ browser, outDir, emptyOutDir: false }));
 
 	await writeManifest({ browser, outDir });
@@ -97,6 +100,7 @@ async function downloadFile(url, destPath) {
 	fs.mkdirSync(path.dirname(destPath), { recursive: true });
 
 	const fileStream = createWriteStream(destPath);
+	// @ts-ignore
 	await pipeline(response.body, fileStream);
 }
 

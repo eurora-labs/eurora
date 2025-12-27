@@ -1,15 +1,16 @@
 import {
-	TranscriptSnippet,
-	FetchedTranscript,
-	TranscriptInfo,
-	TranslationLanguage,
-	CaptionsJson,
-	InnertubeData,
 	YouTubeTranscriptError,
 	TranscriptsDisabledError,
 	NoTranscriptFoundError,
 	VideoUnavailableError,
 	RequestBlockedError,
+} from './types.js';
+import type {
+	TranscriptSnippet,
+	FetchedTranscript,
+	TranslationLanguage,
+	CaptionsJson,
+	InnertubeData,
 } from './types.js';
 
 export class Transcript {
@@ -207,13 +208,13 @@ export class YouTubeTranscriptApi {
 	): Promise<FetchedTranscript> {
 		const transcriptList = await this.list(videoId);
 		const transcript = transcriptList.findTranscript(languages);
-		return transcript.fetch(preserveFormatting);
+		return await transcript.fetch(preserveFormatting);
 	}
 
 	async list(videoId: string): Promise<TranscriptList> {
 		try {
 			const captionsJson = await this.fetchCaptionsJson(videoId);
-			return TranscriptList.build(videoId, captionsJson);
+			return await TranscriptList.build(videoId, captionsJson);
 		} catch (error) {
 			if (error instanceof YouTubeTranscriptError) {
 				throw error;

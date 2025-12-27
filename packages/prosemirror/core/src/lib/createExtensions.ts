@@ -1,12 +1,10 @@
-import { Schema } from 'prosemirror-model';
-import { default as Editor } from './Editor.svelte';
-import type { SveltePMExtension, ExtensionData, Initialized } from '$lib/typings/index.js';
-import { createNodeSpec } from './extensions/createNodeSpec.js';
+import { default as Editor } from '$lib/Editor.svelte';
+import { createNodeSpec } from '$lib/extensions/createNodeSpec.js';
+import { caretAfterChip } from '$lib/plugins/caretAfterChip';
 import { keymap } from 'prosemirror-keymap';
-import { schema as defaultSchema } from 'prosemirror-schema-basic';
-import { addListNodes } from 'prosemirror-schema-list';
+import { Schema } from 'prosemirror-model';
 import { type Command, Plugin } from 'prosemirror-state';
-import { caretAfterChip } from './plugins/caretAfterChip';
+import type { SveltePMExtension, ExtensionData, Initialized } from '$lib/typings/index.js';
 
 export async function createExtensions(
 	editor: Editor,

@@ -1,6 +1,6 @@
 <script lang="ts" module>
-	import type { NodeSpec } from 'prosemirror-model';
 	import { Node as PMNode } from 'prosemirror-model';
+	import type { NodeSpec } from 'prosemirror-model';
 
 	export interface Frame {
 		id: string;
@@ -56,12 +56,12 @@
 </script>
 
 <script lang="ts">
-	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
-	import { Label } from '@eurora/ui/components/label/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import { Label } from '@eurora/ui/components/label/index';
 	import * as Popover from '@eurora/ui/components/popover/index';
-	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
+	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
 	import { SiYoutube } from '@icons-pack/svelte-simple-icons';
+	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
 	export interface Props extends SvelteNodeViewProps<VideoAttrs> {
 		ref: HTMLElement;
 		attrs: VideoAttrs;
@@ -70,11 +70,6 @@
 	let { ref, attrs }: Props = $props();
 
 	export { ref, attrs };
-
-	function handleClick(event: MouseEvent) {
-		alert('some longer script');
-		event.preventDefault();
-	}
 
 	function handleKeyDown(event: KeyboardEvent) {
 		event.preventDefault();
