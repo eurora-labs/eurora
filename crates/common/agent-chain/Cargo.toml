@@ -7,6 +7,7 @@ license = "MIT"
 
 [dependencies]
 agent-chain-core = { workspace = true }
+agent-chain-macros = { workspace = true }
 async-stream = "0.3"
 async-trait = { workspace = true }
 futures = { workspace = true }
