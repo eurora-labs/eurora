@@ -149,10 +149,8 @@ mod tests {
     #[test]
     fn test_render_tools() {
         let tools: Vec<Arc<dyn BaseTool>> = vec![
-            Arc::new(create_simple_tool("tool1", "First tool", |input| Ok(input))),
-            Arc::new(create_simple_tool("tool2", "Second tool", |input| {
-                Ok(input)
-            })),
+            Arc::new(create_simple_tool("tool1", "First tool", Ok)),
+            Arc::new(create_simple_tool("tool2", "Second tool", Ok)),
         ];
 
         let rendered = render_text_description(&tools);

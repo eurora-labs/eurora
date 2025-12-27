@@ -260,7 +260,6 @@ dependencies = [
 name = "agent-chain-core"
 version = "0.0.2"
 dependencies = [
- "agent-chain-macros",
  "async-stream",
  "async-trait",
  "base64 0.22.1",
