@@ -1,22 +1,22 @@
 <script lang="ts">
-	import { create } from '@bufbuild/protobuf';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
-	import * as Form from '@eurora/ui/components/form/index';
+	import { page } from '$app/state';
+	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
+	import { create } from '@bufbuild/protobuf';
+	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
+	import { authService } from '@eurora/shared/services/auth-service';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
+	import * as Form from '@eurora/ui/components/form/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Separator from '@eurora/ui/components/separator/index';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import { authService } from '@eurora/shared/services/auth-service';
-	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
+	import { onMount } from 'svelte';
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient, type ZodObjectType } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
-	import { page } from '$app/state';
-	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 	// import { auth } from '$lib/stores/auth.js';
 
 	onMount(() => {
@@ -36,8 +36,7 @@
 			}
 			loginToken = sessionStorage.getItem('loginToken');
 			challengeMethod = sessionStorage.getItem('challengeMethod');
-		} catch (error) {
-			console.error('Invalid login token or challenge method');
+		} catch (_error) {
 			goto('/login?error=invalid_login_token');
 			return;
 		}
@@ -56,7 +55,7 @@
 		},
 	);
 
-	const { form: formData, enhance, errors, submitting } = form;
+	const { form: formData, enhance, submitting } = form;
 
 	let showPassword = $state(false);
 	let success = $state(false);
@@ -76,12 +75,8 @@
 				},
 			});
 
-			console.log('Logging in user:', loginData);
-
 			// Call the auth service to login the user
-			const tokens = await authService.login(loginData);
-
-			console.log('Login successful, tokens:', tokens);
+			await authService.login(loginData);
 
 			// Store tokens in auth store
 			// auth.login(tokens);
@@ -106,7 +101,6 @@
 		try {
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
 			window.location.href = url;
-			console.log('Google login clicked');
 		} catch (err) {
 			console.error('Google login error:', err);
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
@@ -117,7 +111,6 @@
 		try {
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
 			window.location.href = url;
-			console.log('GitHub login clicked');
 		} catch (err) {
 			console.error('GitHub login error:', err);
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';

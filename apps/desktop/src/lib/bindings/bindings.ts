@@ -521,5 +521,7 @@ new_app_event: (event: TimelineAppEvent) => Promise<void>,
 new_assets_event: (chips: ContextChip[]) => Promise<void>} };
 
 
-export const createTauRPCProxy = () => createProxy<Router>(ARGS_MAP)
+export function createTauRPCProxy() {
+	return createProxy<Router>(ARGS_MAP);
+}
 export type { InferCommandOutput }

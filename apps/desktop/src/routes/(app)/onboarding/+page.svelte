@@ -1,7 +1,7 @@
 <script lang="ts">
-	import * as Card from '@eurora/ui/components/card/index';
-	import { Button } from '@eurora/ui/components/button/index';
 	import FirstPartyLogin from '$lib/components/FirstPartyLogin.svelte';
+	import { Button } from '@eurora/ui/components/button/index';
+	import * as Card from '@eurora/ui/components/card/index';
 </script>
 
 <div class="relative flex h-full w-full flex-col">

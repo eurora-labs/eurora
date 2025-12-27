@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment, no-empty-pattern */
 import { test as base, chromium, type BrowserContext, type Worker } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -19,6 +20,7 @@ export const test = base.extend<{
 	sw: Worker;
 }>({
 	// Override context to load the complete extension (content scripts, background, popup)
+	// @ts-ignore
 	context: async ({}, use) => {
 		// Path to the built extension directory
 		const pathToExtension = path.join(__dirname, '../../../../apps/browser/dist/chrome');

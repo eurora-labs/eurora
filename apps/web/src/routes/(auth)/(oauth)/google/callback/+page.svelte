@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
-	import { create } from '@bufbuild/protobuf';
-	import { onMount } from 'svelte';
-	import { authService } from '@eurora/shared/services/auth-service';
 	import { goto } from '$app/navigation';
+	import { create } from '@bufbuild/protobuf';
+	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
+	import { authService } from '@eurora/shared/services/auth-service';
+	import { onMount } from 'svelte';
 
 	onMount(async () => {
 		const query = new URLSearchParams(window.location.search);
@@ -46,9 +46,7 @@
 				},
 			});
 
-			const tokens = await authService.login(loginData);
-
-			console.log('Tokens:', tokens);
+			await authService.login(loginData);
 
 			// Store tokens in auth store
 			// auth.login(tokens);
