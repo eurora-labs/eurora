@@ -46,9 +46,7 @@
 				},
 			});
 
-			const tokens = await authService.login(loginData);
-
-			console.log('Tokens:', tokens);
+			await authService.login(loginData);
 
 			// Store tokens in auth store
 			// auth.login(tokens);
