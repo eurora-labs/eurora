@@ -1,8 +1,8 @@
 // scripts/zip.mjs
+import pkg from '../package.json' assert { type: 'json' };
+import archiver from 'archiver';
 import fs from 'node:fs';
 import path from 'node:path';
-import archiver from 'archiver';
-import pkg from '../package.json' assert { type: 'json' };
 
 const root = process.cwd();
 const distRoot = path.join(root, 'dist');
