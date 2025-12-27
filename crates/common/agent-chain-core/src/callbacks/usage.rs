@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
 
-use crate::ChatResult;
-use crate::chat_models::UsageMetadata;
+use crate::messages::{BaseMessage, UsageMetadata};
+use crate::outputs::ChatResult;
 
 use super::base::{
     BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
@@ -23,11 +23,7 @@ use super::base::{
 /// This function combines the token counts from two usage metadata objects,
 /// returning a new object with the summed values.
 pub fn add_usage(left: &UsageMetadata, right: &UsageMetadata) -> UsageMetadata {
-    UsageMetadata {
-        input_tokens: left.input_tokens + right.input_tokens,
-        output_tokens: left.output_tokens + right.output_tokens,
-        total_tokens: left.total_tokens + right.total_tokens,
-    }
+    left.add(right)
 }
 
 /// Callback Handler that tracks AIMessage.usage_metadata.
@@ -90,18 +86,46 @@ impl fmt::Display for UsageMetadataCallbackHandler {
 
 impl LLMManagerMixin for UsageMetadataCallbackHandler {
     fn on_llm_end(&mut self, response: &ChatResult, _run_id: Uuid, _parent_run_id: Option<Uuid>) {
-        // Extract usage metadata from the response
-        let usage_metadata = response.metadata.usage.as_ref();
-        let model_name = response.metadata.model.as_deref();
+        // Extract usage metadata from the first generation's message
+        let first_generation = response.generations.first();
+
+        let (usage_metadata, model_name) = match first_generation {
+            Some(generation) => {
+                // Try to get usage from the AIMessage
+                let usage = match &generation.message {
+                    BaseMessage::AI(ai_msg) => ai_msg.usage_metadata().cloned(),
+                    _ => None,
+                };
+
+                // Try to get model name from llm_output or response_metadata
+                let model = response
+                    .llm_output
+                    .as_ref()
+                    .and_then(|output| output.get("model"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .or_else(|| {
+                        generation
+                            .message
+                            .response_metadata()
+                            .and_then(|meta| meta.get("model"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                    });
+
+                (usage, model)
+            }
+            None => (None, None),
+        };
 
         // Update shared state behind lock
         if let (Some(usage), Some(model)) = (usage_metadata, model_name) {
             let mut guard = self.usage_metadata.lock().unwrap();
-            if let Some(existing) = guard.get(model) {
-                let combined = add_usage(existing, usage);
-                guard.insert(model.to_string(), combined);
+            if let Some(existing) = guard.get(&model) {
+                let combined = add_usage(existing, &usage);
+                guard.insert(model, combined);
             } else {
-                guard.insert(model.to_string(), usage.clone());
+                guard.insert(model, usage);
             }
         }
     }
@@ -223,8 +247,33 @@ pub fn get_usage_metadata_callback() -> UsageMetadataCallbackGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chat_models::ChatResultMetadata;
     use crate::messages::AIMessage;
+    use crate::outputs::ChatGeneration;
+    use serde_json::json;
+
+    /// Helper to create a ChatResult with usage metadata for testing.
+    fn create_chat_result_with_usage(
+        content: &str,
+        model: &str,
+        input_tokens: u32,
+        output_tokens: u32,
+    ) -> ChatResult {
+        let mut ai_msg = AIMessage::new(content);
+        ai_msg = ai_msg.with_usage_metadata(UsageMetadata::new(
+            input_tokens as i64,
+            output_tokens as i64,
+        ));
+
+        let generation = ChatGeneration::new(ai_msg.into());
+
+        let mut llm_output = HashMap::new();
+        llm_output.insert("model".to_string(), json!(model));
+
+        ChatResult {
+            generations: vec![generation],
+            llm_output: Some(llm_output),
+        }
+    }
 
     #[test]
     fn test_usage_handler_creation() {
@@ -248,14 +297,7 @@ mod tests {
     fn test_on_llm_end_collects_usage() {
         let mut handler = UsageMetadataCallbackHandler::new();
 
-        let result = ChatResult {
-            message: AIMessage::new("Hello"),
-            metadata: ChatResultMetadata {
-                model: Some("gpt-4".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(10, 20)),
-            },
-        };
+        let result = create_chat_result_with_usage("Hello", "gpt-4", 10, 20);
 
         handler.on_llm_end(&result, Uuid::new_v4(), None);
 
@@ -272,23 +314,8 @@ mod tests {
     fn test_on_llm_end_accumulates_usage() {
         let mut handler = UsageMetadataCallbackHandler::new();
 
-        let result1 = ChatResult {
-            message: AIMessage::new("Hello"),
-            metadata: ChatResultMetadata {
-                model: Some("gpt-4".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(10, 20)),
-            },
-        };
-
-        let result2 = ChatResult {
-            message: AIMessage::new("World"),
-            metadata: ChatResultMetadata {
-                model: Some("gpt-4".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(5, 15)),
-            },
-        };
+        let result1 = create_chat_result_with_usage("Hello", "gpt-4", 10, 20);
+        let result2 = create_chat_result_with_usage("World", "gpt-4", 5, 15);
 
         handler.on_llm_end(&result1, Uuid::new_v4(), None);
         handler.on_llm_end(&result2, Uuid::new_v4(), None);
@@ -306,23 +333,8 @@ mod tests {
     fn test_on_llm_end_multiple_models() {
         let mut handler = UsageMetadataCallbackHandler::new();
 
-        let result1 = ChatResult {
-            message: AIMessage::new("Hello"),
-            metadata: ChatResultMetadata {
-                model: Some("gpt-4".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(10, 20)),
-            },
-        };
-
-        let result2 = ChatResult {
-            message: AIMessage::new("Hello"),
-            metadata: ChatResultMetadata {
-                model: Some("claude-3".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(8, 25)),
-            },
-        };
+        let result1 = create_chat_result_with_usage("Hello", "gpt-4", 10, 20);
+        let result2 = create_chat_result_with_usage("Hello", "claude-3", 8, 25);
 
         handler.on_llm_end(&result1, Uuid::new_v4(), None);
         handler.on_llm_end(&result2, Uuid::new_v4(), None);
@@ -342,14 +354,7 @@ mod tests {
         let mut handler1 = UsageMetadataCallbackHandler::new();
         let handler2 = handler1.clone();
 
-        let result = ChatResult {
-            message: AIMessage::new("Hello"),
-            metadata: ChatResultMetadata {
-                model: Some("gpt-4".to_string()),
-                stop_reason: None,
-                usage: Some(UsageMetadata::new(10, 20)),
-            },
-        };
+        let result = create_chat_result_with_usage("Hello", "gpt-4", 10, 20);
 
         handler1.on_llm_end(&result, Uuid::new_v4(), None);
 

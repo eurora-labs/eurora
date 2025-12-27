@@ -63,25 +63,16 @@ pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
     ///
     /// * `input` - Either a string or a BaseMessage.
     /// * `config` - Optional runnable configuration.
-    fn invoke(
-        &self,
-        input: LanguageModelInput,
-        _config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
-        match input {
-            LanguageModelInput::Text(text) => self.parse_result(&[Generation::new(text)], false),
-            LanguageModelInput::Message(msg) => {
-                // Match Python: use ChatGeneration for message inputs
-                let chat_gen = ChatGeneration::new(*msg);
-                self.parse_result(&[Generation::new(&chat_gen.text)], false)
-            }
-        }
+    fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+        // Match Python: use ChatGeneration for message inputs
+        let chat_gen = ChatGeneration::new(input);
+        self.parse_result(&[Generation::new(&chat_gen.text)], false)
     }
 
     /// Async invoke the parser on a string or message input.
     async fn ainvoke(
         &self,
-        input: LanguageModelInput,
+        input: BaseMessage,
         config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
         self.invoke(input, config)
@@ -208,66 +199,20 @@ pub trait BaseOutputParser: Send + Sync + Debug {
     /// For string inputs, creates a `Generation` with the text.
     /// For message inputs, creates a `ChatGeneration` with the message,
     /// matching the Python implementation.
-    fn invoke(
-        &self,
-        input: LanguageModelInput,
-        _config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
-        match input {
-            LanguageModelInput::Text(text) => self.parse_result(&[Generation::new(text)], false),
-            LanguageModelInput::Message(msg) => {
-                // Match Python: use ChatGeneration for message inputs
-                let chat_gen = ChatGeneration::new(*msg);
-                // ChatGeneration has a text field that extracts content from message
-                self.parse_result(&[Generation::new(&chat_gen.text)], false)
-            }
-        }
+    fn invoke(&self, input: BaseMessage, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+        // Match Python: use ChatGeneration for message inputs
+        let chat_gen = ChatGeneration::new(input);
+        // ChatGeneration has a text field that extracts content from message
+        self.parse_result(&[Generation::new(&chat_gen.text)], false)
     }
 
     /// Async invoke the parser on input.
     async fn ainvoke(
         &self,
-        input: LanguageModelInput,
+        input: BaseMessage,
         config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
         self.invoke(input, config)
-    }
-}
-
-/// Input type for language model output parsers.
-///
-/// Can be either a raw text string or a message.
-/// This is a simplified version for output parsers that only need
-/// to handle string or message inputs.
-#[derive(Debug, Clone)]
-pub enum LanguageModelInput {
-    /// Raw text input.
-    Text(String),
-    /// Message input.
-    Message(Box<BaseMessage>),
-}
-
-impl From<String> for LanguageModelInput {
-    fn from(text: String) -> Self {
-        LanguageModelInput::Text(text)
-    }
-}
-
-impl From<&str> for LanguageModelInput {
-    fn from(text: &str) -> Self {
-        LanguageModelInput::Text(text.to_string())
-    }
-}
-
-impl From<BaseMessage> for LanguageModelInput {
-    fn from(msg: BaseMessage) -> Self {
-        LanguageModelInput::Message(Box::new(msg))
-    }
-}
-
-impl From<Box<BaseMessage>> for LanguageModelInput {
-    fn from(msg: Box<BaseMessage>) -> Self {
-        LanguageModelInput::Message(msg)
     }
 }
 
@@ -338,11 +283,6 @@ impl From<OutputParserError> for Error {
     }
 }
 
-/// Type alias for language model output.
-///
-/// This can be either a string or a message.
-pub type LanguageModelOutput = LanguageModelInput;
-
 /// Convert a Generation to a Value for JSON operations.
 pub fn generation_to_value(generation: &Generation) -> Value {
     serde_json::json!({
@@ -399,14 +339,5 @@ mod tests {
         let err = OutputParserError::parse_error("Invalid JSON", "{invalid}");
         assert_eq!(err.message, "Invalid JSON");
         assert_eq!(err.llm_output, Some("{invalid}".to_string()));
-    }
-
-    #[test]
-    fn test_language_model_input_from_string() {
-        let input: LanguageModelInput = "test".into();
-        match input {
-            LanguageModelInput::Text(t) => assert_eq!(t, "test"),
-            _ => panic!("Expected Text variant"),
-        }
     }
 }

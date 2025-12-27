@@ -60,10 +60,12 @@ pub mod chat_models {
     //! New code should use [`language_models`] directly.
 
     pub use crate::language_models::{
-        BaseChatModel, BoundChatModel, ChatChunk, ChatModel, ChatModelConfig, ChatModelExt,
-        ChatResult, ChatResultMetadata, ChatStream, DynBoundChatModel, DynChatModel,
-        DynChatModelExt, LangSmithParams, ToolChoice, UsageMetadata,
+        BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, DisableStreaming, LangSmithParams,
+        ToolChoice, UsageMetadata,
     };
+
+    // Re-export ChatResult from outputs for backward compatibility
+    pub use crate::outputs::ChatResult;
 }
 
 // Re-export env types
@@ -75,25 +77,17 @@ pub use error::{Error, Result};
 // Re-export core language model types
 pub use language_models::{
     // Chat model types
+    AIMessageChunkStream,
     BaseChatModel,
-    BaseChatModelExt,
     // LLM types
     BaseLLM,
     // Base types
     BaseLanguageModel,
-    BoundChatModel,
     ChatChunk,
     ChatGenerationStream,
-    ChatModel,
     ChatModelConfig,
-    ChatModelExt,
-    ChatResult,
-    ChatResultMetadata,
     ChatStream,
-    DynBaseChatModel,
-    DynBoundChatModel,
-    DynChatModel,
-    DynChatModelExt,
+    DisableStreaming,
     FakeListChatModel,
     FakeListChatModelError,
     // Fake implementations for testing
@@ -120,6 +114,8 @@ pub use language_models::{
     SimpleChatModel,
     ToolChoice,
     UsageMetadata,
+    agenerate_from_stream,
+    collect_and_merge_stream,
     generate_from_stream,
 
     get_prompts_from_cache,
@@ -136,7 +132,7 @@ pub use messages::{
 };
 
 // Re-export tool types
-pub use tools::{Tool, ToolDefinition, tool};
+pub use tools::{BaseTool, Tool, ToolDefinition};
 
 // Re-export chat history types
 pub use chat_history::{
@@ -158,16 +154,15 @@ pub use globals::{get_debug, get_llm_cache, get_verbose, set_debug, set_llm_cach
 // Re-export output parser types
 pub use output_parsers::{
     BaseCumulativeTransformOutputParser, BaseLLMOutputParser, BaseOutputParser,
-    BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser,
-    LanguageModelInput as OutputParserInput, ListOutputParser, MarkdownListOutputParser,
-    NumberedListOutputParser, OutputParserError, SimpleJsonOutputParser, StrOutputParser,
-    XMLOutputParser,
+    BaseTransformOutputParser, CommaSeparatedListOutputParser, JsonOutputParser, ListOutputParser,
+    MarkdownListOutputParser, NumberedListOutputParser, OutputParserError, SimpleJsonOutputParser,
+    StrOutputParser, XMLOutputParser,
 };
 
 // Re-export output types
 pub use outputs::{
-    ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, Generation,
-    GenerationChunk, GenerationType, LLMResult, RunInfo, merge_chat_generation_chunks,
+    ChatGeneration, ChatGenerationChunk, ChatResult, Generation, GenerationChunk, GenerationType,
+    LLMResult, RunInfo, merge_chat_generation_chunks,
 };
 
 // Re-export callback types
