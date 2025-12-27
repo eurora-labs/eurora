@@ -21,7 +21,7 @@ test.describe('Content Script Basic Tests', () => {
 		await page.goto('https://example.com');
 
 		const heading = page.locator('h1').first();
-		expect(heading).toBeVisible();
+		await expect(heading).toBeVisible();
 	});
 
 	test('should have window object available', async ({ page }) => {
