@@ -55,10 +55,13 @@ pub use base::{
 
 // Re-export chat model types
 pub use chat_models::{
-    BaseChatModel, BoundChatModel, ChatChunk, ChatGenerationStream, ChatModelConfig, ChatModelExt,
-    ChatResult, ChatResultMetadata, ChatStream, DynBoundChatModel, SimpleChatModel, ToolChoice,
-    UsageMetadata, generate_from_stream,
+    AIMessageChunkStream, BaseChatModel, ChatChunk, ChatGenerationStream, ChatModelConfig,
+    ChatResult, ChatResultMetadata, ChatStream, DisableStreaming, SimpleChatModel, ToolChoice,
+    agenerate_from_stream, collect_and_merge_stream, generate_from_stream,
 };
+
+// Re-export UsageMetadata from messages (where it's canonically defined)
+pub use crate::messages::UsageMetadata;
 
 // Re-export LLM types
 pub use llms::{BaseLLM, LLM, LLMConfig, get_prompts_from_cache, update_cache};
