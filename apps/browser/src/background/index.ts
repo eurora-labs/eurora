@@ -3,7 +3,7 @@ import { startNativeMessenger } from '@eurora/browser-shared/background/native-m
 import browser from 'webextension-polyfill';
 
 browser.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
-	webNavigationListener(tabId, url, frameId).then((result) => console.log(result));
+	webNavigationListener(tabId, url, frameId).catch(console.error);
 	return true;
 });
 

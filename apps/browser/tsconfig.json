@@ -18,4 +18,14 @@
 		"declaration": true,
 		"declarationMap": true,
 	},
+	"include": [
+		"manifest/**/*.js",
+		"scripts/**/*.mjs",
+		"postcss.config.mjs",
+		"svelte.config.js",
+		"vite.config.ts",
+		"vitest.config.ts",
+		"vite/presets/*.js",
+		"src/**/*"
+	]
 }
