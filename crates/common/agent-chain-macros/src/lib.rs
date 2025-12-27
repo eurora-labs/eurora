@@ -97,8 +97,14 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
+            impl std::fmt::Debug for #struct_name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    f.debug_struct(stringify!(#struct_name)).finish()
+                }
+            }
+
             #[::agent_chain::_core::async_trait]
-            impl ::agent_chain::_core::tools::Tool for #struct_name {
+            impl ::agent_chain::_core::tools::BaseTool for #struct_name {
                 fn name(&self) -> &str {
                     #fn_name_str
                 }
@@ -107,7 +113,16 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     concat!("Tool: ", #fn_name_str)
                 }
 
-                fn parameters_schema(&self) -> serde_json::Value {
+                fn args_schema(&self) -> Option<&::agent_chain::_core::tools::ArgsSchema> {
+                    None
+                }
+
+                fn run(&self, input: ::agent_chain::_core::tools::ToolInput, _config: Option<::agent_chain::_core::runnables::RunnableConfig>) -> ::agent_chain::_core::error::Result<::agent_chain::_core::tools::ToolOutput> {
+                    // For generated tools, we always use async version
+                    Err(::agent_chain::_core::error::Error::NotImplemented("Use async invoke instead".into()))
+                }
+
+                fn definition(&self) -> ::agent_chain::_core::tools::ToolDefinition {
                     let properties: HashMap<String, serde_json::Value> = [
                         #(#schema_properties),*
                     ].into_iter().collect();
@@ -116,11 +131,15 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         #(#param_names_str.to_string()),*
                     ];
 
-                    serde_json::json!({
-                        "type": "object",
-                        "properties": properties,
-                        "required": required
-                    })
+                    ::agent_chain::_core::tools::ToolDefinition {
+                        name: #fn_name_str.to_string(),
+                        description: concat!("Tool: ", #fn_name_str).to_string(),
+                        parameters: serde_json::json!({
+                            "type": "object",
+                            "properties": properties,
+                            "required": required
+                        }),
+                    }
                 }
 
                 async fn invoke(&self, tool_call: ::agent_chain::_core::messages::ToolCall) -> ::agent_chain::_core::messages::BaseMessage {
