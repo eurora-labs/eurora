@@ -75,7 +75,7 @@ pub use error::EuroraError;
 pub use provider::ChatEurora;
 
 // Re-export agent-chain types that users will need
-pub use agent_chain_core::{ChatModel, ChatResult, ChatStream};
+pub use agent_chain_core::{BaseChatModel, ChatResult, ChatStream};
 
 #[cfg(test)]
 mod tests {
