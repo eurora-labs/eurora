@@ -1,4 +1,5 @@
 import { YouTubeTranscriptApi } from './transcript-api.js';
+import browser from 'webextension-polyfill';
 
 class YouTubeTranscriptExtractor {
 	private api: YouTubeTranscriptApi;
@@ -11,7 +12,7 @@ class YouTubeTranscriptExtractor {
 
 	private init(): void {
 		// Listen for messages from popup
-		chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+		browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 			this.handleMessage(request, sender, sendResponse);
 			return true; // Keep message channel open for async response
 		});
@@ -27,12 +28,13 @@ class YouTubeTranscriptExtractor {
 	): Promise<void> {
 		try {
 			switch (request.action) {
-				case 'getCurrentVideoId':
+				case 'getCurrentVideoId': {
 					const videoId = this.getCurrentVideoId();
 					sendResponse({ success: true, videoId });
 					break;
+				}
 
-				case 'getTranscriptList':
+				case 'getTranscriptList': {
 					const transcriptList = await this.api.list(request.videoId);
 					const transcripts = transcriptList.getAllTranscripts().map((t) => ({
 						language: t.language,
@@ -42,8 +44,9 @@ class YouTubeTranscriptExtractor {
 					}));
 					sendResponse({ success: true, transcripts });
 					break;
+				}
 
-				case 'fetchTranscript':
+				case 'fetchTranscript': {
 					const transcript = await this.api.fetch(
 						request.videoId,
 						request.languages || ['en'],
@@ -51,6 +54,7 @@ class YouTubeTranscriptExtractor {
 					);
 					sendResponse({ success: true, transcript });
 					break;
+				}
 
 				default:
 					sendResponse({ success: false, error: 'Unknown action' });
@@ -67,7 +71,7 @@ class YouTubeTranscriptExtractor {
 	private getCurrentVideoId(): string | null {
 		// Method 1: Extract from URL
 		const urlParams = new URLSearchParams(window.location.search);
-		let videoId = urlParams.get('v');
+		const videoId = urlParams.get('v');
 
 		if (videoId) {
 			return videoId;
@@ -150,7 +154,7 @@ class YouTubeTranscriptExtractor {
 
 	private notifyVideoChange(videoId: string): void {
 		// Send message to background script about video change
-		chrome.runtime
+		browser.runtime
 			.sendMessage({
 				action: 'videoChanged',
 				videoId: videoId,

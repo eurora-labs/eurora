@@ -1,6 +1,6 @@
 <script lang="ts" module>
-	import type { NodeSpec } from 'prosemirror-model';
 	import { Node as PMNode } from 'prosemirror-model';
+	import type { NodeSpec } from 'prosemirror-model';
 
 	export interface Tweet {
 		text: string;
@@ -77,12 +77,12 @@
 </script>
 
 <script lang="ts">
-	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
-	import { Label } from '@eurora/ui/components/label/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import { Label } from '@eurora/ui/components/label/index';
 	import * as Popover from '@eurora/ui/components/popover/index';
-	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
+	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
 	import { SiX } from '@icons-pack/svelte-simple-icons';
+	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
 
 	export interface Props extends SvelteNodeViewProps<TweetAttrs> {
 		ref: HTMLElement;
@@ -112,7 +112,7 @@
 				const tweets = JSON.parse(attrs.tweets) as Tweet[];
 				const tweetTexts = tweets.map((tweet) => tweet.text).join('\n\n');
 				alert(`Twitter Content:\n\n${tweetTexts}`);
-			} catch (e) {
+			} catch (_e) {
 				alert('Twitter content available');
 			}
 		}
@@ -138,7 +138,7 @@
 						? tweets[0].text.substring(0, 50) + '...'
 						: tweets[0].text;
 				}
-			} catch (e) {
+			} catch (_e) {
 				// Fall through to default
 			}
 		}
@@ -152,7 +152,7 @@
 			try {
 				const tweets = JSON.parse(attrs.tweets) as Tweet[];
 				return tweets.length;
-			} catch (e) {
+			} catch (_e) {
 				return 0;
 			}
 		}

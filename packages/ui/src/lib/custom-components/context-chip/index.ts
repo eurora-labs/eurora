@@ -2,7 +2,7 @@ import Root, {
 	type ContextChipProps,
 	type ContextChipVariant,
 	contextChipVariants,
-} from './context-chip.svelte';
+} from '$lib/custom-components/context-chip/context-chip.svelte';
 
 export {
 	Root,

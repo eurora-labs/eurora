@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { platform } from '@tauri-apps/plugin-os';
-	import { onMount } from 'svelte';
-	import Menubar from '$lib/components/Menubar.svelte';
+	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
+	import Menubar from '$lib/components/Menubar.svelte';
+	import { inject } from '@eurora/shared/context';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
-	import { inject } from '@eurora/shared/context';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
+	import { platform } from '@tauri-apps/plugin-os';
+	import { onMount } from 'svelte';
 
 	let taurpcService = inject(TAURPC_SERVICE);
 	let timelineItems: TimelineAppEvent[] = $state([]);
