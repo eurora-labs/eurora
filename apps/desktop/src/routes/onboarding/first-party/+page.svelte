@@ -3,7 +3,6 @@
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
-	import * as Card from '@eurora/ui/components/card/index';
 	import { open } from '@tauri-apps/plugin-shell';
 	import { onMount } from 'svelte';
 
@@ -29,12 +28,15 @@
 	}
 
 	onMount(() => {
-		// openLogin();
+		openLogin();
 	});
 </script>
 
-<div class="relative flex h-full w-full flex-col">
-	<div class="flex flex-col justify-center items-center h-full w-full gap-8 px-8">
-		<h1 class="text-4xl font-bold drop-shadow-lg">Welcome to Eurora!</h1>
+<div class="relative flex h-full w-full flex-col px-8">
+	<div class="flex flex-col justify-center items-center h-full w-full gap-8">
+		<h1 class="text-4xl font-bold drop-shadow-lg">Waiting for you to log in...</h1>
+	</div>
+	<div class="mb-8">
+		<Button variant="outline" size="default" onclick={() => goto('/onboarding')}>Cancel</Button>
 	</div>
 </div>
