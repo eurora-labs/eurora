@@ -12,14 +12,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::callbacks::{CallbackManagerForToolRun, AsyncCallbackManagerForToolRun};
 use crate::error::{Error, Result};
-use crate::messages::ToolCall;
 use crate::runnables::RunnableConfig;
 
 use super::base::{
-    ArgsSchema, BaseTool, HandleToolError, HandleValidationError, ResponseFormat,
-    ToolException, ToolInput, ToolOutput, ToolDefinition, FILTERED_ARGS,
+    ArgsSchema, BaseTool, FILTERED_ARGS, HandleToolError, HandleValidationError, ResponseFormat, ToolException, ToolInput, ToolOutput,
 };
 
 /// Type alias for sync structured tool function.
@@ -293,24 +290,18 @@ impl BaseTool for StructuredTool {
         self.extras.as_ref()
     }
 
-    fn run(
-        &self,
-        input: ToolInput,
-        _config: Option<RunnableConfig>,
-    ) -> Result<ToolOutput> {
+    fn run(&self, input: ToolInput, _config: Option<RunnableConfig>) -> Result<ToolOutput> {
         let args = self.extract_args(input)?;
         let filtered_args = self.filter_args(args);
-        
+
         if let Some(ref func) = self.func {
             match func(filtered_args) {
                 Ok(result) => {
                     match self.response_format {
-                        ResponseFormat::Content => {
-                            match result {
-                                Value::String(s) => Ok(ToolOutput::String(s)),
-                                other => Ok(ToolOutput::Json(other)),
-                            }
-                        }
+                        ResponseFormat::Content => match result {
+                            Value::String(s) => Ok(ToolOutput::String(s)),
+                            other => Ok(ToolOutput::Json(other)),
+                        },
                         ResponseFormat::ContentAndArtifact => {
                             // Expect a tuple [content, artifact]
                             if let Value::Array(arr) = result {
@@ -321,7 +312,8 @@ impl BaseTool for StructuredTool {
                                     })
                                 } else {
                                     Err(Error::ToolInvocation(
-                                        "content_and_artifact response must be a 2-tuple".to_string(),
+                                        "content_and_artifact response must be a 2-tuple"
+                                            .to_string(),
                                     ))
                                 }
                             } else {
@@ -335,7 +327,9 @@ impl BaseTool for StructuredTool {
                 Err(e) => {
                     if let Error::ToolInvocation(msg) = &e {
                         let exc = ToolException::new(msg.clone());
-                        if let Some(handled) = super::base::handle_tool_error_impl(&exc, &self.handle_tool_error) {
+                        if let Some(handled) =
+                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
+                        {
                             return Ok(ToolOutput::String(handled));
                         }
                     }
@@ -343,52 +337,48 @@ impl BaseTool for StructuredTool {
                 }
             }
         } else {
-            Err(Error::ToolInvocation("StructuredTool does not support sync invocation.".to_string()))
+            Err(Error::ToolInvocation(
+                "StructuredTool does not support sync invocation.".to_string(),
+            ))
         }
     }
 
-    async fn arun(
-        &self,
-        input: ToolInput,
-        config: Option<RunnableConfig>,
-    ) -> Result<ToolOutput> {
+    async fn arun(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput> {
         let args = self.extract_args(input.clone())?;
         let filtered_args = self.filter_args(args);
-        
+
         if let Some(ref coroutine) = self.coroutine {
             match coroutine(filtered_args).await {
-                Ok(result) => {
-                    match self.response_format {
-                        ResponseFormat::Content => {
-                            match result {
-                                Value::String(s) => Ok(ToolOutput::String(s)),
-                                other => Ok(ToolOutput::Json(other)),
-                            }
-                        }
-                        ResponseFormat::ContentAndArtifact => {
-                            if let Value::Array(arr) = result {
-                                if arr.len() == 2 {
-                                    Ok(ToolOutput::ContentAndArtifact {
-                                        content: arr[0].clone(),
-                                        artifact: arr[1].clone(),
-                                    })
-                                } else {
-                                    Err(Error::ToolInvocation(
-                                        "content_and_artifact response must be a 2-tuple".to_string(),
-                                    ))
-                                }
+                Ok(result) => match self.response_format {
+                    ResponseFormat::Content => match result {
+                        Value::String(s) => Ok(ToolOutput::String(s)),
+                        other => Ok(ToolOutput::Json(other)),
+                    },
+                    ResponseFormat::ContentAndArtifact => {
+                        if let Value::Array(arr) = result {
+                            if arr.len() == 2 {
+                                Ok(ToolOutput::ContentAndArtifact {
+                                    content: arr[0].clone(),
+                                    artifact: arr[1].clone(),
+                                })
                             } else {
                                 Err(Error::ToolInvocation(
                                     "content_and_artifact response must be a 2-tuple".to_string(),
                                 ))
                             }
+                        } else {
+                            Err(Error::ToolInvocation(
+                                "content_and_artifact response must be a 2-tuple".to_string(),
+                            ))
                         }
                     }
-                }
+                },
                 Err(e) => {
                     if let Error::ToolInvocation(msg) = &e {
                         let exc = ToolException::new(msg.clone());
-                        if let Some(handled) = super::base::handle_tool_error_impl(&exc, &self.handle_tool_error) {
+                        if let Some(handled) =
+                            super::base::handle_tool_error_impl(&exc, &self.handle_tool_error)
+                        {
                             return Ok(ToolOutput::String(handled));
                         }
                     }
@@ -518,14 +508,18 @@ impl StructuredToolBuilder {
 
     /// Build the StructuredTool.
     pub fn build(self) -> Result<StructuredTool> {
-        let name = self.name.ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
+        let name = self
+            .name
+            .ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
         let description = self.description.unwrap_or_default();
         let args_schema = self.args_schema.unwrap_or_default();
-        
+
         if self.func.is_none() && self.coroutine.is_none() {
-            return Err(Error::InvalidConfig("Function and/or coroutine must be provided".to_string()));
+            return Err(Error::InvalidConfig(
+                "Function and/or coroutine must be provided".to_string(),
+            ));
         }
-        
+
         Ok(StructuredTool {
             name,
             description,
@@ -563,11 +557,11 @@ pub fn create_args_schema(
         "properties": properties,
         "required": required,
     });
-    
+
     if let Some(desc) = description {
         schema["description"] = Value::String(desc.to_string());
     }
-    
+
     ArgsSchema::JsonSchema(schema)
 }
 
@@ -588,7 +582,7 @@ mod tests {
             vec!["a".to_string(), "b".to_string()],
             Some("Add two numbers"),
         );
-        
+
         let tool = StructuredTool::from_function(
             |args| {
                 let a = args.get("a").and_then(|v| v.as_f64()).unwrap_or(0.0);
@@ -599,7 +593,7 @@ mod tests {
             "Adds two numbers together",
             schema,
         );
-        
+
         assert_eq!(tool.name(), "add");
         assert_eq!(tool.description(), "Adds two numbers together");
     }
@@ -617,7 +611,7 @@ mod tests {
             vec!["x".to_string(), "y".to_string()],
             None,
         );
-        
+
         let tool = StructuredTool::from_function(
             |args| {
                 let x = args.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
@@ -628,11 +622,11 @@ mod tests {
             "Multiplies two numbers",
             schema,
         );
-        
+
         let mut input = HashMap::new();
         input.insert("x".to_string(), Value::from(3.0));
         input.insert("y".to_string(), Value::from(4.0));
-        
+
         let result = tool.run(ToolInput::Dict(input), None).unwrap();
         match result {
             ToolOutput::Json(v) => assert_eq!(v.as_f64().unwrap(), 12.0),
@@ -656,13 +650,16 @@ mod tests {
                 None,
             ))
             .func(|args| {
-                let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("stranger");
+                let name = args
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("stranger");
                 Ok(Value::String(format!("Hello, {}!", name)))
             })
             .return_direct(true)
             .build()
             .unwrap();
-        
+
         assert_eq!(tool.name(), "greet");
         assert!(tool.return_direct());
     }
@@ -679,7 +676,7 @@ mod tests {
             vec!["field1".to_string()],
             Some("Test description"),
         );
-        
+
         let json = schema.to_json_schema();
         assert_eq!(json["title"], "test_schema");
         assert_eq!(json["description"], "Test description");
@@ -699,7 +696,7 @@ mod tests {
             vec!["a".to_string(), "b".to_string()],
             None,
         );
-        
+
         let tool = StructuredTool::from_function(
             |args| {
                 let a = args.get("a").and_then(|v| v.as_str()).unwrap_or("");
@@ -710,11 +707,11 @@ mod tests {
             "Concatenates two strings",
             schema,
         );
-        
+
         let mut input = HashMap::new();
         input.insert("a".to_string(), Value::String("Hello".to_string()));
         input.insert("b".to_string(), Value::String("World".to_string()));
-        
+
         let result = tool.arun(ToolInput::Dict(input), None).await.unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "HelloWorld"),

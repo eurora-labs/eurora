@@ -5,13 +5,12 @@
 
 use std::collections::HashMap;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use serde_json::Value;
 
 use crate::error::{Error, Result};
-use crate::runnables::{Runnable, RunnableConfig};
+use crate::runnables::Runnable;
 
 use super::base::{ArgsSchema, BaseTool, ResponseFormat};
 use super::simple::Tool;
@@ -159,29 +158,28 @@ where
 }
 
 /// Create a tool using a configuration object.
-pub fn create_tool_with_config<F>(
-    func: F,
-    config: ToolConfig,
-) -> Result<StructuredTool>
+pub fn create_tool_with_config<F>(func: F, config: ToolConfig) -> Result<StructuredTool>
 where
     F: Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync + 'static,
 {
-    let name = config.name.ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
+    let name = config
+        .name
+        .ok_or_else(|| Error::InvalidConfig("Tool name is required".to_string()))?;
     let description = config.description.unwrap_or_default();
     let args_schema = config.args_schema.unwrap_or_default();
-    
+
     let mut tool = StructuredTool::from_function(func, name, description, args_schema);
-    
+
     if config.return_direct {
         tool = tool.with_return_direct(true);
     }
-    
+
     tool = tool.with_response_format(config.response_format);
-    
+
     if let Some(extras) = config.extras {
         tool = tool.with_extras(extras);
     }
-    
+
     Ok(tool)
 }
 
@@ -198,19 +196,17 @@ where
 {
     let name = name.into();
     let description = description.into();
-    
+
     let runnable_clone = runnable.clone();
-    let func = move |args: HashMap<String, Value>| {
-        runnable_clone.invoke(args, None)
-    };
-    
+    let func = move |args: HashMap<String, Value>| runnable_clone.invoke(args, None);
+
     // Create a simple schema based on what we know
     let schema = ArgsSchema::JsonSchema(serde_json::json!({
         "type": "object",
         "properties": {},
         "additionalProperties": true
     }));
-    
+
     StructuredTool::from_function(func, name, description, schema)
 }
 
@@ -222,15 +218,14 @@ pub fn tool_from_schema(
     name: impl Into<String>,
     description: impl Into<String>,
     properties: Vec<(&str, &str, &str, bool)>, // (name, type, description, required)
-) -> impl FnOnce(
-    Box<dyn Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync>,
-) -> StructuredTool {
+) -> impl FnOnce(Box<dyn Fn(HashMap<String, Value>) -> Result<Value> + Send + Sync>) -> StructuredTool
+{
     let name = name.into();
     let description = description.into();
-    
+
     let mut props = HashMap::new();
     let mut required = Vec::new();
-    
+
     for (prop_name, prop_type, prop_desc, is_required) in properties {
         props.insert(
             prop_name.to_string(),
@@ -243,17 +238,10 @@ pub fn tool_from_schema(
             required.push(prop_name.to_string());
         }
     }
-    
+
     let schema = create_args_schema(&name, props, required, Some(&description));
-    
-    move |func| {
-        StructuredTool::from_function(
-            move |args| func(args),
-            name,
-            description,
-            schema,
-        )
-    }
+
+    move |func| StructuredTool::from_function(move |args| func(args), name, description, schema)
 }
 
 /// Generate a placeholder description for a runnable.
@@ -270,12 +258,10 @@ mod tests {
 
     #[test]
     fn test_create_simple_tool() {
-        let tool = create_simple_tool(
-            "echo",
-            "Echoes the input",
-            |input| Ok(format!("Echo: {}", input)),
-        );
-        
+        let tool = create_simple_tool("echo", "Echoes the input", |input| {
+            Ok(format!("Echo: {}", input))
+        });
+
         assert_eq!(tool.name(), "echo");
         assert_eq!(tool.description(), "Echoes the input");
     }
@@ -293,18 +279,13 @@ mod tests {
             vec!["a".to_string(), "b".to_string()],
             None,
         );
-        
-        let tool = create_structured_tool(
-            "add",
-            "Adds two numbers",
-            schema,
-            |args| {
-                let a = args.get("a").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                let b = args.get("b").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                Ok(Value::from(a + b))
-            },
-        );
-        
+
+        let tool = create_structured_tool("add", "Adds two numbers", schema, |args| {
+            let a = args.get("a").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let b = args.get("b").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            Ok(Value::from(a + b))
+        });
+
         assert_eq!(tool.name(), "add");
     }
 
@@ -315,7 +296,7 @@ mod tests {
             .with_description("A test tool")
             .with_return_direct(true)
             .with_response_format(ResponseFormat::ContentAndArtifact);
-        
+
         assert_eq!(config.name, Some("test".to_string()));
         assert!(config.return_direct);
         assert_eq!(config.response_format, ResponseFormat::ContentAndArtifact);
@@ -332,12 +313,13 @@ mod tests {
                     "input": {"type": "string"}
                 }
             })));
-        
+
         let tool = create_tool_with_config(
             |args| Ok(args.get("input").cloned().unwrap_or(Value::Null)),
             config,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         assert_eq!(tool.name(), "configured_tool");
     }
 
@@ -346,16 +328,17 @@ mod tests {
         let create_tool = tool_from_schema(
             "greet",
             "Greets a person",
-            vec![
-                ("name", "string", "The person's name", true),
-            ],
+            vec![("name", "string", "The person's name", true)],
         );
-        
+
         let tool = create_tool(Box::new(|args| {
-            let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("stranger");
+            let name = args
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("stranger");
             Ok(Value::String(format!("Hello, {}!", name)))
         }));
-        
+
         assert_eq!(tool.name(), "greet");
     }
 }
