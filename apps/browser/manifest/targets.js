@@ -15,7 +15,7 @@ function deepMerge(a, b) {
 // Firefox extension ID configuration
 // Development ID is used by default, production ID should be set via FIREFOX_EXTENSION_ID env var
 const FIREFOX_DEV_ID = 'dev@eurora-labs.com';
-const FIREFOX_PROD_ID = '{271903fe-1905-4636-b47f-6f0873dc97f8}';
+const _FIREFOX_PROD_ID = '{271903fe-1905-4636-b47f-6f0873dc97f8}';
 
 function targetPatch(browser) {
 	if (browser === 'firefox') {

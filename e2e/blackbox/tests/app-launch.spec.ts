@@ -1,13 +1,10 @@
-import { findAndClick } from '../utils.js';
-
 describe('Eurora Application', () => {
 	it('should launch successfully', async () => {
 		// Wait for the app to be ready
 		await browser.pause(2000);
 
 		// Check if the browser object exists and is ready
-		const title = await browser.getTitle();
-		console.log('App title:', title);
+		await browser.getTitle();
 
 		// Basic check that the app launched
 		await expect(browser).toHaveTitle(/.*/);
@@ -19,7 +16,7 @@ describe('Eurora Application', () => {
 		await browser.pause(1000);
 
 		// Example: Check if body element exists
-		const body = await $('body');
+		const body = $('body');
 		await expect(body).toExist();
 	});
 });

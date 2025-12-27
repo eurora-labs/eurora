@@ -1,4 +1,3 @@
-
 import Dialog from '$lib/components/command/command-dialog.svelte';
 import Empty from '$lib/components/command/command-empty.svelte';
 import Group from '$lib/components/command/command-group.svelte';

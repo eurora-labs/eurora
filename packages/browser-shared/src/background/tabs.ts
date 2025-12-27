@@ -53,7 +53,7 @@ export async function getCurrentTabIcon(activeTab: browser.Tabs.Tab): Promise<st
 		}
 
 		const blob = await response.blob();
-		return new Promise((resolve, reject) => {
+		return await new Promise((resolve, reject) => {
 			const reader = new FileReader();
 			reader.onloadend = () => {
 				const result = reader.result as string;

@@ -15,7 +15,7 @@
 		"declaration": true,
 		"composite": true,
 		"declarationMap": true,
-		"mapRoot": "../../dist",
+		"mapRoot": "../../dist"
 	},
 	"include": [
 		".svelte-kit/ambient.d.ts",
@@ -33,7 +33,7 @@
 		"src/**/*.svelte",
 		"tests/**/*.js",
 		"tests/**/*.ts",
-		"tests/**/*.svelte",
+		"tests/**/*.svelte"
 	],
 	"exclude": [
 		"node_modules/**",
@@ -41,6 +41,6 @@
 		"src/service-worker.ts",
 		"src/service-worker.d.ts",
 		"src/stories/**/*.stories.ts",
-		".storybook/**",
-	],
+		".storybook/**"
+	]
 }

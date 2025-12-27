@@ -1,4 +1,3 @@
-
 import Content from '$lib/components/select/select-content.svelte';
 import Group from '$lib/components/select/select-group.svelte';
 import Item from '$lib/components/select/select-item.svelte';

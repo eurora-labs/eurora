@@ -214,7 +214,7 @@ export class YouTubeTranscriptApi {
 	async list(videoId: string): Promise<TranscriptList> {
 		try {
 			const captionsJson = await this.fetchCaptionsJson(videoId);
-			return TranscriptList.build(videoId, captionsJson);
+			return await TranscriptList.build(videoId, captionsJson);
 		} catch (error) {
 			if (error instanceof YouTubeTranscriptError) {
 				throw error;

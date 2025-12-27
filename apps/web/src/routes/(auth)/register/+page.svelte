@@ -55,7 +55,7 @@
 		},
 	);
 
-	const { form: formData, enhance, errors, submitting } = form;
+	const { form: formData, enhance, submitting } = form;
 
 	let showPassword = $state(false);
 	let showConfirmPassword = $state(false);
@@ -73,12 +73,8 @@
 				displayName: $formData.displayName || undefined,
 			});
 
-			console.log('Registering user:', registerData);
-
 			// Call the auth service to register the user
-			const tokens = await authService.register(registerData);
-
-			console.log('Registration successful, tokens:', tokens);
+			await authService.register(registerData);
 			success = true;
 		} catch (err) {
 			console.error('Registration error:', err);
@@ -96,18 +92,11 @@
 	}
 
 	// Social registration handlers
-	function handleAppleRegister() {
-		console.log('Apple registration clicked');
-		// TODO: Implement Apple OAuth registration
-	}
-
 	function handleGoogleRegister() {
-		console.log('Google registration clicked');
 		// TODO: Implement Google OAuth registration
 	}
 
 	function handleGitHubRegister() {
-		console.log('GitHub registration clicked');
 		// TODO: Implement GitHub OAuth registration
 	}
 </script>

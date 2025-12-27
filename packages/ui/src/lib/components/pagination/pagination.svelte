@@ -2,7 +2,6 @@
 	import { cn } from '$lib/utils.js';
 	import { Pagination as PaginationPrimitive } from 'bits-ui';
 
-
 	let {
 		ref = $bindable(null),
 		class: className,
