@@ -1,9 +1,9 @@
-import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
-import type { TokenResponse } from '@eurora/shared/services/auth-service';
-import { authService } from '@eurora/shared/services/auth-service';
 import { create } from '@bufbuild/protobuf';
 import { RefreshTokenRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
+import { authService } from '@eurora/shared/services/auth-service';
+import { writable, derived, get } from 'svelte/store';
+import type { TokenResponse } from '@eurora/shared/services/auth-service';
 
 export interface User {
 	id: string;

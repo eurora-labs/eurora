@@ -1,8 +1,8 @@
+import { onUpdated, onActivated } from './focus-tracker.js';
+import { handleMessage } from './messaging.js';
+import { getCurrentTabIcon } from './tabs.js';
 import browser from 'webextension-polyfill';
 import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings.js';
-import { getCurrentTabIcon } from './tabs.js';
-import { handleMessage } from './messaging.js';
-import { onUpdated, onActivated } from './focus-tracker.js';
 
 const host = 'com.eurora.app';
 const connectTimeout = 5000;

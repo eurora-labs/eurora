@@ -130,6 +130,7 @@ export default ts.config(
 			'**/.DS_Store',
 			'**/node_modules',
 			'**/build',
+			'**/stories',
 			'**/static',
 			'**/dist',
 			'**/.svelte-kit',
@@ -148,6 +149,9 @@ export default ts.config(
 			'target/',
 			'crates/',
 			'packages/ui/storybook-static',
+			'packages/ui/.storybook',
+			'packages/ui/src/stories',
+			'packages/ui/src/lib/components',
 			// Storybook Meta type wrapper
 			'packages/ui/src/stories/**/*.stories.ts',
 		],

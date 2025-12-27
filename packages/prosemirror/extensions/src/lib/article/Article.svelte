@@ -1,6 +1,6 @@
 <script lang="ts" module>
-	import type { NodeSpec } from 'prosemirror-model';
 	import { Node as PMNode } from 'prosemirror-model';
+	import type { NodeSpec } from 'prosemirror-model';
 
 	export interface Frame {
 		id: string;
@@ -66,10 +66,10 @@
 </script>
 
 <script lang="ts">
-	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
-	import { Label } from '@eurora/ui/components/label/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import { Label } from '@eurora/ui/components/label/index';
 	import * as Popover from '@eurora/ui/components/popover/index';
+	import { ContextChip } from '@eurora/ui/custom-components/context-chip/index';
 	import type { SvelteNodeViewProps } from '@eurora/prosemirror-core/index';
 	export interface Props extends SvelteNodeViewProps<ArticleAttrs> {
 		ref: HTMLElement;
