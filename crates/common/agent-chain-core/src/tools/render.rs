@@ -20,11 +20,9 @@ pub type ToolsRenderer = fn(&[Arc<dyn BaseTool>]) -> String;
 pub fn render_text_description(tools: &[Arc<dyn BaseTool>]) -> String {
     let descriptions: Vec<String> = tools
         .iter()
-        .map(|tool| {
-            format!("{} - {}", tool.name(), tool.description())
-        })
+        .map(|tool| format!("{} - {}", tool.name(), tool.description()))
         .collect();
-    
+
     descriptions.join("\n")
 }
 
@@ -39,7 +37,8 @@ pub fn render_text_description_and_args(tools: &[Arc<dyn BaseTool>]) -> String {
     let tool_strings: Vec<String> = tools
         .iter()
         .map(|tool| {
-            let args_schema = serde_json::to_string(&tool.args()).unwrap_or_else(|_| "{}".to_string());
+            let args_schema =
+                serde_json::to_string(&tool.args()).unwrap_or_else(|_| "{}".to_string());
             format!(
                 "{} - {}, args: {}",
                 tool.name(),
@@ -48,7 +47,7 @@ pub fn render_text_description_and_args(tools: &[Arc<dyn BaseTool>]) -> String {
             )
         })
         .collect();
-    
+
     tool_strings.join("\n")
 }
 
@@ -77,19 +76,18 @@ pub fn render_tool(tool: &dyn BaseTool) -> String {
 /// Render tools in a format suitable for system prompts.
 pub fn render_for_prompt(tools: &[Arc<dyn BaseTool>]) -> String {
     let mut output = String::from("Available tools:\n\n");
-    
+
     for (i, tool) in tools.iter().enumerate() {
         output.push_str(&format!("{}. {}\n", i + 1, tool.name()));
         output.push_str(&format!("   Description: {}\n", tool.description()));
-        
+
         let args = tool.args();
         if !args.is_empty() {
             output.push_str("   Arguments:\n");
             for (name, schema) in args {
-                let type_str = schema.get("type")
-                    .and_then(|t| t.as_str())
-                    .unwrap_or("any");
-                let desc = schema.get("description")
+                let type_str = schema.get("type").and_then(|t| t.as_str()).unwrap_or("any");
+                let desc = schema
+                    .get("description")
                     .and_then(|d| d.as_str())
                     .unwrap_or("");
                 output.push_str(&format!("     - {} ({}): {}\n", name, type_str, desc));
@@ -97,7 +95,7 @@ pub fn render_for_prompt(tools: &[Arc<dyn BaseTool>]) -> String {
         }
         output.push('\n');
     }
-    
+
     output
 }
 
@@ -106,9 +104,7 @@ pub fn render_numbered_list(tools: &[Arc<dyn BaseTool>]) -> String {
     tools
         .iter()
         .enumerate()
-        .map(|(i, tool)| {
-            format!("{}. {} - {}", i + 1, tool.name(), tool.description())
-        })
+        .map(|(i, tool)| format!("{}. {} - {}", i + 1, tool.name(), tool.description()))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -116,7 +112,7 @@ pub fn render_numbered_list(tools: &[Arc<dyn BaseTool>]) -> String {
 /// Render tools with their full schemas.
 pub fn render_with_schemas(tools: &[Arc<dyn BaseTool>]) -> String {
     let mut output = String::new();
-    
+
     for tool in tools {
         output.push_str(&format!("## {}\n\n", tool.name()));
         output.push_str(&format!("{}\n\n", tool.description()));
@@ -125,7 +121,7 @@ pub fn render_with_schemas(tools: &[Arc<dyn BaseTool>]) -> String {
         output.push_str(&serde_json::to_string_pretty(&tool.definition()).unwrap_or_default());
         output.push_str("\n```\n\n");
     }
-    
+
     output
 }
 
@@ -153,7 +149,7 @@ mod tests {
     fn test_render_text_description() {
         let tools = create_test_tools();
         let rendered = render_text_description(&tools);
-        
+
         assert!(rendered.contains("search - Search for information"));
         assert!(rendered.contains("calculator - Perform calculations"));
     }
@@ -162,7 +158,7 @@ mod tests {
     fn test_render_text_description_and_args() {
         let tools = create_test_tools();
         let rendered = render_text_description_and_args(&tools);
-        
+
         assert!(rendered.contains("search -"));
         assert!(rendered.contains("args:"));
     }
@@ -171,7 +167,7 @@ mod tests {
     fn test_render_json() {
         let tools = create_test_tools();
         let rendered = render_json(&tools);
-        
+
         assert!(rendered.contains("\"name\": \"search\""));
         assert!(rendered.contains("\"name\": \"calculator\""));
     }
@@ -180,7 +176,7 @@ mod tests {
     fn test_render_for_prompt() {
         let tools = create_test_tools();
         let rendered = render_for_prompt(&tools);
-        
+
         assert!(rendered.contains("Available tools:"));
         assert!(rendered.contains("1. search"));
         assert!(rendered.contains("2. calculator"));
@@ -190,21 +186,17 @@ mod tests {
     fn test_render_numbered_list() {
         let tools = create_test_tools();
         let rendered = render_numbered_list(&tools);
-        
+
         assert!(rendered.starts_with("1."));
         assert!(rendered.contains("2. calculator"));
     }
 
     #[test]
     fn test_render_tool() {
-        let tool = Tool::from_function(
-            |input| Ok(input),
-            "test",
-            "A test tool",
-        );
-        
+        let tool = Tool::from_function(|input| Ok(input), "test", "A test tool");
+
         let rendered = render_tool(&tool);
-        
+
         assert!(rendered.contains("Tool: test"));
         assert!(rendered.contains("Description: A test tool"));
     }
