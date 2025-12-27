@@ -10,8 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
 
-use crate::ChatResult;
-use crate::chat_models::UsageMetadata;
+use crate::language_models::{ChatResult, UsageMetadata};
 
 use super::base::{
     BaseCallbackHandler, CallbackManagerMixin, ChainManagerMixin, LLMManagerMixin,
@@ -23,11 +22,7 @@ use super::base::{
 /// This function combines the token counts from two usage metadata objects,
 /// returning a new object with the summed values.
 pub fn add_usage(left: &UsageMetadata, right: &UsageMetadata) -> UsageMetadata {
-    UsageMetadata {
-        input_tokens: left.input_tokens + right.input_tokens,
-        output_tokens: left.output_tokens + right.output_tokens,
-        total_tokens: left.total_tokens + right.total_tokens,
-    }
+    left.add(right)
 }
 
 /// Callback Handler that tracks AIMessage.usage_metadata.

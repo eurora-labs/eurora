@@ -1,59 +1,162 @@
-//! Tools module for LLM function calling.
+//! **Tools** are classes that an Agent uses to interact with the world.
 //!
-//! This module provides the `Tool` trait and `#[tool]` macro for creating
-//! tools that can be invoked by AI models.
+//! Each tool has a **description**. Agent uses the description to choose the right
+//! tool for the job.
+//!
+//! This module provides the core tool abstractions, mirroring
+//! `langchain_core.tools`.
+//!
+//! # Overview
+//!
+//! Tools are the primary way for LLM agents to interact with external systems,
+//! APIs, and data sources. This module provides:
+//!
+//! - [`BaseTool`] - The base trait that all tools must implement
+//! - [`Tool`] - A simple single-input string-to-string tool
+//! - [`StructuredTool`] - A tool that accepts multiple typed arguments
+//! - [`ToolDefinition`] - Schema definition for LLM function calling
+//! - Rendering utilities for displaying tool information
+//! - Retriever tool creation utilities
+//!
+//! # Example
+//!
+//! ```rust,ignore
+//! use agent_chain_core::tools::{Tool, StructuredTool, BaseTool, ToolInput};
+//!
+//! // Create a simple tool
+//! let echo_tool = Tool::from_function(
+//!     |input| Ok(format!("Echo: {}", input)),
+//!     "echo",
+//!     "Echoes back the input",
+//! );
+//!
+//! // Use the tool
+//! let result = echo_tool.run(ToolInput::from("Hello"), None)?;
+//! ```
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
+pub mod base;
+pub mod convert;
+pub mod render;
+pub mod retriever;
+pub mod simple;
+pub mod structured;
 
-use crate::messages::{BaseMessage, ToolCall};
+// Re-export from base
+pub use base::{
+    // Core types
+    ArgsSchema,
+    BaseTool,
+    BaseToolkit,
+    DynTool,
+    // Constants
+    FILTERED_ARGS,
+    HandleToolError,
+    HandleValidationError,
+    InjectedToolArg,
+    InjectedToolCallId,
+    ResponseFormat,
+    // Error types
+    SchemaAnnotationError,
+    TOOL_MESSAGE_BLOCK_TYPES,
+    ToolDefinition,
+    ToolException,
+    ToolInput,
+    ToolOutput,
+    // Utility functions
+    format_output,
+    handle_tool_error_impl,
+    handle_validation_error_impl,
+    is_message_content_block,
+    is_message_content_type,
+    is_tool_call,
+    prep_run_args,
+    stringify_content,
+};
 
-// Re-export the tool macro
-pub use agent_chain_macros::tool;
+// Re-export from simple
+pub use simple::{AsyncToolFunc, Tool, ToolBuilder, ToolFunc};
 
-/// Represents a tool's definition for LLM function calling.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolDefinition {
-    /// The name of the tool
-    pub name: String,
-    /// A description of what the tool does
-    pub description: String,
-    /// JSON schema for the tool's parameters
-    pub parameters: serde_json::Value,
-}
+// Re-export from structured
+pub use structured::{
+    AsyncStructuredToolFunc, StructuredTool, StructuredToolBuilder, StructuredToolFunc,
+    create_args_schema,
+};
 
-/// A trait for tools that can be invoked by an AI model.
-#[async_trait]
-pub trait Tool: Send + Sync {
-    /// Get the name of the tool.
-    fn name(&self) -> &str;
+// Re-export from convert
+pub use convert::{
+    ToolConfig, convert_runnable_to_tool, create_simple_tool, create_simple_tool_async,
+    create_structured_tool, create_structured_tool_async, create_tool_with_config,
+    get_description_from_runnable, tool_from_schema,
+};
 
-    /// Get the description of the tool.
-    fn description(&self) -> &str;
+// Re-export from render
+pub use render::{
+    ToolsRenderer, render_for_prompt, render_json, render_json_compact, render_numbered_list,
+    render_text_description, render_text_description_and_args, render_tool, render_with_schemas,
+};
 
-    /// Get the JSON schema for the tool's parameters.
-    fn parameters_schema(&self) -> serde_json::Value;
+// Re-export from retriever
+pub use retriever::{
+    RetrieverInput, RetrieverToolBuilder, create_async_retriever_tool, create_retriever_tool,
+    create_retriever_tool_with_options,
+};
 
-    /// Invoke the tool with the given tool call.
-    async fn invoke(&self, tool_call: ToolCall) -> BaseMessage;
+// Legacy re-export for backward compatibility with the old tools.rs
+// The old Tool trait is now BaseTool
+pub use base::BaseTool as LegacyTool;
 
-    /// Invoke the tool directly with arguments (without a full ToolCall).
-    /// Returns the result as a JSON value.
-    ///
-    /// This is a convenience method for when you have the args directly.
-    /// The default implementation creates a temporary ToolCall and invokes it.
-    async fn invoke_args(&self, args: serde_json::Value) -> serde_json::Value {
-        let tool_call = ToolCall::new(self.name(), args);
-        let result = self.invoke(tool_call).await;
-        serde_json::Value::String(result.content().to_string())
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_module_exports() {
+        // Test that key types are accessible
+        let _: fn() -> ArgsSchema = ArgsSchema::default;
+        let _: fn() -> ResponseFormat = ResponseFormat::default;
     }
 
-    /// Get the tool definition for LLM function calling.
-    fn definition(&self) -> ToolDefinition {
-        ToolDefinition {
-            name: self.name().to_string(),
-            description: self.description().to_string(),
-            parameters: self.parameters_schema(),
-        }
+    #[test]
+    fn test_create_simple_tool() {
+        let tool = create_simple_tool("test", "A test tool", |input| Ok(format!("Got: {}", input)));
+
+        assert_eq!(tool.name(), "test");
+    }
+
+    #[test]
+    fn test_create_structured_tool() {
+        let schema = create_args_schema(
+            "test",
+            {
+                let mut props = HashMap::new();
+                props.insert("x".to_string(), serde_json::json!({"type": "number"}));
+                props
+            },
+            vec!["x".to_string()],
+            None,
+        );
+
+        let tool = create_structured_tool("test", "A test tool", schema, |args| {
+            let x = args.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            Ok(serde_json::json!(x * 2.0))
+        });
+
+        assert_eq!(tool.name(), "test");
+    }
+
+    #[test]
+    fn test_render_tools() {
+        let tools: Vec<Arc<dyn BaseTool>> = vec![
+            Arc::new(create_simple_tool("tool1", "First tool", |input| Ok(input))),
+            Arc::new(create_simple_tool("tool2", "Second tool", |input| {
+                Ok(input)
+            })),
+        ];
+
+        let rendered = render_text_description(&tools);
+        assert!(rendered.contains("tool1"));
+        assert!(rendered.contains("tool2"));
     }
 }
