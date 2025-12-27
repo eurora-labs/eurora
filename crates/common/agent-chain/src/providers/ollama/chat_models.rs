@@ -590,6 +590,10 @@ impl BaseChatModel for ChatOllama {
         &self.chat_model_config
     }
 
+    fn has_astream_impl(&self) -> bool {
+        true
+    }
+
     async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
@@ -597,6 +601,39 @@ impl BaseChatModel for ChatOllama {
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         self._generate_internal(messages, stop, None).await
+    }
+
+    async fn _astream(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        _run_manager: Option<&crate::callbacks::AsyncCallbackManagerForLLMRun>,
+    ) -> Result<crate::language_models::ChatGenerationStream> {
+        use crate::outputs::ChatGenerationChunk;
+
+        let chat_stream = self.stream_internal(messages, stop).await?;
+
+        let generation_stream = async_stream::stream! {
+            use futures::StreamExt;
+
+            let mut pinned_stream = chat_stream;
+
+            while let Some(result) = pinned_stream.next().await {
+                match result {
+                    Ok(chat_chunk) => {
+                        let message = AIMessage::new(&chat_chunk.content);
+                        let generation_chunk = ChatGenerationChunk::new(message.into());
+                        yield Ok(generation_chunk);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(generation_stream) as crate::language_models::ChatGenerationStream)
     }
 
     async fn generate_with_tools(
