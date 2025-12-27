@@ -1,6 +1,6 @@
 <script lang="ts">
+	import SettingsSidebar from '$components/settings/Sidebar.svelte';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import SettingsSidebar from './Sidebar.svelte';
 
 	let { children } = $props();
 </script>

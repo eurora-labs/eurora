@@ -225,6 +225,20 @@ impl Message {
                     updated_at: now,
                 })
             }
+            BaseMessage::Remove(_) => {
+                // Remove messages are operational (for message list manipulation)
+                // and should not be stored in the database.
+                Err(serde_json::Error::custom(
+                    "Remove messages are operational and should not be persisted",
+                ))
+            }
+            BaseMessage::Chat(_) | BaseMessage::Function(_) => {
+                // Chat and Function messages are deprecated/legacy types
+                // and should not be stored in the database.
+                Err(serde_json::Error::custom(
+                    "Chat and Function messages are deprecated and should not be persisted",
+                ))
+            }
         }
     }
 }
