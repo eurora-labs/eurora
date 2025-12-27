@@ -1,4 +1,4 @@
-import Root from './login.svelte';
+import Root from '$lib/custom-components/login/login.svelte';
 
 export {
 	Root,

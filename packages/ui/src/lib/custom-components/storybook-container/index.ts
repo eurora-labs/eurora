@@ -1,3 +1,3 @@
-import Root from './storybook-container.svelte';
+import Root from '$lib/custom-components/storybook-container/storybook-container.svelte';
 
 export { Root, Root as StorybookContainer };

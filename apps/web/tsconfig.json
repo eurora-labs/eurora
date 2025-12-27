@@ -10,5 +10,12 @@
 		"sourceMap": true,
 		"strict": true,
 		"moduleResolution": "bundler"
-	}
+	},
+	"include": [
+		"playwright.config.ts",
+		"postcss.config.mjs",
+		"svelte.config.js",
+		"vite.config.ts",
+		"src/**/*"
+	]
 }

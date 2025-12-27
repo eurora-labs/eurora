@@ -1,8 +1,8 @@
+import { onUpdated, onActivated } from './focus-tracker.js';
+import { handleMessage } from './messaging.js';
+import { getCurrentTabIcon } from './tabs.js';
 import browser from 'webextension-polyfill';
 import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings.js';
-import { getCurrentTabIcon } from './tabs.js';
-import { handleMessage } from './messaging.js';
-import { onUpdated, onActivated } from './focus-tracker.js';
 
 const host = 'com.eurora.app';
 const connectTimeout = 5000;
@@ -23,8 +23,6 @@ export function startNativeMessenger() {
 
 		await onActivated(activeInfo.tabId, nativePort);
 	});
-
-	console.log('Native messaging service worker registered');
 }
 
 function onNativePortDisconnect(port: browser.Runtime.Port) {
@@ -35,7 +33,6 @@ function onNativePortDisconnect(port: browser.Runtime.Port) {
 	// Try to reconnect after a delay
 	setTimeout(() => {
 		connect();
-		console.log('Reconnected to native host');
 	}, connectTimeout);
 }
 
@@ -54,7 +51,6 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 		throw new Error('Invalid frame kind');
 	}
 
-	console.log('kind: ', kind);
 	if ('Request' in kind) {
 		sender.postMessage(await onRequestFrame(kind.Request));
 	} else if ('Response' in kind) {
@@ -74,9 +70,8 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 	switch (frame.action) {
 		case 'GET_METADATA':
 			return await onActionMetadata(frame);
-		default:
+		default: {
 			const response = await handleMessage(frame.action);
-			console.log('Finished responding to ', frame.action, ': ', response);
 			const responseFrame: ResponseFrame = {
 				id: frame.id,
 				action: frame.action,
@@ -87,17 +82,13 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 					Response: responseFrame,
 				},
 			} as Frame;
+		}
 	}
-}
-
-async function onResponseFrame(frame: ResponseFrame): Promise<Frame> {
-	throw new Error('Not implemented');
 }
 
 async function onActionMetadata(frame: RequestFrame): Promise<Frame> {
 	const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
 	const iconBase64 = await getCurrentTabIcon(activeTab);
-	console.log('Tab metadata:', { url: activeTab.url, icon_base64: iconBase64 });
 
 	const response: ResponseFrame = {
 		id: frame.id,

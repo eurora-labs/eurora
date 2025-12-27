@@ -22,9 +22,11 @@
 		".svelte-kit/non-ambient.d.ts",
 		".svelte-kit/types/**/$types.d.ts",
 		"terrazzo.config.js",
-		"postcss.config.mjss",
+		"postcss.config.mjs",
 		"vite.config.js",
+		"svelte.config.js",
 		"vite.config.ts",
+		"scripts/watch-styles.js",
 		"vitest.workspace.ts",
 		"src/**/*.js",
 		"src/**/*.ts",
@@ -38,6 +40,7 @@
 		"src/service-worker.js",
 		"src/service-worker.ts",
 		"src/service-worker.d.ts",
-		"src/stories/**/*.stories.ts"
+		"src/stories/**/*.stories.ts",
+		".storybook/**"
 	]
 }

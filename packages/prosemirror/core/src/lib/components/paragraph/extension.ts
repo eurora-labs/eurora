@@ -1,4 +1,8 @@
-import { default as Paragraph, paragraphAttrs, paragraphSchema } from './Paragraph.svelte';
+import {
+	default as Paragraph,
+	paragraphAttrs,
+	paragraphSchema,
+} from '$lib/components/paragraph/Paragraph.svelte';
 import type { SveltePMExtension } from '@eurora/prosemirror-core/index';
 
 export function paragraphExtension() {

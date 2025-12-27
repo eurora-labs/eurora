@@ -1,13 +1,13 @@
 import {
+	createArticleAsset,
+	createArticleSnapshot,
+} from '@eurora/browser-shared/content/extensions/article/util';
+import {
 	Watcher,
 	type WatcherResponse,
 } from '@eurora/browser-shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
-import {
-	createArticleAsset,
-	createArticleSnapshot,
-} from '@eurora/browser-shared/content/extensions/article/util';
-import { ArticleBrowserMessage, type WatcherParams } from './types.js';
+import type { ArticleBrowserMessage, WatcherParams } from './types.js';
 
 export class ArticleWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
@@ -55,7 +55,7 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 		_obj: ArticleBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		console.log('Article Watcher: New article detected');
+		return { kind: 'Ok', data: null };
 	}
 
 	public async handleGenerateAssets(

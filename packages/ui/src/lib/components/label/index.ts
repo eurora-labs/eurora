@@ -1,4 +1,4 @@
-import Root from './label.svelte';
+import Root from '$lib/components/label/label.svelte';
 
 export {
 	Root,
