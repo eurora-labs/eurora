@@ -20,7 +20,7 @@ use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
 use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
 use crate::outputs::{
-    ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, GenerationType, LLMResult,
+    ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult,
 };
 
 /// Fake chat model for testing purposes.
@@ -140,7 +140,7 @@ impl BaseChatModel for FakeMessagesListChatModel {
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         if let Some(duration) = self.sleep {
             tokio::time::sleep(duration).await;
         }
@@ -162,7 +162,7 @@ impl BaseChatModel for FakeMessagesListChatModel {
 
         // Create ChatGeneration with the original message type preserved
         let generation = ChatGeneration::new(response);
-        Ok(OutputChatResult::new(vec![generation]))
+        Ok(ChatResult::new(vec![generation]))
     }
 }
 
@@ -322,7 +322,7 @@ impl BaseChatModel for FakeListChatModel {
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         if let Some(duration) = self.sleep {
             tokio::time::sleep(duration).await;
         }
@@ -330,7 +330,7 @@ impl BaseChatModel for FakeListChatModel {
         let response = self.get_next_response();
         let message = AIMessage::new(&response);
         let generation = ChatGeneration::new(message.into());
-        Ok(OutputChatResult::new(vec![generation]))
+        Ok(ChatResult::new(vec![generation]))
     }
 
     fn _stream(
@@ -465,10 +465,10 @@ impl BaseChatModel for FakeChatModel {
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         let message = AIMessage::new("fake response");
         let generation = ChatGeneration::new(message.into());
-        Ok(OutputChatResult::new(vec![generation]))
+        Ok(ChatResult::new(vec![generation]))
     }
 }
 
@@ -581,14 +581,14 @@ impl BaseChatModel for GenericFakeChatModel {
         _messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         let message = {
             let mut guard = self.messages.lock().unwrap();
             guard.next().unwrap_or_else(|| AIMessage::new(""))
         };
 
         let generation = ChatGeneration::new(message.into());
-        Ok(OutputChatResult::new(vec![generation]))
+        Ok(ChatResult::new(vec![generation]))
     }
 
     fn _stream(
@@ -800,7 +800,7 @@ impl BaseChatModel for ParrotFakeChatModel {
         messages: Vec<BaseMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         // Return the last message as-is, preserving its type
         let last_message = messages
             .last()
@@ -808,7 +808,7 @@ impl BaseChatModel for ParrotFakeChatModel {
             .unwrap_or_else(|| BaseMessage::AI(AIMessage::new("")));
 
         let generation = ChatGeneration::new(last_message);
-        Ok(OutputChatResult::new(vec![generation]))
+        Ok(ChatResult::new(vec![generation]))
     }
 }
 

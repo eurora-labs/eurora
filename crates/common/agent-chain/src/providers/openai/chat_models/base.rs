@@ -55,8 +55,7 @@ use crate::callbacks::AsyncCallbackManagerForLLMRun;
 use crate::callbacks::CallbackManagerForLLMRun;
 use crate::callbacks::Callbacks;
 use crate::chat_models::{
-    BaseChatModel, ChatChunk, ChatModelConfig, ChatResult, ChatResultMetadata, ChatStream,
-    LangSmithParams, ToolChoice, UsageMetadata,
+    BaseChatModel, ChatChunk, ChatModelConfig, ChatStream, LangSmithParams, UsageMetadata,
 };
 use crate::error::{Error, Result};
 use crate::language_models::ChatGenerationStream;
@@ -65,8 +64,9 @@ use crate::messages::{
     AIMessage, BaseMessage, ContentPart, ImageDetail, ImageSource, MessageContent, ToolCall,
 };
 use crate::outputs::ChatGenerationChunk;
-use crate::outputs::{ChatGeneration, ChatResult as OutputChatResult, LLMResult};
+use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
 use crate::tools::ToolDefinition;
+use crate::ToolChoice;
 
 /// Default API base URL for OpenAI.
 const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
@@ -914,11 +914,6 @@ impl ChatOpenAI {
                                     yield Ok(ChatChunk {
                                         content: String::new(),
                                         is_final: true,
-                                        metadata: Some(ChatResultMetadata {
-                                            model: Some(model.clone()),
-                                            stop_reason: Some("stop".to_string()),
-                                            usage: usage.clone(),
-                                        }),
                                     });
                                     continue;
                                 }
@@ -930,11 +925,10 @@ impl ChatOpenAI {
                                             // Text content delta
                                             if let Some(delta) = event.delta {
                                                 accumulated_text.push_str(&delta);
-                                                yield Ok(ChatChunk {
-                                                    content: delta,
-                                                    is_final: false,
-                                                    metadata: None,
-                                                });
+                                                    yield Ok(ChatChunk {
+                                                        content: delta,
+                                                        is_final: false,
+                                                    });
                                             }
                                         }
                                         "response.output_text.annotation.added" => {
@@ -949,19 +943,14 @@ impl ChatOpenAI {
                                                 && let Some(resp_usage) = resp.usage
                                             {
                                                 usage = Some(UsageMetadata::new(
-                                                    resp_usage.input_tokens,
-                                                    resp_usage.output_tokens,
+                                                    resp_usage.input_tokens as i64,
+                                                    resp_usage.output_tokens as i64,
                                                 ));
                                             }
                                             // Final chunk
                                             yield Ok(ChatChunk {
                                                 content: String::new(),
                                                 is_final: true,
-                                                metadata: Some(ChatResultMetadata {
-                                                    model: Some(model.clone()),
-                                                    stop_reason: Some("stop".to_string()),
-                                                    usage: usage.clone(),
-                                                }),
                                             });
                                         }
                                         _ => {
@@ -1096,8 +1085,8 @@ impl ChatOpenAI {
         input
     }
 
-    /// Parse the API response into an OutputChatResult.
-    fn parse_response(&self, response: OpenAIResponse) -> OutputChatResult {
+    /// Parse the API response into a ChatResult.
+    fn parse_response(&self, response: OpenAIResponse) -> ChatResult {
         // Extract finish_reason before consuming choices
         let _finish_reason = response
             .choices
@@ -1125,18 +1114,26 @@ impl ChatOpenAI {
             None => (String::new(), Vec::new()),
         };
 
-        let message: BaseMessage = if tool_calls.is_empty() {
-            AIMessage::new(content).into()
+        let mut ai_message = if tool_calls.is_empty() {
+            AIMessage::new(content)
         } else {
-            AIMessage::with_tool_calls(content, tool_calls).into()
+            AIMessage::with_tool_calls(content, tool_calls)
         };
 
-        let generation = ChatGeneration::new(message);
-        OutputChatResult::new(vec![generation])
+        // Set usage metadata if available from response
+        if let Some(usage) = response.usage {
+            ai_message = ai_message.with_usage_metadata(UsageMetadata::new(
+                usage.prompt_tokens as i64,
+                usage.completion_tokens as i64,
+            ));
+        }
+
+        let generation = ChatGeneration::new(ai_message.into());
+        ChatResult::new(vec![generation])
     }
 
-    /// Parse the Responses API response into an OutputChatResult.
-    fn parse_responses_api_response(&self, response: ResponsesApiResponse) -> OutputChatResult {
+    /// Parse the Responses API response into a ChatResult.
+    fn parse_responses_api_response(&self, response: ResponsesApiResponse) -> ChatResult {
         let mut text_content = String::new();
         let mut tool_calls = Vec::new();
         let mut annotations: Vec<TextAnnotation> = Vec::new();
@@ -1173,36 +1170,26 @@ impl ChatOpenAI {
             }
         }
 
-        let message: BaseMessage = if tool_calls.is_empty() {
+        let mut ai_message = if tool_calls.is_empty() {
             let mut msg = AIMessage::new(text_content);
             if !annotations.is_empty() {
-                // Store annotations in additional_kwargs for access
                 msg = msg.with_annotations(annotations);
             }
-            msg.into()
+            msg
         } else {
-            AIMessage::with_tool_calls(text_content, tool_calls).into()
+            AIMessage::with_tool_calls(text_content, tool_calls)
         };
 
-        let generation = ChatGeneration::new(message);
-        OutputChatResult::new(vec![generation])
-    }
-
-    /// Convert OutputChatResult to ChatResult for generate_with_tools return type.
-    fn convert_to_chat_result(&self, output: OutputChatResult) -> Result<ChatResult> {
-        if output.generations.is_empty() {
-            return Err(Error::other("No generations returned"));
+        // Set usage metadata if available from response
+        if let Some(usage) = response.usage {
+            ai_message = ai_message.with_usage_metadata(UsageMetadata::new(
+                usage.input_tokens as i64,
+                usage.output_tokens as i64,
+            ));
         }
 
-        let message = match output.generations[0].message.clone() {
-            BaseMessage::AI(msg) => msg,
-            _ => return Err(Error::other("Expected AI message")),
-        };
-
-        Ok(ChatResult {
-            message,
-            metadata: ChatResultMetadata::default(),
-        })
+        let generation = ChatGeneration::new(ai_message.into());
+        ChatResult::new(vec![generation])
     }
 
     /// Generate using the Responses API.
@@ -1210,7 +1197,7 @@ impl ChatOpenAI {
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         let api_key = self.get_api_key()?;
         let client = self.build_client();
         let payload = self.build_responses_api_payload(&messages, stop, None, false);
@@ -1289,10 +1276,14 @@ impl BaseLanguageModel for ChatOpenAI {
         let mut all_generations = Vec::new();
         for prompt in prompts {
             let messages = prompt.to_messages();
-            let result = self
-                ._generate_internal(messages, stop.clone(), None)
-                .await?;
-            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
+            let result = self._generate_internal(messages, stop.clone(), None).await?;
+            all_generations.push(
+                result
+                    .generations
+                    .into_iter()
+                    .map(|g| g.into())
+                    .collect(),
+            );
         }
         Ok(LLMResult::new(all_generations))
     }
@@ -1325,7 +1316,7 @@ impl BaseChatModel for ChatOpenAI {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         self._generate_internal(messages, stop, None).await
     }
 
@@ -1371,7 +1362,7 @@ impl BaseChatModel for ChatOpenAI {
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
+    ) -> Result<AIMessage> {
         self.generate_with_tools_internal(messages, tools, tool_choice, stop)
             .await
     }
@@ -1384,7 +1375,7 @@ impl ChatOpenAI {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         // Use Responses API if enabled or if using built-in tools
         if self.should_use_responses_api(!self.builtin_tools.is_empty()) {
             return self.generate_responses_api(messages, stop).await;
@@ -1450,7 +1441,7 @@ impl ChatOpenAI {
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
+    ) -> Result<AIMessage> {
         // Convert tool definitions to OpenAI format
         let openai_tools: Vec<serde_json::Value> = tools
             .iter()
@@ -1491,8 +1482,8 @@ impl ChatOpenAI {
                         if resp.status().is_success() {
                             match resp.json::<ResponsesApiResponse>().await {
                                 Ok(responses_resp) => {
-                                    let output = self.parse_responses_api_response(responses_resp);
-                                    return self.convert_to_chat_result(output);
+                                    let result = self.parse_responses_api_response(responses_resp);
+                                    return Self::extract_ai_message(result);
                                 }
                                 Err(e) => {
                                     return Err(Error::Json(serde_json::Error::io(
@@ -1529,23 +1520,20 @@ impl ChatOpenAI {
 
         // Add tool_choice if specified
         if let Some(choice) = tool_choice {
-            match choice {
-                ToolChoice::Auto => {
-                    payload["tool_choice"] = serde_json::json!("auto");
+            let choice_json = match choice {
+                ToolChoice::String(s) => serde_json::json!(s),
+                ToolChoice::Structured { choice_type, name } => {
+                    if choice_type == "tool" || choice_type == "function" {
+                        serde_json::json!({
+                            "type": "function",
+                            "function": {"name": name}
+                        })
+                    } else {
+                        serde_json::json!(choice_type)
+                    }
                 }
-                ToolChoice::Any => {
-                    payload["tool_choice"] = serde_json::json!("required");
-                }
-                ToolChoice::Tool { name } => {
-                    payload["tool_choice"] = serde_json::json!({
-                        "type": "function",
-                        "function": {"name": name}
-                    });
-                }
-                ToolChoice::None => {
-                    payload["tool_choice"] = serde_json::json!("none");
-                }
-            }
+            };
+            payload["tool_choice"] = choice_json;
         }
 
         let mut last_error = None;
@@ -1566,8 +1554,8 @@ impl ChatOpenAI {
                     if resp.status().is_success() {
                         match resp.json::<OpenAIResponse>().await {
                             Ok(openai_resp) => {
-                                let output = self.parse_response(openai_resp);
-                                return self.convert_to_chat_result(output);
+                                let result = self.parse_response(openai_resp);
+                                return Self::extract_ai_message(result);
                             }
                             Err(e) => {
                                 return Err(Error::Json(serde_json::Error::io(
@@ -1595,6 +1583,17 @@ impl ChatOpenAI {
         }
 
         Err(last_error.unwrap_or_else(|| Error::other("Unknown error")))
+    }
+
+    /// Extract AIMessage from ChatResult
+    fn extract_ai_message(result: ChatResult) -> Result<AIMessage> {
+        if result.generations.is_empty() {
+            return Err(Error::other("No generations returned"));
+        }
+        match result.generations[0].message.clone() {
+            BaseMessage::AI(msg) => Ok(msg),
+            _ => Err(Error::other("Expected AI message")),
+        }
     }
 
     /// Internal stream implementation.
@@ -1655,14 +1654,9 @@ impl ChatOpenAI {
                                 if let Some(data) = line.strip_prefix("data: ") {
                                     if data == "[DONE]" {
                                         yield Ok(ChatChunk {
-                                            content: String::new(),
-                                            is_final: true,
-                                            metadata: Some(ChatResultMetadata {
-                                                model: Some(model.clone()),
-                                                stop_reason: finish_reason.clone(),
-                                                usage: usage.clone(),
-                                            }),
-                                        });
+                                                        content: String::new(),
+                                                        is_final: true,
+                                                    });
                                         continue;
                                     }
 
@@ -1672,7 +1666,6 @@ impl ChatOpenAI {
                                                 yield Ok(ChatChunk {
                                                     content: content.clone(),
                                                     is_final: false,
-                                                    metadata: None,
                                                 });
                                             }
                                             if let Some(ref reason) = choice.finish_reason {
@@ -1681,8 +1674,8 @@ impl ChatOpenAI {
                                         }
                                         if let Some(ref u) = chunk.usage {
                                             usage = Some(UsageMetadata::new(
-                                                u.prompt_tokens,
-                                                u.completion_tokens,
+                                                u.prompt_tokens as i64,
+                                                u.completion_tokens as i64,
                                             ));
                                         }
                                     }
@@ -1708,7 +1701,7 @@ impl ChatOpenAI {
 struct OpenAIResponse {
     model: String,
     choices: Vec<OpenAIChoice>,
-    usage: Option<OpenAIUsage>,
+    pub usage: Option<OpenAIUsage>,
 }
 
 /// OpenAI choice in response.
