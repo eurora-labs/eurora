@@ -15,14 +15,15 @@
 		"declaration": true,
 		"composite": true,
 		"declarationMap": true,
-		"mapRoot": "../../dist"
+		"mapRoot": "../../dist",
 	},
 	"include": [
 		".svelte-kit/ambient.d.ts",
 		".svelte-kit/non-ambient.d.ts",
 		".svelte-kit/types/**/$types.d.ts",
 		"terrazzo.config.js",
-		"postcss.config.js",
+		"postcss.config.mjs",
+		"svelte.config.js",
 		"vite.config.js",
 		"vite.config.ts",
 		"vitest.workspace.ts",
@@ -31,13 +32,13 @@
 		"src/**/*.svelte",
 		"tests/**/*.js",
 		"tests/**/*.ts",
-		"tests/**/*.svelte"
+		"tests/**/*.svelte",
 	],
 	"exclude": [
 		"node_modules/**",
 		"src/service-worker.js",
 		"src/service-worker.ts",
 		"src/service-worker.d.ts",
-		"src/stories/**/*.stories.ts"
-	]
+		"src/stories/**/*.stories.ts",
+	],
 }

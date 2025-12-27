@@ -1,11 +1,11 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { currentUser, auth } from '$lib/stores/auth.js';
+	import * as Avatar from '@eurora/ui/components/avatar/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
-	import * as Avatar from '@eurora/ui/components/avatar/index';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import UserIcon from '@lucide/svelte/icons/user';
-	import { currentUser, auth } from '$lib/stores/auth.js';
-	import { goto } from '$app/navigation';
 
 	function handleLogout() {
 		auth.logout();

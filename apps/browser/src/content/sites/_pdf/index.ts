@@ -1,12 +1,12 @@
-import {
-	Watcher,
-	type WatcherResponse,
-} from '@eurora/browser-shared/content/extensions/watchers/watcher';
+import { PdfBrowserMessage, type WatcherParams } from './types.js';
 import {
 	createArticleAsset,
 	createArticleSnapshot,
 } from '@eurora/browser-shared/content/extensions/article/util';
-import { PdfBrowserMessage, type WatcherParams } from './types.js';
+import {
+	Watcher,
+	type WatcherResponse,
+} from '@eurora/browser-shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { NativePdfAsset, NativePdfSnapshot } from '@eurora/browser-shared/content/bindings';
 

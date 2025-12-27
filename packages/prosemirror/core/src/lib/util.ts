@@ -1,4 +1,4 @@
-import Editor from './Editor.svelte';
+import Editor from '$lib/Editor.svelte';
 
 export interface QueryAssets {
 	text: string;

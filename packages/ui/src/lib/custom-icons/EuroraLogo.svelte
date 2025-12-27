@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import type { BaseProps, Props } from './types.js';
+	import type { BaseProps, Props } from '$lib/custom-icons/types.js';
 
 	const ctx: BaseProps = getContext('iconCtx') ?? {};
 
 	let {
 		size = ctx.size || '24',
 		role = ctx.role || 'img',
-		color = ctx.color || 'currentColor',
 		strokeWidth = ctx.strokeWidth || '0',
 		title,
 		desc,
@@ -15,7 +14,7 @@
 		...restProps
 	}: Props = $props();
 
-	let ariaDescribedby = `${title?.id || ''} ${desc?.id || ''}`;
+	const ariaDescribedby = $derived(`${title?.id || ''} ${desc?.id || ''}`);
 	const hasDescription = $derived(!!(title?.id || desc?.id));
 </script>
 

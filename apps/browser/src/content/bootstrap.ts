@@ -16,7 +16,7 @@ async function listener(msg: any, sender: any, sendResponse: (response?: any) =>
 	loaded = true;
 	document.documentElement.setAttribute('eurora-ext-ready', '1');
 
-	const imp = (p: string) => import(browserAny.runtime.getURL(p));
+	const imp = async (p: string) => await import(browserAny.runtime.getURL(p));
 	const runDefault = async () => {
 		try {
 			const def = await imp(msg.defaultChunk);

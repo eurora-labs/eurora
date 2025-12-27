@@ -1,8 +1,8 @@
-import { type DOMOutputSpec, Node as PMNode, type NodeSpec } from 'prosemirror-model';
-import type { SveltePMNode } from '$lib/typings/index.js';
-import { mount } from 'svelte';
-import { htmlToDOMOutputSpec } from '$lib/extensions/htmlToDOMOutputSpec.js';
 import { getAttrsWithOutputSpec } from '$lib/extensions/getAttrsWithOutputSpec.js';
+import { htmlToDOMOutputSpec } from '$lib/extensions/htmlToDOMOutputSpec.js';
+import { type DOMOutputSpec, Node as PMNode, type NodeSpec } from 'prosemirror-model';
+import { mount } from 'svelte';
+import type { SveltePMNode } from '$lib/typings/index.js';
 
 function applyAttrsToSpec(spec: any[], attrs: Record<string, any>): any[] {
 	const clone = (v: any): any => {
