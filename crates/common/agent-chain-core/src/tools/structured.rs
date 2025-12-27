@@ -16,7 +16,8 @@ use crate::error::{Error, Result};
 use crate::runnables::RunnableConfig;
 
 use super::base::{
-    ArgsSchema, BaseTool, FILTERED_ARGS, HandleToolError, HandleValidationError, ResponseFormat, ToolException, ToolInput, ToolOutput,
+    ArgsSchema, BaseTool, FILTERED_ARGS, HandleToolError, HandleValidationError, ResponseFormat,
+    ToolException, ToolInput, ToolOutput,
 };
 
 /// Type alias for sync structured tool function.
