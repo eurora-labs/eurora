@@ -1,7 +1,7 @@
-import { default as YoutubeVideo, videoAttrs, videoSchema } from './YoutubeVideo.svelte';
+import { default as YoutubeVideo, videoAttrs, videoSchema } from '$lib/youtube/YoutubeVideo.svelte';
+import { Editor, type SveltePMExtension, SvelteNodeView } from '@eurora/prosemirror-core/index';
 import type { Component } from 'svelte';
 
-import { Editor, type SveltePMExtension, SvelteNodeView } from '@eurora/prosemirror-core/index';
 export const ID = '7c7b59bb-d44d-431a-9f4d-64240172e092';
 
 export function youtubeVideoExtension(): SveltePMExtension {

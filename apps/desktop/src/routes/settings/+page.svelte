@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { Label } from '@eurora/ui/components/label/index';
-	import { Input } from '@eurora/ui/components/input/index';
-	import { Switch } from '@eurora/ui/components/switch/index';
-	import * as Card from '@eurora/ui/components/card/index';
 	import { createTauRPCProxy, type GeneralSettings } from '$lib/bindings/bindings.js';
+	import FirstPartyLogin from '$lib/components/FirstPartyLogin.svelte';
+	import * as Card from '@eurora/ui/components/card/index';
+	import { Input } from '@eurora/ui/components/input/index';
+	import { Label } from '@eurora/ui/components/label/index';
+	import { Switch } from '@eurora/ui/components/switch/index';
 	import { onMount } from 'svelte';
 
-	import FirstPartyLogin from '$lib/components/FirstPartyLogin.svelte';
 
 	const tauRPC = createTauRPCProxy();
 

@@ -1,6 +1,6 @@
 <script lang="ts" module>
-	import type { ClassValue } from 'svelte/elements';
 	import type { Query } from '$lib/typings/index.js';
+	import type { ClassValue } from 'svelte/elements';
 
 	export interface EditorProps {
 		value?: string;
@@ -13,16 +13,16 @@
 </script>
 
 <script lang="ts">
-	import { EditorState, Plugin } from 'prosemirror-state';
+	import { type Commands, commands as defaultCommands } from '$lib/commands.js';
+	import { paragraphExtension } from '$lib/components/paragraph/extension.js';
+	import { createExtensions } from '$lib/createExtensions.js';
 	import { Node as PMNode } from 'prosemirror-model';
 	import { DOMParser } from 'prosemirror-model';
+	import { EditorState, Plugin } from 'prosemirror-state';
 	import { EditorView } from 'prosemirror-view';
-	import type { Cmd } from '$lib/typings/index.js';
 	import { onDestroy } from 'svelte';
 	import type { SveltePMExtension } from '$lib/typings/extension.js';
-	import { createExtensions } from '$lib/createExtensions.js';
-	import { paragraphExtension } from '$lib/components/paragraph/extension.js';
-	import { type Commands, commands as defaultCommands } from '$lib/commands.js';
+	import type { Cmd } from '$lib/typings/index.js';
 	// import '$lib/Editor.css';
 
 	let editorRef: HTMLDivElement | null = $state(null);
