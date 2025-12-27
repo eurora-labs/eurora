@@ -19,9 +19,7 @@ use crate::caches::BaseCache;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
 use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
-use crate::outputs::{
-    ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult,
-};
+use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult};
 
 /// Fake chat model for testing purposes.
 ///
