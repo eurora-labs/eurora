@@ -1,16 +1,14 @@
 <script lang="ts">
-	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
-	import ServerIcon from '@lucide/svelte/icons/server';
+	import { goto } from '$app/navigation';
+	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
-	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import ServerIcon from '@lucide/svelte/icons/server';
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
 	import type { UnlistenFn } from '@tauri-apps/api/event';
 
 	const taurpc = createTauRPCProxy();
-	let service_name: String | undefined = $state(undefined);
+	let service_name: string | undefined = $state(undefined);
 
 	onMount(() => {
 		taurpc.prompt

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import * as Card from '@eurora/ui/components/card/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import MailIcon from '@lucide/svelte/icons/mail';
-	import PhoneIcon from '@lucide/svelte/icons/phone';
-	import MapPinIcon from '@lucide/svelte/icons/map-pin';
+	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import MapPinIcon from '@lucide/svelte/icons/map-pin';
+	import PhoneIcon from '@lucide/svelte/icons/phone';
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 py-16">

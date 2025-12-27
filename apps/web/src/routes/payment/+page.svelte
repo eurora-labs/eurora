@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 	import { loadStripe } from '@stripe/stripe-js';
-	import { PUBLIC_STRIPE_KEY } from '$env/static/public';
+	import { onMount } from 'svelte';
 	import { Elements, PaymentElement, LinkAuthenticationElement, Address } from 'svelte-stripe';
 	import type { Stripe, StripeError, StripeElements } from '@stripe/stripe-js';
+	// import { PUBLIC_STRIPE_KEY } from '$env/static/public';
+	const PUBLIC_STRIPE_KEY = 'sk-test-';
 
 	let stripe: Stripe | null = null;
 	let clientSecret: string | null = null;
@@ -48,9 +49,6 @@
 			redirect: 'if_required',
 		});
 
-		// log results, for debugging
-		console.log({ result });
-
 		if (result?.error) {
 			// payment failed, notify user
 			error = result.error;
@@ -90,7 +88,7 @@
 			<PaymentElement />
 			<Address mode="billing" />
 
-			<button disabled={processing}>
+			<button type="button" disabled={processing}>
 				{#if processing}
 					Processing...
 				{:else}

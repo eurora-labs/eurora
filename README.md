@@ -7,4 +7,5 @@ The primary goal of Eurora is to provide seamless OS integration for AI assistan
 We're a community driven project, and we welcome contributions from anyone who is interested in helping us build a better future for AI.
 
 ## Installation
+
 We support Windows, macOS, and Linux (x11). The installation will be available soon.
