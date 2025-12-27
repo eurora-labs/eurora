@@ -246,6 +246,7 @@ name = "agent-chain"
 version = "0.0.2"
 dependencies = [
  "agent-chain-core",
+ "agent-chain-macros",
  "async-stream",
  "async-trait",
  "futures",
