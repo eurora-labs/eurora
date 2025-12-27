@@ -3,6 +3,7 @@
 //! This module provides the base abstraction for chat models,
 //! following the LangChain pattern of having a common interface
 //! for different providers.
+//!
 //! Mirrors `langchain_core.language_models.chat_models`.
 
 use std::collections::HashMap;
@@ -17,72 +18,14 @@ use serde_json::Value;
 use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
 use super::model_profile::ModelProfile;
 use crate::GenerationType;
-use crate::callbacks::{AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun, Callbacks};
-use crate::error::{Error, Result};
-use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
-use crate::outputs::{
-    ChatGeneration, ChatGenerationChunk, ChatResult as OutputChatResult, LLMResult,
+use crate::callbacks::{
+    AsyncCallbackManagerForLLMRun, BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks,
 };
+use crate::error::{Error, Result};
+use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, UsageMetadata};
+use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, Generation, LLMResult};
 use crate::rate_limiters::BaseRateLimiter;
-use crate::tools::{Tool, ToolDefinition};
-
-/// Output from a chat model generation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatResult {
-    /// The generated message.
-    pub message: AIMessage,
-    /// Additional metadata from the model.
-    #[serde(default)]
-    pub metadata: ChatResultMetadata,
-}
-
-/// Metadata from a chat model generation.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ChatResultMetadata {
-    /// The model that was used.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-    /// Stop reason from the model.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stop_reason: Option<String>,
-    /// Token usage information.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub usage: Option<UsageMetadata>,
-}
-
-/// Token usage metadata.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct UsageMetadata {
-    /// Number of input tokens.
-    pub input_tokens: u32,
-    /// Number of output tokens.
-    pub output_tokens: u32,
-    /// Total tokens (input + output).
-    pub total_tokens: u32,
-}
-
-impl UsageMetadata {
-    /// Create a new usage metadata.
-    pub fn new(input_tokens: u32, output_tokens: u32) -> Self {
-        Self {
-            input_tokens,
-            output_tokens,
-            total_tokens: input_tokens + output_tokens,
-        }
-    }
-}
-
-/// A chunk of output from streaming.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatChunk {
-    /// The content delta.
-    pub content: String,
-    /// Whether this is the final chunk.
-    pub is_final: bool,
-    /// Metadata (only present on final chunk).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<ChatResultMetadata>,
-}
+use crate::tools::{BaseTool, ToolDefinition};
 
 /// Type alias for streaming output.
 pub type ChatStream = Pin<Box<dyn Stream<Item = Result<ChatChunk>> + Send>>;
@@ -93,30 +36,115 @@ pub type ChatGenerationStream = Pin<Box<dyn Stream<Item = Result<ChatGenerationC
 /// Type alias for streaming AIMessageChunk output.
 pub type AIMessageChunkStream = Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>;
 
-/// Configuration for tool choice.
+/// A chunk of output from streaming.
+///
+/// This struct carries content deltas during streaming, along with optional
+/// metadata that is typically attached to the final chunk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+pub struct ChatChunk {
+    /// The content delta.
+    pub content: String,
+    /// Whether this is the final chunk.
+    pub is_final: bool,
+    /// Usage metadata (token counts) - typically present on the final chunk.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage_metadata: Option<UsageMetadata>,
+    /// The reason the model stopped generating (e.g., "stop", "length", "tool_calls").
+    /// Typically present on the final chunk.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finish_reason: Option<String>,
+}
+
+impl ChatChunk {
+    /// Create a new content chunk (non-final).
+    pub fn new(content: impl Into<String>) -> Self {
+        Self {
+            content: content.into(),
+            is_final: false,
+            usage_metadata: None,
+            finish_reason: None,
+        }
+    }
+
+    /// Create a final chunk with optional metadata.
+    pub fn final_chunk(
+        usage_metadata: Option<UsageMetadata>,
+        finish_reason: Option<String>,
+    ) -> Self {
+        Self {
+            content: String::new(),
+            is_final: true,
+            usage_metadata,
+            finish_reason,
+        }
+    }
+
+    /// Set usage metadata on this chunk.
+    pub fn with_usage_metadata(mut self, usage: UsageMetadata) -> Self {
+        self.usage_metadata = Some(usage);
+        self
+    }
+
+    /// Set finish reason on this chunk.
+    pub fn with_finish_reason(mut self, reason: impl Into<String>) -> Self {
+        self.finish_reason = Some(reason.into());
+        self
+    }
+}
+
+/// Configuration for tool choice.
+///
+/// Mirrors Python's tool_choice parameter patterns.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
 pub enum ToolChoice {
-    /// Let the model decide whether to use tools.
-    Auto,
-    /// Model must use at least one tool.
-    Any,
-    /// Model must use a specific tool.
-    Tool {
-        /// Name of the tool to use.
-        name: String,
+    /// String value like "auto", "any", "none", or a specific tool name.
+    String(String),
+    /// Structured tool choice with type and optional name.
+    Structured {
+        /// Type of tool choice.
+        #[serde(rename = "type")]
+        choice_type: String,
+        /// Optional tool name.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
     },
-    /// Model should not use any tools.
-    None,
+}
+
+impl ToolChoice {
+    /// Create an "auto" tool choice - let the model decide.
+    pub fn auto() -> Self {
+        ToolChoice::String("auto".to_string())
+    }
+
+    /// Create an "any" tool choice - model must use at least one tool.
+    pub fn any() -> Self {
+        ToolChoice::String("any".to_string())
+    }
+
+    /// Create a "none" tool choice - model should not use any tools.
+    pub fn none() -> Self {
+        ToolChoice::String("none".to_string())
+    }
+
+    /// Create a tool choice for a specific tool by name.
+    pub fn tool(name: impl Into<String>) -> Self {
+        ToolChoice::Structured {
+            choice_type: "tool".to_string(),
+            name: Some(name.into()),
+        }
+    }
 }
 
 /// Disable streaming options.
+///
+/// Mirrors Python's `disable_streaming: bool | Literal["tool_calling"]` field.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DisableStreaming {
     /// Boolean value: true = always disable, false = never disable.
     Bool(bool),
-    /// String "tool_calling": disable only when tools are present.
+    /// Literal "tool_calling": disable only when tools are present.
     ToolCalling,
 }
 
@@ -128,6 +156,10 @@ impl Default for DisableStreaming {
 
 impl DisableStreaming {
     /// Check if streaming should be bypassed.
+    ///
+    /// # Arguments
+    ///
+    /// * `has_tools` - Whether tools are present in the current call.
     pub fn should_disable(&self, has_tools: bool) -> bool {
         match self {
             DisableStreaming::Bool(b) => *b,
@@ -252,13 +284,14 @@ impl ChatModelConfig {
 ///
 /// Custom chat model implementations should override these methods:
 ///
-/// | Method/Property         | Description                                        | Required |
-/// |------------------------|----------------------------------------------------|---------:|
-/// | `_generate`            | Use to generate a chat result from messages        | Required |
-/// | `_llm_type` (property) | Used to uniquely identify the type of the model    | Required |
-/// | `_stream`              | Use to implement streaming                         | Optional |
-/// | `_agenerate`           | Use to implement a native async method             | Optional |
-/// | `_astream`             | Use to implement async version of `_stream`        | Optional |
+/// | Method/Property           | Description                                        | Required |
+/// |--------------------------|----------------------------------------------------|---------:|
+/// | `_generate`              | Use to generate a chat result from messages        | Required |
+/// | `_llm_type` (property)   | Used to uniquely identify the type of the model    | Required |
+/// | `_identifying_params`    | Represent model parameterization for tracing       | Optional |
+/// | `_stream`                | Use to implement streaming                         | Optional |
+/// | `_agenerate`             | Use to implement a native async method             | Optional |
+/// | `_astream`               | Use to implement async version of `_stream`        | Optional |
 #[async_trait]
 pub trait BaseChatModel: BaseLanguageModel {
     /// Get the chat model configuration.
@@ -272,12 +305,22 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// Core abstract method to generate a chat result.
     ///
     /// Implementations must override this method.
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` - The messages to generate from.
+    /// * `stop` - Optional list of stop words to use when generating.
+    /// * `run_manager` - Optional callback manager to use for this call.
+    ///
+    /// # Returns
+    ///
+    /// The output chat result containing generations.
     async fn _generate(
         &self,
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult>;
+    ) -> Result<ChatResult>;
 
     /// Async version of `_generate`.
     ///
@@ -287,14 +330,23 @@ pub trait BaseChatModel: BaseLanguageModel {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
-        // Default: call sync version (suboptimal but provides fallback)
+    ) -> Result<ChatResult> {
         self._generate(messages, stop, None).await
     }
 
     /// Stream the output of the model.
     ///
     /// Default implementation raises NotImplementedError.
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` - The messages to generate from.
+    /// * `stop` - Optional list of stop words to use when generating.
+    /// * `run_manager` - Optional callback manager to use for this call.
+    ///
+    /// # Yields
+    ///
+    /// The chat generation chunks.
     fn _stream(
         &self,
         _messages: Vec<BaseMessage>,
@@ -313,8 +365,92 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
         _run_manager: Option<&AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
-        // Default: call sync version
         self._stream(messages, stop, None)
+    }
+
+    /// Get the first AI message from a chat result.
+    ///
+    /// Helper method to extract the first generation's message as an AIMessage.
+    fn get_first_message(&self, result: &ChatResult) -> Result<AIMessage> {
+        if result.generations.is_empty() {
+            return Err(Error::Other("No generations returned".into()));
+        }
+
+        match result.generations[0].message.clone() {
+            BaseMessage::AI(message) => Ok(message),
+            other => Ok(AIMessage::new(other.content())),
+        }
+    }
+
+    /// Combine LLM outputs from multiple results.
+    ///
+    /// This method is called after generating results from multiple prompts
+    /// to combine any LLM-specific output information.
+    ///
+    /// Default implementation returns an empty HashMap.
+    /// Subclasses can override to combine provider-specific output data.
+    fn _combine_llm_outputs(
+        &self,
+        _llm_outputs: &[Option<HashMap<String, Value>>],
+    ) -> HashMap<String, Value> {
+        HashMap::new()
+    }
+
+    /// Convert cached Generation objects to ChatGeneration objects.
+    ///
+    /// Handle case where cache contains Generation objects instead of
+    /// ChatGeneration objects. This can happen due to serialization/deserialization
+    /// issues or legacy cache data.
+    fn _convert_cached_generations(&self, cache_val: Vec<Generation>) -> Vec<ChatGeneration> {
+        cache_val
+            .into_iter()
+            .map(|cached_gen| {
+                // Convert Generation to ChatGeneration by creating AIMessage from text
+                let message = AIMessage::new(&cached_gen.text);
+                match cached_gen.generation_info {
+                    Some(info) => ChatGeneration::with_info(message.into(), info),
+                    None => ChatGeneration::new(message.into()),
+                }
+            })
+            .collect()
+    }
+
+    /// Get invocation parameters for tracing.
+    ///
+    /// Returns a HashMap containing the model configuration and stop sequences.
+    fn _get_invocation_params(
+        &self,
+        stop: Option<&[String]>,
+        kwargs: Option<&HashMap<String, Value>>,
+    ) -> HashMap<String, Value> {
+        let mut params = self.get_identifying_params();
+        if let Some(stop) = stop {
+            params.insert(
+                "stop".to_string(),
+                Value::Array(stop.iter().map(|s| Value::String(s.clone())).collect()),
+            );
+        }
+        if let Some(kw) = kwargs {
+            params.extend(kw.clone());
+        }
+        params
+    }
+
+    /// Get the LLM string for cache key generation.
+    ///
+    /// This string uniquely identifies the model configuration for caching purposes.
+    fn _get_llm_string(
+        &self,
+        stop: Option<&[String]>,
+        kwargs: Option<&HashMap<String, Value>>,
+    ) -> String {
+        let params = self._get_invocation_params(stop, kwargs);
+
+        // Sort params for deterministic key
+        let mut sorted_items: Vec<_> = params.iter().collect();
+        sorted_items.sort_by_key(|(k, _)| *k);
+
+        format!("{:?}", sorted_items)
     }
 
     /// Check if `_stream` is implemented (not the default).
@@ -333,22 +469,39 @@ pub trait BaseChatModel: BaseLanguageModel {
         false
     }
 
+    /// Check if streaming is enabled via a model field.
+    ///
+    /// Override this if the model has a `streaming` field that should be checked.
+    fn has_streaming_field(&self) -> Option<bool> {
+        None
+    }
+
     /// Determine if a given model call should hit the streaming API.
     ///
-    /// This method checks:
-    /// 1. If streaming is implemented (either sync or async)
-    /// 2. If streaming has been disabled on this instance
-    /// 3. If streaming is disabled for tool calling and tools are present
+    /// This method mirrors Python's `_should_stream` behavior:
+    /// 1. Check if streaming is implemented (either sync or async)
+    /// 2. Check if streaming has been disabled on this instance
+    /// 3. Check if streaming is disabled for tool calling and tools are present
+    /// 4. Check if streaming field is set on the model
+    /// 5. Check if any streaming callback handlers are present
     ///
     /// # Arguments
     ///
     /// * `async_api` - Whether this is an async API call
     /// * `has_tools` - Whether tools are present in the call
+    /// * `stream_kwarg` - Optional explicit stream kwarg from caller
+    /// * `run_manager` - Optional callback manager for checking streaming handlers
     ///
     /// # Returns
     ///
     /// `true` if streaming should be used, `false` otherwise.
-    fn _should_stream(&self, async_api: bool, has_tools: bool) -> bool {
+    fn _should_stream(
+        &self,
+        async_api: bool,
+        has_tools: bool,
+        stream_kwarg: Option<bool>,
+        run_manager: Option<&[Arc<dyn BaseCallbackHandler>]>,
+    ) -> bool {
         // Check if streaming is implemented
         let sync_not_implemented = !self.has_stream_impl();
         let async_not_implemented = !self.has_astream_impl();
@@ -371,12 +524,39 @@ pub trait BaseChatModel: BaseLanguageModel {
             return false;
         }
 
+        // Check if a runtime streaming flag has been passed in
+        if let Some(stream) = stream_kwarg {
+            return stream;
+        }
+
+        // Check if streaming field is set on the model
+        if let Some(streaming) = self.has_streaming_field() {
+            return streaming;
+        }
+
+        // Check if any streaming callback handlers are present
+        if let Some(handlers) = run_manager {
+            // In Python, this checks for `_StreamingCallbackHandler` instances
+            // For Rust, we can check if any handler implements StreamingCallbackHandler
+            // This is a simplified check - in practice, you'd want a more sophisticated check
+            if !handlers.is_empty() {
+                // If there are any handlers, we assume streaming might be wanted
+                return true;
+            }
+        }
+
+        // Default: streaming is available and not disabled
         true
     }
 
     /// Generate from a batch of message lists.
     ///
     /// This method should make use of batched calls for models that expose a batched API.
+    ///
+    /// Use this method when you want to:
+    /// 1. Take advantage of batched calls
+    /// 2. Need more output from the model than just the top generated value
+    /// 3. Are building chains that are agnostic to the underlying language model type
     ///
     /// # Arguments
     ///
@@ -420,6 +600,61 @@ pub trait BaseChatModel: BaseLanguageModel {
         Ok(LLMResult::new(all_generations))
     }
 
+    /// Async call helper.
+    ///
+    /// This is a convenience method that wraps `agenerate` for single-message calls.
+    async fn _call_async(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        callbacks: Option<Callbacks>,
+    ) -> Result<BaseMessage> {
+        let result = self.agenerate(vec![messages], stop, callbacks).await?;
+
+        if result.generations.is_empty() || result.generations[0].is_empty() {
+            return Err(Error::Other("No generations returned".into()));
+        }
+
+        match &result.generations[0][0] {
+            GenerationType::ChatGeneration(chat_gen) => Ok(chat_gen.message.clone()),
+            _ => Err(Error::Other("Unexpected generation type".into())),
+        }
+    }
+
+    /// Generate a response from the model with tools.
+    ///
+    /// This is the preferred method when tool calling is needed.
+    /// Default implementation ignores tools and calls `_generate`.
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` - The conversation history.
+    /// * `tools` - Tool definitions for the model to use.
+    /// * `tool_choice` - Optional configuration for tool selection.
+    /// * `stop` - Optional stop sequences.
+    ///
+    /// # Returns
+    ///
+    /// An `AIMessage` containing the generated response.
+    async fn generate_with_tools(
+        &self,
+        messages: Vec<BaseMessage>,
+        _tools: &[ToolDefinition],
+        _tool_choice: Option<&ToolChoice>,
+        stop: Option<Vec<String>>,
+    ) -> Result<AIMessage> {
+        let result = self._generate(messages, stop, None).await?;
+
+        if result.generations.is_empty() {
+            return Err(Error::Other("No generations returned".into()));
+        }
+
+        match result.generations[0].message.clone() {
+            BaseMessage::AI(message) => Ok(message),
+            _ => Err(Error::Other("Unexpected message type".into())),
+        }
+    }
+
     /// Convert input to messages.
     fn convert_input(&self, input: LanguageModelInput) -> Result<Vec<BaseMessage>> {
         Ok(input.to_messages())
@@ -455,46 +690,38 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
-    /// Generate a response from the model with tools.
+    /// Bind tools to the model.
     ///
-    /// This is the preferred method when tool calling is needed.
-    /// Default implementation ignores tools and calls `_generate`.
+    /// This method returns a Runnable that can call tools. The default
+    /// implementation raises NotImplementedError.
     ///
     /// # Arguments
     ///
-    /// * `messages` - The conversation history.
-    /// * `tools` - Tool definitions for the model to use.
-    /// * `tool_choice` - Optional configuration for tool selection.
-    /// * `stop` - Optional stop sequences.
+    /// * `tools` - Sequence of tools to bind to the model.
+    /// * `tool_choice` - Optional tool choice configuration.
     ///
     /// # Returns
     ///
-    /// A `ChatResult` containing the generated message and metadata.
-    async fn generate_with_tools(
+    /// A Result with error indicating tools are not supported.
+    ///
+    /// # Note
+    ///
+    /// Provider implementations should override this method to return a configured model.
+    fn bind_tools(
         &self,
-        messages: Vec<BaseMessage>,
-        tools: &[ToolDefinition],
-        tool_choice: Option<&ToolChoice>,
-        stop: Option<Vec<String>>,
-    ) -> Result<ChatResult> {
-        // Default implementation ignores tools
-        let _ = tools;
-        let _ = tool_choice;
-        let result = self._generate(messages, stop, None).await?;
+        _tools: &[Arc<dyn BaseTool>],
+        _tool_choice: Option<ToolChoice>,
+    ) -> Result<()> {
+        Err(Error::NotImplemented(
+            "bind_tools is not implemented for this model".into(),
+        ))
+    }
 
-        if result.generations.is_empty() {
-            return Err(Error::Other("No generations returned".into()));
-        }
-
-        let message = match result.generations[0].message.clone() {
-            BaseMessage::AI(message) => Ok(message),
-            _ => Err(Error::Other("Unexpected message type".into())),
-        }?;
-
-        Ok(ChatResult {
-            message,
-            metadata: ChatResultMetadata::default(),
-        })
+    /// Get tool definitions from tools.
+    ///
+    /// Helper method to convert tools to their definitions.
+    fn get_tool_definitions(&self, tools: &[Arc<dyn BaseTool>]) -> Vec<ToolDefinition> {
+        tools.iter().map(|t| t.definition()).collect()
     }
 
     /// Generate a streaming response from the model.
@@ -516,21 +743,14 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
     ) -> Result<AIMessageChunkStream> {
         let messages = self.convert_input(input)?;
-        let has_tools = false; // In real implementation, check kwargs for tools
+        let has_tools = false;
 
         // Check if streaming should be used
-        if !self._should_stream(false, has_tools) {
+        if !self._should_stream(false, has_tools, Some(true), None) {
             // Model doesn't implement streaming or streaming is disabled,
             // fall back to invoke and yield the result as a single chunk
             let result = self._generate(messages, stop, None).await?;
-            if result.generations.is_empty() {
-                return Err(Error::Other("No generations returned".into()));
-            }
-
-            let message = match result.generations[0].message.clone() {
-                BaseMessage::AI(ai_msg) => ai_msg,
-                other => AIMessage::new(other.content()),
-            };
+            let message = self.get_first_message(&result)?;
             let chunk = AIMessageChunk::new(message.content());
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
@@ -568,7 +788,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 }
             }
 
-            // Yield a final empty chunk with chunk_position="last" if not yet yielded
+            // Yield a final empty chunk with chunk_position="last" if we yielded anything
             if yielded {
                 let mut final_chunk = AIMessageChunk::new("");
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
@@ -598,20 +818,13 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
     ) -> Result<AIMessageChunkStream> {
         let messages = self.convert_input(input)?;
-        let has_tools = false; // In real implementation, check kwargs for tools
+        let has_tools = false;
 
         // Check if streaming should be used
-        if !self._should_stream(true, has_tools) {
+        if !self._should_stream(true, has_tools, Some(true), None) {
             // No async or sync stream is implemented, fall back to ainvoke
             let result = self._agenerate(messages, stop, None).await?;
-            if result.generations.is_empty() {
-                return Err(Error::Other("No generations returned".into()));
-            }
-
-            let message = match result.generations[0].message.clone() {
-                BaseMessage::AI(ai_msg) => ai_msg,
-                other => AIMessage::new(other.content()),
-            };
+            let message = self.get_first_message(&result)?;
             let chunk = AIMessageChunk::new(message.content());
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
@@ -649,7 +862,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 }
             }
 
-            // Yield a final empty chunk with chunk_position="last" if not yet yielded
+            // Yield a final empty chunk with chunk_position="last" if we yielded anything
             if yielded {
                 let mut final_chunk = AIMessageChunk::new("");
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
@@ -683,7 +896,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let has_tools = false;
 
         // Check if streaming should be used
-        if !self._should_stream(false, has_tools) {
+        if !self._should_stream(false, has_tools, None, None) {
             // Fall back to non-streaming
             let result = self._generate(messages, stop, run_manager).await?;
             if result.generations.is_empty() {
@@ -703,6 +916,58 @@ pub trait BaseChatModel: BaseLanguageModel {
     fn get_chat_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
         let mut params = self.get_ls_params(stop);
         params.ls_model_type = Some("chat".to_string());
+        params
+    }
+
+    /// Get a dictionary representation of the model.
+    ///
+    /// Returns identifying parameters plus the model type.
+    fn to_dict(&self) -> HashMap<String, Value> {
+        let mut result = self.get_identifying_params();
+        result.insert(
+            "_type".to_string(),
+            Value::String(self.llm_type().to_string()),
+        );
+        result
+    }
+
+    /// Create a wrapper that structures model output using a schema.
+    ///
+    /// This method returns a Runnable that formats outputs to match the given schema.
+    /// The default implementation raises NotImplementedError.
+    ///
+    /// # Arguments
+    ///
+    /// * `schema` - The output schema (as a JSON value).
+    /// * `include_raw` - If true, include raw model response in output.
+    ///
+    /// # Returns
+    ///
+    /// A Result with error indicating structured output is not supported.
+    ///
+    /// # Note
+    ///
+    /// Provider implementations should override `bind_tools` first, as the default
+    /// implementation uses `bind_tools` internally.
+    fn with_structured_output(&self, _schema: Value, _include_raw: bool) -> Result<()> {
+        Err(Error::NotImplemented(
+            "with_structured_output is not implemented for this model".into(),
+        ))
+    }
+
+    /// Get the identifying parameters for this model.
+    ///
+    /// Returns a map of parameters that uniquely identify this model instance.
+    fn get_identifying_params(&self) -> HashMap<String, Value> {
+        let mut params = HashMap::new();
+        params.insert(
+            "_type".to_string(),
+            Value::String(self.llm_type().to_string()),
+        );
+        params.insert(
+            "model".to_string(),
+            Value::String(self.model_name().to_string()),
+        );
         params
     }
 }
@@ -735,189 +1000,11 @@ impl<T: SimpleChatModel> BaseChatModel for T {
         messages: Vec<BaseMessage>,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<OutputChatResult> {
+    ) -> Result<ChatResult> {
         let output_str = self._call(messages, stop, run_manager).await?;
         let message = AIMessage::new(output_str);
         let generation = ChatGeneration::new(message.into());
-        Ok(OutputChatResult::new(vec![generation]))
-    }
-}
-
-/// A chat model that has been bound with tools (generic version).
-///
-/// This wraps an underlying chat model and includes tool definitions
-/// that will be passed to the model on each invocation.
-pub struct BoundChatModel<M: BaseChatModel> {
-    /// The underlying chat model.
-    model: M,
-    /// Tools bound to this model.
-    tools: Vec<Arc<dyn Tool + Send + Sync>>,
-    /// Tool choice configuration.
-    tool_choice: Option<ToolChoice>,
-}
-
-impl<M: BaseChatModel> BoundChatModel<M> {
-    /// Create a new bound chat model.
-    pub fn new(model: M, tools: Vec<Arc<dyn Tool + Send + Sync>>) -> Self {
-        Self {
-            model,
-            tools,
-            tool_choice: None,
-        }
-    }
-
-    /// Set the tool choice.
-    pub fn with_tool_choice(mut self, tool_choice: ToolChoice) -> Self {
-        self.tool_choice = Some(tool_choice);
-        self
-    }
-
-    /// Get the tool definitions.
-    pub fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        self.tools.iter().map(|t| t.definition()).collect()
-    }
-
-    /// Get a reference to the underlying model.
-    pub fn model(&self) -> &M {
-        &self.model
-    }
-
-    /// Get the tools.
-    pub fn tools(&self) -> &[Arc<dyn Tool + Send + Sync>] {
-        &self.tools
-    }
-
-    /// Get the tool choice.
-    pub fn tool_choice(&self) -> Option<&ToolChoice> {
-        self.tool_choice.as_ref()
-    }
-
-    /// Invoke the model with messages.
-    ///
-    /// This generates a response using the bound tools.
-    pub async fn invoke(&self, messages: Vec<BaseMessage>) -> BaseMessage {
-        let tool_definitions = self.tool_definitions();
-        match self
-            .model
-            .generate_with_tools(messages, &tool_definitions, self.tool_choice.as_ref(), None)
-            .await
-        {
-            Ok(result) => result.message.into(),
-            Err(e) => {
-                // Return an error message
-                AIMessage::new(format!("Error: {}", e)).into()
-            }
-        }
-    }
-}
-
-impl<M: BaseChatModel + Clone> Clone for BoundChatModel<M> {
-    fn clone(&self) -> Self {
-        Self {
-            model: self.model.clone(),
-            tools: self.tools.clone(),
-            tool_choice: self.tool_choice.clone(),
-        }
-    }
-}
-
-/// Extension trait for chat models to add tool binding.
-pub trait ChatModelExt: BaseChatModel + Sized {
-    /// Bind tools to this chat model.
-    ///
-    /// # Arguments
-    ///
-    /// * `tools` - The tools to bind.
-    ///
-    /// # Returns
-    ///
-    /// A `BoundChatModel` that includes the tools.
-    fn bind_tools(self, tools: Vec<Arc<dyn Tool + Send + Sync>>) -> BoundChatModel<Self> {
-        BoundChatModel::new(self, tools)
-    }
-}
-
-// Implement ChatModelExt for all BaseChatModel implementations
-impl<T: BaseChatModel + Sized> ChatModelExt for T {}
-
-/// A dynamically-typed chat model bound with tools.
-///
-/// This is the dynamic dispatch version of `BoundChatModel`, useful when
-/// working with `Arc<dyn BaseChatModel>` or boxed trait objects.
-#[derive(Clone)]
-pub struct DynBoundChatModel {
-    /// The underlying chat model.
-    model: Arc<dyn BaseChatModel>,
-    /// Tools bound to this model.
-    tools: Vec<Arc<dyn Tool + Send + Sync>>,
-    /// Tool choice configuration.
-    tool_choice: Option<ToolChoice>,
-}
-
-impl DynBoundChatModel {
-    /// Create a new dynamically-typed bound chat model.
-    pub fn new(model: Arc<dyn BaseChatModel>, tools: Vec<Arc<dyn Tool + Send + Sync>>) -> Self {
-        Self {
-            model,
-            tools,
-            tool_choice: None,
-        }
-    }
-
-    /// Set the tool choice.
-    pub fn with_tool_choice(mut self, tool_choice: ToolChoice) -> Self {
-        self.tool_choice = Some(tool_choice);
-        self
-    }
-
-    /// Get the tool definitions.
-    pub fn tool_definitions(&self) -> Vec<ToolDefinition> {
-        self.tools.iter().map(|t| t.definition()).collect()
-    }
-
-    /// Get a reference to the underlying model.
-    pub fn model(&self) -> &Arc<dyn BaseChatModel> {
-        &self.model
-    }
-
-    /// Get the tools.
-    pub fn tools(&self) -> &[Arc<dyn Tool + Send + Sync>] {
-        &self.tools
-    }
-
-    /// Get the tool choice.
-    pub fn tool_choice(&self) -> Option<&ToolChoice> {
-        self.tool_choice.as_ref()
-    }
-
-    /// Invoke the model with messages.
-    ///
-    /// This generates a response using the bound tools.
-    pub async fn invoke(&self, messages: Vec<BaseMessage>) -> BaseMessage {
-        let tool_definitions = self.tool_definitions();
-        match self
-            .model
-            .generate_with_tools(messages, &tool_definitions, self.tool_choice.as_ref(), None)
-            .await
-        {
-            Ok(result) => result.message.into(),
-            Err(e) => {
-                // Return an error message
-                AIMessage::new(format!("Error: {}", e)).into()
-            }
-        }
-    }
-}
-
-/// Extension methods for `Arc<dyn BaseChatModel>`.
-pub trait DynChatModelExt {
-    /// Bind tools to this chat model, returning a dynamically-typed bound model.
-    fn bind_tools(self, tools: Vec<Arc<dyn Tool + Send + Sync>>) -> DynBoundChatModel;
-}
-
-impl DynChatModelExt for Arc<dyn BaseChatModel> {
-    fn bind_tools(self, tools: Vec<Arc<dyn Tool + Send + Sync>>) -> DynBoundChatModel {
-        DynBoundChatModel::new(self, tools)
+        Ok(ChatResult::new(vec![generation]))
     }
 }
 
@@ -938,7 +1025,7 @@ impl DynChatModelExt for Arc<dyn BaseChatModel> {
 /// # Errors
 ///
 /// Returns an error if no generations are found in the stream.
-pub fn generate_from_stream<I>(mut stream: I) -> Result<OutputChatResult>
+pub fn generate_from_stream<I>(mut stream: I) -> Result<ChatResult>
 where
     I: Iterator<Item = ChatGenerationChunk>,
 {
@@ -956,7 +1043,7 @@ where
 
     // Convert ChatGenerationChunk to ChatGeneration
     let chat_generation: ChatGeneration = generation.into();
-    Ok(OutputChatResult::new(vec![chat_generation]))
+    Ok(ChatResult::new(vec![chat_generation]))
 }
 
 /// Async generate from a stream of chunks.
@@ -976,10 +1063,9 @@ where
 /// # Errors
 ///
 /// Returns an error if no generations are found in the stream.
-#[allow(dead_code)]
 pub async fn agenerate_from_stream(
     stream: impl futures::Stream<Item = Result<ChatGenerationChunk>> + Unpin,
-) -> Result<OutputChatResult> {
+) -> Result<ChatResult> {
     use futures::StreamExt;
 
     let chunks: Vec<ChatGenerationChunk> = stream
@@ -1006,7 +1092,6 @@ pub async fn agenerate_from_stream(
 /// # Returns
 ///
 /// The merged `ChatGenerationChunk`, or `None` if the stream was empty.
-#[allow(dead_code)]
 pub async fn collect_and_merge_stream(
     mut stream: impl futures::StreamExt<Item = Result<ChatGenerationChunk>> + Unpin,
 ) -> Result<Option<ChatGenerationChunk>> {
@@ -1027,14 +1112,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_usage_metadata() {
-        let usage = UsageMetadata::new(100, 50);
-        assert_eq!(usage.input_tokens, 100);
-        assert_eq!(usage.output_tokens, 50);
-        assert_eq!(usage.total_tokens, 150);
-    }
-
-    #[test]
     fn test_chat_model_config_builder() {
         let config = ChatModelConfig::new()
             .with_cache(true)
@@ -1049,30 +1126,45 @@ mod tests {
     }
 
     #[test]
-    fn test_tool_choice_serialization() {
-        let auto = ToolChoice::Auto;
-        let json = serde_json::to_string(&auto).unwrap();
-        assert!(json.contains("auto"));
-
-        let tool = ToolChoice::Tool {
-            name: "my_tool".to_string(),
-        };
-        let json = serde_json::to_string(&tool).unwrap();
-        assert!(json.contains("my_tool"));
+    fn test_tool_choice_auto() {
+        let choice = ToolChoice::auto();
+        assert_eq!(choice, ToolChoice::String("auto".to_string()));
     }
 
     #[test]
-    fn test_chat_result_metadata_serialization() {
-        let metadata = ChatResultMetadata {
-            model: Some("gpt-4".to_string()),
-            stop_reason: Some("stop".to_string()),
-            usage: Some(UsageMetadata::new(100, 50)),
-        };
+    fn test_tool_choice_any() {
+        let choice = ToolChoice::any();
+        assert_eq!(choice, ToolChoice::String("any".to_string()));
+    }
 
-        let json = serde_json::to_string(&metadata).unwrap();
-        assert!(json.contains("gpt-4"));
-        assert!(json.contains("stop"));
-        assert!(json.contains("150")); // total_tokens
+    #[test]
+    fn test_tool_choice_none() {
+        let choice = ToolChoice::none();
+        assert_eq!(choice, ToolChoice::String("none".to_string()));
+    }
+
+    #[test]
+    fn test_tool_choice_tool() {
+        let choice = ToolChoice::tool("my_tool");
+        assert_eq!(
+            choice,
+            ToolChoice::Structured {
+                choice_type: "tool".to_string(),
+                name: Some("my_tool".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn test_tool_choice_serialization() {
+        let auto = ToolChoice::auto();
+        let json = serde_json::to_string(&auto).unwrap();
+        assert_eq!(json, "\"auto\"");
+
+        let tool = ToolChoice::tool("my_tool");
+        let json = serde_json::to_string(&tool).unwrap();
+        assert!(json.contains("my_tool"));
+        assert!(json.contains("tool"));
     }
 
     #[test]
