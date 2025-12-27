@@ -80,11 +80,6 @@
 
 	export { ref, attrs, articleAttrs, articleSchema };
 
-	function handleClick(event: MouseEvent) {
-		alert('some longer script');
-		event.preventDefault();
-	}
-
 	function handleKeyDown(event: KeyboardEvent) {
 		event.preventDefault();
 	}

@@ -6,11 +6,6 @@
 	const FIREFOX_EXTENSION_URL = 'https://addons.mozilla.org/en-US/firefox/addon/eurora';
 	const CHROME_EXTENSION_URL =
 		'https://chromewebstore.google.com/detail/google-translate/odjnhjhlbmfmcaolcklpmhhlblkgjban';
-
-	type BrowserType = 'firefox' | 'chromium' | 'unknown';
-
-	let browserType = $state<BrowserType>('unknown');
-	let redirecting = $state(false);
 </script>
 
 <div class="flex min-h-screen flex-col items-center justify-center gap-6 p-8">

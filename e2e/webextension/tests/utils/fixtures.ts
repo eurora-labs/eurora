@@ -19,7 +19,7 @@ export const test = base.extend<{
 	sw: Worker;
 }>({
 	// Override context to load the complete extension (content scripts, background, popup)
-	context: async ({}, use) => {
+	context: async (_, use) => {
 		// Path to the built extension directory
 		const pathToExtension = path.join(__dirname, '../../../../apps/browser/dist/chrome');
 

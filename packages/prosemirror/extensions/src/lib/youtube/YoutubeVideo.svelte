@@ -71,11 +71,6 @@
 
 	export { ref, attrs };
 
-	function handleClick(event: MouseEvent) {
-		alert('some longer script');
-		event.preventDefault();
-	}
-
 	function handleKeyDown(event: KeyboardEvent) {
 		event.preventDefault();
 	}
