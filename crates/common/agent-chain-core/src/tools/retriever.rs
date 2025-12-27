@@ -115,10 +115,10 @@ where
 
     // Sync function
     let func = {
-        let retriever = retriever_clone.clone();
+        let _retriever = retriever_clone.clone();
         let separator = separator_clone.clone();
         move |args: HashMap<String, Value>| -> Result<Value> {
-            let query = args
+            let _query = args
                 .get("query")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
@@ -176,8 +176,8 @@ where
     let name = name.into();
     let description = description.into();
 
-    let retriever_clone = retriever.clone();
-    let retrieve_fn = Arc::new(retrieve_fn);
+    let _retriever_clone = retriever.clone();
+    let _retrieve_fn = Arc::new(retrieve_fn);
 
     // Async version - wrapped as a sync function that returns a placeholder
     // In practice, you'd use the async invoke
@@ -281,7 +281,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::retrievers::SimpleRetriever;
 
     #[test]
     fn test_retriever_input() {

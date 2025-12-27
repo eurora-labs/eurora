@@ -6,7 +6,6 @@ description = "Core library for agent-chain crate"
 license = "MIT"
 
 [dependencies]
-agent-chain-macros = { workspace = true }
 async-stream = "0.3"
 async-trait = { workspace = true }
 csv = "1.3"

@@ -51,6 +51,7 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 
+use crate::ToolChoice;
 use crate::callbacks::AsyncCallbackManagerForLLMRun;
 use crate::callbacks::CallbackManagerForLLMRun;
 use crate::callbacks::Callbacks;
@@ -66,7 +67,6 @@ use crate::messages::{
 use crate::outputs::ChatGenerationChunk;
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
 use crate::tools::ToolDefinition;
-use crate::ToolChoice;
 
 /// Default API base URL for OpenAI.
 const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
@@ -882,12 +882,12 @@ impl ChatOpenAI {
             return Err(Error::api(status, error_text));
         }
 
-        let model = self.model.clone();
+        let _model = self.model.clone();
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
             let mut accumulated_text = String::new();
-            let mut usage: Option<UsageMetadata> = None;
+            let mut _usage: Option<UsageMetadata> = None;
             let mut annotations: Vec<TextAnnotation> = Vec::new();
 
             use futures::StreamExt;
@@ -942,7 +942,7 @@ impl ChatOpenAI {
                                             if let Some(resp) = event.response
                                                 && let Some(resp_usage) = resp.usage
                                             {
-                                                usage = Some(UsageMetadata::new(
+                                                _usage = Some(UsageMetadata::new(
                                                     resp_usage.input_tokens as i64,
                                                     resp_usage.output_tokens as i64,
                                                 ));
@@ -1276,14 +1276,10 @@ impl BaseLanguageModel for ChatOpenAI {
         let mut all_generations = Vec::new();
         for prompt in prompts {
             let messages = prompt.to_messages();
-            let result = self._generate_internal(messages, stop.clone(), None).await?;
-            all_generations.push(
-                result
-                    .generations
-                    .into_iter()
-                    .map(|g| g.into())
-                    .collect(),
-            );
+            let result = self
+                ._generate_internal(messages, stop.clone(), None)
+                .await?;
+            all_generations.push(result.generations.into_iter().map(|g| g.into()).collect());
         }
         Ok(LLMResult::new(all_generations))
     }
@@ -1630,12 +1626,12 @@ impl ChatOpenAI {
         }
 
         // Create a stream from the SSE response
-        let model = self.model.clone();
+        let _model = self.model.clone();
         let stream = async_stream::stream! {
             let mut bytes_stream = response.bytes_stream();
             let mut buffer = String::new();
-            let mut usage: Option<UsageMetadata> = None;
-            let mut finish_reason: Option<String> = None;
+            let mut _usage: Option<UsageMetadata> = None;
+            let mut _finish_reason: Option<String> = None;
 
             use futures::StreamExt;
 
@@ -1669,11 +1665,11 @@ impl ChatOpenAI {
                                                 });
                                             }
                                             if let Some(ref reason) = choice.finish_reason {
-                                                finish_reason = Some(reason.clone());
+                                                _finish_reason = Some(reason.clone());
                                             }
                                         }
                                         if let Some(ref u) = chunk.usage {
-                                            usage = Some(UsageMetadata::new(
+                                            _usage = Some(UsageMetadata::new(
                                                 u.prompt_tokens as i64,
                                                 u.completion_tokens as i64,
                                             ));
