@@ -1,6 +1,6 @@
 import { getCurrentTabIcon } from './tabs.js';
-import browser from 'webextension-polyfill';
 import { NativeMetadata, Frame } from '../content/bindings.js';
+import browser from 'webextension-polyfill';
 
 const lastUrl = new Map();
 
@@ -21,7 +21,6 @@ export async function onUpdated(
 	if (typeof tab.url === 'string' && isRealWebUrl(tab.url)) {
 		const prev = lastUrl.get(tabId);
 		if (prev !== tab.url) {
-			console.log(`[URL Changed] ${tab.url}`);
 			lastUrl.set(tabId, tab.url);
 
 			const metadata = {
@@ -52,7 +51,6 @@ export async function onActivated(tabId: number, nativePort: browser.Runtime.Por
 		if (!tab) return;
 		const url = tab.url;
 		if (!url || !isRealWebUrl(url)) return;
-		console.log(`[Tab Activated] ${url}`);
 
 		const metadata = {
 			kind: 'NativeMetadata',

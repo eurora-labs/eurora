@@ -1,5 +1,3 @@
-import { createGrpcWebTransport } from '@connectrpc/connect-web';
-import { createClient, type Client } from '@connectrpc/connect';
 import {
 	ProtoAuthService,
 	type LoginRequest,
@@ -11,6 +9,8 @@ import {
 	type LoginByLoginTokenRequest,
 	type GetLoginTokenResponse,
 } from '$lib/protos/auth_service_pb.js';
+import { createClient, type Client } from '@connectrpc/connect';
+import { createGrpcWebTransport } from '@connectrpc/connect-web';
 
 class AuthService {
 	private readonly client: Client<typeof ProtoAuthService>;

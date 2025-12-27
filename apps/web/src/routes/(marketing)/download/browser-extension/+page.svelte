@@ -1,7 +1,7 @@
 <script lang="ts">
+	import { Button } from '@eurora/ui/components/button/index';
 	import Chromium from '@lucide/svelte/icons/chromium';
 	import Globe from '@lucide/svelte/icons/globe';
-	import { Button } from '@eurora/ui/components/button/index';
 
 	const FIREFOX_EXTENSION_URL = 'https://addons.mozilla.org/en-US/firefox/addon/eurora';
 	const CHROME_EXTENSION_URL =

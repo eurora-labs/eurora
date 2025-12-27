@@ -11,8 +11,8 @@
 </script>
 
 <script lang="ts">
+	import InputArea from '$lib/launcher/input-area.svelte';
 	import { cn } from '$lib/utils';
-	import InputArea from './input-area.svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
 
 	let {
