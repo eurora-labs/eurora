@@ -54,7 +54,7 @@ serde = { workspace = true }
 serde_json = { version = "1.0", features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
-tauri = { version = "2.9.3", features = ["tray-icon", "unstable"] }
+tauri = { version = "2.9.5", features = ["tray-icon", "unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-http = "2"
