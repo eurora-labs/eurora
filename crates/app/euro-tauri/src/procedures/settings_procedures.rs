@@ -20,12 +20,12 @@ pub trait SettingsApi {
     async fn set_general_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         general_settings: GeneralSettings,
-    ) -> Result<(), String>;
+    ) -> Result<GeneralSettings, String>;
 
     async fn set_telemetry_settings<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         telemetry_settings: TelemetrySettings,
-    ) -> Result<(), String>;
+    ) -> Result<TelemetrySettings, String>;
 }
 #[derive(Clone)]
 pub struct SettingsApiImpl;
@@ -66,7 +66,7 @@ impl SettingsApi for SettingsApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         general_settings: GeneralSettings,
-    ) -> Result<(), String> {
+    ) -> Result<GeneralSettings, String> {
         let state = app_handle.state::<SharedAppSettings>();
         let mut settings = state.lock().await;
 
@@ -75,14 +75,14 @@ impl SettingsApi for SettingsApiImpl {
             .save_to_default_path()
             .map_err(|e| format!("Failed to persist general settings: {e}"))?;
 
-        Ok(())
+        Ok(settings.general.clone())
     }
 
     async fn set_telemetry_settings<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
         telemetry_settings: TelemetrySettings,
-    ) -> Result<(), String> {
+    ) -> Result<TelemetrySettings, String> {
         let state = app_handle.state::<SharedAppSettings>();
         let mut settings = state.lock().await;
 
@@ -91,6 +91,6 @@ impl SettingsApi for SettingsApiImpl {
             .save_to_default_path()
             .map_err(|e| format!("Failed to persist telemetry settings: {e}"))?;
 
-        Ok(())
+        Ok(settings.telemetry.clone())
     }
 }
