@@ -17,16 +17,21 @@
 	let telemetrySettings: TelemetrySettings | undefined = $state();
 
 	onMount(() => {
-		taurpc.settings.get_telemetry_settings().then((settings) => {
-			if (settings.considered) {
-				goToLogin();
-			}
+		taurpc.settings
+			.get_telemetry_settings()
+			.then((settings) => {
+				if (settings.considered) {
+					goToLogin();
+				}
 
-			telemetrySettings = settings;
-			errorReporting = settings.anonymousErrors;
-			usageMetrics = settings.anonymousMetrics;
-			nonAnonymousUsageMetrics = settings.nonAnonymousMetrics;
-		});
+				telemetrySettings = settings;
+				errorReporting = settings.anonymousErrors;
+				usageMetrics = settings.anonymousMetrics;
+				nonAnonymousUsageMetrics = settings.nonAnonymousMetrics;
+			})
+			.catch((error) => {
+				console.error('Failed to fetch telemetry settings:', error);
+			});
 	});
 
 	async function updateSettings() {
@@ -37,7 +42,12 @@
 		telemetrySettings.anonymousMetrics = usageMetrics;
 		telemetrySettings.nonAnonymousMetrics = nonAnonymousUsageMetrics;
 
-		await taurpc.settings.set_telemetry_settings(telemetrySettings);
+		try {
+			telemetrySettings = await taurpc.settings.set_telemetry_settings(telemetrySettings);
+		} catch (error) {
+			console.error('Failed to update telemetry settings:', error);
+		}
+
 		goToLogin();
 	}
 
@@ -47,7 +57,7 @@
 </script>
 
 <div class="relative flex h-full w-full flex-col">
-	<div class="flex flex-col justify-center items-left h-full w-full px-8">
+	<div class="flex flex-col justify-center items-start h-full w-full px-8">
 		<article class="pb-4">
 			<h1 class="text-4xl font-bold drop-shadow-lg pb-4">Welcome to Eurora!</h1>
 			<p class="pb-2">
@@ -64,7 +74,7 @@
 		<Item.Root variant="default">
 			<Item.Content>
 				<Item.Title>Error reporting</Item.Title>
-				<Item.Description>A simple item with title and description.</Item.Description>
+				<Item.Description>Report crashes and errors.</Item.Description>
 			</Item.Content>
 			<Item.Actions>
 				<Switch bind:checked={errorReporting} />
@@ -74,7 +84,7 @@
 		<Item.Root variant="default">
 			<Item.Content>
 				<Item.Title>Usage metrics</Item.Title>
-				<Item.Description>A simple item with title and description.</Item.Description>
+				<Item.Description>Provide anonymous usage metrics.</Item.Description>
 			</Item.Content>
 			<Item.Actions>
 				<Switch bind:checked={usageMetrics} />
@@ -84,7 +94,7 @@
 		<Item.Root variant="default">
 			<Item.Content>
 				<Item.Title>Non-anonymous usage metrics</Item.Title>
-				<Item.Description>A simple item with title and description.</Item.Description>
+				<Item.Description>Share of detailed usage metrics.</Item.Description>
 			</Item.Content>
 			<Item.Actions>
 				<Switch bind:checked={nonAnonymousUsageMetrics} />
