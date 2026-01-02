@@ -1,13 +1,41 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { type TelemetrySettings } from '$lib/bindings/bindings.js';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Item from '@eurora/ui/components/item/index';
 	import { Switch } from '@eurora/ui/components/switch/index';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import { onMount } from 'svelte';
 
-	let errorReporting = $state(true);
-	let usageMetrics = $state(true);
+	let taurpc = inject(TAURPC_SERVICE);
+
+	let errorReporting = $state(false);
+	let usageMetrics = $state(false);
 	let nonAnonymousUsageMetrics = $state(false);
+	let telemetrySettings: TelemetrySettings | undefined = $state();
+
+	onMount(() => {
+		taurpc.settings.get_telemetry_settings().then((settings) => {
+			telemetrySettings = settings;
+			errorReporting = settings.anonymousErrors;
+			usageMetrics = settings.anonymousMetrics;
+			nonAnonymousUsageMetrics = settings.nonAnonymousMetrics;
+		});
+	});
+
+	async function updateSettings() {
+		if (!telemetrySettings) return;
+
+		telemetrySettings.considered = true;
+		telemetrySettings.anonymousErrors = errorReporting;
+		telemetrySettings.anonymousMetrics = usageMetrics;
+		telemetrySettings.nonAnonymousMetrics = nonAnonymousUsageMetrics;
+
+		await taurpc.settings.set_telemetry_settings(telemetrySettings);
+		goto('/onboarding/login');
+	}
 </script>
 
 <div class="relative flex h-full w-full flex-col">
@@ -55,25 +83,15 @@
 			</Item.Actions>
 		</Item.Root>
 		<div class="flex justify-end">
-			<Button variant="default" onclick={() => goto('/onboarding/login')}
+			<Button
+				variant="default"
+				onclick={() => {
+					updateSettings();
+				}}
 				>Continue
 				<ChevronRight />
 			</Button>
 		</div>
-
-		<!-- <Card.Root
-			class="flex group cursor-pointer w-1/2"
-			onclick={() => goto('/onboarding/first-party')}
-		>
-			<Card.Header class="pb-6 text-left ">
-				<Card.Title class="mb-2 text-2xl font-semibold">Get started with Eurora</Card.Title>
-				<Card.Description class="">Fastest way to get started.</Card.Description>
-			</Card.Header>
-		</Card.Root> -->
-		<!-- First party login card -->
-		<!-- <Button variant="ghost" onclick={() => goto('/onboarding/local')}
-			>Or set up a local or a remote LLM provider</Button
-		> -->
 	</div>
 
 	<!-- Footer space -->
