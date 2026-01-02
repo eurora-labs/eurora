@@ -1,11 +1,13 @@
 <script lang="ts">
-	import { createTauRPCProxy, type TelemetrySettings } from '$lib/bindings/bindings.js';
+	import { type TelemetrySettings } from '$lib/bindings/bindings.js';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { inject } from '@eurora/shared/context';
 	import { Label } from '@eurora/ui/components/label/index';
 	import { Switch } from '@eurora/ui/components/switch/index';
 
 	import { onMount } from 'svelte';
 
-	const taurpc = createTauRPCProxy();
+	const taurpc = inject(TAURPC_SERVICE);
 
 	let telemetrySettings = $state<TelemetrySettings | null>(null);
 	let anonymousMetricsEnabled = $state(false);
