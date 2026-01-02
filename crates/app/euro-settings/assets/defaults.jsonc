@@ -3,6 +3,7 @@
         "autostart": true
     },
     "telemetry": {
+        "considered": false,
         "anonymousMetrics": true,
         "anonymousErrors": true,
         "nonAnonymousMetrics": false,

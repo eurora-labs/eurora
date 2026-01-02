@@ -1,6 +1,6 @@
 {
 	"name": "@eurora/web",
-	"version": "0.1.0",
+	"version": "0.0.0",
 	"private": true,
 	"type": "module",
 	"module": "index.ts",
@@ -33,7 +33,7 @@
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
-		"@lucide/svelte": "^0.562.0",
+		"@lucide/svelte": "catalog:",
 		"@playwright/test": "^1.57.0",
 		"@sveltejs/adapter-auto": "^4.0.0",
 		"@sveltejs/adapter-static": "catalog:svelte",
