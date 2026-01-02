@@ -18,6 +18,10 @@
 
 	onMount(() => {
 		taurpc.settings.get_telemetry_settings().then((settings) => {
+			if (settings.considered) {
+				goToLogin();
+			}
+
 			telemetrySettings = settings;
 			errorReporting = settings.anonymousErrors;
 			usageMetrics = settings.anonymousMetrics;
@@ -34,6 +38,10 @@
 		telemetrySettings.nonAnonymousMetrics = nonAnonymousUsageMetrics;
 
 		await taurpc.settings.set_telemetry_settings(telemetrySettings);
+		goToLogin();
+	}
+
+	function goToLogin() {
 		goto('/onboarding/login');
 	}
 </script>
