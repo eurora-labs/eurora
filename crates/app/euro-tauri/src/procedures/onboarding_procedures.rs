@@ -14,6 +14,6 @@ impl OnboardingApi for OnboardingApiImpl {
         let base_url =
             std::env::var("AUTH_SERVICE_URL").unwrap_or("https://www.eurora-labs.com".to_string());
 
-        Ok(format!("{}/download/browser-extension", base_url))
+        Ok(format!("{}/download/browser-extension/redirect", base_url))
     }
 }
