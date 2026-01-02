@@ -1,12 +1,6 @@
 packages:
     - apps/*
-    - apps/extension/*
-    - apps/extension/content-scripts/*
-    - apps/extension/chromium/*
-    - apps/extension/firefox/*
     - packages/*
-    - packages/website-modules/youtube/*
-    - packages/custom-components/*
     - packages/prosemirror/*
     - crates/*
     - backend/*
@@ -15,6 +9,7 @@ packages:
 catalog:
     '@tailwindcss/postcss': ^4.1.18
     '@vitest/ui': 3.2.4
+    '@lucide/svelte': ^0.562.0
     postcss: ^8.5.6
     tailwindcss: ^4.1.18
     vite: 6.4.1

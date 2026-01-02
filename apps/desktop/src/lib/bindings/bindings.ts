@@ -371,7 +371,7 @@ name?: string | null;
  */
 additional_kwargs?: Partial<{ [key in string]: JsonValue }> }
 
-export type TelemetrySettings = { 
+export type TelemetrySettings = { considered: boolean; 
 /**
  * Anonymous metrics
  */
@@ -489,7 +489,7 @@ input_token_details?: InputTokenDetails | null;
  */
 output_token_details?: OutputTokenDetails | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["conversation","channel","query"],"switch_conversation":["conversation_id"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'personal_db.conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"]}', 'personal_db.message':'{"get":["conversation_id","limit","offset"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["conversation","channel","query"],"switch_conversation":["conversation_id"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'personal_db.conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"]}', 'personal_db.message':'{"get":["conversation_id","limit","offset"]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
 "chat": {current_conversation_changed: (conversation: Conversation) => Promise<void>, 
@@ -511,7 +511,8 @@ switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<n
 "settings": {get_all_settings: () => Promise<AppSettings>, 
 get_general_settings: () => Promise<GeneralSettings>, 
 get_telemetry_settings: () => Promise<TelemetrySettings>, 
-set_general_settings: (generalSettings: GeneralSettings) => Promise<null>},
+set_general_settings: (generalSettings: GeneralSettings) => Promise<GeneralSettings>, 
+set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<TelemetrySettings>},
 "system": {check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
 list_activities: () => Promise<ContextChip[]>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
@@ -521,7 +522,5 @@ new_app_event: (event: TimelineAppEvent) => Promise<void>,
 new_assets_event: (chips: ContextChip[]) => Promise<void>} };
 
 
-export function createTauRPCProxy() {
-	return createProxy<Router>(ARGS_MAP);
-}
+export const createTauRPCProxy = () => createProxy<Router>(ARGS_MAP)
 export type { InferCommandOutput }

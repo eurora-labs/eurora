@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import { onMount } from 'svelte';
 	import type { UnlistenFn } from '@tauri-apps/api/event';
 
-	const taurpc = createTauRPCProxy();
+	const taurpc = inject(TAURPC_SERVICE);
 	let service_name: string | undefined = $state(undefined);
 
 	onMount(() => {
