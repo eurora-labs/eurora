@@ -5,7 +5,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 #[cfg(feature = "specta")]
 use specta::Type;
@@ -17,7 +16,7 @@ use super::tool::{
 use crate::utils::json::parse_partial_json;
 use crate::utils::merge::{merge_dicts, merge_lists};
 use crate::utils::usage::{dict_int_add_json, dict_int_sub_floor_json};
-use crate::utils::uuid::{LC_AUTO_PREFIX, LC_ID_PREFIX};
+use crate::utils::uuid::{LC_AUTO_PREFIX, LC_ID_PREFIX, uuid7};
 
 /// Breakdown of input token counts.
 ///
@@ -171,7 +170,7 @@ impl AIMessage {
     pub fn new(content: impl Into<String>) -> Self {
         Self {
             content: content.into(),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             name: None,
             tool_calls: Vec::new(),
             invalid_tool_calls: Vec::new(),
@@ -201,7 +200,7 @@ impl AIMessage {
     pub fn with_tool_calls(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
         Self {
             content: content.into(),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             name: None,
             tool_calls,
             invalid_tool_calls: Vec::new(),
@@ -239,7 +238,7 @@ impl AIMessage {
     ) -> Self {
         Self {
             content: content.into(),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             name: None,
             tool_calls,
             invalid_tool_calls,
