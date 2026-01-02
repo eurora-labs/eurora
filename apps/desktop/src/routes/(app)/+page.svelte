@@ -209,7 +209,7 @@
 	{/if}
 
 	<Launcher.Root
-		class="h-fit rounded-[36px] shadow-none flex flex-col p-4 m-0 w-[70%] bg-gray-200"
+		class="h-fit rounded-[36px] shadow-none flex flex-col p-4 m-0 w-[70%] bg-gray-700"
 	>
 		<Launcher.Input
 			placeholder="What can I help you with?"
