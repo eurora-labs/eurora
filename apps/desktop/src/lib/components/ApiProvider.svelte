@@ -5,7 +5,8 @@
 </script>
 
 <script lang="ts">
-	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { inject } from '@eurora/shared/context';
 	import Button from '@eurora/ui/components/button/button.svelte';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
@@ -15,7 +16,7 @@
 
 	let { finished }: ApiProviderProps = $props();
 
-	const tauRPC = createTauRPCProxy();
+	const taurpc = inject(TAURPC_SERVICE);
 	const providers = [
 		{ value: 'openai', label: 'OpenAI' },
 		{ value: 'anthropic', label: 'Anthropic' },
@@ -47,7 +48,7 @@
 		connectionStatus = 'pending';
 
 		try {
-			await tauRPC.prompt.switch_to_remote(apiProvider, apiKey, model);
+			await taurpc.prompt.switch_to_remote(apiProvider, apiKey, model);
 			connectionStatus = 'success';
 			finished?.();
 		} catch (_error) {
