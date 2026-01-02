@@ -9,8 +9,8 @@
 		onclick={() => goto('/onboarding/login/first-party')}
 	>
 		<Card.Header class="pb-6 text-left ">
-			<Card.Title class="mb-2 text-2xl font-semibold">Log In/Sign Up</Card.Title>
-			<Card.Description>Login to access the Eurora app</Card.Description>
+			<Card.Title class="mb-2 text-2xl font-semibold">Log In / Sign Up</Card.Title>
+			<Card.Description>Access everything Eurora has to offer.</Card.Description>
 		</Card.Header>
 	</Card.Root>
 </div>

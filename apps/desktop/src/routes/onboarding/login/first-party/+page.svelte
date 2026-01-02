@@ -14,10 +14,10 @@
 
 		// Attempt to login by token every 5 seconds
 		const interval = setInterval(async () => {
-			// if (loginToken.expires_in < Date.now()) {
-			// 	clearInterval(interval);
-			// 	return;
-			// }
+			if (loginToken.expires_in < Date.now()) {
+				clearInterval(interval);
+				return;
+			}
 
 			const isLoginSuccess = await taurpc.auth.poll_for_login();
 			if (!isLoginSuccess) {
@@ -29,7 +29,9 @@
 	}
 
 	onMount(() => {
-		openLogin();
+		openLogin().catch((err) => {
+			console.error('Error opening login:', err);
+		});
 	});
 </script>
 
