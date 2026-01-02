@@ -5,7 +5,8 @@
 </script>
 
 <script lang="ts">
-	import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
@@ -14,7 +15,7 @@
 
 	let { finished }: OllamaProps = $props();
 
-	const taurpc = createTauRPCProxy();
+	const taurpc = inject(TAURPC_SERVICE);
 
 	let ollamaUrl = $state('http://localhost:11434');
 	let modelName = $state('llama3.2:latest');

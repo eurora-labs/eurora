@@ -137,6 +137,7 @@ export default ts.config(
 			'**/package',
 			'**/.env',
 			'**/.env.*',
+			'**/bindings.ts',
 			'!**/.env.example',
 			'**/pnpm-lock.yaml',
 			'**/package-lock.json',

@@ -1,25 +1,27 @@
 <script lang="ts">
-	import { createTauRPCProxy, type GeneralSettings } from '$lib/bindings/bindings.js';
+	import { type GeneralSettings } from '$lib/bindings/bindings.js';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import FirstPartyLogin from '$lib/components/FirstPartyLogin.svelte';
+	import { inject } from '@eurora/shared/context';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
 	import { Switch } from '@eurora/ui/components/switch/index';
 	import { onMount } from 'svelte';
 
-	const tauRPC = createTauRPCProxy();
+	const taurpc = inject(TAURPC_SERVICE);
 
 	let generalSettings = $state<GeneralSettings | null>(null);
 	let autostartEnabled = $state(false);
 
 	async function saveSettings() {
-		await tauRPC.settings.set_general_settings({
+		await taurpc.settings.set_general_settings({
 			...generalSettings,
 			autostart: autostartEnabled,
 		});
 	}
 
 	onMount(() => {
-		tauRPC.settings.get_general_settings().then((settings) => {
+		taurpc.settings.get_general_settings().then((settings) => {
 			generalSettings = settings;
 
 			autostartEnabled = generalSettings.autostart;
