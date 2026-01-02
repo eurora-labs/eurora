@@ -5,7 +5,7 @@
 
 	const FIREFOX_EXTENSION_URL = 'https://addons.mozilla.org/en-US/firefox/addon/eurora';
 	const CHROME_EXTENSION_URL =
-		'https://chromewebstore.google.com/detail/google-translate/odjnhjhlbmfmcaolcklpmhhlblkgjban';
+		'https://chromewebstore.google.com/detail/google-translate/bfndcocdeinignobnnjplgoggmgebihm';
 
 	type BrowserType = 'firefox' | 'chromium' | 'unknown';
 
