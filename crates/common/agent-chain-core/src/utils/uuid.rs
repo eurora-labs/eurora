@@ -4,6 +4,7 @@
 //!
 //! Adapted from langchain_core/utils/uuid.py
 
+use uuid::Timestamp;
 use uuid::Uuid;
 
 /// LangChain auto-generated ID prefix for messages and content blocks.
@@ -16,33 +17,6 @@ pub const LC_AUTO_PREFIX: &str = "lc_";
 ///   gets a unique run_id (UUID)
 /// - Enables tracking parent-child relationships between operations
 pub const LC_ID_PREFIX: &str = "lc_run-";
-
-/// Generate a new UUID v4.
-///
-/// # Returns
-///
-/// A new random UUID.
-///
-/// # Example
-///
-/// ```
-/// use agent_chain_core::utils::uuid::uuid4;
-///
-/// let id = uuid4();
-/// println!("Generated UUID: {}", id);
-/// ```
-pub fn uuid4() -> Uuid {
-    Uuid::new_v4()
-}
-
-/// Generate a new UUID v4 as a string.
-///
-/// # Returns
-///
-/// A new random UUID as a string.
-pub fn uuid4_string() -> String {
-    Uuid::new_v4().to_string()
-}
 
 /// Generate a time-ordered UUID v7.
 ///
@@ -68,8 +42,6 @@ pub fn uuid4_string() -> String {
 /// println!("Generated UUID v7: {}", id);
 /// ```
 pub fn uuid7(timestamp_millis: Option<u64>) -> Uuid {
-    use uuid::Timestamp;
-
     match timestamp_millis {
         Some(millis) => {
             let secs = millis / 1000;
@@ -106,7 +78,7 @@ pub fn uuid7(timestamp_millis: Option<u64>) -> Uuid {
 /// assert!(generated.starts_with("lc_"));
 /// ```
 pub fn ensure_id(id_val: Option<String>) -> String {
-    id_val.unwrap_or_else(|| format!("{}{}", LC_AUTO_PREFIX, uuid4()))
+    id_val.unwrap_or_else(|| format!("{}{}", LC_AUTO_PREFIX, uuid7(None)))
 }
 
 /// Generate a run ID with the LC_ID_PREFIX.
@@ -115,7 +87,7 @@ pub fn ensure_id(id_val: Option<String>) -> String {
 ///
 /// A string ID prefixed with `lc_run-`.
 pub fn generate_run_id() -> String {
-    format!("{}{}", LC_ID_PREFIX, uuid4())
+    format!("{}{}", LC_ID_PREFIX, uuid7(None))
 }
 
 /// Parse a UUID from a string.
@@ -147,20 +119,6 @@ pub fn is_valid_uuid(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_uuid4() {
-        let id1 = uuid4();
-        let id2 = uuid4();
-        assert_ne!(id1, id2);
-    }
-
-    #[test]
-    fn test_uuid4_string() {
-        let s = uuid4_string();
-        assert!(!s.is_empty());
-        assert!(is_valid_uuid(&s));
-    }
 
     #[test]
     fn test_uuid7() {
