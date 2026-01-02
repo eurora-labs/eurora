@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-axum = "0.8.7"
+axum = "0.8.8"
 dotenv = { workspace = true }
 euro-auth = { workspace = true }
 euro-auth-service = { workspace = true }
@@ -20,7 +20,7 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 tonic = { workspace = true }
 tonic-health = "0.14.2"
 tonic-web = "0.14.2"
-tower-http = { version = "0.6.7", features = ["cors"] }
+tower-http = { version = "0.6.8", features = ["cors"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
 
