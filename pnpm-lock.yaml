@@ -1344,8 +1344,8 @@ importers:
         specifier: ^3.4.0
         version: 3.4.0
       tailwind-variants:
-        specifier: ^1.0.0
-        version: 1.0.0(tailwindcss@4.1.18)
+        specifier: ^3.2.2
+        version: 3.2.2(tailwind-merge@3.4.0)(tailwindcss@4.1.18)
       tailwindcss:
         specifier: 'catalog:'
         version: 4.1.18
@@ -8357,6 +8357,16 @@ packages:
     engines: {node: '>=16.x', pnpm: '>=7.x'}
     peerDependencies:
       tailwindcss: '*'
+
+  tailwind-variants@3.2.2:
+    resolution: {integrity: sha512-Mi4kHeMTLvKlM98XPnK+7HoBPmf4gygdFmqQPaDivc3DpYS6aIY6KiG/PgThrGvii5YZJqRsPz0aPyhoFzmZgg==}
+    engines: {node: '>=16.x', pnpm: '>=7.x'}
+    peerDependencies:
+      tailwind-merge: '>=3.0.0'
+      tailwindcss: '*'
+    peerDependenciesMeta:
+      tailwind-merge:
+        optional: true
 
   tailwindcss-animate@1.0.7:
     resolution: {integrity: sha512-bl6mpH3T7I3UFxuvDEXLxy/VuFxBk5bbzplh7tXI68mwMokNYd1t9qPBHlnyTwfa4JGC4zP516I1hYYtQ/vspA==}
@@ -16792,6 +16802,12 @@ snapshots:
     dependencies:
       tailwind-merge: 3.0.2
       tailwindcss: 4.1.18
+
+  tailwind-variants@3.2.2(tailwind-merge@3.4.0)(tailwindcss@4.1.18):
+    dependencies:
+      tailwindcss: 4.1.18
+    optionalDependencies:
+      tailwind-merge: 3.4.0
 
   tailwindcss-animate@1.0.7(tailwindcss@4.1.18):
     dependencies:
