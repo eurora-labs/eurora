@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "crates/app/euro-*",
   "crates/backend/euro-*",
+  "crates/common/activity-models",
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
   "crates/common/agent-chain-eurora",
@@ -10,6 +11,8 @@ members = [
   "crates/common/agent-graph",
   "crates/common/agent-graph-macros",
   "crates/common/euro-*",
+  "crates/common/focus-tracker",
+  "crates/common/focus-tracker-core",
 ]
 
 [workspace.package]
@@ -20,6 +23,7 @@ license = "Functional Source License"
 license-file = "LICENSE.md"
 
 [workspace.dependencies]
+activity-models = { path = "crates/common/activity-models" }
 agent-chain = { path = "crates/common/agent-chain" }
 agent-chain-core = { path = "crates/common/agent-chain-core" }
 agent-chain-eurora = { path = "crates/common/agent-chain-eurora" }
@@ -40,7 +44,6 @@ euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/common/euro-auth" }
 euro-auth-service = { path = "crates/backend/euro-auth-service" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
-euro-focus = { path = "crates/common/euro-focus" }
 euro-fs = { path = "crates/common/euro-fs" }
 euro-monolith = { path = "crates/backend/euro-monolith" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
@@ -61,6 +64,8 @@ euro-timeline = { path = "crates/app/euro-timeline" }
 euro-update-service = { path = "crates/backend/euro-update-service" }
 euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
+focus-tracker = { path = "crates/common/focus-tracker" }
+focus-tracker-core = { path = "crates/common/focus-tracker-core" }
 futures = "0.3.31"
 http-body = "1.0.1"
 http-body-util = "0.1.3"

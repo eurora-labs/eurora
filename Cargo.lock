@@ -34,6 +34,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "activity-models"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "euro-auth",
+ "euro-remote-db",
+ "prost",
+ "prost-types",
+ "specta",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "actix-codec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3166,9 +3184,9 @@ dependencies = [
  "dirs 6.0.0",
  "enum_dispatch",
  "euro-encrypt",
- "euro-focus",
  "euro-fs",
  "euro-native-messaging",
+ "focus-tracker",
  "humantime-serde",
  "image",
  "regex",
@@ -3265,31 +3283,6 @@ dependencies = [
  "tokio",
  "tracing",
  "zeroize",
-]
-
-[[package]]
-name = "euro-focus"
-version = "0.2.0"
-dependencies = [
- "accessibility-sys",
- "cocoa",
- "core-foundation 0.10.1",
- "core-graphics 0.25.0",
- "ctrlc",
- "dispatch2",
- "image",
- "objc2 0.6.3",
- "objc2-app-kit 0.3.2",
- "objc2-core-foundation",
- "objc2-foundation 0.3.2",
- "serial_test",
- "thiserror 2.0.17",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "windows-sys 0.61.2",
- "winit",
- "x11rb",
 ]
 
 [[package]]
@@ -3571,8 +3564,8 @@ dependencies = [
  "anyhow",
  "chrono",
  "euro-activity",
- "euro-focus",
  "euro-personal-db",
+ "focus-tracker",
  "image",
  "keyring",
  "serde",
@@ -3813,6 +3806,39 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
+
+[[package]]
+name = "focus-tracker"
+version = "0.0.1"
+dependencies = [
+ "accessibility-sys",
+ "cocoa",
+ "core-foundation 0.10.1",
+ "core-graphics 0.25.0",
+ "ctrlc",
+ "dispatch2",
+ "focus-tracker-core",
+ "image",
+ "objc2 0.6.3",
+ "objc2-app-kit 0.3.2",
+ "objc2-core-foundation",
+ "objc2-foundation 0.3.2",
+ "serial_test",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "windows-sys 0.61.2",
+ "winit",
+ "x11rb",
+]
+
+[[package]]
+name = "focus-tracker-core"
+version = "0.0.0"
+dependencies = [
+ "image",
+ "thiserror 2.0.17",
+]
 
 [[package]]
 name = "foldhash"
