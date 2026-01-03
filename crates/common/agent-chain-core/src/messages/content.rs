@@ -38,7 +38,7 @@ use std::collections::HashMap;
 #[cfg(feature = "specta")]
 use specta::Type;
 
-use crate::utils::utils_base::ensure_id;
+use crate::utils::base::ensure_id;
 
 // =============================================================================
 // Legacy types (kept for backwards compatibility)
