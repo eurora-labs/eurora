@@ -141,3 +141,21 @@ pub struct CreateLoginTokenRequest {
 pub struct UpdateLoginTokenRequest {
     pub user_id: Uuid,
 }
+
+// =============================================================================
+// Activity Types
+// =============================================================================
+
+/// Represents a user activity (application/process usage)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Activity {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub name: String,
+    pub icon_asset_id: Option<Uuid>,
+    pub process_name: String,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
