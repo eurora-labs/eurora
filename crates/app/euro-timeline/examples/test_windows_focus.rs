@@ -14,7 +14,7 @@ fn main() -> anyhow::Result<()> {
 
     tracker.track_focus(|event: FocusedWindow| -> FocusTrackerResult<()> {
         debug!("Focus changed:");
-        debug!("  Process: {}", event.process_name.unwrap());
+        debug!("  Process: {}", event.process_name);
         debug!("  Title: {}", event.window_title.unwrap());
         debug!(
             "  Icon: {}",

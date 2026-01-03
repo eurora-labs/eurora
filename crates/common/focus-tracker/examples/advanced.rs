@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Extract window information
             let window_title = window.window_title.as_deref().unwrap_or("Unknown");
-            let process_name = window.process_name.as_deref().unwrap_or("Unknown");
+            let process_name = window.process_name;
 
             // Track unique processes
             unique_processes.insert(process_name.to_string());
