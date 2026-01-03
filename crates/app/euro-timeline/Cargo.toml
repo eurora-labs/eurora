@@ -9,8 +9,8 @@ agent-chain-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-activity = { workspace = true }
-euro-focus = { workspace = true, features = ["async"] }
 euro-personal-db = { workspace = true }
+focus-tracker = { workspace = true, features = ["async"] }
 image = { workspace = true }
 keyring = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
