@@ -1,0 +1,13 @@
+[package]
+name = "focus-tracker-core"
+version = "0.0.0"
+edition.workspace = true
+description = "The core types for the focus tracker crate"
+homepage = "https://github.com/eurora-labs/eurora/tree/main/crates/common/focus-tracker-core"
+repository = "https://github.com/eurora-labs/eurora.git"
+license = "Apache-2.0"
+keywords = []
+
+[dependencies]
+image = { workspace = true }
+thiserror = { workspace = true }
