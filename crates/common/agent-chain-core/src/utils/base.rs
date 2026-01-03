@@ -25,7 +25,7 @@ use uuid::Uuid;
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::utils::utils::validate_xor_args;
+/// use agent_chain_core::utils::base::validate_xor_args;
 /// use std::collections::HashMap;
 ///
 /// let mut values: HashMap<&str, Option<&str>> = HashMap::new();
@@ -101,7 +101,7 @@ impl std::error::Error for XorArgsError {}
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::utils::utils::raise_for_status_with_text;
+/// use agent_chain_core::utils::base::raise_for_status_with_text;
 ///
 /// // Success case
 /// assert!(raise_for_status_with_text(200, "OK").is_ok());
@@ -200,7 +200,7 @@ impl From<&str> for SecretString {
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::utils::utils::convert_to_secret_str;
+/// use agent_chain_core::utils::base::convert_to_secret_str;
 ///
 /// let secret = convert_to_secret_str("my-api-key");
 /// assert_eq!(secret.expose_secret(), "my-api-key");
@@ -259,7 +259,7 @@ impl std::error::Error for EnvError {}
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::utils::utils::from_env;
+/// use agent_chain_core::utils::base::from_env;
 /// use std::env;
 ///
 /// // SAFETY: This is a single-threaded doc test
@@ -316,7 +316,7 @@ pub fn from_env<'a>(
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::utils::utils::secret_from_env;
+/// use agent_chain_core::utils::base::secret_from_env;
 /// use std::env;
 ///
 /// // SAFETY: This is a single-threaded doc test
@@ -362,7 +362,7 @@ pub const LC_ID_PREFIX: &str = "lc_run-";
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::utils::utils::ensure_id;
+/// use agent_chain_core::utils::base::ensure_id;
 ///
 /// let id = ensure_id(Some("my-custom-id".to_string()));
 /// assert_eq!(id, "my-custom-id");
@@ -391,7 +391,7 @@ pub fn ensure_id(id_val: Option<String>) -> String {
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::utils::utils::build_model_kwargs;
+/// use agent_chain_core::utils::base::build_model_kwargs;
 /// use std::collections::HashMap;
 /// use std::collections::HashSet;
 ///
@@ -449,7 +449,7 @@ pub fn build_model_kwargs(
 /// # Example
 ///
 /// ```
-/// use agent_chain_core::utils::utils::MockTime;
+/// use agent_chain_core::utils::base::MockTime;
 ///
 /// // Create a mock time at a specific Unix timestamp (seconds)
 /// let mock = MockTime::fixed(1609459200); // 2021-01-01 00:00:00 UTC

@@ -4,6 +4,7 @@
 //!
 //! This module provides various utilities ported from `langchain_core/utils/`.
 
+pub mod base;
 pub mod env;
 pub mod formatting;
 pub mod html;
@@ -16,7 +17,6 @@ pub mod merge;
 pub mod mustache;
 pub mod strings;
 pub mod usage;
-pub mod utils_base;
 pub mod uuid;
 
 // Re-export items from env.rs (mirrors langchain_core/utils/env.py)
@@ -26,7 +26,7 @@ pub use env::{EnvError, env_var_is_set, get_from_dict_or_env, get_from_env};
 pub use uuid::uuid7;
 
 // Re-export items from utils/utils.rs (mirrors langchain_core/utils/utils.py)
-pub use utils_base::{
+pub use base::{
     HttpStatusError, LC_AUTO_PREFIX, LC_ID_PREFIX, MockTime, NoDefault, SecretString, XorArgsError,
     build_model_kwargs, convert_to_secret_str, ensure_id, from_env, now_millis, now_secs,
     raise_for_status_with_text, secret_from_env, validate_xor_args,
