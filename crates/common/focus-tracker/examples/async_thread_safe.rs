@@ -37,15 +37,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     *count += 1;
 
                     println!("--- Focus Change #{} ---", *count);
-                    if let Some(process) = &window.process_name {
-                        println!("Process: {}", process);
-                    }
+                    println!("Process: {}", window.process_name);
                     if let Some(title) = &window.window_title {
                         println!("Title: {}", title);
                     }
-                    if let Some(pid) = window.process_id {
-                        println!("PID: {}", pid);
-                    }
+
+                    println!("PID: {}", window.process_id);
+
                     if let Some(icon) = &window.icon {
                         println!("Icon: {}x{}", icon.width(), icon.height());
                     }

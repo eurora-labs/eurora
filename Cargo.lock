@@ -38,10 +38,12 @@ name = "activity-models"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "chrono",
  "euro-auth",
  "euro-remote-db",
  "focus-tracker-core",
+ "image",
  "prost",
  "prost-types",
  "specta",
