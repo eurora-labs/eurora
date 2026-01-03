@@ -3,7 +3,7 @@ use std::pin::Pin;
 use agent_chain::providers::openai::ChatOpenAI;
 use agent_chain_core::chat_models::BaseChatModel;
 use agent_chain_core::messages::BaseMessage;
-use agent_chain_eurora::proto::chat::{
+use agent_chain_eurora::proto::chat_service::{
     ProtoAiMessage, ProtoAiMessageChunk, ProtoChatRequest, ProtoChatResponse,
     ProtoChatStreamResponse,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
@@ -94,11 +94,13 @@ impl ProtoChatService for PromptService {
         let tool_calls: Vec<_> = ai_message
             .tool_calls()
             .iter()
-            .map(|tc| agent_chain_eurora::proto::chat::ProtoToolCall {
-                id: tc.id().to_string(),
-                name: tc.name().to_string(),
-                args: tc.args().to_string(),
-            })
+            .map(
+                |tc| agent_chain_eurora::proto::chat_service::ProtoToolCall {
+                    id: tc.id().to_string(),
+                    name: tc.name().to_string(),
+                    args: tc.args().to_string(),
+                },
+            )
             .collect();
 
         Ok(Response::new(ProtoChatResponse {
