@@ -47,26 +47,29 @@ message Activity {
   // Unique identifier for the activity (UUID)
   string id = 1;
 
-  // Display name of the activity (e.g., app name, window title)
+  // Name of the activity decided by the strategy
   string name = 2;
 
-  // Asset ID for the activity icon (stored in Asset service)
-  optional string icon_asset_id = 3;
-
   // System process name (e.g., "firefox", "code")
-  string process_name = 4;
+  optional string process_name = 3;
+
+  // Window title (e.g., "Firefox", "Visual Studio Code")
+  optional string window_title = 4;
+
+  // Base64 encoded png icon data
+  optional string icon = 5;
 
   // When the activity started
-  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp started_at = 6;
 
   // When the activity ended (NULL if still active)
-  optional google.protobuf.Timestamp ended_at = 6;
+  optional google.protobuf.Timestamp ended_at = 7;
 
   // When the record was created
-  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp created_at = 8;
 
   // When the record was last updated
-  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
 }
 
 // =============================================================================

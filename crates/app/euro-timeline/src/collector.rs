@@ -315,46 +315,42 @@ impl CollectorService {
                     let activity_tx_inner = activity_tx.clone();
 
                     async move {
-                        if let Some(process_name) = window.process_name.clone() {
-                            let new_focus = process_name.clone();
-                            debug!("New focus: {:?}", new_focus);
+                        let process_name = window.process_name.clone();
+                        let new_focus = process_name.clone();
+                        debug!("New focus: {:?}", new_focus);
 
-                            let mut prev = prev_focus.lock().await;
-                            if new_focus != *prev {
-                                let mut strategy_write = strategy_for_update.write().await;
+                        let mut prev = prev_focus.lock().await;
+                        if new_focus != *prev {
+                            let mut strategy_write = strategy_for_update.write().await;
 
-                                match strategy_write.handle_process_change(&process_name).await {
-                                    Ok(true) => {
-                                        debug!("Strategy can continue handling: {}", process_name);
-                                    }
-                                    Ok(false) => {
-                                        debug!("Strategy can no longer handle: {}", process_name);
-                                        match ActivityStrategy::new(&process_name).await {
-                                            Ok(mut new_strategy) => {
-                                                // Start tracking with new strategy
-                                                let _ = new_strategy
-                                                    .start_tracking(
-                                                        &window,
-                                                        activity_tx_inner.clone(),
-                                                    )
-                                                    .await
-                                                    .map_err(|err| {
-                                                        error!("Failed to start tracking: {}", err);
-                                                    });
-
-                                                *strategy_write = new_strategy;
-                                            }
-                                            Err(err) => {
-                                                error!("Failed to create new strategy: {}", err);
-                                            }
-                                        };
-                                    }
-                                    Err(err) => {
-                                        debug!("Error handling process change: {}", err);
-                                    }
+                            match strategy_write.handle_process_change(&process_name).await {
+                                Ok(true) => {
+                                    debug!("Strategy can continue handling: {}", process_name);
                                 }
-                                *prev = new_focus;
+                                Ok(false) => {
+                                    debug!("Strategy can no longer handle: {}", process_name);
+                                    match ActivityStrategy::new(&process_name).await {
+                                        Ok(mut new_strategy) => {
+                                            // Start tracking with new strategy
+                                            let _ = new_strategy
+                                                .start_tracking(&window, activity_tx_inner.clone())
+                                                .await
+                                                .map_err(|err| {
+                                                    error!("Failed to start tracking: {}", err);
+                                                });
+
+                                            *strategy_write = new_strategy;
+                                        }
+                                        Err(err) => {
+                                            error!("Failed to create new strategy: {}", err);
+                                        }
+                                    };
+                                }
+                                Err(err) => {
+                                    debug!("Error handling process change: {}", err);
+                                }
                             }
+                            *prev = new_focus;
                         }
                         Ok(())
                     }

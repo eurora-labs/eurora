@@ -47,7 +47,7 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         let activity = Activity::new(
             focus_window.window_title.clone().unwrap_or_default(),
             focus_window.icon.clone(),
-            focus_window.process_name.clone().unwrap_or_default(),
+            focus_window.process_name.clone(),
             vec![],
         );
 

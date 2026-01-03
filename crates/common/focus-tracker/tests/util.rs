@@ -206,8 +206,8 @@ fn get_focused_window_linux() -> Result<focus_tracker::FocusedWindow, Box<dyn st
     {
         let title = String::from_utf8_lossy(&output.stdout).trim().to_string();
         return Ok(focus_tracker::FocusedWindow {
-            process_id: None,
-            process_name: None,
+            process_id: "123".to_string(),
+            process_name: "unknown".to_string(),
             window_title: Some(title),
             icon: None,
         });
@@ -215,8 +215,8 @@ fn get_focused_window_linux() -> Result<focus_tracker::FocusedWindow, Box<dyn st
 
     // Fallback
     Ok(focus_tracker::FocusedWindow {
-        process_id: None,
-        process_name: Some("unknown".to_string()),
+        process_id: "123".to_string(),
+        process_name: "unknown".to_string(),
         window_title: Some("unknown".to_string()),
         icon: None,
     })
@@ -291,8 +291,8 @@ pub fn spawn_window(title: &str) -> Result<Child, Box<dyn std::error::Error>> {
 #[allow(dead_code)]
 pub fn get_focused_window() -> focus_tracker::FocusedWindow {
     get_current_focused_window().unwrap_or_else(|_| focus_tracker::FocusedWindow {
-        process_id: None,
-        process_name: Some("unknown".to_string()),
+        process_id: "123".to_string(),
+        process_name: "unknown".to_string(),
         window_title: Some("unknown".to_string()),
         icon: None,
     })

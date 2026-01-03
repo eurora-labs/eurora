@@ -40,9 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     focused_window.window_title.as_deref().unwrap_or("Unknown")
                 );
 
-                if let Some(process_name) = &focused_window.process_name {
-                    println!("   Process: {}", process_name);
-                }
+                println!("   Process: {}", &focused_window.process_name);
 
                 // Check if icon is available
                 let icon_status = if focused_window.icon.is_some() {
