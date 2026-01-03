@@ -51,9 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     window.window_title.as_deref().unwrap_or("Unknown")
                 );
 
-                if let Some(process_name) = &window.process_name {
-                    println!("   📱 Process: {}", process_name);
-                }
+                println!("   📱 Process: {}", window.process_name);
 
                 // Check if icon is available
                 let icon_status = if window.icon.is_some() {
@@ -93,7 +91,7 @@ async fn simulate_async_processing(
 
     println!(
         "   🔄 [ASYNC] Processed focus event for: {}",
-        window.process_name.as_deref().unwrap_or("Unknown")
+        window.process_name
     );
 
     Ok(())
@@ -106,7 +104,7 @@ async fn process_window_data(window: &focus_tracker::FocusedWindow) -> FocusTrac
     tokio::time::sleep(Duration::from_millis(30)).await;
 
     let title_length = window.window_title.as_ref().map(|t| t.len()).unwrap_or(0);
-    let process_length = window.process_name.as_ref().map(|p| p.len()).unwrap_or(0);
+    let process_length = window.process_name.len();
 
     println!(
         "   📊 [DATA] Title length: {}, Process length: {}, Has icon: {}",
