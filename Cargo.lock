@@ -41,6 +41,7 @@ dependencies = [
  "chrono",
  "euro-auth",
  "euro-remote-db",
+ "focus-tracker-core",
  "prost",
  "prost-types",
  "specta",
