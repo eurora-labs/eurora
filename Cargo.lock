@@ -3189,6 +3189,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-activity-service"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "euro-auth",
+ "euro-remote-db",
+ "prost",
+ "prost-types",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "euro-auth"
 version = "0.0.0"
 dependencies = [
