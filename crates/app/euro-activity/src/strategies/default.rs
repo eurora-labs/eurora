@@ -35,7 +35,7 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
 
     async fn start_tracking(
         &mut self,
-        focus_window: &euro_focus::FocusedWindow,
+        focus_window: &focus_tracker::FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
         debug!(
