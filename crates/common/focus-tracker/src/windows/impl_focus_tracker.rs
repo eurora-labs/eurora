@@ -1,4 +1,5 @@
 use crate::{FocusTrackerConfig, FocusTrackerError, FocusTrackerResult, FocusedWindow};
+use focus_tracker_core::IconConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(feature = "async")]
@@ -331,7 +332,7 @@ fn get_window_info_without_icon() -> Option<WindowInfo> {
 /// Get the icon for a window by HWND value (isize)
 fn get_window_icon_by_hwnd(
     hwnd_value: isize,
-    icon_config: &crate::config::IconConfig,
+    icon_config: &IconConfig,
 ) -> Option<image::RgbaImage> {
     get_window_icon(hwnd_value as HWND, icon_config)
 }
@@ -351,10 +352,7 @@ fn resize_icon(
 }
 
 /// Get the icon for a window
-fn get_window_icon(
-    hwnd: HWND,
-    icon_config: &crate::config::IconConfig,
-) -> Option<image::RgbaImage> {
+fn get_window_icon(hwnd: HWND, icon_config: &IconConfig) -> Option<image::RgbaImage> {
     unsafe { extract_window_icon(hwnd, icon_config).ok() }
 }
 
@@ -364,7 +362,7 @@ fn get_window_icon(
 /// This function uses unsafe Win32 API calls and assumes the HWND is valid
 unsafe fn extract_window_icon(
     hwnd: HWND,
-    icon_config: &crate::config::IconConfig,
+    icon_config: &IconConfig,
 ) -> FocusTrackerResult<image::RgbaImage> {
     use windows_sys::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
 
