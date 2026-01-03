@@ -2,7 +2,7 @@ use std::{io::Result, path::PathBuf};
 
 fn main() -> Result<()> {
     let proto_dir = PathBuf::from("../../../proto");
-    let proto_files = vec![PathBuf::from("chat.proto")];
+    let proto_files = vec![PathBuf::from("chat_service.proto")];
 
     #[cfg(target_os = "windows")]
     {
