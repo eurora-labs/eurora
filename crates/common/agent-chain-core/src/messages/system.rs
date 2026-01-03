@@ -3,9 +3,9 @@
 //! This module contains the `SystemMessage` and `SystemMessageChunk` types which represent
 //! system instructions for priming AI behavior. Mirrors `langchain_core.messages.system`.
 
+use crate::utils::uuid7;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 #[cfg(feature = "specta")]
 use specta::Type;
@@ -38,7 +38,7 @@ impl SystemMessage {
     pub fn new(content: impl Into<String>) -> Self {
         Self {
             content: content.into(),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             name: None,
             additional_kwargs: HashMap::new(),
         }

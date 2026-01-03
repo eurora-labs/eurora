@@ -7,9 +7,9 @@
 //! Note: FunctionMessage is an older version of ToolMessage and doesn't contain
 //! the `tool_call_id` field. Consider using ToolMessage for new code.
 
+use crate::utils::uuid7;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 #[cfg(feature = "specta")]
 use specta::Type;
@@ -54,7 +54,7 @@ impl FunctionMessage {
         Self {
             content: content.into(),
             name: name.into(),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }

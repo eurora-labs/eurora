@@ -29,7 +29,7 @@ use tracing::{debug, error};
 use crate::{
     config::EuroraConfig,
     error::EuroraError,
-    proto::chat::{
+    proto::chat_service::{
         ProtoChatRequest, ProtoParameters, proto_chat_service_client::ProtoChatServiceClient,
     },
 };

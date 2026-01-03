@@ -3,9 +3,9 @@
 //! This module contains the `HumanMessage` and `HumanMessageChunk` types which represent
 //! messages from the user. Mirrors `langchain_core.messages.human`.
 
+use crate::utils::uuid7;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 #[cfg(feature = "specta")]
 use specta::Type;
@@ -40,7 +40,7 @@ impl HumanMessage {
     pub fn new(content: impl Into<String>) -> Self {
         Self {
             content: MessageContent::Text(content.into()),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             name: None,
             additional_kwargs: HashMap::new(),
         }
@@ -78,7 +78,7 @@ impl HumanMessage {
     pub fn with_content(parts: Vec<ContentPart>) -> Self {
         Self {
             content: MessageContent::Parts(parts),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             name: None,
             additional_kwargs: HashMap::new(),
         }
