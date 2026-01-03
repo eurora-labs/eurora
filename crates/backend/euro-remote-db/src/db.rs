@@ -9,7 +9,7 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::types::{
-    CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
+    Activity, CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
     CreateRefreshTokenRequest, CreateUserRequest, LoginToken, OAuthCredentials, OAuthState,
     PasswordCredentials, RefreshToken, UpdateOAuthCredentialsRequest, UpdatePasswordRequest,
     UpdateUserRequest, User,
@@ -692,5 +692,278 @@ impl DatabaseManager {
         .await?;
 
         Ok(result.rows_affected())
+    }
+
+    // =========================================================================
+    // Activity Management Methods
+    // =========================================================================
+
+    /// Create a new activity
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_activity(
+        &self,
+        id: Option<Uuid>,
+        user_id: Uuid,
+        name: &str,
+        icon_asset_id: Option<Uuid>,
+        process_name: &str,
+        started_at: DateTime<Utc>,
+        ended_at: Option<DateTime<Utc>>,
+    ) -> Result<Activity, sqlx::Error> {
+        let id = id.unwrap_or_else(Uuid::new_v4);
+        let now = Utc::now();
+
+        let activity = sqlx::query_as::<_, Activity>(
+            r#"
+            INSERT INTO activities (id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind(name)
+        .bind(icon_asset_id)
+        .bind(process_name)
+        .bind(started_at)
+        .bind(ended_at)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(activity)
+    }
+
+    /// Get an activity by ID
+    pub async fn get_activity(&self, activity_id: Uuid) -> Result<Activity, sqlx::Error> {
+        let activity = sqlx::query_as::<_, Activity>(
+            r#"
+            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            FROM activities
+            WHERE id = $1
+            "#,
+        )
+        .bind(activity_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(activity)
+    }
+
+    /// Get an activity by ID for a specific user
+    pub async fn get_activity_for_user(
+        &self,
+        activity_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Activity, sqlx::Error> {
+        let activity = sqlx::query_as::<_, Activity>(
+            r#"
+            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            FROM activities
+            WHERE id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(activity_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(activity)
+    }
+
+    /// List activities for a user with pagination
+    pub async fn list_activities(
+        &self,
+        user_id: Uuid,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<Activity>, u64), sqlx::Error> {
+        // Clamp limit to max 100
+        let limit = limit.clamp(1, 100);
+
+        let activities = sqlx::query_as::<_, Activity>(
+            r#"
+            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            FROM activities
+            WHERE user_id = $1
+            ORDER BY started_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(user_id)
+        .bind(limit as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await?;
+
+        // Get total count
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM activities WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok((activities, count.0 as u64))
+    }
+
+    /// Update an existing activity
+    #[allow(clippy::too_many_arguments)]
+    pub async fn update_activity(
+        &self,
+        activity_id: Uuid,
+        user_id: Uuid,
+        name: Option<&str>,
+        icon_asset_id: Option<Uuid>,
+        process_name: Option<&str>,
+        started_at: Option<DateTime<Utc>>,
+        ended_at: Option<DateTime<Utc>>,
+    ) -> Result<Activity, sqlx::Error> {
+        let now = Utc::now();
+
+        let activity = sqlx::query_as::<_, Activity>(
+            r#"
+            UPDATE activities
+            SET name = COALESCE($3, name),
+                icon_asset_id = COALESCE($4, icon_asset_id),
+                process_name = COALESCE($5, process_name),
+                started_at = COALESCE($6, started_at),
+                ended_at = COALESCE($7, ended_at),
+                updated_at = $8
+            WHERE id = $1 AND user_id = $2
+            RETURNING id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            "#,
+        )
+        .bind(activity_id)
+        .bind(user_id)
+        .bind(name)
+        .bind(icon_asset_id)
+        .bind(process_name)
+        .bind(started_at)
+        .bind(ended_at)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(activity)
+    }
+
+    /// Update activity end time
+    pub async fn update_activity_end_time(
+        &self,
+        activity_id: Uuid,
+        user_id: Uuid,
+        ended_at: DateTime<Utc>,
+    ) -> Result<(), sqlx::Error> {
+        let now = Utc::now();
+
+        sqlx::query(
+            r#"
+            UPDATE activities
+            SET ended_at = $3, updated_at = $4
+            WHERE id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(activity_id)
+        .bind(user_id)
+        .bind(ended_at)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Get the last active (not ended) activity for a user
+    pub async fn get_last_active_activity(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Option<Activity>, sqlx::Error> {
+        let activity = sqlx::query_as::<_, Activity>(
+            r#"
+            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            FROM activities
+            WHERE user_id = $1 AND ended_at IS NULL
+            ORDER BY started_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(activity)
+    }
+
+    /// Delete an activity
+    pub async fn delete_activity(
+        &self,
+        activity_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            DELETE FROM activities
+            WHERE id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(activity_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Get activities by time range for a user
+    pub async fn get_activities_by_time_range(
+        &self,
+        user_id: Uuid,
+        start_time: DateTime<Utc>,
+        end_time: DateTime<Utc>,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<Activity>, u64), sqlx::Error> {
+        // Clamp limit to max 100
+        let limit = limit.clamp(1, 100);
+
+        let activities = sqlx::query_as::<_, Activity>(
+            r#"
+            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            FROM activities
+            WHERE user_id = $1
+              AND started_at >= $2
+              AND started_at <= $3
+            ORDER BY started_at DESC
+            LIMIT $4 OFFSET $5
+            "#,
+        )
+        .bind(user_id)
+        .bind(start_time)
+        .bind(end_time)
+        .bind(limit as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await?;
+
+        // Get total count for the time range
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM activities
+            WHERE user_id = $1
+              AND started_at >= $2
+              AND started_at <= $3
+            "#,
+        )
+        .bind(user_id)
+        .bind(start_time)
+        .bind(end_time)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok((activities, count.0 as u64))
     }
 }
