@@ -18,9 +18,9 @@ dashmap = "6.1.0"
 dirs = { workspace = true }
 enum_dispatch = { workspace = true }
 euro-encrypt = { workspace = true }
-euro-focus = { workspace = true, features = ["async"] }
 euro-fs = { workspace = true }
 euro-native-messaging = { workspace = true }
+focus-tracker = { workspace = true, features = ["async"] }
 humantime-serde = { workspace = true }
 image = { workspace = true }
 regex = "1.12.2"

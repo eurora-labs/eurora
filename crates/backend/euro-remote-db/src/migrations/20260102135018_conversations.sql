@@ -138,15 +138,6 @@ CREATE TABLE activities (
 );
 
 ----------------------------------------------------------------
--- Add activity_id foreign key to assets (now that activities exists)
-----------------------------------------------------------------
-ALTER TABLE assets ADD COLUMN activity_id UUID;
-ALTER TABLE assets ADD CONSTRAINT fk_assets_activity_id
-    FOREIGN KEY (activity_id)
-    REFERENCES activities(id)
-    ON DELETE SET NULL;
-
-----------------------------------------------------------------
 -- Create activity_conversations junction table
 -- Links activities to conversations (many-to-many)
 ----------------------------------------------------------------
@@ -165,6 +156,28 @@ CREATE TABLE activity_conversations (
     CONSTRAINT fk_activity_conversations_conversation_id
         FOREIGN KEY (conversation_id)
         REFERENCES conversations(id)
+        ON DELETE CASCADE
+);
+
+----------------------------------------------------------------
+-- Create activity_assets junction table
+-- Links activities to assets (many-to-many)
+----------------------------------------------------------------
+CREATE TABLE activity_assets (
+    activity_id UUID NOT NULL,
+    asset_id UUID NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+
+    PRIMARY KEY (activity_id, asset_id),
+
+    CONSTRAINT fk_activity_assets_activity_id
+        FOREIGN KEY (activity_id)
+        REFERENCES activities(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_activity_assets_asset_id
+        FOREIGN KEY (asset_id)
+        REFERENCES assets(id)
         ON DELETE CASCADE
 );
 
@@ -216,9 +229,12 @@ CREATE INDEX idx_activities_ended_at ON activities(ended_at) WHERE ended_at IS N
 -- Note: Primary key (activity_id, conversation_id) already indexes activity_id
 CREATE INDEX idx_activity_conversations_conversation_id ON activity_conversations(conversation_id);
 
+-- Activity assets indexes
+-- Note: Primary key (activity_id, asset_id) already indexes activity_id
+CREATE INDEX idx_activity_assets_asset_id ON activity_assets(asset_id);
+
 -- Assets indexes
 CREATE INDEX idx_assets_user_id ON assets(user_id);
-CREATE INDEX idx_assets_activity_id ON assets(activity_id);
 CREATE INDEX idx_assets_file_path ON assets(file_path);
 
 -- Message assets indexes
@@ -282,11 +298,15 @@ COMMENT ON TABLE activity_conversations IS 'Links activities to related conversa
 COMMENT ON COLUMN activity_conversations.activity_id IS 'Foreign key to activities table';
 COMMENT ON COLUMN activity_conversations.conversation_id IS 'Foreign key to conversations table';
 
+-- Activity assets table
+COMMENT ON TABLE activity_assets IS 'Links activities to their associated assets (many-to-many)';
+COMMENT ON COLUMN activity_assets.activity_id IS 'Foreign key to activities table';
+COMMENT ON COLUMN activity_assets.asset_id IS 'Foreign key to assets table';
+
 -- Assets table
 COMMENT ON TABLE assets IS 'File assets (screenshots, attachments) with external storage';
 COMMENT ON COLUMN assets.id IS 'Primary key UUID for asset';
 COMMENT ON COLUMN assets.user_id IS 'Foreign key to users table - owner of the asset';
-COMMENT ON COLUMN assets.activity_id IS 'Optional foreign key to activities table';
 COMMENT ON COLUMN assets.content_sha256 IS 'SHA256 hash of the file content for deduplication';
 COMMENT ON COLUMN assets.byte_size IS 'Size of the asset in bytes';
 COMMENT ON COLUMN assets.file_path IS 'Path to the file (S3 key, local path, etc.)';
