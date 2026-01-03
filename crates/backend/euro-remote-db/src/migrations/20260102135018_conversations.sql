@@ -4,6 +4,13 @@
 --              Designed to work seamlessly with agent-chain message types
 
 ----------------------------------------------------------------
+-- Enable pg_uuidv7 extension for UUID v7 support
+-- UUID v7 is time-ordered which is better for database performance (clustering)
+-- Install on server: See https://github.com/fboulnois/pg_uuidv7
+----------------------------------------------------------------
+CREATE EXTENSION IF NOT EXISTS "pg_uuidv7";
+
+----------------------------------------------------------------
 -- Create ENUM type for message types
 -- Matches agent-chain-core's BaseMessage variants that are stored
 ----------------------------------------------------------------
@@ -122,7 +129,7 @@ CREATE TABLE activities (
         FOREIGN KEY (user_id)
         REFERENCES users(id)
         ON DELETE CASCADE,
-    
+
     -- Foreign key to assets table
     CONSTRAINT fk_activities_icon_asset_id
         FOREIGN KEY (icon_asset_id)
