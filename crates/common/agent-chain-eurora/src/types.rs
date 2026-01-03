@@ -9,7 +9,7 @@ use agent_chain_core::{
 };
 use serde_json;
 
-use crate::proto::chat::{
+use crate::proto::chat_service::{
     ProtoAiMessage, ProtoBase64Image, ProtoBaseMessage, ProtoContentPart, ProtoContentParts,
     ProtoHumanMessage, ProtoImageDetail, ProtoImagePart, ProtoImageSource, ProtoMessageContent,
     ProtoSystemMessage, ProtoTextPart, ProtoToolCall, ProtoToolMessage, ProtoToolStatus,
