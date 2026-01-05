@@ -154,6 +154,7 @@ pub struct Activity {
     pub name: String,
     pub icon_asset_id: Option<Uuid>,
     pub process_name: String,
+    pub window_title: String,
     pub started_at: DateTime<Utc>,
     pub ended_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,

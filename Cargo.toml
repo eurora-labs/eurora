@@ -3,7 +3,7 @@ resolver = "2"
 members = [
   "crates/app/euro-*",
   "crates/backend/euro-*",
-  "crates/common/activity-models",
+  # "crates/common/activity-models",
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
   "crates/common/agent-chain-eurora",
@@ -65,7 +65,7 @@ euro-update-service = { path = "crates/backend/euro-update-service" }
 euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
 focus-tracker = { path = "crates/common/focus-tracker" }
-focus-tracker-core = { path = "crates/common/focus-tracker-core" }
+focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "0.0.1" }
 futures = "0.3.31"
 http-body = "1.0.1"
 http-body-util = "0.1.3"
