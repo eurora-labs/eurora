@@ -73,7 +73,8 @@ impl ActivityService {
             id: activity.id.to_string(),
             name: activity.name.clone(),
             icon_asset_id: activity.icon_asset_id.map(|id| id.to_string()),
-            process_name: activity.process_name.clone(),
+            process_name: Some(activity.process_name.clone()),
+            window_title: Some(activity.window_title.clone()),
             started_at: Some(datetime_to_timestamp(activity.started_at)),
             ended_at: activity.ended_at.map(datetime_to_timestamp),
             created_at: Some(datetime_to_timestamp(activity.created_at)),
@@ -212,6 +213,7 @@ impl ProtoActivityService for ActivityService {
                 &req.name,
                 icon_asset_id,
                 &req.process_name,
+                &req.window_title,
                 started_at,
                 ended_at,
             )
@@ -263,6 +265,7 @@ impl ProtoActivityService for ActivityService {
                 req.name.as_deref(),
                 icon_asset_id,
                 req.process_name.as_deref(),
+                req.window_title.as_deref(),
                 started_at,
                 ended_at,
             )

@@ -57,7 +57,7 @@ message Activity {
   optional string window_title = 4;
 
   // Base64 encoded png icon data
-  optional string icon = 5;
+  optional string icon_asset_id = 5;
 
   // When the activity started
   google.protobuf.Timestamp started_at = 6;
@@ -102,11 +102,14 @@ message InsertActivityRequest {
   // System process name
   string process_name = 4;
 
+  // Window title
+  string window_title = 5;
+
   // When the activity started
-  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp started_at = 6;
 
   // When the activity ended (optional - NULL if still active)
-  optional google.protobuf.Timestamp ended_at = 6;
+  optional google.protobuf.Timestamp ended_at = 7;
 }
 
 message UpdateActivityRequest {
@@ -122,11 +125,14 @@ message UpdateActivityRequest {
   // Updated process name (optional)
   optional string process_name = 4;
 
+  // Updated window title (optional)
+  optional string window_title = 5;
+
   // Updated start time (optional)
-  optional google.protobuf.Timestamp started_at = 5;
+  optional google.protobuf.Timestamp started_at = 6;
 
   // Updated end time (optional)
-  optional google.protobuf.Timestamp ended_at = 6;
+  optional google.protobuf.Timestamp ended_at = 7;
 }
 
 message UpdateActivityEndTimeRequest {
