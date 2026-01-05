@@ -156,7 +156,7 @@ impl DatabaseManager {
 
         let user = sqlx::query_as::<_, User>(
             r#"
-            UPDATE users 
+            UPDATE users
             SET username = COALESCE($2, username),
                 email = COALESCE($3, email),
                 display_name = COALESCE($4, display_name),
@@ -235,7 +235,7 @@ impl DatabaseManager {
 
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
             r#"
-            UPDATE password_credentials 
+            UPDATE password_credentials
             SET password_hash = $2,
                 updated_at = $3
             WHERE user_id = $1
@@ -278,7 +278,7 @@ impl DatabaseManager {
 
         let user = sqlx::query_as::<_, User>(
             r#"
-            UPDATE users 
+            UPDATE users
             SET email_verified = true,
                 updated_at = $2
             WHERE id = $1
@@ -707,6 +707,7 @@ impl DatabaseManager {
         name: &str,
         icon_asset_id: Option<Uuid>,
         process_name: &str,
+        window_title: &str,
         started_at: DateTime<Utc>,
         ended_at: Option<DateTime<Utc>>,
     ) -> Result<Activity, sqlx::Error> {
@@ -715,9 +716,9 @@ impl DatabaseManager {
 
         let activity = sqlx::query_as::<_, Activity>(
             r#"
-            INSERT INTO activities (id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            INSERT INTO activities (id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             "#,
         )
         .bind(id)
@@ -725,6 +726,7 @@ impl DatabaseManager {
         .bind(name)
         .bind(icon_asset_id)
         .bind(process_name)
+        .bind(window_title)
         .bind(started_at)
         .bind(ended_at)
         .bind(now)
@@ -739,7 +741,7 @@ impl DatabaseManager {
     pub async fn get_activity(&self, activity_id: Uuid) -> Result<Activity, sqlx::Error> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE id = $1
             "#,
@@ -759,7 +761,7 @@ impl DatabaseManager {
     ) -> Result<Activity, sqlx::Error> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE id = $1 AND user_id = $2
             "#,
@@ -784,7 +786,7 @@ impl DatabaseManager {
 
         let activities = sqlx::query_as::<_, Activity>(
             r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
             ORDER BY started_at DESC
@@ -819,6 +821,7 @@ impl DatabaseManager {
         name: Option<&str>,
         icon_asset_id: Option<Uuid>,
         process_name: Option<&str>,
+        window_title: Option<&str>,
         started_at: Option<DateTime<Utc>>,
         ended_at: Option<DateTime<Utc>>,
     ) -> Result<Activity, sqlx::Error> {
@@ -830,11 +833,12 @@ impl DatabaseManager {
             SET name = COALESCE($3, name),
                 icon_asset_id = COALESCE($4, icon_asset_id),
                 process_name = COALESCE($5, process_name),
-                started_at = COALESCE($6, started_at),
-                ended_at = COALESCE($7, ended_at),
-                updated_at = $8
+                window_title = COALESCE($6, window_title),
+                started_at = COALESCE($7, started_at),
+                ended_at = COALESCE($8, ended_at),
+                updated_at = $9
             WHERE id = $1 AND user_id = $2
-            RETURNING id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             "#,
         )
         .bind(activity_id)
@@ -842,6 +846,7 @@ impl DatabaseManager {
         .bind(name)
         .bind(icon_asset_id)
         .bind(process_name)
+        .bind(window_title)
         .bind(started_at)
         .bind(ended_at)
         .bind(now)
@@ -884,7 +889,7 @@ impl DatabaseManager {
     ) -> Result<Option<Activity>, sqlx::Error> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1 AND ended_at IS NULL
             ORDER BY started_at DESC
@@ -932,7 +937,7 @@ impl DatabaseManager {
 
         let activities = sqlx::query_as::<_, Activity>(
             r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, started_at, ended_at, created_at, updated_at
+            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
               AND started_at >= $2
