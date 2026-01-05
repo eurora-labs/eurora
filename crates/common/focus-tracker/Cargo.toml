@@ -2,7 +2,7 @@
 name = "focus-tracker"
 version = "0.0.1"
 edition.workspace = true
-description = "The core types for the focus tracker crate"
+description = "Cross-platform focus tracker for Linux (X11), macOS and Windows"
 homepage = "https://github.com/eurora-labs/eurora/tree/main/crates/common/focus-tracker"
 repository = "https://github.com/eurora-labs/eurora.git"
 license = "Apache-2.0"
