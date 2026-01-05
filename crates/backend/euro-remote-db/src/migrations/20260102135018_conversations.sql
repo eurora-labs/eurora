@@ -121,6 +121,7 @@ CREATE TABLE activities (
     name VARCHAR(500) NOT NULL,
     icon_asset_id UUID NOT NULL,
     process_name VARCHAR(500) NOT NULL,
+    window_title VARCHAR(500) NOT NULL,
     started_at TIMESTAMP WITH TIME ZONE NOT NULL,
     ended_at TIMESTAMP WITH TIME ZONE,
 
