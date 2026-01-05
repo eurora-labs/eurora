@@ -1,8 +1,8 @@
-pub use crate::proto::Activity;
+pub use crate::proto;
 use base64::{Engine as _, engine::general_purpose};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use focus_tracker_core::FocusedWindow;
-use prost_types::Timestamp;
+use serde::{Deserialize, Serialize};
 // use image;
 use specta::Type;
 use std::collections::HashMap;
@@ -18,22 +18,38 @@ pub struct AttachmentChip {
     pub icon: Option<String>,
 }
 
+/// Main activity structure - now fully cloneable and serializable
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Activity {
+    /// ID of the activity
+    pub id: Uuid,
+    /// Name of the activity
+    pub name: String,
+    /// Icon representing the activity
+    pub icon: Option<String>,
+    /// Process name of the activity
+    pub process_name: Option<String>,
+    /// Window title of the activity
+    pub window_title: Option<String>,
+    /// Start time
+    pub started_at: DateTime<Utc>,
+    /// End time
+    pub ended_at: Option<DateTime<Utc>>,
+    /// Assets associated with the activity
+    pub assets: Vec<Uuid>,
+}
+
 impl Activity {
     pub fn new(name: String) -> Self {
-        let now = Utc::now();
         Self {
-            id: Uuid::now_v7().to_string(),
+            id: Uuid::now_v7(),
             name,
             process_name: None,
             window_title: None,
             icon: None,
-            started_at: Some(Timestamp {
-                seconds: now.timestamp(),
-                nanos: now.timestamp_subsec_nanos() as i32,
-            }),
+            started_at: Utc::now(),
             ended_at: None,
-            created_at: None,
-            updated_at: None,
+            assets: Vec::new(),
         }
     }
 
