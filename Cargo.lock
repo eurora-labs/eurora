@@ -34,27 +34,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "activity-models"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "chrono",
- "euro-auth",
- "euro-remote-db",
- "focus-tracker-core",
- "image",
- "prost",
- "prost-types",
- "specta",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "actix-codec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3837,7 +3816,7 @@ dependencies = [
 
 [[package]]
 name = "focus-tracker-core"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "image",
  "thiserror 2.0.17",
