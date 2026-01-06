@@ -1,6 +1,8 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use dotenv::dotenv;
+use euro_activity_service::{ActivityService, ProtoActivityServiceServer};
+use euro_assets_service::{AssetsService, ProtoAssetsServiceServer};
 use euro_auth::JwtConfig;
 use euro_auth_service::AuthService;
 use euro_ocr_service::OcrService;
@@ -81,8 +83,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Invalid HTTP_ADDR format");
 
     let ocr_service = OcrService::new(Some(jwt_config.clone()));
-    let auth_service = AuthService::new(db_manager, Some(jwt_config.clone()));
+    let auth_service = AuthService::new(db_manager.clone(), Some(jwt_config.clone()));
     let prompt_service = PromptService::new(Some(jwt_config.clone()));
+    let activity_service = ActivityService::new(db_manager.clone(), Some(jwt_config.clone()));
+    let assets_service = AssetsService::new(db_manager, Some(jwt_config.clone()));
 
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
@@ -118,6 +122,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(ProtoOcrServiceServer::new(ocr_service))
         .add_service(ProtoAuthServiceServer::new(auth_service))
         .add_service(euro_prompt_service::get_service(prompt_service))
+        .add_service(ProtoActivityServiceServer::new(activity_service))
+        .add_service(ProtoAssetsServiceServer::new(assets_service))
         .serve_with_shutdown(grpc_addr, shutdown_signal);
 
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;

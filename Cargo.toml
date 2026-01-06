@@ -41,6 +41,8 @@ dirs = "6.0"
 dotenv = "0.15.0"
 enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
+euro-activity-service = { path = "crates/backend/euro-activity-service" }
+euro-assets-service = { path = "crates/backend/euro-assets-service" }
 euro-auth = { path = "crates/common/euro-auth" }
 euro-auth-service = { path = "crates/backend/euro-auth-service" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
