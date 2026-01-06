@@ -255,7 +255,9 @@ fn main() {
                         base_dir: app_handle.path().app_data_dir().unwrap(),
                         use_content_hash: false,
                         max_file_size: None,
-                        main_key: main_key.clone()
+                        main_key: main_key.clone(),
+                        service_endpoint: None,
+                        auth_token: None,
                     })
                         .build().expect("Failed to create timeline");
                     app_handle.manage(Mutex::new(timeline));
