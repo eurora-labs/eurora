@@ -163,7 +163,7 @@ pub struct Asset {
 /// Request for creating a new asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateAssetRequest {
-    pub id: Option<Uuid>,
+    pub id: Uuid,
     pub content_sha256: Option<Vec<u8>>,
     pub byte_size: Option<i64>,
     pub file_path: String,
