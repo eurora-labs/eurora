@@ -100,6 +100,24 @@ impl ActivityStorage {
         Ok(asset)
     }
 
+    /// Save all assets of an activity to service by ids
+    pub async fn save_assets_to_service_by_ids(
+        &self,
+        activity: &Activity,
+        ids: &[String],
+    ) -> ActivityResult<Vec<SavedAssetInfo>> {
+        let mut saved_assets = Vec::new();
+
+        for asset in &activity.assets {
+            if ids.contains(&asset.get_id().to_string()) {
+                let saved_info = self.save_asset_to_service(asset).await?;
+                saved_assets.push(saved_info);
+            }
+        }
+
+        Ok(saved_assets)
+    }
+
     /// Save all assets of an activity to disk by ids
     pub async fn save_assets_to_disk_by_ids(
         &self,
@@ -131,6 +149,34 @@ impl ActivityStorage {
         }
 
         Ok(saved_assets)
+    }
+
+    /// Save an asset to service
+    pub async fn save_asset_to_service(
+        &self,
+        asset: &ActivityAsset,
+    ) -> ActivityResult<SavedAssetInfo> {
+        // Serialize the entire ActivityAsset enum, not just the individual asset
+        let mut bytes = serde_json::to_vec(asset)?;
+
+        bytes = encrypt_file_contents(&self.config.main_key, &bytes, asset.get_asset_type())
+            .await
+            .map_err(ActivityError::Encryption)?;
+
+        // Make a placeholder filepath
+        let file_path = self.generate_asset_path(asset, None)?;
+        let absolute_path = self.config.base_dir.join(&file_path);
+        let final_path = self.config.base_dir.join(&absolute_path);
+        debug!("Saving asset to {}", final_path.display());
+        create_dirs_then_write(&final_path, &bytes)?;
+
+        Ok(SavedAssetInfo {
+            file_path,
+            absolute_path,
+            content_hash: None,
+            file_size: 0,
+            saved_at: chrono::Utc::now(),
+        })
     }
 
     /// Save an asset to disk
