@@ -983,7 +983,7 @@ impl DatabaseManager {
         user_id: Uuid,
         request: CreateAssetRequest,
     ) -> Result<Asset, sqlx::Error> {
-        let id = request.id.unwrap_or_else(Uuid::new_v4);
+        let id = request.id;
         let now = Utc::now();
         let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
 
