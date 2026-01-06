@@ -139,19 +139,7 @@ impl ProtoAssetsService for AssetsService {
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
-
-        let id = req
-            .id
-            .as_ref()
-            .map(|s| Uuid::parse_str(s))
-            .transpose()
-            .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
-
-        let content_sha256 = req
-            .content_sha256
-            .as_ref()
-            .map(|h| decode_sha256(h))
-            .transpose()?;
+        let id = Uuid::now_v7();
 
         let metadata = req
             .metadata
