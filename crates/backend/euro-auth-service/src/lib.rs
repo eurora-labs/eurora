@@ -1,13 +1,13 @@
 //! The Eurora authentication service that provides gRPC endpoints for user authentication.
 
-use std::sync::Arc;
-
 use anyhow::{Result, anyhow};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use std::sync::Arc;
 // Re-export shared types for convenience
-pub use euro_auth::{Claims, JwtConfig, validate_access_token, validate_refresh_token};
+pub use euro_auth::Claims;
 use euro_proto::proto_auth_service::{
     EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
     Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
@@ -18,73 +18,62 @@ use euro_remote_db::{
     CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
     CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
 };
-use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use oauth2::TokenResponse as OAuth2TokenResponse;
 use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
 use tonic::{Request, Response, Status};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
 pub mod oauth;
 
 use oauth::google::create_google_oauth_client;
 
-/// Extract and validate JWT token from request metadata
-pub fn authenticate_request_access_token<T>(
-    request: &Request<T>,
-    jwt_config: &JwtConfig,
-) -> Result<Claims> {
-    // Get authorization header
-    let auth_header = request
-        .metadata()
-        .get("authorization")
-        .ok_or_else(|| anyhow!("Missing authorization header"))?;
+/// Configuration for JWT tokens
+#[derive(Clone)]
+pub struct JwtConfig {
+    pub access_token_encoding_key: EncodingKey,
+    pub access_token_decoding_key: DecodingKey,
 
-    // Convert to string
-    let auth_str = auth_header
-        .to_str()
-        .map_err(|_| anyhow!("Invalid authorization header format"))?;
+    pub refresh_token_encoding_key: EncodingKey,
+    pub refresh_token_decoding_key: DecodingKey,
 
-    // Extract Bearer token
-    if !auth_str.starts_with("Bearer ") {
-        return Err(anyhow!("Authorization header must start with 'Bearer '"));
-    }
+    pub access_token_expiry_hours: i64,
+    pub refresh_token_expiry_days: i64,
 
-    let token = &auth_str[7..]; // Remove "Bearer " prefix
+    pub validation: Validation,
 
-    // Validate access token using shared function
-    validate_access_token(token, jwt_config)
+    pub approved_emails: Vec<String>,
 }
 
-/// Extract and validate JWT token from request metadata
-pub fn authenticate_request_refresh_token<T>(
-    request: &Request<T>,
-    jwt_config: &JwtConfig,
-) -> Result<Claims> {
-    // Get authorization header
-    let auth_header = request
-        .metadata()
-        .get("authorization")
-        .ok_or_else(|| anyhow!("Missing authorization header"))?;
+impl Default for JwtConfig {
+    fn default() -> Self {
+        let access_secret = std::env::var("JWT_ACCESS_SECRET")
+            .expect("JWT_ACCESS_SECRET must be set at runtime for secure token validation");
+        let refresh_secret = std::env::var("JWT_REFRESH_SECRET")
+            .expect("JWT_REFRESH_SECRET must be set at runtime for secure token validation");
 
-    // Convert to string
-    let auth_str = auth_header
-        .to_str()
-        .map_err(|_| anyhow!("Invalid authorization header format"))?;
+        Self {
+            access_token_encoding_key: EncodingKey::from_secret(access_secret.as_bytes()),
+            access_token_decoding_key: DecodingKey::from_secret(access_secret.as_bytes()),
+            refresh_token_encoding_key: EncodingKey::from_secret(refresh_secret.as_bytes()),
+            refresh_token_decoding_key: DecodingKey::from_secret(refresh_secret.as_bytes()),
 
-    // Extract Bearer token
-    if !auth_str.starts_with("Bearer ") {
-        return Err(anyhow!("Authorization header must start with 'Bearer '"));
+            access_token_expiry_hours: 1,
+            refresh_token_expiry_days: 7,
+
+            validation: Validation::new(Algorithm::HS256),
+
+            approved_emails: std::env::var("APPROVED_EMAILS")
+                .unwrap_or_default()
+                .split(',')
+                .map(|s| s.trim().to_lowercase().to_string())
+                .collect::<Vec<_>>(),
+        }
     }
-
-    let token = &auth_str[7..]; // Remove "Bearer " prefix
-
-    // Validate refresh token using shared function
-    validate_refresh_token(token, jwt_config)
 }
 
 /// The main authentication service
-#[derive(Debug)]
 pub struct AuthService {
     db: Arc<DatabaseManager>,
     jwt_config: JwtConfig,
@@ -107,6 +96,54 @@ impl AuthService {
         }
     }
 
+    /// Extract and validate JWT token from request metadata
+    pub fn authenticate_request_access_token<T>(&self, request: &Request<T>) -> Result<Claims> {
+        // Get authorization header
+        let auth_header = request
+            .metadata()
+            .get("authorization")
+            .ok_or_else(|| anyhow!("Missing authorization header"))?;
+
+        // Convert to string
+        let auth_str = auth_header
+            .to_str()
+            .map_err(|_| anyhow!("Invalid authorization header format"))?;
+
+        // Extract Bearer token
+        if !auth_str.starts_with("Bearer ") {
+            return Err(anyhow!("Authorization header must start with 'Bearer '"));
+        }
+
+        let token = &auth_str[7..]; // Remove "Bearer " prefix
+
+        // Validate access token using shared function
+        self.validate_access_token(token)
+    }
+
+    /// Extract and validate JWT token from request metadata
+    pub fn authenticate_request_refresh_token<T>(&self, request: &Request<T>) -> Result<Claims> {
+        // Get authorization header
+        let auth_header = request
+            .metadata()
+            .get("authorization")
+            .ok_or_else(|| anyhow!("Missing authorization header"))?;
+
+        // Convert to string
+        let auth_str = auth_header
+            .to_str()
+            .map_err(|_| anyhow!("Invalid authorization header format"))?;
+
+        // Extract Bearer token
+        if !auth_str.starts_with("Bearer ") {
+            return Err(anyhow!("Authorization header must start with 'Bearer '"));
+        }
+
+        let token = &auth_str[7..]; // Remove "Bearer " prefix
+
+        // Validate refresh token using shared function
+        self.validate_refresh_token(token)
+    }
+
     /// Hash a password using bcrypt
     fn hash_password(&self, password: &str) -> Result<String> {
         let hashed =
@@ -123,7 +160,6 @@ impl AuthService {
     fn hash_refresh_token(&self, token: &str) -> String {
         let mut hasher = Sha256::new();
         hasher.update(token.as_bytes());
-        hasher.update(self.jwt_config.secret.as_bytes());
         format!("{:x}", hasher.finalize())
     }
 
@@ -143,8 +179,8 @@ impl AuthService {
             sub: user_id.to_string(),
             username: username.to_string(),
             email: email.to_string(),
-            exp: access_exp.timestamp() as usize,
-            iat: now.timestamp() as usize,
+            exp: access_exp.timestamp(),
+            iat: now.timestamp(),
             token_type: "access".to_string(),
         };
 
@@ -153,19 +189,26 @@ impl AuthService {
             sub: user_id.to_string(),
             username: username.to_string(),
             email: email.to_string(),
-            exp: refresh_exp.timestamp() as usize,
-            iat: now.timestamp() as usize,
+            exp: refresh_exp.timestamp(),
+            iat: now.timestamp(),
             token_type: "refresh".to_string(),
         };
 
         let header = Header::new(Algorithm::HS256);
-        let encoding_key = EncodingKey::from_secret(self.jwt_config.secret.as_ref());
 
-        let access_token = encode(&header, &access_claims, &encoding_key)
-            .map_err(|e| anyhow!("Failed to generate access token: {}", e))?;
+        let access_token = encode(
+            &header,
+            &access_claims,
+            &self.jwt_config.access_token_encoding_key,
+        )
+        .map_err(|e| anyhow!("Failed to generate access token: {}", e))?;
 
-        let refresh_token = encode(&header, &refresh_claims, &encoding_key)
-            .map_err(|e| anyhow!("Failed to generate refresh token: {}", e))?;
+        let refresh_token = encode(
+            &header,
+            &refresh_claims,
+            &self.jwt_config.refresh_token_encoding_key,
+        )
+        .map_err(|e| anyhow!("Failed to generate refresh token: {}", e))?;
 
         // Store refresh token in database
         let user_uuid =
@@ -186,9 +229,36 @@ impl AuthService {
         Ok((access_token, refresh_token))
     }
 
-    /// Validate and decode a JWT token
-    pub fn validate_token(&self, token: &str) -> Result<Claims> {
-        euro_auth::validate_token(token, &self.jwt_config)
+    pub fn validate_access_token(&self, token: &str) -> Result<Claims> {
+        let token_data = decode::<Claims>(
+            token,
+            &self.jwt_config.access_token_decoding_key,
+            &self.jwt_config.validation,
+        )
+        .map_err(|e| anyhow!("Invalid token: {}", e))?;
+
+        // Ensure it's an access token
+        if token_data.claims.token_type != "access" {
+            return Err(anyhow!("Invalid token type: expected access token"));
+        }
+
+        Ok(token_data.claims)
+    }
+
+    pub fn validate_refresh_token(&self, token: &str) -> Result<Claims> {
+        let token_data = decode::<Claims>(
+            token,
+            &self.jwt_config.refresh_token_decoding_key,
+            &self.jwt_config.validation,
+        )
+        .map_err(|e| anyhow!("Invalid token: {}", e))?;
+
+        // Ensure it's a refresh token
+        if token_data.claims.token_type != "refresh" {
+            return Err(anyhow!("Invalid token type: expected refresh token"));
+        }
+
+        Ok(token_data.claims)
     }
 
     fn generate_random_string(&self, length: usize) -> Result<String> {
@@ -713,7 +783,7 @@ impl ProtoAuthService for AuthService {
         request: Request<RefreshTokenRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
         info!("Refresh token request received");
-        authenticate_request_refresh_token(&request, &self.jwt_config)
+        self.authenticate_request_refresh_token(&request)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
         let req = request.into_inner();
 
