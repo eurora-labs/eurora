@@ -7,8 +7,8 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
-aws-config = { version = "1.8.7", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.107.0"
+aws-config = { version = "1.8.12", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.119.0"
 axum = { version = "0.8.8", features = ["macros"] }
 chrono = { workspace = true, features = ["serde"] }
 semver = "1.0"
