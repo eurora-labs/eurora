@@ -263,6 +263,8 @@ impl ChatEurora {
         let stop_sequences = stop.unwrap_or_else(|| self.stop_sequences.clone());
 
         ProtoChatRequest {
+            // TODO: change to actual conversation id
+            conversation_id: "test".to_string(),
             messages: proto_messages,
             parameters: Some(ProtoParameters {
                 temperature: self.temperature,
