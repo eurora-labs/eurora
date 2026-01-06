@@ -9,9 +9,10 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::types::{
-    Activity, CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
-    CreateRefreshTokenRequest, CreateUserRequest, LoginToken, OAuthCredentials, OAuthState,
-    PasswordCredentials, RefreshToken, UpdateOAuthCredentialsRequest, UpdatePasswordRequest,
+    Activity, ActivityAsset, Asset, CreateAssetRequest, CreateLoginTokenRequest,
+    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
+    CreateUserRequest, LoginToken, MessageAsset, OAuthCredentials, OAuthState, PasswordCredentials,
+    RefreshToken, UpdateAssetRequest, UpdateOAuthCredentialsRequest, UpdatePasswordRequest,
     UpdateUserRequest, User,
 };
 #[derive(Debug)]
@@ -970,5 +971,322 @@ impl DatabaseManager {
         .await?;
 
         Ok((activities, count.0 as u64))
+    }
+
+    // =========================================================================
+    // Asset Management Methods
+    // =========================================================================
+
+    /// Create a new asset
+    pub async fn create_asset(
+        &self,
+        user_id: Uuid,
+        request: CreateAssetRequest,
+    ) -> Result<Asset, sqlx::Error> {
+        let id = request.id.unwrap_or_else(Uuid::new_v4);
+        let now = Utc::now();
+        let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
+
+        let asset = sqlx::query_as::<_, Asset>(
+            r#"
+            INSERT INTO assets (id, user_id, content_sha256, byte_size, file_path, mime_type, metadata, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, user_id, content_sha256, byte_size, file_path, mime_type, metadata, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind(&request.content_sha256)
+        .bind(request.byte_size)
+        .bind(&request.file_path)
+        .bind(&request.mime_type)
+        .bind(&metadata)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(asset)
+    }
+
+    /// Get an asset by ID
+    pub async fn get_asset(&self, asset_id: Uuid) -> Result<Asset, sqlx::Error> {
+        let asset = sqlx::query_as::<_, Asset>(
+            r#"
+            SELECT id, user_id, content_sha256, byte_size, file_path, mime_type, metadata, created_at, updated_at
+            FROM assets
+            WHERE id = $1
+            "#,
+        )
+        .bind(asset_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(asset)
+    }
+
+    /// Get an asset by ID for a specific user
+    pub async fn get_asset_for_user(
+        &self,
+        asset_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Asset, sqlx::Error> {
+        let asset = sqlx::query_as::<_, Asset>(
+            r#"
+            SELECT id, user_id, content_sha256, byte_size, file_path, mime_type, metadata, created_at, updated_at
+            FROM assets
+            WHERE id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(asset_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(asset)
+    }
+
+    /// List assets for a user with pagination
+    pub async fn list_assets(
+        &self,
+        user_id: Uuid,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<Asset>, u64), sqlx::Error> {
+        // Clamp limit to max 100
+        let limit = limit.clamp(1, 100);
+
+        let assets = sqlx::query_as::<_, Asset>(
+            r#"
+            SELECT id, user_id, content_sha256, byte_size, file_path, mime_type, metadata, created_at, updated_at
+            FROM assets
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(user_id)
+        .bind(limit as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await?;
+
+        // Get total count
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM assets WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok((assets, count.0 as u64))
+    }
+
+    /// Update an asset
+    pub async fn update_asset(
+        &self,
+        asset_id: Uuid,
+        user_id: Uuid,
+        request: UpdateAssetRequest,
+    ) -> Result<Asset, sqlx::Error> {
+        let now = Utc::now();
+
+        let asset = sqlx::query_as::<_, Asset>(
+            r#"
+            UPDATE assets
+            SET content_sha256 = COALESCE($3, content_sha256),
+                byte_size = COALESCE($4, byte_size),
+                file_path = COALESCE($5, file_path),
+                mime_type = COALESCE($6, mime_type),
+                metadata = COALESCE($7, metadata),
+                updated_at = $8
+            WHERE id = $1 AND user_id = $2
+            RETURNING id, user_id, content_sha256, byte_size, file_path, mime_type, metadata, created_at, updated_at
+            "#,
+        )
+        .bind(asset_id)
+        .bind(user_id)
+        .bind(&request.content_sha256)
+        .bind(request.byte_size)
+        .bind(&request.file_path)
+        .bind(&request.mime_type)
+        .bind(&request.metadata)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(asset)
+    }
+
+    /// Delete an asset
+    pub async fn delete_asset(&self, asset_id: Uuid, user_id: Uuid) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            DELETE FROM assets
+            WHERE id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(asset_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Get assets by message ID
+    pub async fn get_assets_by_message_id(
+        &self,
+        message_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Vec<Asset>, sqlx::Error> {
+        let assets = sqlx::query_as::<_, Asset>(
+            r#"
+            SELECT a.id, a.user_id, a.content_sha256, a.byte_size, a.file_path, a.mime_type, a.metadata, a.created_at, a.updated_at
+            FROM assets a
+            INNER JOIN message_assets ma ON a.id = ma.asset_id
+            WHERE ma.message_id = $1 AND a.user_id = $2
+            "#,
+        )
+        .bind(message_id)
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(assets)
+    }
+
+    /// Get assets by activity ID
+    pub async fn get_assets_by_activity_id(
+        &self,
+        activity_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Vec<Asset>, sqlx::Error> {
+        let assets = sqlx::query_as::<_, Asset>(
+            r#"
+            SELECT a.id, a.user_id, a.content_sha256, a.byte_size, a.file_path, a.mime_type, a.metadata, a.created_at, a.updated_at
+            FROM assets a
+            INNER JOIN activity_assets aa ON a.id = aa.asset_id
+            WHERE aa.activity_id = $1 AND a.user_id = $2
+            "#,
+        )
+        .bind(activity_id)
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(assets)
+    }
+
+    /// Link an asset to a message
+    pub async fn link_asset_to_message(
+        &self,
+        message_id: Uuid,
+        asset_id: Uuid,
+    ) -> Result<MessageAsset, sqlx::Error> {
+        let now = Utc::now();
+
+        let message_asset = sqlx::query_as::<_, MessageAsset>(
+            r#"
+            INSERT INTO message_assets (message_id, asset_id, created_at)
+            VALUES ($1, $2, $3)
+            RETURNING message_id, asset_id, created_at
+            "#,
+        )
+        .bind(message_id)
+        .bind(asset_id)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(message_asset)
+    }
+
+    /// Unlink an asset from a message
+    pub async fn unlink_asset_from_message(
+        &self,
+        message_id: Uuid,
+        asset_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            DELETE FROM message_assets
+            WHERE message_id = $1 AND asset_id = $2
+            "#,
+        )
+        .bind(message_id)
+        .bind(asset_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Link an asset to an activity
+    pub async fn link_asset_to_activity(
+        &self,
+        activity_id: Uuid,
+        asset_id: Uuid,
+    ) -> Result<ActivityAsset, sqlx::Error> {
+        let now = Utc::now();
+
+        let activity_asset = sqlx::query_as::<_, ActivityAsset>(
+            r#"
+            INSERT INTO activity_assets (activity_id, asset_id, created_at)
+            VALUES ($1, $2, $3)
+            RETURNING activity_id, asset_id, created_at
+            "#,
+        )
+        .bind(activity_id)
+        .bind(asset_id)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(activity_asset)
+    }
+
+    /// Unlink an asset from an activity
+    pub async fn unlink_asset_from_activity(
+        &self,
+        activity_id: Uuid,
+        asset_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            DELETE FROM activity_assets
+            WHERE activity_id = $1 AND asset_id = $2
+            "#,
+        )
+        .bind(activity_id)
+        .bind(asset_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Find asset by SHA256 hash for deduplication
+    pub async fn find_asset_by_sha256(
+        &self,
+        user_id: Uuid,
+        content_sha256: &[u8],
+    ) -> Result<Option<Asset>, sqlx::Error> {
+        let asset = sqlx::query_as::<_, Asset>(
+            r#"
+            SELECT id, user_id, content_sha256, byte_size, file_path, mime_type, metadata, created_at, updated_at
+            FROM assets
+            WHERE user_id = $1 AND content_sha256 = $2
+            LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .bind(content_sha256)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(asset)
     }
 }

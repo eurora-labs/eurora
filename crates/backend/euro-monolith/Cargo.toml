@@ -7,6 +7,8 @@ publish = false
 [dependencies]
 axum = "0.8.8"
 dotenv = { workspace = true }
+euro-activity-service = { workspace = true, features = ["server"] }
+euro-assets-service = { workspace = true, features = ["server"] }
 euro-auth = { workspace = true }
 euro-auth-service = { workspace = true }
 euro-ocr-service = { workspace = true }
