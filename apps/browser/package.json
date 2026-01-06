@@ -34,7 +34,7 @@
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
 		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.51.0",
+		"typescript-eslint": "^8.52.0",
 		"vite": "catalog:",
 		"vite-plugin-dts": "^4.5.3",
 		"cross-env": "^7.0.3",
