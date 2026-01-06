@@ -24,6 +24,7 @@ use crate::proto::{
     ListAssetsRequest, ListAssetsResponse, MessageAsset, MessageAssetResponse,
     UnlinkAssetFromActivityRequest, UnlinkAssetFromMessageRequest, UpdateAssetRequest,
 };
+use crate::storage::StorageService;
 
 pub use crate::proto::proto_assets_service_server::{ProtoAssetsService, ProtoAssetsServiceServer};
 
@@ -52,22 +53,39 @@ pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> 
 #[derive(Debug)]
 pub struct AssetsService {
     db: Arc<DatabaseManager>,
+    storage: Arc<StorageService>,
     jwt_config: JwtConfig,
 }
 
 impl AssetsService {
     /// Create a new AssetsService instance
-    pub fn new(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Self {
+    pub fn new(
+        db: Arc<DatabaseManager>,
+        storage: Arc<StorageService>,
+        jwt_config: Option<JwtConfig>,
+    ) -> Self {
         info!("Creating new AssetsService instance");
         Self {
             db,
+            storage,
             jwt_config: jwt_config.unwrap_or_default(),
         }
+    }
+
+    /// Create a new AssetsService with storage configured from environment
+    pub fn from_env(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Result<Self> {
+        let storage = StorageService::from_env()?;
+        Ok(Self::new(db, Arc::new(storage), jwt_config))
     }
 
     /// Get the JWT config reference
     pub fn jwt_config(&self) -> &JwtConfig {
         &self.jwt_config
+    }
+
+    /// Get the storage service reference
+    pub fn storage(&self) -> &StorageService {
+        &self.storage
     }
 
     /// Convert a database Asset to a proto Asset
@@ -139,8 +157,66 @@ impl ProtoAssetsService for AssetsService {
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
-        let id = Uuid::now_v7();
 
+        // Validate request
+        if req.content.is_empty() {
+            return Err(Status::invalid_argument("Content cannot be empty"));
+        }
+
+        if req.mime_type.is_empty() {
+            return Err(Status::invalid_argument("MIME type is required"));
+        }
+
+        // Calculate SHA256 hash and byte size
+        let content_sha256 = StorageService::calculate_sha256(&req.content);
+        let byte_size = req.content.len() as i64;
+
+        debug!(
+            "Processing asset: {} bytes, SHA256: {}",
+            byte_size,
+            hex::encode(&content_sha256)
+        );
+
+        // Check for deduplication - if we already have this exact content, return existing asset
+        if let Ok(Some(existing_asset)) =
+            self.db.find_asset_by_sha256(user_id, &content_sha256).await
+        {
+            info!(
+                "Found existing asset {} with same SHA256 hash, reusing",
+                existing_asset.id
+            );
+
+            // If activity_id is provided, link the existing asset to it
+            if let Some(activity_id_str) = &req.activity_id {
+                let activity_id = Uuid::parse_str(activity_id_str)
+                    .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+
+                // Try to link, ignore if already linked
+                let _ = self
+                    .db
+                    .link_asset_to_activity(activity_id, existing_asset.id)
+                    .await;
+            }
+
+            return Ok(Response::new(AssetResponse {
+                asset: Some(Self::db_asset_to_proto(&existing_asset)),
+            }));
+        }
+
+        // Generate new asset ID
+        let asset_id = Uuid::now_v7();
+
+        // Upload content to storage
+        let file_path = self
+            .storage
+            .upload(&user_id, &asset_id, &req.content, &req.mime_type)
+            .await
+            .map_err(|e| {
+                error!("Failed to upload asset to storage: {}", e);
+                Status::internal("Failed to upload asset to storage")
+            })?;
+
+        // Parse metadata if provided
         let metadata = req
             .metadata
             .as_ref()
@@ -148,11 +224,12 @@ impl ProtoAssetsService for AssetsService {
             .transpose()
             .map_err(|e| Status::invalid_argument(format!("Invalid metadata JSON: {}", e)))?;
 
+        // Create database record
         let db_request = DbCreateAssetRequest {
-            id,
-            content_sha256,
-            byte_size: req.byte_size,
-            file_path: req.file_path,
+            id: asset_id,
+            content_sha256: Some(content_sha256),
+            byte_size: Some(byte_size),
+            file_path,
             mime_type: req.mime_type,
             metadata,
         };
@@ -162,23 +239,9 @@ impl ProtoAssetsService for AssetsService {
             .create_asset(user_id, db_request)
             .await
             .map_err(|e| {
-                error!("Failed to create asset: {}", e);
+                error!("Failed to create asset in database: {}", e);
                 Status::internal("Failed to create asset")
             })?;
-
-        // Link to message if message_id provided
-        if let Some(message_id_str) = &req.message_id {
-            let message_id = Uuid::parse_str(message_id_str)
-                .map_err(|e| Status::invalid_argument(format!("Invalid message ID: {}", e)))?;
-
-            self.db
-                .link_asset_to_message(message_id, asset.id)
-                .await
-                .map_err(|e| {
-                    error!("Failed to link asset to message: {}", e);
-                    Status::internal("Failed to link asset to message")
-                })?;
-        }
 
         // Link to activity if activity_id provided
         if let Some(activity_id_str) = &req.activity_id {
@@ -338,6 +401,26 @@ impl ProtoAssetsService for AssetsService {
         let asset_id = Uuid::parse_str(&req.id)
             .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
 
+        // Get the asset first to get the file path for storage deletion
+        let asset = self
+            .db
+            .get_asset_for_user(asset_id, user_id)
+            .await
+            .map_err(|e| {
+                warn!("Asset not found for deletion: {}", e);
+                Status::not_found("Asset not found")
+            })?;
+
+        // Delete from storage
+        if let Err(e) = self.storage.delete(&asset.file_path).await {
+            warn!(
+                "Failed to delete asset from storage (continuing with DB deletion): {}",
+                e
+            );
+            // Continue with database deletion even if storage deletion fails
+        }
+
+        // Delete from database
         self.db.delete_asset(asset_id, user_id).await.map_err(|e| {
             error!("Failed to delete asset: {}", e);
             Status::internal("Failed to delete asset")
