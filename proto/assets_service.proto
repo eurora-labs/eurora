@@ -101,29 +101,17 @@ message ActivityAsset {
 // =============================================================================
 
 message CreateAssetRequest {
-  // Optional ID (if not provided, server generates UUID)
-  optional string id = 1;
-
-  // SHA256 hash of the file content (for deduplication) - base64 encoded
-  optional string content_sha256 = 2;
-
-  // Size of the asset in bytes
-  optional int64 byte_size = 3;
-
-  // Path to the file (S3 key, local path, etc.) - required
-  string file_path = 4;
+  // File content as bytes
+  bytes content = 1;
 
   // MIME type of the asset - required
-  string mime_type = 5;
+  string mime_type = 2;
 
   // Additional metadata as JSON string
-  optional string metadata = 6;
-
-  // Optional message ID to link asset to
-  optional string message_id = 7;
+  optional string metadata = 3;
 
   // Optional activity ID to link asset to
-  optional string activity_id = 8;
+  optional string activity_id = 4;
 }
 
 message GetAssetRequest {
