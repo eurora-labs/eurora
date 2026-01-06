@@ -86,7 +86,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth_service = AuthService::new(db_manager.clone(), Some(jwt_config.clone()));
     let prompt_service = PromptService::new(Some(jwt_config.clone()));
     let activity_service = ActivityService::new(db_manager.clone(), Some(jwt_config.clone()));
-    let assets_service = AssetsService::new(db_manager, Some(jwt_config.clone()));
+    let assets_service = AssetsService::from_env(db_manager, Some(jwt_config.clone()))
+        .expect("Failed to initialize assets service");
 
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
