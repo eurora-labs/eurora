@@ -75,6 +75,7 @@ humantime-serde = "1.1.1"
 image = "0.25.9"
 indexmap = "2.12"  # collapse 2.10, 1.9
 insta = "1.41.1"
+jsonwebtoken = { version = "10.2.0", features = ["aws_lc_rs"] }
 keyring = "3.6.3"
 log = "0.4"
 once_cell = "1.21"

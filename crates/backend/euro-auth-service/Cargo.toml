@@ -13,7 +13,7 @@ euro-auth = { workspace = true }
 euro-proto = { workspace = true }
 euro-remote-db = { workspace = true }
 hex = "0.4.3"
-jsonwebtoken = "9.3"
+jsonwebtoken = { workspace = true }
 oauth2 = "5.0.0"
 prost = { workspace = true }
 rand = { workspace = true }

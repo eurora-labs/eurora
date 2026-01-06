@@ -1,13 +1,8 @@
-use std::path::PathBuf;
-
+use crate::{User, auth::AuthManager, storage::Storage};
 use anyhow::{Context, Result};
+use euro_auth::Claims;
 use euro_secret::{Sensitive, secret};
-
-use crate::{
-    User,
-    auth::{AuthManager, Claims},
-    storage::Storage,
-};
+use std::path::PathBuf;
 
 #[derive(Clone)]
 pub struct Controller {
