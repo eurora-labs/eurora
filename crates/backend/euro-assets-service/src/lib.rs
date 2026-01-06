@@ -20,6 +20,10 @@ pub mod proto {
 #[cfg(feature = "server")]
 mod server;
 
+// Storage module is only available with the "server" feature
+#[cfg(feature = "server")]
+mod storage;
+
 // Re-export proto types (always available)
 pub use proto::*;
 
@@ -28,3 +32,7 @@ pub use proto::*;
 pub use server::{
     AssetsService, ProtoAssetsService, ProtoAssetsServiceServer, authenticate_request,
 };
+
+// Re-export storage types when the feature is enabled
+#[cfg(feature = "server")]
+pub use storage::{StorageConfig, StorageService};
