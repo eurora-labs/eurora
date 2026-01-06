@@ -17,11 +17,14 @@ service ProtoChatService {
 
 // A chat request containing messages and parameters
 message ProtoChatRequest {
+  // The conversation ID
+  string conversation_id = 1;
+
   // The conversation messages
-  repeated ProtoBaseMessage messages = 1;
+  repeated ProtoBaseMessage messages = 2;
 
   // Request parameters
-  ProtoParameters parameters = 2;
+  ProtoParameters parameters = 3;
 }
 
 // A chat response
