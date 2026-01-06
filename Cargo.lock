@@ -3622,6 +3622,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "euro-activity",
+ "euro-assets-service",
  "euro-personal-db",
  "focus-tracker",
  "image",
