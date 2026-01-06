@@ -3206,6 +3206,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-assets-service"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "euro-auth",
+ "euro-remote-db",
+ "prost",
+ "prost-types",
+ "serde_json",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "euro-auth"
 version = "0.0.0"
 dependencies = [
@@ -3283,6 +3302,8 @@ version = "0.0.1"
 dependencies = [
  "axum",
  "dotenv",
+ "euro-activity-service",
+ "euro-assets-service",
  "euro-auth",
  "euro-auth-service",
  "euro-ocr-service",
@@ -3436,6 +3457,7 @@ dependencies = [
  "chrono",
  "ipnet",
  "serde",
+ "serde_json",
  "sqlx",
  "tracing",
  "uuid",
@@ -3496,6 +3518,7 @@ dependencies = [
  "color-thief",
  "dotenv",
  "euro-activity",
+ "euro-activity-service",
  "euro-encrypt",
  "euro-native-messaging",
  "euro-personal-db",
