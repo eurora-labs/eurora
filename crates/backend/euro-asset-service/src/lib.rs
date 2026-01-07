@@ -13,7 +13,7 @@
 
 // Include the generated proto code
 pub mod proto {
-    tonic::include_proto!("assets_service");
+    tonic::include_proto!("asset_service");
 }
 
 // Server module is only available with the "server" feature
@@ -29,7 +29,7 @@ pub use proto::*;
 
 // Re-export server types when the feature is enabled
 #[cfg(feature = "server")]
-pub use server::{AssetsService, ProtoAssetsService, ProtoAssetsServiceServer};
+pub use server::{AssetsService, ProtoAssetService, ProtoAssetServiceServer};
 
 // Re-export storage types when the feature is enabled
 #[cfg(feature = "server")]

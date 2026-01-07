@@ -2,7 +2,7 @@ use std::{io::Result, path::PathBuf};
 
 fn main() -> Result<()> {
     let proto_dir = PathBuf::from("../../../proto");
-    let proto_files = vec![PathBuf::from("assets_service.proto")];
+    let proto_files = vec![PathBuf::from("asset_service.proto")];
 
     let build_server = std::env::var("CARGO_FEATURE_SERVER").is_ok();
 

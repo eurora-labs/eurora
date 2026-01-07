@@ -1,8 +1,8 @@
 [package]
-name = "euro-assets-service"
+name = "euro-asset-service"
 version = "0.0.0"
 edition.workspace = true
-description = "Eurora Assets Service - gRPC service for managing user file assets"
+description = "Eurora Asset Service - gRPC service for managing user file assets"
 
 [package.metadata.cargo-machete]
 ignored = ["tonic-prost"]
