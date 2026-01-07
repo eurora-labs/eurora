@@ -70,7 +70,7 @@ euro-update-service = { path = "crates/backend/euro-update-service" }
 euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
 focus-tracker = { path = "crates/common/focus-tracker" }
-focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "0.0.1" }
+focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "0.0.2" }
 futures = "0.3.31"
 http-body = "1.0.1"
 http-body-util = "0.1.3"
