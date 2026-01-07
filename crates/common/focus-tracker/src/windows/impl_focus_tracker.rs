@@ -214,8 +214,8 @@ impl ImplFocusTracker {
 
             let process_id = unsafe { utils::get_window_process_id(hwnd) }.unwrap_or_default();
             if let Err(e) = on_focus(FocusedWindow {
-                process_id: Some(process_id),
-                process_name: Some(process.clone()),
+                process_id,
+                process_name: process.clone(),
                 window_title: Some(title.clone()),
                 icon,
             }) {
@@ -266,8 +266,8 @@ impl ImplFocusTracker {
                             let process_id = unsafe { utils::get_window_process_id(current_hwnd) }
                                 .unwrap_or_default();
                             if let Err(e) = on_focus(FocusedWindow {
-                                process_id: Some(process_id),
-                                process_name: Some(process.clone()),
+                                process_id,
+                                process_name: process.clone(),
                                 window_title: Some(title.clone()),
                                 icon,
                             }) {
@@ -306,8 +306,8 @@ impl ImplFocusTracker {
 /// Helper struct to hold window information with Send-safe types (without icon)
 struct WindowInfo {
     hwnd_value: isize,
-    process_id: Option<u32>,
-    process_name: Option<String>,
+    process_id: u32,
+    process_name: String,
     window_title: Option<String>,
 }
 
@@ -323,8 +323,8 @@ fn get_window_info_without_icon() -> Option<WindowInfo> {
 
     Some(WindowInfo {
         hwnd_value,
-        process_id: Some(process_id),
-        process_name: Some(process),
+        process_id,
+        process_name: process,
         window_title: Some(title),
     })
 }
