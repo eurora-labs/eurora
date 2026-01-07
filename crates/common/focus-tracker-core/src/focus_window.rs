@@ -2,7 +2,7 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FocusedWindow {
     /// Process ID of the focused window.
-    pub process_id: String,
+    pub process_id: u32,
     /// Reported process name, if not available nothing is reported.
     pub process_name: String,
     /// Full window title/caption as provided by the OS.
