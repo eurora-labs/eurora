@@ -29,7 +29,7 @@ use tracing::{debug, error};
 use crate::{
     config::EuroraConfig,
     error::EuroraError,
-    proto::chat::{
+    proto::chat_service::{
         ProtoChatRequest, ProtoParameters, proto_chat_service_client::ProtoChatServiceClient,
     },
 };
@@ -263,6 +263,8 @@ impl ChatEurora {
         let stop_sequences = stop.unwrap_or_else(|| self.stop_sequences.clone());
 
         ProtoChatRequest {
+            // TODO: change to actual conversation id
+            conversation_id: "test".to_string(),
             messages: proto_messages,
             parameters: Some(ProtoParameters {
                 temperature: self.temperature,
