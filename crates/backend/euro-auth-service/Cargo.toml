@@ -8,6 +8,7 @@ publish = false
 anyhow = { workspace = true }
 base64 = { workspace = true }
 bcrypt = "0.17"
+be-auth-grpc = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-auth = { workspace = true }
 euro-proto = { workspace = true }

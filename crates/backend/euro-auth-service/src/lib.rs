@@ -4,9 +4,10 @@ use anyhow::{Result, anyhow};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use jsonwebtoken::{Algorithm, Header, decode, encode};
 use std::sync::Arc;
 // Re-export shared types for convenience
+use be_auth_grpc::JwtConfig;
 pub use euro_auth::Claims;
 use euro_proto::proto_auth_service::{
     EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
@@ -29,50 +30,6 @@ pub mod oauth;
 
 use oauth::google::create_google_oauth_client;
 
-/// Configuration for JWT tokens
-#[derive(Clone)]
-pub struct JwtConfig {
-    pub access_token_encoding_key: EncodingKey,
-    pub access_token_decoding_key: DecodingKey,
-
-    pub refresh_token_encoding_key: EncodingKey,
-    pub refresh_token_decoding_key: DecodingKey,
-
-    pub access_token_expiry_hours: i64,
-    pub refresh_token_expiry_days: i64,
-
-    pub validation: Validation,
-
-    pub approved_emails: Vec<String>,
-}
-
-impl Default for JwtConfig {
-    fn default() -> Self {
-        let access_secret = std::env::var("JWT_ACCESS_SECRET")
-            .expect("JWT_ACCESS_SECRET must be set at runtime for secure token validation");
-        let refresh_secret = std::env::var("JWT_REFRESH_SECRET")
-            .expect("JWT_REFRESH_SECRET must be set at runtime for secure token validation");
-
-        Self {
-            access_token_encoding_key: EncodingKey::from_secret(access_secret.as_bytes()),
-            access_token_decoding_key: DecodingKey::from_secret(access_secret.as_bytes()),
-            refresh_token_encoding_key: EncodingKey::from_secret(refresh_secret.as_bytes()),
-            refresh_token_decoding_key: DecodingKey::from_secret(refresh_secret.as_bytes()),
-
-            access_token_expiry_hours: 1,
-            refresh_token_expiry_days: 7,
-
-            validation: Validation::new(Algorithm::HS256),
-
-            approved_emails: std::env::var("APPROVED_EMAILS")
-                .unwrap_or_default()
-                .split(',')
-                .map(|s| s.trim().to_lowercase().to_string())
-                .collect::<Vec<_>>(),
-        }
-    }
-}
-
 /// The main authentication service
 pub struct AuthService {
     db: Arc<DatabaseManager>,
@@ -83,7 +40,7 @@ pub struct AuthService {
 
 impl AuthService {
     /// Create a new AuthService instance
-    pub fn new(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Self {
+    pub fn new(db: Arc<DatabaseManager>, jwt_config: JwtConfig) -> Self {
         info!("Creating new AuthService instance");
         let desktop_login_url = std::env::var("DESKTOP_LOGIN_URL").unwrap_or_else(|e| {
             error!("DESKTOP_LOGIN_URL environment variable not set: {}", e);
@@ -91,7 +48,7 @@ impl AuthService {
         });
         Self {
             db,
-            jwt_config: jwt_config.unwrap_or_default(),
+            jwt_config,
             desktop_login_url,
         }
     }
