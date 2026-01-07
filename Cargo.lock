@@ -545,6 +545,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "asset-models"
+version = "0.0.0"
+dependencies = [
+ "agent-chain-core",
+ "anyhow",
+ "async-trait",
+ "auth-core",
+ "base64 0.22.1",
+ "chrono",
+ "enum_dispatch",
+ "euro-remote-db",
+ "focus-tracker-core",
+ "image",
+ "prost",
+ "prost-types",
+ "serde",
+ "serde_json",
+ "specta",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3303,6 +3329,55 @@ dependencies = [
  "tonic-prost",
  "tonic-prost-build",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "euro-auth"
+version = "0.0.0"
+dependencies = [
+ "agent-chain-core",
+ "anyhow",
+ "async-trait",
+ "auth-core",
+ "base64 0.22.1",
+ "be-auth-grpc",
+ "cfg-if",
+ "chrono",
+ "dashmap",
+ "dirs 6.0.0",
+ "enum_dispatch",
+ "euro-assets-service",
+ "euro-encrypt",
+ "euro-fs",
+ "euro-native-messaging",
+ "euro-remote-db",
+ "euro-secret",
+ "focus-tracker",
+ "humantime-serde",
+ "image",
+ "jsonwebtoken",
+ "prost",
+ "prost-types",
+ "rand 0.9.2",
+ "regex",
+ "resvg",
+ "serde",
+ "serde_json",
+ "sha2",
+ "specta",
+ "taurpc",
+ "thiserror 2.0.17",
+ "tiny-skia",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "usvg",
  "uuid",
 ]
 
