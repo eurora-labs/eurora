@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::{Duration, Utc};
-use jsonwebtoken::{Algorithm, Header, decode, encode};
+use jsonwebtoken::{Algorithm, Header, encode};
 use std::sync::Arc;
 // Re-export shared types for convenience
 pub use auth_core::Claims;
@@ -74,11 +74,14 @@ impl AuthService {
         let token = &auth_str[7..]; // Remove "Bearer " prefix
 
         // Validate access token using shared function
-        self.validate_access_token(token)
+        self.jwt_config.validate_access_token(token)
     }
 
     /// Extract and validate JWT token from request metadata
-    pub fn authenticate_request_refresh_token<T>(&self, request: &Request<T>) -> Result<Claims> {
+    pub fn authenticate_request_refresh_token<T>(
+        &self,
+        request: &Request<T>,
+    ) -> Result<(Claims, String)> {
         // Get authorization header
         let auth_header = request
             .metadata()
@@ -98,7 +101,9 @@ impl AuthService {
         let token = &auth_str[7..]; // Remove "Bearer " prefix
 
         // Validate refresh token using shared function
-        self.validate_refresh_token(token)
+        let claims = self.jwt_config.validate_refresh_token(token)?;
+
+        Ok((claims, token.to_string()))
     }
 
     /// Hash a password using bcrypt
@@ -184,38 +189,6 @@ impl AuthService {
             .map_err(|e| anyhow!("Failed to store refresh token: {}", e))?;
 
         Ok((access_token, refresh_token))
-    }
-
-    pub fn validate_access_token(&self, token: &str) -> Result<Claims> {
-        let token_data = decode::<Claims>(
-            token,
-            &self.jwt_config.access_token_decoding_key,
-            &self.jwt_config.validation,
-        )
-        .map_err(|e| anyhow!("Invalid token: {}", e))?;
-
-        // Ensure it's an access token
-        if token_data.claims.token_type != "access" {
-            return Err(anyhow!("Invalid token type: expected access token"));
-        }
-
-        Ok(token_data.claims)
-    }
-
-    pub fn validate_refresh_token(&self, token: &str) -> Result<Claims> {
-        let token_data = decode::<Claims>(
-            token,
-            &self.jwt_config.refresh_token_decoding_key,
-            &self.jwt_config.validation,
-        )
-        .map_err(|e| anyhow!("Invalid token: {}", e))?;
-
-        // Ensure it's a refresh token
-        if token_data.claims.token_type != "refresh" {
-            return Err(anyhow!("Invalid token type: expected refresh token"));
-        }
-
-        Ok(token_data.claims)
     }
 
     fn generate_random_string(&self, length: usize) -> Result<String> {
@@ -740,12 +713,12 @@ impl ProtoAuthService for AuthService {
         request: Request<RefreshTokenRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
         info!("Refresh token request received");
-        self.authenticate_request_refresh_token(&request)
+        let (_, refresh_token) = self
+            .authenticate_request_refresh_token(&request)
             .map_err(|e| Status::unauthenticated(e.to_string()))?;
-        let req = request.into_inner();
 
         // Call the existing refresh_access_token method
-        let response = match self.refresh_access_token(&req.refresh_token).await {
+        let response = match self.refresh_access_token(&refresh_token).await {
             Ok(response) => response,
             Err(e) => {
                 error!("Token refresh failed: {}", e);
