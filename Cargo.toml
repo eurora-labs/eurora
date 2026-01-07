@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
   "crates/app/euro-*",
+  "crates/backend/be-auth-core",
+  "crates/backend/be-auth-grpc",
   "crates/backend/euro-*",
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
@@ -34,6 +36,8 @@ anyhow = "1.0.99"
 async_from = "0.2.0"
 async-trait = "0.1.89"
 base64 = "0.22.1"
+be-auth-core = { path = "crates/backend/be-auth-core" }
+be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
 bstr = "1.12.1"
 cfg-if = "1.0.4"
 chrono = "0.4.41"
@@ -49,8 +53,6 @@ euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-fs = { path = "crates/common/euro-fs" }
 euro-monolith = { path = "crates/backend/euro-monolith" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
-euro-ocr = { path = "crates/common/euro-ocr" }
-euro-ocr-service = { path = "crates/backend/euro-ocr-service" }
 euro-personal-db = { path = "crates/app/euro-personal-db" }
 euro-prompt-kit = { path = "crates/common/euro-prompt-kit" }
 euro-prompt-service = { path = "crates/backend/euro-prompt-service" }
