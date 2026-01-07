@@ -132,10 +132,10 @@ fn find_processes_by_name(process_name: &str) -> Result<Vec<u32>> {
                             let parts: Vec<&str> = line.split(',').collect();
                             if parts.len() > 1 {
                                 let pid_str = parts[1].trim_matches('"');
-                                if let Ok(pid) = pid_str.parse::<u32>() {
-                                    if pid != current_pid {
-                                        pids.push(pid);
-                                    }
+                                if let Ok(pid) = pid_str.parse::<u32>()
+                                    && pid != current_pid
+                                {
+                                    pids.push(pid);
                                 }
                             }
                         }
