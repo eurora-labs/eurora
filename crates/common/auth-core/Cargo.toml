@@ -4,13 +4,8 @@ version = "0.0.0"
 edition.workspace = true
 
 [dependencies]
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-chrono = { workspace = true, features = ["serde"] }
-euro-proto-client = { workspace = true }
-euro-secret = { workspace = true }
-jsonwebtoken = { workspace = true }
 serde = { workspace = true, features = ["std"] }
-specta = { workspace = true, features = ["derive", "function"] }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tracing = { workspace = true }
+specta = { workspace = true, optional = true }
+
+[features]
+specta = ["specta/derive", "specta/function"]

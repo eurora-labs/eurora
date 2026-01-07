@@ -748,16 +748,8 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "auth-core"
 version = "0.0.0"
 dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "euro-proto-client",
- "euro-secret",
- "jsonwebtoken",
  "serde",
  "specta",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -1407,30 +1399,16 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "auth-core",
- "base64 0.22.1",
- "chrono",
- "euro-remote-db",
  "jsonwebtoken",
- "serde",
- "serde_json",
- "tracing",
- "uuid",
 ]
 
 [[package]]
 name = "be-auth-grpc"
 version = "0.0.0"
 dependencies = [
- "anyhow",
- "auth-core",
  "be-auth-core",
- "chrono",
- "euro-remote-db",
- "jsonwebtoken",
  "tonic",
  "tonic-prost",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -3311,7 +3289,6 @@ name = "euro-assets-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "auth-core",
  "base64 0.22.1",
  "be-auth-grpc",
  "chrono",
@@ -3389,7 +3366,6 @@ dependencies = [
 name = "euro-monolith"
 version = "0.0.1"
 dependencies = [
- "auth-core",
  "axum",
  "be-auth-grpc",
  "dotenv",
@@ -3485,7 +3461,6 @@ dependencies = [
  "agent-chain-core",
  "agent-chain-eurora",
  "anyhow",
- "auth-core",
  "be-auth-grpc",
  "prost",
  "tokio-stream",
