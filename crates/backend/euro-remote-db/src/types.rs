@@ -141,3 +141,77 @@ pub struct CreateLoginTokenRequest {
 pub struct UpdateLoginTokenRequest {
     pub user_id: Uuid,
 }
+
+// =============================================================================
+// Asset Types
+// =============================================================================
+
+/// Represents a file asset (screenshots, attachments, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Asset {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub content_sha256: Option<Vec<u8>>,
+    pub byte_size: Option<i64>,
+    pub file_path: String,
+    pub mime_type: String,
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Request for creating a new asset
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateAssetRequest {
+    pub id: Uuid,
+    pub content_sha256: Option<Vec<u8>>,
+    pub byte_size: Option<i64>,
+    pub file_path: String,
+    pub mime_type: String,
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Request for updating an asset
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateAssetRequest {
+    pub content_sha256: Option<Vec<u8>>,
+    pub byte_size: Option<i64>,
+    pub file_path: Option<String>,
+    pub mime_type: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Message-asset link
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct MessageAsset {
+    pub message_id: Uuid,
+    pub asset_id: Uuid,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Activity-asset link
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ActivityAsset {
+    pub activity_id: Uuid,
+    pub asset_id: Uuid,
+    pub created_at: DateTime<Utc>,
+}
+
+// =============================================================================
+// Activity Types
+// =============================================================================
+
+/// Represents a user activity (application/process usage)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Activity {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub name: String,
+    pub icon_asset_id: Option<Uuid>,
+    pub process_name: String,
+    pub window_title: String,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}

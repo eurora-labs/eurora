@@ -5,7 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
+
+use crate::utils::uuid7;
 
 #[cfg(feature = "specta")]
 use specta::Type;
@@ -36,7 +37,7 @@ impl ToolCall {
     /// Create a new tool call.
     pub fn new(name: impl Into<String>, args: serde_json::Value) -> Self {
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: uuid7(None).to_string(),
             name: name.into(),
             args,
         }
@@ -203,7 +204,7 @@ impl ToolMessage {
         Self {
             content: content.into(),
             tool_call_id: tool_call_id.into(),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             name: None,
             status: ToolStatus::Success,
             artifact: None,
@@ -237,7 +238,7 @@ impl ToolMessage {
         Self {
             content: content.into(),
             tool_call_id: tool_call_id.into(),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             name: None,
             status: ToolStatus::Error,
             artifact: None,
@@ -255,7 +256,7 @@ impl ToolMessage {
         Self {
             content: content.into(),
             tool_call_id: tool_call_id.into(),
-            id: Some(Uuid::new_v4().to_string()),
+            id: Some(uuid7(None).to_string()),
             name: None,
             status: ToolStatus::Success,
             artifact: Some(artifact),
