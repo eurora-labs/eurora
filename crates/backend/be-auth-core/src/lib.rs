@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation, decode};
 
-pub use euro_auth::Claims;
+pub use auth_core::Claims;
 
 /// Configuration for JWT tokens
 #[derive(Clone)]

@@ -745,6 +745,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "auth-core"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "euro-proto-client",
+ "euro-secret",
+ "jsonwebtoken",
+ "serde",
+ "specta",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "auto-launch"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1390,9 +1406,9 @@ name = "be-auth-core"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "auth-core",
  "base64 0.22.1",
  "chrono",
- "euro-auth",
  "euro-remote-db",
  "jsonwebtoken",
  "serde",
@@ -1406,9 +1422,9 @@ name = "be-auth-grpc"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "auth-core",
  "be-auth-core",
  "chrono",
- "euro-auth",
  "euro-remote-db",
  "jsonwebtoken",
  "tonic",
@@ -3295,10 +3311,10 @@ name = "euro-assets-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "auth-core",
  "base64 0.22.1",
  "be-auth-grpc",
  "chrono",
- "euro-auth",
  "euro-remote-db",
  "hex",
  "opendal",
@@ -3314,31 +3330,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-auth"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "euro-proto-client",
- "euro-secret",
- "jsonwebtoken",
- "serde",
- "specta",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "euro-auth-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "auth-core",
  "base64 0.22.1",
  "bcrypt",
  "be-auth-grpc",
  "chrono",
- "euro-auth",
  "euro-proto",
  "euro-remote-db",
  "hex",
@@ -3389,12 +3389,12 @@ dependencies = [
 name = "euro-monolith"
 version = "0.0.1"
 dependencies = [
+ "auth-core",
  "axum",
  "be-auth-grpc",
  "dotenv",
  "euro-activity-service",
  "euro-assets-service",
- "euro-auth",
  "euro-auth-service",
  "euro-prompt-service",
  "euro-proto",
@@ -3485,8 +3485,8 @@ dependencies = [
  "agent-chain-core",
  "agent-chain-eurora",
  "anyhow",
+ "auth-core",
  "be-auth-grpc",
- "euro-auth",
  "prost",
  "tokio-stream",
  "tonic",
@@ -3668,9 +3668,9 @@ name = "euro-user"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "auth-core",
  "base64 0.22.1",
  "chrono",
- "euro-auth",
  "euro-proto-client",
  "euro-secret",
  "euro-storage",

@@ -1,6 +1,6 @@
 use crate::{User, auth::AuthManager, storage::Storage};
 use anyhow::{Context, Result};
-use euro_auth::Claims;
+use auth_core::Claims;
 use euro_secret::{Sensitive, secret};
 use std::path::PathBuf;
 

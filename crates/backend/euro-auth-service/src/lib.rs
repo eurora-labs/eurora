@@ -7,8 +7,8 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, decode, encode};
 use std::sync::Arc;
 // Re-export shared types for convenience
+pub use auth_core::Claims;
 use be_auth_grpc::JwtConfig;
-pub use euro_auth::Claims;
 use euro_proto::proto_auth_service::{
     EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
     Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
