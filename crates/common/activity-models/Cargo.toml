@@ -11,10 +11,10 @@ ignored = ["tonic-prost"]
 agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+auth-core = { workspace = true, optional = true }
 base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 enum_dispatch = { workspace = true }
-euro-auth = { workspace = true, optional = true }
 euro-remote-db = { workspace = true, optional = true }
 focus-tracker-core = { workspace = true }
 image = { workspace = true }
