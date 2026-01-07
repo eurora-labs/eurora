@@ -11,6 +11,7 @@ members = [
   "crates/common/agent-chain-macros",
   "crates/common/agent-graph",
   "crates/common/agent-graph-macros",
+  "crates/common/auth-core",
   # "crates/common/activity-models",
   "crates/common/euro-*",
   "crates/common/focus-tracker",
@@ -35,6 +36,7 @@ agent-graph-macros = { path = "crates/common/agent-graph-macros" }
 anyhow = "1.0.99"
 async_from = "0.2.0"
 async-trait = "0.1.89"
+auth-core = { path = "crates/common/auth-core" }
 base64 = "0.22.1"
 be-auth-core = { path = "crates/backend/be-auth-core" }
 be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
@@ -47,7 +49,6 @@ enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-activity-service = { path = "crates/backend/euro-activity-service" }
 euro-assets-service = { path = "crates/backend/euro-assets-service" }
-euro-auth = { path = "crates/common/euro-auth" }
 euro-auth-service = { path = "crates/backend/euro-auth-service" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-fs = { path = "crates/common/euro-fs" }
