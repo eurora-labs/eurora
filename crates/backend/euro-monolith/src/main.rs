@@ -2,7 +2,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use dotenv::dotenv;
 use euro_activity_service::{ActivityService, ProtoActivityServiceServer};
-use euro_assets_service::{AssetsService, ProtoAssetsServiceServer};
+use euro_asset_service::{AssetsService, ProtoAssetServiceServer};
 use euro_auth_service::AuthService;
 use euro_prompt_service::PromptService;
 use euro_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer;
@@ -123,7 +123,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             activity_service,
             jwt_interceptor.clone(),
         ))
-        .add_service(ProtoAssetsServiceServer::with_interceptor(
+        .add_service(ProtoAssetServiceServer::with_interceptor(
             assets_service,
             jwt_interceptor.clone(),
         ))

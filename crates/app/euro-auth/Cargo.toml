@@ -19,7 +19,7 @@ chrono = { workspace = true, features = ["serde"] }
 dashmap = "6.1.0"
 dirs = { workspace = true }
 enum_dispatch = { workspace = true }
-euro-assets-service = { workspace = true }
+euro-asset-service = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-fs = { workspace = true }
 euro-native-messaging = { workspace = true }

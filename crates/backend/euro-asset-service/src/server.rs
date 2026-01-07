@@ -26,7 +26,7 @@ use crate::proto::{
 };
 use crate::storage::StorageService;
 
-pub use crate::proto::proto_assets_service_server::{ProtoAssetsService, ProtoAssetsServiceServer};
+pub use crate::proto::proto_asset_service_server::{ProtoAssetService, ProtoAssetServiceServer};
 
 /// The main assets service
 #[derive(Debug)]
@@ -108,7 +108,7 @@ fn decode_sha256(base64_hash: &str) -> Result<Vec<u8>, Status> {
 }
 
 #[tonic::async_trait]
-impl ProtoAssetsService for AssetsService {
+impl ProtoAssetService for AssetsService {
     async fn create_asset(
         &self,
         request: Request<CreateAssetRequest>,
