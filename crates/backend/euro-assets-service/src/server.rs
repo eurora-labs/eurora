@@ -6,8 +6,8 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use be_auth_grpc::Claims;
 use chrono::{DateTime, Utc};
-use euro_auth::{Claims, JwtConfig, validate_access_token};
 use euro_remote_db::{
     CreateAssetRequest as DbCreateAssetRequest, DatabaseManager,
     UpdateAssetRequest as DbUpdateAssetRequest,
@@ -28,59 +28,24 @@ use crate::storage::StorageService;
 
 pub use crate::proto::proto_assets_service_server::{ProtoAssetsService, ProtoAssetsServiceServer};
 
-/// Extract and validate JWT token from request metadata
-pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
-    let auth_header = request
-        .metadata()
-        .get("authorization")
-        .ok_or_else(|| anyhow::anyhow!("Missing authorization header"))?;
-
-    let auth_str = auth_header
-        .to_str()
-        .map_err(|_| anyhow::anyhow!("Invalid authorization header format"))?;
-
-    if !auth_str.starts_with("Bearer ") {
-        return Err(anyhow::anyhow!(
-            "Authorization header must start with 'Bearer '"
-        ));
-    }
-
-    let token = &auth_str[7..];
-    validate_access_token(token, jwt_config)
-}
-
 /// The main assets service
 #[derive(Debug)]
 pub struct AssetsService {
     db: Arc<DatabaseManager>,
     storage: Arc<StorageService>,
-    jwt_config: JwtConfig,
 }
 
 impl AssetsService {
     /// Create a new AssetsService instance
-    pub fn new(
-        db: Arc<DatabaseManager>,
-        storage: Arc<StorageService>,
-        jwt_config: Option<JwtConfig>,
-    ) -> Self {
+    pub fn new(db: Arc<DatabaseManager>, storage: Arc<StorageService>) -> Self {
         info!("Creating new AssetsService instance");
-        Self {
-            db,
-            storage,
-            jwt_config: jwt_config.unwrap_or_default(),
-        }
+        Self { db, storage }
     }
 
     /// Create a new AssetsService with storage configured from environment
-    pub fn from_env(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Result<Self> {
+    pub fn from_env(db: Arc<DatabaseManager>) -> Result<Self> {
         let storage = StorageService::from_env()?;
-        Ok(Self::new(db, Arc::new(storage), jwt_config))
-    }
-
-    /// Get the JWT config reference
-    pub fn jwt_config(&self) -> &JwtConfig {
-        &self.jwt_config
+        Ok(Self::new(db, Arc::new(storage)))
     }
 
     /// Get the storage service reference
@@ -150,8 +115,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<AssetResponse>, Status> {
         info!("CreateAsset request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -270,8 +237,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<AssetResponse>, Status> {
         info!("GetAsset request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -302,8 +271,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<ListAssetsResponse>, Status> {
         info!("ListAssets request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -336,8 +307,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<AssetResponse>, Status> {
         info!("UpdateAsset request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -390,8 +363,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<()>, Status> {
         info!("DeleteAsset request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -437,8 +412,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<AssetResponse>, Status> {
         info!("FindAssetBySha256 request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -472,8 +449,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<ListAssetsResponse>, Status> {
         info!("GetAssetsByMessageId request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -511,8 +490,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<ListAssetsResponse>, Status> {
         info!("GetAssetsByActivityId request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -550,8 +531,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<MessageAssetResponse>, Status> {
         info!("LinkAssetToMessage request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -596,8 +579,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<()>, Status> {
         info!("UnlinkAssetFromMessage request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -639,8 +624,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<ActivityAssetResponse>, Status> {
         info!("LinkAssetToActivity request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -685,8 +672,10 @@ impl ProtoAssetsService for AssetsService {
     ) -> Result<Response<()>, Status> {
         info!("UnlinkAssetFromActivity request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
