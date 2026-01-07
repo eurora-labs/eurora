@@ -3268,7 +3268,7 @@ dependencies = [
  "dashmap",
  "dirs 6.0.0",
  "enum_dispatch",
- "euro-assets-service",
+ "euro-asset-service",
  "euro-encrypt",
  "euro-fs",
  "euro-native-messaging",
@@ -3311,7 +3311,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-assets-service"
+name = "euro-asset-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -3347,7 +3347,7 @@ dependencies = [
  "dashmap",
  "dirs 6.0.0",
  "enum_dispatch",
- "euro-assets-service",
+ "euro-asset-service",
  "euro-encrypt",
  "euro-fs",
  "euro-native-messaging",
@@ -3445,7 +3445,7 @@ dependencies = [
  "be-auth-grpc",
  "dotenv",
  "euro-activity-service",
- "euro-assets-service",
+ "euro-asset-service",
  "euro-auth-service",
  "euro-prompt-service",
  "euro-proto",
@@ -3685,7 +3685,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "euro-activity",
- "euro-assets-service",
+ "euro-asset-service",
  "euro-personal-db",
  "focus-tracker",
  "image",
