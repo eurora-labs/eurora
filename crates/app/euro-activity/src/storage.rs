@@ -1,13 +1,16 @@
-//! Asset storage functionality for saving activity assets to disk
+//! Asset storage functionality for saving activity assets to disk and remote service
 
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
+use euro_assets_service::proto::CreateAssetRequest;
+use euro_assets_service::proto::proto_assets_service_client::ProtoAssetsServiceClient;
 use euro_encrypt::{MainKey, encrypt_file_contents};
 use euro_fs::create_dirs_then_write;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+use tonic::transport::Channel;
 use tracing::debug;
 
 use crate::{Activity, ActivityAsset, ActivityError, AssetFunctionality, error::ActivityResult};
@@ -23,6 +26,12 @@ pub struct ActivityStorageConfig {
     pub max_file_size: Option<u64>,
     /// Master key
     pub main_key: MainKey,
+    /// Remote assets service endpoint (e.g., "http://localhost:50051")
+    #[serde(default)]
+    pub service_endpoint: Option<String>,
+    /// Authorization token for the remote service
+    #[serde(default)]
+    pub auth_token: Option<String>,
 }
 
 impl Default for ActivityStorageConfig {
@@ -33,6 +42,8 @@ impl Default for ActivityStorageConfig {
             use_content_hash: true,
             max_file_size: Some(100 * 1024 * 1024), // 100MB default limit
             main_key,
+            service_endpoint: None,
+            auth_token: None,
         }
     }
 }
@@ -100,6 +111,24 @@ impl ActivityStorage {
         Ok(asset)
     }
 
+    /// Save all assets of an activity to service by ids
+    pub async fn save_assets_to_service_by_ids(
+        &self,
+        activity: &Activity,
+        ids: &[String],
+    ) -> ActivityResult<Vec<SavedAssetInfo>> {
+        let mut saved_assets = Vec::new();
+
+        for asset in &activity.assets {
+            if ids.contains(&asset.get_id().to_string()) {
+                let saved_info = self.save_asset_to_service(asset).await?;
+                saved_assets.push(saved_info);
+            }
+        }
+
+        Ok(saved_assets)
+    }
+
     /// Save all assets of an activity to disk by ids
     pub async fn save_assets_to_disk_by_ids(
         &self,
@@ -131,6 +160,81 @@ impl ActivityStorage {
         }
 
         Ok(saved_assets)
+    }
+
+    /// Save an asset to remote service via gRPC
+    pub async fn save_asset_to_service(
+        &self,
+        asset: &ActivityAsset,
+    ) -> ActivityResult<SavedAssetInfo> {
+        let service_endpoint = self.config.service_endpoint.as_ref().ok_or_else(|| {
+            ActivityError::Configuration("service_endpoint not configured".to_string())
+        })?;
+
+        // Serialize the entire ActivityAsset enum to JSON (no encryption as requested)
+        let bytes = serde_json::to_vec(asset)?;
+        let file_size = bytes.len() as u64;
+
+        debug!(
+            "Saving asset {} to service at {}",
+            asset.get_unique_id(),
+            service_endpoint
+        );
+
+        // Connect to the gRPC service
+        let channel = Channel::from_shared(service_endpoint.clone())
+            .map_err(|e| ActivityError::Network(format!("Invalid service endpoint: {}", e)))?
+            .connect()
+            .await
+            .map_err(|e| ActivityError::Network(format!("Failed to connect to service: {}", e)))?;
+
+        let mut client = ProtoAssetsServiceClient::new(channel);
+
+        // Prepare metadata as JSON containing asset type info
+        let metadata = serde_json::json!({
+            "asset_type": asset.get_asset_type(),
+            "unique_id": asset.get_unique_id(),
+            "display_name": asset.get_display_name(),
+        });
+
+        // Create the request
+        let mut request = tonic::Request::new(CreateAssetRequest {
+            content: bytes,
+            mime_type: "application/json".to_string(),
+            metadata: Some(metadata.to_string()),
+            activity_id: None, // Could be linked later if needed
+        });
+
+        // Add authorization header if configured
+        if let Some(token) = &self.config.auth_token {
+            request.metadata_mut().insert(
+                "authorization",
+                format!("Bearer {}", token)
+                    .parse()
+                    .map_err(|e| ActivityError::Network(format!("Invalid auth token: {}", e)))?,
+            );
+        }
+
+        // Call the service
+        let response = client
+            .create_asset(request)
+            .await
+            .map_err(|e| ActivityError::Network(format!("gRPC call failed: {}", e)))?;
+
+        let asset_response = response.into_inner();
+        let created_asset = asset_response
+            .asset
+            .ok_or_else(|| ActivityError::Network("No asset returned from service".to_string()))?;
+
+        debug!("Asset saved with ID: {}", created_asset.id);
+
+        Ok(SavedAssetInfo {
+            file_path: PathBuf::from(&created_asset.file_path),
+            absolute_path: PathBuf::from(&created_asset.file_path),
+            content_hash: created_asset.content_sha256,
+            file_size,
+            saved_at: chrono::Utc::now(),
+        })
     }
 
     /// Save an asset to disk

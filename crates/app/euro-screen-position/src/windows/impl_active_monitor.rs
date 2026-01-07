@@ -1,6 +1,5 @@
 use enigo::{Enigo, Mouse, Settings};
 use tauri::PhysicalSize;
-use tracing::debug;
 use xcap::Monitor;
 
 use super::util::find_cursor_monitor;
@@ -39,6 +38,7 @@ impl ImplActiveMonitor {
     }
 
     /// Get all available monitors
+    #[allow(dead_code)]
     pub fn get_all_monitors() -> Result<Vec<MonitorInfo>, String> {
         let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 

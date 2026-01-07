@@ -3,63 +3,38 @@ use std::pin::Pin;
 use agent_chain::providers::openai::ChatOpenAI;
 use agent_chain_core::chat_models::BaseChatModel;
 use agent_chain_core::messages::BaseMessage;
-use agent_chain_eurora::proto::chat::{
+use agent_chain_eurora::proto::chat_service::{
     ProtoAiMessage, ProtoAiMessageChunk, ProtoChatRequest, ProtoChatResponse,
     ProtoChatStreamResponse,
     proto_chat_service_server::{ProtoChatService, ProtoChatServiceServer},
 };
-use anyhow::{Result, anyhow};
-use euro_auth::{Claims, JwtConfig, validate_access_token};
+use anyhow::Result;
+use be_auth_grpc::JwtInterceptor;
 
 use tokio_stream::{Stream, StreamExt};
-use tonic::{Request, Response, Status};
+use tonic::{Request, Response, Status, service::interceptor::InterceptedService};
 use tracing::debug;
 
-/// Extract and validate JWT token from request metadata
-pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
-    // Get authorization header
-    let auth_header = request
-        .metadata()
-        .get("authorization")
-        .ok_or_else(|| anyhow!("Missing authorization header"))?;
-
-    // Convert to string
-    let auth_str = auth_header
-        .to_str()
-        .map_err(|_| anyhow!("Invalid authorization header format"))?;
-
-    // Extract Bearer token
-    if !auth_str.starts_with("Bearer ") {
-        return Err(anyhow!("Authorization header must start with 'Bearer '"));
-    }
-
-    let token = &auth_str[7..]; // Remove "Bearer " prefix
-
-    // Validate access token using shared function
-    validate_access_token(token, jwt_config)
-}
-
-pub fn get_service(prompt_service: PromptService) -> ProtoChatServiceServer<PromptService> {
-    ProtoChatServiceServer::new(prompt_service)
+pub fn get_service(
+    prompt_service: PromptService,
+    jwt_interceptor: JwtInterceptor,
+) -> InterceptedService<ProtoChatServiceServer<PromptService>, JwtInterceptor> {
+    ProtoChatServiceServer::with_interceptor(prompt_service, jwt_interceptor)
 }
 
 #[derive(Debug)]
 pub struct PromptService {
     provider: ChatOpenAI,
-    jwt_config: JwtConfig,
 }
 
-impl PromptService {
-    pub fn new(jwt_config: Option<JwtConfig>) -> Self {
+impl Default for PromptService {
+    fn default() -> Self {
         let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
-        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4".to_string());
 
         let provider = ChatOpenAI::new(&model).api_key(api_key);
 
-        Self {
-            provider,
-            jwt_config: jwt_config.unwrap_or_default(),
-        }
+        Self { provider }
     }
 }
 
@@ -71,8 +46,6 @@ impl ProtoChatService for PromptService {
     type ChatStreamStream = ChatStreamResult;
 
     async fn chat(&self, request: Request<ProtoChatRequest>) -> ChatResult<ProtoChatResponse> {
-        authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
         debug!("Received chat request");
 
         let request_inner = request.into_inner();
@@ -94,11 +67,13 @@ impl ProtoChatService for PromptService {
         let tool_calls: Vec<_> = ai_message
             .tool_calls()
             .iter()
-            .map(|tc| agent_chain_eurora::proto::chat::ProtoToolCall {
-                id: tc.id().to_string(),
-                name: tc.name().to_string(),
-                args: tc.args().to_string(),
-            })
+            .map(
+                |tc| agent_chain_eurora::proto::chat_service::ProtoToolCall {
+                    id: tc.id().to_string(),
+                    name: tc.name().to_string(),
+                    args: tc.args().to_string(),
+                },
+            )
             .collect();
 
         Ok(Response::new(ProtoChatResponse {
@@ -121,8 +96,6 @@ impl ProtoChatService for PromptService {
         &self,
         request: Request<ProtoChatRequest>,
     ) -> ChatResult<Self::ChatStreamStream> {
-        authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
         debug!("Received chat_stream request");
         let request_inner = request.into_inner();
 

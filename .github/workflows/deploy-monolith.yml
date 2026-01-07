@@ -6,7 +6,6 @@ on:
         paths:
             - 'crates/backend/euro-monolith/**'
             - 'crates/backend/euro-auth-service/**'
-            - 'crates/backend/euro-ocr-service/**'
             - 'crates/backend/euro-remote-db/**'
             - 'crates/common/euro-auth/**'
             - 'proto/**'
