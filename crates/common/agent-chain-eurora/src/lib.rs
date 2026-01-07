@@ -59,8 +59,8 @@
 
 /// Proto-generated types for the Eurora chat service.
 pub mod proto {
-    pub mod chat {
-        tonic::include_proto!("eurora.chat");
+    pub mod chat_service {
+        tonic::include_proto!("chat_service");
     }
 }
 
