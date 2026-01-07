@@ -1,6 +1,6 @@
 [package]
 name = "focus-tracker-core"
-version = "0.0.1"
+version = "0.0.2"
 edition.workspace = true
 description = "The core types for the focus tracker crate"
 homepage = "https://github.com/eurora-labs/eurora/tree/main/crates/common/focus-tracker-core"
