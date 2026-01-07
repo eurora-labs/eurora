@@ -61,10 +61,10 @@ fn test_macos_accessibility_permission() {
         Ok(_) => {
             info!("Focus tracking succeeded - accessibility permission likely granted");
             // Check if we got meaningful window titles
-            if let Ok(events) = focus_events.lock() {
-                if events.iter().any(|w| w.window_title.is_none()) {
-                    info!("Some windows had no title - possible permission issue");
-                }
+            if let Ok(events) = focus_events.lock()
+                && events.iter().any(|w| w.window_title.is_none())
+            {
+                info!("Some windows had no title - possible permission issue");
             }
         }
         Err(FocusTrackerError::PermissionDenied) => {
