@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
+use auth_core::Claims;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use euro_auth::Claims;
 use euro_proto_client::auth::AuthClient;
 use euro_secret::{Sensitive, secret};
 use rand::{TryRngCore, rngs::OsRng};
