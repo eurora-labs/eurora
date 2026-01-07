@@ -7,7 +7,7 @@
 //! ## Features
 //!
 //! - `server` - Enables server-side functionality including the gRPC service
-//!   implementation. This feature adds dependencies on `euro-auth` and
+//!   implementation. This feature adds dependencies on `auth-core` and
 //!   `euro-remote-db`. Without this feature, only the proto types and
 //!   client are available.
 
