@@ -241,6 +241,29 @@ impl TimelineManager {
         // Ok(vec![asset])
     }
 
+    /// Save the assets via the euro-assets-service
+    pub async fn save_assets_to_service_by_ids(
+        &self,
+        ids: &[String],
+    ) -> TimelineResult<Vec<SavedAssetInfo>> {
+        let activity = {
+            let storage = self.storage.lock().await;
+            storage.get_current_activity().cloned()
+        };
+
+        match activity {
+            Some(activity) => {
+                let activity_storage = self.activity_storage.lock().await;
+                return Ok(activity_storage
+                    .save_assets_to_service_by_ids(&activity, ids)
+                    .await?);
+            }
+            None => Err(TimelineError::Storage(
+                "No current activity found".to_string(),
+            )),
+        }
+    }
+
     /// Save the assets to disk by ids
     pub async fn save_assets_to_disk_by_ids(
         &self,
@@ -255,7 +278,7 @@ impl TimelineManager {
             Some(activity) => {
                 let activity_storage = self.activity_storage.lock().await;
                 return Ok(activity_storage
-                    .save_assets_to_disk_by_ids(&activity, ids)
+                    .save_assets_to_service_by_ids(&activity, ids)
                     .await?);
             }
             None => Err(TimelineError::Storage(
