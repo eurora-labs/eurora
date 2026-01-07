@@ -1,9 +1,9 @@
-use crate::{FocusedWindow, config::IconConfig, error::FocusTrackerResult};
 use core_foundation::array::{CFArray, CFArrayRef};
 use core_foundation::base::{CFType, TCFType};
 use core_foundation::dictionary::CFDictionary;
 use core_foundation::number::CFNumber;
 use core_foundation::string::CFString;
+use focus_tracker_core::{FocusTrackerError, FocusTrackerResult, FocusedWindow, IconConfig};
 use objc2::ClassType;
 use objc2::msg_send;
 use objc2::rc::autoreleasepool;
@@ -64,10 +64,14 @@ pub fn get_frontmost_window_basic_info() -> FocusTrackerResult<FocusedWindow> {
             None
         };
 
+        let Some(process_name) = process_name else {
+            return Err(FocusTrackerError::Platform(pid.to_string()));
+        };
+
         let window_title = get_window_title_via_accessibility(pid)?;
 
         Ok(FocusedWindow {
-            process_id: Some(pid as u32),
+            process_id: pid as u32,
             window_title,
             process_name,
             icon: None,
@@ -98,7 +102,7 @@ fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
         let window_list_ref = CGWindowListCopyWindowInfo(options, K_CG_NULL_WINDOW_ID);
 
         if window_list_ref.is_null() {
-            return Err(crate::error::FocusTrackerError::Platform(
+            return Err(FocusTrackerError::Platform(
                 "Failed to get window list".to_string(),
             ));
         }
@@ -106,9 +110,7 @@ fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
         let window_list: CFArray<CFDictionary> = CFArray::wrap_under_create_rule(window_list_ref);
 
         if window_list.is_empty() {
-            return Err(crate::error::FocusTrackerError::Platform(
-                "No windows found".to_string(),
-            ));
+            return Err(FocusTrackerError::Platform("No windows found".to_string()));
         }
 
         let layer_key = CFString::from_static_string("kCGWindowLayer");
@@ -117,7 +119,7 @@ fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
         // Find the first window at layer 0 (normal application windows)
         for i in 0..window_list.len() {
             let window_info = window_list.get(i).ok_or_else(|| {
-                crate::error::FocusTrackerError::Platform(format!("Failed to get window {}", i))
+                FocusTrackerError::Platform(format!("Failed to get window {}", i))
             })?;
 
             // Check window layer
@@ -137,27 +139,21 @@ fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
             let pid_value_ptr = window_info
                 .find(pid_key.as_CFTypeRef() as *const _)
                 .ok_or_else(|| {
-                    crate::error::FocusTrackerError::Platform(
-                        "Failed to get window owner PID".to_string(),
-                    )
+                    FocusTrackerError::Platform("Failed to get window owner PID".to_string())
                 })?;
 
             let pid_cftype = CFType::wrap_under_get_rule(pid_value_ptr.cast());
             let pid_number: CFNumber = pid_cftype.downcast().ok_or_else(|| {
-                crate::error::FocusTrackerError::Platform(
-                    "Failed to downcast PID to CFNumber".to_string(),
-                )
+                FocusTrackerError::Platform("Failed to downcast PID to CFNumber".to_string())
             })?;
             let pid: i32 = pid_number.to_i32().ok_or_else(|| {
-                crate::error::FocusTrackerError::Platform(
-                    "Failed to convert PID to i32".to_string(),
-                )
+                FocusTrackerError::Platform("Failed to convert PID to i32".to_string())
             })?;
 
             return Ok(pid);
         }
 
-        Err(crate::error::FocusTrackerError::Platform(
+        Err(FocusTrackerError::Platform(
             "No normal application window found".to_string(),
         ))
     }
@@ -183,7 +179,7 @@ fn get_window_title_via_accessibility(pid: i32) -> FocusTrackerResult<Option<Str
     unsafe { CFRelease(app_element as *const c_void) };
 
     if result == K_AX_ERROR_APIDISABLED {
-        return Err(crate::error::FocusTrackerError::PermissionDenied);
+        return Err(FocusTrackerError::PermissionDenied);
     }
 
     if result != K_AX_ERROR_SUCCESS || focused_window.is_null() {
@@ -309,7 +305,7 @@ fn nsimage_to_rgba(
     };
 
     if bitmap_rep.is_none() {
-        return Err(crate::error::FocusTrackerError::Platform(
+        return Err(FocusTrackerError::Platform(
             "Failed to create bitmap representation".to_string(),
         ));
     }
@@ -352,7 +348,7 @@ fn nsimage_to_rgba(
     };
 
     if png_data.is_none() {
-        return Err(crate::error::FocusTrackerError::Platform(
+        return Err(FocusTrackerError::Platform(
             "Failed to get PNG data from bitmap".to_string(),
         ));
     }
@@ -365,10 +361,7 @@ fn nsimage_to_rgba(
 
     let rgba_image = image::load_from_memory(bytes)
         .map_err(|e| {
-            crate::error::FocusTrackerError::Platform(format!(
-                "Failed to load image from PNG data: {}",
-                e
-            ))
+            FocusTrackerError::Platform(format!("Failed to load image from PNG data: {}", e))
         })?
         .to_rgba8();
 
