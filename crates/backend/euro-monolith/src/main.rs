@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let jwt_interceptor = JwtInterceptor::default();
 
     let auth_service = AuthService::new(db_manager.clone(), jwt_interceptor.get_config().clone());
-    let prompt_service = PromptService::new();
+    let prompt_service = PromptService::default();
     let activity_service = ActivityService::new(db_manager.clone());
     let assets_service =
         AssetsService::from_env(db_manager).expect("Failed to initialize assets service");
