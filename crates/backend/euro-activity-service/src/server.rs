@@ -6,8 +6,8 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use be_auth_grpc::Claims;
 use chrono::{DateTime, Utc};
-use euro_auth::{Claims, JwtConfig, validate_access_token};
 use euro_remote_db::DatabaseManager;
 use prost_types::Timestamp;
 use tonic::{Request, Response, Status};
@@ -24,47 +24,17 @@ pub use crate::proto::proto_activity_service_server::{
     ProtoActivityService, ProtoActivityServiceServer,
 };
 
-/// Extract and validate JWT token from request metadata
-pub fn authenticate_request<T>(request: &Request<T>, jwt_config: &JwtConfig) -> Result<Claims> {
-    let auth_header = request
-        .metadata()
-        .get("authorization")
-        .ok_or_else(|| anyhow::anyhow!("Missing authorization header"))?;
-
-    let auth_str = auth_header
-        .to_str()
-        .map_err(|_| anyhow::anyhow!("Invalid authorization header format"))?;
-
-    if !auth_str.starts_with("Bearer ") {
-        return Err(anyhow::anyhow!(
-            "Authorization header must start with 'Bearer '"
-        ));
-    }
-
-    let token = &auth_str[7..];
-    validate_access_token(token, jwt_config)
-}
-
 /// The main activity service
 #[derive(Debug)]
 pub struct ActivityService {
     db: Arc<DatabaseManager>,
-    jwt_config: JwtConfig,
 }
 
 impl ActivityService {
     /// Create a new ActivityService instance
-    pub fn new(db: Arc<DatabaseManager>, jwt_config: Option<JwtConfig>) -> Self {
+    pub fn new(db: Arc<DatabaseManager>) -> Self {
         info!("Creating new ActivityService instance");
-        Self {
-            db,
-            jwt_config: jwt_config.unwrap_or_default(),
-        }
-    }
-
-    /// Get the JWT config reference
-    pub fn jwt_config(&self) -> &JwtConfig {
-        &self.jwt_config
+        Self { db }
     }
 
     /// Convert a database Activity to a proto Activity
@@ -104,8 +74,10 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ListActivitiesResponse>, Status> {
         info!("ListActivities request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -143,8 +115,10 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ActivityResponse>, Status> {
         info!("GetActivity request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -175,8 +149,10 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ActivityResponse>, Status> {
         info!("InsertActivity request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -236,8 +212,10 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ActivityResponse>, Status> {
         info!("UpdateActivity request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -288,8 +266,10 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<()>, Status> {
         info!("UpdateActivityEndTime request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -327,8 +307,10 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ActivityResponse>, Status> {
         info!("GetLastActiveActivity request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -355,8 +337,10 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<()>, Status> {
         info!("DeleteActivity request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
@@ -385,8 +369,10 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ListActivitiesResponse>, Status> {
         info!("GetActivitiesByTimeRange request received");
 
-        let claims = authenticate_request(&request, &self.jwt_config)
-            .map_err(|e| Status::unauthenticated(e.to_string()))?;
+        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
+            error!("Missing claims in request");
+            Status::unauthenticated("Missing claims")
+        })?;
 
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
