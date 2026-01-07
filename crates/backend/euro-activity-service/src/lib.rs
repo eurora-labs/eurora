@@ -7,7 +7,7 @@
 //! ## Features
 //!
 //! - `server` - Enables server-side functionality including the gRPC service
-//!   implementation. This feature adds dependencies on `euro-auth` and
+//!   implementation. This feature adds dependencies on `auth-core` and
 //!   `euro-remote-db`. Without this feature, only the proto types and
 //!   client are available.
 
@@ -25,6 +25,4 @@ pub use proto::*;
 
 // Re-export server types when the feature is enabled
 #[cfg(feature = "server")]
-pub use server::{
-    ActivityService, ProtoActivityService, ProtoActivityServiceServer, authenticate_request,
-};
+pub use server::{ActivityService, ProtoActivityService, ProtoActivityServiceServer};

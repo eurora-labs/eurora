@@ -1,0 +1,9 @@
+[package]
+name = "be-auth-grpc"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+be-auth-core = { workspace = true }
+tonic = { workspace = true }
+tonic-prost = { workspace = true }
