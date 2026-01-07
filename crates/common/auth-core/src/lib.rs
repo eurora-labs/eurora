@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "specta")]
+use specta::Type;
+
 /// JWT Claims structure used across all services
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "specta", derive(Type))]
 pub struct Claims {
     pub sub: String,        // Subject (user ID)
     pub username: String,   // Username
