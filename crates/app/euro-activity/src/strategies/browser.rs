@@ -5,13 +5,13 @@ pub use crate::strategies::processes::*;
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use euro_focus::FocusedWindow;
 use euro_native_messaging::proto::RequestFrame;
 use euro_native_messaging::proto::ResponseFrame;
 use euro_native_messaging::{
     NativeMessage, create_browser_bridge_client,
     server::{Frame, FrameKind},
 };
+use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -279,7 +279,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     ) -> ActivityResult<()> {
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
-        self.active_browser = process_name.clone();
+        self.active_browser = Some(process_name.clone());
 
         match self.get_metadata().await {
             Ok(metadata) => {
@@ -287,7 +287,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 let activity = Activity::new(
                     metadata.url.unwrap_or_default(),
                     metadata.icon,
-                    process_name.clone().unwrap_or_default(),
+                    process_name.clone(),
                     assets,
                 );
                 if sender.send(ActivityReport::NewActivity(activity)).is_err() {
@@ -296,9 +296,9 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             }
             Err(err) => {
                 let activity = Activity::new(
-                    focus_window.process_name.clone().unwrap_or_default(),
+                    focus_window.process_name.clone(),
                     focus_window.icon.clone(),
-                    focus_window.process_name.clone().unwrap_or_default(),
+                    focus_window.process_name.clone(),
                     vec![],
                 );
                 if sender.send(ActivityReport::NewActivity(activity)).is_err() {
