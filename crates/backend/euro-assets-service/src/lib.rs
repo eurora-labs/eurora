@@ -29,9 +29,7 @@ pub use proto::*;
 
 // Re-export server types when the feature is enabled
 #[cfg(feature = "server")]
-pub use server::{
-    AssetsService, ProtoAssetsService, ProtoAssetsServiceServer, authenticate_request,
-};
+pub use server::{AssetsService, ProtoAssetsService, ProtoAssetsServiceServer};
 
 // Re-export storage types when the feature is enabled
 #[cfg(feature = "server")]
