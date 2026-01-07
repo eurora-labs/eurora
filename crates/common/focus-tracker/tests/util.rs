@@ -187,8 +187,8 @@ fn get_current_focused_window() -> Result<focus_tracker::FocusedWindow, Box<dyn 
     {
         // Placeholder for other platforms
         Ok(focus_tracker::FocusedWindow {
-            process_id: None,
-            process_name: Some("unknown".to_string()),
+            process_id: 123,
+            process_name: "some process".to_string(),
             window_title: Some("unknown".to_string()),
             icon: None,
         })
@@ -291,7 +291,7 @@ pub fn spawn_window(title: &str) -> Result<Child, Box<dyn std::error::Error>> {
 #[allow(dead_code)]
 pub fn get_focused_window() -> focus_tracker::FocusedWindow {
     get_current_focused_window().unwrap_or_else(|_| focus_tracker::FocusedWindow {
-        process_id: "123".to_string(),
+        process_id: 123,
         process_name: "unknown".to_string(),
         window_title: Some("unknown".to_string()),
         icon: None,

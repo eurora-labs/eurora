@@ -645,7 +645,7 @@ fn get_process_info<C: Connection>(
     conn: &C,
     window: u32,
     net_wm_pid: u32,
-) -> FocusTrackerResult<(String, String)> {
+) -> FocusTrackerResult<(u32, String)> {
     // fetch the PID stored in _NET_WM_PID
     let cookie = conn
         .get_property(false, window, net_wm_pid, AtomEnum::CARDINAL, 0, 1)
@@ -668,7 +668,7 @@ fn get_process_info<C: Connection>(
         .map(|name| name.trim_end_matches('\n').to_owned())
         .map_err(|e| FocusTrackerError::Platform(format!("Failed to get process name: {e}")))?;
 
-    Ok((pid.to_string(), process_name))
+    Ok((pid, process_name))
 }
 
 /// Resize an image to the specified dimensions using the specified filter type
