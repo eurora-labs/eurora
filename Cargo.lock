@@ -745,6 +745,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "auth-core"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "specta",
+]
+
+[[package]]
 name = "auto-launch"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -853,6 +861,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94b8ff6c09cd57b16da53641caa860168b88c172a5ee163b0288d3d6eea12786"
 dependencies = [
  "aws-lc-sys",
+ "untrusted 0.7.1",
  "zeroize",
 ]
 
@@ -1382,6 +1391,24 @@ dependencies = [
  "getrandom 0.3.3",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "be-auth-core"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "auth-core",
+ "jsonwebtoken",
+]
+
+[[package]]
+name = "be-auth-grpc"
+version = "0.0.0"
+dependencies = [
+ "be-auth-core",
+ "tonic",
+ "tonic-prost",
 ]
 
 [[package]]
@@ -3245,8 +3272,8 @@ name = "euro-activity-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "be-auth-grpc",
  "chrono",
- "euro-auth",
  "euro-remote-db",
  "prost",
  "prost-types",
@@ -3263,8 +3290,8 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "be-auth-grpc",
  "chrono",
- "euro-auth",
  "euro-remote-db",
  "hex",
  "opendal",
@@ -3280,31 +3307,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-auth"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "euro-proto-client",
- "euro-secret",
- "jsonwebtoken",
- "serde",
- "specta",
- "taurpc",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "euro-auth-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "auth-core",
  "base64 0.22.1",
  "bcrypt",
+ "be-auth-grpc",
  "chrono",
- "euro-auth",
  "euro-proto",
  "euro-remote-db",
  "hex",
@@ -3356,12 +3367,11 @@ name = "euro-monolith"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "be-auth-grpc",
  "dotenv",
  "euro-activity-service",
  "euro-assets-service",
- "euro-auth",
  "euro-auth-service",
- "euro-ocr-service",
  "euro-prompt-service",
  "euro-proto",
  "euro-remote-db",
@@ -3409,30 +3419,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-ocr"
-version = "0.0.0"
-dependencies = [
- "image",
- "rusty-tesseract",
-]
-
-[[package]]
-name = "euro-ocr-service"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "euro-auth",
- "euro-ocr",
- "euro-proto",
- "futures",
- "image",
- "prost",
- "tonic",
- "tonic-prost-build",
- "tracing",
-]
-
-[[package]]
 name = "euro-personal-db"
 version = "0.0.0"
 dependencies = [
@@ -3475,7 +3461,7 @@ dependencies = [
  "agent-chain-core",
  "agent-chain-eurora",
  "anyhow",
- "euro-auth",
+ "be-auth-grpc",
  "prost",
  "tokio-stream",
  "tonic",
@@ -3657,6 +3643,7 @@ name = "euro-user"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "auth-core",
  "base64 0.22.1",
  "chrono",
  "euro-proto-client",
@@ -3676,7 +3663,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
- "euro-ocr",
  "image",
  "tracing",
  "xcap",
@@ -5489,16 +5475,18 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
-version = "9.3.1"
+version = "10.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a87cc7a48537badeae96744432de36f4be2b4a34a05a5ef32e9dd8a1c169dde"
+checksum = "c76e1c7d7df3e34443b3621b459b066a7b79644f059fc8b2db7070c825fd417e"
 dependencies = [
+ "aws-lc-rs",
  "base64 0.22.1",
+ "getrandom 0.2.16",
  "js-sys",
  "pem",
- "ring",
  "serde",
  "serde_json",
+ "signature 2.2.0",
  "simple_asn1",
 ]
 
@@ -8497,7 +8485,7 @@ dependencies = [
  "cfg-if",
  "getrandom 0.2.16",
  "libc",
- "untrusted",
+ "untrusted 0.9.0",
  "windows-sys 0.52.0",
 ]
 
@@ -8749,7 +8737,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b6275d1ee7a1cd780b64aca7726599a1dbc893b1e64144529e55c3c2f745765"
 dependencies = [
  "ring",
- "untrusted",
+ "untrusted 0.9.0",
 ]
 
 [[package]]
@@ -8761,7 +8749,7 @@ dependencies = [
  "aws-lc-rs",
  "ring",
  "rustls-pki-types",
- "untrusted",
+ "untrusted 0.9.0",
 ]
 
 [[package]]
@@ -8769,19 +8757,6 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
-
-[[package]]
-name = "rusty-tesseract"
-version = "1.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "781e2d6ed8bb85607de972e6c174902953da1f682b1d43004f0e66bf419b798f"
-dependencies = [
- "image",
- "subprocess",
- "substring",
- "tempfile",
- "thiserror 1.0.69",
-]
 
 [[package]]
 name = "rustybuzz"
@@ -8924,7 +8899,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da046153aa2352493d6cb7da4b6e5c0c057d8a1d0a9aa8560baffdd945acd414"
 dependencies = [
  "ring",
- "untrusted",
+ "untrusted 0.9.0",
 ]
 
 [[package]]
@@ -10112,25 +10087,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.112",
-]
-
-[[package]]
-name = "subprocess"
-version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c2e86926081dda636c546d8c5e641661049d7562a68f5488be4a1f7f66f6086"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
-name = "substring"
-version = "1.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42ee6433ecef213b2e72f587ef64a2f5943e7cd16fbd82dbe8bc07486c534c86"
-dependencies = [
- "autocfg",
 ]
 
 [[package]]
@@ -11656,6 +11612,12 @@ dependencies = [
  "crypto-common",
  "subtle",
 ]
+
+[[package]]
+name = "untrusted"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "untrusted"
