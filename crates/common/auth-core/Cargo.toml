@@ -1,0 +1,11 @@
+[package]
+name = "auth-core"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["std"] }
+specta = { workspace = true, optional = true }
+
+[features]
+specta = ["specta/derive", "specta/function"]
