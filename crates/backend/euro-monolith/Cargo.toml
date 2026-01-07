@@ -6,12 +6,12 @@ publish = false
 
 [dependencies]
 axum = "0.8.8"
+be-auth-grpc = { workspace = true }
 dotenv = { workspace = true }
 euro-activity-service = { workspace = true, features = ["server"] }
 euro-assets-service = { workspace = true, features = ["server"] }
 euro-auth = { workspace = true }
 euro-auth-service = { workspace = true }
-euro-ocr-service = { workspace = true }
 euro-prompt-service = { workspace = true }
 euro-proto = { workspace = true }
 euro-remote-db = { workspace = true }

@@ -3,15 +3,11 @@ use std::{net::SocketAddr, sync::Arc};
 use dotenv::dotenv;
 use euro_activity_service::{ActivityService, ProtoActivityServiceServer};
 use euro_assets_service::{AssetsService, ProtoAssetsServiceServer};
-use euro_auth::JwtConfig;
 use euro_auth_service::AuthService;
-use euro_ocr_service::OcrService;
 use euro_prompt_service::PromptService;
-use euro_proto::{
-    proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer,
-    proto_ocr_service::proto_ocr_service_server::ProtoOcrServiceServer,
-};
+use euro_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer;
 // use euro_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
+use be_auth_grpc::JwtInterceptor;
 use euro_remote_db::DatabaseManager;
 use euro_update_service::init_update_service;
 use tonic::transport::Server;
@@ -69,9 +65,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("REMOTE_DATABASE_URL environment variable must be set");
     let db_manager = Arc::new(DatabaseManager::new(&database_url).await?);
 
-    // Create shared JWT configuration
-    let jwt_config = JwtConfig::default();
-
     let grpc_addr = std::env::var("MONOLITH_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:50051".to_string())
         .parse()
@@ -82,12 +75,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse()
         .expect("Invalid HTTP_ADDR format");
 
-    let ocr_service = OcrService::new(Some(jwt_config.clone()));
-    let auth_service = AuthService::new(db_manager.clone(), Some(jwt_config.clone()));
-    let prompt_service = PromptService::new(Some(jwt_config.clone()));
-    let activity_service = ActivityService::new(db_manager.clone(), Some(jwt_config.clone()));
-    let assets_service = AssetsService::from_env(db_manager, Some(jwt_config.clone()))
-        .expect("Failed to initialize assets service");
+    let jwt_interceptor = JwtInterceptor::default();
+
+    let auth_service = AuthService::new(db_manager.clone(), jwt_interceptor.get_config().clone());
+    let prompt_service = PromptService::new();
+    let activity_service = ActivityService::new(db_manager.clone());
+    let assets_service =
+        AssetsService::from_env(db_manager).expect("Failed to initialize assets service");
 
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
@@ -120,11 +114,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(cors)
         .layer(GrpcWebLayer::new())
         .add_service(health_service)
-        .add_service(ProtoOcrServiceServer::new(ocr_service))
         .add_service(ProtoAuthServiceServer::new(auth_service))
-        .add_service(euro_prompt_service::get_service(prompt_service))
-        .add_service(ProtoActivityServiceServer::new(activity_service))
-        .add_service(ProtoAssetsServiceServer::new(assets_service))
+        .add_service(euro_prompt_service::get_service(
+            prompt_service,
+            jwt_interceptor.clone(),
+        ))
+        .add_service(ProtoActivityServiceServer::with_interceptor(
+            activity_service,
+            jwt_interceptor.clone(),
+        ))
+        .add_service(ProtoAssetsServiceServer::with_interceptor(
+            assets_service,
+            jwt_interceptor.clone(),
+        ))
         .serve_with_shutdown(grpc_addr, shutdown_signal);
 
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
