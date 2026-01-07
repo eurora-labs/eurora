@@ -206,7 +206,7 @@ fn get_focused_window_linux() -> Result<focus_tracker::FocusedWindow, Box<dyn st
     {
         let title = String::from_utf8_lossy(&output.stdout).trim().to_string();
         return Ok(focus_tracker::FocusedWindow {
-            process_id: "123".to_string(),
+            process_id: 123,
             process_name: "unknown".to_string(),
             window_title: Some(title),
             icon: None,
@@ -215,7 +215,7 @@ fn get_focused_window_linux() -> Result<focus_tracker::FocusedWindow, Box<dyn st
 
     // Fallback
     Ok(focus_tracker::FocusedWindow {
-        process_id: "123".to_string(),
+        process_id: 123,
         process_name: "unknown".to_string(),
         window_title: Some("unknown".to_string()),
         icon: None,
