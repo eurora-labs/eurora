@@ -1,19 +1,19 @@
 syntax = "proto3";
 
-package assets_service;
+package asset_service;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 // =============================================================================
-// Assets Service
+// Asset Service
 // =============================================================================
 
 // Assets service provides cloud-based storage for user file assets.
 // This service manages file metadata (screenshots, attachments, etc.) with
 // actual file content stored externally (e.g., S3, filesystem).
 // This replaces the asset-related functionality in the local personal database.
-service ProtoAssetsService {
+service ProtoAssetService {
   // Create a new asset
   rpc CreateAsset(CreateAssetRequest) returns (AssetResponse);
 
