@@ -1,9 +1,8 @@
 use agent_chain::{ollama::ChatOllama, openai::ChatOpenAI};
 use agent_chain_core::language_models::BaseChatModel;
 use agent_chain_core::messages::BaseMessage;
-use agent_chain_eurora::{ChatEurora, EuroraConfig};
 use anyhow::Result;
-use async_from::{AsyncTryFrom, async_trait};
+use euro_chat_client::ChatEurora;
 use serde::{Deserialize, Serialize};
 use tokio_stream::{Stream, StreamExt};
 use tracing::info;
@@ -256,15 +255,10 @@ impl From<OllamaConfig> for PromptKitService {
     }
 }
 
-#[async_trait]
-impl AsyncTryFrom<EuroraConfig> for PromptKitService {
-    type Error = PromptKitError;
-    async fn async_try_from(config: EuroraConfig) -> Result<Self, Self::Error> {
-        let chat_eurora = ChatEurora::new(config)
-            .await
-            .map_err(PromptKitError::EuroraError)?;
-        Ok(Self {
-            provider: LLMProvider::Eurora(chat_eurora),
-        })
+impl From<euro_chat_client::ChatEurora> for PromptKitService {
+    fn from(eurora: euro_chat_client::ChatEurora) -> Self {
+        Self {
+            provider: LLMProvider::Eurora(eurora),
+        }
     }
 }

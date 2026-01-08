@@ -1,8 +1,8 @@
 [package]
-name = "agent-chain-eurora"
+name = "agent-chain-grpc"
 version = "0.0.0"
 edition.workspace = true
-description = "Eurora gRPC provider for agent-chain"
+description = "gRPC provider for agent-chain"
 publish = false
 
 [package.metadata.cargo-machete]
@@ -12,7 +12,6 @@ ignored = ["tonic-prost"]
 agent-chain-core = { workspace = true }
 async-stream = "0.3.1"
 async-trait = { workspace = true }
-# euro-user = { workspace = true }
 futures = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
