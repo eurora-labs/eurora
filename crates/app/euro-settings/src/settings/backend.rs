@@ -85,20 +85,20 @@ impl BackendSettings {
                 }
             }
             BackendType::Eurora => {
-                if let Some(config) = &self.config {
-                    // let config: EuroraConfig = serde_json::from_value(config.clone())
-                    //     .expect("Failed to deserialize EuroraConfig");
+                // if let Some(config) = &self.config {
+                // let config: EuroraConfig = serde_json::from_value(config.clone())
+                //     .expect("Failed to deserialize EuroraConfig");
 
-                    // Ok(euro_prompt_kit::PromptKitService::async_try_from(config)
-                    //     .await
-                    //     .map_err(|e| e.to_string())?)
-                    Ok(euro_chat_client::ChatEurora::new()
-                        .await
-                        .expect("Failed to initialize Eurora backend")
-                        .into())
-                } else {
-                    Err("No Eurora config provided".to_string())
-                }
+                // Ok(euro_prompt_kit::PromptKitService::async_try_from(config)
+                //     .await
+                //     .map_err(|e| e.to_string())?)
+                Ok(euro_chat_client::ChatEurora::new()
+                    .await
+                    .expect("Failed to initialize Eurora backend")
+                    .into())
+                // } else {
+                //     Err("No Eurora config provided".to_string())
+                // }
             }
             _ => Err("Unsupported backend".to_string()),
         }
