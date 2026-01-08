@@ -7,9 +7,9 @@ description = "Timeline storage for capturing system state over time"
 [dependencies]
 agent-chain-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
+be-asset-service = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-activity = { workspace = true }
-euro-asset-service = { workspace = true }
 euro-personal-db = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
 image = { workspace = true }
