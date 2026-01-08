@@ -29,12 +29,10 @@ test = false
 agent-chain-core = { workspace = true, features = ["specta"] }
 agent-chain-eurora = { workspace = true }
 anyhow = { workspace = true }
-async_from = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
 color-thief = "0.2.2"
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
-euro-activity-service = { workspace = true }
 euro-chat-client = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
