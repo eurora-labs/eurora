@@ -3,7 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 use be_prompt_service::PromptService;
 use dotenv::dotenv;
 use euro_activity_service::{ActivityService, ProtoActivityServiceServer};
-use euro_asset_service::{AssetsService, ProtoAssetServiceServer};
+use euro_asset_service::{AssetService, ProtoAssetServiceServer};
 use euro_auth_service::AuthService;
 use euro_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer;
 // use euro_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
@@ -81,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let prompt_service = PromptService::default();
     let activity_service = ActivityService::new(db_manager.clone());
     let assets_service =
-        AssetsService::from_env(db_manager).expect("Failed to initialize assets service");
+        AssetService::from_env(db_manager).expect("Failed to initialize assets service");
 
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
