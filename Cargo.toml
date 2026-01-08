@@ -53,6 +53,7 @@ enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-activity-service = { path = "crates/backend/euro-activity-service" }
 euro-asset-service = { path = "crates/backend/euro-asset-service" }
+euro-assets = { path = "crates/app/euro-assets" }
 euro-auth = { path = "crates/app/euro-auth" }
 euro-auth-service = { path = "crates/backend/euro-auth-service" }
 euro-chat-client = { path = "crates/app/euro-chat-client" }
