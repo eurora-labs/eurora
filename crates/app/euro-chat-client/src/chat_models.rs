@@ -14,17 +14,54 @@ use agent_chain_core::{
     AIMessage, BaseChatModel, BaseMessage, ChatModelConfig, LangSmithParams, ToolCall, ToolChoice,
     ToolDefinition,
 };
+use anyhow::Result;
 use async_trait::async_trait;
+use euro_auth::AuthedChannel;
 use futures::StreamExt;
-use tonic::{Request, transport::Channel};
+use tonic::Request;
 
-use crate::{
-    config::EuroraConfig,
-    error::EuroraError,
-    proto::{ProtoChatRequest, ProtoParameters, proto_chat_service_client::ProtoChatServiceClient},
+use agent_chain_grpc::proto::{
+    ProtoChatRequest, ProtoParameters, proto_chat_service_client::ProtoChatServiceClient,
 };
 
-type EuroraGrpcClient = ProtoChatServiceClient<Channel>;
+// /// Auth interceptor for adding authentication headers to gRPC requests.
+// #[derive(Clone)]
+// struct AuthInterceptor {
+//     auth: euro_auth::AuthManager,
+// }
+
+// impl AuthInterceptor {
+//     pub fn new(auth: euro_auth::AuthManager) -> Self {
+//         Self { auth }
+//     }
+// }
+
+// impl AsyncInterceptor for AuthInterceptor {
+//     type Future = Pin<Box<dyn std::future::Future<Output = Result<Request<()>, Status>> + Send>>;
+
+//     fn call(&mut self, mut request: Request<()>) -> Self::Future {
+//         let auth = self.auth.clone();
+//         Box::pin(async move {
+//             let access_token = auth.get_or_refresh_access_token().await.map_err(|e| {
+//                 Status::unauthenticated(format!("Failed to retrieve access token: {}", e))
+//             })?;
+//             let header: String = format!("Bearer {}", access_token.0);
+
+//             match header.parse() {
+//                 Ok(value) => {
+//                     request.metadata_mut().insert("authorization", value);
+//                     Ok(request)
+//                 }
+//                 Err(err) => {
+//                     error!("Failed to parse authorization header: {}", err);
+//                     Ok(request)
+//                 }
+//             }
+//         })
+//     }
+// }
+
+type EuroraGrpcClient = ProtoChatServiceClient<AuthedChannel>;
 
 /// Eurora gRPC chat model.
 ///
@@ -80,8 +117,10 @@ impl ChatEurora {
     /// # Returns
     ///
     /// A new `ChatEurora` instance, or an error if connection fails.
-    pub async fn new(config: EuroraConfig, client: EuroraGrpcClient) -> Result<Self, EuroraError> {
-        config.validate()?;
+    pub async fn new() -> Result<Self> {
+        let channel = euro_auth::get_authed_channel().await;
+
+        let client = ProtoChatServiceClient::new(channel);
 
         Ok(Self {
             client,
@@ -297,7 +336,7 @@ impl BaseChatModel for ChatEurora {
         let response = client
             .chat_stream(grpc_request)
             .await
-            .map_err(EuroraError::from)?;
+            .expect("Failed to start streaming");
         let grpc_stream = response.into_inner();
 
         // Create an async stream that yields ChatGenerationChunk for each gRPC chunk
@@ -363,7 +402,7 @@ impl ChatEurora {
         let response = client
             .chat_stream(grpc_request)
             .await
-            .map_err(EuroraError::from)?;
+            .expect("Failed to start streaming");
         let mut stream = response.into_inner();
 
         // Accumulate content from all chunks
@@ -372,7 +411,7 @@ impl ChatEurora {
         let mut message_id: Option<String> = None;
 
         while let Some(chunk_result) = stream.next().await {
-            let stream_response = chunk_result.map_err(EuroraError::from)?;
+            let stream_response = chunk_result.expect("Failed to receive chunk");
 
             if let Some(chunk) = stream_response.chunk {
                 // Accumulate content
@@ -438,24 +477,5 @@ impl ChatEurora {
             BaseMessage::AI(msg) => Ok(msg),
             _ => Err(agent_chain_core::Error::Other("Expected AI message".into())),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use url::Url;
-
-    #[test]
-    fn test_llm_type() {
-        // Can't fully test without a running server, but we can test the type identifier
-        // This is a placeholder for now
-        assert_eq!("eurora-chat", "eurora-chat");
-    }
-
-    #[tokio::test]
-    async fn test_config_validation() {
-        let config = EuroraConfig::new(Url::parse("http://localhost:50051").unwrap());
-        assert!(config.validate().is_ok());
     }
 }
