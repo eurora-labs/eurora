@@ -1,4 +1,4 @@
-//! Eurora gRPC provider for agent-chain.
+//! gRPC provider for agent-chain.
 //!
 //! This crate provides a gRPC-based implementation of the `ChatModel` trait
 //! from agent-chain, allowing you to use Eurora's chat service with the
@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use agent_chain_eurora::{ChatEurora, EuroraConfig};
+//! use agent_chain_grpc::ChatEurora;
 //! use agent_chain_core::{ChatModel, HumanMessage};
 //! use url::Url;
 //!
@@ -33,7 +33,7 @@
 //! The provider also supports streaming responses:
 //!
 //! ```ignore
-//! use agent_chain_eurora::{ChatEurora, EuroraConfig};
+//! use agent_chain_grpc::ChatEurora;
 //! use agent_chain_core::{ChatModel, HumanMessage};
 //! use futures::StreamExt;
 //! use url::Url;
@@ -62,40 +62,7 @@ pub mod proto {
     tonic::include_proto!("chat_service");
 }
 
-pub mod config;
-pub mod error;
-pub mod provider;
 pub mod types;
-
-// Re-export main types for convenience
-pub use config::EuroraConfig;
-pub use error::EuroraError;
-pub use provider::ChatEurora;
 
 // Re-export agent-chain types that users will need
 pub use agent_chain_core::{BaseChatModel, ChatResult, ChatStream};
-
-#[cfg(test)]
-mod tests {
-    use url::Url;
-
-    use super::*;
-
-    #[test]
-    fn test_config_creation() {
-        let config = EuroraConfig::new(Url::parse("http://localhost:50051").unwrap());
-        assert_eq!(config.endpoint.to_string(), "http://localhost:50051/");
-        assert!(!config.use_tls);
-    }
-
-    #[test]
-    fn test_config_with_tls() {
-        let config = EuroraConfig::new(Url::parse("https://api.example.com").unwrap())
-            .with_tls(Some("api.example.com".to_string()))
-            .with_auth_token("test-token".to_string());
-
-        assert!(config.use_tls);
-        assert_eq!(config.tls_domain, Some("api.example.com".to_string()));
-        assert_eq!(config.auth_token, Some("test-token".to_string()));
-    }
-}
