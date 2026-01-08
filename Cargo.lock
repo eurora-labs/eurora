@@ -3371,6 +3371,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-assets"
+version = "0.0.0"
+dependencies = [
+ "agent-chain-core",
+ "agent-chain-grpc",
+ "anyhow",
+ "asset-models",
+ "async-stream",
+ "async-trait",
+ "euro-activity",
+ "euro-auth",
+ "futures",
+ "prost",
+ "prost-types",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+]
+
+[[package]]
 name = "euro-auth"
 version = "0.0.0"
 dependencies = [
