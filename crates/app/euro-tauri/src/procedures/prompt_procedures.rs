@@ -1,4 +1,3 @@
-use async_from::AsyncTryFrom;
 use euro_prompt_kit::{OllamaConfig, OpenAIConfig};
 use euro_secret::secret;
 use euro_settings::BackendType;
