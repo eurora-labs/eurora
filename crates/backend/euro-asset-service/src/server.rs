@@ -30,12 +30,12 @@ pub use crate::proto::proto_asset_service_server::{ProtoAssetService, ProtoAsset
 
 /// The main assets service
 #[derive(Debug)]
-pub struct AssetsService {
+pub struct AssetService {
     db: Arc<DatabaseManager>,
     storage: Arc<StorageService>,
 }
 
-impl AssetsService {
+impl AssetService {
     /// Create a new AssetsService instance
     pub fn new(db: Arc<DatabaseManager>, storage: Arc<StorageService>) -> Self {
         info!("Creating new AssetsService instance");
@@ -108,7 +108,7 @@ fn decode_sha256(base64_hash: &str) -> Result<Vec<u8>, Status> {
 }
 
 #[tonic::async_trait]
-impl ProtoAssetService for AssetsService {
+impl ProtoAssetService for AssetService {
     async fn create_asset(
         &self,
         request: Request<CreateAssetRequest>,
