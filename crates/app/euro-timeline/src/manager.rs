@@ -241,7 +241,7 @@ impl TimelineManager {
         // Ok(vec![asset])
     }
 
-    /// Save the assets via the euro-asset-service
+    /// Save the assets via the be-asset-service
     pub async fn save_assets_to_service_by_ids(
         &self,
         ids: &[String],

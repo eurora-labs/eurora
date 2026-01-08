@@ -3,9 +3,9 @@
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
+use be_asset_service::proto::CreateAssetRequest;
+use be_asset_service::proto::proto_asset_service_client::ProtoAssetServiceClient;
 use enum_dispatch::enum_dispatch;
-use euro_asset_service::proto::CreateAssetRequest;
-use euro_asset_service::proto::proto_asset_service_client::ProtoAssetServiceClient;
 use euro_encrypt::{MainKey, encrypt_file_contents};
 use euro_fs::create_dirs_then_write;
 use serde::{Deserialize, Serialize};
