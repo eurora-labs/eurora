@@ -1,7 +1,6 @@
 //! Authentication procedures for the Tauri application.
 
 use agent_chain_eurora::EuroraConfig;
-use async_from::AsyncTryFrom;
 use euro_prompt_kit::PromptKitService;
 use euro_secret::{Sensitive, secret};
 use tauri::{AppHandle, Manager, Runtime};
