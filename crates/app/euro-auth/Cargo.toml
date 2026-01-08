@@ -26,6 +26,7 @@ euro-native-messaging = { workspace = true }
 euro-remote-db = { workspace = true, optional = true }
 euro-secret = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
+http = "1.0"
 humantime-serde = { workspace = true }
 image = { workspace = true }
 jsonwebtoken = { workspace = true }
@@ -49,6 +50,7 @@ tokio = { workspace = true, features = [
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
+tower = { workspace = true }
 tracing = { workspace = true }
 url = { version = "2.5.7" }
 usvg = { version = "0.45" }

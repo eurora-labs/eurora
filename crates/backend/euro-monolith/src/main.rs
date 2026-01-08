@@ -1,10 +1,10 @@
 use std::{net::SocketAddr, sync::Arc};
 
+use be_prompt_service::PromptService;
 use dotenv::dotenv;
 use euro_activity_service::{ActivityService, ProtoActivityServiceServer};
 use euro_asset_service::{AssetsService, ProtoAssetServiceServer};
 use euro_auth_service::AuthService;
-use euro_prompt_service::PromptService;
 use euro_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer;
 // use euro_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
 use be_auth_grpc::JwtInterceptor;
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(GrpcWebLayer::new())
         .add_service(health_service)
         .add_service(ProtoAuthServiceServer::new(auth_service))
-        .add_service(euro_prompt_service::get_service(
+        .add_service(be_prompt_service::get_service(
             prompt_service,
             jwt_interceptor.clone(),
         ))
