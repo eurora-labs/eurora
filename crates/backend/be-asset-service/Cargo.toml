@@ -1,5 +1,5 @@
 [package]
-name = "euro-asset-service"
+name = "be-asset-service"
 version = "0.0.0"
 edition.workspace = true
 description = "Eurora Asset Service - gRPC service for managing user file assets"
