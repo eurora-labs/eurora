@@ -1,44 +1,29 @@
-use crate::proto::{
-    EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
-    RefreshTokenRequest, RegisterRequest, TokenResponse, login_request::Credential,
-    proto_auth_service_client::ProtoAuthServiceClient,
+use crate::{
+    get_secure_channel,
+    proto::{
+        EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
+        RefreshTokenRequest, RegisterRequest, TokenResponse, login_request::Credential,
+        proto_auth_service_client::ProtoAuthServiceClient,
+    },
 };
 use anyhow::{Ok, Result, anyhow};
-use tonic::transport::{Channel, ClientTlsConfig};
-use tracing::{debug, error};
-
-async fn get_secure_channel(base_url: String) -> Result<Option<Channel>> {
-    let tls = ClientTlsConfig::new().with_native_roots();
-    let channel = Channel::from_shared(base_url.clone())?
-        .tls_config(tls)?
-        .connect()
-        .await
-        .map_err(|e| anyhow!("Failed to connect to url: {}", e))?;
-
-    Ok(Some(channel))
-}
+use tonic::transport::Channel;
+use tracing::error;
 
 /// gRPC client for authentication service
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AuthClient {
-    base_url: String,
     client: ProtoAuthServiceClient<Channel>,
 }
 
 impl AuthClient {
     /// Create a new gRPC client connected to the auth service
     pub async fn new() -> Result<Self> {
-        let base_url =
-            std::env::var("API_BASE_URL").unwrap_or("https://api.eurora-labs.com".to_string());
-
-        let channel = get_secure_channel(base_url.clone())
-            .await?
-            .ok_or_else(|| anyhow!("Failed to initialize auth channel"))?;
+        let channel = get_secure_channel().await?;
 
         let client = ProtoAuthServiceClient::new(channel);
 
-        debug!("Connected to auth service at {}", base_url);
-        Ok(Self { base_url, client })
+        Ok(Self { client })
     }
 
     pub async fn login_by_password(

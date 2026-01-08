@@ -7,6 +7,7 @@ members = [
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
   "crates/common/agent-chain-eurora",
+  "crates/common/agent-chain-grpc",
   "crates/common/agent-chain-macros",
   "crates/common/agent-graph",
   "crates/common/agent-graph-macros",
@@ -29,6 +30,7 @@ license-file = "LICENSE.md"
 agent-chain = { path = "crates/common/agent-chain" }
 agent-chain-core = { path = "crates/common/agent-chain-core" }
 agent-chain-eurora = { path = "crates/common/agent-chain-eurora" }
+agent-chain-grpc = { path = "crates/common/agent-chain-grpc" }
 agent-chain-macros = { path = "crates/common/agent-chain-macros" }
 agent-graph = { path = "crates/common/agent-graph" }
 agent-graph-macros = { path = "crates/common/agent-graph-macros" }
@@ -41,6 +43,7 @@ auth-core = { path = "crates/common/auth-core" }
 base64 = "0.22.1"
 be-auth-core = { path = "crates/backend/be-auth-core" }
 be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
+be-prompt-service = { path = "crates/backend/be-prompt-service" }
 bstr = "1.12.1"
 cfg-if = "1.0.4"
 chrono = "0.4.41"
@@ -50,14 +53,15 @@ enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-activity-service = { path = "crates/backend/euro-activity-service" }
 euro-asset-service = { path = "crates/backend/euro-asset-service" }
+euro-auth = { path = "crates/app/euro-auth" }
 euro-auth-service = { path = "crates/backend/euro-auth-service" }
+euro-chat-client = { path = "crates/app/euro-chat-client" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-fs = { path = "crates/common/euro-fs" }
 euro-monolith = { path = "crates/backend/euro-monolith" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
 euro-personal-db = { path = "crates/app/euro-personal-db" }
 euro-prompt-kit = { path = "crates/common/euro-prompt-kit" }
-euro-prompt-service = { path = "crates/backend/euro-prompt-service" }
 euro-proto = { path = "crates/common/euro-proto" }
 euro-proto-client = { path = "crates/common/euro-proto-client" }
 euro-remote-db = { path = "crates/backend/euro-remote-db" }
@@ -108,6 +112,7 @@ toml_edit = "0.23.10"  # collapse 0.22, 0.20, 0.19
 tonic = "0.14"
 tonic-prost = "0.14"
 tonic-prost-build = "0.14"
+tower = "0.5.2"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 url = "2.5.4"
