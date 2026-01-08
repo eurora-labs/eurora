@@ -2,8 +2,7 @@
 resolver = "2"
 members = [
   "crates/app/euro-*",
-  "crates/backend/be-auth-core",
-  "crates/backend/be-auth-grpc",
+  "crates/backend/be-*",
   "crates/backend/euro-*",
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
