@@ -1,5 +1,4 @@
 use agent_chain_eurora::EuroraConfig;
-use async_from::AsyncTryFrom;
 use euro_prompt_kit::{OllamaConfig, OpenAIConfig};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -87,12 +86,16 @@ impl BackendSettings {
             }
             BackendType::Eurora => {
                 if let Some(config) = &self.config {
-                    let config: EuroraConfig = serde_json::from_value(config.clone())
-                        .expect("Failed to deserialize EuroraConfig");
+                    // let config: EuroraConfig = serde_json::from_value(config.clone())
+                    //     .expect("Failed to deserialize EuroraConfig");
 
-                    Ok(euro_prompt_kit::PromptKitService::async_try_from(config)
+                    // Ok(euro_prompt_kit::PromptKitService::async_try_from(config)
+                    //     .await
+                    //     .map_err(|e| e.to_string())?)
+                    Ok(euro_chat_client::ChatEurora::new()
                         .await
-                        .map_err(|e| e.to_string())?)
+                        .expect("Failed to initialize Eurora backend")
+                        .into())
                 } else {
                     Err("No Eurora config provided".to_string())
                 }

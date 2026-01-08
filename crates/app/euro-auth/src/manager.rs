@@ -9,13 +9,13 @@ use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
 use tracing::error;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct JwtConfig {
     /// Minutes offset
     refresh_offset: i64,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AuthManager {
     auth_client: AuthClient,
     jwt_config: JwtConfig,
