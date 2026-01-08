@@ -1442,6 +1442,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "be-asset-service"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "be-auth-grpc",
+ "chrono",
+ "euro-remote-db",
+ "hex",
+ "opendal",
+ "prost",
+ "prost-types",
+ "serde_json",
+ "sha2",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "be-auth-core"
 version = "0.0.0"
 dependencies = [
@@ -3301,12 +3323,12 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
+ "be-asset-service",
  "cfg-if",
  "chrono",
  "dashmap",
  "dirs 6.0.0",
  "enum_dispatch",
- "euro-asset-service",
  "euro-encrypt",
  "euro-fs",
  "euro-native-messaging",
@@ -3349,28 +3371,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-asset-service"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "be-auth-grpc",
- "chrono",
- "euro-remote-db",
- "hex",
- "opendal",
- "prost",
- "prost-types",
- "serde_json",
- "sha2",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "euro-assets"
 version = "0.0.0"
 dependencies = [
@@ -3390,6 +3390,7 @@ dependencies = [
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
+ "uuid",
 ]
 
 [[package]]
@@ -3498,11 +3499,11 @@ name = "euro-monolith"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "be-asset-service",
  "be-auth-grpc",
  "be-prompt-service",
  "dotenv",
  "euro-activity-service",
- "euro-asset-service",
  "euro-auth-service",
  "euro-proto",
  "euro-remote-db",
@@ -3723,9 +3724,9 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-core",
  "anyhow",
+ "be-asset-service",
  "chrono",
  "euro-activity",
- "euro-asset-service",
  "euro-personal-db",
  "focus-tracker",
  "image",
