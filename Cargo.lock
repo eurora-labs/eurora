@@ -1446,6 +1446,7 @@ name = "be-asset-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "asset-models",
  "base64 0.22.1",
  "be-auth-grpc",
  "chrono",
@@ -3329,6 +3330,7 @@ dependencies = [
  "dashmap",
  "dirs 6.0.0",
  "enum_dispatch",
+ "euro-auth",
  "euro-encrypt",
  "euro-fs",
  "euro-native-messaging",
@@ -3367,29 +3369,6 @@ dependencies = [
  "tonic-prost",
  "tonic-prost-build",
  "tracing",
- "uuid",
-]
-
-[[package]]
-name = "euro-assets"
-version = "0.0.0"
-dependencies = [
- "agent-chain-core",
- "agent-chain-grpc",
- "anyhow",
- "asset-models",
- "async-stream",
- "async-trait",
- "euro-activity",
- "euro-auth",
- "futures",
- "prost",
- "prost-types",
- "serde_json",
- "thiserror 2.0.17",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
  "uuid",
 ]
 

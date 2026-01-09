@@ -61,13 +61,13 @@ message Asset {
   string id = 1;
 
   // SHA256 hash of the file content (for deduplication) - base64 encoded
-  optional string content_sha256 = 2;
+  optional string checksum_sha256 = 2;
 
   // Size of the asset in bytes
-  optional int64 byte_size = 3;
+  optional int64 size_bytes = 3;
 
   // Path to the file (S3 key, local path, etc.)
-  string file_path = 4;
+  string storage_uri = 4;
 
   // MIME type of the asset
   string mime_type = 5;
@@ -101,17 +101,20 @@ message ActivityAsset {
 // =============================================================================
 
 message CreateAssetRequest {
+  // File name of the asset - required
+  string name = 1;
+
   // File content as bytes
-  bytes content = 1;
+  bytes content = 2;
 
   // MIME type of the asset - required
-  string mime_type = 2;
+  string mime_type = 3;
 
   // Additional metadata as JSON string
-  optional string metadata = 3;
+  optional string metadata = 4;
 
   // Optional activity ID to link asset to
-  optional string activity_id = 4;
+  optional string activity_id = 5;
 }
 
 message GetAssetRequest {
@@ -132,13 +135,13 @@ message UpdateAssetRequest {
   string id = 1;
 
   // Updated SHA256 hash (optional) - base64 encoded
-  optional string content_sha256 = 2;
+  optional string checksum_sha256 = 2;
 
   // Updated byte size (optional)
-  optional int64 byte_size = 3;
+  optional int64 size_bytes = 3;
 
   // Updated file path (optional)
-  optional string file_path = 4;
+  optional string storage_uri = 4;
 
   // Updated MIME type (optional)
   optional string mime_type = 5;
@@ -154,7 +157,7 @@ message DeleteAssetRequest {
 
 message FindAssetBySha256Request {
   // SHA256 hash to search for - base64 encoded
-  string content_sha256 = 1;
+  string checksum_sha256 = 1;
 }
 
 message GetAssetsByMessageIdRequest {
