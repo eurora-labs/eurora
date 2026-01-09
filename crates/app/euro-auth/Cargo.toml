@@ -11,11 +11,8 @@ ignored = ["humantime-serde", "specta", "tonic-prost"]
 anyhow = { workspace = true }
 auth-core = { workspace = true }
 base64 = { workspace = true }
-bytes = "1.10"
 chrono = { workspace = true, features = ["serde"] }
 euro-secret = { workspace = true }
-http = "1.0"
-http-body-util = { workspace = true }
 humantime-serde = { workspace = true }
 jsonwebtoken = { workspace = true }
 prost = { workspace = true }
