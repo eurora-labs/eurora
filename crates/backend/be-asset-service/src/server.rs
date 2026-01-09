@@ -113,6 +113,7 @@ impl ProtoAssetService for AssetService {
         &self,
         request: Request<CreateAssetRequest>,
     ) -> Result<Response<AssetResponse>, Status> {
+        eprintln!("CreateAsset request received");
         info!("CreateAsset request received");
 
         let claims = request.extensions().get::<Claims>().ok_or_else(|| {

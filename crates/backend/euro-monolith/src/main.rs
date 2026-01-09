@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
-        .parse_lossy("euro_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+        .parse_lossy("euro_=trace,be_=trace,hyper=off,tokio=off"); // keep yours, silence deps
 
     // Initialize tracing
     tracing_subscriber::registry()
