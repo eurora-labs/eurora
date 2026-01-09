@@ -11,23 +11,12 @@
 //!   `euro-remote-db`. Without this feature, only the proto types and
 //!   client are available.
 
-pub use asset_models::proto;
+use asset_models::proto;
 
-// Server module is only available with the "server" feature
-#[cfg(feature = "server")]
 mod server;
 
-// Storage module is only available with the "server" feature
-#[cfg(feature = "server")]
 mod storage;
 
-// Re-export proto types (always available)
-pub use proto::*;
-
-// Re-export server types when the feature is enabled
-#[cfg(feature = "server")]
 pub use server::{AssetService, ProtoAssetService, ProtoAssetServiceServer};
 
-// Re-export storage types when the feature is enabled
-#[cfg(feature = "server")]
 pub use storage::{StorageConfig, StorageService};
