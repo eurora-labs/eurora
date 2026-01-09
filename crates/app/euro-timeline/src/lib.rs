@@ -26,7 +26,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_new_api() {
-        let timeline = TimelineManager::new();
+        let timeline = TimelineManager::new().await;
         assert!(!timeline.is_running());
         assert!(timeline.is_empty().await);
     }
@@ -40,17 +40,20 @@ mod tests {
 
         assert!(config.validate().is_ok());
 
-        let timeline =
-            TimelineManager::with_config(config).expect("Failed to create timeline manager");
+        let timeline = TimelineManager::with_config(config)
+            .await
+            .expect("Failed to create timeline manager");
         assert_eq!(timeline.get_config().storage.max_activities, 100);
     }
 
     #[tokio::test]
     async fn test_convenience_functions() {
-        let timeline1 = TimelineManager::new();
+        let timeline1 = TimelineManager::new().await;
         assert!(!timeline1.is_running());
 
-        let timeline2 = create_timeline(500, 5).expect("Failed to create timeline manager");
+        let timeline2 = create_timeline(500, 5)
+            .await
+            .expect("Failed to create timeline manager");
         assert_eq!(timeline2.get_config().storage.max_activities, 500);
     }
 }
