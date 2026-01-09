@@ -115,7 +115,7 @@ impl ActivityStorage {
     pub async fn save_assets_to_service_by_ids(
         &self,
         activity: &Activity,
-        ids: &[String],
+        _ids: &[String],
     ) -> ActivityResult<Vec<SavedAssetInfo>> {
         let mut saved_assets = Vec::new();
 
