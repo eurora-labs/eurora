@@ -10,9 +10,9 @@ ignored = ["humantime-serde", "specta"]
 [dependencies]
 agent-chain-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
+asset-models = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
-be-asset-service = { workspace = true }
 cfg-if = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 dashmap = "6.1.0"

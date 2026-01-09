@@ -16,13 +16,6 @@ pub mod proto {
     tonic::include_proto!("activity_service");
 }
 
-// Server module is only available with the "server" feature
-#[cfg(feature = "server")]
 mod server;
 
-// Re-export proto types (always available)
-pub use proto::*;
-
-// Re-export server types when the feature is enabled
-#[cfg(feature = "server")]
 pub use server::{ActivityService, ProtoActivityService, ProtoActivityServiceServer};
