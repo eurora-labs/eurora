@@ -11,10 +11,7 @@
 //!   `euro-remote-db`. Without this feature, only the proto types and
 //!   client are available.
 
-// Include the generated proto code
-pub mod proto {
-    tonic::include_proto!("asset_service");
-}
+pub use asset_models::proto;
 
 // Server module is only available with the "server" feature
 #[cfg(feature = "server")]
