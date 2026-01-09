@@ -9,7 +9,6 @@ use euro_fs::create_dirs_then_write;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use tonic::transport::Channel;
 use tracing::debug;
 
 use crate::{Activity, ActivityAsset, ActivityError, AssetFunctionality, error::ActivityResult};
@@ -184,15 +183,7 @@ impl ActivityStorage {
             asset.get_unique_id(),
             service_endpoint
         );
-
-        // Connect to the gRPC service
-        let channel = Channel::from_shared(service_endpoint.clone())
-            .map_err(|e| ActivityError::Network(format!("Invalid service endpoint: {}", e)))?
-            .connect()
-            .await
-            .map_err(|e| ActivityError::Network(format!("Failed to connect to service: {}", e)))?;
-
-        let mut client = ProtoAssetServiceClient::new(channel);
+        let mut client = self.client.clone();
 
         // Prepare metadata as JSON containing asset type info
         let metadata = serde_json::json!({
