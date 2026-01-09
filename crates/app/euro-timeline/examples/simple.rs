@@ -3,7 +3,7 @@ use euro_timeline::TimelineManager;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create with sensible defaults
-    let mut timeline = TimelineManager::new();
+    let mut timeline = TimelineManager::new().await;
 
     // Start collection (handles focus tracking automatically)
     timeline.start().await?;
