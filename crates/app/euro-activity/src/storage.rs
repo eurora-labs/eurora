@@ -1,14 +1,13 @@
 //! Asset storage functionality for saving activity assets to disk and remote service
-
-use std::path::{Path, PathBuf};
-
 use async_trait::async_trait;
 use be_asset_service::proto::CreateAssetRequest;
 use be_asset_service::proto::proto_asset_service_client::ProtoAssetServiceClient;
 use enum_dispatch::enum_dispatch;
+use euro_auth::AuthedChannel;
 use euro_encrypt::{MainKey, encrypt_file_contents};
 use euro_fs::create_dirs_then_write;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use tokio::fs;
 use tonic::transport::Channel;
 use tracing::debug;
@@ -88,13 +87,18 @@ pub trait SaveableAsset {
 
 /// Asset storage manager
 pub struct ActivityStorage {
+    #[allow(dead_code)]
+    client: ProtoAssetServiceClient<AuthedChannel>,
     config: ActivityStorageConfig,
 }
 
 impl ActivityStorage {
     /// Create a new asset storage manager
-    pub fn new(config: ActivityStorageConfig) -> Self {
-        Self { config }
+    pub async fn new(config: ActivityStorageConfig) -> Self {
+        let channel = euro_auth::get_authed_channel().await;
+        let client = ProtoAssetServiceClient::new(channel);
+
+        Self { config, client }
     }
 
     // /// Create with default configuration
@@ -199,6 +203,7 @@ impl ActivityStorage {
 
         // Create the request
         let mut request = tonic::Request::new(CreateAssetRequest {
+            name: asset.get_display_name(),
             content: bytes,
             mime_type: "application/json".to_string(),
             metadata: Some(metadata.to_string()),
@@ -229,9 +234,9 @@ impl ActivityStorage {
         debug!("Asset saved with ID: {}", created_asset.id);
 
         Ok(SavedAssetInfo {
-            file_path: PathBuf::from(&created_asset.file_path),
-            absolute_path: PathBuf::from(&created_asset.file_path),
-            content_hash: created_asset.content_sha256,
+            file_path: PathBuf::from(&created_asset.storage_uri),
+            absolute_path: PathBuf::from(&created_asset.storage_uri),
+            content_hash: created_asset.checksum_sha256,
             file_size,
             saved_at: chrono::Utc::now(),
         })
