@@ -7,6 +7,7 @@ edition.workspace = true
 ignored = ["tonic-prost"]
 
 [dependencies]
+activity-models = { workspace = true }
 anyhow = { workspace = true }
 be-auth-grpc = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }

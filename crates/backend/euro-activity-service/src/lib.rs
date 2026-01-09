@@ -11,11 +11,6 @@
 //!   `euro-remote-db`. Without this feature, only the proto types and
 //!   client are available.
 
-// Include the generated proto code
-pub mod proto {
-    tonic::include_proto!("activity_service");
-}
-
 mod server;
 
 pub use server::{ActivityService, ProtoActivityService, ProtoActivityServiceServer};

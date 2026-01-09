@@ -4,6 +4,7 @@ members = [
   "crates/app/euro-*",
   "crates/backend/be-*",
   "crates/backend/euro-*",
+  "crates/common/activity-models",
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
   "crates/common/agent-chain-eurora",
@@ -11,7 +12,6 @@ members = [
   "crates/common/agent-chain-macros",
   "crates/common/agent-graph",
   "crates/common/agent-graph-macros",
-  # "crates/common/activity-models",
   "crates/common/asset-models",
   "crates/common/auth-core",
   "crates/common/euro-*",
@@ -27,6 +27,7 @@ license = "Functional Source License"
 license-file = "LICENSE.md"
 
 [workspace.dependencies]
+activity-models = { path = "crates/common/activity-models" }
 agent-chain = { path = "crates/common/agent-chain" }
 agent-chain-core = { path = "crates/common/agent-chain-core" }
 agent-chain-eurora = { path = "crates/common/agent-chain-eurora" }
@@ -35,7 +36,6 @@ agent-chain-macros = { path = "crates/common/agent-chain-macros" }
 agent-graph = { path = "crates/common/agent-graph" }
 agent-graph-macros = { path = "crates/common/agent-graph-macros" }
 anyhow = "1.0.99"
-# activity-models = { path = "crates/common/activity-models" }
 asset-models = { path = "crates/common/asset-models" }
 async_from = "0.2.0"
 async-trait = "0.1.89"
@@ -77,8 +77,6 @@ euro-vision = { path = "crates/app/euro-vision" }
 focus-tracker = { path = "crates/common/focus-tracker" }
 focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "0.0.2" }
 futures = "0.3.31"
-http-body = "1.0.1"
-http-body-util = "0.1.3"
 humantime-serde = "1.1.1"
 image = "0.25.9"
 indexmap = "2.12"  # collapse 2.10, 1.9
