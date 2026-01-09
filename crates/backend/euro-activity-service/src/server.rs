@@ -14,13 +14,13 @@ use tonic::{Request, Response, Status};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use crate::proto::{
+use activity_models::proto::{
     Activity, ActivityResponse, DeleteActivityRequest, GetActivitiesByTimeRangeRequest,
     GetActivityRequest, InsertActivityRequest, ListActivitiesRequest, ListActivitiesResponse,
     UpdateActivityEndTimeRequest, UpdateActivityRequest,
 };
 
-pub use crate::proto::proto_activity_service_server::{
+pub use activity_models::proto::proto_activity_service_server::{
     ProtoActivityService, ProtoActivityServiceServer,
 };
 
