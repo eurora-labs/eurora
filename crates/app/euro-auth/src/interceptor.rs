@@ -2,7 +2,7 @@ use crate::{AuthManager, get_secure_channel};
 use std::pin::Pin;
 use tokio::sync::OnceCell;
 use tonic::{Request, Status, transport::Channel};
-use tonic_async_interceptor::{AsyncInterceptor, AsyncInterceptorLayer, async_interceptor};
+use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
 use tower::ServiceBuilder;
 
 /// The authenticated channel type using tonic-async-interceptor.
