@@ -1,93 +1,70 @@
 use crate::{AuthManager, get_secure_channel};
-use http::header::{AUTHORIZATION, HeaderValue};
-use std::future::Future;
 use std::pin::Pin;
-use std::task::{Context, Poll};
 use tokio::sync::OnceCell;
-use tonic::{body::Body, transport::Channel};
-use tower::{Layer, Service, ServiceBuilder};
+use tonic::{Request, Status, transport::Channel};
+use tonic_async_interceptor::{AsyncInterceptor, AsyncInterceptorLayer, async_interceptor};
+use tower::ServiceBuilder;
 
-pub type AuthedChannel = AuthService<Channel>;
+/// The authenticated channel type using tonic-async-interceptor.
+///
+/// This type wraps a tonic Channel with an async interceptor that automatically
+/// injects Bearer authentication tokens into gRPC requests.
+pub type AuthedChannel = tonic_async_interceptor::AsyncInterceptedService<Channel, AuthInterceptor>;
+
+/// Global singleton for the authenticated channel
 pub static AUTHED_CHANNEL: OnceCell<AuthedChannel> = OnceCell::const_new();
 
+/// An async interceptor that injects Bearer authentication tokens into gRPC requests.
+///
+/// This interceptor retrieves the current access token (refreshing if necessary)
+/// and adds it as a Bearer token in the Authorization header of each request.
 #[derive(Debug, Clone)]
-pub struct AuthService<S> {
-    inner: S,
+pub struct AuthInterceptor {
     auth_manager: AuthManager,
 }
 
-impl AuthService<Channel> {
-    pub async fn new(channel: Channel, auth_manager: AuthManager) -> Self {
-        Self {
-            inner: channel,
-            auth_manager,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct AuthLayer {
-    auth_manager: AuthManager,
-}
-
-impl AuthLayer {
+impl AuthInterceptor {
+    /// Create a new AuthInterceptor with the given AuthManager
     pub fn new(auth_manager: AuthManager) -> Self {
         Self { auth_manager }
     }
 }
 
-impl<S> Layer<S> for AuthLayer {
-    type Service = AuthService<S>;
+impl AsyncInterceptor for AuthInterceptor {
+    type Future =
+        Pin<Box<dyn std::future::Future<Output = Result<Request<()>, Status>> + Send + 'static>>;
 
-    fn layer(&self, inner: S) -> Self::Service {
-        AuthService {
-            inner,
-            auth_manager: self.auth_manager.clone(),
-        }
-    }
-}
-
-// This is the critical part: implement Service<Request<BoxBody>>
-// so that AuthService<S> is a valid tonic transport.
-impl<S> Service<http::Request<Body>> for AuthService<S>
-where
-    S: Service<http::Request<Body>> + Clone + Send + 'static,
-    S::Future: Send + 'static,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, mut req: http::Request<Body>) -> Self::Future {
-        let mut inner = self.inner.clone();
+    fn call(&mut self, mut request: Request<()>) -> Self::Future {
         let auth_manager = self.auth_manager.clone();
 
         Box::pin(async move {
+            // Get or refresh the access token
             let token = auth_manager
                 .get_or_refresh_access_token()
                 .await
-                .map_err(|status| {
-                    // Map tonic::Status into your transport error as needed.
-                    // For a real app, don't panic. Convert into S::Error properly.
-                    panic!("token refresh failed: {status}");
+                .map_err(|e| {
+                    tracing::error!("Failed to get access token: {}", e);
+                    Status::unauthenticated(format!("Failed to retrieve access token: {}", e))
                 })?;
 
-            // let token: MetadataValue<_> = format!("Bearer {}", token.0).parse().unwrap();
-            // req.metadata_mut().insert("authorization", token);
-            req.headers_mut().insert(
-                AUTHORIZATION,
-                HeaderValue::from_str(&token.0).expect("valid header value"),
-            );
+            // Format the Bearer token and insert into metadata
+            let bearer_value = format!("Bearer {}", token.0);
+            let metadata_value = bearer_value.parse().map_err(|e| {
+                tracing::error!("Failed to parse authorization header: {}", e);
+                Status::internal("Failed to create authorization header")
+            })?;
 
-            inner.call(req).await
+            request
+                .metadata_mut()
+                .insert("authorization", metadata_value);
+
+            Ok(request)
         })
     }
 }
 
+/// Build an authenticated channel by connecting to the secure endpoint
+/// and wrapping it with the auth interceptor.
 async fn build_authed_channel() -> AuthedChannel {
     let channel = get_secure_channel()
         .await
@@ -97,11 +74,17 @@ async fn build_authed_channel() -> AuthedChannel {
         .await
         .expect("Failed to create AuthManager");
 
+    let interceptor = AuthInterceptor::new(auth_manager);
+
     ServiceBuilder::new()
-        .layer(AuthLayer::new(auth_manager))
+        .layer(async_interceptor(interceptor))
         .service(channel)
 }
 
+/// Get or initialize the global authenticated channel.
+///
+/// This function is thread-safe and will only initialize the channel once.
+/// Subsequent calls will return a clone of the existing channel.
 pub async fn get_authed_channel() -> AuthedChannel {
     AUTHED_CHANNEL
         .get_or_init(|| async { build_authed_channel().await })

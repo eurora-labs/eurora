@@ -5,7 +5,7 @@ use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
 
@@ -61,6 +61,10 @@ impl ChatApi for ChatApiImpl {
                 error!("Failed to capture posthog event: {}", e);
             });
         });
+
+        if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
+            info!("Infos: {:?}", infos);
+        }
 
         let mut messages: Vec<BaseMessage> = Vec::new();
 
@@ -234,6 +238,7 @@ impl ChatApi for ChatApiImpl {
             .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
         Ok(complete_response)
+        // Ok("test lol".to_string())
     }
 
     async fn switch_conversation<R: Runtime>(
