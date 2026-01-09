@@ -259,7 +259,6 @@ fn main() {
                             max_file_size: None,
                             main_key: main_key.clone(),
                             service_endpoint: None,
-                            auth_token: None,
                         })
                             .build().await.expect("Failed to create timeline");
                         timeline_handle.manage(Mutex::new(timeline));
