@@ -27,9 +27,6 @@ pub struct ActivityStorageConfig {
     /// Remote assets service endpoint (e.g., "http://localhost:50051")
     #[serde(default)]
     pub service_endpoint: Option<String>,
-    /// Authorization token for the remote service
-    #[serde(default)]
-    pub auth_token: Option<String>,
 }
 
 impl Default for ActivityStorageConfig {
@@ -41,7 +38,6 @@ impl Default for ActivityStorageConfig {
             max_file_size: Some(100 * 1024 * 1024), // 100MB default limit
             main_key,
             service_endpoint: None,
-            auth_token: None,
         }
     }
 }
@@ -123,10 +119,10 @@ impl ActivityStorage {
         let mut saved_assets = Vec::new();
 
         for asset in &activity.assets {
-            if ids.contains(&asset.get_id().to_string()) {
-                let saved_info = self.save_asset_to_service(asset).await?;
-                saved_assets.push(saved_info);
-            }
+            // if ids.contains(&asset.get_id().to_string()) {
+            let saved_info = self.save_asset_to_service(asset).await?;
+            saved_assets.push(saved_info);
+            // }
         }
 
         Ok(saved_assets)
@@ -170,19 +166,14 @@ impl ActivityStorage {
         &self,
         asset: &ActivityAsset,
     ) -> ActivityResult<SavedAssetInfo> {
-        let service_endpoint = self.config.service_endpoint.as_ref().ok_or_else(|| {
-            ActivityError::Configuration("service_endpoint not configured".to_string())
-        })?;
+        // let service_endpoint = self.config.service_endpoint.as_ref().ok_or_else(|| {
+        //     ActivityError::Configuration("service_endpoint not configured".to_string())
+        // })?;
 
         // Serialize the entire ActivityAsset enum to JSON (no encryption as requested)
         let bytes = serde_json::to_vec(asset)?;
         let file_size = bytes.len() as u64;
 
-        debug!(
-            "Saving asset {} to service at {}",
-            asset.get_unique_id(),
-            service_endpoint
-        );
         let mut client = self.client.clone();
 
         // Prepare metadata as JSON containing asset type info
@@ -193,23 +184,13 @@ impl ActivityStorage {
         });
 
         // Create the request
-        let mut request = tonic::Request::new(CreateAssetRequest {
+        let request = tonic::Request::new(CreateAssetRequest {
             name: asset.get_display_name(),
             content: bytes,
             mime_type: "application/json".to_string(),
             metadata: Some(metadata.to_string()),
             activity_id: None, // Could be linked later if needed
         });
-
-        // Add authorization header if configured
-        if let Some(token) = &self.config.auth_token {
-            request.metadata_mut().insert(
-                "authorization",
-                format!("Bearer {}", token)
-                    .parse()
-                    .map_err(|e| ActivityError::Network(format!("Invalid auth token: {}", e)))?,
-            );
-        }
 
         // Call the service
         let response = client
