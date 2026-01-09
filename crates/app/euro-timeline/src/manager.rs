@@ -60,7 +60,7 @@ impl TimelineManagerBuilder {
     }
 
     /// Build the TimelineManager
-    pub fn build(self) -> TimelineResult<TimelineManager> {
+    pub async fn build(self) -> TimelineResult<TimelineManager> {
         let timeline_config = self.timeline_config.unwrap_or_default();
         let activity_storage_config = self.activity_storage_config.unwrap_or_default();
 
@@ -81,7 +81,9 @@ impl TimelineManagerBuilder {
             timeline_config.clone(),
         );
 
-        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new(activity_storage_config)));
+        let activity_storage = Arc::new(Mutex::new(
+            ActivityStorage::new(activity_storage_config).await,
+        ));
 
         Ok(TimelineManager {
             storage,
@@ -117,17 +119,19 @@ impl TimelineManager {
     }
 
     /// Create a new timeline manager with default configuration
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         TimelineManagerBuilder::new()
             .build()
+            .await
             .expect("Failed to build timeline manager")
     }
 
     /// Create a new timeline manager with custom configuration
-    pub fn with_config(timeline_config: TimelineConfig) -> TimelineResult<Self> {
+    pub async fn with_config(timeline_config: TimelineConfig) -> TimelineResult<Self> {
         TimelineManagerBuilder::new()
             .with_timeline_config(timeline_config)
             .build()
+            .await
     }
 
     /// Start the timeline manager (begins activity collection)
@@ -453,18 +457,16 @@ impl TimelineManager {
     }
 }
 
-impl Default for TimelineManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Create a timeline manager with custom capacity and interval (convenience function)
-pub fn create_timeline(capacity: usize, interval_seconds: u64) -> TimelineResult<TimelineManager> {
+pub async fn create_timeline(
+    capacity: usize,
+    interval_seconds: u64,
+) -> TimelineResult<TimelineManager> {
     TimelineManager::builder()
         .with_max_activities(capacity)
         .with_collection_interval(std::time::Duration::from_secs(interval_seconds))
         .build()
+        .await
 }
 
 #[cfg(test)]
@@ -482,7 +484,7 @@ mod tests {
     #[tokio::test]
     async fn test_manager_creation() {
         set_default_credential_builder(mock::default_credential_builder());
-        let manager = TimelineManager::new();
+        let manager = TimelineManager::new().await;
         assert!(!manager.is_running());
         assert!(manager.is_empty().await);
     }
@@ -495,8 +497,9 @@ mod tests {
             .collection_interval(Duration::from_secs(5))
             .build();
 
-        let manager =
-            TimelineManager::with_config(config).expect("Failed to create timeline manager");
+        let manager = TimelineManager::with_config(config)
+            .await
+            .expect("Failed to create timeline manager");
         assert!(!manager.is_running());
         assert_eq!(manager.get_config().storage.max_activities, 100);
     }
@@ -508,6 +511,7 @@ mod tests {
             .with_max_activities(200)
             .with_collection_interval(Duration::from_secs(10))
             .build()
+            .await
             .expect("Failed to build timeline manager");
 
         assert!(!manager.is_running());
@@ -532,6 +536,7 @@ mod tests {
             .with_timeline_config(timeline_config)
             .with_activity_storage_config(activity_storage_config)
             .build()
+            .await
             .expect("Failed to build timeline manager");
 
         assert_eq!(manager.get_config().storage.max_activities, 150);
@@ -546,8 +551,9 @@ mod tests {
         set_default_credential_builder(mock::default_credential_builder());
         let manager1 = TimelineManager::builder()
             .build()
+            .await
             .expect("Failed to build timeline manager");
-        let manager2 = TimelineManager::new();
+        let manager2 = TimelineManager::new().await;
 
         assert_eq!(
             manager1.get_config().storage.max_activities,
@@ -562,7 +568,7 @@ mod tests {
     #[tokio::test]
     async fn test_add_activity() {
         set_default_credential_builder(mock::default_credential_builder());
-        let manager = TimelineManager::new();
+        let manager = TimelineManager::new().await;
         let activity = create_test_activity("Test Activity");
 
         manager.add_activity(activity).await;
@@ -577,7 +583,7 @@ mod tests {
     #[tokio::test]
     async fn test_clear_activities() {
         set_default_credential_builder(mock::default_credential_builder());
-        let manager = TimelineManager::new();
+        let manager = TimelineManager::new().await;
 
         manager
             .add_activity(create_test_activity("Activity 1"))
@@ -597,10 +603,12 @@ mod tests {
     #[tokio::test]
     async fn test_convenience_functions() {
         set_default_credential_builder(mock::default_credential_builder());
-        let manager1 = TimelineManager::new();
+        let manager1 = TimelineManager::new().await;
         assert!(!manager1.is_running());
 
-        let manager2 = create_timeline(500, 5).expect("Failed to create timeline");
+        let manager2 = create_timeline(500, 5)
+            .await
+            .expect("Failed to create timeline");
         assert_eq!(manager2.get_config().storage.max_activities, 500);
         assert_eq!(
             manager2.get_config().collector.collection_interval,
@@ -611,7 +619,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_stats() {
         set_default_credential_builder(mock::default_credential_builder());
-        let manager = TimelineManager::new();
+        let manager = TimelineManager::new().await;
         manager.add_activity(create_test_activity("Test")).await;
 
         let storage_stats = manager.get_storage_stats().await;
