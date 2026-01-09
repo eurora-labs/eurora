@@ -34,6 +34,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "activity-models"
+version = "0.0.0"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+]
+
+[[package]]
 name = "actix-codec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -570,26 +581,11 @@ dependencies = [
 name = "asset-models"
 version = "0.0.0"
 dependencies = [
- "agent-chain-core",
- "anyhow",
- "async-trait",
- "auth-core",
- "base64 0.22.1",
- "chrono",
- "enum_dispatch",
- "euro-remote-db",
- "focus-tracker-core",
- "image",
  "prost",
  "prost-types",
- "serde",
- "serde_json",
- "specta",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -3359,6 +3355,7 @@ dependencies = [
 name = "euro-activity-service"
 version = "0.0.0"
 dependencies = [
+ "activity-models",
  "anyhow",
  "be-auth-grpc",
  "chrono",
@@ -3379,11 +3376,8 @@ dependencies = [
  "anyhow",
  "auth-core",
  "base64 0.22.1",
- "bytes",
  "chrono",
  "euro-secret",
- "http 1.3.1",
- "http-body-util",
  "humantime-serde",
  "jsonwebtoken",
  "prost",
@@ -3421,7 +3415,6 @@ dependencies = [
  "reqwest 0.12.24",
  "serde",
  "sha2",
- "tokio",
  "tonic",
  "tonic-prost-build",
  "tracing",
@@ -3706,7 +3699,6 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-core",
  "anyhow",
- "asset-models",
  "chrono",
  "euro-activity",
  "euro-personal-db",
