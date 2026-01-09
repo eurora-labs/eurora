@@ -1,7 +1,8 @@
 //! Asset storage functionality for saving activity assets to disk and remote service
+use asset_models::proto::{
+    CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient,
+};
 use async_trait::async_trait;
-use be_asset_service::proto::CreateAssetRequest;
-use be_asset_service::proto::proto_asset_service_client::ProtoAssetServiceClient;
 use enum_dispatch::enum_dispatch;
 use euro_auth::AuthedChannel;
 use euro_encrypt::{MainKey, encrypt_file_contents};

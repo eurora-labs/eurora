@@ -3322,9 +3322,9 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-core",
  "anyhow",
+ "asset-models",
  "async-trait",
  "base64 0.22.1",
- "be-asset-service",
  "cfg-if",
  "chrono",
  "dashmap",
@@ -3706,7 +3706,7 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-core",
  "anyhow",
- "be-asset-service",
+ "asset-models",
  "chrono",
  "euro-activity",
  "euro-personal-db",
