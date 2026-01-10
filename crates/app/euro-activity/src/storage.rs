@@ -1,17 +1,22 @@
 //! Asset storage functionality for saving activity assets to disk and remote service
-
-use std::path::{Path, PathBuf};
-
+use activity_models::proto::{
+    ActivityResponse, InsertActivityRequest,
+    proto_activity_service_client::ProtoActivityServiceClient,
+};
+use asset_models::proto::{
+    CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient,
+};
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use euro_assets_service::proto::CreateAssetRequest;
-use euro_assets_service::proto::proto_assets_service_client::ProtoAssetsServiceClient;
+use euro_auth::AuthedChannel;
 use euro_encrypt::{MainKey, encrypt_file_contents};
 use euro_fs::create_dirs_then_write;
+use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use tokio::fs;
-use tonic::transport::Channel;
-use tracing::debug;
+use tonic::Status;
+use tracing::{debug, error};
 
 use crate::{Activity, ActivityAsset, ActivityError, AssetFunctionality, error::ActivityResult};
 
@@ -29,9 +34,6 @@ pub struct ActivityStorageConfig {
     /// Remote assets service endpoint (e.g., "http://localhost:50051")
     #[serde(default)]
     pub service_endpoint: Option<String>,
-    /// Authorization token for the remote service
-    #[serde(default)]
-    pub auth_token: Option<String>,
 }
 
 impl Default for ActivityStorageConfig {
@@ -43,7 +45,6 @@ impl Default for ActivityStorageConfig {
             max_file_size: Some(100 * 1024 * 1024), // 100MB default limit
             main_key,
             service_endpoint: None,
-            auth_token: None,
         }
     }
 }
@@ -88,13 +89,26 @@ pub trait SaveableAsset {
 
 /// Asset storage manager
 pub struct ActivityStorage {
+    #[allow(dead_code)]
+    activity_client: ProtoActivityServiceClient<AuthedChannel>,
+    asset_client: ProtoAssetServiceClient<AuthedChannel>,
     config: ActivityStorageConfig,
 }
 
 impl ActivityStorage {
     /// Create a new asset storage manager
-    pub fn new(config: ActivityStorageConfig) -> Self {
-        Self { config }
+    pub async fn new(config: ActivityStorageConfig) -> Self {
+        let channel = euro_auth::get_authed_channel().await;
+        let asset_client = ProtoAssetServiceClient::new(channel);
+
+        let channel = euro_auth::get_authed_channel().await;
+        let activity_client = ProtoActivityServiceClient::new(channel);
+
+        Self {
+            activity_client,
+            asset_client,
+            config,
+        }
     }
 
     // /// Create with default configuration
@@ -112,18 +126,48 @@ impl ActivityStorage {
     }
 
     /// Save all assets of an activity to service by ids
+    pub async fn save_activity_to_service(
+        &self,
+        activity: &Activity,
+    ) -> ActivityResult<ActivityResponse> {
+        let mut client = self.activity_client.clone();
+        let icon = activity.icon.as_ref().map(|icon| icon.to_vec());
+        let response = client
+            .insert_activity(InsertActivityRequest {
+                id: None,
+                name: activity.name.clone(),
+                process_name: activity.process_name.clone(),
+                window_title: activity.process_name.clone(),
+                icon,
+                started_at: Some(Timestamp {
+                    seconds: activity.start.timestamp(),
+                    nanos: activity.start.timestamp_subsec_nanos() as i32,
+                }),
+                ended_at: None,
+            })
+            .await
+            .map_err(|e| {
+                error!("Failed to insert activity: {}", e);
+                Status::internal("Failed to insert activity")
+            })
+            .expect("Failed to insert activity");
+
+        Ok(response.into_inner())
+    }
+
+    /// Save all assets of an activity to service by ids
     pub async fn save_assets_to_service_by_ids(
         &self,
         activity: &Activity,
-        ids: &[String],
+        _ids: &[String],
     ) -> ActivityResult<Vec<SavedAssetInfo>> {
         let mut saved_assets = Vec::new();
 
         for asset in &activity.assets {
-            if ids.contains(&asset.get_id().to_string()) {
-                let saved_info = self.save_asset_to_service(asset).await?;
-                saved_assets.push(saved_info);
-            }
+            // if ids.contains(&asset.get_id().to_string()) {
+            let saved_info = self.save_asset_to_service(asset).await?;
+            saved_assets.push(saved_info);
+            // }
         }
 
         Ok(saved_assets)
@@ -167,28 +211,15 @@ impl ActivityStorage {
         &self,
         asset: &ActivityAsset,
     ) -> ActivityResult<SavedAssetInfo> {
-        let service_endpoint = self.config.service_endpoint.as_ref().ok_or_else(|| {
-            ActivityError::Configuration("service_endpoint not configured".to_string())
-        })?;
+        // let service_endpoint = self.config.service_endpoint.as_ref().ok_or_else(|| {
+        //     ActivityError::Configuration("service_endpoint not configured".to_string())
+        // })?;
 
         // Serialize the entire ActivityAsset enum to JSON (no encryption as requested)
         let bytes = serde_json::to_vec(asset)?;
         let file_size = bytes.len() as u64;
 
-        debug!(
-            "Saving asset {} to service at {}",
-            asset.get_unique_id(),
-            service_endpoint
-        );
-
-        // Connect to the gRPC service
-        let channel = Channel::from_shared(service_endpoint.clone())
-            .map_err(|e| ActivityError::Network(format!("Invalid service endpoint: {}", e)))?
-            .connect()
-            .await
-            .map_err(|e| ActivityError::Network(format!("Failed to connect to service: {}", e)))?;
-
-        let mut client = ProtoAssetsServiceClient::new(channel);
+        let mut client = self.asset_client.clone();
 
         // Prepare metadata as JSON containing asset type info
         let metadata = serde_json::json!({
@@ -198,22 +229,13 @@ impl ActivityStorage {
         });
 
         // Create the request
-        let mut request = tonic::Request::new(CreateAssetRequest {
+        let request = tonic::Request::new(CreateAssetRequest {
+            name: asset.get_display_name(),
             content: bytes,
             mime_type: "application/json".to_string(),
             metadata: Some(metadata.to_string()),
             activity_id: None, // Could be linked later if needed
         });
-
-        // Add authorization header if configured
-        if let Some(token) = &self.config.auth_token {
-            request.metadata_mut().insert(
-                "authorization",
-                format!("Bearer {}", token)
-                    .parse()
-                    .map_err(|e| ActivityError::Network(format!("Invalid auth token: {}", e)))?,
-            );
-        }
 
         // Call the service
         let response = client
@@ -229,9 +251,9 @@ impl ActivityStorage {
         debug!("Asset saved with ID: {}", created_asset.id);
 
         Ok(SavedAssetInfo {
-            file_path: PathBuf::from(&created_asset.file_path),
-            absolute_path: PathBuf::from(&created_asset.file_path),
-            content_hash: created_asset.content_sha256,
+            file_path: PathBuf::from(&created_asset.storage_uri),
+            absolute_path: PathBuf::from(&created_asset.storage_uri),
+            content_hash: created_asset.checksum_sha256,
             file_size,
             saved_at: chrono::Utc::now(),
         })
