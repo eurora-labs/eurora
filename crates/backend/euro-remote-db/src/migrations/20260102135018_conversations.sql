@@ -122,11 +122,13 @@ CREATE TABLE activities (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
     user_id UUID NOT NULL,
     name VARCHAR(500) NOT NULL,
-    icon_asset_id UUID NOT NULL,
+    icon_asset_id UUID,
     process_name VARCHAR(500) NOT NULL,
     window_title VARCHAR(500) NOT NULL,
     started_at TIMESTAMP WITH TIME ZONE NOT NULL,
     ended_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
     -- Foreign key to users table
     CONSTRAINT fk_activities_user_id
@@ -134,11 +136,11 @@ CREATE TABLE activities (
         REFERENCES users(id)
         ON DELETE CASCADE,
 
-    -- Foreign key to assets table
+    -- Foreign key to assets table (nullable, SET NULL on delete)
     CONSTRAINT fk_activities_icon_asset_id
         FOREIGN KEY (icon_asset_id)
         REFERENCES assets(id)
-        ON DELETE CASCADE
+        ON DELETE SET NULL
 );
 
 ----------------------------------------------------------------
@@ -264,6 +266,11 @@ CREATE TRIGGER update_assets_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_activities_updated_at
+    BEFORE UPDATE ON activities
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 ----------------------------------------------------------------
 -- Add comments for documentation
 ----------------------------------------------------------------
@@ -292,10 +299,13 @@ COMMENT ON TABLE activities IS 'Tracked user activities (applications, browser t
 COMMENT ON COLUMN activities.id IS 'Primary key UUID for activity';
 COMMENT ON COLUMN activities.user_id IS 'Foreign key to users table';
 COMMENT ON COLUMN activities.name IS 'Display name of the activity';
-COMMENT ON COLUMN activities.icon_asset_id IS 'Foreign key to assets table for activity icon';
+COMMENT ON COLUMN activities.icon_asset_id IS 'Foreign key to assets table for activity icon (nullable)';
 COMMENT ON COLUMN activities.process_name IS 'System process name';
+COMMENT ON COLUMN activities.window_title IS 'Window title';
 COMMENT ON COLUMN activities.started_at IS 'When the activity started';
 COMMENT ON COLUMN activities.ended_at IS 'When the activity ended (NULL if still active)';
+COMMENT ON COLUMN activities.created_at IS 'Timestamp when activity was created';
+COMMENT ON COLUMN activities.updated_at IS 'Timestamp when activity was last updated';
 
 -- Activity conversations table
 COMMENT ON TABLE activity_conversations IS 'Links activities to related conversations';
