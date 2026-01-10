@@ -9,7 +9,6 @@ agent-chain-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-activity = { workspace = true }
-euro-assets-service = { workspace = true }
 euro-personal-db = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
 image = { workspace = true }
@@ -23,6 +22,9 @@ tokio = { workspace = true, features = [
   "time",
 ] }
 tracing = { workspace = true }
+
+[dev-dependencies]
+rustls = { workspace = true, default-features = false, features = ["ring", "std", "tls12"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.61.2", features = [

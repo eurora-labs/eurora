@@ -8,25 +8,10 @@ description = "Models for activity-related data"
 ignored = ["tonic-prost"]
 
 [dependencies]
-agent-chain-core = { workspace = true }
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-auth-core = { workspace = true, optional = true }
-base64 = { workspace = true }
-chrono = { workspace = true, features = ["serde"] }
-enum_dispatch = { workspace = true }
-euro-remote-db = { workspace = true, optional = true }
-focus-tracker-core = { workspace = true }
-image = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-specta = { workspace = true, features = ["derive", "function"] }
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
-tracing = { workspace = true }
-uuid = { workspace = true, features = ["serde", "v7"] }
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }

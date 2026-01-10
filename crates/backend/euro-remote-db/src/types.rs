@@ -151,9 +151,11 @@ pub struct UpdateLoginTokenRequest {
 pub struct Asset {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub content_sha256: Option<Vec<u8>>,
-    pub byte_size: Option<i64>,
-    pub file_path: String,
+    pub checksum_sha256: Option<Vec<u8>>,
+    pub size_bytes: Option<i64>,
+    pub storage_backend: String,
+    pub storage_uri: String,
+
     pub mime_type: String,
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
@@ -164,9 +166,9 @@ pub struct Asset {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateAssetRequest {
     pub id: Uuid,
-    pub content_sha256: Option<Vec<u8>>,
-    pub byte_size: Option<i64>,
-    pub file_path: String,
+    pub checksum_sha256: Option<Vec<u8>>,
+    pub size_bytes: Option<i64>,
+    pub storage_uri: String,
     pub mime_type: String,
     pub metadata: Option<serde_json::Value>,
 }
@@ -174,9 +176,9 @@ pub struct CreateAssetRequest {
 /// Request for updating an asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateAssetRequest {
-    pub content_sha256: Option<Vec<u8>>,
-    pub byte_size: Option<i64>,
-    pub file_path: Option<String>,
+    pub checksum_sha256: Option<Vec<u8>>,
+    pub size_bytes: Option<i64>,
+    pub storage_uri: Option<String>,
     pub mime_type: Option<String>,
     pub metadata: Option<serde_json::Value>,
 }
