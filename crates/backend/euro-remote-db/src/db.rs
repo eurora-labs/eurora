@@ -58,8 +58,8 @@ impl DatabaseManager {
 
     // User management methods
     pub async fn create_user(&self, request: CreateUserRequest) -> Result<User, sqlx::Error> {
-        let user_id = Uuid::new_v4();
-        let password_id = Uuid::new_v4();
+        let user_id = Uuid::now_v7();
+        let password_id = Uuid::now_v7();
         let now = Utc::now();
 
         // Start a transaction to ensure both user and password_credentials are created atomically
@@ -326,7 +326,7 @@ impl DatabaseManager {
         &self,
         request: CreateOAuthCredentialsRequest,
     ) -> Result<OAuthCredentials, sqlx::Error> {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let now = Utc::now();
 
         let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
@@ -457,7 +457,7 @@ impl DatabaseManager {
         &self,
         request: CreateRefreshTokenRequest,
     ) -> Result<RefreshToken, sqlx::Error> {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let now = Utc::now();
 
         let refresh_token = sqlx::query_as::<_, RefreshToken>(
@@ -553,7 +553,7 @@ impl DatabaseManager {
         &self,
         request: CreateOAuthStateRequest,
     ) -> Result<OAuthState, sqlx::Error> {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let now = Utc::now();
 
         let oauth_state = sqlx::query_as::<_, OAuthState>(
@@ -625,7 +625,7 @@ impl DatabaseManager {
         &self,
         request: CreateLoginTokenRequest,
     ) -> Result<LoginToken, sqlx::Error> {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let now = Utc::now();
 
         let login_token = sqlx::query_as::<_, LoginToken>(
@@ -712,7 +712,7 @@ impl DatabaseManager {
         started_at: DateTime<Utc>,
         ended_at: Option<DateTime<Utc>>,
     ) -> Result<Activity, sqlx::Error> {
-        let id = id.unwrap_or_else(Uuid::new_v4);
+        let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
