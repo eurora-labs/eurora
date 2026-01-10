@@ -1,4 +1,8 @@
 //! Asset storage functionality for saving activity assets to disk and remote service
+use activity_models::proto::{
+    ActivityResponse, InsertActivityRequest,
+    proto_activity_service_client::ProtoActivityServiceClient,
+};
 use asset_models::proto::{
     CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient,
 };
@@ -7,10 +11,12 @@ use enum_dispatch::enum_dispatch;
 use euro_auth::AuthedChannel;
 use euro_encrypt::{MainKey, encrypt_file_contents};
 use euro_fs::create_dirs_then_write;
+use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use tracing::debug;
+use tonic::Status;
+use tracing::{debug, error};
 
 use crate::{Activity, ActivityAsset, ActivityError, AssetFunctionality, error::ActivityResult};
 
@@ -84,7 +90,8 @@ pub trait SaveableAsset {
 /// Asset storage manager
 pub struct ActivityStorage {
     #[allow(dead_code)]
-    client: ProtoAssetServiceClient<AuthedChannel>,
+    activity_client: ProtoActivityServiceClient<AuthedChannel>,
+    asset_client: ProtoAssetServiceClient<AuthedChannel>,
     config: ActivityStorageConfig,
 }
 
@@ -92,9 +99,16 @@ impl ActivityStorage {
     /// Create a new asset storage manager
     pub async fn new(config: ActivityStorageConfig) -> Self {
         let channel = euro_auth::get_authed_channel().await;
-        let client = ProtoAssetServiceClient::new(channel);
+        let asset_client = ProtoAssetServiceClient::new(channel);
 
-        Self { config, client }
+        let channel = euro_auth::get_authed_channel().await;
+        let activity_client = ProtoActivityServiceClient::new(channel);
+
+        Self {
+            activity_client,
+            asset_client,
+            config,
+        }
     }
 
     // /// Create with default configuration
@@ -109,6 +123,39 @@ impl ActivityStorage {
         let asset =
             euro_encrypt::load_encrypted_file::<ActivityAsset>(&self.config.main_key, path).await?;
         Ok(asset)
+    }
+
+    /// Save all assets of an activity to service by ids
+    pub async fn save_activity_to_service(
+        &self,
+        activity: &Activity,
+    ) -> ActivityResult<ActivityResponse> {
+        let mut client = self.activity_client.clone();
+        let icon = match &activity.icon {
+            Some(icon) => Some(icon.to_vec()),
+            None => None,
+        };
+        let response = client
+            .insert_activity(InsertActivityRequest {
+                id: None,
+                name: activity.name.clone(),
+                process_name: activity.process_name.clone(),
+                window_title: activity.process_name.clone(),
+                icon,
+                started_at: Some(Timestamp {
+                    seconds: activity.start.timestamp(),
+                    nanos: activity.start.timestamp_subsec_nanos() as i32,
+                }),
+                ended_at: None,
+            })
+            .await
+            .map_err(|e| {
+                error!("Failed to insert activity: {}", e);
+                Status::internal("Failed to insert activity")
+            })
+            .expect("Failed to insert activity");
+
+        Ok(response.into_inner())
     }
 
     /// Save all assets of an activity to service by ids
@@ -175,7 +222,7 @@ impl ActivityStorage {
         let bytes = serde_json::to_vec(asset)?;
         let file_size = bytes.len() as u64;
 
-        let mut client = self.client.clone();
+        let mut client = self.asset_client.clone();
 
         // Prepare metadata as JSON containing asset type info
         let metadata = serde_json::json!({
