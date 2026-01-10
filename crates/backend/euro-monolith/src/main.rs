@@ -1,9 +1,9 @@
 use std::{net::SocketAddr, sync::Arc};
 
+use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
 use be_prompt_service::PromptService;
 use dotenv::dotenv;
-use euro_activity_service::{ActivityService, ProtoActivityServiceServer};
 use euro_auth_service::AuthService;
 use euro_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer;
 // use euro_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
