@@ -14,13 +14,13 @@ use tonic::{Request, Response, Status};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use crate::proto::{
+use activity_models::proto::{
     Activity, ActivityResponse, DeleteActivityRequest, GetActivitiesByTimeRangeRequest,
     GetActivityRequest, InsertActivityRequest, ListActivitiesRequest, ListActivitiesResponse,
     UpdateActivityEndTimeRequest, UpdateActivityRequest,
 };
 
-pub use crate::proto::proto_activity_service_server::{
+pub use activity_models::proto::proto_activity_service_server::{
     ProtoActivityService, ProtoActivityServiceServer,
 };
 
@@ -166,13 +166,6 @@ impl ProtoActivityService for ActivityService {
             .transpose()
             .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
 
-        let icon_asset_id = req
-            .icon_asset_id
-            .as_ref()
-            .map(|s| Uuid::parse_str(s))
-            .transpose()
-            .map_err(|e| Status::invalid_argument(format!("Invalid icon asset ID: {}", e)))?;
-
         let started_at = req
             .started_at
             .as_ref()
@@ -181,13 +174,16 @@ impl ProtoActivityService for ActivityService {
 
         let ended_at = req.ended_at.as_ref().and_then(timestamp_to_datetime);
 
+        // TODO: Handle icon upload - for now, pass None for icon_asset_id
+        // The req.icon bytes would need to be uploaded to the asset service first
+        // to obtain a valid icon_asset_id
         let activity = self
             .db
             .create_activity(
                 id,
                 user_id,
                 &req.name,
-                icon_asset_id,
+                None, // icon_asset_id - requires proper asset upload implementation
                 &req.process_name,
                 &req.window_title,
                 started_at,
@@ -195,7 +191,7 @@ impl ProtoActivityService for ActivityService {
             )
             .await
             .map_err(|e| {
-                error!("Failed to create activity: {}", e);
+                info!("Failed to create activity: {}", e);
                 Status::internal("Failed to create activity")
             })?;
 
