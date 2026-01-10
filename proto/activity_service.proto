@@ -96,8 +96,8 @@ message InsertActivityRequest {
   // Display name of the activity
   string name = 2;
 
-  // Asset ID for the activity icon
-  optional string icon_asset_id = 3;
+  // PNG icon data
+  optional bytes icon = 3;
 
   // System process name
   string process_name = 4;

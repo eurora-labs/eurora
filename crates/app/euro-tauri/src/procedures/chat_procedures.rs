@@ -62,6 +62,11 @@ impl ChatApi for ChatApiImpl {
             });
         });
 
+        timeline
+            .save_current_activity_to_service()
+            .await
+            .expect("Failed to save activity");
+
         if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
             info!("Infos: {:?}", infos);
         }
