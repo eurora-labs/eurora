@@ -89,7 +89,6 @@ pub trait SaveableAsset {
 
 /// Asset storage manager
 pub struct ActivityStorage {
-    #[allow(dead_code)]
     activity_client: ProtoActivityServiceClient<AuthedChannel>,
     asset_client: ProtoAssetServiceClient<AuthedChannel>,
     config: ActivityStorageConfig,
