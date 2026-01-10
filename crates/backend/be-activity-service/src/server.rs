@@ -191,7 +191,7 @@ impl ProtoActivityService for ActivityService {
             )
             .await
             .map_err(|e| {
-                info!("Failed to create activity: {}", e);
+                error!("Failed to create activity: {}", e);
                 Status::internal("Failed to create activity")
             })?;
 
