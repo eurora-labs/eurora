@@ -88,18 +88,21 @@ CREATE TABLE assets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
     user_id UUID NOT NULL,
 
-    -- Storage location references
-    content_sha256 bytea,
-    byte_size BIGINT CHECK (byte_size IS NULL OR byte_size >= 0),
-
-    file_path TEXT NOT NULL, -- Path to the file, could be s3 path or local server
+    name TEXT NOT NULL,
     mime_type TEXT NOT NULL, -- MIME type of the asset
+    size_bytes BIGINT CHECK (size_bytes IS NULL OR size_bytes >= 0),
+    checksum_sha256 bytea,
 
-    -- Additional metadata
-    metadata JSONB NOT NULL DEFAULT '{}',
+    storage_backend TEXT NOT NULL, -- Backend used for storage (e.g., S3, filesystem)
+    storage_uri TEXT NOT NULL, -- Path to the file, could be s3 path or local server
+
+    status TEXT NOT NULL DEFAULT 'uploaded',
 
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+
+    -- Additional metadata
+    metadata JSONB NOT NULL DEFAULT '{}',
 
     -- Foreign key constraints
     CONSTRAINT fk_assets_user_id
@@ -108,7 +111,7 @@ CREATE TABLE assets (
         ON DELETE CASCADE,
 
     -- SHA256 length check
-    CONSTRAINT assets_sha256_len CHECK (content_sha256 IS NULL OR octet_length(content_sha256) = 32)
+    CONSTRAINT assets_sha256_len CHECK (checksum_sha256 IS NULL OR octet_length(checksum_sha256) = 32)
 );
 
 ----------------------------------------------------------------
@@ -119,11 +122,13 @@ CREATE TABLE activities (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
     user_id UUID NOT NULL,
     name VARCHAR(500) NOT NULL,
-    icon_asset_id UUID NOT NULL,
+    icon_asset_id UUID,
     process_name VARCHAR(500) NOT NULL,
     window_title VARCHAR(500) NOT NULL,
     started_at TIMESTAMP WITH TIME ZONE NOT NULL,
     ended_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
     -- Foreign key to users table
     CONSTRAINT fk_activities_user_id
@@ -131,11 +136,11 @@ CREATE TABLE activities (
         REFERENCES users(id)
         ON DELETE CASCADE,
 
-    -- Foreign key to assets table
+    -- Foreign key to assets table (nullable, SET NULL on delete)
     CONSTRAINT fk_activities_icon_asset_id
         FOREIGN KEY (icon_asset_id)
         REFERENCES assets(id)
-        ON DELETE CASCADE
+        ON DELETE SET NULL
 );
 
 ----------------------------------------------------------------
@@ -236,7 +241,7 @@ CREATE INDEX idx_activity_assets_asset_id ON activity_assets(asset_id);
 
 -- Assets indexes
 CREATE INDEX idx_assets_user_id ON assets(user_id);
-CREATE INDEX idx_assets_file_path ON assets(file_path);
+CREATE INDEX idx_assets_storage_uri ON assets(storage_uri);
 
 -- Message assets indexes
 -- Note: Primary key (message_id, asset_id) already indexes message_id
@@ -258,6 +263,11 @@ CREATE TRIGGER update_messages_updated_at
 
 CREATE TRIGGER update_assets_updated_at
     BEFORE UPDATE ON assets
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_activities_updated_at
+    BEFORE UPDATE ON activities
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
@@ -289,10 +299,13 @@ COMMENT ON TABLE activities IS 'Tracked user activities (applications, browser t
 COMMENT ON COLUMN activities.id IS 'Primary key UUID for activity';
 COMMENT ON COLUMN activities.user_id IS 'Foreign key to users table';
 COMMENT ON COLUMN activities.name IS 'Display name of the activity';
-COMMENT ON COLUMN activities.icon_asset_id IS 'Foreign key to assets table for activity icon';
+COMMENT ON COLUMN activities.icon_asset_id IS 'Foreign key to assets table for activity icon (nullable)';
 COMMENT ON COLUMN activities.process_name IS 'System process name';
+COMMENT ON COLUMN activities.window_title IS 'Window title';
 COMMENT ON COLUMN activities.started_at IS 'When the activity started';
 COMMENT ON COLUMN activities.ended_at IS 'When the activity ended (NULL if still active)';
+COMMENT ON COLUMN activities.created_at IS 'Timestamp when activity was created';
+COMMENT ON COLUMN activities.updated_at IS 'Timestamp when activity was last updated';
 
 -- Activity conversations table
 COMMENT ON TABLE activity_conversations IS 'Links activities to related conversations';
@@ -308,9 +321,10 @@ COMMENT ON COLUMN activity_assets.asset_id IS 'Foreign key to assets table';
 COMMENT ON TABLE assets IS 'File assets (screenshots, attachments) with external storage';
 COMMENT ON COLUMN assets.id IS 'Primary key UUID for asset';
 COMMENT ON COLUMN assets.user_id IS 'Foreign key to users table - owner of the asset';
-COMMENT ON COLUMN assets.content_sha256 IS 'SHA256 hash of the file content for deduplication';
-COMMENT ON COLUMN assets.byte_size IS 'Size of the asset in bytes';
-COMMENT ON COLUMN assets.file_path IS 'Path to the file (S3 key, local path, etc.)';
+COMMENT ON COLUMN assets.checksum_sha256 IS 'SHA256 hash of the file content for deduplication';
+COMMENT ON COLUMN assets.size_bytes IS 'Size of the asset in bytes';
+COMMENT ON COLUMN assets.storage_backend IS 'Storage backend type (e.g., S3, local)';
+COMMENT ON COLUMN assets.storage_uri IS 'Path to the file (S3 key, local path, etc.)';
 COMMENT ON COLUMN assets.mime_type IS 'MIME type of the asset';
 COMMENT ON COLUMN assets.metadata IS 'Additional metadata as JSON';
 
