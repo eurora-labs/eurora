@@ -24,8 +24,13 @@ mod storage;
 mod tests {
     use super::*;
 
+    fn init_crypto_provider() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+
     #[tokio::test]
     async fn test_new_api() {
+        init_crypto_provider();
         let timeline = TimelineManager::new().await;
         assert!(!timeline.is_running());
         assert!(timeline.is_empty().await);
@@ -33,6 +38,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_builder() {
+        init_crypto_provider();
         let config = TimelineConfig::builder()
             .max_activities(100)
             .collection_interval(std::time::Duration::from_secs(5))
@@ -48,6 +54,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_convenience_functions() {
+        init_crypto_provider();
         let timeline1 = TimelineManager::new().await;
         assert!(!timeline1.is_running());
 
