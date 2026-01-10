@@ -496,13 +496,18 @@ mod tests {
     use super::*;
     use crate::config::TimelineConfig;
 
+    fn init_test() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        set_default_credential_builder(mock::default_credential_builder());
+    }
+
     fn create_test_activity(name: &str) -> Activity {
         crate::Activity::new(name.to_string(), None, "test_process".to_string(), vec![])
     }
 
     #[tokio::test]
     async fn test_manager_creation() {
-        set_default_credential_builder(mock::default_credential_builder());
+        init_test();
         let manager = TimelineManager::new().await;
         assert!(!manager.is_running());
         assert!(manager.is_empty().await);
@@ -510,7 +515,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_manager_with_config() {
-        set_default_credential_builder(mock::default_credential_builder());
+        init_test();
         let config = TimelineConfig::builder()
             .max_activities(100)
             .collection_interval(Duration::from_secs(5))
@@ -525,7 +530,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_pattern() {
-        set_default_credential_builder(mock::default_credential_builder());
+        init_test();
         let manager = TimelineManager::builder()
             .with_max_activities(200)
             .with_collection_interval(Duration::from_secs(10))
@@ -543,7 +548,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_with_timeline_config() {
-        set_default_credential_builder(mock::default_credential_builder());
+        init_test();
         let timeline_config = TimelineConfig::builder()
             .max_activities(150)
             .collection_interval(Duration::from_secs(3))
@@ -567,7 +572,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_default() {
-        set_default_credential_builder(mock::default_credential_builder());
+        init_test();
         let manager1 = TimelineManager::builder()
             .build()
             .await
@@ -586,7 +591,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_activity() {
-        set_default_credential_builder(mock::default_credential_builder());
+        init_test();
         let manager = TimelineManager::new().await;
         let activity = create_test_activity("Test Activity");
 
@@ -601,7 +606,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_clear_activities() {
-        set_default_credential_builder(mock::default_credential_builder());
+        init_test();
         let manager = TimelineManager::new().await;
 
         manager
@@ -621,7 +626,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_convenience_functions() {
-        set_default_credential_builder(mock::default_credential_builder());
+        init_test();
         let manager1 = TimelineManager::new().await;
         assert!(!manager1.is_running());
 
@@ -637,7 +642,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_stats() {
-        set_default_credential_builder(mock::default_credential_builder());
+        init_test();
         let manager = TimelineManager::new().await;
         manager.add_activity(create_test_activity("Test")).await;
 

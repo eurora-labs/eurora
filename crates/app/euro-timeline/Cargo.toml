@@ -23,6 +23,9 @@ tokio = { workspace = true, features = [
 ] }
 tracing = { workspace = true }
 
+[dev-dependencies]
+rustls = { workspace = true, default-features = false, features = ["ring", "std", "tls12"] }
+
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.61.2", features = [
   "Win32_Foundation",
