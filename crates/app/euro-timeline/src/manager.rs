@@ -268,6 +268,25 @@ impl TimelineManager {
         }
     }
 
+    /// Save current activity to disk
+    pub async fn save_current_activity_to_service(&self) -> TimelineResult<()> {
+        let activity = {
+            let storage = self.storage.lock().await;
+            storage.get_current_activity().cloned()
+        };
+
+        match activity {
+            Some(activity) => {
+                let activity_storage = self.activity_storage.lock().await;
+                activity_storage.save_activity_to_service(&activity).await?;
+                Ok(())
+            }
+            None => Err(TimelineError::Storage(
+                "No current activity found".to_string(),
+            )),
+        }
+    }
+
     /// Save the assets to disk by ids
     pub async fn save_assets_to_disk_by_ids(
         &self,
