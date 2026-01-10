@@ -1438,6 +1438,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "be-activity-service"
+version = "0.0.0"
+dependencies = [
+ "activity-models",
+ "anyhow",
+ "be-auth-grpc",
+ "chrono",
+ "euro-remote-db",
+ "prost",
+ "prost-types",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "be-asset-service"
 version = "0.0.0"
 dependencies = [
@@ -3354,24 +3372,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-activity-service"
-version = "0.0.0"
-dependencies = [
- "activity-models",
- "anyhow",
- "be-auth-grpc",
- "chrono",
- "euro-remote-db",
- "prost",
- "prost-types",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "euro-auth"
 version = "0.0.0"
 dependencies = [
@@ -3476,11 +3476,11 @@ name = "euro-monolith"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "be-activity-service",
  "be-asset-service",
  "be-auth-grpc",
  "be-prompt-service",
  "dotenv",
- "euro-activity-service",
  "euro-auth-service",
  "euro-proto",
  "euro-remote-db",
