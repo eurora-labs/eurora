@@ -26,16 +26,16 @@ use crate::proto::{
 };
 use crate::storage::StorageService;
 
-pub use crate::proto::proto_assets_service_server::{ProtoAssetsService, ProtoAssetsServiceServer};
+pub use crate::proto::proto_asset_service_server::{ProtoAssetService, ProtoAssetServiceServer};
 
 /// The main assets service
 #[derive(Debug)]
-pub struct AssetsService {
+pub struct AssetService {
     db: Arc<DatabaseManager>,
     storage: Arc<StorageService>,
 }
 
-impl AssetsService {
+impl AssetService {
     /// Create a new AssetsService instance
     pub fn new(db: Arc<DatabaseManager>, storage: Arc<StorageService>) -> Self {
         info!("Creating new AssetsService instance");
@@ -59,12 +59,12 @@ impl AssetsService {
 
         Asset {
             id: asset.id.to_string(),
-            content_sha256: asset
-                .content_sha256
+            checksum_sha256: asset
+                .checksum_sha256
                 .as_ref()
                 .map(|h| general_purpose::STANDARD.encode(h)),
-            byte_size: asset.byte_size,
-            file_path: asset.file_path.clone(),
+            size_bytes: asset.size_bytes,
+            storage_uri: asset.storage_uri.clone(),
             mime_type: asset.mime_type.clone(),
             metadata: asset.metadata.to_string(),
             created_at: Some(datetime_to_timestamp(asset.created_at)),
@@ -108,11 +108,12 @@ fn decode_sha256(base64_hash: &str) -> Result<Vec<u8>, Status> {
 }
 
 #[tonic::async_trait]
-impl ProtoAssetsService for AssetsService {
+impl ProtoAssetService for AssetService {
     async fn create_asset(
         &self,
         request: Request<CreateAssetRequest>,
     ) -> Result<Response<AssetResponse>, Status> {
+        eprintln!("CreateAsset request received");
         info!("CreateAsset request received");
 
         let claims = request.extensions().get::<Claims>().ok_or_else(|| {
@@ -135,18 +136,20 @@ impl ProtoAssetsService for AssetsService {
         }
 
         // Calculate SHA256 hash and byte size
-        let content_sha256 = StorageService::calculate_sha256(&req.content);
-        let byte_size = req.content.len() as i64;
+        let checksum_sha256 = StorageService::calculate_sha256(&req.content);
+        let size_bytes = req.content.len() as i64;
 
         debug!(
             "Processing asset: {} bytes, SHA256: {}",
-            byte_size,
-            hex::encode(&content_sha256)
+            size_bytes,
+            hex::encode(&checksum_sha256)
         );
 
         // Check for deduplication - if we already have this exact content, return existing asset
-        if let Ok(Some(existing_asset)) =
-            self.db.find_asset_by_sha256(user_id, &content_sha256).await
+        if let Ok(Some(existing_asset)) = self
+            .db
+            .find_asset_by_sha256(user_id, &checksum_sha256)
+            .await
         {
             info!(
                 "Found existing asset {} with same SHA256 hash, reusing",
@@ -174,7 +177,7 @@ impl ProtoAssetsService for AssetsService {
         let asset_id = Uuid::now_v7();
 
         // Upload content to storage
-        let file_path = self
+        let storage_uri = self
             .storage
             .upload(&user_id, &asset_id, &req.content, &req.mime_type)
             .await
@@ -194,9 +197,9 @@ impl ProtoAssetsService for AssetsService {
         // Create database record
         let db_request = DbCreateAssetRequest {
             id: asset_id,
-            content_sha256: Some(content_sha256),
-            byte_size: Some(byte_size),
-            file_path,
+            checksum_sha256: Some(checksum_sha256),
+            size_bytes: Some(size_bytes),
+            storage_uri,
             mime_type: req.mime_type,
             metadata,
         };
@@ -320,8 +323,8 @@ impl ProtoAssetsService for AssetsService {
         let asset_id = Uuid::parse_str(&req.id)
             .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
 
-        let content_sha256 = req
-            .content_sha256
+        let checksum_sha256 = req
+            .checksum_sha256
             .as_ref()
             .map(|h| decode_sha256(h))
             .transpose()?;
@@ -334,9 +337,9 @@ impl ProtoAssetsService for AssetsService {
             .map_err(|e| Status::invalid_argument(format!("Invalid metadata JSON: {}", e)))?;
 
         let db_request = DbUpdateAssetRequest {
-            content_sha256,
-            byte_size: req.byte_size,
-            file_path: req.file_path,
+            checksum_sha256,
+            size_bytes: req.size_bytes,
+            storage_uri: req.storage_uri,
             mime_type: req.mime_type,
             metadata,
         };
@@ -387,7 +390,7 @@ impl ProtoAssetsService for AssetsService {
             })?;
 
         // Delete from storage
-        if let Err(e) = self.storage.delete(&asset.file_path).await {
+        if let Err(e) = self.storage.delete(&asset.storage_uri).await {
             warn!(
                 "Failed to delete asset from storage (continuing with DB deletion): {}",
                 e
@@ -421,11 +424,11 @@ impl ProtoAssetsService for AssetsService {
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
-        let content_sha256 = decode_sha256(&req.content_sha256)?;
+        let checksum_sha256 = decode_sha256(&req.checksum_sha256)?;
 
         let asset = self
             .db
-            .find_asset_by_sha256(user_id, &content_sha256)
+            .find_asset_by_sha256(user_id, &checksum_sha256)
             .await
             .map_err(|e| {
                 error!("Failed to find asset by SHA256: {}", e);
