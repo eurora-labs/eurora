@@ -131,10 +131,7 @@ impl ActivityStorage {
         activity: &Activity,
     ) -> ActivityResult<ActivityResponse> {
         let mut client = self.activity_client.clone();
-        let icon = match &activity.icon {
-            Some(icon) => Some(icon.to_vec()),
-            None => None,
-        };
+        let icon = activity.icon.as_ref().map(|icon| icon.to_vec());
         let response = client
             .insert_activity(InsertActivityRequest {
                 id: None,
