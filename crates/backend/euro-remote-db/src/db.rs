@@ -798,18 +798,19 @@ impl DatabaseManager {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
             UPDATE activities
-            SET name = COALESCE($2, name),
-                icon_asset_id = COALESCE($3, icon_asset_id),
-                process_name = COALESCE($4, process_name),
-                window_title = COALESCE($5, window_title),
-                started_at = COALESCE($6, started_at),
-                ended_at = COALESCE($7, ended_at),
-                updated_at = $8
-            WHERE id = $1
+            SET name = COALESCE($3, name),
+                icon_asset_id = COALESCE($4, icon_asset_id),
+                process_name = COALESCE($5, process_name),
+                window_title = COALESCE($6, window_title),
+                started_at = COALESCE($7, started_at),
+                ended_at = COALESCE($8, ended_at),
+                updated_at = $9
+            WHERE id = $1 AND user_id = $2
             RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             "#,
         )
         .bind(request.id)
+        .bind(request.user_id)
         .bind(&request.name)
         .bind(request.icon_asset_id)
         .bind(&request.process_name)
