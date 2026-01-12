@@ -3,7 +3,6 @@ resolver = "2"
 members = [
   "crates/app/euro-*",
   "crates/backend/be-*",
-  "crates/backend/euro-*",
   "crates/common/activity-models",
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
@@ -46,8 +45,12 @@ be-asset = { path = "crates/backend/be-asset" }
 be-asset-service = { path = "crates/backend/be-asset-service" }
 be-auth-core = { path = "crates/backend/be-auth-core" }
 be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
+be-auth-service = { path = "crates/backend/be-auth-service" }
+be-monolith = { path = "crates/backend/be-monolith" }
 be-prompt-service = { path = "crates/backend/be-prompt-service" }
+be-remote-db = { path = "crates/backend/be-remote-db" }
 be-storage = { path = "crates/backend/be-storage" }
+be-update-service = { path = "crates/backend/be-update-service" }
 bstr = "1.12.1"
 cfg-if = "1.0.4"
 chrono = "0.4.41"
@@ -56,24 +59,20 @@ dotenv = "0.15.0"
 enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
-euro-auth-service = { path = "crates/backend/euro-auth-service" }
 euro-chat-client = { path = "crates/app/euro-chat-client" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-fs = { path = "crates/common/euro-fs" }
-euro-monolith = { path = "crates/backend/euro-monolith" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
 euro-personal-db = { path = "crates/app/euro-personal-db" }
 euro-prompt-kit = { path = "crates/common/euro-prompt-kit" }
 euro-proto = { path = "crates/common/euro-proto" }
 euro-proto-client = { path = "crates/common/euro-proto-client" }
-euro-remote-db = { path = "crates/backend/euro-remote-db" }
 euro-screen-position = { path = "crates/app/euro-screen-position" }
 euro-secret = { path = "crates/app/euro-secret" }
 euro-settings = { path = "crates/app/euro-settings" }
 euro-storage = { path = "crates/app/euro-storage" }
 euro-tauri = { path = "crates/app/euro-tauri" }
 euro-timeline = { path = "crates/app/euro-timeline" }
-euro-update-service = { path = "crates/backend/euro-update-service" }
 euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
 focus-tracker = { path = "crates/common/focus-tracker" }

@@ -23,7 +23,7 @@ pub enum ActivityServiceError {
 
     /// Database operation failed.
     #[error("Database error: {0}")]
-    Database(#[source] euro_remote_db::DbError),
+    Database(#[source] be_remote_db::DbError),
 
     /// Storage operation failed.
     #[error("Storage error: {0}")]
@@ -105,8 +105,8 @@ impl ActivityServiceError {
     }
 }
 
-impl From<euro_remote_db::DbError> for ActivityServiceError {
-    fn from(err: euro_remote_db::DbError) -> Self {
+impl From<be_remote_db::DbError> for ActivityServiceError {
+    fn from(err: be_remote_db::DbError) -> Self {
         Self::Database(err)
     }
 }

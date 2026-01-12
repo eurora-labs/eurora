@@ -4,12 +4,12 @@ pub use error::{AssetError, AssetResult};
 
 use std::sync::Arc;
 
-use be_storage::StorageService;
-use chrono::{DateTime, Utc};
-use euro_remote_db::{
+use be_remote_db::{
     CreateAssetRequest as DbCreateAssetRequest, DatabaseManager,
     UpdateAssetRequest as DbUpdateAssetRequest,
 };
+use be_storage::StorageService;
+use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -53,7 +53,7 @@ impl AssetService {
     }
 
     /// Convert a database Asset to a proto Asset
-    fn db_asset_to_proto(asset: &euro_remote_db::Asset) -> Asset {
+    fn db_asset_to_proto(asset: &be_remote_db::Asset) -> Asset {
         use base64::{Engine as _, engine::general_purpose};
 
         Asset {
@@ -72,7 +72,7 @@ impl AssetService {
     }
 
     /// Convert a database MessageAsset to a proto MessageAsset
-    fn db_message_asset_to_proto(ma: &euro_remote_db::MessageAsset) -> MessageAsset {
+    fn db_message_asset_to_proto(ma: &be_remote_db::MessageAsset) -> MessageAsset {
         MessageAsset {
             message_id: ma.message_id.to_string(),
             asset_id: ma.asset_id.to_string(),
@@ -81,7 +81,7 @@ impl AssetService {
     }
 
     /// Convert a database ActivityAsset to a proto ActivityAsset
-    fn db_activity_asset_to_proto(aa: &euro_remote_db::ActivityAsset) -> ActivityAsset {
+    fn db_activity_asset_to_proto(aa: &be_remote_db::ActivityAsset) -> ActivityAsset {
         ActivityAsset {
             activity_id: aa.activity_id.to_string(),
             asset_id: aa.asset_id.to_string(),

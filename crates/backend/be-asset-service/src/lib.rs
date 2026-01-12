@@ -8,7 +8,7 @@
 //!
 //! - `server` - Enables server-side functionality including the gRPC service
 //!   implementation. This feature adds dependencies on `auth-core` and
-//!   `euro-remote-db`. Without this feature, only the proto types and
+//!   `be-remote-db`. Without this feature, only the proto types and
 //!   client are available.
 
 use asset_models::proto;
