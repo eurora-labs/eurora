@@ -1462,14 +1462,13 @@ dependencies = [
  "asset-models",
  "base64 0.22.1",
  "be-auth-grpc",
+ "be-storage",
  "chrono",
  "euro-remote-db",
  "hex",
- "opendal",
  "prost",
  "prost-types",
  "serde_json",
- "sha2",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
@@ -1509,6 +1508,18 @@ dependencies = [
  "tonic",
  "tonic-prost-build",
  "tracing",
+]
+
+[[package]]
+name = "be-storage"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "opendal",
+ "sha2",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
