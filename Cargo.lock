@@ -1539,6 +1539,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "be-conversation-service"
+version = "0.0.0"
+dependencies = [
+ "activity-models",
+ "asset-models",
+ "be-asset",
+ "be-auth-grpc",
+ "be-remote-db",
+ "be-storage",
+ "chrono",
+ "prost",
+ "prost-types",
+ "thiserror 2.0.17",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "be-monolith"
 version = "0.0.1"
 dependencies = [
@@ -2279,6 +2300,17 @@ name = "constant_time_eq"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
+
+[[package]]
+name = "conversation-models"
+version = "0.0.0"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+]
 
 [[package]]
 name = "convert_case"
