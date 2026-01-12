@@ -8,14 +8,14 @@ use std::sync::Arc;
 use asset_models::proto::CreateAssetRequest;
 use be_asset::AssetService;
 use be_auth_grpc::Claims;
-use chrono::{DateTime, Utc};
-use euro_remote_db::{
+use be_remote_db::{
     CreateActivityRequest as DbCreateActivityRequest, DatabaseManager,
     GetActivitiesByTimeRangeRequest as DbGetActivitiesByTimeRangeRequest,
     ListActivitiesRequest as DbListActivitiesRequest,
     UpdateActivityEndTimeRequest as DbUpdateActivityEndTimeRequest,
     UpdateActivityRequest as DbUpdateActivityRequest,
 };
+use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use tonic::{Request, Response, Status};
 use tracing::{debug, info};
@@ -63,7 +63,7 @@ impl ActivityService {
     }
 
     /// Convert a database Activity to a proto Activity
-    fn db_activity_to_proto(activity: &euro_remote_db::Activity) -> Activity {
+    fn db_activity_to_proto(activity: &be_remote_db::Activity) -> Activity {
         Activity {
             id: activity.id.to_string(),
             name: activity.name.clone(),

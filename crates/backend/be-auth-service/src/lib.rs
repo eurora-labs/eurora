@@ -9,15 +9,15 @@ use std::sync::Arc;
 // Re-export shared types for convenience
 pub use auth_core::Claims;
 use be_auth_grpc::JwtConfig;
+use be_remote_db::{
+    CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
+    CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
+};
 use euro_proto::proto_auth_service::{
     EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
     Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
     ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
     proto_auth_service_server::ProtoAuthService,
-};
-use euro_remote_db::{
-    CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
-    CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
 };
 use oauth2::TokenResponse as OAuth2TokenResponse;
 use rand::{TryRngCore, rngs::OsRng};
@@ -206,7 +206,7 @@ impl AuthService {
 
     /// Try to associate any pending login tokens with the user
     /// This looks for unused login tokens and associates them with the user
-    async fn try_associate_login_token_with_user(&self, user: &euro_remote_db::User, token: &str) {
+    async fn try_associate_login_token_with_user(&self, user: &be_remote_db::User, token: &str) {
         debug!(
             "Attempting to associate login token with user: {}",
             user.username
@@ -451,7 +451,7 @@ impl AuthService {
                     .get_oauth_credentials_by_provider_and_user("google", user.id)
                     .await
                 {
-                    let update_request = euro_remote_db::UpdateOAuthCredentialsRequest {
+                    let update_request = be_remote_db::UpdateOAuthCredentialsRequest {
                         access_token: Some(access_token.as_bytes().to_vec()),
                         refresh_token: token_result
                             .refresh_token()
@@ -546,7 +546,7 @@ impl AuthService {
                             counter += 1;
                         }
 
-                        let create_request = euro_remote_db::CreateUserRequest {
+                        let create_request = be_remote_db::CreateUserRequest {
                             username: final_username,
                             email: user_info.email.clone(),
                             display_name: Some(user_info.name.clone()),
