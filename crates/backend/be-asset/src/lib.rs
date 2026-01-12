@@ -133,33 +133,33 @@ impl AssetService {
             hex::encode(&checksum_sha256)
         );
 
-        // Check for deduplication - if we already have this exact content, return existing asset
-        if let Ok(Some(existing_asset)) = self
-            .db
-            .find_asset_by_sha256(user_id, &checksum_sha256)
-            .await
-        {
-            info!(
-                "Found existing asset {} with same SHA256 hash, reusing",
-                existing_asset.id
-            );
+        // // Check for deduplication - if we already have this exact content, return existing asset
+        // if let Ok(Some(existing_asset)) = self
+        //     .db
+        //     .find_asset_by_sha256(user_id, &checksum_sha256)
+        //     .await
+        // {
+        //     info!(
+        //         "Found existing asset {} with same SHA256 hash, reusing",
+        //         existing_asset.id
+        //     );
 
-            // If activity_id is provided, link the existing asset to it
-            if let Some(activity_id_str) = &req.activity_id {
-                let activity_id =
-                    Uuid::parse_str(activity_id_str).map_err(AssetError::InvalidActivityId)?;
+        //     // If activity_id is provided, link the existing asset to it
+        //     if let Some(activity_id_str) = &req.activity_id {
+        //         let activity_id =
+        //             Uuid::parse_str(activity_id_str).map_err(AssetError::InvalidActivityId)?;
 
-                // Try to link, ignore if already linked
-                let _ = self
-                    .db
-                    .link_asset_to_activity(activity_id, existing_asset.id)
-                    .await;
-            }
+        //         // Try to link, ignore if already linked
+        //         let _ = self
+        //             .db
+        //             .link_asset_to_activity(activity_id, existing_asset.id)
+        //             .await;
+        //     }
 
-            return Ok(AssetResponse {
-                asset: Some(Self::db_asset_to_proto(&existing_asset)),
-            });
-        }
+        //     return Ok(AssetResponse {
+        //         asset: Some(Self::db_asset_to_proto(&existing_asset)),
+        //     });
+        // }
 
         // Generate new asset ID
         let asset_id = Uuid::now_v7();
@@ -185,6 +185,7 @@ impl AssetService {
         // Create database record
         let db_request = DbCreateAssetRequest {
             id: asset_id,
+            name: req.name,
             checksum_sha256: Some(checksum_sha256),
             size_bytes: Some(size_bytes),
             storage_uri,
