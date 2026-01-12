@@ -10,11 +10,13 @@ use uuid::Uuid;
 
 use crate::error::DbResult;
 use crate::types::{
-    Activity, ActivityAsset, Asset, CreateAssetRequest, CreateLoginTokenRequest,
-    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
-    CreateUserRequest, LoginToken, MessageAsset, OAuthCredentials, OAuthState, PasswordCredentials,
-    RefreshToken, UpdateAssetRequest, UpdateOAuthCredentialsRequest, UpdatePasswordRequest,
-    UpdateUserRequest, User,
+    Activity, ActivityAsset, Asset, CreateActivityRequest, CreateAssetRequest,
+    CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
+    CreateRefreshTokenRequest, CreateUserRequest, GetActivitiesByTimeRangeRequest,
+    ListActivitiesRequest, LoginToken, MessageAsset, OAuthCredentials, OAuthState,
+    PasswordCredentials, RefreshToken, UpdateActivityEndTimeRequest, UpdateActivityRequest,
+    UpdateAssetRequest, UpdateOAuthCredentialsRequest, UpdatePasswordRequest, UpdateUserRequest,
+    User,
 };
 #[derive(Debug)]
 pub struct DatabaseManager {
@@ -689,19 +691,8 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new activity
-    #[allow(clippy::too_many_arguments)]
-    pub async fn create_activity(
-        &self,
-        id: Option<Uuid>,
-        user_id: Uuid,
-        name: &str,
-        icon_asset_id: Option<Uuid>,
-        process_name: &str,
-        window_title: &str,
-        started_at: DateTime<Utc>,
-        ended_at: Option<DateTime<Utc>>,
-    ) -> DbResult<Activity> {
-        let id = id.unwrap_or_else(Uuid::now_v7);
+    pub async fn create_activity(&self, request: CreateActivityRequest) -> DbResult<Activity> {
+        let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
@@ -712,13 +703,13 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(user_id)
-        .bind(name)
-        .bind(icon_asset_id)
-        .bind(process_name)
-        .bind(window_title)
-        .bind(started_at)
-        .bind(ended_at)
+        .bind(request.user_id)
+        .bind(&request.name)
+        .bind(request.icon_asset_id)
+        .bind(&request.process_name)
+        .bind(&request.window_title)
+        .bind(request.started_at)
+        .bind(request.ended_at)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -767,12 +758,10 @@ impl DatabaseManager {
     /// List activities for a user with pagination
     pub async fn list_activities(
         &self,
-        user_id: Uuid,
-        limit: u32,
-        offset: u32,
+        request: ListActivitiesRequest,
     ) -> DbResult<(Vec<Activity>, u64)> {
         // Clamp limit to max 100
-        let limit = limit.clamp(1, 100);
+        let limit = request.limit.clamp(1, 100);
 
         let activities = sqlx::query_as::<_, Activity>(
             r#"
@@ -783,9 +772,9 @@ impl DatabaseManager {
             LIMIT $2 OFFSET $3
             "#,
         )
-        .bind(user_id)
+        .bind(request.user_id)
         .bind(limit as i64)
-        .bind(offset as i64)
+        .bind(request.offset as i64)
         .fetch_all(&self.pool)
         .await?;
 
@@ -795,7 +784,7 @@ impl DatabaseManager {
             SELECT COUNT(*) FROM activities WHERE user_id = $1
             "#,
         )
-        .bind(user_id)
+        .bind(request.user_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -803,42 +792,30 @@ impl DatabaseManager {
     }
 
     /// Update an existing activity
-    #[allow(clippy::too_many_arguments)]
-    pub async fn update_activity(
-        &self,
-        activity_id: Uuid,
-        user_id: Uuid,
-        name: Option<&str>,
-        icon_asset_id: Option<Uuid>,
-        process_name: Option<&str>,
-        window_title: Option<&str>,
-        started_at: Option<DateTime<Utc>>,
-        ended_at: Option<DateTime<Utc>>,
-    ) -> DbResult<Activity> {
+    pub async fn update_activity(&self, request: UpdateActivityRequest) -> DbResult<Activity> {
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
             r#"
             UPDATE activities
-            SET name = COALESCE($3, name),
-                icon_asset_id = COALESCE($4, icon_asset_id),
-                process_name = COALESCE($5, process_name),
-                window_title = COALESCE($6, window_title),
-                started_at = COALESCE($7, started_at),
-                ended_at = COALESCE($8, ended_at),
-                updated_at = $9
-            WHERE id = $1 AND user_id = $2
+            SET name = COALESCE($2, name),
+                icon_asset_id = COALESCE($3, icon_asset_id),
+                process_name = COALESCE($4, process_name),
+                window_title = COALESCE($5, window_title),
+                started_at = COALESCE($6, started_at),
+                ended_at = COALESCE($7, ended_at),
+                updated_at = $8
+            WHERE id = $1
             RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             "#,
         )
-        .bind(activity_id)
-        .bind(user_id)
-        .bind(name)
-        .bind(icon_asset_id)
-        .bind(process_name)
-        .bind(window_title)
-        .bind(started_at)
-        .bind(ended_at)
+        .bind(request.id)
+        .bind(&request.name)
+        .bind(request.icon_asset_id)
+        .bind(&request.process_name)
+        .bind(&request.window_title)
+        .bind(request.started_at)
+        .bind(request.ended_at)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -849,9 +826,7 @@ impl DatabaseManager {
     /// Update activity end time
     pub async fn update_activity_end_time(
         &self,
-        activity_id: Uuid,
-        user_id: Uuid,
-        ended_at: DateTime<Utc>,
+        request: UpdateActivityEndTimeRequest,
     ) -> DbResult<()> {
         let now = Utc::now();
 
@@ -862,9 +837,9 @@ impl DatabaseManager {
             WHERE id = $1 AND user_id = $2
             "#,
         )
-        .bind(activity_id)
-        .bind(user_id)
-        .bind(ended_at)
+        .bind(request.activity_id)
+        .bind(request.user_id)
+        .bind(request.ended_at)
         .bind(now)
         .execute(&self.pool)
         .await?;
@@ -909,14 +884,10 @@ impl DatabaseManager {
     /// Get activities by time range for a user
     pub async fn get_activities_by_time_range(
         &self,
-        user_id: Uuid,
-        start_time: DateTime<Utc>,
-        end_time: DateTime<Utc>,
-        limit: u32,
-        offset: u32,
+        request: GetActivitiesByTimeRangeRequest,
     ) -> DbResult<(Vec<Activity>, u64)> {
         // Clamp limit to max 100
-        let limit = limit.clamp(1, 100);
+        let limit = request.limit.clamp(1, 100);
 
         let activities = sqlx::query_as::<_, Activity>(
             r#"
@@ -929,11 +900,11 @@ impl DatabaseManager {
             LIMIT $4 OFFSET $5
             "#,
         )
-        .bind(user_id)
-        .bind(start_time)
-        .bind(end_time)
+        .bind(request.user_id)
+        .bind(request.start_time)
+        .bind(request.end_time)
         .bind(limit as i64)
-        .bind(offset as i64)
+        .bind(request.offset as i64)
         .fetch_all(&self.pool)
         .await?;
 
@@ -946,9 +917,9 @@ impl DatabaseManager {
               AND started_at <= $3
             "#,
         )
-        .bind(user_id)
-        .bind(start_time)
-        .bind(end_time)
+        .bind(request.user_id)
+        .bind(request.start_time)
+        .bind(request.end_time)
         .fetch_one(&self.pool)
         .await?;
 

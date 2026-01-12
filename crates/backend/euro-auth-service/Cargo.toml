@@ -13,7 +13,7 @@ be-auth-grpc = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-proto = { workspace = true }
 euro-remote-db = { workspace = true }
-hex = "0.4.3"
+hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 oauth2 = "5.0.0"
 prost = { workspace = true }
