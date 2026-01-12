@@ -10,6 +10,7 @@ ignored = ["tonic-prost"]
 activity-models = { workspace = true }
 anyhow = { workspace = true }
 be-auth-grpc = { workspace = true }
+be-storage = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-remote-db = { workspace = true }
 prost = { workspace = true }
