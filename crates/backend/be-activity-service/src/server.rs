@@ -24,17 +24,25 @@ pub use activity_models::proto::proto_activity_service_server::{
     ProtoActivityService, ProtoActivityServiceServer,
 };
 
+use be_storage::StorageService;
+
 /// The main activity service
 #[derive(Debug)]
 pub struct ActivityService {
     db: Arc<DatabaseManager>,
+    storage: Arc<StorageService>,
 }
 
 impl ActivityService {
     /// Create a new ActivityService instance
-    pub fn new(db: Arc<DatabaseManager>) -> Self {
+    pub fn new(db: Arc<DatabaseManager>, storage: Arc<StorageService>) -> Self {
         info!("Creating new ActivityService instance");
-        Self { db }
+        Self { db, storage }
+    }
+
+    pub fn from_env(db: Arc<DatabaseManager>) -> Result<Self> {
+        let storage = StorageService::from_env()?;
+        Ok(Self::new(db, Arc::new(storage)))
     }
 
     /// Convert a database Activity to a proto Activity
@@ -158,6 +166,23 @@ impl ProtoActivityService for ActivityService {
             .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
+        let icon_id = match req.icon {
+            Some(icon) => {
+                let id = Uuid::now_v7();
+
+                // Upload content to storage
+                self.storage
+                    .upload(&user_id, &id, &icon, "image/png")
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to upload icon to storage: {}", e);
+                        Status::internal("Failed to upload asset to storage")
+                    })?;
+
+                Some(id)
+            }
+            None => None,
+        };
 
         let id = req
             .id
@@ -183,7 +208,7 @@ impl ProtoActivityService for ActivityService {
                 id,
                 user_id,
                 &req.name,
-                None, // icon_asset_id - requires proper asset upload implementation
+                icon_id,
                 &req.process_name,
                 &req.window_title,
                 started_at,
