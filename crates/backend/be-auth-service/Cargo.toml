@@ -1,5 +1,5 @@
 [package]
-name = "euro-auth-service"
+name = "be-auth-service"
 version = "0.0.0"
 edition.workspace = true
 publish = false
@@ -10,9 +10,9 @@ auth-core = { workspace = true }
 base64 = { workspace = true }
 bcrypt = "0.17"
 be-auth-grpc = { workspace = true }
+be-remote-db = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-proto = { workspace = true }
-euro-remote-db = { workspace = true }
 hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 oauth2 = "5.0.0"
