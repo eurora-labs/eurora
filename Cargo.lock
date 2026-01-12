@@ -1515,10 +1515,10 @@ dependencies = [
 name = "be-storage"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "hex",
  "opendal",
  "sha2",
+ "thiserror 2.0.17",
  "tracing",
  "uuid",
 ]
