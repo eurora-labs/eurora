@@ -5,8 +5,8 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
 use be_auth_grpc::Claims;
+use be_storage::StorageService;
 use chrono::{DateTime, Utc};
 use euro_remote_db::{
     CreateAssetRequest as DbCreateAssetRequest, DatabaseManager,
@@ -17,6 +17,7 @@ use tonic::{Request, Response, Status};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use crate::error::{AssetServiceError, Result};
 use crate::proto::{
     ActivityAsset, ActivityAssetResponse, Asset, AssetResponse, CreateAssetRequest,
     DeleteAssetRequest, FindAssetBySha256Request, GetAssetRequest, GetAssetsByActivityIdRequest,
@@ -24,7 +25,6 @@ use crate::proto::{
     ListAssetsRequest, ListAssetsResponse, MessageAsset, MessageAssetResponse,
     UnlinkAssetFromActivityRequest, UnlinkAssetFromMessageRequest, UpdateAssetRequest,
 };
-use be_storage::StorageService;
 
 pub use crate::proto::proto_asset_service_server::{ProtoAssetService, ProtoAssetServiceServer};
 
@@ -43,8 +43,13 @@ impl AssetService {
     }
 
     /// Create a new AssetsService with storage configured from environment
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AssetServiceError::StorageConfig`] if the storage service
+    /// cannot be configured from environment variables.
     pub fn from_env(db: Arc<DatabaseManager>) -> Result<Self> {
-        let storage = StorageService::from_env()?;
+        let storage = StorageService::from_env().map_err(AssetServiceError::StorageConfig)?;
         Ok(Self::new(db, Arc::new(storage)))
     }
 
@@ -100,11 +105,21 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
 }
 
 /// Decode base64 SHA256 hash
-fn decode_sha256(base64_hash: &str) -> Result<Vec<u8>, Status> {
+fn decode_sha256(base64_hash: &str) -> Result<Vec<u8>> {
     use base64::{Engine as _, engine::general_purpose};
     general_purpose::STANDARD
         .decode(base64_hash)
-        .map_err(|e| Status::invalid_argument(format!("Invalid base64 SHA256 hash: {}", e)))
+        .map_err(AssetServiceError::InvalidSha256)
+}
+
+/// Extract and validate user ID from request claims
+fn extract_user_id<T>(request: &Request<T>) -> Result<Uuid> {
+    let claims = request
+        .extensions()
+        .get::<Claims>()
+        .ok_or(AssetServiceError::MissingClaims)?;
+
+    Uuid::parse_str(&claims.sub).map_err(AssetServiceError::InvalidUserId)
 }
 
 #[tonic::async_trait]
@@ -112,27 +127,23 @@ impl ProtoAssetService for AssetService {
     async fn create_asset(
         &self,
         request: Request<CreateAssetRequest>,
-    ) -> Result<Response<AssetResponse>, Status> {
-        eprintln!("CreateAsset request received");
+    ) -> std::result::Result<Response<AssetResponse>, Status> {
         info!("CreateAsset request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
 
         // Validate request
         if req.content.is_empty() {
-            return Err(Status::invalid_argument("Content cannot be empty"));
+            return Err(AssetServiceError::EmptyContent.into());
         }
 
         if req.mime_type.is_empty() {
-            return Err(Status::invalid_argument("MIME type is required"));
+            return Err(AssetServiceError::MissingMimeType.into());
         }
 
         // Calculate SHA256 hash and byte size
@@ -159,7 +170,7 @@ impl ProtoAssetService for AssetService {
             // If activity_id is provided, link the existing asset to it
             if let Some(activity_id_str) = &req.activity_id {
                 let activity_id = Uuid::parse_str(activity_id_str)
-                    .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+                    .map_err(AssetServiceError::InvalidActivityId)?;
 
                 // Try to link, ignore if already linked
                 let _ = self
@@ -183,7 +194,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 error!("Failed to upload asset to storage: {}", e);
-                Status::internal("Failed to upload asset to storage")
+                AssetServiceError::StorageUpload(e)
             })?;
 
         // Parse metadata if provided
@@ -192,7 +203,7 @@ impl ProtoAssetService for AssetService {
             .as_ref()
             .map(|m| serde_json::from_str(m))
             .transpose()
-            .map_err(|e| Status::invalid_argument(format!("Invalid metadata JSON: {}", e)))?;
+            .map_err(AssetServiceError::InvalidMetadata)?;
 
         // Create database record
         let db_request = DbCreateAssetRequest {
@@ -210,20 +221,20 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 error!("Failed to create asset in database: {}", e);
-                Status::internal("Failed to create asset")
+                AssetServiceError::DatabaseCreate(e)
             })?;
 
         // Link to activity if activity_id provided
         if let Some(activity_id_str) = &req.activity_id {
-            let activity_id = Uuid::parse_str(activity_id_str)
-                .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+            let activity_id =
+                Uuid::parse_str(activity_id_str).map_err(AssetServiceError::InvalidActivityId)?;
 
             self.db
                 .link_asset_to_activity(activity_id, asset.id)
                 .await
                 .map_err(|e| {
                     error!("Failed to link asset to activity: {}", e);
-                    Status::internal("Failed to link asset to activity")
+                    AssetServiceError::DatabaseLinkActivity(e)
                 })?;
         }
 
@@ -237,20 +248,16 @@ impl ProtoAssetService for AssetService {
     async fn get_asset(
         &self,
         request: Request<GetAssetRequest>,
-    ) -> Result<Response<AssetResponse>, Status> {
+    ) -> std::result::Result<Response<AssetResponse>, Status> {
         info!("GetAsset request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
 
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
-
         let req = request.into_inner();
-        let asset_id = Uuid::parse_str(&req.id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
+        let asset_id = Uuid::parse_str(&req.id).map_err(AssetServiceError::InvalidAssetId)?;
 
         let asset = self
             .db
@@ -258,7 +265,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 warn!("Asset not found: {}", e);
-                Status::not_found("Asset not found")
+                AssetServiceError::AssetNotFound
             })?;
 
         debug!("Retrieved asset {} for user {}", asset_id, user_id);
@@ -271,16 +278,13 @@ impl ProtoAssetService for AssetService {
     async fn list_assets(
         &self,
         request: Request<ListAssetsRequest>,
-    ) -> Result<Response<ListAssetsResponse>, Status> {
+    ) -> std::result::Result<Response<ListAssetsResponse>, Status> {
         info!("ListAssets request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
         let limit = if req.limit == 0 { 50 } else { req.limit };
@@ -291,7 +295,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 error!("Failed to list assets: {}", e);
-                Status::internal("Failed to list assets")
+                AssetServiceError::DatabaseList(e)
             })?;
 
         let proto_assets: Vec<Asset> = assets.iter().map(Self::db_asset_to_proto).collect();
@@ -307,21 +311,17 @@ impl ProtoAssetService for AssetService {
     async fn update_asset(
         &self,
         request: Request<UpdateAssetRequest>,
-    ) -> Result<Response<AssetResponse>, Status> {
+    ) -> std::result::Result<Response<AssetResponse>, Status> {
         info!("UpdateAsset request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
 
-        let asset_id = Uuid::parse_str(&req.id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
+        let asset_id = Uuid::parse_str(&req.id).map_err(AssetServiceError::InvalidAssetId)?;
 
         let checksum_sha256 = req
             .checksum_sha256
@@ -334,7 +334,7 @@ impl ProtoAssetService for AssetService {
             .as_ref()
             .map(|m| serde_json::from_str(m))
             .transpose()
-            .map_err(|e| Status::invalid_argument(format!("Invalid metadata JSON: {}", e)))?;
+            .map_err(AssetServiceError::InvalidMetadata)?;
 
         let db_request = DbUpdateAssetRequest {
             checksum_sha256,
@@ -350,7 +350,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 error!("Failed to update asset: {}", e);
-                Status::internal("Failed to update asset")
+                AssetServiceError::DatabaseUpdate(e)
             })?;
 
         debug!("Updated asset {} for user {}", asset_id, user_id);
@@ -363,21 +363,17 @@ impl ProtoAssetService for AssetService {
     async fn delete_asset(
         &self,
         request: Request<DeleteAssetRequest>,
-    ) -> Result<Response<()>, Status> {
+    ) -> std::result::Result<Response<()>, Status> {
         info!("DeleteAsset request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
 
-        let asset_id = Uuid::parse_str(&req.id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
+        let asset_id = Uuid::parse_str(&req.id).map_err(AssetServiceError::InvalidAssetId)?;
 
         // Get the asset first to get the file path for storage deletion
         let asset = self
@@ -386,7 +382,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 warn!("Asset not found for deletion: {}", e);
-                Status::not_found("Asset not found")
+                AssetServiceError::AssetNotFound
             })?;
 
         // Delete from storage
@@ -401,7 +397,7 @@ impl ProtoAssetService for AssetService {
         // Delete from database
         self.db.delete_asset(asset_id, user_id).await.map_err(|e| {
             error!("Failed to delete asset: {}", e);
-            Status::internal("Failed to delete asset")
+            AssetServiceError::DatabaseDelete(e)
         })?;
 
         debug!("Deleted asset {} for user {}", asset_id, user_id);
@@ -412,16 +408,13 @@ impl ProtoAssetService for AssetService {
     async fn find_asset_by_sha256(
         &self,
         request: Request<FindAssetBySha256Request>,
-    ) -> Result<Response<AssetResponse>, Status> {
+    ) -> std::result::Result<Response<AssetResponse>, Status> {
         info!("FindAssetBySha256 request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
         let checksum_sha256 = decode_sha256(&req.checksum_sha256)?;
@@ -432,7 +425,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 error!("Failed to find asset by SHA256: {}", e);
-                Status::internal("Failed to find asset by SHA256")
+                AssetServiceError::DatabaseFindBySha256(e)
             })?;
 
         debug!(
@@ -449,20 +442,17 @@ impl ProtoAssetService for AssetService {
     async fn get_assets_by_message_id(
         &self,
         request: Request<GetAssetsByMessageIdRequest>,
-    ) -> Result<Response<ListAssetsResponse>, Status> {
+    ) -> std::result::Result<Response<ListAssetsResponse>, Status> {
         info!("GetAssetsByMessageId request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
 
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
-
         let req = request.into_inner();
-        let message_id = Uuid::parse_str(&req.message_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid message ID: {}", e)))?;
+        let message_id =
+            Uuid::parse_str(&req.message_id).map_err(AssetServiceError::InvalidMessageId)?;
 
         let assets = self
             .db
@@ -470,7 +460,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 error!("Failed to get assets by message ID: {}", e);
-                Status::internal("Failed to get assets by message ID")
+                AssetServiceError::DatabaseGetByMessageId(e)
             })?;
 
         let proto_assets: Vec<Asset> = assets.iter().map(Self::db_asset_to_proto).collect();
@@ -490,20 +480,17 @@ impl ProtoAssetService for AssetService {
     async fn get_assets_by_activity_id(
         &self,
         request: Request<GetAssetsByActivityIdRequest>,
-    ) -> Result<Response<ListAssetsResponse>, Status> {
+    ) -> std::result::Result<Response<ListAssetsResponse>, Status> {
         info!("GetAssetsByActivityId request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
 
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
-
         let req = request.into_inner();
-        let activity_id = Uuid::parse_str(&req.activity_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+        let activity_id =
+            Uuid::parse_str(&req.activity_id).map_err(AssetServiceError::InvalidActivityId)?;
 
         let assets = self
             .db
@@ -511,7 +498,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 error!("Failed to get assets by activity ID: {}", e);
-                Status::internal("Failed to get assets by activity ID")
+                AssetServiceError::DatabaseGetByActivityId(e)
             })?;
 
         let proto_assets: Vec<Asset> = assets.iter().map(Self::db_asset_to_proto).collect();
@@ -531,31 +518,26 @@ impl ProtoAssetService for AssetService {
     async fn link_asset_to_message(
         &self,
         request: Request<LinkAssetToMessageRequest>,
-    ) -> Result<Response<MessageAssetResponse>, Status> {
+    ) -> std::result::Result<Response<MessageAssetResponse>, Status> {
         info!("LinkAssetToMessage request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
 
-        let message_id = Uuid::parse_str(&req.message_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid message ID: {}", e)))?;
+        let message_id =
+            Uuid::parse_str(&req.message_id).map_err(AssetServiceError::InvalidMessageId)?;
 
-        let asset_id = Uuid::parse_str(&req.asset_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
+        let asset_id = Uuid::parse_str(&req.asset_id).map_err(AssetServiceError::InvalidAssetId)?;
 
         // Verify the asset belongs to the user
-        let _ = self
-            .db
+        self.db
             .get_asset_for_user(asset_id, user_id)
             .await
-            .map_err(|_| Status::not_found("Asset not found or not owned by user"))?;
+            .map_err(|_| AssetServiceError::AssetNotOwned)?;
 
         let message_asset = self
             .db
@@ -563,7 +545,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 error!("Failed to link asset to message: {}", e);
-                Status::internal("Failed to link asset to message")
+                AssetServiceError::DatabaseLinkMessage(e)
             })?;
 
         debug!(
@@ -579,38 +561,33 @@ impl ProtoAssetService for AssetService {
     async fn unlink_asset_from_message(
         &self,
         request: Request<UnlinkAssetFromMessageRequest>,
-    ) -> Result<Response<()>, Status> {
+    ) -> std::result::Result<Response<()>, Status> {
         info!("UnlinkAssetFromMessage request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
 
-        let message_id = Uuid::parse_str(&req.message_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid message ID: {}", e)))?;
+        let message_id =
+            Uuid::parse_str(&req.message_id).map_err(AssetServiceError::InvalidMessageId)?;
 
-        let asset_id = Uuid::parse_str(&req.asset_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
+        let asset_id = Uuid::parse_str(&req.asset_id).map_err(AssetServiceError::InvalidAssetId)?;
 
         // Verify the asset belongs to the user
-        let _ = self
-            .db
+        self.db
             .get_asset_for_user(asset_id, user_id)
             .await
-            .map_err(|_| Status::not_found("Asset not found or not owned by user"))?;
+            .map_err(|_| AssetServiceError::AssetNotOwned)?;
 
         self.db
             .unlink_asset_from_message(message_id, asset_id)
             .await
             .map_err(|e| {
                 error!("Failed to unlink asset from message: {}", e);
-                Status::internal("Failed to unlink asset from message")
+                AssetServiceError::DatabaseUnlinkMessage(e)
             })?;
 
         debug!(
@@ -624,31 +601,26 @@ impl ProtoAssetService for AssetService {
     async fn link_asset_to_activity(
         &self,
         request: Request<LinkAssetToActivityRequest>,
-    ) -> Result<Response<ActivityAssetResponse>, Status> {
+    ) -> std::result::Result<Response<ActivityAssetResponse>, Status> {
         info!("LinkAssetToActivity request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
 
-        let activity_id = Uuid::parse_str(&req.activity_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+        let activity_id =
+            Uuid::parse_str(&req.activity_id).map_err(AssetServiceError::InvalidActivityId)?;
 
-        let asset_id = Uuid::parse_str(&req.asset_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
+        let asset_id = Uuid::parse_str(&req.asset_id).map_err(AssetServiceError::InvalidAssetId)?;
 
         // Verify the asset belongs to the user
-        let _ = self
-            .db
+        self.db
             .get_asset_for_user(asset_id, user_id)
             .await
-            .map_err(|_| Status::not_found("Asset not found or not owned by user"))?;
+            .map_err(|_| AssetServiceError::AssetNotOwned)?;
 
         let activity_asset = self
             .db
@@ -656,7 +628,7 @@ impl ProtoAssetService for AssetService {
             .await
             .map_err(|e| {
                 error!("Failed to link asset to activity: {}", e);
-                Status::internal("Failed to link asset to activity")
+                AssetServiceError::DatabaseLinkActivity(e)
             })?;
 
         debug!(
@@ -672,38 +644,33 @@ impl ProtoAssetService for AssetService {
     async fn unlink_asset_from_activity(
         &self,
         request: Request<UnlinkAssetFromActivityRequest>,
-    ) -> Result<Response<()>, Status> {
+    ) -> std::result::Result<Response<()>, Status> {
         info!("UnlinkAssetFromActivity request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
+        let user_id = extract_user_id(&request).map_err(|e| {
+            error!("Authentication failed: {}", e);
+            Status::from(e)
         })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
 
         let req = request.into_inner();
 
-        let activity_id = Uuid::parse_str(&req.activity_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+        let activity_id =
+            Uuid::parse_str(&req.activity_id).map_err(AssetServiceError::InvalidActivityId)?;
 
-        let asset_id = Uuid::parse_str(&req.asset_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid asset ID: {}", e)))?;
+        let asset_id = Uuid::parse_str(&req.asset_id).map_err(AssetServiceError::InvalidAssetId)?;
 
         // Verify the asset belongs to the user
-        let _ = self
-            .db
+        self.db
             .get_asset_for_user(asset_id, user_id)
             .await
-            .map_err(|_| Status::not_found("Asset not found or not owned by user"))?;
+            .map_err(|_| AssetServiceError::AssetNotOwned)?;
 
         self.db
             .unlink_asset_from_activity(activity_id, asset_id)
             .await
             .map_err(|e| {
                 error!("Failed to unlink asset from activity: {}", e);
-                Status::internal("Failed to unlink asset from activity")
+                AssetServiceError::DatabaseUnlinkActivity(e)
             })?;
 
         debug!(
