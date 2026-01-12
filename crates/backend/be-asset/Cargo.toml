@@ -11,7 +11,7 @@ be-auth-grpc = { workspace = true }
 be-storage = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-remote-db = { workspace = true }
-hex = { version = "0.4" }
+hex = { workspace = true }
 prost-types = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
