@@ -65,51 +65,51 @@ pub enum AssetError {
     // === Database Errors ===
     /// Failed to create the asset in the database.
     #[error("failed to create asset in database")]
-    DatabaseCreate(#[source] euro_remote_db::DbError),
+    DatabaseCreate(#[source] be_remote_db::DbError),
 
     /// Failed to retrieve the asset from the database.
     #[error("failed to retrieve asset from database")]
-    DatabaseGet(#[source] euro_remote_db::DbError),
+    DatabaseGet(#[source] be_remote_db::DbError),
 
     /// Failed to update the asset in the database.
     #[error("failed to update asset in database")]
-    DatabaseUpdate(#[source] euro_remote_db::DbError),
+    DatabaseUpdate(#[source] be_remote_db::DbError),
 
     /// Failed to delete the asset from the database.
     #[error("failed to delete asset from database")]
-    DatabaseDelete(#[source] euro_remote_db::DbError),
+    DatabaseDelete(#[source] be_remote_db::DbError),
 
     /// Failed to list assets from the database.
     #[error("failed to list assets from database")]
-    DatabaseList(#[source] euro_remote_db::DbError),
+    DatabaseList(#[source] be_remote_db::DbError),
 
     /// Failed to find asset by SHA256 hash.
     #[error("failed to find asset by SHA256")]
-    DatabaseFindBySha256(#[source] euro_remote_db::DbError),
+    DatabaseFindBySha256(#[source] be_remote_db::DbError),
 
     /// Failed to get assets by message ID.
     #[error("failed to get assets by message ID")]
-    DatabaseGetByMessageId(#[source] euro_remote_db::DbError),
+    DatabaseGetByMessageId(#[source] be_remote_db::DbError),
 
     /// Failed to get assets by activity ID.
     #[error("failed to get assets by activity ID")]
-    DatabaseGetByActivityId(#[source] euro_remote_db::DbError),
+    DatabaseGetByActivityId(#[source] be_remote_db::DbError),
 
     /// Failed to link asset to message.
     #[error("failed to link asset to message")]
-    DatabaseLinkMessage(#[source] euro_remote_db::DbError),
+    DatabaseLinkMessage(#[source] be_remote_db::DbError),
 
     /// Failed to unlink asset from message.
     #[error("failed to unlink asset from message")]
-    DatabaseUnlinkMessage(#[source] euro_remote_db::DbError),
+    DatabaseUnlinkMessage(#[source] be_remote_db::DbError),
 
     /// Failed to link asset to activity.
     #[error("failed to link asset to activity")]
-    DatabaseLinkActivity(#[source] euro_remote_db::DbError),
+    DatabaseLinkActivity(#[source] be_remote_db::DbError),
 
     /// Failed to unlink asset from activity.
     #[error("failed to unlink asset from activity")]
-    DatabaseUnlinkActivity(#[source] euro_remote_db::DbError),
+    DatabaseUnlinkActivity(#[source] be_remote_db::DbError),
 
     // === Configuration Errors ===
     /// Failed to configure storage from environment.

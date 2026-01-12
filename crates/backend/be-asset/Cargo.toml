@@ -8,9 +8,9 @@ description = "Asset Service - Logic for managing file assets"
 asset-models = { workspace = true }
 base64 = { workspace = true }
 be-auth-grpc = { workspace = true }
+be-remote-db = { workspace = true }
 be-storage = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-euro-remote-db = { workspace = true }
 hex = { workspace = true }
 prost-types = { workspace = true }
 serde_json = { workspace = true }
