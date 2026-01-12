@@ -29,6 +29,10 @@ pub enum ActivityServiceError {
     #[error("Storage error: {0}")]
     Storage(#[source] be_storage::StorageError),
 
+    /// Asset operation failed.
+    #[error("Asset error: {0}")]
+    Asset(#[source] be_asset::AssetError),
+
     /// UUID parsing failed.
     #[error("Invalid UUID '{field}': {source}")]
     InvalidUuid {
@@ -96,6 +100,7 @@ impl ActivityServiceError {
             }
             Self::NotFound(_) => Code::NotFound,
             Self::Database(_) | Self::Storage(_) | Self::Internal(_) => Code::Internal,
+            Self::Asset(_) => Code::Internal,
         }
     }
 }
@@ -138,6 +143,9 @@ impl From<ActivityServiceError> for Status {
             }
             ActivityServiceError::Internal(_) => {
                 tracing::error!("Internal error: {}", message);
+            }
+            ActivityServiceError::Asset(_) => {
+                tracing::error!("Asset error: {}", message);
             }
         }
 

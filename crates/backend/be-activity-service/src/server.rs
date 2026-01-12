@@ -5,6 +5,8 @@
 
 use std::sync::Arc;
 
+use asset_models::proto::CreateAssetRequest;
+use be_asset::AssetService;
 use be_auth_grpc::Claims;
 use chrono::{DateTime, Utc};
 use euro_remote_db::DatabaseManager;
@@ -25,20 +27,21 @@ pub use activity_models::proto::proto_activity_service_server::{
     ProtoActivityService, ProtoActivityServiceServer,
 };
 
-use be_storage::StorageService;
-
 /// The main activity service
 #[derive(Debug)]
 pub struct ActivityService {
     db: Arc<DatabaseManager>,
-    storage: Arc<StorageService>,
+    asset_service: Arc<AssetService>,
 }
 
 impl ActivityService {
     /// Create a new ActivityService instance
-    pub fn new(db: Arc<DatabaseManager>, storage: Arc<StorageService>) -> Self {
+    pub fn new(db: Arc<DatabaseManager>, asset: Arc<AssetService>) -> Self {
         info!("Creating new ActivityService instance");
-        Self { db, storage }
+        Self {
+            db,
+            asset_service: asset,
+        }
     }
 
     /// Create a new ActivityService from environment variables.
@@ -48,8 +51,9 @@ impl ActivityService {
     /// Returns [`ActivityServiceError::Storage`] if the storage service
     /// cannot be initialized from environment variables.
     pub fn from_env(db: Arc<DatabaseManager>) -> ActivityResult<Self> {
-        let storage = StorageService::from_env()?;
-        Ok(Self::new(db, Arc::new(storage)))
+        let asset = AssetService::from_env(db.clone()).map_err(ActivityServiceError::Asset)?;
+
+        Ok(Self::new(db, Arc::new(asset)))
     }
 
     /// Convert a database Activity to a proto Activity
@@ -180,16 +184,35 @@ impl ProtoActivityService for ActivityService {
 
         let req = request.into_inner();
 
+        let activity_id = match &req.id {
+            Some(id) => {
+                Uuid::parse_str(id).map_err(|_| Status::invalid_argument("Invalid activity ID"))?
+            }
+            None => Uuid::now_v7(),
+        };
+
         // Upload icon to storage if provided
         let icon_id = match req.icon {
             Some(icon) => {
-                let id = Uuid::now_v7();
-
-                self.storage
-                    .upload(&user_id, &id, &icon, "image/png")
+                let icon_response = self
+                    .asset_service
+                    .create_asset(
+                        CreateAssetRequest {
+                            name: "icon".to_string(),
+                            content: icon,
+                            mime_type: "image/png".to_string(),
+                            metadata: None,
+                            activity_id: Some(activity_id.to_string()),
+                        },
+                        user_id,
+                    )
                     .await
-                    .map_err(ActivityServiceError::from)?;
-                Some(id)
+                    .map_err(ActivityServiceError::Asset)?;
+
+                match icon_response.asset {
+                    Some(asset) => Some(Uuid::parse_str(&asset.id).unwrap()),
+                    None => None,
+                }
             }
             None => None,
         };
