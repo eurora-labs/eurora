@@ -231,7 +231,7 @@ impl ProtoActivityService for ActivityService {
                             content: icon,
                             mime_type: "image/png".to_string(),
                             metadata: None,
-                            activity_id: Some(activity.id.to_string()),
+                            activity_id: None, // Prevent this icon from being treated as a regular activity asset
                         },
                         user_id,
                     )
