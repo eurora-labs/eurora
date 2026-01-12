@@ -1459,7 +1459,6 @@ dependencies = [
 name = "be-asset-service"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "asset-models",
  "base64 0.22.1",
  "be-auth-grpc",
@@ -1470,6 +1469,7 @@ dependencies = [
  "prost",
  "prost-types",
  "serde_json",
+ "thiserror 2.0.17",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
