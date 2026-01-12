@@ -1,5 +1,5 @@
 [package]
-name = "euro-remote-db"
+name = "be-remote-db"
 version = "0.0.0"
 edition.workspace = true
 description = "Eurora Remote DB"
@@ -9,7 +9,6 @@ chrono = { workspace = true, features = ["serde"] }
 ipnet = { version = "2", features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
 sqlx = { version = "0.8.6", features = [
   "chrono",
   "ipnet",
@@ -20,5 +19,6 @@ sqlx = { version = "0.8.6", features = [
   "tls-native-tls",
   "uuid",
 ] }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4", "v7"] }
