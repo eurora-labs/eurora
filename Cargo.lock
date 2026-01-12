@@ -1480,16 +1480,12 @@ name = "be-asset-service"
 version = "0.0.0"
 dependencies = [
  "asset-models",
- "base64 0.22.1",
  "be-asset",
  "be-auth-grpc",
  "be-storage",
- "chrono",
  "euro-remote-db",
- "hex",
  "prost",
  "prost-types",
- "serde_json",
  "thiserror 2.0.17",
  "tonic",
  "tonic-prost",
