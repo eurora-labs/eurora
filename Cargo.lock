@@ -1441,6 +1441,8 @@ name = "be-activity-service"
 version = "0.0.0"
 dependencies = [
  "activity-models",
+ "asset-models",
+ "be-asset",
  "be-auth-grpc",
  "be-storage",
  "chrono",
@@ -1451,6 +1453,24 @@ dependencies = [
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "be-asset"
+version = "0.0.0"
+dependencies = [
+ "asset-models",
+ "base64 0.22.1",
+ "be-auth-grpc",
+ "be-storage",
+ "chrono",
+ "euro-remote-db",
+ "hex",
+ "prost-types",
+ "serde_json",
+ "thiserror 2.0.17",
  "tracing",
  "uuid",
 ]
