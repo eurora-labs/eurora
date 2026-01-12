@@ -151,12 +151,13 @@ pub struct UpdateLoginTokenRequest {
 pub struct Asset {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub checksum_sha256: Option<Vec<u8>>,
+    pub name: String,
+    pub mime_type: String,
     pub size_bytes: Option<i64>,
+    pub checksum_sha256: Option<Vec<u8>>,
     pub storage_backend: String,
     pub storage_uri: String,
-
-    pub mime_type: String,
+    pub status: String,
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -166,6 +167,7 @@ pub struct Asset {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateAssetRequest {
     pub id: Uuid,
+    pub name: String,
     pub checksum_sha256: Option<Vec<u8>>,
     pub size_bytes: Option<i64>,
     pub storage_uri: String,

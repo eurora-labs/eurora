@@ -5,7 +5,7 @@ use sqlx::{
     migrate::MigrateDatabase,
     postgres::{PgPool, PgPoolOptions},
 };
-use tracing::debug;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::error::DbResult;
@@ -965,23 +965,27 @@ impl DatabaseManager {
         user_id: Uuid,
         request: CreateAssetRequest,
     ) -> DbResult<Asset> {
+        info!("create asset request: {:?}", request.clone());
         let id = request.id;
         let now = Utc::now();
         let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
 
         let asset = sqlx::query_as::<_, Asset>(
             r#"
-            INSERT INTO assets (id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at
+            INSERT INTO assets (id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            RETURNING id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
             "#,
         )
         .bind(id)
         .bind(user_id)
-        .bind(&request.checksum_sha256)
-        .bind(request.size_bytes)
-        .bind(&request.storage_uri)
+        .bind(&request.name)
         .bind(&request.mime_type)
+        .bind(request.size_bytes)
+        .bind(&request.checksum_sha256)
+        .bind("fs")
+        .bind(&request.storage_uri)
+        .bind("uploaded")
         .bind(&metadata)
         .bind(now)
         .bind(now)
@@ -995,7 +999,7 @@ impl DatabaseManager {
     pub async fn get_asset(&self, asset_id: Uuid) -> DbResult<Asset> {
         let asset = sqlx::query_as::<_, Asset>(
             r#"
-            SELECT id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at
+            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
             FROM assets
             WHERE id = $1
             "#,
@@ -1011,7 +1015,7 @@ impl DatabaseManager {
     pub async fn get_asset_for_user(&self, asset_id: Uuid, user_id: Uuid) -> DbResult<Asset> {
         let asset = sqlx::query_as::<_, Asset>(
             r#"
-            SELECT id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at
+            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
             FROM assets
             WHERE id = $1 AND user_id = $2
             "#,
@@ -1036,7 +1040,7 @@ impl DatabaseManager {
 
         let assets = sqlx::query_as::<_, Asset>(
             r#"
-            SELECT id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at
+            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
             FROM assets
             WHERE user_id = $1
             ORDER BY created_at DESC
@@ -1081,7 +1085,7 @@ impl DatabaseManager {
                 metadata = COALESCE($7, metadata),
                 updated_at = $8
             WHERE id = $1 AND user_id = $2
-            RETURNING id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at
+            RETURNING id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
             "#,
         )
         .bind(asset_id)
@@ -1122,7 +1126,7 @@ impl DatabaseManager {
     ) -> DbResult<Vec<Asset>> {
         let assets = sqlx::query_as::<_, Asset>(
             r#"
-            SELECT a.id, a.user_id, a.checksum_sha256, a.size_bytes, a.storage_uri, a.mime_type, a.metadata, a.created_at, a.updated_at
+            SELECT a.id, a.user_id, a.name, a.mime_type, a.size_bytes, a.checksum_sha256, a.storage_backend, a.storage_uri, a.status, a.metadata, a.created_at, a.updated_at
             FROM assets a
             INNER JOIN message_assets ma ON a.id = ma.asset_id
             WHERE ma.message_id = $1 AND a.user_id = $2
@@ -1144,7 +1148,7 @@ impl DatabaseManager {
     ) -> DbResult<Vec<Asset>> {
         let assets = sqlx::query_as::<_, Asset>(
             r#"
-            SELECT a.id, a.user_id, a.checksum_sha256, a.size_bytes, a.storage_uri, a.mime_type, a.metadata, a.created_at, a.updated_at
+            SELECT a.id, a.user_id, a.name, a.mime_type, a.size_bytes, a.checksum_sha256, a.storage_backend, a.storage_uri, a.status, a.metadata, a.created_at, a.updated_at
             FROM assets a
             INNER JOIN activity_assets aa ON a.id = aa.asset_id
             WHERE aa.activity_id = $1 AND a.user_id = $2
@@ -1254,7 +1258,7 @@ impl DatabaseManager {
     ) -> DbResult<Option<Asset>> {
         let asset = sqlx::query_as::<_, Asset>(
             r#"
-            SELECT id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at
+            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
             FROM assets
             WHERE user_id = $1 AND checksum_sha256 = $2
             LIMIT 1
