@@ -13,6 +13,7 @@ members = [
   "crates/common/agent-graph-macros",
   "crates/common/asset-models",
   "crates/common/auth-core",
+  "crates/common/conversation-models",
   "crates/common/euro-*",
   "crates/common/focus-tracker",
   "crates/common/focus-tracker-core",
@@ -46,6 +47,7 @@ be-asset-service = { path = "crates/backend/be-asset-service" }
 be-auth-core = { path = "crates/backend/be-auth-core" }
 be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
 be-auth-service = { path = "crates/backend/be-auth-service" }
+be-conversation-service = { path = "crates/backend/be-conversation-service" }
 be-monolith = { path = "crates/backend/be-monolith" }
 be-prompt-service = { path = "crates/backend/be-prompt-service" }
 be-remote-db = { path = "crates/backend/be-remote-db" }
@@ -54,6 +56,7 @@ be-update-service = { path = "crates/backend/be-update-service" }
 bstr = "1.12.1"
 cfg-if = "1.0.4"
 chrono = "0.4.41"
+conversation-models = { path = "crates/common/conversation-models" }
 dirs = "6.0"
 dotenv = "0.15.0"
 enum_dispatch = "0.3.13"

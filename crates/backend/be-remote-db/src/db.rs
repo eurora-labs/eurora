@@ -10,13 +10,14 @@ use uuid::Uuid;
 
 use crate::error::DbResult;
 use crate::types::{
-    Activity, ActivityAsset, Asset, CreateActivityRequest, CreateAssetRequest,
-    CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
-    CreateRefreshTokenRequest, CreateUserRequest, GetActivitiesByTimeRangeRequest,
-    ListActivitiesRequest, LoginToken, MessageAsset, OAuthCredentials, OAuthState,
-    PasswordCredentials, RefreshToken, UpdateActivityEndTimeRequest, UpdateActivityRequest,
-    UpdateAssetRequest, UpdateOAuthCredentialsRequest, UpdatePasswordRequest, UpdateUserRequest,
-    User,
+    Activity, ActivityAsset, ActivityConversation, Asset, Conversation, CreateActivityRequest,
+    CreateAssetRequest, CreateConversationRequest, CreateLoginTokenRequest, CreateMessageRequest,
+    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
+    CreateUserRequest, GetActivitiesByTimeRangeRequest, ListActivitiesRequest,
+    ListConversationsRequest, ListMessagesRequest, LoginToken, Message, MessageAsset,
+    OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken, UpdateActivityEndTimeRequest,
+    UpdateActivityRequest, UpdateAssetRequest, UpdateConversationRequest, UpdateMessageRequest,
+    UpdateOAuthCredentialsRequest, UpdatePasswordRequest, UpdateUserRequest, User,
 };
 #[derive(Debug)]
 pub struct DatabaseManager {
@@ -1242,5 +1243,497 @@ impl DatabaseManager {
         .await?;
 
         Ok(asset)
+    }
+
+    // =========================================================================
+    // Conversation Management Methods
+    // =========================================================================
+
+    /// Create a new conversation
+    pub async fn create_conversation(
+        &self,
+        request: CreateConversationRequest,
+    ) -> DbResult<Conversation> {
+        let id = request.id.unwrap_or_else(Uuid::now_v7);
+        let now = Utc::now();
+
+        let conversation = sqlx::query_as::<_, Conversation>(
+            r#"
+            INSERT INTO conversations (id, user_id, title, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, user_id, title, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(request.user_id)
+        .bind(&request.title)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(conversation)
+    }
+
+    /// Get a conversation by ID
+    pub async fn get_conversation(&self, conversation_id: Uuid) -> DbResult<Conversation> {
+        let conversation = sqlx::query_as::<_, Conversation>(
+            r#"
+            SELECT id, user_id, title, created_at, updated_at
+            FROM conversations
+            WHERE id = $1
+            "#,
+        )
+        .bind(conversation_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(conversation)
+    }
+
+    /// Get a conversation by ID for a specific user
+    pub async fn get_conversation_for_user(
+        &self,
+        conversation_id: Uuid,
+        user_id: Uuid,
+    ) -> DbResult<Conversation> {
+        let conversation = sqlx::query_as::<_, Conversation>(
+            r#"
+            SELECT id, user_id, title, created_at, updated_at
+            FROM conversations
+            WHERE id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(conversation_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(conversation)
+    }
+
+    /// List conversations for a user with pagination
+    pub async fn list_conversations(
+        &self,
+        request: ListConversationsRequest,
+    ) -> DbResult<(Vec<Conversation>, u64)> {
+        // Clamp limit to max 100
+        let limit = request.limit.clamp(1, 100);
+
+        let conversations = sqlx::query_as::<_, Conversation>(
+            r#"
+            SELECT id, user_id, title, created_at, updated_at
+            FROM conversations
+            WHERE user_id = $1
+            ORDER BY updated_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(request.user_id)
+        .bind(limit as i64)
+        .bind(request.offset as i64)
+        .fetch_all(&self.pool)
+        .await?;
+
+        // Get total count
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM conversations WHERE user_id = $1
+            "#,
+        )
+        .bind(request.user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok((conversations, count.0 as u64))
+    }
+
+    /// Update an existing conversation
+    pub async fn update_conversation(
+        &self,
+        conversation_id: Uuid,
+        user_id: Uuid,
+        request: UpdateConversationRequest,
+    ) -> DbResult<Conversation> {
+        let now = Utc::now();
+
+        let conversation = sqlx::query_as::<_, Conversation>(
+            r#"
+            UPDATE conversations
+            SET title = COALESCE($3, title),
+                updated_at = $4
+            WHERE id = $1 AND user_id = $2
+            RETURNING id, user_id, title, created_at, updated_at
+            "#,
+        )
+        .bind(conversation_id)
+        .bind(user_id)
+        .bind(&request.title)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(conversation)
+    }
+
+    /// Delete a conversation (will cascade delete all messages)
+    pub async fn delete_conversation(&self, conversation_id: Uuid, user_id: Uuid) -> DbResult<()> {
+        sqlx::query(
+            r#"
+            DELETE FROM conversations
+            WHERE id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(conversation_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    // =========================================================================
+    // Message Management Methods
+    // =========================================================================
+
+    /// Get the next sequence number for a conversation
+    async fn get_next_sequence_num(&self, conversation_id: Uuid) -> DbResult<i32> {
+        let result: (Option<i32>,) = sqlx::query_as(
+            r#"
+            SELECT MAX(sequence_num) FROM messages WHERE conversation_id = $1
+            "#,
+        )
+        .bind(conversation_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(result.0.unwrap_or(0) + 1)
+    }
+
+    /// Create a new message
+    pub async fn create_message(&self, request: CreateMessageRequest) -> DbResult<Message> {
+        let id = request.id.unwrap_or_else(Uuid::now_v7);
+        let now = Utc::now();
+        let additional_kwargs = request
+            .additional_kwargs
+            .unwrap_or_else(|| serde_json::json!({}));
+
+        // Get sequence number (either provided or auto-calculated)
+        let sequence_num = match request.sequence_num {
+            Some(seq) => seq,
+            None => self.get_next_sequence_num(request.conversation_id).await?,
+        };
+
+        let message = sqlx::query_as::<_, Message>(
+            r#"
+            INSERT INTO messages (id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(request.conversation_id)
+        .bind(request.message_type)
+        .bind(&request.content)
+        .bind(&request.tool_call_id)
+        .bind(&request.tool_calls)
+        .bind(&additional_kwargs)
+        .bind(sequence_num)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        // Update conversation's updated_at timestamp
+        sqlx::query(
+            r#"
+            UPDATE conversations SET updated_at = $2 WHERE id = $1
+            "#,
+        )
+        .bind(request.conversation_id)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(message)
+    }
+
+    /// Get a message by ID
+    pub async fn get_message(&self, message_id: Uuid) -> DbResult<Message> {
+        let message = sqlx::query_as::<_, Message>(
+            r#"
+            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at
+            FROM messages
+            WHERE id = $1
+            "#,
+        )
+        .bind(message_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(message)
+    }
+
+    /// Get a message by ID for a specific user (joins with conversation to verify ownership)
+    pub async fn get_message_for_user(&self, message_id: Uuid, user_id: Uuid) -> DbResult<Message> {
+        let message = sqlx::query_as::<_, Message>(
+            r#"
+            SELECT m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.sequence_num, m.created_at, m.updated_at
+            FROM messages m
+            INNER JOIN conversations c ON m.conversation_id = c.id
+            WHERE m.id = $1 AND c.user_id = $2
+            "#,
+        )
+        .bind(message_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(message)
+    }
+
+    /// List messages for a conversation with pagination
+    pub async fn list_messages(
+        &self,
+        request: ListMessagesRequest,
+    ) -> DbResult<(Vec<Message>, u64)> {
+        // Clamp limit to max 100
+        let limit = request.limit.clamp(1, 100);
+
+        let messages = sqlx::query_as::<_, Message>(
+            r#"
+            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at
+            FROM messages
+            WHERE conversation_id = $1
+            ORDER BY sequence_num ASC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(request.conversation_id)
+        .bind(limit as i64)
+        .bind(request.offset as i64)
+        .fetch_all(&self.pool)
+        .await?;
+
+        // Get total count
+        let count: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM messages WHERE conversation_id = $1
+            "#,
+        )
+        .bind(request.conversation_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok((messages, count.0 as u64))
+    }
+
+    /// List all messages for a conversation (no pagination, ordered by sequence_num)
+    pub async fn list_all_messages(&self, conversation_id: Uuid) -> DbResult<Vec<Message>> {
+        let messages = sqlx::query_as::<_, Message>(
+            r#"
+            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at
+            FROM messages
+            WHERE conversation_id = $1
+            ORDER BY sequence_num ASC
+            "#,
+        )
+        .bind(conversation_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(messages)
+    }
+
+    /// List messages for a conversation for a specific user (verifies ownership)
+    pub async fn list_messages_for_user(
+        &self,
+        conversation_id: Uuid,
+        user_id: Uuid,
+        limit: u32,
+        offset: u32,
+    ) -> DbResult<(Vec<Message>, u64)> {
+        // First verify the user owns the conversation
+        let _ = self
+            .get_conversation_for_user(conversation_id, user_id)
+            .await?;
+
+        let request = ListMessagesRequest {
+            conversation_id,
+            limit,
+            offset,
+        };
+
+        self.list_messages(request).await
+    }
+
+    /// Update an existing message
+    pub async fn update_message(
+        &self,
+        message_id: Uuid,
+        user_id: Uuid,
+        request: UpdateMessageRequest,
+    ) -> DbResult<Message> {
+        let now = Utc::now();
+
+        let message = sqlx::query_as::<_, Message>(
+            r#"
+            UPDATE messages m
+            SET content = COALESCE($3, m.content),
+                tool_call_id = COALESCE($4, m.tool_call_id),
+                tool_calls = COALESCE($5, m.tool_calls),
+                additional_kwargs = COALESCE($6, m.additional_kwargs),
+                updated_at = $7
+            FROM conversations c
+            WHERE m.id = $1 AND m.conversation_id = c.id AND c.user_id = $2
+            RETURNING m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.sequence_num, m.created_at, m.updated_at
+            "#,
+        )
+        .bind(message_id)
+        .bind(user_id)
+        .bind(&request.content)
+        .bind(&request.tool_call_id)
+        .bind(&request.tool_calls)
+        .bind(&request.additional_kwargs)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(message)
+    }
+
+    /// Delete a message
+    pub async fn delete_message(&self, message_id: Uuid, user_id: Uuid) -> DbResult<()> {
+        sqlx::query(
+            r#"
+            DELETE FROM messages m
+            USING conversations c
+            WHERE m.id = $1 AND m.conversation_id = c.id AND c.user_id = $2
+            "#,
+        )
+        .bind(message_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Delete all messages in a conversation
+    pub async fn delete_all_messages_in_conversation(
+        &self,
+        conversation_id: Uuid,
+        user_id: Uuid,
+    ) -> DbResult<u64> {
+        // First verify the user owns the conversation
+        let _ = self
+            .get_conversation_for_user(conversation_id, user_id)
+            .await?;
+
+        let result = sqlx::query(
+            r#"
+            DELETE FROM messages
+            WHERE conversation_id = $1
+            "#,
+        )
+        .bind(conversation_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    // =========================================================================
+    // Activity-Conversation Linking Methods
+    // =========================================================================
+
+    /// Link an activity to a conversation
+    pub async fn link_activity_to_conversation(
+        &self,
+        activity_id: Uuid,
+        conversation_id: Uuid,
+    ) -> DbResult<ActivityConversation> {
+        let now = Utc::now();
+
+        let activity_conversation = sqlx::query_as::<_, ActivityConversation>(
+            r#"
+            INSERT INTO activity_conversations (activity_id, conversation_id, created_at)
+            VALUES ($1, $2, $3)
+            RETURNING activity_id, conversation_id, created_at
+            "#,
+        )
+        .bind(activity_id)
+        .bind(conversation_id)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(activity_conversation)
+    }
+
+    /// Unlink an activity from a conversation
+    pub async fn unlink_activity_from_conversation(
+        &self,
+        activity_id: Uuid,
+        conversation_id: Uuid,
+    ) -> DbResult<()> {
+        sqlx::query(
+            r#"
+            DELETE FROM activity_conversations
+            WHERE activity_id = $1 AND conversation_id = $2
+            "#,
+        )
+        .bind(activity_id)
+        .bind(conversation_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Get all conversations linked to an activity
+    pub async fn get_conversations_by_activity_id(
+        &self,
+        activity_id: Uuid,
+        user_id: Uuid,
+    ) -> DbResult<Vec<Conversation>> {
+        let conversations = sqlx::query_as::<_, Conversation>(
+            r#"
+            SELECT c.id, c.user_id, c.title, c.created_at, c.updated_at
+            FROM conversations c
+            INNER JOIN activity_conversations ac ON c.id = ac.conversation_id
+            WHERE ac.activity_id = $1 AND c.user_id = $2
+            ORDER BY c.updated_at DESC
+            "#,
+        )
+        .bind(activity_id)
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(conversations)
+    }
+
+    /// Get all activities linked to a conversation
+    pub async fn get_activities_by_conversation_id(
+        &self,
+        conversation_id: Uuid,
+        user_id: Uuid,
+    ) -> DbResult<Vec<Activity>> {
+        let activities = sqlx::query_as::<_, Activity>(
+            r#"
+            SELECT a.id, a.user_id, a.name, a.icon_asset_id, a.process_name, a.window_title, a.started_at, a.ended_at, a.created_at, a.updated_at
+            FROM activities a
+            INNER JOIN activity_conversations ac ON a.id = ac.activity_id
+            WHERE ac.conversation_id = $1 AND a.user_id = $2
+            ORDER BY a.started_at DESC
+            "#,
+        )
+        .bind(conversation_id)
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(activities)
     }
 }

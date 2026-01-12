@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, Type};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -277,7 +277,7 @@ pub struct UpdateActivityEndTimeRequest {
 // =============================================================================
 
 /// Database representation of a conversation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Conversation {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -289,7 +289,113 @@ pub struct Conversation {
 /// Request for creating a conversation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateConversationRequest {
-    pub id: Uuid,
+    pub id: Option<Uuid>,
     pub user_id: Uuid,
     pub title: Option<String>,
+}
+
+/// Request for updating a conversation
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UpdateConversationRequest {
+    pub title: Option<String>,
+}
+
+/// Request for listing conversations with pagination
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListConversationsRequest {
+    pub user_id: Uuid,
+    pub limit: u32,
+    pub offset: u32,
+}
+
+// =============================================================================
+// Message Types
+// =============================================================================
+
+/// Message type enum matching the database enum
+/// Corresponds to agent-chain BaseMessage variants
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[sqlx(type_name = "message_type", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum MessageType {
+    Human,
+    System,
+    Ai,
+    Tool,
+}
+
+impl std::fmt::Display for MessageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MessageType::Human => write!(f, "human"),
+            MessageType::System => write!(f, "system"),
+            MessageType::Ai => write!(f, "ai"),
+            MessageType::Tool => write!(f, "tool"),
+        }
+    }
+}
+
+/// Database representation of a message within a conversation
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Message {
+    pub id: Uuid,
+    pub conversation_id: Uuid,
+    pub message_type: MessageType,
+    /// Content stored as JSONB
+    /// For human: MessageContent (can be {"Text": "..."} or {"Parts": [...]})
+    /// For system/ai/tool: Simple string stored as JSON string
+    pub content: serde_json::Value,
+    /// For ToolMessage: the ID of the tool call this responds to
+    pub tool_call_id: Option<String>,
+    /// For AIMessage: JSON array of ToolCall objects
+    pub tool_calls: Option<serde_json::Value>,
+    /// Additional metadata as JSON object
+    pub additional_kwargs: serde_json::Value,
+    /// Ordering within conversation (messages sorted by this)
+    pub sequence_num: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Request for creating a new message
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateMessageRequest {
+    pub id: Option<Uuid>,
+    pub conversation_id: Uuid,
+    pub message_type: MessageType,
+    pub content: serde_json::Value,
+    pub tool_call_id: Option<String>,
+    pub tool_calls: Option<serde_json::Value>,
+    pub additional_kwargs: Option<serde_json::Value>,
+    /// If not provided, will be auto-calculated as max(sequence_num) + 1
+    pub sequence_num: Option<i32>,
+}
+
+/// Request for updating an existing message
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UpdateMessageRequest {
+    pub content: Option<serde_json::Value>,
+    pub tool_call_id: Option<String>,
+    pub tool_calls: Option<serde_json::Value>,
+    pub additional_kwargs: Option<serde_json::Value>,
+}
+
+/// Request for listing messages with pagination
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListMessagesRequest {
+    pub conversation_id: Uuid,
+    pub limit: u32,
+    pub offset: u32,
+}
+
+// =============================================================================
+// Junction Types (Activity-Conversation)
+// =============================================================================
+
+/// Activity-conversation link
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ActivityConversation {
+    pub activity_id: Uuid,
+    pub conversation_id: Uuid,
+    pub created_at: DateTime<Utc>,
 }
