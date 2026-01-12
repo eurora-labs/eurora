@@ -1,0 +1,19 @@
+[package]
+name = "be-asset"
+version = "0.0.0"
+edition.workspace = true
+description = "Asset Service - Logic for managing file assets"
+
+[dependencies]
+asset-models = { workspace = true }
+base64 = { workspace = true }
+be-auth-grpc = { workspace = true }
+be-storage = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+euro-remote-db = { workspace = true }
+hex = { version = "0.4" }
+prost-types = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["serde", "v4", "v7"] }
