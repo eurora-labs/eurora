@@ -9,7 +9,13 @@ use asset_models::proto::CreateAssetRequest;
 use be_asset::AssetService;
 use be_auth_grpc::Claims;
 use chrono::{DateTime, Utc};
-use euro_remote_db::DatabaseManager;
+use euro_remote_db::{
+    CreateActivityRequest as DbCreateActivityRequest, DatabaseManager,
+    GetActivitiesByTimeRangeRequest as DbGetActivitiesByTimeRangeRequest,
+    ListActivitiesRequest as DbListActivitiesRequest,
+    UpdateActivityEndTimeRequest as DbUpdateActivityEndTimeRequest,
+    UpdateActivityRequest as DbUpdateActivityRequest,
+};
 use prost_types::Timestamp;
 use tonic::{Request, Response, Status};
 use tracing::{debug, info};
@@ -129,7 +135,11 @@ impl ProtoActivityService for ActivityService {
 
         let (activities, total_count) = self
             .db
-            .list_activities(user_id, limit, req.offset)
+            .list_activities(DbListActivitiesRequest {
+                user_id,
+                limit,
+                offset: req.offset,
+            })
             .await
             .map_err(ActivityServiceError::from)?;
 
@@ -184,13 +194,6 @@ impl ProtoActivityService for ActivityService {
 
         let req = request.into_inner();
 
-        let activity_id = match &req.id {
-            Some(id) => {
-                Uuid::parse_str(id).map_err(|_| Status::invalid_argument("Invalid activity ID"))?
-            }
-            None => Uuid::now_v7(),
-        };
-
         let id = parse_optional_uuid(req.id.as_ref(), "activity_id")?;
 
         let started_at = req
@@ -204,16 +207,16 @@ impl ProtoActivityService for ActivityService {
 
         let activity = self
             .db
-            .create_activity(
+            .create_activity(DbCreateActivityRequest {
                 id,
                 user_id,
-                &req.name,
-                None,
-                &req.process_name,
-                &req.window_title,
+                name: req.name.clone(),
+                icon_asset_id: None,
+                process_name: req.process_name.clone(),
+                window_title: req.window_title.clone(),
                 started_at,
                 ended_at,
-            )
+            })
             .await
             .map_err(ActivityServiceError::from)?;
         info!("Created activity at: {:?}", activity.created_at);
@@ -243,6 +246,15 @@ impl ProtoActivityService for ActivityService {
             None => None,
         };
 
+        self.db
+            .update_activity(DbUpdateActivityRequest {
+                id: activity.id,
+                icon_asset_id: icon_id,
+                ..Default::default()
+            })
+            .await
+            .map_err(ActivityServiceError::Database)?;
+
         debug!("Created activity {} for user {}", activity.id, user_id);
 
         Ok(Response::new(ActivityResponse {
@@ -269,16 +281,15 @@ impl ProtoActivityService for ActivityService {
 
         let activity = self
             .db
-            .update_activity(
-                activity_id,
-                user_id,
-                req.name.as_deref(),
+            .update_activity(DbUpdateActivityRequest {
+                id: activity_id,
+                name: req.name.clone(),
                 icon_asset_id,
-                req.process_name.as_deref(),
-                req.window_title.as_deref(),
+                process_name: req.process_name.clone(),
+                window_title: req.window_title.clone(),
                 started_at,
                 ended_at,
-            )
+            })
             .await
             .map_err(ActivityServiceError::from)?;
 
@@ -309,7 +320,11 @@ impl ProtoActivityService for ActivityService {
             .ok_or_else(|| ActivityServiceError::invalid_timestamp("ended_at"))?;
 
         self.db
-            .update_activity_end_time(activity_id, user_id, ended_at)
+            .update_activity_end_time(DbUpdateActivityEndTimeRequest {
+                activity_id,
+                user_id,
+                ended_at,
+            })
             .await
             .map_err(ActivityServiceError::from)?;
 
@@ -393,7 +408,13 @@ impl ProtoActivityService for ActivityService {
 
         let (activities, total_count) = self
             .db
-            .get_activities_by_time_range(user_id, start_time, end_time, limit, req.offset)
+            .get_activities_by_time_range(DbGetActivitiesByTimeRangeRequest {
+                user_id,
+                start_time,
+                end_time,
+                limit,
+                offset: req.offset,
+            })
             .await
             .map_err(ActivityServiceError::from)?;
 

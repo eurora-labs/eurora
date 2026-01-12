@@ -219,3 +219,54 @@ pub struct Activity {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+/// Request for creating a new activity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateActivityRequest {
+    pub id: Option<Uuid>,
+    pub user_id: Uuid,
+    pub name: String,
+    pub icon_asset_id: Option<Uuid>,
+    pub process_name: String,
+    pub window_title: String,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+}
+
+/// Request for updating an existing activity
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UpdateActivityRequest {
+    pub id: Uuid,
+    pub name: Option<String>,
+    pub icon_asset_id: Option<Uuid>,
+    pub process_name: Option<String>,
+    pub window_title: Option<String>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+}
+
+/// Request for listing activities with pagination
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListActivitiesRequest {
+    pub user_id: Uuid,
+    pub limit: u32,
+    pub offset: u32,
+}
+
+/// Request for getting activities by time range
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetActivitiesByTimeRangeRequest {
+    pub user_id: Uuid,
+    pub start_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
+    pub limit: u32,
+    pub offset: u32,
+}
+
+/// Request for updating activity end time
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateActivityEndTimeRequest {
+    pub activity_id: Uuid,
+    pub user_id: Uuid,
+    pub ended_at: DateTime<Utc>,
+}
