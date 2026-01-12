@@ -271,3 +271,25 @@ pub struct UpdateActivityEndTimeRequest {
     pub user_id: Uuid,
     pub ended_at: DateTime<Utc>,
 }
+
+// =============================================================================
+// Conversation Types
+// =============================================================================
+
+/// Database representation of a conversation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Conversation {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub title: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Request for creating a conversation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateConversationRequest {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub title: Option<String>,
+}
