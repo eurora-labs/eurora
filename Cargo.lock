@@ -1443,6 +1443,7 @@ dependencies = [
  "activity-models",
  "anyhow",
  "be-auth-grpc",
+ "be-storage",
  "chrono",
  "euro-remote-db",
  "prost",
