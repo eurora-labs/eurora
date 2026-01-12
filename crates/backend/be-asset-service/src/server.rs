@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use be_asset::AssetService as CoreAssetService;
 use be_auth_grpc::Claims;
+use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
-use euro_remote_db::DatabaseManager;
 use tonic::{Request, Response, Status};
 use tracing::{error, info};
 use uuid::Uuid;
