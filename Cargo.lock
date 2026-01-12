@@ -1481,6 +1481,7 @@ version = "0.0.0"
 dependencies = [
  "asset-models",
  "base64 0.22.1",
+ "be-asset",
  "be-auth-grpc",
  "be-storage",
  "chrono",
