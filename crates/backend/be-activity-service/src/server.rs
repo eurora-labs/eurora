@@ -249,6 +249,7 @@ impl ProtoActivityService for ActivityService {
         self.db
             .update_activity(DbUpdateActivityRequest {
                 id: activity.id,
+                user_id,
                 icon_asset_id: icon_id,
                 ..Default::default()
             })
@@ -283,6 +284,7 @@ impl ProtoActivityService for ActivityService {
             .db
             .update_activity(DbUpdateActivityRequest {
                 id: activity_id,
+                user_id,
                 name: req.name.clone(),
                 icon_asset_id,
                 process_name: req.process_name.clone(),

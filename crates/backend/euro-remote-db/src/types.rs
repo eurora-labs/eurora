@@ -237,6 +237,7 @@ pub struct CreateActivityRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UpdateActivityRequest {
     pub id: Uuid,
+    pub user_id: Uuid,
     pub name: Option<String>,
     pub icon_asset_id: Option<Uuid>,
     pub process_name: Option<String>,
