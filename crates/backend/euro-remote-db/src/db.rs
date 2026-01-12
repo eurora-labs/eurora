@@ -8,6 +8,7 @@ use sqlx::{
 use tracing::debug;
 use uuid::Uuid;
 
+use crate::error::DbResult;
 use crate::types::{
     Activity, ActivityAsset, Asset, CreateAssetRequest, CreateLoginTokenRequest,
     CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
@@ -21,7 +22,7 @@ pub struct DatabaseManager {
 }
 
 impl DatabaseManager {
-    pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
+    pub async fn new(database_url: &str) -> DbResult<Self> {
         debug!(
             "Initializing DatabaseManager with database URL: {}",
             database_url
@@ -47,17 +48,15 @@ impl DatabaseManager {
         Ok(db_manager)
     }
 
-    async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
+    async fn run_migrations(pool: &PgPool) -> DbResult<()> {
         let mut migrator = sqlx::migrate!("./src/migrations");
         migrator.set_ignore_missing(true);
-        match migrator.run(pool).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e.into()),
-        }
+        migrator.run(pool).await?;
+        Ok(())
     }
 
     // User management methods
-    pub async fn create_user(&self, request: CreateUserRequest) -> Result<User, sqlx::Error> {
+    pub async fn create_user(&self, request: CreateUserRequest) -> DbResult<User> {
         let user_id = Uuid::now_v7();
         let password_id = Uuid::now_v7();
         let now = Utc::now();
@@ -103,7 +102,7 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn get_user_by_id(&self, user_id: Uuid) -> Result<User, sqlx::Error> {
+    pub async fn get_user_by_id(&self, user_id: Uuid) -> DbResult<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, username, email, display_name, email_verified, created_at, updated_at
@@ -118,7 +117,7 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn get_user_by_username(&self, username: &str) -> Result<User, sqlx::Error> {
+    pub async fn get_user_by_username(&self, username: &str) -> DbResult<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, username, email, display_name, email_verified, created_at, updated_at
@@ -133,7 +132,7 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn get_user_by_email(&self, email: &str) -> Result<User, sqlx::Error> {
+    pub async fn get_user_by_email(&self, email: &str) -> DbResult<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, username, email, display_name, email_verified, created_at, updated_at
@@ -148,11 +147,7 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn update_user(
-        &self,
-        user_id: Uuid,
-        request: UpdateUserRequest,
-    ) -> Result<User, sqlx::Error> {
+    pub async fn update_user(&self, user_id: Uuid, request: UpdateUserRequest) -> DbResult<User> {
         let now = Utc::now();
 
         let user = sqlx::query_as::<_, User>(
@@ -179,7 +174,7 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn delete_user(&self, user_id: Uuid) -> Result<(), sqlx::Error> {
+    pub async fn delete_user(&self, user_id: Uuid) -> DbResult<()> {
         // Due to CASCADE DELETE constraint, this will also delete password_credentials
         sqlx::query(
             r#"
@@ -194,7 +189,7 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn list_users(&self) -> Result<Vec<User>, sqlx::Error> {
+    pub async fn list_users(&self) -> DbResult<Vec<User>> {
         let users = sqlx::query_as::<_, User>(
             r#"
             SELECT id, username, email, display_name, email_verified, created_at, updated_at
@@ -209,10 +204,7 @@ impl DatabaseManager {
     }
 
     // Password credentials management methods
-    pub async fn get_password_credentials(
-        &self,
-        user_id: Uuid,
-    ) -> Result<PasswordCredentials, sqlx::Error> {
+    pub async fn get_password_credentials(&self, user_id: Uuid) -> DbResult<PasswordCredentials> {
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
             r#"
             SELECT id, user_id, password_hash, updated_at
@@ -231,7 +223,7 @@ impl DatabaseManager {
         &self,
         user_id: Uuid,
         request: UpdatePasswordRequest,
-    ) -> Result<PasswordCredentials, sqlx::Error> {
+    ) -> DbResult<PasswordCredentials> {
         let now = Utc::now();
 
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
@@ -257,7 +249,7 @@ impl DatabaseManager {
         &self,
         username_or_email: &str,
         password_hash: &str,
-    ) -> Result<Option<User>, sqlx::Error> {
+    ) -> DbResult<Option<User>> {
         let user_result = sqlx::query_as::<_, User>(
             r#"
             SELECT u.id, u.username, u.email, u.display_name, u.email_verified, u.created_at, u.updated_at
@@ -274,7 +266,7 @@ impl DatabaseManager {
         Ok(user_result)
     }
 
-    pub async fn verify_email(&self, user_id: Uuid) -> Result<User, sqlx::Error> {
+    pub async fn verify_email(&self, user_id: Uuid) -> DbResult<User> {
         let now = Utc::now();
 
         let user = sqlx::query_as::<_, User>(
@@ -295,7 +287,7 @@ impl DatabaseManager {
     }
 
     // Utility methods
-    pub async fn user_exists_by_username(&self, username: &str) -> Result<bool, sqlx::Error> {
+    pub async fn user_exists_by_username(&self, username: &str) -> DbResult<bool> {
         let count: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*) FROM users WHERE username = $1
@@ -308,7 +300,7 @@ impl DatabaseManager {
         Ok(count.0 > 0)
     }
 
-    pub async fn user_exists_by_email(&self, email: &str) -> Result<bool, sqlx::Error> {
+    pub async fn user_exists_by_email(&self, email: &str) -> DbResult<bool> {
         let count: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*) FROM users WHERE email = $1
@@ -325,7 +317,7 @@ impl DatabaseManager {
     pub async fn create_oauth_credentials(
         &self,
         request: CreateOAuthCredentialsRequest,
-    ) -> Result<OAuthCredentials, sqlx::Error> {
+    ) -> DbResult<OAuthCredentials> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -361,7 +353,7 @@ impl DatabaseManager {
         &self,
         provider: &str,
         user_id: Uuid,
-    ) -> Result<OAuthCredentials, sqlx::Error> {
+    ) -> DbResult<OAuthCredentials> {
         let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
             r#"
             SELECT id, user_id, provider, provider_user_id, access_token,
@@ -382,7 +374,7 @@ impl DatabaseManager {
         &self,
         provider: &str,
         provider_user_id: &str,
-    ) -> Result<OAuthCredentials, sqlx::Error> {
+    ) -> DbResult<OAuthCredentials> {
         let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
             r#"
             SELECT id, user_id, provider, provider_user_id, access_token,
@@ -403,7 +395,7 @@ impl DatabaseManager {
         &self,
         id: Uuid,
         request: UpdateOAuthCredentialsRequest,
-    ) -> Result<OAuthCredentials, sqlx::Error> {
+    ) -> DbResult<OAuthCredentials> {
         let now = Utc::now();
 
         let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
@@ -435,7 +427,7 @@ impl DatabaseManager {
         &self,
         provider: &str,
         provider_user_id: &str,
-    ) -> Result<User, sqlx::Error> {
+    ) -> DbResult<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT u.id, u.username, u.email, u.display_name, u.email_verified, u.created_at, u.updated_at
@@ -456,7 +448,7 @@ impl DatabaseManager {
     pub async fn create_refresh_token(
         &self,
         request: CreateRefreshTokenRequest,
-    ) -> Result<RefreshToken, sqlx::Error> {
+    ) -> DbResult<RefreshToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -481,10 +473,7 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
-    pub async fn get_refresh_token_by_hash(
-        &self,
-        token_hash: &str,
-    ) -> Result<RefreshToken, sqlx::Error> {
+    pub async fn get_refresh_token_by_hash(&self, token_hash: &str) -> DbResult<RefreshToken> {
         let refresh_token = sqlx::query_as::<_, RefreshToken>(
             r#"
             SELECT id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at
@@ -499,7 +488,7 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
-    pub async fn revoke_refresh_token(&self, token_hash: &str) -> Result<(), sqlx::Error> {
+    pub async fn revoke_refresh_token(&self, token_hash: &str) -> DbResult<()> {
         let now = Utc::now();
 
         sqlx::query(
@@ -517,7 +506,7 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn revoke_all_user_refresh_tokens(&self, user_id: Uuid) -> Result<(), sqlx::Error> {
+    pub async fn revoke_all_user_refresh_tokens(&self, user_id: Uuid) -> DbResult<()> {
         let now = Utc::now();
 
         sqlx::query(
@@ -535,7 +524,7 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn cleanup_expired_refresh_tokens(&self) -> Result<u64, sqlx::Error> {
+    pub async fn cleanup_expired_refresh_tokens(&self) -> DbResult<u64> {
         let result = sqlx::query(
             r#"
             DELETE FROM refresh_tokens
@@ -552,7 +541,7 @@ impl DatabaseManager {
     pub async fn create_oauth_state(
         &self,
         request: CreateOAuthStateRequest,
-    ) -> Result<OAuthState, sqlx::Error> {
+    ) -> DbResult<OAuthState> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -577,7 +566,7 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
-    pub async fn get_oauth_state_by_state(&self, state: &str) -> Result<OAuthState, sqlx::Error> {
+    pub async fn get_oauth_state_by_state(&self, state: &str) -> DbResult<OAuthState> {
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
             SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
@@ -592,7 +581,7 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
-    pub async fn consume_oauth_state(&self, state: &str) -> Result<(), sqlx::Error> {
+    pub async fn consume_oauth_state(&self, state: &str) -> DbResult<()> {
         sqlx::query(
             r#"
             UPDATE oauth_state
@@ -607,7 +596,7 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn cleanup_expired_oauth_states(&self) -> Result<u64, sqlx::Error> {
+    pub async fn cleanup_expired_oauth_states(&self) -> DbResult<u64> {
         let result = sqlx::query(
             r#"
             DELETE FROM oauth_state
@@ -624,7 +613,7 @@ impl DatabaseManager {
     pub async fn create_login_token(
         &self,
         request: CreateLoginTokenRequest,
-    ) -> Result<LoginToken, sqlx::Error> {
+    ) -> DbResult<LoginToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -648,7 +637,7 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
-    pub async fn get_login_token_by_token(&self, token: &str) -> Result<LoginToken, sqlx::Error> {
+    pub async fn get_login_token_by_token(&self, token: &str) -> DbResult<LoginToken> {
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
             SELECT id, token, consumed, expires_at, user_id, created_at, updated_at
@@ -663,7 +652,7 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
-    pub async fn consume_login_token(&self, token: &str) -> Result<LoginToken, sqlx::Error> {
+    pub async fn consume_login_token(&self, token: &str) -> DbResult<LoginToken> {
         let now = Utc::now();
 
         let login_token = sqlx::query_as::<_, LoginToken>(
@@ -682,7 +671,7 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
-    pub async fn cleanup_expired_login_tokens(&self) -> Result<u64, sqlx::Error> {
+    pub async fn cleanup_expired_login_tokens(&self) -> DbResult<u64> {
         let result = sqlx::query(
             r#"
             DELETE FROM login_tokens
@@ -711,7 +700,7 @@ impl DatabaseManager {
         window_title: &str,
         started_at: DateTime<Utc>,
         ended_at: Option<DateTime<Utc>>,
-    ) -> Result<Activity, sqlx::Error> {
+    ) -> DbResult<Activity> {
         let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
@@ -739,7 +728,7 @@ impl DatabaseManager {
     }
 
     /// Get an activity by ID
-    pub async fn get_activity(&self, activity_id: Uuid) -> Result<Activity, sqlx::Error> {
+    pub async fn get_activity(&self, activity_id: Uuid) -> DbResult<Activity> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
@@ -759,7 +748,7 @@ impl DatabaseManager {
         &self,
         activity_id: Uuid,
         user_id: Uuid,
-    ) -> Result<Activity, sqlx::Error> {
+    ) -> DbResult<Activity> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
@@ -781,7 +770,7 @@ impl DatabaseManager {
         user_id: Uuid,
         limit: u32,
         offset: u32,
-    ) -> Result<(Vec<Activity>, u64), sqlx::Error> {
+    ) -> DbResult<(Vec<Activity>, u64)> {
         // Clamp limit to max 100
         let limit = limit.clamp(1, 100);
 
@@ -825,7 +814,7 @@ impl DatabaseManager {
         window_title: Option<&str>,
         started_at: Option<DateTime<Utc>>,
         ended_at: Option<DateTime<Utc>>,
-    ) -> Result<Activity, sqlx::Error> {
+    ) -> DbResult<Activity> {
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
@@ -863,7 +852,7 @@ impl DatabaseManager {
         activity_id: Uuid,
         user_id: Uuid,
         ended_at: DateTime<Utc>,
-    ) -> Result<(), sqlx::Error> {
+    ) -> DbResult<()> {
         let now = Utc::now();
 
         sqlx::query(
@@ -884,10 +873,7 @@ impl DatabaseManager {
     }
 
     /// Get the last active (not ended) activity for a user
-    pub async fn get_last_active_activity(
-        &self,
-        user_id: Uuid,
-    ) -> Result<Option<Activity>, sqlx::Error> {
+    pub async fn get_last_active_activity(&self, user_id: Uuid) -> DbResult<Option<Activity>> {
         let activity = sqlx::query_as::<_, Activity>(
             r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
@@ -905,11 +891,7 @@ impl DatabaseManager {
     }
 
     /// Delete an activity
-    pub async fn delete_activity(
-        &self,
-        activity_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<()> {
         sqlx::query(
             r#"
             DELETE FROM activities
@@ -932,7 +914,7 @@ impl DatabaseManager {
         end_time: DateTime<Utc>,
         limit: u32,
         offset: u32,
-    ) -> Result<(Vec<Activity>, u64), sqlx::Error> {
+    ) -> DbResult<(Vec<Activity>, u64)> {
         // Clamp limit to max 100
         let limit = limit.clamp(1, 100);
 
@@ -982,7 +964,7 @@ impl DatabaseManager {
         &self,
         user_id: Uuid,
         request: CreateAssetRequest,
-    ) -> Result<Asset, sqlx::Error> {
+    ) -> DbResult<Asset> {
         let id = request.id;
         let now = Utc::now();
         let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
@@ -1010,7 +992,7 @@ impl DatabaseManager {
     }
 
     /// Get an asset by ID
-    pub async fn get_asset(&self, asset_id: Uuid) -> Result<Asset, sqlx::Error> {
+    pub async fn get_asset(&self, asset_id: Uuid) -> DbResult<Asset> {
         let asset = sqlx::query_as::<_, Asset>(
             r#"
             SELECT id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at
@@ -1026,11 +1008,7 @@ impl DatabaseManager {
     }
 
     /// Get an asset by ID for a specific user
-    pub async fn get_asset_for_user(
-        &self,
-        asset_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<Asset, sqlx::Error> {
+    pub async fn get_asset_for_user(&self, asset_id: Uuid, user_id: Uuid) -> DbResult<Asset> {
         let asset = sqlx::query_as::<_, Asset>(
             r#"
             SELECT id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at
@@ -1052,7 +1030,7 @@ impl DatabaseManager {
         user_id: Uuid,
         limit: u32,
         offset: u32,
-    ) -> Result<(Vec<Asset>, u64), sqlx::Error> {
+    ) -> DbResult<(Vec<Asset>, u64)> {
         // Clamp limit to max 100
         let limit = limit.clamp(1, 100);
 
@@ -1090,7 +1068,7 @@ impl DatabaseManager {
         asset_id: Uuid,
         user_id: Uuid,
         request: UpdateAssetRequest,
-    ) -> Result<Asset, sqlx::Error> {
+    ) -> DbResult<Asset> {
         let now = Utc::now();
 
         let asset = sqlx::query_as::<_, Asset>(
@@ -1121,7 +1099,7 @@ impl DatabaseManager {
     }
 
     /// Delete an asset
-    pub async fn delete_asset(&self, asset_id: Uuid, user_id: Uuid) -> Result<(), sqlx::Error> {
+    pub async fn delete_asset(&self, asset_id: Uuid, user_id: Uuid) -> DbResult<()> {
         sqlx::query(
             r#"
             DELETE FROM assets
@@ -1141,7 +1119,7 @@ impl DatabaseManager {
         &self,
         message_id: Uuid,
         user_id: Uuid,
-    ) -> Result<Vec<Asset>, sqlx::Error> {
+    ) -> DbResult<Vec<Asset>> {
         let assets = sqlx::query_as::<_, Asset>(
             r#"
             SELECT a.id, a.user_id, a.checksum_sha256, a.size_bytes, a.storage_uri, a.mime_type, a.metadata, a.created_at, a.updated_at
@@ -1163,7 +1141,7 @@ impl DatabaseManager {
         &self,
         activity_id: Uuid,
         user_id: Uuid,
-    ) -> Result<Vec<Asset>, sqlx::Error> {
+    ) -> DbResult<Vec<Asset>> {
         let assets = sqlx::query_as::<_, Asset>(
             r#"
             SELECT a.id, a.user_id, a.checksum_sha256, a.size_bytes, a.storage_uri, a.mime_type, a.metadata, a.created_at, a.updated_at
@@ -1185,7 +1163,7 @@ impl DatabaseManager {
         &self,
         message_id: Uuid,
         asset_id: Uuid,
-    ) -> Result<MessageAsset, sqlx::Error> {
+    ) -> DbResult<MessageAsset> {
         let now = Utc::now();
 
         let message_asset = sqlx::query_as::<_, MessageAsset>(
@@ -1209,7 +1187,7 @@ impl DatabaseManager {
         &self,
         message_id: Uuid,
         asset_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
+    ) -> DbResult<()> {
         sqlx::query(
             r#"
             DELETE FROM message_assets
@@ -1229,7 +1207,7 @@ impl DatabaseManager {
         &self,
         activity_id: Uuid,
         asset_id: Uuid,
-    ) -> Result<ActivityAsset, sqlx::Error> {
+    ) -> DbResult<ActivityAsset> {
         let now = Utc::now();
 
         let activity_asset = sqlx::query_as::<_, ActivityAsset>(
@@ -1253,7 +1231,7 @@ impl DatabaseManager {
         &self,
         activity_id: Uuid,
         asset_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
+    ) -> DbResult<()> {
         sqlx::query(
             r#"
             DELETE FROM activity_assets
@@ -1273,7 +1251,7 @@ impl DatabaseManager {
         &self,
         user_id: Uuid,
         checksum_sha256: &[u8],
-    ) -> Result<Option<Asset>, sqlx::Error> {
+    ) -> DbResult<Option<Asset>> {
         let asset = sqlx::query_as::<_, Asset>(
             r#"
             SELECT id, user_id, checksum_sha256, size_bytes, storage_uri, mime_type, metadata, created_at, updated_at
