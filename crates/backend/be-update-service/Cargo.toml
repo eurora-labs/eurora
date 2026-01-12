@@ -1,5 +1,5 @@
 [package]
-name = "euro-update-service"
+name = "be-update-service"
 version = "0.0.0"
 edition.workspace = true
 description = "Eurora Update Service"
