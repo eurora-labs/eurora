@@ -15,8 +15,4 @@ use asset_models::proto;
 
 mod server;
 
-mod storage;
-
 pub use server::{AssetService, ProtoAssetService, ProtoAssetServiceServer};
-
-pub use storage::{StorageConfig, StorageService};

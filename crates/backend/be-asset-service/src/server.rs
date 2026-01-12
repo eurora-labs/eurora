@@ -24,7 +24,7 @@ use crate::proto::{
     ListAssetsRequest, ListAssetsResponse, MessageAsset, MessageAssetResponse,
     UnlinkAssetFromActivityRequest, UnlinkAssetFromMessageRequest, UpdateAssetRequest,
 };
-use crate::storage::StorageService;
+use be_storage::StorageService;
 
 pub use crate::proto::proto_asset_service_server::{ProtoAssetService, ProtoAssetServiceServer};
 
