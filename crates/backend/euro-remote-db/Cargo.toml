@@ -9,6 +9,7 @@ chrono = { workspace = true, features = ["serde"] }
 ipnet = { version = "2", features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
 sqlx = { version = "0.8.6", features = [
   "chrono",
   "ipnet",
@@ -20,4 +21,4 @@ sqlx = { version = "0.8.6", features = [
   "uuid",
 ] }
 tracing = { workspace = true }
-uuid = { workspace = true, features = ["serde", "v4"] }
+uuid = { workspace = true, features = ["serde", "v4", "v7"] }
