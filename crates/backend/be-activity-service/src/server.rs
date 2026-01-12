@@ -191,32 +191,6 @@ impl ProtoActivityService for ActivityService {
             None => Uuid::now_v7(),
         };
 
-        // Upload icon to storage if provided
-        let icon_id = match req.icon {
-            Some(icon) => {
-                let icon_response = self
-                    .asset_service
-                    .create_asset(
-                        CreateAssetRequest {
-                            name: "icon".to_string(),
-                            content: icon,
-                            mime_type: "image/png".to_string(),
-                            metadata: None,
-                            activity_id: Some(activity_id.to_string()),
-                        },
-                        user_id,
-                    )
-                    .await
-                    .map_err(ActivityServiceError::Asset)?;
-
-                match icon_response.asset {
-                    Some(asset) => Some(Uuid::parse_str(&asset.id).unwrap()),
-                    None => None,
-                }
-            }
-            None => None,
-        };
-
         let id = parse_optional_uuid(req.id.as_ref(), "activity_id")?;
 
         let started_at = req
@@ -234,7 +208,7 @@ impl ProtoActivityService for ActivityService {
                 id,
                 user_id,
                 &req.name,
-                icon_id,
+                None,
                 &req.process_name,
                 &req.window_title,
                 started_at,
@@ -243,6 +217,31 @@ impl ProtoActivityService for ActivityService {
             .await
             .map_err(ActivityServiceError::from)?;
         info!("Created activity at: {:?}", activity.created_at);
+        // Upload icon to storage if provided
+        let icon_id = match req.icon {
+            Some(icon) => {
+                let icon_response = self
+                    .asset_service
+                    .create_asset(
+                        CreateAssetRequest {
+                            name: "icon".to_string(),
+                            content: icon,
+                            mime_type: "image/png".to_string(),
+                            metadata: None,
+                            activity_id: Some(activity.id.to_string()),
+                        },
+                        user_id,
+                    )
+                    .await
+                    .map_err(ActivityServiceError::Asset)?;
+
+                match icon_response.asset {
+                    Some(asset) => Some(Uuid::parse_str(&asset.id).unwrap()),
+                    None => None,
+                }
+            }
+            None => None,
+        };
 
         debug!("Created activity {} for user {}", activity.id, user_id);
 
