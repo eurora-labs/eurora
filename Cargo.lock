@@ -1441,13 +1441,13 @@ name = "be-activity-service"
 version = "0.0.0"
 dependencies = [
  "activity-models",
- "anyhow",
  "be-auth-grpc",
  "be-storage",
  "chrono",
  "euro-remote-db",
  "prost",
  "prost-types",
+ "thiserror 2.0.17",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",

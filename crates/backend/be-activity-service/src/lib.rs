@@ -10,7 +10,14 @@
 //!   implementation. This feature adds dependencies on `auth-core` and
 //!   `euro-remote-db`. Without this feature, only the proto types and
 //!   client are available.
+//!
+//! ## Error Handling
+//!
+//! The crate uses [`ActivityServiceError`] for all error conditions, which
+//! automatically converts to appropriate gRPC [`tonic::Status`] codes.
 
+mod error;
 mod server;
 
+pub use error::{ActivityResult, ActivityServiceError};
 pub use server::{ActivityService, ProtoActivityService, ProtoActivityServiceServer};
