@@ -17,6 +17,10 @@
 //! - `ASSET_STORAGE_S3_ACCESS_KEY_ID`: AWS access key ID (optional, uses default credentials if not set)
 //! - `ASSET_STORAGE_S3_SECRET_ACCESS_KEY`: AWS secret access key (optional)
 
+mod error;
+
+pub use error::{StorageError, StorageResult};
+
 use opendal::{Operator, services};
 use sha2::{Digest, Sha256};
 use tracing::{debug, info};
@@ -47,7 +51,12 @@ impl Default for StorageConfig {
 
 impl StorageConfig {
     /// Create configuration from environment variables
-    pub fn from_env() -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::MissingEnvVar` if required environment variables
+    /// are not set when using S3 backend.
+    pub fn from_env() -> StorageResult<Self> {
         let backend = std::env::var("ASSET_STORAGE_BACKEND")
             .unwrap_or_else(|_| "fs".to_string())
             .to_lowercase();
@@ -55,25 +64,25 @@ impl StorageConfig {
         match backend.as_str() {
             "s3" => {
                 let bucket = std::env::var("ASSET_STORAGE_S3_BUCKET")
-                    .expect("ASSET_STORAGE_S3_BUCKET is required for S3 backend");
+                    .map_err(|_| StorageError::missing_env_var("ASSET_STORAGE_S3_BUCKET"))?;
                 let region = std::env::var("ASSET_STORAGE_S3_REGION")
-                    .expect("ASSET_STORAGE_S3_REGION is required for S3 backend");
+                    .map_err(|_| StorageError::missing_env_var("ASSET_STORAGE_S3_REGION"))?;
                 let endpoint = std::env::var("ASSET_STORAGE_S3_ENDPOINT").ok();
                 let access_key_id = std::env::var("ASSET_STORAGE_S3_ACCESS_KEY_ID").ok();
                 let secret_access_key = std::env::var("ASSET_STORAGE_S3_SECRET_ACCESS_KEY").ok();
 
-                StorageConfig::S3 {
+                Ok(StorageConfig::S3 {
                     bucket,
                     region,
                     endpoint,
                     access_key_id,
                     secret_access_key,
-                }
+                })
             }
             _ => {
                 let root = std::env::var("ASSET_STORAGE_FS_ROOT")
                     .unwrap_or_else(|_| "./assets".to_string());
-                StorageConfig::Filesystem { root }
+                Ok(StorageConfig::Filesystem { root })
             }
         }
     }
@@ -88,20 +97,28 @@ pub struct StorageService {
 
 impl StorageService {
     /// Create a new storage service with the given configuration
-    pub fn new(config: StorageConfig) -> anyhow::Result<Self> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the storage operator cannot be created.
+    pub fn new(config: StorageConfig) -> StorageResult<Self> {
         let operator = Self::create_operator(&config)?;
         Ok(Self { operator, config })
     }
 
     /// Create a new storage service using environment variables for configuration
-    pub fn from_env() -> anyhow::Result<Self> {
-        let config = StorageConfig::from_env();
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or the operator cannot be created.
+    pub fn from_env() -> StorageResult<Self> {
+        let config = StorageConfig::from_env()?;
         info!("Initializing storage service with config: {:?}", config);
         Self::new(config)
     }
 
     /// Create an OpenDAL operator based on the configuration
-    fn create_operator(config: &StorageConfig) -> anyhow::Result<Operator> {
+    fn create_operator(config: &StorageConfig) -> StorageResult<Operator> {
         match config {
             StorageConfig::Filesystem { root } => {
                 debug!("Creating filesystem storage operator with root: {}", root);
@@ -191,13 +208,17 @@ impl StorageService {
     }
 
     /// Upload content to storage and return the path
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the upload operation fails.
     pub async fn upload(
         &self,
         user_id: &Uuid,
         asset_id: &Uuid,
         content: &[u8],
         mime_type: &str,
-    ) -> anyhow::Result<String> {
+    ) -> StorageResult<String> {
         let extension = Self::extension_from_mime(mime_type);
         let path = Self::generate_path(user_id, asset_id, Some(extension));
 
@@ -221,10 +242,20 @@ impl StorageService {
     }
 
     /// Download content from storage
-    pub async fn download(&self, path: &str) -> anyhow::Result<Vec<u8>> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the download operation fails or the asset is not found.
+    pub async fn download(&self, path: &str) -> StorageResult<Vec<u8>> {
         debug!("Downloading asset from path: {}", path);
 
-        let content = self.operator.read(path).await?.to_vec();
+        let content = self.operator.read(path).await.map_err(|e| {
+            if e.kind() == opendal::ErrorKind::NotFound {
+                StorageError::not_found(path)
+            } else {
+                StorageError::from(e)
+            }
+        })?;
 
         debug!(
             "Successfully downloaded {} bytes from {}",
@@ -232,11 +263,15 @@ impl StorageService {
             path
         );
 
-        Ok(content)
+        Ok(content.to_vec())
     }
 
     /// Delete content from storage
-    pub async fn delete(&self, path: &str) -> anyhow::Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the delete operation fails.
+    pub async fn delete(&self, path: &str) -> StorageResult<()> {
         debug!("Deleting asset at path: {}", path);
 
         self.operator.delete(path).await?;
@@ -247,7 +282,11 @@ impl StorageService {
     }
 
     /// Check if content exists at path
-    pub async fn exists(&self, path: &str) -> anyhow::Result<bool> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stat operation fails (other than NotFound).
+    pub async fn exists(&self, path: &str) -> StorageResult<bool> {
         match self.operator.stat(path).await {
             Ok(_) => Ok(true),
             Err(e) if e.kind() == opendal::ErrorKind::NotFound => Ok(false),
