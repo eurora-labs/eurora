@@ -24,15 +24,21 @@ mod storage;
 mod tests {
     use super::*;
 
+    fn init_crypto_provider() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+
     #[tokio::test]
     async fn test_new_api() {
-        let timeline = TimelineManager::new();
+        init_crypto_provider();
+        let timeline = TimelineManager::new().await;
         assert!(!timeline.is_running());
         assert!(timeline.is_empty().await);
     }
 
     #[tokio::test]
     async fn test_config_builder() {
+        init_crypto_provider();
         let config = TimelineConfig::builder()
             .max_activities(100)
             .collection_interval(std::time::Duration::from_secs(5))
@@ -40,17 +46,21 @@ mod tests {
 
         assert!(config.validate().is_ok());
 
-        let timeline =
-            TimelineManager::with_config(config).expect("Failed to create timeline manager");
+        let timeline = TimelineManager::with_config(config)
+            .await
+            .expect("Failed to create timeline manager");
         assert_eq!(timeline.get_config().storage.max_activities, 100);
     }
 
     #[tokio::test]
     async fn test_convenience_functions() {
-        let timeline1 = TimelineManager::new();
+        init_crypto_provider();
+        let timeline1 = TimelineManager::new().await;
         assert!(!timeline1.is_running());
 
-        let timeline2 = create_timeline(500, 5).expect("Failed to create timeline manager");
+        let timeline2 = create_timeline(500, 5)
+            .await
+            .expect("Failed to create timeline manager");
         assert_eq!(timeline2.get_config().storage.max_activities, 500);
     }
 }
