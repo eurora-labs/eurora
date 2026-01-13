@@ -5,7 +5,6 @@ edition.workspace = true
 description = "Asset Service - Logic for managing file assets"
 
 [dependencies]
-asset-models = { workspace = true }
 base64 = { workspace = true }
 be-auth-grpc = { workspace = true }
 be-remote-db = { workspace = true }
@@ -13,6 +12,7 @@ be-storage = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 hex = { workspace = true }
 prost-types = { workspace = true }
+proto-gen = { workspace = true, features = ["server"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

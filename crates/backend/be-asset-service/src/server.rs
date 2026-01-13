@@ -14,7 +14,7 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::error::{AssetServiceError, Result};
-use crate::proto::{
+use proto_gen::asset::{
     ActivityAssetResponse, AssetResponse, CreateAssetRequest, DeleteAssetRequest,
     FindAssetBySha256Request, GetAssetRequest, GetAssetsByActivityIdRequest,
     GetAssetsByMessageIdRequest, LinkAssetToActivityRequest, LinkAssetToMessageRequest,
@@ -22,7 +22,9 @@ use crate::proto::{
     UnlinkAssetFromMessageRequest, UpdateAssetRequest,
 };
 
-pub use crate::proto::proto_asset_service_server::{ProtoAssetService, ProtoAssetServiceServer};
+pub use proto_gen::asset::proto_asset_service_server::{
+    ProtoAssetService, ProtoAssetServiceServer,
+};
 
 /// The main assets service
 #[derive(Debug)]

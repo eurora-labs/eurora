@@ -5,7 +5,7 @@ use be_asset_service::{AssetService, ProtoAssetServiceServer};
 use be_auth_service::AuthService;
 use be_prompt_service::PromptService;
 use dotenv::dotenv;
-use euro_proto::proto_auth_service::proto_auth_service_server::ProtoAuthServiceServer;
+use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 // use euro_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
 use be_auth_grpc::JwtInterceptor;
 use be_remote_db::DatabaseManager;

@@ -12,11 +12,11 @@ bcrypt = "0.17"
 be-auth-grpc = { workspace = true }
 be-remote-db = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-euro-proto = { workspace = true }
 hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 oauth2 = "5.0.0"
 prost = { workspace = true }
+proto-gen = { workspace = true, features = ["server"] }
 rand = { workspace = true }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { workspace = true, features = ["derive"] }
