@@ -757,10 +757,7 @@ impl DatabaseManager {
     }
 
     /// List activities for a user with pagination
-    pub async fn list_activities(
-        &self,
-        request: ListActivitiesRequest,
-    ) -> DbResult<(Vec<Activity>, u64)> {
+    pub async fn list_activities(&self, request: ListActivitiesRequest) -> DbResult<Vec<Activity>> {
         // Clamp limit to max 100
         let limit = request.limit.clamp(1, 100);
 
@@ -779,17 +776,7 @@ impl DatabaseManager {
         .fetch_all(&self.pool)
         .await?;
 
-        // Get total count
-        let count: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM activities WHERE user_id = $1
-            "#,
-        )
-        .bind(request.user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok((activities, count.0 as u64))
+        Ok(activities)
     }
 
     /// Update an existing activity
@@ -887,7 +874,7 @@ impl DatabaseManager {
     pub async fn get_activities_by_time_range(
         &self,
         request: GetActivitiesByTimeRangeRequest,
-    ) -> DbResult<(Vec<Activity>, u64)> {
+    ) -> DbResult<Vec<Activity>> {
         // Clamp limit to max 100
         let limit = request.limit.clamp(1, 100);
 
@@ -910,22 +897,7 @@ impl DatabaseManager {
         .fetch_all(&self.pool)
         .await?;
 
-        // Get total count for the time range
-        let count: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM activities
-            WHERE user_id = $1
-              AND started_at >= $2
-              AND started_at <= $3
-            "#,
-        )
-        .bind(request.user_id)
-        .bind(request.start_time)
-        .bind(request.end_time)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok((activities, count.0 as u64))
+        Ok(activities)
     }
 
     // =========================================================================
@@ -1007,7 +979,7 @@ impl DatabaseManager {
         user_id: Uuid,
         limit: u32,
         offset: u32,
-    ) -> DbResult<(Vec<Asset>, u64)> {
+    ) -> DbResult<Vec<Asset>> {
         // Clamp limit to max 100
         let limit = limit.clamp(1, 100);
 
@@ -1026,17 +998,7 @@ impl DatabaseManager {
         .fetch_all(&self.pool)
         .await?;
 
-        // Get total count
-        let count: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM assets WHERE user_id = $1
-            "#,
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok((assets, count.0 as u64))
+        Ok(assets)
     }
 
     /// Update an asset
@@ -1316,7 +1278,7 @@ impl DatabaseManager {
     pub async fn list_conversations(
         &self,
         request: ListConversationsRequest,
-    ) -> DbResult<(Vec<Conversation>, u64)> {
+    ) -> DbResult<Vec<Conversation>> {
         // Clamp limit to max 100
         let limit = request.limit.clamp(1, 100);
 
@@ -1335,17 +1297,7 @@ impl DatabaseManager {
         .fetch_all(&self.pool)
         .await?;
 
-        // Get total count
-        let count: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM conversations WHERE user_id = $1
-            "#,
-        )
-        .bind(request.user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok((conversations, count.0 as u64))
+        Ok(conversations)
     }
 
     /// Update an existing conversation
@@ -1493,10 +1445,7 @@ impl DatabaseManager {
     }
 
     /// List messages for a conversation with pagination
-    pub async fn list_messages(
-        &self,
-        request: ListMessagesRequest,
-    ) -> DbResult<(Vec<Message>, u64)> {
+    pub async fn list_messages(&self, request: ListMessagesRequest) -> DbResult<Vec<Message>> {
         // Clamp limit to max 100
         let limit = request.limit.clamp(1, 100);
 
@@ -1515,17 +1464,7 @@ impl DatabaseManager {
         .fetch_all(&self.pool)
         .await?;
 
-        // Get total count
-        let count: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM messages WHERE conversation_id = $1
-            "#,
-        )
-        .bind(request.conversation_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok((messages, count.0 as u64))
+        Ok(messages)
     }
 
     /// List all messages for a conversation (no pagination, ordered by sequence_num)
@@ -1552,7 +1491,7 @@ impl DatabaseManager {
         user_id: Uuid,
         limit: u32,
         offset: u32,
-    ) -> DbResult<(Vec<Message>, u64)> {
+    ) -> DbResult<Vec<Message>> {
         // First verify the user owns the conversation
         let _ = self
             .get_conversation_for_user(conversation_id, user_id)

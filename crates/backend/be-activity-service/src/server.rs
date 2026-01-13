@@ -133,7 +133,7 @@ impl ProtoActivityService for ActivityService {
         let req = request.into_inner();
         let limit = if req.limit == 0 { 50 } else { req.limit };
 
-        let (activities, total_count) = self
+        let activities = self
             .db
             .list_activities(DbListActivitiesRequest {
                 user_id,
@@ -154,7 +154,6 @@ impl ProtoActivityService for ActivityService {
 
         Ok(Response::new(ListActivitiesResponse {
             activities: proto_activities,
-            total_count,
         }))
     }
 
@@ -408,7 +407,7 @@ impl ProtoActivityService for ActivityService {
 
         let limit = if req.limit == 0 { 50 } else { req.limit };
 
-        let (activities, total_count) = self
+        let activities = self
             .db
             .get_activities_by_time_range(DbGetActivitiesByTimeRangeRequest {
                 user_id,
@@ -431,7 +430,6 @@ impl ProtoActivityService for ActivityService {
 
         Ok(Response::new(ListActivitiesResponse {
             activities: proto_activities,
-            total_count,
         }))
     }
 }
