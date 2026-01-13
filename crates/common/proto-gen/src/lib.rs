@@ -5,22 +5,32 @@
 #![allow(clippy::all)]
 
 // Include the generated code
-pub mod generated {
-    pub mod shared {
-        tonic::include_proto!("shared");
+mod proto {
+    pub mod activity {
+        tonic::include_proto!("activity_service");
         pub use super::*;
     }
 
-    pub mod proto_auth_service {
+    pub mod asset {
+        tonic::include_proto!("asset_service");
+        pub use super::*;
+    }
+
+    pub mod auth {
         tonic::include_proto!("auth_service");
         pub use super::*;
     }
 
-    pub mod proto_prompt_service {
-        tonic::include_proto!("prompt_service");
+    pub mod conversation {
+        tonic::include_proto!("conversation_service");
+        pub use super::*;
+    }
+
+    pub mod shared {
+        tonic::include_proto!("shared");
         pub use super::*;
     }
 }
 
 // Convenience re-exports of the most commonly used types
-pub use generated::*;
+pub use proto::*;

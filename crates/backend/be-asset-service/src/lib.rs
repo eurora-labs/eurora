@@ -11,8 +11,6 @@
 //!   `be-remote-db`. Without this feature, only the proto types and
 //!   client are available.
 
-use asset_models::proto;
-
 pub mod error;
 mod server;
 
