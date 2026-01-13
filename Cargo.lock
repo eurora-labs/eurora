@@ -290,18 +290,15 @@ dependencies = [
  "async-stream",
  "async-trait",
  "futures",
- "prost 0.14.1",
- "prost-types 0.14.1",
- "proto-gen",
+ "prost",
+ "prost-types",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
  "tokio",
  "tonic",
- "tonic-async-interceptor",
  "tonic-prost",
  "tonic-prost-build",
- "tower",
  "tracing",
  "url",
 ]
@@ -1401,8 +1398,8 @@ dependencies = [
  "be-remote-db",
  "be-storage",
  "chrono",
- "prost 0.14.1",
- "prost-types 0.14.1",
+ "prost",
+ "prost-types",
  "proto-gen",
  "thiserror 2.0.17",
  "tonic",
@@ -1417,12 +1414,11 @@ name = "be-asset"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
- "be-auth-grpc",
  "be-remote-db",
  "be-storage",
  "chrono",
  "hex",
- "prost-types 0.14.1",
+ "prost-types",
  "proto-gen",
  "serde_json",
  "thiserror 2.0.17",
@@ -1438,8 +1434,8 @@ dependencies = [
  "be-auth-grpc",
  "be-remote-db",
  "be-storage",
- "prost 0.14.1",
- "prost-types 0.14.1",
+ "prost",
+ "prost-types",
  "proto-gen",
  "thiserror 2.0.17",
  "tonic",
@@ -1481,7 +1477,7 @@ dependencies = [
  "hex",
  "jsonwebtoken",
  "oauth2",
- "prost 0.14.1",
+ "prost",
  "proto-gen",
  "rand 0.9.2",
  "reqwest 0.12.24",
@@ -1502,8 +1498,8 @@ dependencies = [
  "be-remote-db",
  "be-storage",
  "chrono",
- "prost 0.14.1",
- "prost-types 0.14.1",
+ "prost",
+ "prost-types",
  "proto-gen",
  "thiserror 2.0.17",
  "tonic",
@@ -1526,7 +1522,7 @@ dependencies = [
  "be-remote-db",
  "be-update-service",
  "dotenv",
- "prost 0.14.1",
+ "prost",
  "proto-gen",
  "sentry",
  "tokio",
@@ -1548,7 +1544,7 @@ dependencies = [
  "agent-chain-eurora",
  "anyhow",
  "be-auth-grpc",
- "prost 0.14.1",
+ "prost",
  "tokio-stream",
  "tonic",
  "tonic-prost-build",
@@ -3452,7 +3448,7 @@ dependencies = [
  "focus-tracker",
  "humantime-serde",
  "image",
- "prost-types 0.14.1",
+ "prost-types",
  "proto-gen",
  "regex",
  "resvg",
@@ -3483,8 +3479,8 @@ dependencies = [
  "euro-secret",
  "humantime-serde",
  "jsonwebtoken",
- "prost 0.14.1",
- "prost-types 0.14.1",
+ "prost",
+ "prost-types",
  "proto-gen",
  "rand 0.9.2",
  "sha2",
@@ -3510,8 +3506,8 @@ dependencies = [
  "async-trait",
  "euro-auth",
  "futures",
- "prost 0.14.1",
- "prost-types 0.14.1",
+ "prost",
+ "prost-types",
  "serde_json",
  "tonic",
  "tonic-prost",
@@ -3557,8 +3553,8 @@ dependencies = [
  "enum_dispatch",
  "futures",
  "image",
- "prost 0.14.1",
- "prost-types 0.14.1",
+ "prost",
+ "prost-types",
  "resvg",
  "serde",
  "serde_json",
@@ -3598,22 +3594,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-prompt-kit"
-version = "0.0.0"
-dependencies = [
- "agent-chain",
- "agent-chain-core",
- "agent-chain-eurora",
- "anyhow",
- "async_from",
- "euro-chat-client",
- "serde",
- "thiserror 2.0.17",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
 name = "euro-screen-position"
 version = "0.0.0"
 dependencies = [
@@ -3641,9 +3621,9 @@ dependencies = [
  "dirs 6.0.0",
  "euro-chat-client",
  "euro-fs",
- "euro-prompt-kit",
  "euro-secret",
  "notify",
+ "prompt-kit",
  "serde",
  "serde_json",
  "serde_json_lenient",
@@ -3671,7 +3651,6 @@ dependencies = [
  "euro-encrypt",
  "euro-native-messaging",
  "euro-personal-db",
- "euro-prompt-kit",
  "euro-secret",
  "euro-settings",
  "euro-timeline",
@@ -3683,6 +3662,7 @@ dependencies = [
  "log",
  "parking_lot",
  "posthog-rs",
+ "prompt-kit",
  "sentry",
  "serde",
  "serde_json",
@@ -7345,43 +7325,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 
 [[package]]
-name = "pbjson"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7e6349fa080353f4a597daffd05cb81572a9c031a6d4fff7e504947496fcc68"
-dependencies = [
- "base64 0.21.7",
- "serde",
-]
-
-[[package]]
-name = "pbjson-build"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6eea3058763d6e656105d1403cb04e0a41b7bbac6362d413e7c33be0c32279c9"
-dependencies = [
- "heck 0.5.0",
- "itertools 0.13.0",
- "prost 0.13.5",
- "prost-types 0.13.5",
-]
-
-[[package]]
-name = "pbjson-types"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e54e5e7bfb1652f95bc361d76f3c780d8e526b134b85417e774166ee941f0887"
-dependencies = [
- "bytes",
- "chrono",
- "pbjson",
- "pbjson-build",
- "prost 0.13.5",
- "prost-build 0.13.5",
- "serde",
-]
-
-[[package]]
 name = "pbkdf2"
 version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7917,13 +7860,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "prost"
-version = "0.13.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2796faa41db3ec313a31f7624d9286acf277b52de526150b7e69f3debf891ee5"
+name = "prompt-kit"
+version = "0.0.0"
 dependencies = [
- "bytes",
- "prost-derive 0.13.5",
+ "agent-chain",
+ "agent-chain-core",
+ "agent-chain-eurora",
+ "anyhow",
+ "async_from",
+ "euro-chat-client",
+ "serde",
+ "thiserror 2.0.17",
+ "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -7933,27 +7882,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7231bd9b3d3d33c86b58adbac74b5ec0ad9f496b19d22801d773636feaa95f3d"
 dependencies = [
  "bytes",
- "prost-derive 0.14.1",
-]
-
-[[package]]
-name = "prost-build"
-version = "0.13.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
-dependencies = [
- "heck 0.5.0",
- "itertools 0.14.0",
- "log",
- "multimap",
- "once_cell",
- "petgraph",
- "prettyplease",
- "prost 0.13.5",
- "prost-types 0.13.5",
- "regex",
- "syn 2.0.112",
- "tempfile",
+ "prost-derive",
 ]
 
 [[package]]
@@ -7969,26 +7898,13 @@ dependencies = [
  "once_cell",
  "petgraph",
  "prettyplease",
- "prost 0.14.1",
- "prost-types 0.14.1",
+ "prost",
+ "prost-types",
  "pulldown-cmark",
  "pulldown-cmark-to-cmark",
  "regex",
  "syn 2.0.112",
  "tempfile",
-]
-
-[[package]]
-name = "prost-derive"
-version = "0.13.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
-dependencies = [
- "anyhow",
- "itertools 0.14.0",
- "proc-macro2",
- "quote",
- "syn 2.0.112",
 ]
 
 [[package]]
@@ -8006,29 +7922,19 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.13.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52c2c1bf36ddb1a1c396b3601a3cec27c2462e45f07c386894ec3ccf5332bd16"
-dependencies = [
- "prost 0.13.5",
-]
-
-[[package]]
-name = "prost-types"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9b4db3d6da204ed77bb26ba83b6122a73aeb2e87e25fbf7ad2e84c4ccbf8f72"
 dependencies = [
- "prost 0.14.1",
+ "prost",
 ]
 
 [[package]]
 name = "proto-gen"
 version = "0.0.0"
 dependencies = [
- "pbjson-types",
- "prost 0.14.1",
- "prost-types 0.14.1",
+ "prost",
+ "prost-types",
  "serde",
  "tonic",
  "tonic-prost",
@@ -11481,7 +11387,7 @@ version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a82868bf299e0a1d2e8dce0dc33a46c02d6f045b2c1f1d6cc8dc3d0bf1812ef"
 dependencies = [
- "prost 0.14.1",
+ "prost",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -11495,7 +11401,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66bd50ad6ce1252d87ef024b3d64fe4c3cf54a86fb9ef4c631fdd0ded7aeaa67"
 dependencies = [
  "bytes",
- "prost 0.14.1",
+ "prost",
  "tonic",
 ]
 
@@ -11507,8 +11413,8 @@ checksum = "b4a16cba4043dc3ff43fcb3f96b4c5c154c64cbd18ca8dce2ab2c6a451d058a2"
 dependencies = [
  "prettyplease",
  "proc-macro2",
- "prost-build 0.14.1",
- "prost-types 0.14.1",
+ "prost-build",
+ "prost-types",
  "quote",
  "syn 2.0.112",
  "tempfile",
