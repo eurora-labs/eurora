@@ -1,0 +1,226 @@
+syntax = "proto3";
+
+package asset_service;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// =============================================================================
+// Asset Service
+// =============================================================================
+
+// Assets service provides cloud-based storage for user file assets.
+// This service manages file metadata (screenshots, attachments, etc.) with
+// actual file content stored externally (e.g., S3, filesystem).
+// This replaces the asset-related functionality in the local personal database.
+service ProtoAssetService {
+  // Create a new asset
+  rpc CreateAsset(CreateAssetRequest) returns (AssetResponse);
+
+  // Get a specific asset by ID
+  rpc GetAsset(GetAssetRequest) returns (AssetResponse);
+
+  // List assets with pagination
+  rpc ListAssets(ListAssetsRequest) returns (ListAssetsResponse);
+
+  // Update an existing asset
+  rpc UpdateAsset(UpdateAssetRequest) returns (AssetResponse);
+
+  // Delete an asset
+  rpc DeleteAsset(DeleteAssetRequest) returns (google.protobuf.Empty);
+
+  // Find asset by SHA256 hash (for deduplication)
+  rpc FindAssetBySha256(FindAssetBySha256Request) returns (AssetResponse);
+
+  // Get assets linked to a message
+  rpc GetAssetsByMessageId(GetAssetsByMessageIdRequest) returns (ListAssetsResponse);
+
+  // Get assets linked to an activity
+  rpc GetAssetsByActivityId(GetAssetsByActivityIdRequest) returns (ListAssetsResponse);
+
+  // Link an asset to a message
+  rpc LinkAssetToMessage(LinkAssetToMessageRequest) returns (MessageAssetResponse);
+
+  // Unlink an asset from a message
+  rpc UnlinkAssetFromMessage(UnlinkAssetFromMessageRequest) returns (google.protobuf.Empty);
+
+  // Link an asset to an activity
+  rpc LinkAssetToActivity(LinkAssetToActivityRequest) returns (ActivityAssetResponse);
+
+  // Unlink an asset from an activity
+  rpc UnlinkAssetFromActivity(UnlinkAssetFromActivityRequest) returns (google.protobuf.Empty);
+}
+
+// =============================================================================
+// Asset Types
+// =============================================================================
+
+// Represents a file asset (screenshots, attachments, etc.)
+message Asset {
+  // Unique identifier for the asset (UUID)
+  string id = 1;
+
+  // SHA256 hash of the file content (for deduplication) - base64 encoded
+  optional string checksum_sha256 = 2;
+
+  // Size of the asset in bytes
+  optional int64 size_bytes = 3;
+
+  // Path to the file (S3 key, local path, etc.)
+  string storage_uri = 4;
+
+  // MIME type of the asset
+  string mime_type = 5;
+
+  // Additional metadata as JSON string
+  string metadata = 6;
+
+  // When the record was created
+  google.protobuf.Timestamp created_at = 7;
+
+  // When the record was last updated
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+// Message-asset link
+message MessageAsset {
+  string message_id = 1;
+  string asset_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+// Activity-asset link
+message ActivityAsset {
+  string activity_id = 1;
+  string asset_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+// =============================================================================
+// Asset Requests/Responses
+// =============================================================================
+
+message CreateAssetRequest {
+  // File name of the asset - required
+  string name = 1;
+
+  // File content as bytes
+  bytes content = 2;
+
+  // MIME type of the asset - required
+  string mime_type = 3;
+
+  // Additional metadata as JSON string
+  optional string metadata = 4;
+
+  // Optional activity ID to link asset to
+  optional string activity_id = 5;
+}
+
+message GetAssetRequest {
+  // Asset ID to retrieve
+  string id = 1;
+}
+
+message ListAssetsRequest {
+  // Maximum number of assets to return (default: 50, max: 100)
+  uint32 limit = 1;
+
+  // Offset for pagination
+  uint32 offset = 2;
+}
+
+message UpdateAssetRequest {
+  // Asset ID to update
+  string id = 1;
+
+  // Updated SHA256 hash (optional) - base64 encoded
+  optional string checksum_sha256 = 2;
+
+  // Updated byte size (optional)
+  optional int64 size_bytes = 3;
+
+  // Updated file path (optional)
+  optional string storage_uri = 4;
+
+  // Updated MIME type (optional)
+  optional string mime_type = 5;
+
+  // Updated metadata as JSON string (optional)
+  optional string metadata = 6;
+}
+
+message DeleteAssetRequest {
+  // Asset ID to delete
+  string id = 1;
+}
+
+message FindAssetBySha256Request {
+  // SHA256 hash to search for - base64 encoded
+  string checksum_sha256 = 1;
+}
+
+message GetAssetsByMessageIdRequest {
+  // Message ID to get assets for
+  string message_id = 1;
+}
+
+message GetAssetsByActivityIdRequest {
+  // Activity ID to get assets for
+  string activity_id = 1;
+}
+
+message LinkAssetToMessageRequest {
+  // Message ID to link asset to
+  string message_id = 1;
+
+  // Asset ID to link
+  string asset_id = 2;
+}
+
+message UnlinkAssetFromMessageRequest {
+  // Message ID to unlink asset from
+  string message_id = 1;
+
+  // Asset ID to unlink
+  string asset_id = 2;
+}
+
+message LinkAssetToActivityRequest {
+  // Activity ID to link asset to
+  string activity_id = 1;
+
+  // Asset ID to link
+  string asset_id = 2;
+}
+
+message UnlinkAssetFromActivityRequest {
+  // Activity ID to unlink asset from
+  string activity_id = 1;
+
+  // Asset ID to unlink
+  string asset_id = 2;
+}
+
+message AssetResponse {
+  // The asset (may be null for FindAssetBySha256 if not found)
+  optional Asset asset = 1;
+}
+
+message ListAssetsResponse {
+  // List of assets
+  repeated Asset assets = 1;
+
+  // Total count of assets matching the query (for pagination)
+  uint64 total_count = 2;
+}
+
+message MessageAssetResponse {
+  // The message-asset link
+  MessageAsset message_asset = 1;
+}
+
+message ActivityAssetResponse {
+  // The activity-asset link
+  ActivityAsset activity_asset = 1;
+}
