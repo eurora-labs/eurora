@@ -3515,6 +3515,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-conversation"
+version = "0.0.0"
+dependencies = [
+ "agent-chain-core",
+ "agent-chain-eurora",
+ "anyhow",
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "euro-auth",
+ "futures",
+ "prost",
+ "prost-types",
+ "proto-gen",
+ "serde",
+ "serde_json",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "uuid",
+]
+
+[[package]]
 name = "euro-encrypt"
 version = "0.0.0"
 dependencies = [
@@ -3648,6 +3671,7 @@ dependencies = [
  "dotenv",
  "euro-activity",
  "euro-chat-client",
+ "euro-conversation",
  "euro-encrypt",
  "euro-native-messaging",
  "euro-personal-db",

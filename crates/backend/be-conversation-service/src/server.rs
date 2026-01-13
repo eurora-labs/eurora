@@ -16,7 +16,8 @@ use uuid::Uuid;
 use crate::error::ConversationServiceError;
 
 use proto_gen::conversation::{
-    Conversation, CreateConversationRequest, CreateConversationResponse,
+    Conversation, CreateConversationRequest, CreateConversationResponse, ListConversationsRequest,
+    ListConversationsResponse,
 };
 
 pub use proto_gen::conversation::proto_conversation_service_server::{
@@ -106,5 +107,12 @@ impl ProtoConversationService for ConversationService {
         Ok(Response::new(CreateConversationResponse {
             conversation: Some(Self::db_conversation_to_proto(&conversation)),
         }))
+    }
+
+    async fn list_conversations(
+        &self,
+        _request: Request<ListConversationsRequest>,
+    ) -> Result<Response<ListConversationsResponse>, Status> {
+        todo!()
     }
 }
