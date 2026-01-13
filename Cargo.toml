@@ -55,6 +55,7 @@ enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
 euro-chat-client = { path = "crates/app/euro-chat-client" }
+euro-conversation = { path = "crates/app/euro-conversation" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-fs = { path = "crates/app/euro-fs" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
