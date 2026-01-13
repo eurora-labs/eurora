@@ -170,7 +170,4 @@ message ActivityResponse {
 message ListActivitiesResponse {
   // List of activities
   repeated Activity activities = 1;
-
-  // Total count of activities matching the query (for pagination)
-  uint64 total_count = 2;
 }
