@@ -27,7 +27,7 @@ impl ConversationManager {
     }
 
     pub async fn create_empty_conversation(&self) -> Result<Conversation, Status> {
-        let conversation = Conversation::new();
+        let conversation = Conversation::default();
         Ok(conversation)
     }
 
