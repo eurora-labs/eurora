@@ -1461,6 +1461,7 @@ dependencies = [
  "be-auth-core",
  "tonic",
  "tonic-prost",
+ "uuid",
 ]
 
 [[package]]

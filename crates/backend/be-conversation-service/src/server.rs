@@ -3,15 +3,14 @@
 //! This module contains the gRPC server implementation and is only
 //! available when the `server` feature is enabled.
 
-use std::sync::Arc;
-
-use be_auth_grpc::Claims;
+use be_auth_grpc::{Claims, extract_claims};
 use be_remote_db::{
     CreateConversationRequest as DbCreateConversationRequest, DatabaseManager,
     ListConversationsRequest as DbListConversationsRequest,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
+use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::info;
 use uuid::Uuid;
@@ -58,14 +57,6 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
         seconds: dt.timestamp(),
         nanos: dt.timestamp_subsec_nanos() as i32,
     }
-}
-
-/// Extract and validate claims from a gRPC request.
-fn extract_claims<T>(request: &Request<T>) -> Result<&Claims, ConversationServiceError> {
-    request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| ConversationServiceError::unauthenticated("Missing claims"))
 }
 
 /// Parse a user ID from claims.
