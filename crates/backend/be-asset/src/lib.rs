@@ -257,7 +257,7 @@ impl AssetService {
 
         let limit = if req.limit == 0 { 50 } else { req.limit };
 
-        let (assets, total_count) = self
+        let assets = self
             .db
             .list_assets(user_id, limit, req.offset)
             .await
@@ -272,7 +272,6 @@ impl AssetService {
 
         Ok(ListAssetsResponse {
             assets: proto_assets,
-            total_count,
         })
     }
 
@@ -414,7 +413,6 @@ impl AssetService {
 
         Ok(ListAssetsResponse {
             assets: proto_assets,
-            total_count,
         })
     }
 
@@ -447,7 +445,6 @@ impl AssetService {
 
         Ok(ListAssetsResponse {
             assets: proto_assets,
-            total_count,
         })
     }
 
