@@ -13,8 +13,8 @@ pub struct Conversation {
     updated_at: DateTime<Utc>,
 }
 
-impl Conversation {
-    pub fn new() -> Self {
+impl Default for Conversation {
+    fn default() -> Self {
         let title = "New Chat".to_string();
         let created_at = Utc::now();
         let updated_at = created_at;
