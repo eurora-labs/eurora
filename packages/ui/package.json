@@ -63,7 +63,7 @@
 		"eslint-plugin-svelte": "^2.46.1",
 		"globals": "^15.14.0",
 		"jsdom": "^25.0.1",
-		"layerchart": "2.0.0-next.43",
+		"layerchart": "2.0.0-next.44",
 		"mode-watcher": "^1.1.0",
 		"paneforge": "1.0.2",
 		"postcss": "catalog:",
