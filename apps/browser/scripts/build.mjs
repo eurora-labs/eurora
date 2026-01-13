@@ -11,7 +11,7 @@ import { pipeline } from 'node:stream/promises';
 const PDFJS_CACHE_DIR = '.pdfjs-viewer';
 const PDFJS_TEMP_DIR = '.pdfjs-temp';
 const VERSION_FILE = path.join(PDFJS_CACHE_DIR, '.version');
-const PDFJS_VERSION = '5.4.496';
+const PDFJS_VERSION = '5.4.551';
 
 async function main() {
 	const browser = process.env['BROWSER'] ?? 'chrome'; // chrome | firefox | safari
