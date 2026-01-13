@@ -6,7 +6,6 @@ description = "Asset Service - Logic for managing file assets"
 
 [dependencies]
 base64 = { workspace = true }
-be-auth-grpc = { workspace = true }
 be-remote-db = { workspace = true }
 be-storage = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
