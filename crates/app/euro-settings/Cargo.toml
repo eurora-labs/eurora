@@ -11,9 +11,9 @@ async_from = { workspace = true }
 dirs = { workspace = true }
 euro-chat-client = { workspace = true }
 euro-fs = { workspace = true }
-euro-prompt-kit = { workspace = true }
 euro-secret = { workspace = true }
 notify = { version = "8.2.0" }
+prompt-kit = { workspace = true }
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 serde_json_lenient = { workspace = true }
