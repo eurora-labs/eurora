@@ -14,8 +14,8 @@ be-prompt-service = { workspace = true }
 be-remote-db = { workspace = true }
 be-update-service = { workspace = true }
 dotenv = { workspace = true }
-euro-proto = { workspace = true }
 prost = { workspace = true }
+proto-gen = { workspace = true }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 tonic = { workspace = true }

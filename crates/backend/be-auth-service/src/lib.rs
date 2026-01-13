@@ -13,13 +13,13 @@ use be_remote_db::{
     CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
     CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
 };
-use euro_proto::proto_auth_service::{
+use oauth2::TokenResponse as OAuth2TokenResponse;
+use proto_gen::auth::{
     EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
     Provider, RefreshTokenRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
     ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse, login_request::Credential,
     proto_auth_service_server::ProtoAuthService,
 };
-use oauth2::TokenResponse as OAuth2TokenResponse;
 use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
 use tonic::{Request, Response, Status};

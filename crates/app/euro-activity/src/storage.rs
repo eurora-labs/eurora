@@ -1,17 +1,15 @@
 //! Asset storage functionality for saving activity assets to disk and remote service
-use activity_models::proto::{
-    ActivityResponse, InsertActivityRequest,
-    proto_activity_service_client::ProtoActivityServiceClient,
-};
-use asset_models::proto::{
-    CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient,
-};
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use euro_auth::AuthedChannel;
 use euro_encrypt::{MainKey, encrypt_file_contents};
 use euro_fs::create_dirs_then_write;
 use prost_types::Timestamp;
+use proto_gen::activity::{
+    ActivityResponse, InsertActivityRequest,
+    proto_activity_service_client::ProtoActivityServiceClient,
+};
+use proto_gen::asset::{CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient};
 use serde::{Deserialize, Serialize};
 use std::{
     io::Cursor,

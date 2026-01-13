@@ -5,7 +5,6 @@
 
 use std::sync::Arc;
 
-use asset_models::proto::CreateAssetRequest;
 use be_asset::AssetService;
 use be_auth_grpc::Claims;
 use be_remote_db::{
@@ -17,19 +16,20 @@ use be_remote_db::{
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
+use proto_gen::asset::CreateAssetRequest;
 use tonic::{Request, Response, Status};
 use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::error::{ActivityResult, ActivityServiceError};
 
-use activity_models::proto::{
+use proto_gen::activity::{
     Activity, ActivityResponse, DeleteActivityRequest, GetActivitiesByTimeRangeRequest,
     GetActivityRequest, InsertActivityRequest, ListActivitiesRequest, ListActivitiesResponse,
     UpdateActivityEndTimeRequest, UpdateActivityRequest,
 };
 
-pub use activity_models::proto::proto_activity_service_server::{
+pub use proto_gen::activity::proto_activity_service_server::{
     ProtoActivityService, ProtoActivityServiceServer,
 };
 
