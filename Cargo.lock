@@ -3814,17 +3814,12 @@ name = "euro-user"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "auth-core",
- "base64 0.22.1",
  "chrono",
- "euro-proto-client",
+ "euro-auth",
  "euro-secret",
  "euro-storage",
- "rand 0.9.2",
  "serde",
  "serde_json",
- "sha2",
- "tracing",
  "uuid",
 ]
 
