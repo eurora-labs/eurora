@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use be_asset::AssetService;
-use be_auth_grpc::Claims;
+use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
     CreateActivityRequest as DbCreateActivityRequest, DatabaseManager,
     GetActivitiesByTimeRangeRequest as DbGetActivitiesByTimeRangeRequest,
@@ -89,19 +89,6 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
 /// Convert prost_types::Timestamp to DateTime<Utc>
 fn timestamp_to_datetime(ts: &Timestamp) -> Option<DateTime<Utc>> {
     DateTime::from_timestamp(ts.seconds, ts.nanos as u32)
-}
-
-/// Extract and validate claims from a gRPC request.
-fn extract_claims<T>(request: &Request<T>) -> Result<&Claims, ActivityServiceError> {
-    request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| ActivityServiceError::unauthenticated("Missing claims"))
-}
-
-/// Parse a user ID from claims.
-fn parse_user_id(claims: &Claims) -> Result<Uuid, ActivityServiceError> {
-    Uuid::parse_str(&claims.sub).map_err(|e| ActivityServiceError::invalid_uuid("user_id", e))
 }
 
 /// Parse an activity ID from a string.
