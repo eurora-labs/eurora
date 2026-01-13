@@ -29,7 +29,7 @@
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",
 		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
-		"proto:rust": "cargo build -p euro-proto",
+		"proto:rust": "cargo build -p proto-gen",
 		"prettier": "prettier --check",
 		"fix": "eslint --fix .",
 		"format": "prettier --write .",
