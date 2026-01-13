@@ -34,6 +34,7 @@ color-thief = "0.2.2"
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-chat-client = { workspace = true }
+euro-conversation = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true, features = ["specta"] }

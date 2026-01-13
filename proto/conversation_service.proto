@@ -6,6 +6,7 @@ import "google/protobuf/timestamp.proto";
 
 service ProtoConversationService {
   rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
 }
 
 message CreateConversationRequest {
@@ -23,4 +24,16 @@ message Conversation {
 
 message CreateConversationResponse {
   Conversation conversation = 1;
+}
+
+message ListConversationsRequest {
+  // Maximum number of conversations to return
+  uint32 limit = 1;
+
+  // Offset for pagination
+  uint32 offset = 2;
+}
+
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
 }
