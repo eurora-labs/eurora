@@ -1,7 +1,7 @@
 //! Authentication procedures for the Tauri application.
 
 use agent_chain_eurora::EuroraConfig;
-use async_from::AsyncTryFrom;
+use euro_prompt_kit::PromptKitService;
 use euro_secret::{Sensitive, secret};
 use tauri::{AppHandle, Manager, Runtime};
 use tracing::error;
@@ -98,10 +98,10 @@ impl AuthApi for AuthApiImpl {
                         .map_err(|e| format!("Failed to save settings: {}", e))?;
 
                     // TODO: re-enable remote eurora provider
-                    let promptkit_client =
-                        euro_prompt_kit::PromptKitService::async_try_from(config)
-                            .await
-                            .map_err(|e| e.to_string())?;
+                    let promptkit_client: PromptKitService = euro_chat_client::ChatEurora::new()
+                        .await
+                        .expect("Failed to initialize ChatEurora")
+                        .into();
 
                     TauRpcPromptApiEventTrigger::new(app_handle.clone())
                         .prompt_service_change(Some(
