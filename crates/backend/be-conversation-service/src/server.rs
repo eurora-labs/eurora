@@ -6,7 +6,10 @@
 use std::sync::Arc;
 
 use be_auth_grpc::Claims;
-use be_remote_db::{CreateConversationRequest as DbCreateConversationRequest, DatabaseManager};
+use be_remote_db::{
+    CreateConversationRequest as DbCreateConversationRequest, DatabaseManager,
+    ListConversationsRequest as DbListConversationsRequest,
+};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use tonic::{Request, Response, Status};
@@ -38,7 +41,7 @@ impl ConversationService {
     }
 
     /// Convert a database Conversation to a proto Conversation
-    fn db_conversation_to_proto(conversation: &be_remote_db::Conversation) -> Conversation {
+    fn db_conversation_to_proto(conversation: be_remote_db::Conversation) -> Conversation {
         Conversation {
             id: conversation.id.to_string(),
             user_id: conversation.user_id.to_string(),
@@ -105,14 +108,42 @@ impl ProtoConversationService for ConversationService {
         );
 
         Ok(Response::new(CreateConversationResponse {
-            conversation: Some(Self::db_conversation_to_proto(&conversation)),
+            conversation: Some(Self::db_conversation_to_proto(conversation)),
         }))
     }
 
     async fn list_conversations(
         &self,
-        _request: Request<ListConversationsRequest>,
+        request: Request<ListConversationsRequest>,
     ) -> Result<Response<ListConversationsResponse>, Status> {
-        todo!()
+        info!("ListConversations request received");
+
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+
+        let req = request.into_inner();
+
+        let conversations = self
+            .db
+            .list_conversations(DbListConversationsRequest {
+                user_id,
+                limit: req.limit,
+                offset: req.offset,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        info!(
+            "Listed {} conversations for user {}",
+            conversations.len(),
+            user_id
+        );
+
+        Ok(Response::new(ListConversationsResponse {
+            conversations: conversations
+                .into_iter()
+                .map(Self::db_conversation_to_proto)
+                .collect(),
+        }))
     }
 }
