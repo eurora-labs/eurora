@@ -307,29 +307,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "agent-chain-grpc"
-version = "0.0.0"
-dependencies = [
- "agent-chain-core",
- "async-stream",
- "async-trait",
- "futures",
- "prost 0.14.1",
- "prost-types 0.14.1",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tonic",
- "tonic-async-interceptor",
- "tonic-prost",
- "tonic-prost-build",
- "tower",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "agent-chain-macros"
 version = "0.0.2"
 dependencies = [
@@ -1568,7 +1545,7 @@ version = "0.0.0"
 dependencies = [
  "agent-chain",
  "agent-chain-core",
- "agent-chain-grpc",
+ "agent-chain-eurora",
  "anyhow",
  "be-auth-grpc",
  "prost 0.14.1",
@@ -3527,7 +3504,7 @@ name = "euro-chat-client"
 version = "0.0.0"
 dependencies = [
  "agent-chain-core",
- "agent-chain-grpc",
+ "agent-chain-eurora",
  "anyhow",
  "async-stream",
  "async-trait",
@@ -3626,7 +3603,7 @@ version = "0.0.0"
 dependencies = [
  "agent-chain",
  "agent-chain-core",
- "agent-chain-grpc",
+ "agent-chain-eurora",
  "anyhow",
  "async_from",
  "euro-chat-client",
