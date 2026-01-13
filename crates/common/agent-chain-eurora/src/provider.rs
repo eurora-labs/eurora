@@ -3,8 +3,6 @@
 //! This module provides the `ChatEurora` struct which implements the
 //! `ChatModel` trait for the Eurora gRPC service.
 
-use std::pin::Pin;
-
 use agent_chain_core::callbacks::{
     AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun, Callbacks,
 };
@@ -18,63 +16,15 @@ use agent_chain_core::{
 };
 use async_trait::async_trait;
 use futures::StreamExt;
-use tonic::{
-    Request, Status,
-    transport::{Channel, ClientTlsConfig, Endpoint},
-};
-use tonic_async_interceptor::{AsyncInterceptor, async_interceptor};
-use tower::ServiceBuilder;
-use tracing::{debug, error};
+use tonic::{Request, transport::Channel};
 
 use crate::{
     config::EuroraConfig,
     error::EuroraError,
-    proto::chat::{
-        ProtoChatRequest, ProtoParameters, proto_chat_service_client::ProtoChatServiceClient,
-    },
+    proto::{ProtoChatRequest, ProtoParameters, proto_chat_service_client::ProtoChatServiceClient},
 };
 
-/// Auth interceptor for adding authentication headers to gRPC requests.
-#[derive(Clone)]
-struct AuthInterceptor {
-    auth: euro_user::AuthManager,
-}
-
-impl AuthInterceptor {
-    pub fn new(auth: euro_user::AuthManager) -> Self {
-        Self { auth }
-    }
-}
-
-impl AsyncInterceptor for AuthInterceptor {
-    type Future = Pin<Box<dyn std::future::Future<Output = Result<Request<()>, Status>> + Send>>;
-
-    fn call(&mut self, mut request: Request<()>) -> Self::Future {
-        let auth = self.auth.clone();
-        debug!("AuthInterceptor called");
-        Box::pin(async move {
-            let access_token = auth.get_or_refresh_access_token().await.map_err(|e| {
-                Status::unauthenticated(format!("Failed to retrieve access token: {}", e))
-            })?;
-            let header: String = format!("Bearer {}", access_token.0);
-
-            match header.parse() {
-                Ok(value) => {
-                    request.metadata_mut().insert("authorization", value);
-                    Ok(request)
-                }
-                Err(err) => {
-                    error!("Failed to parse authorization header: {}", err);
-                    Ok(request)
-                }
-            }
-        })
-    }
-}
-
-type EuroraGrpcClient = ProtoChatServiceClient<
-    tonic_async_interceptor::AsyncInterceptedService<Channel, AuthInterceptor>,
->;
+type EuroraGrpcClient = ProtoChatServiceClient<Channel>;
 
 /// Eurora gRPC chat model.
 ///
@@ -130,9 +80,8 @@ impl ChatEurora {
     /// # Returns
     ///
     /// A new `ChatEurora` instance, or an error if connection fails.
-    pub async fn new(config: EuroraConfig) -> Result<Self, EuroraError> {
+    pub async fn new(config: EuroraConfig, client: EuroraGrpcClient) -> Result<Self, EuroraError> {
         config.validate()?;
-        let client = Self::create_client(&config).await?;
 
         Ok(Self {
             client,
@@ -149,61 +98,61 @@ impl ChatEurora {
         })
     }
 
-    /// Create a gRPC client from the configuration.
-    async fn create_client(config: &EuroraConfig) -> Result<EuroraGrpcClient, EuroraError> {
-        // Convert URL to URI
-        let uri = config
-            .endpoint
-            .to_string()
-            .parse::<tonic::transport::Uri>()
-            .map_err(|e| EuroraError::InvalidConfig(format!("Invalid endpoint URI: {}", e)))?;
+    // /// Create a gRPC client from the configuration.
+    // async fn create_client(config: &EuroraConfig) -> Result<EuroraGrpcClient, EuroraError> {
+    //     // Convert URL to URI
+    //     let uri = config
+    //         .endpoint
+    //         .to_string()
+    //         .parse::<tonic::transport::Uri>()
+    //         .map_err(|e| EuroraError::InvalidConfig(format!("Invalid endpoint URI: {}", e)))?;
 
-        let mut endpoint = Endpoint::from(uri)
-            .user_agent(config.user_agent.as_deref().unwrap_or("agent-chain-eurora"))?;
+    //     let mut endpoint = Endpoint::from(uri)
+    //         .user_agent(config.user_agent.as_deref().unwrap_or("agent-chain-eurora"))?;
 
-        // Configure timeouts
-        if let Some(timeout) = config.timeout {
-            endpoint = endpoint.timeout(timeout);
-        }
+    //     // Configure timeouts
+    //     if let Some(timeout) = config.timeout {
+    //         endpoint = endpoint.timeout(timeout);
+    //     }
 
-        if let Some(connect_timeout) = config.connect_timeout {
-            endpoint = endpoint.connect_timeout(connect_timeout);
-        }
+    //     if let Some(connect_timeout) = config.connect_timeout {
+    //         endpoint = endpoint.connect_timeout(connect_timeout);
+    //     }
 
-        // Configure keep-alive
-        if let Some(interval) = config.keep_alive_interval {
-            endpoint = endpoint.keep_alive_timeout(config.keep_alive_timeout.unwrap_or(interval));
-            endpoint = endpoint.keep_alive_while_idle(config.keep_alive_while_idle);
-        }
+    //     // Configure keep-alive
+    //     if let Some(interval) = config.keep_alive_interval {
+    //         endpoint = endpoint.keep_alive_timeout(config.keep_alive_timeout.unwrap_or(interval));
+    //         endpoint = endpoint.keep_alive_while_idle(config.keep_alive_while_idle);
+    //     }
 
-        // Configure TLS if needed
-        if config.use_tls {
-            let tls_config = ClientTlsConfig::new().with_native_roots();
-            endpoint = endpoint.tls_config(tls_config)?;
-        }
+    //     // Configure TLS if needed
+    //     if config.use_tls {
+    //         let tls_config = ClientTlsConfig::new().with_native_roots();
+    //         endpoint = endpoint.tls_config(tls_config)?;
+    //     }
 
-        let channel = endpoint.connect().await?;
-        let auth_manager = euro_user::AuthManager::new()
-            .await
-            .map_err(|err| EuroraError::Authentication(err.to_string()))?;
-        let auth_interceptor = AuthInterceptor::new(auth_manager);
+    //     let channel = endpoint.connect().await?;
+    //     let auth_manager = euro_user::AuthManager::new()
+    //         .await
+    //         .map_err(|err| EuroraError::Authentication(err.to_string()))?;
+    //     let auth_interceptor = AuthInterceptor::new(auth_manager);
 
-        let service = ServiceBuilder::new()
-            .layer(async_interceptor(auth_interceptor))
-            .service(channel);
-        let mut client = ProtoChatServiceClient::new(service);
+    //     let service = ServiceBuilder::new()
+    //         .layer(async_interceptor(auth_interceptor))
+    //         .service(channel);
+    //     let mut client = ProtoChatServiceClient::new(service);
 
-        // Configure message size limits
-        if let Some(max_request_size) = config.max_request_size {
-            client = client.max_encoding_message_size(max_request_size);
-        }
+    //     // Configure message size limits
+    //     if let Some(max_request_size) = config.max_request_size {
+    //         client = client.max_encoding_message_size(max_request_size);
+    //     }
 
-        if let Some(max_response_size) = config.max_response_size {
-            client = client.max_decoding_message_size(max_response_size);
-        }
+    //     if let Some(max_response_size) = config.max_response_size {
+    //         client = client.max_decoding_message_size(max_response_size);
+    //     }
 
-        Ok(client)
-    }
+    //     Ok(client)
+    // }
 
     /// Set the model name.
     pub fn model(mut self, model: impl Into<String>) -> Self {
@@ -263,6 +212,8 @@ impl ChatEurora {
         let stop_sequences = stop.unwrap_or_else(|| self.stop_sequences.clone());
 
         ProtoChatRequest {
+            // TODO: change to actual conversation id
+            conversation_id: "test".to_string(),
             messages: proto_messages,
             parameters: Some(ProtoParameters {
                 temperature: self.temperature,

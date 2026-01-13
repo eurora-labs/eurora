@@ -1,74 +1,71 @@
 syntax = "proto3";
-
-import "google/protobuf/empty.proto";
 package auth_service;
 
+import "google/protobuf/empty.proto";
 
 service ProtoAuthService {
-    rpc Login (LoginRequest) returns (TokenResponse);
-    rpc Register (RegisterRequest) returns (TokenResponse);
-    rpc RefreshToken (RefreshTokenRequest) returns (TokenResponse);
-    rpc GetThirdPartyAuthUrl (ThirdPartyAuthUrlRequest) returns (ThirdPartyAuthUrlResponse);
-    rpc GetLoginToken (google.protobuf.Empty) returns (GetLoginTokenResponse);
-    rpc LoginByLoginToken (LoginByLoginTokenRequest) returns (TokenResponse);
+  rpc Login(LoginRequest) returns (TokenResponse);
+  rpc Register(RegisterRequest) returns (TokenResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (TokenResponse);
+  rpc GetThirdPartyAuthUrl(ThirdPartyAuthUrlRequest) returns (ThirdPartyAuthUrlResponse);
+  rpc GetLoginToken(google.protobuf.Empty) returns (GetLoginTokenResponse);
+  rpc LoginByLoginToken(LoginByLoginTokenRequest) returns (TokenResponse);
 }
 
 message LoginRequest {
-    oneof credential {
-        EmailPasswordCredentials email_password = 1;
-        ThirdPartyCredentials third_party = 2;
-    }
+  oneof credential {
+    EmailPasswordCredentials email_password = 1;
+    ThirdPartyCredentials third_party = 2;
+  }
 }
 
 message EmailPasswordCredentials {
-    string login = 1;
-    string password = 2;
+  string login = 1;
+  string password = 2;
 }
 
 message ThirdPartyCredentials {
-    Provider provider = 1;
-    string code = 2;
-    string state = 3;
-    optional string login_token = 4;
-    optional string challenge_method = 5;
+  Provider provider = 1;
+  string code = 2;
+  string state = 3;
+  optional string login_token = 4;
+  optional string challenge_method = 5;
 }
 
 enum Provider {
-    PROVIDER_UNSPECIFIED = 0;
-    GOOGLE = 1;
-    GITHUB = 2;
+  PROVIDER_UNSPECIFIED = 0;
+  GOOGLE = 1;
+  GITHUB = 2;
 }
 message RegisterRequest {
-    string username = 1;
-    string email = 2;
-    string password = 3;
-    optional string display_name = 4;
+  string username = 1;
+  string email = 2;
+  string password = 3;
+  optional string display_name = 4;
 }
 
-message RefreshTokenRequest {
-    string refresh_token = 1;
-}
+message RefreshTokenRequest {}
 
 message ThirdPartyAuthUrlRequest {
-    Provider provider = 1;
+  Provider provider = 1;
 }
 
 message ThirdPartyAuthUrlResponse {
-    string url = 1;
+  string url = 1;
 }
 
 message TokenResponse {
-    string access_token = 1;
-    string refresh_token = 2;
-    int64 expires_in = 3;
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
 }
 
 message LoginByLoginTokenRequest {
-    string token = 1;
+  string token = 1;
 }
 
 message GetLoginTokenResponse {
-    string token = 1;
-    int64 expires_in = 2;
-    string url = 3;
+  string token = 1;
+  int64 expires_in = 2;
+  string url = 3;
 }

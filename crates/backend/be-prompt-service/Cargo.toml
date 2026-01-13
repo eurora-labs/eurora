@@ -1,0 +1,19 @@
+[package]
+name = "be-prompt-service"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+agent-chain = { workspace = true, features = ["openai"] }
+agent-chain-core = { workspace = true }
+agent-chain-grpc = { workspace = true }
+anyhow = { workspace = true }
+be-auth-grpc = { workspace = true }
+prost = { workspace = true }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }

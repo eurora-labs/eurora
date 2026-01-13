@@ -6,5 +6,4 @@ edition.workspace = true
 [dependencies]
 enigo = "0.6.1"
 tauri = { version = "^2.9.5", features = ["tray-icon", "unstable"] }
-tracing = { workspace = true }
 xcap = { version = "0.7.0" }

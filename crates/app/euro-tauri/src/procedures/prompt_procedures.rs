@@ -1,10 +1,7 @@
-use agent_chain_eurora::EuroraConfig;
-use async_from::AsyncTryFrom;
 use euro_prompt_kit::{OllamaConfig, OpenAIConfig};
 use euro_secret::secret;
 use euro_settings::BackendType;
 use tauri::{Manager, Runtime};
-use url::Url;
 
 use crate::shared_types::{SharedAppSettings, SharedPromptKitService};
 
@@ -128,18 +125,22 @@ impl PromptApi for PromptApiImpl {
                         .ok_or_else(|| "Refresh token not found".to_string())?;
 
                     // Initialize prompt kit
-                    let config = EuroraConfig::new(
-                        Url::parse(
-                            std::env::var("API_BASE_URL")
-                                .unwrap_or("https://api.eurora-labs.com".to_string())
-                                .as_str(),
-                        )
-                        .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
-                    );
+                    // let config = EuroraConfig::new(
+                    //     Url::parse(
+                    //         std::env::var("API_BASE_URL")
+                    //             .unwrap_or("https://api.eurora-labs.com".to_string())
+                    //             .as_str(),
+                    //     )
+                    //     .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
+                    // );
 
-                    euro_prompt_kit::PromptKitService::async_try_from(config)
+                    // euro_prompt_kit::PromptKitService::async_try_from(config)
+                    //     .await
+                    //     .map_err(|e| e.to_string())
+                    Ok(euro_chat_client::ChatEurora::new()
                         .await
-                        .map_err(|e| e.to_string())
+                        .expect("Failed to initialize ChatEurora")
+                        .into())
                 }
                 BackendType::OpenAI => app_settings
                     .backend
