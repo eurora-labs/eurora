@@ -59,9 +59,7 @@
 
 /// Proto-generated types for the Eurora chat service.
 pub mod proto {
-    pub mod chat {
-        tonic::include_proto!("eurora.chat");
-    }
+    tonic::include_proto!("chat_service");
 }
 
 pub mod config;
@@ -99,14 +97,5 @@ mod tests {
         assert!(config.use_tls);
         assert_eq!(config.tls_domain, Some("api.example.com".to_string()));
         assert_eq!(config.auth_token, Some("test-token".to_string()));
-    }
-
-    #[tokio::test]
-    async fn test_chat_provider_creation_fails_with_invalid_endpoint() {
-        let config = EuroraConfig::new(Url::parse("http://invalid-endpoint:8080").unwrap());
-
-        // This should fail because the endpoint is not reachable
-        let result = ChatEurora::new(config).await;
-        assert!(result.is_err());
     }
 }

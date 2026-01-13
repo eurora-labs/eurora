@@ -90,9 +90,7 @@ impl AuthClient {
     pub async fn refresh_token(&self, refresh_token: impl Into<String>) -> Result<TokenResponse> {
         let refresh_token: String = refresh_token.into();
         let mut client = self.try_init_client().await?;
-        let mut request = tonic::Request::new(RefreshTokenRequest {
-            refresh_token: refresh_token.clone(),
-        });
+        let mut request = tonic::Request::new(RefreshTokenRequest {});
         request.metadata_mut().insert(
             "authorization",
             format!("Bearer {}", refresh_token).parse().unwrap(),

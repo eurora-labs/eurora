@@ -1,6 +1,6 @@
 //! Utilities for environment variables.
 //!
-//! Adapted from langchain_core/utils/env.py
+//! Adapted from `langchain_core/utils/env.py`
 
 use std::collections::HashMap;
 use std::env;
@@ -14,6 +14,19 @@ use std::env;
 /// # Returns
 ///
 /// `true` if the environment variable is set and not falsy, `false` otherwise.
+///
+/// # Example
+///
+/// ```
+/// use agent_chain_core::utils::env::env_var_is_set;
+/// use std::env;
+///
+/// // SAFETY: This is a single-threaded doc test
+/// unsafe { env::set_var("MY_TEST_VAR", "value"); }
+/// assert!(env_var_is_set("MY_TEST_VAR"));
+/// // SAFETY: This is a single-threaded doc test
+/// unsafe { env::remove_var("MY_TEST_VAR"); }
+/// ```
 pub fn env_var_is_set(env_var: &str) -> bool {
     match env::var(env_var) {
         Ok(value) => !value.is_empty() && value != "0" && value != "false" && value != "False",
@@ -108,116 +121,6 @@ pub fn get_from_env(key: &str, env_key: &str, default: Option<&str>) -> Result<S
         key: key.to_string(),
         env_key: env_key.to_string(),
     })
-}
-
-/// Create a factory function that gets a value from an environment variable.
-///
-/// # Arguments
-///
-/// * `key` - The environment variable to look up. If multiple keys are provided,
-///   the first key found in the environment will be used.
-/// * `default` - The default value to return if the environment variable is not set.
-/// * `error_message` - The error message to raise if the key is not found and no default is provided.
-///
-/// # Returns
-///
-/// A closure that will look up the value from the environment.
-pub fn from_env<'a>(
-    keys: &'a [&'a str],
-    default: Option<&'a str>,
-    error_message: Option<&'a str>,
-) -> impl Fn() -> Result<String, EnvError> + 'a {
-    move || {
-        for key in keys {
-            if let Ok(value) = env::var(key)
-                && !value.is_empty()
-            {
-                return Ok(value);
-            }
-        }
-
-        if let Some(default_val) = default {
-            return Ok(default_val.to_string());
-        }
-
-        if let Some(msg) = error_message {
-            return Err(EnvError::Custom(msg.to_string()));
-        }
-
-        let keys_str = keys.join(", ");
-        Err(EnvError::NotFound {
-            key: keys_str.clone(),
-            env_key: keys_str,
-        })
-    }
-}
-
-/// Create a factory function that gets a secret value from an environment variable.
-///
-/// This is similar to `from_env` but is intended for sensitive values like API keys.
-///
-/// # Arguments
-///
-/// * `key` - The environment variable to look up.
-/// * `default` - The default value to return if the environment variable is not set.
-/// * `error_message` - The error message to raise if the key is not found and no default is provided.
-///
-/// # Returns
-///
-/// A closure that will look up the secret from the environment.
-pub fn secret_from_env<'a>(
-    keys: &'a [&'a str],
-    default: Option<&'a str>,
-    error_message: Option<&'a str>,
-) -> impl Fn() -> Result<SecretString, EnvError> + 'a {
-    let get_value = from_env(keys, default, error_message);
-    move || get_value().map(SecretString::new)
-}
-
-/// A wrapper around a string that prevents it from being printed.
-///
-/// This is useful for sensitive values like API keys.
-#[derive(Clone)]
-pub struct SecretString {
-    value: String,
-}
-
-impl SecretString {
-    /// Create a new secret string.
-    pub fn new(value: String) -> Self {
-        Self { value }
-    }
-
-    /// Get the secret value.
-    ///
-    /// Use this sparingly to avoid leaking secrets.
-    pub fn expose_secret(&self) -> &str {
-        &self.value
-    }
-}
-
-impl std::fmt::Debug for SecretString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SecretString(***)")
-    }
-}
-
-impl std::fmt::Display for SecretString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "***")
-    }
-}
-
-impl From<String> for SecretString {
-    fn from(value: String) -> Self {
-        Self::new(value)
-    }
-}
-
-impl From<&str> for SecretString {
-    fn from(value: &str) -> Self {
-        Self::new(value.to_string())
-    }
 }
 
 /// Error types for environment operations.
@@ -324,28 +227,5 @@ mod tests {
 
         let result = get_from_env("test", "NONEXISTENT_VAR", None);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_from_env() {
-        unsafe {
-            env::set_var("TEST_FROM_ENV", "test_value");
-        }
-        let get_value = from_env(&["TEST_FROM_ENV"], None, None);
-        assert_eq!(get_value().unwrap(), "test_value");
-        unsafe {
-            env::remove_var("TEST_FROM_ENV");
-        }
-
-        let get_value = from_env(&["NONEXISTENT"], Some("default"), None);
-        assert_eq!(get_value().unwrap(), "default");
-    }
-
-    #[test]
-    fn test_secret_string() {
-        let secret = SecretString::new("my_secret".to_string());
-        assert_eq!(secret.expose_secret(), "my_secret");
-        assert_eq!(format!("{}", secret), "***");
-        assert_eq!(format!("{:?}", secret), "SecretString(***)");
     }
 }

@@ -178,9 +178,7 @@ export const auth = {
 		}
 
 		try {
-			const refreshRequest = create(RefreshTokenRequestSchema, {
-				refreshToken: currentState.refreshToken,
-			});
+			const refreshRequest = create(RefreshTokenRequestSchema, {});
 			const tokens = await authService.refreshToken(refreshRequest);
 
 			// Update tokens while keeping user info

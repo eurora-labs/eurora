@@ -4,6 +4,7 @@
 //!
 //! This module provides various utilities ported from `langchain_core/utils/`.
 
+pub mod base;
 pub mod env;
 pub mod formatting;
 pub mod html;
@@ -18,10 +19,20 @@ pub mod strings;
 pub mod usage;
 pub mod uuid;
 
-// Re-export commonly used items at the utils level
-pub use env::{
-    SecretString, env_var_is_set, from_env, get_from_dict_or_env, get_from_env, secret_from_env,
+// Re-export items from env.rs (mirrors langchain_core/utils/env.py)
+pub use env::{EnvError, env_var_is_set, get_from_dict_or_env, get_from_env};
+
+// Re-export items from uuid.rs (mirrors langchain_core/utils/uuid.py)
+pub use uuid::uuid7;
+
+// Re-export items from utils/utils.rs (mirrors langchain_core/utils/utils.py)
+pub use base::{
+    HttpStatusError, LC_AUTO_PREFIX, LC_ID_PREFIX, MockTime, NoDefault, SecretString, XorArgsError,
+    build_model_kwargs, convert_to_secret_str, ensure_id, from_env, now_millis, now_secs,
+    raise_for_status_with_text, secret_from_env, validate_xor_args,
 };
+
+// Re-export from other modules
 pub use formatting::{FORMATTER, StrictFormatter, format_string};
 pub use input::{get_bolded_text, get_color_mapping, get_colored_text, print_text};
 pub use iter::{batch_iterate, tee};
@@ -34,4 +45,3 @@ pub use usage::{
     UsageValue, dict_int_add, dict_int_add_json, dict_int_op, dict_int_op_json, dict_int_sub,
     dict_int_sub_floor_json,
 };
-pub use uuid::{LC_AUTO_PREFIX, LC_ID_PREFIX, ensure_id, uuid4, uuid7};

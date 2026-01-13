@@ -1,0 +1,42 @@
+[package]
+name = "euro-auth"
+version = "0.0.0"
+edition.workspace = true
+description = "Authentication service for Eurora"
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde", "specta", "tonic-prost"]
+
+[dependencies]
+anyhow = { workspace = true }
+auth-core = { workspace = true }
+base64 = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+euro-secret = { workspace = true }
+humantime-serde = { workspace = true }
+jsonwebtoken = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+specta = { workspace = true, features = ["derive", "function"] }
+tokio = { workspace = true, features = [
+  "fs",
+  "macros",
+  "rt-multi-thread",
+] }
+tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
+tonic-async-interceptor = "0.14.1"
+tonic-prost = { workspace = true }
+tower = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }
+
+[features]
+default = []
+compat = []  # Enable backward compatibility layer

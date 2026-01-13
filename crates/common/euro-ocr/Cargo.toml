@@ -1,8 +1,0 @@
-[package]
-name = "euro-ocr"
-version = "0.0.0"
-edition.workspace = true
-
-[dependencies]
-image = { workspace = true }
-rusty-tesseract = "1.1.10"

@@ -1,19 +1,11 @@
 use anyhow::{Result, anyhow};
+use auth_core::Claims;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use euro_proto_client::auth::AuthClient;
 use euro_secret::{Sensitive, secret};
 use rand::{TryRngCore, rngs::OsRng};
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::error;
-
-// Re-export shared types for convenience
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Claims {
-    sub: String,
-    name: String,
-    exp: i64,
-}
 
 #[derive(Clone)]
 pub struct JwtConfig {

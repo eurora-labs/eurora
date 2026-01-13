@@ -82,7 +82,7 @@ pub trait ActivityStrategyFunctionality {
     /// The strategy should spawn its own tasks and report activities through the sender
     async fn start_tracking(
         &mut self,
-        focus_window: &euro_focus::FocusedWindow,
+        focus_window: &focus_tracker::FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()>;
 
