@@ -6,12 +6,11 @@
 use std::sync::Arc;
 
 use be_asset::AssetService as CoreAssetService;
-use be_auth_grpc::Claims;
+use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
 use tonic::{Request, Response, Status};
-use tracing::{error, info};
-use uuid::Uuid;
+use tracing::info;
 
 use crate::error::{AssetServiceError, Result};
 use proto_gen::asset::{
@@ -50,17 +49,6 @@ impl AssetService {
     }
 }
 
-/// Extract and validate user ID from request claims
-fn extract_user_id<T>(request: &Request<T>) -> Result<Uuid> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or(AssetServiceError::MissingClaims)?;
-
-    Uuid::parse_str(&claims.sub)
-        .map_err(|_| AssetServiceError::Internal("Invalid user ID".to_string()))
-}
-
 #[tonic::async_trait]
 impl ProtoAssetService for AssetService {
     async fn create_asset(
@@ -69,10 +57,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<AssetResponse>, Status> {
         info!("CreateAsset request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
 
@@ -91,10 +77,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<AssetResponse>, Status> {
         info!("GetAsset request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         let response = self
@@ -112,10 +96,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<ListAssetsResponse>, Status> {
         info!("ListAssets request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         let response = self
@@ -133,10 +115,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<AssetResponse>, Status> {
         info!("UpdateAsset request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         let response = self
@@ -154,10 +134,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<()>, Status> {
         info!("DeleteAsset request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         self.0
@@ -174,10 +152,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<AssetResponse>, Status> {
         info!("FindAssetBySha256 request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         let response = self
@@ -195,10 +171,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<ListAssetsResponse>, Status> {
         info!("GetAssetsByMessageId request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         let response = self
@@ -216,10 +190,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<ListAssetsResponse>, Status> {
         info!("GetAssetsByActivityId request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         let response = self
@@ -237,10 +209,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<MessageAssetResponse>, Status> {
         info!("LinkAssetToMessage request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         let response = self
@@ -258,10 +228,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<()>, Status> {
         info!("UnlinkAssetFromMessage request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         self.0
@@ -278,10 +246,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<ActivityAssetResponse>, Status> {
         info!("LinkAssetToActivity request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         let response = self
@@ -299,10 +265,8 @@ impl ProtoAssetService for AssetService {
     ) -> std::result::Result<Response<()>, Status> {
         info!("UnlinkAssetFromActivity request received");
 
-        let user_id = extract_user_id(&request).map_err(|e| {
-            error!("Authentication failed: {}", e);
-            Status::from(e)
-        })?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         self.0

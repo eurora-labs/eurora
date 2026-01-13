@@ -1,4 +1,5 @@
 use tonic::{Request, Status, service::Interceptor};
+use uuid::Uuid;
 
 pub use be_auth_core::*;
 
@@ -40,4 +41,17 @@ impl JwtInterceptor {
     pub fn get_config(&self) -> &JwtConfig {
         &self.config
     }
+}
+
+/// Extract and validate claims from a gRPC request.
+pub fn extract_claims<T>(request: &Request<T>) -> Result<&Claims, Status> {
+    request
+        .extensions()
+        .get::<Claims>()
+        .ok_or_else(|| Status::unauthenticated("Missing claims"))
+}
+
+/// Parse a user ID from claims.
+pub fn parse_user_id(claims: &Claims) -> Result<Uuid, Status> {
+    Uuid::parse_str(&claims.sub).map_err(|_| Status::unauthenticated("Missing user ID"))
 }
