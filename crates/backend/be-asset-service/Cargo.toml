@@ -8,13 +8,13 @@ description = "Eurora Asset Service - gRPC service for managing user file assets
 ignored = ["tonic-prost"]
 
 [dependencies]
-asset-models = { workspace = true }
 be-asset = { workspace = true }
 be-auth-grpc = { workspace = true }
 be-remote-db = { workspace = true }
 be-storage = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
+proto-gen = { workspace = true, features = ["server"] }
 thiserror = { workspace = true }
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
