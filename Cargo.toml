@@ -10,7 +10,6 @@ members = [
   "crates/common/agent-graph",
   "crates/common/agent-graph-macros",
   "crates/common/auth-core",
-  "crates/common/euro-*",
   "crates/common/focus-tracker",
   "crates/common/focus-tracker-core",
   "crates/common/proto-gen",
@@ -57,10 +56,9 @@ euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
 euro-chat-client = { path = "crates/app/euro-chat-client" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
-euro-fs = { path = "crates/common/euro-fs" }
+euro-fs = { path = "crates/app/euro-fs" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
 euro-personal-db = { path = "crates/app/euro-personal-db" }
-euro-prompt-kit = { path = "crates/common/euro-prompt-kit" }
 euro-screen-position = { path = "crates/app/euro-screen-position" }
 euro-secret = { path = "crates/app/euro-secret" }
 euro-settings = { path = "crates/app/euro-settings" }
@@ -83,6 +81,7 @@ log = "0.4"
 once_cell = "1.21"
 parking_lot = "0.12.5"
 posthog-rs = "0.3.7"
+prompt-kit = { path = "crates/common/prompt-kit" }
 prost = "0.14"
 prost-types = "0.14"
 proto-gen = { path = "crates/common/proto-gen" }
