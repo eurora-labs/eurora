@@ -8,10 +8,8 @@ description = "Refactored activity system with enum-based type-safe design"
 ignored = ["humantime-serde", "specta"]
 
 [dependencies]
-activity-models = { workspace = true }
 agent-chain-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
-asset-models = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 cfg-if = { workspace = true }
@@ -27,6 +25,7 @@ focus-tracker = { workspace = true, features = ["async"] }
 humantime-serde = { workspace = true }
 image = { workspace = true }
 prost-types = { workspace = true }
+proto-gen = { workspace = true }
 regex = "1.12.2"
 resvg = { version = "0.45" }
 serde = { workspace = true, features = ["derive"] }

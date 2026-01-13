@@ -14,7 +14,7 @@ use prost_types::Timestamp;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use asset_models::proto::{
+use proto_gen::asset::{
     ActivityAsset, ActivityAssetResponse, Asset, AssetResponse, CreateAssetRequest,
     DeleteAssetRequest, FindAssetBySha256Request, GetAssetRequest, GetAssetsByActivityIdRequest,
     GetAssetsByMessageIdRequest, LinkAssetToActivityRequest, LinkAssetToMessageRequest,
