@@ -1,7 +1,7 @@
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
-    CreateConversationRequest, CreateConversationResponse,
-    proto_conversation_service_client::ProtoConversationServiceClient,
+    CreateConversationRequest, CreateConversationResponse, ListConversationsRequest,
+    ListConversationsResponse, proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use tonic::Status;
 
@@ -22,6 +22,15 @@ impl ConversationManager {
     ) -> Result<CreateConversationResponse, Status> {
         let mut client = self.client.clone();
         let response = client.create_conversation(request).await?.into_inner();
+        Ok(response)
+    }
+
+    pub async fn list_conversations(
+        &self,
+        _request: ListConversationsRequest,
+    ) -> Result<ListConversationsResponse, Status> {
+        let mut client = self.client.clone();
+        let response = client.list_conversations(_request).await?.into_inner();
         Ok(response)
     }
 }
