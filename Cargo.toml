@@ -6,7 +6,6 @@ members = [
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
   "crates/common/agent-chain-eurora",
-  "crates/common/agent-chain-grpc",
   "crates/common/agent-chain-macros",
   "crates/common/agent-graph",
   "crates/common/agent-graph-macros",
@@ -28,7 +27,6 @@ license-file = "LICENSE.md"
 agent-chain = { path = "crates/common/agent-chain" }
 agent-chain-core = { path = "crates/common/agent-chain-core" }
 agent-chain-eurora = { path = "crates/common/agent-chain-eurora" }
-agent-chain-grpc = { path = "crates/common/agent-chain-grpc" }
 agent-chain-macros = { path = "crates/common/agent-chain-macros" }
 agent-graph = { path = "crates/common/agent-graph" }
 agent-graph-macros = { path = "crates/common/agent-graph-macros" }
