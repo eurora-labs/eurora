@@ -1,3 +1,5 @@
+use crate::Conversation;
+// use agent_chain_core::BaseMessage;
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
     CreateConversationRequest, CreateConversationResponse, ListConversationsRequest,
@@ -6,31 +8,50 @@ use proto_gen::conversation::{
 use tonic::Status;
 
 pub struct ConversationManager {
-    client: ProtoConversationServiceClient<AuthedChannel>,
+    // conversation: Option<Conversation>,
+    conversation_client: ProtoConversationServiceClient<AuthedChannel>,
+    // chat_client: ProtoChatServiceClient<AuthedChannel>,
 }
 
 impl ConversationManager {
     pub async fn new() -> Self {
         let channel = get_authed_channel().await;
-        let client = ProtoConversationServiceClient::new(channel);
-        Self { client }
+        let conversation_client = ProtoConversationServiceClient::new(channel.clone());
+        // let chat_client = ProtoChatServiceClient::new(channel);
+
+        Self {
+            // conversation: None,
+            conversation_client,
+            // chat_client,
+        }
+    }
+
+    pub async fn create_empty_conversation(&self) -> Result<Conversation, Status> {
+        let conversation = Conversation::new();
+        Ok(conversation)
     }
 
     pub async fn create_conversation(
         &self,
         request: CreateConversationRequest,
     ) -> Result<CreateConversationResponse, Status> {
-        let mut client = self.client.clone();
+        let mut client = self.conversation_client.clone();
         let response = client.create_conversation(request).await?.into_inner();
         Ok(response)
     }
 
     pub async fn list_conversations(
         &self,
-        _request: ListConversationsRequest,
+        request: ListConversationsRequest,
     ) -> Result<ListConversationsResponse, Status> {
-        let mut client = self.client.clone();
-        let response = client.list_conversations(_request).await?.into_inner();
+        let mut client = self.conversation_client.clone();
+        let response = client.list_conversations(request).await?.into_inner();
         Ok(response)
     }
+
+    // pub async fn list_messages(&self, limit: u32, offset: u32) -> Result<Vec<BaseMessage>, Status> {
+    //     let mut client = self.conversation_client.clone();
+    //     let response = client.list_messages().await?.into_inner();
+    //     Ok(response)
+    // }
 }
