@@ -41,7 +41,7 @@
 		"test:e2e:webextension": "turbo run test:e2e:webextension"
 	},
 	"devDependencies": {
-		"@bufbuild/buf": "^1.62.1",
+		"@bufbuild/buf": "^1.63.0",
 		"@bufbuild/protobuf": "^2.10.2",
 		"@bufbuild/protoc-gen-es": "^2.10.2",
 		"@commitlint/cli": "^19.8.1",
@@ -72,8 +72,8 @@
 		"svelte-eslint-parser": "^1.4.1",
 		"tailwindcss": "catalog:",
 		"ts-proto": "^2.10.1",
-		"turbo": "^2.7.3",
-		"typescript-eslint": "^8.52.0",
+		"turbo": "^2.7.4",
+		"typescript-eslint": "^8.53.0",
 		"web-ext": "^8.10.0"
 	},
 	"packageManager": "pnpm@10.27.0",
