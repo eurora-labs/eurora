@@ -4,8 +4,8 @@
 	"private": true,
 	"devDependencies": {
 		"@playwright/test": "1.57.0",
-		"@types/chrome": "^0.1.32",
-		"@types/node": "^24.10.4",
+		"@types/chrome": "^0.1.33",
+		"@types/node": "^24.10.7",
 		"@wdio/cli": "^9.23.0",
 		"@wdio/globals": "^9.23.0",
 		"@wdio/local-runner": "^9.23.0",
