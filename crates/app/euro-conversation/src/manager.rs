@@ -3,6 +3,8 @@ use crate::{
     error::{Error, Result},
     types::ConversationEvent,
 };
+use agent_chain_core::HumanMessage;
+use agent_chain_eurora::proto::proto_chat_service_client::ProtoChatServiceClient;
 // use agent_chain_core::BaseMessage;
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
@@ -15,7 +17,8 @@ pub struct ConversationManager {
     current_conversation: Conversation,
     conversation_client: ProtoConversationServiceClient<AuthedChannel>,
     conversation_event_tx: broadcast::Sender<ConversationEvent>,
-    // chat_client: ProtoChatServiceClient<AuthedChannel>,
+    #[allow(dead_code)]
+    chat_client: ProtoChatServiceClient<AuthedChannel>,
 }
 
 impl ConversationManager {
@@ -23,13 +26,13 @@ impl ConversationManager {
         let channel = get_authed_channel().await;
         let conversation_client = ProtoConversationServiceClient::new(channel.clone());
         let (conversation_event_tx, _) = broadcast::channel(100);
-        // let chat_client = ProtoChatServiceClient::new(channel);
+        let chat_client = ProtoChatServiceClient::new(channel);
 
         Self {
             current_conversation: Conversation::default(),
             conversation_client,
             conversation_event_tx,
-            // chat_client,
+            chat_client,
         }
     }
 
@@ -83,4 +86,10 @@ impl ConversationManager {
     //     let response = client.list_messages().await?.into_inner();
     //     Ok(response)
     // }
+}
+
+impl ConversationManager {
+    pub async fn add_human_message(&mut self, _message: HumanMessage) -> Result<()> {
+        todo!()
+    }
 }
