@@ -1,19 +1,20 @@
 //! Asset storage functionality for saving activity assets to disk and remote service
-use activity_models::proto::{
-    ActivityResponse, InsertActivityRequest,
-    proto_activity_service_client::ProtoActivityServiceClient,
-};
-use asset_models::proto::{
-    CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient,
-};
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use euro_auth::AuthedChannel;
 use euro_encrypt::{MainKey, encrypt_file_contents};
 use euro_fs::create_dirs_then_write;
 use prost_types::Timestamp;
+use proto_gen::activity::{
+    ActivityResponse, InsertActivityRequest,
+    proto_activity_service_client::ProtoActivityServiceClient,
+};
+use proto_gen::asset::{CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::{
+    io::Cursor,
+    path::{Path, PathBuf},
+};
 use tokio::fs;
 use tonic::Status;
 use tracing::{debug, error};
@@ -130,7 +131,21 @@ impl ActivityStorage {
         activity: &Activity,
     ) -> ActivityResult<ActivityResponse> {
         let mut client = self.activity_client.clone();
-        let icon = activity.icon.as_ref().map(|icon| icon.to_vec());
+        let icon = match &activity.icon {
+            Some(icon) => {
+                let mut bytes: Vec<u8> = Vec::new();
+                icon.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
+                    .map_err(ActivityError::Image)?;
+                Some(bytes)
+            }
+            None => None,
+        };
+        // let icon = activity.icon.as_ref().map(|icon| {
+        //     let mut bytes: Vec<u8> = Vec::new();
+        //     icon.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
+        //         .map_err(|e| ActivityError::Image(e)).;
+        //     bytes
+        // });
         let response = client
             .insert_activity(InsertActivityRequest {
                 id: None,
