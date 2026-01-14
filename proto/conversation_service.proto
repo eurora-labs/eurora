@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package conversation_service;
+
+import "google/protobuf/timestamp.proto";
+
+service ProtoConversationService {
+  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
+}
+
+message CreateConversationRequest {
+  string title = 1;
+}
+
+message Conversation {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message CreateConversationResponse {
+  Conversation conversation = 1;
+}
+
+message ListConversationsRequest {
+  // Maximum number of conversations to return
+  uint32 limit = 1;
+
+  // Offset for pagination
+  uint32 offset = 2;
+}
+
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
+}
+
+message ChatStreamRequest {
+  string conversation_id = 1;
+  string content = 2;
+}
+
+message ChatStreamResponse {
+  // The message chunk
+  string chunk = 1;
+
+  // Whether this is the final chunk
+  bool is_final = 2;
+}

@@ -34,10 +34,10 @@ color-thief = "0.2.2"
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-chat-client = { workspace = true }
+euro-conversation = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-personal-db = { workspace = true, features = ["specta"] }
-euro-prompt-kit = { workspace = true }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-timeline = { workspace = true }
@@ -49,6 +49,7 @@ keyring = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 posthog-rs = { workspace = true }
+prompt-kit = { workspace = true }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }
 serde = { workspace = true }
 serde_json = { version = "1.0", features = ["arbitrary_precision", "std"] }
@@ -71,7 +72,7 @@ taurpc = { version = "0.5.2" }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tracing = { workspace = true }
-url = "2.5.4"
+url = { workspace = true }
 
 [build-dependencies]
 tauri-build = { version = "2.5.1", features = [] }

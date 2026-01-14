@@ -1,6 +1,6 @@
-use euro_prompt_kit::{OllamaConfig, OpenAIConfig};
 use euro_secret::secret;
 use euro_settings::BackendType;
+use prompt_kit::{OllamaConfig, OpenAIConfig};
 use tauri::{Manager, Runtime};
 
 use crate::shared_types::{SharedAppSettings, SharedPromptKitService};
@@ -52,7 +52,7 @@ impl PromptApi for PromptApiImpl {
             .save_to_default_path()
             .expect("Failed to save settings");
 
-        let llm_provider = euro_prompt_kit::PromptKitService::from(config);
+        let llm_provider = prompt_kit::PromptKitService::from(config);
 
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
             .prompt_service_change(Some(
@@ -90,7 +90,7 @@ impl PromptApi for PromptApiImpl {
             .save_to_default_path()
             .expect("Failed to save settings");
 
-        let llm_provider = euro_prompt_kit::PromptKitService::from(config);
+        let llm_provider = prompt_kit::PromptKitService::from(config);
 
         TauRpcPromptApiEventTrigger::new(app_handle.clone())
             .prompt_service_change(Some(
@@ -134,7 +134,7 @@ impl PromptApi for PromptApiImpl {
                     //     .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
                     // );
 
-                    // euro_prompt_kit::PromptKitService::async_try_from(config)
+                    // prompt_kit::PromptKitService::async_try_from(config)
                     //     .await
                     //     .map_err(|e| e.to_string())
                     Ok(euro_chat_client::ChatEurora::new()

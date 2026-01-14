@@ -1,5 +1,5 @@
 use agent_chain_eurora::EuroraConfig;
-use euro_prompt_kit::{OllamaConfig, OpenAIConfig};
+use prompt_kit::{OllamaConfig, OpenAIConfig};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -49,7 +49,7 @@ impl From<EuroraConfig> for BackendSettings {
 }
 
 impl BackendSettings {
-    pub async fn initialize(&self) -> Result<euro_prompt_kit::PromptKitService, String> {
+    pub async fn initialize(&self) -> Result<prompt_kit::PromptKitService, String> {
         match self.backend_type {
             BackendType::None => Err("No backend selected".to_string()),
             BackendType::Ollama => {
@@ -57,7 +57,7 @@ impl BackendSettings {
                     let config: OllamaConfig = serde_json::from_value(config.clone())
                         .map_err(|e| format!("Failed to deserialize OllamaConfig: {e}"))?;
 
-                    Ok(euro_prompt_kit::PromptKitService::from(config))
+                    Ok(prompt_kit::PromptKitService::from(config))
                 } else {
                     Err("No Ollama config provided".to_string())
                 }
@@ -79,7 +79,7 @@ impl BackendSettings {
                         return Err("No OpenAI API key provided".to_string());
                     }
 
-                    Ok(euro_prompt_kit::PromptKitService::from(config))
+                    Ok(prompt_kit::PromptKitService::from(config))
                 } else {
                     Err("No OpenAI config provided".to_string())
                 }
@@ -89,7 +89,7 @@ impl BackendSettings {
                 // let config: EuroraConfig = serde_json::from_value(config.clone())
                 //     .expect("Failed to deserialize EuroraConfig");
 
-                // Ok(euro_prompt_kit::PromptKitService::async_try_from(config)
+                // Ok(prompt_kit::PromptKitService::async_try_from(config)
                 //     .await
                 //     .map_err(|e| e.to_string())?)
                 Ok(euro_chat_client::ChatEurora::new()
