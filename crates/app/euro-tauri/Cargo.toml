@@ -72,7 +72,7 @@ taurpc = { version = "0.5.2" }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tracing = { workspace = true }
-url = "2.5.4"
+url = { workspace = true }
 
 [build-dependencies]
 tauri-build = { version = "2.5.1", features = [] }
