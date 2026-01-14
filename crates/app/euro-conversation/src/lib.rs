@@ -1,3 +1,4 @@
+mod error;
 mod manager;
 mod types;
 

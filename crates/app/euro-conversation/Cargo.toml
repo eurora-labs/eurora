@@ -20,9 +20,16 @@ prost-types = { workspace = true }
 proto-gen = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = [
+  "macros",
+  "rt",
+  "sync",
+  "time",
+] }
 tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
 tonic-prost = { workspace = true }
-uuid = { workspace = true }
+uuid = { workspace = true, features = ["v7"] }
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }
