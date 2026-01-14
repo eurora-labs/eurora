@@ -351,8 +351,6 @@ pub struct Message {
     pub tool_calls: Option<serde_json::Value>,
     /// Additional metadata as JSON object
     pub additional_kwargs: serde_json::Value,
-    /// Ordering within conversation (messages sorted by this)
-    pub sequence_num: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -367,8 +365,6 @@ pub struct CreateMessageRequest {
     pub tool_call_id: Option<String>,
     pub tool_calls: Option<serde_json::Value>,
     pub additional_kwargs: Option<serde_json::Value>,
-    /// If not provided, will be auto-calculated as max(sequence_num) + 1
-    pub sequence_num: Option<i32>,
 }
 
 /// Request for updating an existing message
