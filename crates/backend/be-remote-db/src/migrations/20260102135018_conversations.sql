@@ -58,9 +58,6 @@ CREATE TABLE messages (
     -- Additional metadata as JSON object
     additional_kwargs JSONB NOT NULL DEFAULT '{}',
 
-    -- Ordering within conversation (messages sorted by this)
-    sequence_num INTEGER NOT NULL,
-
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
@@ -69,10 +66,6 @@ CREATE TABLE messages (
         FOREIGN KEY (conversation_id)
         REFERENCES conversations(id)
         ON DELETE CASCADE,
-
-    -- Ensure unique sequence number per conversation
-    CONSTRAINT uq_messages_conversation_sequence
-        UNIQUE (conversation_id, sequence_num),
 
     -- ToolMessage must have tool_call_id
     CONSTRAINT ck_messages_tool_call_id
@@ -220,7 +213,6 @@ CREATE INDEX idx_conversations_user_updated ON conversations(user_id, updated_at
 
 -- Messages indexes
 CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
--- Note: uq_messages_conversation_sequence unique constraint already indexes (conversation_id, sequence_num)
 CREATE INDEX idx_messages_type ON messages(message_type);
 -- GIN index for JSONB content queries (if needed for full-text search later)
 CREATE INDEX idx_messages_content ON messages USING GIN (content jsonb_path_ops);
@@ -292,7 +284,6 @@ COMMENT ON COLUMN messages.content IS 'Message content as JSONB - structure depe
 COMMENT ON COLUMN messages.tool_call_id IS 'For tool messages: ID of the tool call this responds to';
 COMMENT ON COLUMN messages.tool_calls IS 'For AI messages: array of tool call requests';
 COMMENT ON COLUMN messages.additional_kwargs IS 'Additional metadata for the message';
-COMMENT ON COLUMN messages.sequence_num IS 'Order of message within conversation';
 
 -- Activities table
 COMMENT ON TABLE activities IS 'Tracked user activities (applications, browser tabs, etc.)';
