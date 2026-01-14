@@ -9,8 +9,8 @@
 		"dev": "turbo run dev",
 		"lint": "turbo run //#globallint --no-daemon",
 		"check-types": "turbo run check-types",
-		"dev:monolith": "cargo run -p euro-monolith -- --mode development",
-		"prod:monolith": "cargo run -p euro-monolith -- --mode production",
+		"dev:monolith": "cargo run -p be-monolith -- --mode development",
+		"prod:monolith": "cargo run -p be-monolith -- --mode production",
 		"dev:desktop": "pnpm tauri dev",
 		"dev:ui": "pnpm --filter @eurora/ui storybook",
 		"check": "turbo run check --no-daemon",
@@ -29,7 +29,7 @@
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",
 		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
-		"proto:rust": "cargo build -p euro-proto",
+		"proto:rust": "cargo build -p proto-gen",
 		"prettier": "prettier --check",
 		"fix": "eslint --fix .",
 		"format": "prettier --write .",
@@ -76,7 +76,7 @@
 		"typescript-eslint": "^8.53.0",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.27.0",
+	"packageManager": "pnpm@10.28.0",
 	"engines": {
 		"node": ">=20.11"
 	},

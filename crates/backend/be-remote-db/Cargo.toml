@@ -1,0 +1,23 @@
+[package]
+name = "be-remote-db"
+version = "0.0.0"
+edition.workspace = true
+description = "Eurora Remote DB"
+
+[dependencies]
+chrono = { workspace = true, features = ["serde"] }
+ipnet = { version = "2", features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sqlx = { version = "0.8.6", features = [
+  "chrono",
+  "ipnet",
+  "json",
+  "migrate",
+  "postgres",
+  "runtime-tokio",
+  "tls-native-tls",
+  "uuid",
+] }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["serde", "v4", "v7"] }

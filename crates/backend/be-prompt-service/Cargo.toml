@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 agent-chain = { workspace = true, features = ["openai"] }
 agent-chain-core = { workspace = true }
-agent-chain-grpc = { workspace = true }
+agent-chain-eurora = { workspace = true }
 anyhow = { workspace = true }
 be-auth-grpc = { workspace = true }
 prost = { workspace = true }

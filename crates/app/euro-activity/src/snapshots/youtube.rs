@@ -6,29 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{error::ActivityError, types::SnapshotFunctionality};
 
-// /// Helper function to safely load images from protocol buffer data
-// fn load_image_from_proto(
-//     proto_image: euro_proto::shared::ProtoImage,
-// ) -> Result<DynamicImage, ActivityError> {
-//     let format = ProtoImageFormat::try_from(proto_image.format)
-//         .map_err(|_| ActivityError::ProtocolBuffer("Invalid image format".to_string()))?;
-
-//     let image = match format {
-//         ProtoImageFormat::Png => {
-//             image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::Png)?
-//         }
-//         ProtoImageFormat::Jpeg => {
-//             image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::Jpeg)?
-//         }
-//         ProtoImageFormat::Webp => {
-//             image::load_from_memory_with_format(&proto_image.data, image::ImageFormat::WebP)?
-//         }
-//         _ => image::load_from_memory(&proto_image.data)?,
-//     };
-
-//     Ok(image)
-// }
-
 /// YouTube video snapshot with frame capture
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YoutubeSnapshot {

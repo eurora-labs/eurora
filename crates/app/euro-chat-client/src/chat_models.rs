@@ -20,7 +20,7 @@ use euro_auth::AuthedChannel;
 use futures::StreamExt;
 use tonic::Request;
 
-use agent_chain_grpc::proto::{
+use agent_chain_eurora::proto::{
     ProtoChatRequest, ProtoParameters, proto_chat_service_client::ProtoChatServiceClient,
 };
 

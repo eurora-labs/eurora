@@ -1,26 +1,32 @@
 //! Server-side implementation for the Activity Service.
-//!
-//! This module contains the gRPC server implementation and is only
-//! available when the `server` feature is enabled.
 
 use std::sync::Arc;
 
-use anyhow::Result;
-use be_auth_grpc::Claims;
+use be_asset::AssetService;
+use be_auth_grpc::{extract_claims, parse_user_id};
+use be_remote_db::{
+    CreateActivityRequest as DbCreateActivityRequest, DatabaseManager,
+    GetActivitiesByTimeRangeRequest as DbGetActivitiesByTimeRangeRequest,
+    ListActivitiesRequest as DbListActivitiesRequest,
+    UpdateActivityEndTimeRequest as DbUpdateActivityEndTimeRequest,
+    UpdateActivityRequest as DbUpdateActivityRequest,
+};
 use chrono::{DateTime, Utc};
-use euro_remote_db::DatabaseManager;
 use prost_types::Timestamp;
+use proto_gen::asset::CreateAssetRequest;
 use tonic::{Request, Response, Status};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
-use activity_models::proto::{
+use crate::error::{ActivityResult, ActivityServiceError};
+
+use proto_gen::activity::{
     Activity, ActivityResponse, DeleteActivityRequest, GetActivitiesByTimeRangeRequest,
     GetActivityRequest, InsertActivityRequest, ListActivitiesRequest, ListActivitiesResponse,
     UpdateActivityEndTimeRequest, UpdateActivityRequest,
 };
 
-pub use activity_models::proto::proto_activity_service_server::{
+pub use proto_gen::activity::proto_activity_service_server::{
     ProtoActivityService, ProtoActivityServiceServer,
 };
 
@@ -28,17 +34,33 @@ pub use activity_models::proto::proto_activity_service_server::{
 #[derive(Debug)]
 pub struct ActivityService {
     db: Arc<DatabaseManager>,
+    asset_service: Arc<AssetService>,
 }
 
 impl ActivityService {
     /// Create a new ActivityService instance
-    pub fn new(db: Arc<DatabaseManager>) -> Self {
+    pub fn new(db: Arc<DatabaseManager>, asset: Arc<AssetService>) -> Self {
         info!("Creating new ActivityService instance");
-        Self { db }
+        Self {
+            db,
+            asset_service: asset,
+        }
+    }
+
+    /// Create a new ActivityService from environment variables.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ActivityServiceError::Storage`] if the storage service
+    /// cannot be initialized from environment variables.
+    pub fn from_env(db: Arc<DatabaseManager>) -> ActivityResult<Self> {
+        let asset = AssetService::from_env(db.clone()).map_err(ActivityServiceError::Asset)?;
+
+        Ok(Self::new(db, Arc::new(asset)))
     }
 
     /// Convert a database Activity to a proto Activity
-    fn db_activity_to_proto(activity: &euro_remote_db::Activity) -> Activity {
+    fn db_activity_to_proto(activity: &be_remote_db::Activity) -> Activity {
         Activity {
             id: activity.id.to_string(),
             name: activity.name.clone(),
@@ -66,6 +88,21 @@ fn timestamp_to_datetime(ts: &Timestamp) -> Option<DateTime<Utc>> {
     DateTime::from_timestamp(ts.seconds, ts.nanos as u32)
 }
 
+/// Parse an activity ID from a string.
+fn parse_activity_id(id: &str) -> Result<Uuid, ActivityServiceError> {
+    Uuid::parse_str(id).map_err(|e| ActivityServiceError::invalid_uuid("activity_id", e))
+}
+
+/// Parse an optional UUID from a string.
+fn parse_optional_uuid(
+    value: Option<&String>,
+    field: &'static str,
+) -> Result<Option<Uuid>, ActivityServiceError> {
+    value
+        .map(|s| Uuid::parse_str(s).map_err(|e| ActivityServiceError::invalid_uuid(field, e)))
+        .transpose()
+}
+
 #[tonic::async_trait]
 impl ProtoActivityService for ActivityService {
     async fn list_activities(
@@ -74,25 +111,21 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ListActivitiesResponse>, Status> {
         info!("ListActivities request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
-        })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
         let limit = if req.limit == 0 { 50 } else { req.limit };
 
-        let (activities, total_count) = self
+        let activities = self
             .db
-            .list_activities(user_id, limit, req.offset)
+            .list_activities(DbListActivitiesRequest {
+                user_id,
+                limit,
+                offset: req.offset,
+            })
             .await
-            .map_err(|e| {
-            error!("Failed to list activities: {}", e);
-            Status::internal("Failed to list activities")
-        })?;
+            .map_err(ActivityServiceError::from)?;
 
         let proto_activities: Vec<Activity> =
             activities.iter().map(Self::db_activity_to_proto).collect();
@@ -105,7 +138,6 @@ impl ProtoActivityService for ActivityService {
 
         Ok(Response::new(ListActivitiesResponse {
             activities: proto_activities,
-            total_count,
         }))
     }
 
@@ -115,26 +147,17 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ActivityResponse>, Status> {
         info!("GetActivity request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
-        })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
-        let activity_id = Uuid::parse_str(&req.id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+        let activity_id = parse_activity_id(&req.id)?;
 
         let activity = self
             .db
             .get_activity_for_user(activity_id, user_id)
             .await
-            .map_err(|e| {
-                warn!("Activity not found: {}", e);
-                Status::not_found("Activity not found")
-            })?;
+            .map_err(ActivityServiceError::from)?;
 
         debug!("Retrieved activity {} for user {}", activity_id, user_id);
 
@@ -149,51 +172,72 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ActivityResponse>, Status> {
         info!("InsertActivity request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
-        })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
 
-        let id = req
-            .id
-            .as_ref()
-            .map(|s| Uuid::parse_str(s))
-            .transpose()
-            .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+        let id = parse_optional_uuid(req.id.as_ref(), "activity_id")?;
 
         let started_at = req
             .started_at
             .as_ref()
             .and_then(timestamp_to_datetime)
-            .ok_or_else(|| Status::invalid_argument("started_at is required"))?;
+            .ok_or_else(|| ActivityServiceError::invalid_timestamp("started_at"))?;
 
         let ended_at = req.ended_at.as_ref().and_then(timestamp_to_datetime);
+        info!("Ended at: {:?}", ended_at);
 
-        // TODO: Handle icon upload - for now, pass None for icon_asset_id
-        // The req.icon bytes would need to be uploaded to the asset service first
-        // to obtain a valid icon_asset_id
         let activity = self
             .db
-            .create_activity(
+            .create_activity(DbCreateActivityRequest {
                 id,
                 user_id,
-                &req.name,
-                None, // icon_asset_id - requires proper asset upload implementation
-                &req.process_name,
-                &req.window_title,
+                name: req.name.clone(),
+                icon_asset_id: None,
+                process_name: req.process_name.clone(),
+                window_title: req.window_title.clone(),
                 started_at,
                 ended_at,
-            )
+            })
             .await
-            .map_err(|e| {
-                error!("Failed to create activity: {}", e);
-                Status::internal("Failed to create activity")
-            })?;
+            .map_err(ActivityServiceError::from)?;
+        info!("Created activity at: {:?}", activity.created_at);
+        // Upload icon to storage if provided
+        let icon_id = match req.icon {
+            Some(icon) => {
+                let icon_response = self
+                    .asset_service
+                    .create_asset(
+                        CreateAssetRequest {
+                            name: "icon".to_string(),
+                            content: icon,
+                            mime_type: "image/png".to_string(),
+                            metadata: None,
+                            activity_id: None, // Prevent this icon from being treated as a regular activity asset
+                        },
+                        user_id,
+                    )
+                    .await
+                    .map_err(ActivityServiceError::Asset)?;
+
+                match icon_response.asset {
+                    Some(asset) => Some(Uuid::parse_str(&asset.id).unwrap()),
+                    None => None,
+                }
+            }
+            None => None,
+        };
+
+        self.db
+            .update_activity(DbUpdateActivityRequest {
+                id: activity.id,
+                user_id,
+                icon_asset_id: icon_id,
+                ..Default::default()
+            })
+            .await
+            .map_err(ActivityServiceError::Database)?;
 
         debug!("Created activity {} for user {}", activity.id, user_id);
 
@@ -208,46 +252,31 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ActivityResponse>, Status> {
         info!("UpdateActivity request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
-        })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
 
-        let activity_id = Uuid::parse_str(&req.id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
-
-        let icon_asset_id = req
-            .icon_asset_id
-            .as_ref()
-            .map(|s| Uuid::parse_str(s))
-            .transpose()
-            .map_err(|e| Status::invalid_argument(format!("Invalid icon asset ID: {}", e)))?;
+        let activity_id = parse_activity_id(&req.id)?;
+        let icon_asset_id = parse_optional_uuid(req.icon_asset_id.as_ref(), "icon_asset_id")?;
 
         let started_at = req.started_at.as_ref().and_then(timestamp_to_datetime);
         let ended_at = req.ended_at.as_ref().and_then(timestamp_to_datetime);
 
         let activity = self
             .db
-            .update_activity(
-                activity_id,
+            .update_activity(DbUpdateActivityRequest {
+                id: activity_id,
                 user_id,
-                req.name.as_deref(),
+                name: req.name.clone(),
                 icon_asset_id,
-                req.process_name.as_deref(),
-                req.window_title.as_deref(),
+                process_name: req.process_name.clone(),
+                window_title: req.window_title.clone(),
                 started_at,
                 ended_at,
-            )
+            })
             .await
-            .map_err(|e| {
-                error!("Failed to update activity: {}", e);
-                Status::internal("Failed to update activity")
-            })?;
+            .map_err(ActivityServiceError::from)?;
 
         debug!("Updated activity {} for user {}", activity_id, user_id);
 
@@ -262,32 +291,27 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<()>, Status> {
         info!("UpdateActivityEndTime request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
-        })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
 
-        let activity_id = Uuid::parse_str(&req.activity_id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+        let activity_id = parse_activity_id(&req.activity_id)?;
 
         let ended_at = req
             .ended_at
             .as_ref()
             .and_then(timestamp_to_datetime)
-            .ok_or_else(|| Status::invalid_argument("ended_at is required"))?;
+            .ok_or_else(|| ActivityServiceError::invalid_timestamp("ended_at"))?;
 
         self.db
-            .update_activity_end_time(activity_id, user_id, ended_at)
+            .update_activity_end_time(DbUpdateActivityEndTimeRequest {
+                activity_id,
+                user_id,
+                ended_at,
+            })
             .await
-            .map_err(|e| {
-                error!("Failed to update activity end time: {}", e);
-                Status::internal("Failed to update activity end time")
-            })?;
+            .map_err(ActivityServiceError::from)?;
 
         debug!(
             "Updated end time for activity {} for user {}",
@@ -303,22 +327,14 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ActivityResponse>, Status> {
         info!("GetLastActiveActivity request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
-        })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let activity = self
             .db
             .get_last_active_activity(user_id)
             .await
-            .map_err(|e| {
-                error!("Failed to get last active activity: {}", e);
-                Status::internal("Failed to get last active activity")
-            })?;
+            .map_err(ActivityServiceError::from)?;
 
         debug!("Retrieved last active activity for user {}", user_id);
 
@@ -333,26 +349,17 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<()>, Status> {
         info!("DeleteActivity request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
-        })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
 
-        let activity_id = Uuid::parse_str(&req.id)
-            .map_err(|e| Status::invalid_argument(format!("Invalid activity ID: {}", e)))?;
+        let activity_id = parse_activity_id(&req.id)?;
 
         self.db
             .delete_activity(activity_id, user_id)
             .await
-            .map_err(|e| {
-                error!("Failed to delete activity: {}", e);
-                Status::internal("Failed to delete activity")
-            })?;
+            .map_err(ActivityServiceError::from)?;
 
         debug!("Deleted activity {} for user {}", activity_id, user_id);
 
@@ -365,13 +372,8 @@ impl ProtoActivityService for ActivityService {
     ) -> Result<Response<ListActivitiesResponse>, Status> {
         info!("GetActivitiesByTimeRange request received");
 
-        let claims = request.extensions().get::<Claims>().ok_or_else(|| {
-            error!("Missing claims in request");
-            Status::unauthenticated("Missing claims")
-        })?;
-
-        let user_id = Uuid::parse_str(&claims.sub)
-            .map_err(|e| Status::internal(format!("Invalid user ID: {}", e)))?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
 
@@ -379,24 +381,27 @@ impl ProtoActivityService for ActivityService {
             .start_time
             .as_ref()
             .and_then(timestamp_to_datetime)
-            .ok_or_else(|| Status::invalid_argument("start_time is required"))?;
+            .ok_or_else(|| ActivityServiceError::invalid_timestamp("start_time"))?;
 
         let end_time = req
             .end_time
             .as_ref()
             .and_then(timestamp_to_datetime)
-            .ok_or_else(|| Status::invalid_argument("end_time is required"))?;
+            .ok_or_else(|| ActivityServiceError::invalid_timestamp("end_time"))?;
 
         let limit = if req.limit == 0 { 50 } else { req.limit };
 
-        let (activities, total_count) = self
+        let activities = self
             .db
-            .get_activities_by_time_range(user_id, start_time, end_time, limit, req.offset)
+            .get_activities_by_time_range(DbGetActivitiesByTimeRangeRequest {
+                user_id,
+                start_time,
+                end_time,
+                limit,
+                offset: req.offset,
+            })
             .await
-            .map_err(|e| {
-                error!("Failed to get activities by time range: {}", e);
-                Status::internal("Failed to get activities by time range")
-            })?;
+            .map_err(ActivityServiceError::from)?;
 
         let proto_activities: Vec<Activity> =
             activities.iter().map(Self::db_activity_to_proto).collect();
@@ -409,7 +414,6 @@ impl ProtoActivityService for ActivityService {
 
         Ok(Response::new(ListActivitiesResponse {
             activities: proto_activities,
-            total_count,
         }))
     }
 }

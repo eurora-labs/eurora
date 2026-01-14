@@ -1,0 +1,18 @@
+[package]
+name = "prompt-kit"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+agent-chain = { workspace = true, features = [
+  "anthropic",
+  "ollama",
+  "openai",
+] }
+agent-chain-eurora = { workspace = true }
+anyhow = { workspace = true }
+euro-chat-client = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+tokio-stream = { workspace = true }
+tracing = { workspace = true }
