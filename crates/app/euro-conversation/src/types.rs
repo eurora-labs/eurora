@@ -3,9 +3,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::error::{Error, Result};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Conversation {
-    id: Uuid,
+    id: Option<Uuid>,
     title: String,
     messages: Vec<BaseMessage>,
 
@@ -14,12 +16,20 @@ pub struct Conversation {
 }
 
 impl Conversation {
-    pub fn id(&self) -> Uuid {
+    pub fn id(&self) -> Option<Uuid> {
         self.id
     }
 
     pub fn title(&self) -> &str {
         &self.title
+    }
+
+    pub fn set_id(&mut self, id: Uuid) -> Result<()> {
+        if self.id.is_none() {
+            self.id = Some(id);
+            return Ok(());
+        }
+        Err(Error::SetId("Conversation ID is already set".to_string()))
     }
 }
 
@@ -30,7 +40,7 @@ impl Default for Conversation {
         let updated_at = created_at;
 
         Self {
-            id: Uuid::now_v7(),
+            id: None,
             title,
             messages: Vec::new(),
             created_at,
@@ -41,5 +51,5 @@ impl Default for Conversation {
 
 #[derive(Debug, Clone)]
 pub enum ConversationEvent {
-    NewConversation { id: uuid::Uuid, title: String },
+    NewConversation { id: Option<Uuid>, title: String },
 }
