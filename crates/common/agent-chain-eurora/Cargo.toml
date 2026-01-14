@@ -10,7 +10,7 @@ ignored = ["tonic-prost"]
 
 [dependencies]
 agent-chain-core = { workspace = true }
-async-stream = "0.3.1"
+async-stream = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 prost = { workspace = true }

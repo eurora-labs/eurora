@@ -31,6 +31,7 @@ agent-graph = { path = "crates/common/agent-graph" }
 agent-graph-macros = { path = "crates/common/agent-graph-macros" }
 anyhow = "1.0.99"
 async_from = "0.2.0"
+async-stream = "0.3.6"
 async-trait = "0.1.89"
 auth-core = { path = "crates/common/auth-core" }
 base64 = "0.22.1"
