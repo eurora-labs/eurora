@@ -1,9 +1,13 @@
-use crate::{Conversation, error::Result, types::ConversationEvent};
+use crate::{
+    Conversation,
+    error::{Error, Result},
+    types::ConversationEvent,
+};
 // use agent_chain_core::BaseMessage;
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
-    CreateConversationRequest, CreateConversationResponse, ListConversationsRequest,
-    ListConversationsResponse, proto_conversation_service_client::ProtoConversationServiceClient,
+    CreateConversationRequest, ListConversationsRequest, ListConversationsResponse,
+    proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use tokio::sync::broadcast;
 
@@ -46,12 +50,23 @@ impl ConversationManager {
     }
 
     pub async fn save_current_conversation(
-        &self,
+        &mut self,
         request: CreateConversationRequest,
-    ) -> Result<CreateConversationResponse> {
+    ) -> Result<Conversation> {
         let mut client = self.conversation_client.clone();
         let response = client.create_conversation(request).await?.into_inner();
-        Ok(response)
+        if let Some(conversation) = response.conversation {
+            // Assign the id if it's not already set
+            if self.current_conversation.id().is_none() {
+                self.current_conversation
+                    .set_id(uuid::Uuid::parse_str(&conversation.id).unwrap())?;
+            }
+            Ok(Conversation::default())
+        } else {
+            Err(Error::CreateConversation(
+                "Server did not return the saved conversation".to_string(),
+            ))
+        }
     }
 
     pub async fn list_conversations(

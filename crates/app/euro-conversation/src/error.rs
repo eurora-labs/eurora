@@ -6,14 +6,17 @@ use crate::types::ConversationEvent;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Failed to create conversation")]
-    CreateConversation,
+    #[error("Failed to create conversation: {0}")]
+    CreateConversation(String),
 
     #[error("Could not send event: {0}")]
     SendEvent(#[source] SendError<ConversationEvent>),
 
     #[error("Could not save conversation: {0}")]
     SaveConversation(#[source] Status),
+
+    #[error("Could not set conversation id: {0}")]
+    SetId(String),
 }
 
 impl From<SendError<ConversationEvent>> for Error {
