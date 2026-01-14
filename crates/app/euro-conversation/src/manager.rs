@@ -1,15 +1,16 @@
-use crate::Conversation;
+use crate::{Conversation, error::Result, types::ConversationEvent};
 // use agent_chain_core::BaseMessage;
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
     CreateConversationRequest, CreateConversationResponse, ListConversationsRequest,
     ListConversationsResponse, proto_conversation_service_client::ProtoConversationServiceClient,
 };
-use tonic::Status;
+use tokio::sync::broadcast;
 
 pub struct ConversationManager {
-    // conversation: Option<Conversation>,
+    current_conversation: Conversation,
     conversation_client: ProtoConversationServiceClient<AuthedChannel>,
+    conversation_event_tx: broadcast::Sender<ConversationEvent>,
     // chat_client: ProtoChatServiceClient<AuthedChannel>,
 }
 
@@ -17,24 +18,37 @@ impl ConversationManager {
     pub async fn new() -> Self {
         let channel = get_authed_channel().await;
         let conversation_client = ProtoConversationServiceClient::new(channel.clone());
+        let (conversation_event_tx, _) = broadcast::channel(100);
         // let chat_client = ProtoChatServiceClient::new(channel);
 
         Self {
-            // conversation: None,
+            current_conversation: Conversation::default(),
             conversation_client,
+            conversation_event_tx,
             // chat_client,
         }
     }
 
-    pub async fn create_empty_conversation(&self) -> Result<Conversation, Status> {
-        let conversation = Conversation::default();
-        Ok(conversation)
+    pub async fn create_new_conversation(&mut self) -> Result<&Conversation> {
+        self.current_conversation = Conversation::default();
+
+        self.conversation_event_tx
+            .send(ConversationEvent::NewConversation {
+                id: self.current_conversation.id(),
+                title: self.current_conversation.title().to_string(),
+            })?;
+
+        Ok(&self.current_conversation)
     }
 
-    pub async fn create_conversation(
+    pub async fn get_current_conversation(&self) -> &Conversation {
+        &self.current_conversation
+    }
+
+    pub async fn save_current_conversation(
         &self,
         request: CreateConversationRequest,
-    ) -> Result<CreateConversationResponse, Status> {
+    ) -> Result<CreateConversationResponse> {
         let mut client = self.conversation_client.clone();
         let response = client.create_conversation(request).await?.into_inner();
         Ok(response)
@@ -43,7 +57,7 @@ impl ConversationManager {
     pub async fn list_conversations(
         &self,
         request: ListConversationsRequest,
-    ) -> Result<ListConversationsResponse, Status> {
+    ) -> Result<ListConversationsResponse> {
         let mut client = self.conversation_client.clone();
         let response = client.list_conversations(request).await?.into_inner();
         Ok(response)
