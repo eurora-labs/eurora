@@ -1,0 +1,29 @@
+[package]
+name = "be-auth-service"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+auth-core = { workspace = true }
+base64 = { workspace = true }
+bcrypt = "0.17"
+be-auth-grpc = { workspace = true }
+be-remote-db = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+hex = { workspace = true }
+jsonwebtoken = { workspace = true }
+oauth2 = "5.0.0"
+prost = { workspace = true }
+proto-gen = { workspace = true, features = ["server"] }
+rand = { workspace = true }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { workspace = true, features = ["derive"] }
+sha2 = "0.10"
+tonic = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["serde", "v4"] }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }

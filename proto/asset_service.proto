@@ -210,9 +210,6 @@ message AssetResponse {
 message ListAssetsResponse {
   // List of assets
   repeated Asset assets = 1;
-
-  // Total count of assets matching the query (for pagination)
-  uint64 total_count = 2;
 }
 
 message MessageAssetResponse {

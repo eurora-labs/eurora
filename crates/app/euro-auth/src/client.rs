@@ -1,12 +1,10 @@
-use crate::{
-    get_secure_channel,
-    proto::{
-        EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
-        RefreshTokenRequest, RegisterRequest, TokenResponse, login_request::Credential,
-        proto_auth_service_client::ProtoAuthServiceClient,
-    },
-};
+use crate::get_secure_channel;
 use anyhow::{Ok, Result, anyhow};
+use proto_gen::auth::{
+    EmailPasswordCredentials, GetLoginTokenResponse, LoginByLoginTokenRequest, LoginRequest,
+    RefreshTokenRequest, RegisterRequest, TokenResponse, login_request::Credential,
+    proto_auth_service_client::ProtoAuthServiceClient,
+};
 use tonic::transport::Channel;
 use tracing::error;
 
