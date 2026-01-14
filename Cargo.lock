@@ -1494,6 +1494,7 @@ dependencies = [
 name = "be-conversation-service"
 version = "0.0.0"
 dependencies = [
+ "agent-chain",
  "be-asset",
  "be-auth-grpc",
  "be-remote-db",
@@ -1503,6 +1504,7 @@ dependencies = [
  "prost-types",
  "proto-gen",
  "thiserror 2.0.17",
+ "tokio-stream",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
