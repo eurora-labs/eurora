@@ -7,6 +7,7 @@ import "google/protobuf/timestamp.proto";
 service ProtoConversationService {
   rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
 }
 
 message CreateConversationRequest {
@@ -36,4 +37,17 @@ message ListConversationsRequest {
 
 message ListConversationsResponse {
   repeated Conversation conversations = 1;
+}
+
+message ChatStreamRequest {
+  string conversation_id = 1;
+  string content = 2;
+}
+
+message ChatStreamResponse {
+  // The message chunk
+  string chunk = 1;
+
+  // Whether this is the final chunk
+  bool is_final = 2;
 }
