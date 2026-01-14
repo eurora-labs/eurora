@@ -384,8 +384,17 @@ pub struct UpdateMessageRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListMessagesRequest {
     pub conversation_id: Uuid,
+    pub user_id: Uuid,
     pub limit: u32,
     pub offset: u32,
+}
+
+/// Request for listing messages with pagination
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetLastMessagesRequest {
+    pub conversation_id: Uuid,
+    pub user_id: Uuid,
+    pub limit: u32,
 }
 
 // =============================================================================
