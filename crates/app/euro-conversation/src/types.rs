@@ -5,12 +5,22 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Conversation {
-    id: Option<Uuid>,
+    id: Uuid,
     title: String,
     messages: Vec<BaseMessage>,
 
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+}
+
+impl Conversation {
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+
+    pub fn title(&self) -> &str {
+        &self.title
+    }
 }
 
 impl Default for Conversation {
@@ -20,11 +30,16 @@ impl Default for Conversation {
         let updated_at = created_at;
 
         Self {
-            id: None,
+            id: Uuid::now_v7(),
             title,
             messages: Vec::new(),
             created_at,
             updated_at,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum ConversationEvent {
+    NewConversation { id: uuid::Uuid, title: String },
 }
