@@ -1,7 +1,4 @@
 //! Server-side implementation for the Conversation Service.
-//!
-//! This module contains the gRPC server implementation and is only
-//! available when the `server` feature is enabled.
 
 use agent_chain::{BaseChatModel, BaseMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};

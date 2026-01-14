@@ -8,10 +8,8 @@ ignored = ["tonic-prost"]
 
 [dependencies]
 agent-chain = { workspace = true, features = ["openai"] }
-be-asset = { workspace = true }
 be-auth-grpc = { workspace = true }
 be-remote-db = { workspace = true }
-be-storage = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 prost = { workspace = true }
 prost-types = { workspace = true }
