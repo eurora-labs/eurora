@@ -695,15 +695,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async_from"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b397bca84f93309aa3c1f6a8153678bfb260a6749a4be58dc5458d18e1bb517"
-dependencies = [
- "async-trait",
-]
-
-[[package]]
 name = "atk"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1442,7 +1433,6 @@ dependencies = [
  "tonic-prost",
  "tonic-prost-build",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -1495,10 +1485,8 @@ name = "be-conversation-service"
 version = "0.0.0"
 dependencies = [
  "agent-chain",
- "be-asset",
  "be-auth-grpc",
  "be-remote-db",
- "be-storage",
  "chrono",
  "prost",
  "prost-types",
@@ -3520,19 +3508,14 @@ dependencies = [
 name = "euro-conversation"
 version = "0.0.0"
 dependencies = [
- "agent-chain-core",
+ "agent-chain",
  "agent-chain-eurora",
- "anyhow",
- "async-stream",
- "async-trait",
  "chrono",
  "euro-auth",
- "futures",
  "prost",
  "prost-types",
  "proto-gen",
  "serde",
- "serde_json",
  "thiserror 2.0.17",
  "tokio",
  "tonic",
@@ -3644,7 +3627,6 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-eurora",
  "anyhow",
- "async_from",
  "dirs 6.0.0",
  "euro-chat-client",
  "euro-fs",
@@ -7892,10 +7874,8 @@ name = "prompt-kit"
 version = "0.0.0"
 dependencies = [
  "agent-chain",
- "agent-chain-core",
  "agent-chain-eurora",
  "anyhow",
- "async_from",
  "euro-chat-client",
  "serde",
  "thiserror 2.0.17",
