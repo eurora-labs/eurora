@@ -1,4 +1,4 @@
-use agent_chain_core::BaseMessage;
+use agent_chain::BaseMessage;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

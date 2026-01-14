@@ -1,7 +1,4 @@
 //! Server-side implementation for the Assets Service.
-//!
-//! This module contains the gRPC server implementation and is only
-//! available when the `server` feature is enabled.
 
 use std::sync::Arc;
 
