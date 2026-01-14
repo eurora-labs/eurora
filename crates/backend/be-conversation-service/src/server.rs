@@ -11,7 +11,7 @@ use prost_types::Timestamp;
 use std::{pin::Pin, sync::Arc};
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::error::ConversationServiceError;
@@ -37,7 +37,10 @@ impl ConversationService {
     pub fn new(db: Arc<DatabaseManager>) -> Self {
         info!("Creating new ConversationService instance");
 
-        let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
+        let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
+            error!("OPENAI_API_KEY environment variable is not set");
+            String::new()
+        });
         let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4".to_string());
 
         let provider = ChatOpenAI::new(&model).api_key(api_key);
@@ -193,6 +196,7 @@ impl ProtoConversationService for ConversationService {
                 // AIMessageChunk has content() method for getting the text content
                 // We determine finality by empty content or chunk_position
                 let content = chunk.content().to_string();
+                // TODO: Don't rely on empty string for finality
                 let is_final = content.is_empty();
 
                 Ok(ChatStreamResponse {
