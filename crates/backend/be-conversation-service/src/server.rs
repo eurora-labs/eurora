@@ -4,10 +4,10 @@
 //! available when the `server` feature is enabled.
 
 use agent_chain::{BaseChatModel, BaseMessage, openai::ChatOpenAI};
-use be_auth_grpc::{Claims, extract_claims};
+use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
     CreateConversationRequest as DbCreateConversationRequest, DatabaseManager,
-    ListConversationsRequest as DbListConversationsRequest,
+    GetLastMessagesRequest, ListConversationsRequest as DbListConversationsRequest,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -66,11 +66,6 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
         seconds: dt.timestamp(),
         nanos: dt.timestamp_subsec_nanos() as i32,
     }
-}
-
-/// Parse a user ID from claims.
-fn parse_user_id(claims: &Claims) -> Result<Uuid, ConversationServiceError> {
-    Uuid::parse_str(&claims.sub).map_err(|e| ConversationServiceError::invalid_uuid("user_id", e))
 }
 
 type ChatResult<T> = Result<Response<T>, Status>;
@@ -154,14 +149,31 @@ impl ProtoConversationService for ConversationService {
 
     async fn chat_stream(
         &self,
-        _request: Request<ChatStreamRequest>,
+        request: Request<ChatStreamRequest>,
     ) -> ChatResult<Self::ChatStreamStream> {
         info!("ChatStream request received");
 
-        // let claims = extract_claims(&request)?;
-        // let user_id = parse_user_id(claims)?;
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
 
-        // let req = request.into_inner();
+        let _db_messages = self
+            .db
+            .get_last_messages(GetLastMessagesRequest {
+                conversation_id,
+                user_id,
+                limit: 5,
+            })
+            .await
+            .unwrap();
+
+        // let messages: Vec<BaseMessage> = db_messages.into_iter().map(|msg| msg.into()).collect();
 
         // 1. Get current conversation
         // 2.
