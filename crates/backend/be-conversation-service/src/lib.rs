@@ -16,6 +16,7 @@
 //! The crate uses [`ConversationServiceError`] for all error conditions, which
 //! automatically converts to appropriate gRPC [`tonic::Status`] codes.
 
+mod converters;
 mod error;
 mod server;
 

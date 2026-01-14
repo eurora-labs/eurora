@@ -8,7 +8,6 @@ use sqlx::{
 use tracing::{debug, info};
 use uuid::Uuid;
 
-use crate::error::DbResult;
 use crate::types::{
     Activity, ActivityAsset, ActivityConversation, Asset, Conversation, CreateActivityRequest,
     CreateAssetRequest, CreateConversationRequest, CreateLoginTokenRequest, CreateMessageRequest,
@@ -19,6 +18,7 @@ use crate::types::{
     UpdateActivityRequest, UpdateAssetRequest, UpdateConversationRequest, UpdateMessageRequest,
     UpdateOAuthCredentialsRequest, UpdatePasswordRequest, UpdateUserRequest, User,
 };
+use crate::{GetLastMessagesRequest, error::DbResult};
 #[derive(Debug)]
 pub struct DatabaseManager {
     pub pool: PgPool,
@@ -1410,38 +1410,29 @@ impl DatabaseManager {
         Ok(message)
     }
 
-    /// Get a message by ID
-    pub async fn get_message(&self, message_id: Uuid) -> DbResult<Message> {
-        let message = sqlx::query_as::<_, Message>(
+    pub async fn get_last_messages(
+        &self,
+        request: GetLastMessagesRequest,
+    ) -> DbResult<Vec<Message>> {
+        // Clamp limit to max 100
+        let limit = request.limit.clamp(1, 100);
+
+        let messages = sqlx::query_as::<_, Message>(
             r#"
             SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at
             FROM messages
-            WHERE id = $1
+            WHERE conversation_id = $1 AND user_id = $2
+            ORDER BY sequence_num DESC
+            LIMIT $3
             "#,
         )
-        .bind(message_id)
-        .fetch_one(&self.pool)
+        .bind(request.conversation_id)
+        .bind(request.user_id)
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
         .await?;
 
-        Ok(message)
-    }
-
-    /// Get a message by ID for a specific user (joins with conversation to verify ownership)
-    pub async fn get_message_for_user(&self, message_id: Uuid, user_id: Uuid) -> DbResult<Message> {
-        let message = sqlx::query_as::<_, Message>(
-            r#"
-            SELECT m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.sequence_num, m.created_at, m.updated_at
-            FROM messages m
-            INNER JOIN conversations c ON m.conversation_id = c.id
-            WHERE m.id = $1 AND c.user_id = $2
-            "#,
-        )
-        .bind(message_id)
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(message)
+        Ok(messages)
     }
 
     /// List messages for a conversation with pagination
@@ -1465,45 +1456,6 @@ impl DatabaseManager {
         .await?;
 
         Ok(messages)
-    }
-
-    /// List all messages for a conversation (no pagination, ordered by sequence_num)
-    pub async fn list_all_messages(&self, conversation_id: Uuid) -> DbResult<Vec<Message>> {
-        let messages = sqlx::query_as::<_, Message>(
-            r#"
-            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at
-            FROM messages
-            WHERE conversation_id = $1
-            ORDER BY sequence_num ASC
-            "#,
-        )
-        .bind(conversation_id)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(messages)
-    }
-
-    /// List messages for a conversation for a specific user (verifies ownership)
-    pub async fn list_messages_for_user(
-        &self,
-        conversation_id: Uuid,
-        user_id: Uuid,
-        limit: u32,
-        offset: u32,
-    ) -> DbResult<Vec<Message>> {
-        // First verify the user owns the conversation
-        let _ = self
-            .get_conversation_for_user(conversation_id, user_id)
-            .await?;
-
-        let request = ListMessagesRequest {
-            conversation_id,
-            limit,
-            offset,
-        };
-
-        self.list_messages(request).await
     }
 
     /// Update an existing message
