@@ -1,7 +1,7 @@
 use anyhow::Result;
 use euro_personal_db::{Conversation, PersonalDatabaseManager};
-use euro_prompt_kit::PromptKitService;
 use euro_settings::AppSettings;
+use prompt_kit::PromptKitService;
 use tokio::sync::Mutex;
 use tracing::error;
 

@@ -34,17 +34,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "activity-models"
-version = "0.0.0"
-dependencies = [
- "prost",
- "prost-types",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
-]
-
-[[package]]
 name = "actix-codec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -308,33 +297,8 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tonic",
- "tonic-async-interceptor",
  "tonic-prost",
  "tonic-prost-build",
- "tower",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "agent-chain-grpc"
-version = "0.0.0"
-dependencies = [
- "agent-chain-core",
- "async-stream",
- "async-trait",
- "futures",
- "prost",
- "prost-types",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tonic",
- "tonic-async-interceptor",
- "tonic-prost",
- "tonic-prost-build",
- "tower",
  "tracing",
  "url",
 ]
@@ -578,17 +542,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "asset-models"
-version = "0.0.0"
-dependencies = [
- "prost",
- "prost-types",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
-]
-
-[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -739,15 +692,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.112",
-]
-
-[[package]]
-name = "async_from"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b397bca84f93309aa3c1f6a8153678bfb260a6749a4be58dc5458d18e1bb517"
-dependencies = [
- "async-trait",
 ]
 
 [[package]]
@@ -1440,13 +1384,15 @@ dependencies = [
 name = "be-activity-service"
 version = "0.0.0"
 dependencies = [
- "activity-models",
- "anyhow",
+ "be-asset",
  "be-auth-grpc",
+ "be-remote-db",
+ "be-storage",
  "chrono",
- "euro-remote-db",
  "prost",
  "prost-types",
+ "proto-gen",
+ "thiserror 2.0.17",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
@@ -1455,26 +1401,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "be-asset"
+version = "0.0.0"
+dependencies = [
+ "base64 0.22.1",
+ "be-remote-db",
+ "be-storage",
+ "chrono",
+ "hex",
+ "prost-types",
+ "proto-gen",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "be-asset-service"
 version = "0.0.0"
 dependencies = [
- "anyhow",
- "asset-models",
- "base64 0.22.1",
+ "be-asset",
  "be-auth-grpc",
- "chrono",
- "euro-remote-db",
- "hex",
- "opendal",
+ "be-remote-db",
+ "be-storage",
  "prost",
  "prost-types",
- "serde_json",
- "sha2",
+ "proto-gen",
+ "thiserror 2.0.17",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -1493,6 +1451,79 @@ dependencies = [
  "be-auth-core",
  "tonic",
  "tonic-prost",
+ "uuid",
+]
+
+[[package]]
+name = "be-auth-service"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "auth-core",
+ "base64 0.22.1",
+ "bcrypt",
+ "be-auth-grpc",
+ "be-remote-db",
+ "chrono",
+ "hex",
+ "jsonwebtoken",
+ "oauth2",
+ "prost",
+ "proto-gen",
+ "rand 0.9.2",
+ "reqwest 0.12.24",
+ "serde",
+ "sha2",
+ "tonic",
+ "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "be-conversation-service"
+version = "0.0.0"
+dependencies = [
+ "agent-chain",
+ "be-auth-grpc",
+ "be-remote-db",
+ "chrono",
+ "prost",
+ "prost-types",
+ "proto-gen",
+ "thiserror 2.0.17",
+ "tokio-stream",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "be-monolith"
+version = "0.0.1"
+dependencies = [
+ "axum",
+ "be-activity-service",
+ "be-asset-service",
+ "be-auth-grpc",
+ "be-auth-service",
+ "be-prompt-service",
+ "be-remote-db",
+ "be-update-service",
+ "dotenv",
+ "prost",
+ "proto-gen",
+ "sentry",
+ "tokio",
+ "tonic",
+ "tonic-health",
+ "tonic-prost-build",
+ "tonic-web",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1501,13 +1532,54 @@ version = "0.0.0"
 dependencies = [
  "agent-chain",
  "agent-chain-core",
- "agent-chain-grpc",
+ "agent-chain-eurora",
  "anyhow",
  "be-auth-grpc",
  "prost",
  "tokio-stream",
  "tonic",
  "tonic-prost-build",
+ "tracing",
+]
+
+[[package]]
+name = "be-remote-db"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "ipnet",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.17",
+ "uuid",
+]
+
+[[package]]
+name = "be-storage"
+version = "0.0.0"
+dependencies = [
+ "hex",
+ "opendal",
+ "sha2",
+ "thiserror 2.0.17",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "be-update-service"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aws-config",
+ "aws-sdk-s3",
+ "axum",
+ "chrono",
+ "semver",
+ "serde",
+ "tower",
+ "tower-http",
  "tracing",
 ]
 
@@ -3350,10 +3422,8 @@ dependencies = [
 name = "euro-activity"
 version = "0.0.0"
 dependencies = [
- "activity-models",
  "agent-chain-core",
  "anyhow",
- "asset-models",
  "async-trait",
  "base64 0.22.1",
  "cfg-if",
@@ -3369,6 +3439,7 @@ dependencies = [
  "humantime-serde",
  "image",
  "prost-types",
+ "proto-gen",
  "regex",
  "resvg",
  "serde",
@@ -3400,6 +3471,7 @@ dependencies = [
  "jsonwebtoken",
  "prost",
  "prost-types",
+ "proto-gen",
  "rand 0.9.2",
  "sha2",
  "specta",
@@ -3414,37 +3486,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-auth-service"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "auth-core",
- "base64 0.22.1",
- "bcrypt",
- "be-auth-grpc",
- "chrono",
- "euro-proto",
- "euro-remote-db",
- "hex",
- "jsonwebtoken",
- "oauth2",
- "prost",
- "rand 0.9.2",
- "reqwest 0.12.24",
- "serde",
- "sha2",
- "tonic",
- "tonic-prost-build",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "euro-chat-client"
 version = "0.0.0"
 dependencies = [
  "agent-chain-core",
- "agent-chain-grpc",
+ "agent-chain-eurora",
  "anyhow",
  "async-stream",
  "async-trait",
@@ -3456,6 +3502,26 @@ dependencies = [
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
+]
+
+[[package]]
+name = "euro-conversation"
+version = "0.0.0"
+dependencies = [
+ "agent-chain",
+ "agent-chain-eurora",
+ "chrono",
+ "euro-auth",
+ "prost",
+ "prost-types",
+ "proto-gen",
+ "serde",
+ "thiserror 2.0.17",
+ "tokio",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "uuid",
 ]
 
 [[package]]
@@ -3485,32 +3551,6 @@ dependencies = [
  "serde",
  "toml 0.9.10+spec-1.1.0",
  "walkdir",
-]
-
-[[package]]
-name = "euro-monolith"
-version = "0.0.1"
-dependencies = [
- "axum",
- "be-activity-service",
- "be-asset-service",
- "be-auth-grpc",
- "be-prompt-service",
- "dotenv",
- "euro-auth-service",
- "euro-proto",
- "euro-remote-db",
- "euro-update-service",
- "prost",
- "sentry",
- "tokio",
- "tonic",
- "tonic-health",
- "tonic-prost-build",
- "tonic-web",
- "tower-http",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -3564,57 +3604,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-prompt-kit"
-version = "0.0.0"
-dependencies = [
- "agent-chain",
- "agent-chain-core",
- "agent-chain-grpc",
- "anyhow",
- "async_from",
- "euro-chat-client",
- "serde",
- "thiserror 2.0.17",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
-name = "euro-proto"
-version = "0.0.0"
-dependencies = [
- "prost",
- "prost-types",
- "serde",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
-]
-
-[[package]]
-name = "euro-proto-client"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "euro-proto",
- "tonic",
- "tracing",
-]
-
-[[package]]
-name = "euro-remote-db"
-version = "0.0.0"
-dependencies = [
- "chrono",
- "ipnet",
- "serde",
- "serde_json",
- "sqlx",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "euro-screen-position"
 version = "0.0.0"
 dependencies = [
@@ -3638,13 +3627,12 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-eurora",
  "anyhow",
- "async_from",
  "dirs 6.0.0",
  "euro-chat-client",
  "euro-fs",
- "euro-prompt-kit",
  "euro-secret",
  "notify",
+ "prompt-kit",
  "serde",
  "serde_json",
  "serde_json_lenient",
@@ -3669,10 +3657,10 @@ dependencies = [
  "dotenv",
  "euro-activity",
  "euro-chat-client",
+ "euro-conversation",
  "euro-encrypt",
  "euro-native-messaging",
  "euro-personal-db",
- "euro-prompt-kit",
  "euro-secret",
  "euro-settings",
  "euro-timeline",
@@ -3684,6 +3672,7 @@ dependencies = [
  "log",
  "parking_lot",
  "posthog-rs",
+ "prompt-kit",
  "sentry",
  "serde",
  "serde_json",
@@ -3732,37 +3721,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-update-service"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "aws-config",
- "aws-sdk-s3",
- "axum",
- "chrono",
- "semver",
- "serde",
- "tower",
- "tower-http",
- "tracing",
-]
-
-[[package]]
 name = "euro-user"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "auth-core",
- "base64 0.22.1",
  "chrono",
- "euro-proto-client",
+ "euro-auth",
  "euro-secret",
  "euro-storage",
- "rand 0.9.2",
  "serde",
  "serde_json",
- "sha2",
- "tracing",
  "uuid",
 ]
 
@@ -7902,6 +7870,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "prompt-kit"
+version = "0.0.0"
+dependencies = [
+ "agent-chain",
+ "agent-chain-eurora",
+ "anyhow",
+ "euro-chat-client",
+ "serde",
+ "thiserror 2.0.17",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "prost"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7953,6 +7935,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9b4db3d6da204ed77bb26ba83b6122a73aeb2e87e25fbf7ad2e84c4ccbf8f72"
 dependencies = [
  "prost",
+]
+
+[[package]]
+name = "proto-gen"
+version = "0.0.0"
+dependencies = [
+ "prost",
+ "prost-types",
+ "serde",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
 ]
 
 [[package]]

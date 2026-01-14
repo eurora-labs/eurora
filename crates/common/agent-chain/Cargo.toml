@@ -8,7 +8,7 @@ license = "MIT"
 [dependencies]
 agent-chain-core = { workspace = true }
 agent-chain-macros = { workspace = true }
-async-stream = "0.3"
+async-stream = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 reqwest = { version = "0.12", features = ["json", "stream"] }
