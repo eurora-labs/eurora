@@ -1413,19 +1413,20 @@ impl DatabaseManager {
         let limit = request.limit.clamp(1, 100);
 
         let messages = sqlx::query_as::<_, Message>(
-            r#"
-            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
-            FROM messages
-            WHERE conversation_id = $1
-            ORDER BY id ASC
-            LIMIT $2 OFFSET $3
-            "#,
-        )
-        .bind(request.conversation_id)
-        .bind(limit as i64)
-        .bind(request.offset as i64)
-        .fetch_all(&self.pool)
-        .await?;
+                    r#"
+                    SELECT m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
+                    FROM messages m
+                    INNER JOIN conversations c ON m.conversation_id = c.id
+                    WHERE m.conversation_id = $1 AND c.user_id = $2
+                    ORDER BY m.id DESC
+                    LIMIT $3
+                    "#,
+                )
+                .bind(request.conversation_id)
+                .bind(request.user_id)
+                .bind(limit as i64)
+                .fetch_all(&self.pool)
+                .await?;
 
         Ok(messages)
     }
@@ -1449,7 +1450,7 @@ impl DatabaseManager {
                 updated_at = $7
             FROM conversations c
             WHERE m.id = $1 AND m.conversation_id = c.id AND c.user_id = $2
-            RETURNING m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.sequence_num, m.created_at, m.updated_at
+            RETURNING m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
             "#,
         )
         .bind(message_id)

@@ -385,7 +385,7 @@ pub struct ListMessagesRequest {
     pub offset: u32,
 }
 
-/// Request for listing messages with pagination
+/// Request for listing messages the last few messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetLastMessagesRequest {
     pub conversation_id: Uuid,
