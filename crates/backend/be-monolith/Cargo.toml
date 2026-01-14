@@ -1,0 +1,29 @@
+[package]
+name = "be-monolith"
+version = "0.0.1"
+edition.workspace = true
+publish = false
+
+[dependencies]
+axum = "0.8.8"
+be-activity-service = { workspace = true }
+be-asset-service = { workspace = true }
+be-auth-grpc = { workspace = true }
+be-auth-service = { workspace = true }
+be-prompt-service = { workspace = true }
+be-remote-db = { workspace = true }
+be-update-service = { workspace = true }
+dotenv = { workspace = true }
+prost = { workspace = true }
+proto-gen = { workspace = true }
+sentry = { workspace = true, features = ["log", "logs", "tracing"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+tonic = { workspace = true }
+tonic-health = "0.14.2"
+tonic-web = "0.14.2"
+tower-http = { version = "0.6.8", features = ["cors"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }

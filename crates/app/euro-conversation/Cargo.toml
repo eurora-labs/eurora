@@ -1,0 +1,30 @@
+[package]
+name = "euro-conversation"
+version = "0.0.0"
+edition.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["tonic-prost"]
+
+[dependencies]
+agent-chain = { workspace = true }
+agent-chain-eurora = { workspace = true }
+chrono = { workspace = true }
+euro-auth = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+proto-gen = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = [
+  "macros",
+  "rt",
+  "sync",
+  "time",
+] }
+tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
+tonic-prost = { workspace = true }
+uuid = { workspace = true, features = ["v7"] }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }

@@ -10,3 +10,4 @@ ignored = ["tonic-prost"]
 be-auth-core = { workspace = true }
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
+uuid = { workspace = true }
