@@ -5,7 +5,6 @@ use sqlx::{
     migrate::MigrateDatabase,
     postgres::{PgPool, PgPoolOptions},
 };
-use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::types::{
@@ -26,11 +25,6 @@ pub struct DatabaseManager {
 
 impl DatabaseManager {
     pub async fn new(database_url: &str) -> DbResult<Self> {
-        debug!(
-            "Initializing DatabaseManager with database URL: {}",
-            database_url
-        );
-
         // Create the database if it doesn't exist
         if !sqlx::Postgres::database_exists(database_url).await? {
             sqlx::Postgres::create_database(database_url).await?;
@@ -910,7 +904,6 @@ impl DatabaseManager {
         user_id: Uuid,
         request: CreateAssetRequest,
     ) -> DbResult<Asset> {
-        info!("create asset request: {:?}", request.clone());
         let id = request.id;
         let now = Utc::now();
         let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
@@ -1348,20 +1341,6 @@ impl DatabaseManager {
     // Message Management Methods
     // =========================================================================
 
-    /// Get the next sequence number for a conversation
-    async fn get_next_sequence_num(&self, conversation_id: Uuid) -> DbResult<i32> {
-        let result: (Option<i32>,) = sqlx::query_as(
-            r#"
-            SELECT MAX(sequence_num) FROM messages WHERE conversation_id = $1
-            "#,
-        )
-        .bind(conversation_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(result.0.unwrap_or(0) + 1)
-    }
-
     /// Create a new message
     pub async fn create_message(&self, request: CreateMessageRequest) -> DbResult<Message> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
@@ -1370,17 +1349,11 @@ impl DatabaseManager {
             .additional_kwargs
             .unwrap_or_else(|| serde_json::json!({}));
 
-        // Get sequence number (either provided or auto-calculated)
-        let sequence_num = match request.sequence_num {
-            Some(seq) => seq,
-            None => self.get_next_sequence_num(request.conversation_id).await?,
-        };
-
         let message = sqlx::query_as::<_, Message>(
             r#"
-            INSERT INTO messages (id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at
+            INSERT INTO messages (id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
             "#,
         )
         .bind(id)
@@ -1390,7 +1363,6 @@ impl DatabaseManager {
         .bind(&request.tool_call_id)
         .bind(&request.tool_calls)
         .bind(&additional_kwargs)
-        .bind(sequence_num)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -1419,10 +1391,10 @@ impl DatabaseManager {
 
         let messages = sqlx::query_as::<_, Message>(
             r#"
-            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at
+            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
             FROM messages
             WHERE conversation_id = $1 AND user_id = $2
-            ORDER BY sequence_num DESC
+            ORDER BY id DESC
             LIMIT $3
             "#,
         )
@@ -1442,10 +1414,10 @@ impl DatabaseManager {
 
         let messages = sqlx::query_as::<_, Message>(
             r#"
-            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, sequence_num, created_at, updated_at
+            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
             FROM messages
             WHERE conversation_id = $1
-            ORDER BY sequence_num ASC
+            ORDER BY id ASC
             LIMIT $2 OFFSET $3
             "#,
         )
