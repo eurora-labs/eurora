@@ -1390,19 +1390,20 @@ impl DatabaseManager {
         let limit = request.limit.clamp(1, 100);
 
         let messages = sqlx::query_as::<_, Message>(
-            r#"
-            SELECT id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
-            FROM messages
-            WHERE conversation_id = $1 AND user_id = $2
-            ORDER BY id DESC
-            LIMIT $3
-            "#,
-        )
-        .bind(request.conversation_id)
-        .bind(request.user_id)
-        .bind(limit as i64)
-        .fetch_all(&self.pool)
-        .await?;
+                   r#"
+                   SELECT m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
+                   FROM messages m
+                   INNER JOIN conversations c ON m.conversation_id = c.id
+                   WHERE m.conversation_id = $1 AND c.user_id = $2
+                   ORDER BY m.id DESC
+                   LIMIT $3
+                   "#,
+               )
+               .bind(request.conversation_id)
+               .bind(request.user_id)
+               .bind(limit as i64)
+               .fetch_all(&self.pool)
+               .await?;
 
         Ok(messages)
     }
