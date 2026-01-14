@@ -3,7 +3,7 @@ use crate::{
     error::{Error, Result},
     types::ConversationEvent,
 };
-use agent_chain_core::HumanMessage;
+use agent_chain::HumanMessage;
 use agent_chain_eurora::proto::proto_chat_service_client::ProtoChatServiceClient;
 // use agent_chain_core::BaseMessage;
 use euro_auth::{AuthedChannel, get_authed_channel};
@@ -36,7 +36,7 @@ impl ConversationManager {
         }
     }
 
-    pub async fn create_new_conversation(&mut self) -> Result<&Conversation> {
+    pub async fn clear_conversation(&mut self) -> Result<&Conversation> {
         self.current_conversation = Conversation::default();
 
         self.conversation_event_tx

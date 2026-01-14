@@ -1,6 +1,6 @@
+use agent_chain::language_models::BaseChatModel;
+use agent_chain::messages::BaseMessage;
 use agent_chain::{ollama::ChatOllama, openai::ChatOpenAI};
-use agent_chain_core::language_models::BaseChatModel;
-use agent_chain_core::messages::BaseMessage;
 use anyhow::Result;
 use euro_chat_client::ChatEurora;
 use serde::{Deserialize, Serialize};

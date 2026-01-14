@@ -19,7 +19,6 @@ thiserror = { workspace = true }
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
 tracing = { workspace = true }
-uuid = { workspace = true, features = ["serde", "v4", "v7"] }
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }
