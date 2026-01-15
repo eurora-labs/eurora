@@ -7,6 +7,8 @@ import "google/protobuf/timestamp.proto";
 service ProtoConversationService {
   rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
+
   rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
 }
 
@@ -40,7 +42,9 @@ message ListConversationsResponse {
 }
 
 message ChatStreamRequest {
+  // Conversation that is used as starting point for the chat
   string conversation_id = 1;
+  // User's message content
   string content = 2;
 }
 
@@ -50,4 +54,13 @@ message ChatStreamResponse {
 
   // Whether this is the final chunk
   bool is_final = 2;
+}
+
+message AddHumanMessageRequest {
+  string conversation_id = 1;
+  string content = 2;
+}
+
+message AddHumanMessageResponse {
+  Conversation conversation = 1;
 }
