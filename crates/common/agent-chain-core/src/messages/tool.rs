@@ -158,30 +158,30 @@ impl InvalidToolCall {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolMessage {
     /// The tool result content
-    content: String,
+    pub content: String,
     /// The ID of the tool call this message is responding to
-    tool_call_id: String,
+    pub tool_call_id: String,
     /// Optional unique identifier
-    id: Option<String>,
+    pub id: Option<String>,
     /// Optional name for the tool
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    pub name: Option<String>,
     /// Status of the tool invocation
     #[serde(default = "default_status")]
-    status: ToolStatus,
+    pub status: ToolStatus,
     /// Artifact of the tool execution which is not meant to be sent to the model.
     ///
     /// Should only be specified if it is different from the message content, e.g. if only
     /// a subset of the full tool output is being passed as message content but the full
     /// output is needed in other parts of the code.
     #[serde(skip_serializing_if = "Option::is_none")]
-    artifact: Option<serde_json::Value>,
+    pub artifact: Option<serde_json::Value>,
     /// Additional metadata
     #[serde(default)]
-    additional_kwargs: HashMap<String, serde_json::Value>,
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
     /// Response metadata
     #[serde(default)]
-    response_metadata: HashMap<String, serde_json::Value>,
+    pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
 fn default_status() -> ToolStatus {
