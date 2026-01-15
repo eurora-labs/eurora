@@ -51,6 +51,11 @@ impl ChatMessage {
         }
     }
 
+    /// Set the message ID.
+    pub fn set_id(&mut self, id: String) {
+        self.id = Some(id);
+    }
+
     /// Create a new chat message with an explicit ID.
     ///
     /// Use this when deserializing or reconstructing messages where the ID must be preserved.

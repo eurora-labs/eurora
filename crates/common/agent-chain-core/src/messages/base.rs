@@ -109,6 +109,19 @@ impl BaseMessage {
         }
     }
 
+    /// Set id of the message
+    pub fn set_id(&mut self, id: String) {
+        match self {
+            BaseMessage::Human(m) => m.set_id(id),
+            BaseMessage::System(m) => m.set_id(id),
+            BaseMessage::AI(m) => m.set_id(id),
+            BaseMessage::Tool(m) => m.set_id(id),
+            BaseMessage::Chat(m) => m.set_id(id),
+            BaseMessage::Function(m) => m.set_id(id),
+            BaseMessage::Remove(m) => m.set_id(id),
+        }
+    }
+
     /// Get tool calls if this is an AI message.
     pub fn tool_calls(&self) -> &[ToolCall] {
         match self {
