@@ -156,6 +156,11 @@ impl HumanMessage {
         self.id.as_deref()
     }
 
+    /// Set the message ID.
+    pub fn set_id(&mut self, id: String) {
+        self.id = Some(id);
+    }
+
     /// Get the message name.
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()

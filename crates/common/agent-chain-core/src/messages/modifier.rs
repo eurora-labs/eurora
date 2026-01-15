@@ -38,4 +38,9 @@ impl RemoveMessage {
     pub fn target_id(&self) -> &str {
         &self.id
     }
+
+    /// Set the message ID.
+    pub fn set_id(&mut self, id: String) {
+        self.id = id;
+    }
 }
