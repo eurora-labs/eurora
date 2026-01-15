@@ -1510,6 +1510,7 @@ dependencies = [
  "be-asset-service",
  "be-auth-grpc",
  "be-auth-service",
+ "be-conversation-service",
  "be-prompt-service",
  "be-remote-db",
  "be-update-service",
