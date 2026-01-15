@@ -66,6 +66,11 @@ impl ChatApi for ChatApiImpl {
             });
         });
 
+        conversation_manager
+            .ensure_remote_conversation()
+            .await
+            .expect("Failed to ensure remote conversation");
+
         timeline
             .save_current_activity_to_service()
             .await
