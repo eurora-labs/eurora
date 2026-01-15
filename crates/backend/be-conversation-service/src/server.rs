@@ -14,6 +14,7 @@ use tonic::{Request, Response, Status};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
+use crate::converters::convert_db_message_to_base_message;
 use crate::error::ConversationServiceError;
 
 use proto_gen::conversation::{
@@ -173,7 +174,10 @@ impl ProtoConversationService for ConversationService {
             .await
             .unwrap();
 
-        // let messages: Vec<BaseMessage> = db_messages.into_iter().map(|msg| msg.into()).collect();
+        let _messages: Vec<BaseMessage> = _db_messages
+            .into_iter()
+            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
+            .collect();
 
         // 1. Get current conversation
         // 2.
