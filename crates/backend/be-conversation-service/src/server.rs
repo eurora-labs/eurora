@@ -15,8 +15,8 @@ use tonic::{Request, Response, Status};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
-use crate::converters::convert_db_message_to_base_message;
 use crate::error::ConversationServiceError;
+use crate::{ConversationServiceResult, converters::convert_db_message_to_base_message};
 
 use proto_gen::conversation::{
     AddHumanMessageRequest, AddHumanMessageResponse, ChatStreamRequest, ChatStreamResponse,
@@ -37,7 +37,7 @@ pub struct ConversationService {
 
 impl ConversationService {
     /// Create a new ConversationService instance
-    pub fn new(db: Arc<DatabaseManager>) -> Self {
+    pub fn from_env(db: Arc<DatabaseManager>) -> ConversationServiceResult<Self> {
         info!("Creating new ConversationService instance");
 
         let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
@@ -48,7 +48,7 @@ impl ConversationService {
 
         let provider = ChatOpenAI::new(&model).api_key(api_key);
 
-        Self { provider, db }
+        Ok(Self { provider, db })
     }
 
     /// Convert a database Conversation to a proto Conversation
