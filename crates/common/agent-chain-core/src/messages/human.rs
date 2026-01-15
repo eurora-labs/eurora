@@ -3,7 +3,6 @@
 //! This module contains the `HumanMessage` and `HumanMessageChunk` types which represent
 //! messages from the user. Mirrors `langchain_core.messages.human`.
 
-use crate::utils::uuid7;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -24,15 +23,15 @@ use super::content::{ContentPart, ImageSource, MessageContent};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HumanMessage {
     /// The message content (text or multipart)
-    content: MessageContent,
+    pub content: MessageContent,
     /// Optional unique identifier
-    id: Option<String>,
+    pub id: Option<String>,
     /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    pub name: Option<String>,
     /// Additional metadata
     #[serde(default)]
-    additional_kwargs: HashMap<String, serde_json::Value>,
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
 }
 
 impl HumanMessage {
@@ -40,7 +39,7 @@ impl HumanMessage {
     pub fn new(content: impl Into<String>) -> Self {
         Self {
             content: MessageContent::Text(content.into()),
-            id: Some(uuid7(None).to_string()),
+            id: None,
             name: None,
             additional_kwargs: HashMap::new(),
         }
@@ -78,7 +77,7 @@ impl HumanMessage {
     pub fn with_content(parts: Vec<ContentPart>) -> Self {
         Self {
             content: MessageContent::Parts(parts),
-            id: Some(uuid7(None).to_string()),
+            id: None,
             name: None,
             additional_kwargs: HashMap::new(),
         }
