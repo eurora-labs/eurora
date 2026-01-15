@@ -22,15 +22,15 @@ use super::base::merge_content;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SystemMessage {
     /// The message content
-    content: String,
+    pub content: String,
     /// Optional unique identifier
-    id: Option<String>,
+    pub id: Option<String>,
     /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    pub name: Option<String>,
     /// Additional metadata
     #[serde(default)]
-    additional_kwargs: HashMap<String, serde_json::Value>,
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
 }
 
 impl SystemMessage {
@@ -42,6 +42,11 @@ impl SystemMessage {
             name: None,
             additional_kwargs: HashMap::new(),
         }
+    }
+
+    /// Set the message ID.
+    pub fn set_id(&mut self, id: String) {
+        self.id = Some(id);
     }
 
     /// Create a new system message with an explicit ID.

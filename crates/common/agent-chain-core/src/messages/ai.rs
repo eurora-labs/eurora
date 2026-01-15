@@ -142,27 +142,27 @@ impl UsageMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AIMessage {
     /// The message content
-    content: String,
+    pub content: String,
     /// Optional unique identifier
-    id: Option<String>,
+    pub id: Option<String>,
     /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    pub name: Option<String>,
     /// Tool calls made by the AI
     #[serde(default)]
-    tool_calls: Vec<ToolCall>,
+    pub tool_calls: Vec<ToolCall>,
     /// Tool calls with parsing errors associated with the message
     #[serde(default)]
-    invalid_tool_calls: Vec<InvalidToolCall>,
+    pub invalid_tool_calls: Vec<InvalidToolCall>,
     /// If present, usage metadata for a message, such as token counts.
     #[serde(skip_serializing_if = "Option::is_none")]
-    usage_metadata: Option<UsageMetadata>,
+    pub usage_metadata: Option<UsageMetadata>,
     /// Additional metadata
     #[serde(default)]
-    additional_kwargs: HashMap<String, serde_json::Value>,
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
     /// Response metadata (e.g., response headers, logprobs, token counts, model name)
     #[serde(default)]
-    response_metadata: HashMap<String, serde_json::Value>,
+    pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
 impl AIMessage {
@@ -178,6 +178,11 @@ impl AIMessage {
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
+    }
+
+    /// Set the message ID.
+    pub fn set_id(&mut self, id: String) {
+        self.id = Some(id);
     }
 
     /// Create a new AI message with an explicit ID.
