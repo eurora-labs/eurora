@@ -168,40 +168,40 @@ pub fn convert_to_messages(messages: &[serde_json::Value]) -> Result<Vec<BaseMes
     let mut result = Vec::new();
 
     for message in messages {
-        if let Some(_msg_type) = message.get("type").and_then(|t| t.as_str()) {
-            // Already a message dict
-            result.push(message_from_dict(message)?);
-        } else if let Some(role) = message.get("role").and_then(|r| r.as_str()) {
-            // OpenAI-style dict with "role" and "content"
-            let content = message
-                .get("content")
-                .and_then(|c| c.as_str())
-                .unwrap_or("");
-            let msg = create_message_from_role(role, content)?;
-            result.push(msg);
-        } else if let Some(s) = message.as_str() {
-            // Plain string -> HumanMessage
-            result.push(BaseMessage::Human(HumanMessage::new(s)));
-        } else if let Some(arr) = message.as_array() {
-            // 2-tuple: [role, content]
-            if arr.len() == 2 {
-                let role = arr[0].as_str().ok_or("First element must be role string")?;
-                let content = arr[1]
-                    .as_str()
-                    .ok_or("Second element must be content string")?;
-                let msg = create_message_from_role(role, content)?;
-                result.push(msg);
-            } else {
-                return Err(
-                    "Array message must have exactly 2 elements [role, content]".to_string()
-                );
-            }
-        } else {
-            return Err(format!("Cannot convert to message: {:?}", message));
-        }
+        result.push(convert_to_message(message)?);
     }
 
     Ok(result)
+}
+
+pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, String> {
+    if let Some(_msg_type) = message.get("type").and_then(|t| t.as_str()) {
+        // Already a message dict
+        message_from_dict(message)
+    } else if let Some(role) = message.get("role").and_then(|r| r.as_str()) {
+        // OpenAI-style dict with "role" and "content"
+        let content = message
+            .get("content")
+            .and_then(|c| c.as_str())
+            .unwrap_or("");
+        create_message_from_role(role, content)
+    } else if let Some(s) = message.as_str() {
+        // Plain string -> HumanMessage
+        Ok(BaseMessage::Human(HumanMessage::new(s)))
+    } else if let Some(arr) = message.as_array() {
+        // 2-tuple: [role, content]
+        if arr.len() == 2 {
+            let role = arr[0].as_str().ok_or("First element must be role string")?;
+            let content = arr[1]
+                .as_str()
+                .ok_or("Second element must be content string")?;
+            create_message_from_role(role, content)
+        } else {
+            Err("Array message must have exactly 2 elements [role, content]".to_string())
+        }
+    } else {
+        Err(format!("Cannot convert to message: {:?}", message))
+    }
 }
 
 /// Create a message from a role string and content.
