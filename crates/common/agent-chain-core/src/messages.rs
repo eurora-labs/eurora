@@ -136,7 +136,7 @@ pub use tool::{
 
 // Re-export from utils
 pub use utils::{
-    AnyMessage, MessageLikeRepresentation, convert_to_messages, filter_messages, get_buffer_string,
-    merge_message_runs, message_chunk_to_message, message_from_dict, message_to_dict,
-    messages_from_dict, messages_to_dict,
+    AnyMessage, MessageLikeRepresentation, convert_to_message, convert_to_messages,
+    filter_messages, get_buffer_string, merge_message_runs, message_chunk_to_message,
+    message_from_dict, message_to_dict, messages_from_dict, messages_to_dict,
 };

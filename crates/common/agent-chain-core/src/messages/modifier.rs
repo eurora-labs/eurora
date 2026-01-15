@@ -16,7 +16,7 @@ use specta::Type;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RemoveMessage {
     /// The ID of the message to remove
-    id: String,
+    pub id: String,
 }
 
 impl RemoveMessage {
@@ -37,5 +37,10 @@ impl RemoveMessage {
     /// Get the target message ID.
     pub fn target_id(&self) -> &str {
         &self.id
+    }
+
+    /// Set the message ID.
+    pub fn set_id(&mut self, id: String) {
+        self.id = id;
     }
 }
