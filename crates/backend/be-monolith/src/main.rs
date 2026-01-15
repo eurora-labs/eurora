@@ -3,6 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
 use be_auth_service::AuthService;
+use be_conversation_service::{ConversationService, ProtoConversationServiceServer};
 use be_prompt_service::PromptService;
 use dotenv::dotenv;
 use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
@@ -82,7 +83,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let activity_service = ActivityService::from_env(db_manager.clone())
         .expect("Failed to initialize activity service");
     let assets_service =
-        AssetService::from_env(db_manager).expect("Failed to initialize assets service");
+        AssetService::from_env(db_manager.clone()).expect("Failed to initialize assets service");
+    let conversation_service = ConversationService::from_env(db_manager.clone())
+        .expect("Failed to initialize conversation service");
 
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
@@ -126,6 +129,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ))
         .add_service(ProtoAssetServiceServer::with_interceptor(
             assets_service,
+            jwt_interceptor.clone(),
+        ))
+        .add_service(ProtoConversationServiceServer::with_interceptor(
+            conversation_service,
             jwt_interceptor.clone(),
         ))
         .serve_with_shutdown(grpc_addr, shutdown_signal);

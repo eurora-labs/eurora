@@ -72,6 +72,14 @@ impl ConversationManager {
         }
     }
 
+    pub async fn ensure_remote_conversation(&mut self) -> Result<()> {
+        if self.current_conversation.id().is_none() {
+            let request = CreateConversationRequest::default();
+            self.save_current_conversation(request).await?;
+        }
+        Ok(())
+    }
+
     pub async fn list_conversations(
         &self,
         request: ListConversationsRequest,
