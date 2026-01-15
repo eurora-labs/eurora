@@ -30,17 +30,17 @@ use super::base::merge_content;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FunctionMessage {
     /// The message content (result of the function)
-    content: String,
+    pub content: String,
     /// The name of the function that was executed
-    name: String,
+    pub name: String,
     /// Optional unique identifier
-    id: Option<String>,
+    pub id: Option<String>,
     /// Additional metadata
     #[serde(default)]
-    additional_kwargs: HashMap<String, serde_json::Value>,
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
     /// Response metadata
     #[serde(default)]
-    response_metadata: HashMap<String, serde_json::Value>,
+    pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
 impl FunctionMessage {
@@ -58,6 +58,11 @@ impl FunctionMessage {
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
+    }
+
+    /// Set the message ID.
+    pub fn set_id(&mut self, id: String) {
+        self.id = Some(id);
     }
 
     /// Create a new function message with an explicit ID.
