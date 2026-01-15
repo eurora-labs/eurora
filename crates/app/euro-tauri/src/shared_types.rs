@@ -1,4 +1,5 @@
 use anyhow::Result;
+use euro_conversation::ConversationManager;
 use euro_personal_db::{Conversation, PersonalDatabaseManager};
 use euro_settings::AppSettings;
 use prompt_kit::PromptKitService;
@@ -9,6 +10,7 @@ use crate::util::get_db_path;
 pub type SharedPromptKitService = Mutex<Option<PromptKitService>>;
 pub type SharedAppSettings = Mutex<AppSettings>;
 pub type SharedCurrentConversation = Mutex<Option<Conversation>>;
+pub type SharedConversationManager = Mutex<ConversationManager>;
 
 pub async fn create_shared_database_manager(
     app_handle: &tauri::AppHandle,

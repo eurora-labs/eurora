@@ -8,8 +8,8 @@ use agent_chain_eurora::proto::proto_chat_service_client::ProtoChatServiceClient
 // use agent_chain_core::BaseMessage;
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
-    CreateConversationRequest, ListConversationsRequest, ListConversationsResponse,
-    proto_conversation_service_client::ProtoConversationServiceClient,
+    AddHumanMessageRequest, CreateConversationRequest, ListConversationsRequest,
+    ListConversationsResponse, proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use tokio::sync::broadcast;
 
@@ -89,7 +89,14 @@ impl ConversationManager {
 }
 
 impl ConversationManager {
-    pub async fn add_human_message(&mut self, _message: HumanMessage) -> Result<()> {
-        todo!()
+    pub async fn add_human_message(&mut self, message: &HumanMessage) -> Result<()> {
+        let mut client = self.conversation_client.clone();
+        client
+            .add_human_message(AddHumanMessageRequest {
+                conversation_id: self.current_conversation.id().unwrap().to_string(),
+                content: message.content().to_string(),
+            })
+            .await?;
+        Ok(())
     }
 }
