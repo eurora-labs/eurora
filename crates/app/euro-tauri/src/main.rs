@@ -27,7 +27,8 @@ use euro_tauri::{
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
     },
     shared_types::{
-        SharedCurrentConversation, SharedPromptKitService, create_shared_database_manager,
+        SharedConversationManager, SharedCurrentConversation, SharedPromptKitService,
+        create_shared_database_manager,
     },
 };
 use euro_timeline::TimelineManager;
@@ -247,6 +248,12 @@ fn main() {
                         })
                         .build(tauri_app)
                         .expect("Failed to create tray icon");
+
+                    let conversation_handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let conversation_manager = euro_conversation::ConversationManager::new().await;
+                        conversation_handle.manage(SharedConversationManager::new(conversation_manager));
+                    });
 
 
                     let timeline_handle = app_handle.clone();

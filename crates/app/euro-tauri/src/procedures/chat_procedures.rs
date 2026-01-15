@@ -7,7 +7,9 @@ use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
-use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
+use crate::shared_types::{
+    SharedConversationManager, SharedCurrentConversation, SharedPromptKitService,
+};
 
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
@@ -54,6 +56,8 @@ impl ChatApi for ChatApiImpl {
             app_handle.state::<PersonalDatabaseManager>().inner();
         let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
+        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        let mut conversation_manager = conversation_state.lock().await;
 
         let event = posthog_rs::Event::new_anon("send_query");
         tauri::async_runtime::spawn(async move {
@@ -69,6 +73,33 @@ impl ChatApi for ChatApiImpl {
 
         if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
             info!("Infos: {:?}", infos);
+        }
+
+        let has_assets = !query.assets.is_empty();
+
+        if has_assets {
+            let mut messages = Vec::new();
+
+            messages.extend(
+                timeline
+                    .construct_asset_messages_by_ids(&query.assets)
+                    .await,
+            );
+            messages.extend(
+                timeline
+                    .construct_snapshot_messages_by_ids(&query.assets)
+                    .await,
+            );
+
+            // Make a for loop
+            for message in messages {
+                match &message {
+                    BaseMessage::Human(m) => {
+                        let _ = conversation_manager.add_human_message(m).await;
+                    }
+                    _ => todo!(),
+                }
+            }
         }
 
         let mut messages: Vec<BaseMessage> = Vec::new();
