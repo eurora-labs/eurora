@@ -140,7 +140,7 @@ impl From<ConversationServiceError> for Status {
 }
 
 /// Result type alias for conversation service operations.
-pub type ConversationResult<T> = std::result::Result<T, ConversationServiceError>;
+pub type ConversationServiceResult<T> = std::result::Result<T, ConversationServiceError>;
 
 #[cfg(test)]
 mod tests {
