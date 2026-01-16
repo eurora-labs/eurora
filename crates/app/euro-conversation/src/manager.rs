@@ -1,24 +1,24 @@
+use std::pin::Pin;
+
 use crate::{
     Conversation,
     error::{Error, Result},
     types::ConversationEvent,
 };
 use agent_chain::HumanMessage;
-use agent_chain_eurora::proto::proto_chat_service_client::ProtoChatServiceClient;
 // use agent_chain_core::BaseMessage;
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
-    AddHumanMessageRequest, CreateConversationRequest, ListConversationsRequest,
+    AddHumanMessageRequest, ChatStreamRequest, CreateConversationRequest, ListConversationsRequest,
     ListConversationsResponse, proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use tokio::sync::broadcast;
+use tokio_stream::{Stream, StreamExt};
 
 pub struct ConversationManager {
     current_conversation: Conversation,
     conversation_client: ProtoConversationServiceClient<AuthedChannel>,
     conversation_event_tx: broadcast::Sender<ConversationEvent>,
-    #[allow(dead_code)]
-    chat_client: ProtoChatServiceClient<AuthedChannel>,
 }
 
 impl ConversationManager {
@@ -26,13 +26,11 @@ impl ConversationManager {
         let channel = get_authed_channel().await;
         let conversation_client = ProtoConversationServiceClient::new(channel.clone());
         let (conversation_event_tx, _) = broadcast::channel(100);
-        let chat_client = ProtoChatServiceClient::new(channel);
 
         Self {
             current_conversation: Conversation::default(),
             conversation_client,
             conversation_event_tx,
-            chat_client,
         }
     }
 
@@ -106,5 +104,26 @@ impl ConversationManager {
             })
             .await?;
         Ok(())
+    }
+}
+
+impl ConversationManager {
+    pub async fn chat_stream(
+        &mut self,
+        content: String,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<String>> + Send>>> {
+        let mut client = self.conversation_client.clone();
+        let stream = client
+            .chat_stream(ChatStreamRequest {
+                conversation_id: self.current_conversation.id().unwrap().to_string(),
+                content,
+            })
+            .await?
+            .into_inner();
+
+        let mapped_stream =
+            stream.map(|result| result.map(|response| response.chunk).map_err(Error::from));
+
+        Ok(Box::pin(mapped_stream))
     }
 }
