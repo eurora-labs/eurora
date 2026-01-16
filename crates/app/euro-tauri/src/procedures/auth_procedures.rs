@@ -1,16 +1,12 @@
 //! Authentication procedures for the Tauri application.
 
-use agent_chain_eurora::EuroraConfig;
 use euro_secret::{Sensitive, secret};
-use prompt_kit::PromptKitService;
+// use prompt_kit::PromptKitService;
 use tauri::{AppHandle, Manager, Runtime};
 use tracing::error;
 use url::Url;
 
-use crate::{
-    procedures::prompt_procedures::TauRpcPromptApiEventTrigger,
-    shared_types::{SharedAppSettings, SharedPromptKitService},
-};
+use crate::shared_types::SharedAppSettings;
 
 #[taurpc::ipc_type]
 pub struct LoginToken {
@@ -80,40 +76,29 @@ impl AuthApi for AuthApiImpl {
                     secret::delete(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
                         .map_err(|e| format!("Failed to remove login token: {}", e))?;
 
-                    let config = EuroraConfig::new(
-                        Url::parse(
-                            std::env::var("API_BASE_URL")
-                                .unwrap_or("https://api.eurora-labs.com".to_string())
-                                .as_str(),
-                        )
-                        .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
-                    );
+                    // let config = EuroraConfig::new(
+                    //     Url::parse(
+                    //         std::env::var("API_BASE_URL")
+                    //             .unwrap_or("https://api.eurora-labs.com".to_string())
+                    //             .as_str(),
+                    //     )
+                    //     .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
+                    // );
 
                     let state = app_handle.state::<SharedAppSettings>();
-                    let mut settings = state.lock().await;
+                    let settings = state.lock().await;
 
-                    settings.backend = config.clone().into();
                     settings
                         .save_to_default_path()
                         .map_err(|e| format!("Failed to save settings: {}", e))?;
 
-                    // TODO: re-enable remote eurora provider
-                    let promptkit_client: PromptKitService = euro_chat_client::ChatEurora::new()
-                        .await
-                        .expect("Failed to initialize ChatEurora")
-                        .into();
-
-                    TauRpcPromptApiEventTrigger::new(app_handle.clone())
-                        .prompt_service_change(Some(
-                            promptkit_client
-                                .get_service_name()
-                                .map_err(|e| e.to_string())?,
-                        ))
-                        .map_err(|e| e.to_string())?;
-
-                    let state: tauri::State<SharedPromptKitService> = app_handle.state();
-                    let mut guard = state.lock().await;
-                    *guard = Some(promptkit_client);
+                    // TauRpcPromptApiEventTrigger::new(app_handle.clone())
+                    //     .prompt_service_change(Some(
+                    //         promptkit_client
+                    //             .get_service_name()
+                    //             .map_err(|e| e.to_string())?,
+                    //     ))
+                    //     .map_err(|e| e.to_string())?;
 
                     Ok(true)
                 }
