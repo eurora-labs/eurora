@@ -602,7 +602,7 @@ impl BaseChatModel for GenericFakeChatModel {
         };
 
         let content = message.content().to_string();
-        let message_id = message.id().map(String::from);
+        let message_id = message.id();
         let additional_kwargs = message.additional_kwargs().clone();
 
         let stream = async_stream::stream! {
