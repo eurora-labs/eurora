@@ -56,15 +56,7 @@ general: GeneralSettings;
 /**
  * Telemetry settings
  */
-telemetry: TelemetrySettings; 
-/**
- * Backend provider settings
- */
-backend?: BackendSettings }
-
-export type BackendSettings = { backendType: BackendType }
-
-export type BackendType = "None" | "Ollama" | "Eurora" | "OpenAI" | "Anthropic"
+telemetry: TelemetrySettings }
 
 /**
  * A unified message type that can represent any message role.
