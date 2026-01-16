@@ -5,11 +5,9 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-agent-chain-eurora = { workspace = true }
 anyhow = { workspace = true }
 dirs = { workspace = true }
 euro-fs = { workspace = true }
-euro-secret = { workspace = true }
 notify = { version = "8.2.0" }
 # prompt-kit = { workspace = true }
 serde = { workspace = true, features = ["std"] }
