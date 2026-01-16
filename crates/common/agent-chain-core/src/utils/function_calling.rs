@@ -299,15 +299,40 @@ impl ConvertibleToOpenAI for Value {
         }
 
         // Handle strict mode
-        if let Some(strict_val) = strict
-            && let Value::Object(ref existing) = oai_function
-            && let Some(existing_strict) = existing.get("strict")
-            && existing_strict.as_bool() != Some(strict_val)
-        {
-            panic!(
-                "Tool/function already has a 'strict' key with value {} which is different from the explicit strict arg {}",
-                existing_strict, strict_val
-            );
+        let mut oai_function = oai_function;
+        if let Some(strict_val) = strict {
+            // Check for conflict with existing strict value
+            if let Value::Object(ref existing) = oai_function
+                && let Some(existing_strict) = existing.get("strict")
+                && existing_strict.as_bool() != Some(strict_val)
+            {
+                panic!(
+                    "Tool/function already has a 'strict' key with value {} which is different from the explicit strict arg {}",
+                    existing_strict, strict_val
+                );
+            }
+
+            // Add strict field to the result
+            if let Value::Object(ref mut map) = oai_function {
+                map.insert("strict".to_string(), Value::Bool(strict_val));
+
+                // If strict is true, apply additional properties and required handling
+                if strict_val && let Some(Value::Object(params)) = map.get_mut("parameters") {
+                    let mut params_value = Value::Object(params.clone());
+                    recursive_set_additional_properties_false(&mut params_value);
+                    *params = params_value.as_object().cloned().unwrap_or_default();
+
+                    // All fields must be required
+                    if let Some(properties) = params.get("properties").cloned()
+                        && let Some(props_obj) = properties.as_object()
+                        && !props_obj.is_empty()
+                    {
+                        let required: Vec<Value> =
+                            props_obj.keys().map(|k| Value::String(k.clone())).collect();
+                        params.insert("required".to_string(), Value::Array(required));
+                    }
+                }
+            }
         }
 
         oai_function
