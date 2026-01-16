@@ -5,6 +5,7 @@
 //! This module provides various utilities ported from `langchain_core/utils/`.
 
 pub mod base;
+pub mod function_calling;
 pub mod env;
 pub mod formatting;
 pub mod html;
