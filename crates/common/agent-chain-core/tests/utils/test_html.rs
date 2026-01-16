@@ -3,7 +3,7 @@
 //! Mirrors `langchain/libs/core/tests/unit_tests/utils/test_html.py`
 
 use agent_chain_core::utils::html::{
-    extract_sub_links, find_all_links, PREFIXES_TO_IGNORE, SUFFIXES_TO_IGNORE,
+    PREFIXES_TO_IGNORE, SUFFIXES_TO_IGNORE, extract_sub_links, find_all_links,
 };
 
 #[test]
@@ -22,7 +22,12 @@ fn test_find_all_links_single() {
     ];
     for html in htmls {
         let actual = find_all_links(html, None);
-        assert_eq!(actual, vec!["foobar.com".to_string()], "Failed for: {}", html);
+        assert_eq!(
+            actual,
+            vec!["foobar.com".to_string()],
+            "Failed for: {}",
+            html
+        );
     }
 }
 
@@ -217,5 +222,9 @@ fn test_extract_sub_links_with_query() {
         &[],
     );
     actual.sort();
-    assert_eq!(actual, expected, "Expected {:?}, but got {:?}", expected, actual);
+    assert_eq!(
+        actual, expected,
+        "Expected {:?}, but got {:?}",
+        expected, actual
+    );
 }

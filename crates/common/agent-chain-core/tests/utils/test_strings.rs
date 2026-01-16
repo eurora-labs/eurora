@@ -74,20 +74,64 @@ fn test_stringify_value_nested_structures() {
     let result = stringify_value(&nested_data);
 
     // Should contain all the nested values
-    assert!(result.contains("users:"), "Result should contain 'users:': {}", result);
-    assert!(result.contains("name: Alice"), "Result should contain 'name: Alice': {}", result);
-    assert!(result.contains("name: Bob"), "Result should contain 'name: Bob': {}", result);
-    assert!(result.contains("metadata:"), "Result should contain 'metadata:': {}", result);
-    assert!(result.contains("total_users: 2"), "Result should contain 'total_users: 2': {}", result);
-    assert!(result.contains("active: true"), "Result should contain 'active: true': {}", result);
+    assert!(
+        result.contains("users:"),
+        "Result should contain 'users:': {}",
+        result
+    );
+    assert!(
+        result.contains("name: Alice"),
+        "Result should contain 'name: Alice': {}",
+        result
+    );
+    assert!(
+        result.contains("name: Bob"),
+        "Result should contain 'name: Bob': {}",
+        result
+    );
+    assert!(
+        result.contains("metadata:"),
+        "Result should contain 'metadata:': {}",
+        result
+    );
+    assert!(
+        result.contains("total_users: 2"),
+        "Result should contain 'total_users: 2': {}",
+        result
+    );
+    assert!(
+        result.contains("active: true"),
+        "Result should contain 'active: true': {}",
+        result
+    );
 
     // Test list of mixed types
     let mixed_list = json!(["string", 42, {"key": "value"}, ["nested", "list"]]);
     let result = stringify_value(&mixed_list);
 
-    assert!(result.contains("string"), "Result should contain 'string': {}", result);
-    assert!(result.contains("42"), "Result should contain '42': {}", result);
-    assert!(result.contains("key: value"), "Result should contain 'key: value': {}", result);
-    assert!(result.contains("nested"), "Result should contain 'nested': {}", result);
-    assert!(result.contains("list"), "Result should contain 'list': {}", result);
+    assert!(
+        result.contains("string"),
+        "Result should contain 'string': {}",
+        result
+    );
+    assert!(
+        result.contains("42"),
+        "Result should contain '42': {}",
+        result
+    );
+    assert!(
+        result.contains("key: value"),
+        "Result should contain 'key: value': {}",
+        result
+    );
+    assert!(
+        result.contains("nested"),
+        "Result should contain 'nested': {}",
+        result
+    );
+    assert!(
+        result.contains("list"),
+        "Result should contain 'list': {}",
+        result
+    );
 }

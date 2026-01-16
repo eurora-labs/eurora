@@ -2,7 +2,7 @@
 //!
 //! Converted from langchain/libs/core/tests/unit_tests/utils/test_usage.py
 
-use agent_chain_core::utils::usage::{dict_int_op_json, UsageError};
+use agent_chain_core::utils::usage::{UsageError, dict_int_op_json};
 use serde_json::json;
 
 #[test]
@@ -54,7 +54,8 @@ fn test_dict_int_op_invalid_types() {
     // Verify the error message
     if let Err(e) = result {
         assert!(
-            e.to_string().contains("Only dict and int values are supported"),
+            e.to_string()
+                .contains("Only dict and int values are supported"),
             "Error message should contain 'Only dict and int values are supported': {}",
             e
         );

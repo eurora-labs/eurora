@@ -159,12 +159,16 @@ pub fn extract_sub_links(
             let base_netloc = format!(
                 "{}{}",
                 parsed_base_url.host_str().unwrap_or(""),
-                parsed_base_url.port().map_or(String::new(), |p| format!(":{}", p))
+                parsed_base_url
+                    .port()
+                    .map_or(String::new(), |p| format!(":{}", p))
             );
             let path_netloc = format!(
                 "{}{}",
                 parsed_path.host_str().unwrap_or(""),
-                parsed_path.port().map_or(String::new(), |p| format!(":{}", p))
+                parsed_path
+                    .port()
+                    .map_or(String::new(), |p| format!(":{}", p))
             );
 
             if base_netloc != path_netloc {

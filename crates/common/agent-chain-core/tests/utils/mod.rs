@@ -1,3 +1,5 @@
+mod test_env;
+mod test_formatting;
 mod test_function_calling;
 mod test_html;
 mod test_imports;
