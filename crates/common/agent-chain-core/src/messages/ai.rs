@@ -9,6 +9,7 @@ use std::collections::HashMap;
 #[cfg(feature = "specta")]
 use specta::Type;
 
+use super::content::ContentBlock;
 use super::tool::{
     InvalidToolCall, ToolCall, ToolCallChunk, default_tool_chunk_parser, default_tool_parser,
     invalid_tool_call, tool_call,
@@ -180,6 +181,24 @@ impl AIMessage {
         }
     }
 
+    /// Create a new AI message with a list of content blocks.
+    ///
+    /// This is used for multimodal content or provider-specific content blocks.
+    /// The content is stored as a JSON array string internally.
+    pub fn with_content_list(content: Vec<serde_json::Value>) -> Self {
+        let content_str = serde_json::to_string(&content).unwrap_or_default();
+        Self {
+            content: content_str,
+            id: None,
+            name: None,
+            tool_calls: Vec::new(),
+            invalid_tool_calls: Vec::new(),
+            usage_metadata: None,
+            additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
+        }
+    }
+
     /// Set the message ID.
     pub fn set_id(&mut self, id: String) {
         self.id = Some(id);
@@ -274,6 +293,112 @@ impl AIMessage {
     /// Get the message content.
     pub fn content(&self) -> &str {
         &self.content
+    }
+
+    /// Get the raw content as a list of JSON values.
+    ///
+    /// If the content is a JSON array, it returns the parsed array.
+    /// If the content is a string, it returns a single text block.
+    pub fn content_list(&self) -> Vec<serde_json::Value> {
+        if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&self.content) {
+            arr
+        } else {
+            vec![serde_json::json!({"type": "text", "text": self.content})]
+        }
+    }
+
+    /// Get the content blocks translated to the standard format.
+    ///
+    /// This method translates provider-specific content blocks to the
+    /// standardized LangChain content block format. The translation is
+    /// based on the `model_provider` field in `response_metadata`.
+    ///
+    /// This corresponds to `content_blocks` property in LangChain Python.
+    pub fn content_blocks(&self) -> Vec<ContentBlock> {
+        use crate::messages::block_translators::anthropic::convert_to_standard_blocks;
+
+        let provider = self
+            .response_metadata
+            .get("model_provider")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        let raw_content = self.content_list();
+
+        let blocks_json = match provider {
+            "anthropic" => convert_to_standard_blocks(&raw_content, false),
+            _ => {
+                // Default: return content as-is or wrap string in text block
+                raw_content
+            }
+        };
+
+        // Deserialize JSON blocks into ContentBlock structs
+        // We can't use direct serde deserialization because the enum has #[serde(tag = "type")]
+        // which expects externally tagged format, but our JSON has type as a field inside.
+        // So we need to manually deserialize based on the type field.
+        use super::content::{
+            AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
+            NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
+            ServerToolCallChunk, ServerToolResult, TextContentBlock, ToolCallBlock,
+            ToolCallChunkBlock, VideoContentBlock,
+        };
+
+        blocks_json
+            .into_iter()
+            .map(|v| {
+                let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                match block_type {
+                    "text" => serde_json::from_value::<TextContentBlock>(v.clone())
+                        .map(ContentBlock::Text),
+                    "reasoning" => serde_json::from_value::<ReasoningContentBlock>(v.clone())
+                        .map(ContentBlock::Reasoning),
+                    "tool_call" => serde_json::from_value::<ToolCallBlock>(v.clone())
+                        .map(ContentBlock::ToolCall),
+                    "invalid_tool_call" => {
+                        serde_json::from_value::<InvalidToolCallBlock>(v.clone())
+                            .map(ContentBlock::InvalidToolCall)
+                    }
+                    "tool_call_chunk" => serde_json::from_value::<ToolCallChunkBlock>(v.clone())
+                        .map(ContentBlock::ToolCallChunk),
+                    "image" => serde_json::from_value::<ImageContentBlock>(v.clone())
+                        .map(ContentBlock::Image),
+                    "audio" => serde_json::from_value::<AudioContentBlock>(v.clone())
+                        .map(ContentBlock::Audio),
+                    "video" => serde_json::from_value::<VideoContentBlock>(v.clone())
+                        .map(ContentBlock::Video),
+                    "file" => serde_json::from_value::<FileContentBlock>(v.clone())
+                        .map(ContentBlock::File),
+                    "text-plain" => serde_json::from_value::<PlainTextContentBlock>(v.clone())
+                        .map(ContentBlock::PlainText),
+                    "server_tool_call" => serde_json::from_value::<ServerToolCall>(v.clone())
+                        .map(ContentBlock::ServerToolCall),
+                    "server_tool_call_chunk" => {
+                        serde_json::from_value::<ServerToolCallChunk>(v.clone())
+                            .map(ContentBlock::ServerToolCallChunk)
+                    }
+                    "server_tool_result" => serde_json::from_value::<ServerToolResult>(v.clone())
+                        .map(ContentBlock::ServerToolResult),
+                    "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
+                        .map(ContentBlock::NonStandard),
+                    _ => {
+                        // Unknown type, try to parse as non_standard
+                        eprintln!(
+                            "Unknown block type: {}, treating as non_standard",
+                            block_type
+                        );
+                        serde_json::from_value::<NonStandardContentBlock>(v.clone())
+                            .map(ContentBlock::NonStandard)
+                    }
+                }
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "JSON value: {:?}\nFailed to deserialize ContentBlock of type '{}': {:?}",
+                        v, block_type, e
+                    );
+                })
+            })
+            .collect()
     }
 
     /// Get the message ID.
@@ -494,8 +619,8 @@ impl AIMessageChunk {
         }
     }
 
-    /// Create a new AI message chunk with tool call chunks.
-    pub fn with_tool_call_chunks(
+    /// Create a new AI message chunk with tool call chunks (associated function).
+    pub fn new_with_tool_call_chunks(
         content: impl Into<String>,
         tool_call_chunks: Vec<ToolCallChunk>,
     ) -> Self {
@@ -511,6 +636,32 @@ impl AIMessageChunk {
             response_metadata: HashMap::new(),
             chunk_position: None,
         }
+    }
+
+    /// Create a new AI message chunk with a list of content blocks.
+    ///
+    /// This is used for multimodal content or provider-specific content blocks.
+    /// The content is stored as a JSON array string internally.
+    pub fn with_content_list(content: Vec<serde_json::Value>) -> Self {
+        let content_str = serde_json::to_string(&content).unwrap_or_default();
+        Self {
+            content: content_str,
+            id: None,
+            name: None,
+            tool_calls: Vec::new(),
+            invalid_tool_calls: Vec::new(),
+            tool_call_chunks: Vec::new(),
+            usage_metadata: None,
+            additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
+            chunk_position: None,
+        }
+    }
+
+    /// Set tool call chunks (builder pattern).
+    pub fn with_tool_call_chunks(mut self, tool_call_chunks: Vec<ToolCallChunk>) -> Self {
+        self.tool_call_chunks = tool_call_chunks;
+        self
     }
 
     /// Get the message content.
@@ -558,6 +709,137 @@ impl AIMessageChunk {
         &self.response_metadata
     }
 
+    /// Set response metadata (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
+        self
+    }
+
+    /// Get the raw content as a list of JSON values.
+    ///
+    /// If the content is a JSON array, it returns the parsed array.
+    /// If the content is a string, it returns a single text block.
+    pub fn content_list(&self) -> Vec<serde_json::Value> {
+        if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&self.content) {
+            arr
+        } else {
+            vec![serde_json::json!({"type": "text", "text": self.content})]
+        }
+    }
+
+    /// Get the content blocks translated to the standard format.
+    ///
+    /// This method translates provider-specific content blocks to the
+    /// standardized LangChain content block format. The translation is
+    /// based on the `model_provider` field in `response_metadata`.
+    ///
+    /// For chunks, this uses the chunk-specific translation which handles
+    /// streaming content like `tool_call_chunk` and `input_json_delta`.
+    ///
+    /// This corresponds to `content_blocks` property in LangChain Python.
+    pub fn content_blocks(&self) -> Vec<ContentBlock> {
+        use crate::messages::block_translators::anthropic::{
+            ChunkContext, convert_to_standard_blocks_with_context,
+        };
+
+        let provider = self
+            .response_metadata
+            .get("model_provider")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        let raw_content = self.content_list();
+        let is_last = self.chunk_position == Some(ChunkPosition::Last);
+
+        let blocks_json = match provider {
+            "anthropic" => {
+                // Create context with tool_call_chunks for proper translation
+                let context = ChunkContext {
+                    tool_call_chunks: self
+                        .tool_call_chunks
+                        .iter()
+                        .filter_map(|tc| serde_json::to_value(tc).ok())
+                        .collect(),
+                };
+                convert_to_standard_blocks_with_context(&raw_content, !is_last, Some(&context))
+            }
+            _ => {
+                // Default: return content as-is or wrap string in text block
+                raw_content
+            }
+        };
+
+        // Deserialize JSON blocks into ContentBlock structs
+        // We can't use direct serde deserialization because the enum has #[serde(tag = "type")]
+        // which expects externally tagged format, but our JSON has type as a field inside.
+        // So we need to manually deserialize based on the type field.
+        use super::content::{
+            AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
+            NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
+            ServerToolCallChunk, ServerToolResult, TextContentBlock, ToolCallBlock,
+            ToolCallChunkBlock, VideoContentBlock,
+        };
+
+        blocks_json
+            .into_iter()
+            .map(|v| {
+                let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                match block_type {
+                    "text" => serde_json::from_value::<TextContentBlock>(v.clone())
+                        .map(ContentBlock::Text),
+                    "reasoning" => serde_json::from_value::<ReasoningContentBlock>(v.clone())
+                        .map(ContentBlock::Reasoning),
+                    "tool_call" => serde_json::from_value::<ToolCallBlock>(v.clone())
+                        .map(ContentBlock::ToolCall),
+                    "invalid_tool_call" => {
+                        serde_json::from_value::<InvalidToolCallBlock>(v.clone())
+                            .map(ContentBlock::InvalidToolCall)
+                    }
+                    "tool_call_chunk" => serde_json::from_value::<ToolCallChunkBlock>(v.clone())
+                        .map(ContentBlock::ToolCallChunk),
+                    "image" => serde_json::from_value::<ImageContentBlock>(v.clone())
+                        .map(ContentBlock::Image),
+                    "audio" => serde_json::from_value::<AudioContentBlock>(v.clone())
+                        .map(ContentBlock::Audio),
+                    "video" => serde_json::from_value::<VideoContentBlock>(v.clone())
+                        .map(ContentBlock::Video),
+                    "file" => serde_json::from_value::<FileContentBlock>(v.clone())
+                        .map(ContentBlock::File),
+                    "text-plain" => serde_json::from_value::<PlainTextContentBlock>(v.clone())
+                        .map(ContentBlock::PlainText),
+                    "server_tool_call" => serde_json::from_value::<ServerToolCall>(v.clone())
+                        .map(ContentBlock::ServerToolCall),
+                    "server_tool_call_chunk" => {
+                        serde_json::from_value::<ServerToolCallChunk>(v.clone())
+                            .map(ContentBlock::ServerToolCallChunk)
+                    }
+                    "server_tool_result" => serde_json::from_value::<ServerToolResult>(v.clone())
+                        .map(ContentBlock::ServerToolResult),
+                    "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
+                        .map(ContentBlock::NonStandard),
+                    _ => {
+                        // Unknown type, try to parse as non_standard
+                        eprintln!(
+                            "Unknown block type: {}, treating as non_standard",
+                            block_type
+                        );
+                        serde_json::from_value::<NonStandardContentBlock>(v.clone())
+                            .map(ContentBlock::NonStandard)
+                    }
+                }
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "JSON value: {:?}\nFailed to deserialize ContentBlock of type '{}': {:?}",
+                        v, block_type, e
+                    );
+                })
+            })
+            .collect()
+    }
+
     /// Get chunk position.
     pub fn chunk_position(&self) -> Option<&ChunkPosition> {
         self.chunk_position.as_ref()
@@ -566,6 +848,17 @@ impl AIMessageChunk {
     /// Set chunk position.
     pub fn set_chunk_position(&mut self, position: Option<ChunkPosition>) {
         self.chunk_position = position;
+    }
+
+    /// Set usage metadata.
+    pub fn set_usage_metadata(&mut self, usage_metadata: Option<UsageMetadata>) {
+        self.usage_metadata = usage_metadata;
+    }
+
+    /// Set usage metadata (builder pattern).
+    pub fn with_usage_metadata(mut self, usage_metadata: UsageMetadata) -> Self {
+        self.usage_metadata = Some(usage_metadata);
+        self
     }
 
     /// Set tool calls.
@@ -696,6 +989,111 @@ impl AIMessageChunk {
     }
 }
 
+/// Merge message content from multiple chunks.
+///
+/// This corresponds to `merge_content` in LangChain Python.
+/// Content can be either a plain string or a JSON array of content blocks.
+///
+/// The merge logic is:
+/// - String + String → String concatenation
+/// - String + List → Prepend string to list
+/// - List + List → Use `merge_lists` (which merges by index)
+/// - List + String → Append string to last element if it's a string, otherwise add as new element
+///
+/// # Arguments
+///
+/// * `first` - The first content string (may be plain text or JSON array)
+/// * `others` - Other content strings to merge
+///
+/// # Returns
+///
+/// The merged content as a string (either plain text or JSON array)
+fn merge_message_content(first: &str, others: &[&str]) -> String {
+    // Try to parse first content as JSON array
+    let mut merged: serde_json::Value = match serde_json::from_str::<Vec<serde_json::Value>>(first)
+    {
+        Ok(arr) => serde_json::Value::Array(arr),
+        Err(_) => {
+            // Not a JSON array, treat as plain string
+            serde_json::Value::String(first.to_string())
+        }
+    };
+
+    for content in others {
+        // Try to parse other content as JSON array
+        let other_val: serde_json::Value =
+            match serde_json::from_str::<Vec<serde_json::Value>>(content) {
+                Ok(arr) => serde_json::Value::Array(arr),
+                Err(_) => {
+                    // Not a JSON array, treat as plain string
+                    serde_json::Value::String(content.to_string())
+                }
+            };
+
+        merged = match (merged, other_val) {
+            // String + String → String concatenation
+            (serde_json::Value::String(s1), serde_json::Value::String(s2)) => {
+                serde_json::Value::String(format!("{}{}", s1, s2))
+            }
+            // String + List → Prepend string to list
+            (serde_json::Value::String(s), serde_json::Value::Array(mut arr)) => {
+                if !s.is_empty() {
+                    arr.insert(0, serde_json::json!({"type": "text", "text": s}));
+                }
+                serde_json::Value::Array(arr)
+            }
+            // List + List → Use merge_lists
+            (serde_json::Value::Array(arr1), serde_json::Value::Array(arr2)) => {
+                let other_chunks: Vec<Option<Vec<serde_json::Value>>> = vec![Some(arr2.clone())];
+                match merge_lists(Some(arr1.clone()), other_chunks) {
+                    Ok(Some(merged_arr)) => serde_json::Value::Array(merged_arr),
+                    _ => {
+                        // Fallback: just concatenate arrays
+                        let mut result = arr1;
+                        result.extend(arr2);
+                        serde_json::Value::Array(result)
+                    }
+                }
+            }
+            // List + String → Append string to last element if it's a string, otherwise add as new element
+            (serde_json::Value::Array(mut arr), serde_json::Value::String(s)) => {
+                if s.is_empty() {
+                    // Empty string is a no-op
+                    serde_json::Value::Array(arr)
+                } else if let Some(last) = arr.last_mut() {
+                    // Check if last element is a text block or plain string
+                    if let Some(text) = last.get_mut("text") {
+                        if let Some(text_str) = text.as_str() {
+                            *text = serde_json::Value::String(format!("{}{}", text_str, s));
+                        }
+                    } else if last.is_string() {
+                        if let Some(last_str) = last.as_str() {
+                            *last = serde_json::Value::String(format!("{}{}", last_str, s));
+                        }
+                    } else {
+                        // Last element is not a string, add as new element
+                        arr.push(serde_json::json!({"type": "text", "text": s}));
+                    }
+                    serde_json::Value::Array(arr)
+                } else {
+                    // Empty array, add as new element
+                    arr.push(serde_json::json!({"type": "text", "text": s}));
+                    serde_json::Value::Array(arr)
+                }
+            }
+            // Fallback for other cases
+            (m, _) => m,
+        };
+    }
+
+    // Serialize back to string
+    match merged {
+        serde_json::Value::String(s) => s,
+        serde_json::Value::Array(arr) => serde_json::to_string(&arr).unwrap_or_default(),
+        _ => String::new(),
+    }
+}
+
 /// Add multiple AIMessageChunks together.
 ///
 /// This corresponds to `add_ai_message_chunks` in LangChain Python.
@@ -709,11 +1107,14 @@ impl AIMessageChunk {
 ///
 /// The resulting AIMessageChunk.
 pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) -> AIMessageChunk {
-    // Merge content (simple string concatenation for now)
-    let mut content = left.content.clone();
-    for other in &others {
-        content.push_str(&other.content);
-    }
+    // Merge content using merge_content logic from Python
+    let content = merge_message_content(
+        &left.content,
+        &others
+            .iter()
+            .map(|o| o.content.as_str())
+            .collect::<Vec<_>>(),
+    );
 
     // Merge additional_kwargs using merge_dicts
     let additional_kwargs = {

@@ -74,6 +74,12 @@ pub enum ImageSource {
         /// Base64-encoded image data (without the data URL prefix)
         data: String,
     },
+    /// Image from a file ID (e.g., from a file storage system).
+    #[serde(rename = "file")]
+    FileId {
+        /// The file ID
+        file_id: String,
+    },
 }
 
 /// A content part in a multimodal message.
@@ -93,6 +99,9 @@ pub enum ContentPart {
         #[serde(skip_serializing_if = "Option::is_none")]
         detail: Option<ImageDetail>,
     },
+    /// Other/unknown content type (for provider-specific content).
+    #[serde(untagged)]
+    Other(serde_json::Value),
 }
 
 impl From<&str> for ContentPart {
@@ -226,44 +235,54 @@ impl From<&str> for BlockIndex {
     }
 }
 
-/// Annotation for citing data from a document.
+/// A union of all defined Annotation types.
 ///
-/// Note: `start_index`/`end_index` indices refer to the **response text**,
-/// not the source text.
+/// In Python this is: `Annotation = Citation | NonStandardAnnotation`
+/// where each variant is a TypedDict with a `type` literal field for discrimination.
 #[cfg_attr(feature = "specta", derive(Type))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Citation {
-    /// Type of the content block. Always "citation".
-    #[serde(rename = "type")]
-    pub block_type: String,
-    /// Content block identifier.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    /// URL of the document source.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-    /// Source document title.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    /// Start index of the response text.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub start_index: Option<i64>,
-    /// End index of the response text.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub end_index: Option<i64>,
-    /// Excerpt of source text being cited.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cited_text: Option<String>,
-    /// Provider-specific metadata.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extras: Option<HashMap<String, serde_json::Value>>,
+#[serde(tag = "type")]
+pub enum Annotation {
+    /// Citation annotation for citing data from a document.
+    #[serde(rename = "citation")]
+    Citation {
+        /// Content block identifier.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        /// URL of the document source.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+        /// Source document title.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        /// Start index of the response text.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        start_index: Option<i64>,
+        /// End index of the response text.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        end_index: Option<i64>,
+        /// Excerpt of source text being cited.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cited_text: Option<String>,
+        /// Provider-specific metadata.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        extras: Option<HashMap<String, serde_json::Value>>,
+    },
+    /// Provider-specific annotation format.
+    #[serde(rename = "non_standard_annotation")]
+    NonStandardAnnotation {
+        /// Content block identifier.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        /// Provider-specific annotation data.
+        value: HashMap<String, serde_json::Value>,
+    },
 }
 
-impl Citation {
-    /// Create a new Citation with the type field set.
-    pub fn new() -> Self {
-        Self {
-            block_type: "citation".to_string(),
+impl Annotation {
+    /// Create a new Citation annotation.
+    pub fn citation() -> Self {
+        Self::Citation {
             id: None,
             url: None,
             title: None,
@@ -273,49 +292,20 @@ impl Citation {
             extras: None,
         }
     }
-}
 
-impl Default for Citation {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Provider-specific annotation format.
-#[cfg_attr(feature = "specta", derive(Type))]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct NonStandardAnnotation {
-    /// Type of the content block. Always "non_standard_annotation".
-    #[serde(rename = "type")]
-    pub block_type: String,
-    /// Content block identifier.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    /// Provider-specific annotation data.
-    pub value: HashMap<String, serde_json::Value>,
-}
-
-impl NonStandardAnnotation {
     /// Create a new NonStandardAnnotation.
-    pub fn new(value: HashMap<String, serde_json::Value>) -> Self {
-        Self {
-            block_type: "non_standard_annotation".to_string(),
-            id: None,
-            value,
-        }
+    pub fn non_standard(value: HashMap<String, serde_json::Value>) -> Self {
+        Self::NonStandardAnnotation { id: None, value }
     }
 }
 
-/// A union of all defined Annotation types.
-#[cfg_attr(feature = "specta", derive(Type))]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "type")]
-pub enum Annotation {
-    #[serde(rename = "citation")]
-    Citation(Citation),
-    #[serde(rename = "non_standard_annotation")]
-    NonStandardAnnotation(NonStandardAnnotation),
-}
+/// Type alias for Citation (matches Python's Citation TypedDict).
+/// This is a convenience type that serializes with `type: "citation"`.
+pub type Citation = Annotation;
+
+/// Type alias for NonStandardAnnotation (matches Python's NonStandardAnnotation TypedDict).
+/// This is a convenience type that serializes with `type: "non_standard_annotation"`.
+pub type NonStandardAnnotation = Annotation;
 
 /// Text output from a LLM.
 ///
@@ -1465,7 +1455,7 @@ pub fn create_reasoning_block(
     }
 }
 
-/// Create a `Citation`.
+/// Create a `Citation` annotation.
 ///
 /// # Arguments
 ///
@@ -1484,9 +1474,8 @@ pub fn create_citation(
     cited_text: Option<String>,
     id: Option<String>,
     extras: Option<HashMap<String, serde_json::Value>>,
-) -> Citation {
-    Citation {
-        block_type: "citation".to_string(),
+) -> Annotation {
+    Annotation::Citation {
         id: Some(ensure_id(id)),
         url,
         title,
@@ -1613,5 +1602,162 @@ mod tests {
             },
         ]);
         assert_eq!(content.as_text(), "Hello World");
+    }
+
+    #[test]
+    fn test_annotation_citation_serialization() {
+        // Test that Citation serializes with "type": "citation"
+        let citation = Annotation::Citation {
+            id: Some("test_id".to_string()),
+            url: Some("https://example.com".to_string()),
+            title: Some("Document Title".to_string()),
+            start_index: Some(0),
+            end_index: Some(10),
+            cited_text: Some("The weather is sunny.".to_string()),
+            extras: None,
+        };
+
+        let json = serde_json::to_value(&citation).unwrap();
+        assert_eq!(json["type"], "citation");
+        assert_eq!(json["id"], "test_id");
+        assert_eq!(json["url"], "https://example.com");
+        assert_eq!(json["title"], "Document Title");
+        assert_eq!(json["start_index"], 0);
+        assert_eq!(json["end_index"], 10);
+        assert_eq!(json["cited_text"], "The weather is sunny.");
+    }
+
+    #[test]
+    fn test_annotation_non_standard_serialization() {
+        // Test that NonStandardAnnotation serializes with "type": "non_standard_annotation"
+        let mut value = HashMap::new();
+        value.insert(
+            "bar".to_string(),
+            serde_json::Value::String("baz".to_string()),
+        );
+
+        let annotation = Annotation::NonStandardAnnotation {
+            id: None,
+            value: value.clone(),
+        };
+
+        let json = serde_json::to_value(&annotation).unwrap();
+        assert_eq!(json["type"], "non_standard_annotation");
+        assert_eq!(json["value"]["bar"], "baz");
+    }
+
+    #[test]
+    fn test_annotation_deserialization() {
+        // Test deserializing a Citation from JSON (matching Python format)
+        let json_str = r#"{
+            "type": "citation",
+            "id": "lc_123",
+            "title": "Document Title",
+            "cited_text": "The weather is sunny.",
+            "extras": {
+                "source": "source_123"
+            }
+        }"#;
+
+        let annotation: Annotation = serde_json::from_str(json_str).unwrap();
+        match annotation {
+            Annotation::Citation {
+                id,
+                title,
+                cited_text,
+                extras,
+                ..
+            } => {
+                assert_eq!(id, Some("lc_123".to_string()));
+                assert_eq!(title, Some("Document Title".to_string()));
+                assert_eq!(cited_text, Some("The weather is sunny.".to_string()));
+                assert!(extras.is_some());
+                let extras = extras.unwrap();
+                assert_eq!(
+                    extras.get("source"),
+                    Some(&serde_json::Value::String("source_123".to_string()))
+                );
+            }
+            _ => panic!("Expected Citation variant"),
+        }
+    }
+
+    #[test]
+    fn test_text_block_with_annotations() {
+        // Test TextContentBlock with annotations (matching Python test format)
+        let mut extras = HashMap::new();
+        extras.insert(
+            "source".to_string(),
+            serde_json::Value::String("source_123".to_string()),
+        );
+        extras.insert("search_result_index".to_string(), serde_json::json!(1));
+
+        let citation = Annotation::Citation {
+            id: None,
+            url: None,
+            title: Some("Document Title".to_string()),
+            start_index: None,
+            end_index: None,
+            cited_text: Some("The weather is sunny.".to_string()),
+            extras: Some(extras),
+        };
+
+        let mut non_std_value = HashMap::new();
+        non_std_value.insert(
+            "bar".to_string(),
+            serde_json::Value::String("baz".to_string()),
+        );
+        let non_standard = Annotation::NonStandardAnnotation {
+            id: None,
+            value: non_std_value,
+        };
+
+        let text_block = TextContentBlock {
+            block_type: "text".to_string(),
+            id: None,
+            text: "It's sunny.".to_string(),
+            annotations: Some(vec![citation, non_standard]),
+            index: None,
+            extras: None,
+        };
+
+        let json = serde_json::to_value(&text_block).unwrap();
+        assert_eq!(json["type"], "text");
+        assert_eq!(json["text"], "It's sunny.");
+
+        let annotations = json["annotations"].as_array().unwrap();
+        assert_eq!(annotations.len(), 2);
+
+        // Check first annotation (Citation)
+        assert_eq!(annotations[0]["type"], "citation");
+        assert_eq!(annotations[0]["title"], "Document Title");
+        assert_eq!(annotations[0]["cited_text"], "The weather is sunny.");
+        assert_eq!(annotations[0]["extras"]["source"], "source_123");
+
+        // Check second annotation (NonStandardAnnotation)
+        assert_eq!(annotations[1]["type"], "non_standard_annotation");
+        assert_eq!(annotations[1]["value"]["bar"], "baz");
+    }
+
+    #[test]
+    fn test_create_citation_factory() {
+        let citation = create_citation(
+            Some("https://example.com".to_string()),
+            Some("Title".to_string()),
+            Some(0),
+            Some(10),
+            Some("Cited text".to_string()),
+            None,
+            None,
+        );
+
+        match citation {
+            Annotation::Citation { id, url, title, .. } => {
+                assert!(id.unwrap().starts_with("lc_"));
+                assert_eq!(url, Some("https://example.com".to_string()));
+                assert_eq!(title, Some("Title".to_string()));
+            }
+            _ => panic!("Expected Citation variant"),
+        }
     }
 }
