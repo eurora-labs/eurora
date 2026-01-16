@@ -44,7 +44,7 @@ impl ConversationService {
             error!("OPENAI_API_KEY environment variable is not set");
             String::new()
         });
-        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4".to_string());
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
 
         let provider = ChatOpenAI::new(&model).api_key(api_key);
 
