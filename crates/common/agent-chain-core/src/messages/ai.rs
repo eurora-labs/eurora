@@ -315,7 +315,10 @@ impl AIMessage {
     ///
     /// This corresponds to `content_blocks` property in LangChain Python.
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
-        use crate::messages::block_translators::anthropic::convert_to_standard_blocks;
+        use crate::messages::block_translators::anthropic::convert_to_standard_blocks as anthropic_convert;
+        use crate::messages::block_translators::openai::{
+            OpenAiContext, convert_to_standard_blocks_with_context as openai_convert,
+        };
 
         let provider = self
             .response_metadata
@@ -326,7 +329,30 @@ impl AIMessage {
         let raw_content = self.content_list();
 
         let blocks_json = match provider {
-            "anthropic" => convert_to_standard_blocks(&raw_content, false),
+            "anthropic" => anthropic_convert(&raw_content, false),
+            "openai" => {
+                // Create context with tool_calls and other message data for OpenAI translation
+                let context = OpenAiContext {
+                    tool_calls: self
+                        .tool_calls
+                        .iter()
+                        .filter_map(|tc| serde_json::to_value(tc).ok())
+                        .collect(),
+                    tool_call_chunks: Vec::new(),
+                    invalid_tool_calls: self
+                        .invalid_tool_calls
+                        .iter()
+                        .filter_map(|tc| serde_json::to_value(tc).ok())
+                        .collect(),
+                    additional_kwargs: serde_json::to_value(&self.additional_kwargs)
+                        .unwrap_or_default(),
+                    response_metadata: serde_json::to_value(&self.response_metadata)
+                        .unwrap_or_default(),
+                    message_id: self.id.clone(),
+                    chunk_position: None,
+                };
+                openai_convert(&raw_content, false, Some(&context))
+            }
             _ => {
                 // Default: return content as-is or wrap string in text block
                 raw_content
@@ -718,6 +744,15 @@ impl AIMessageChunk {
         self
     }
 
+    /// Set additional kwargs (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
     /// Get the raw content as a list of JSON values.
     ///
     /// If the content is a JSON array, it returns the parsed array.
@@ -742,7 +777,11 @@ impl AIMessageChunk {
     /// This corresponds to `content_blocks` property in LangChain Python.
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
         use crate::messages::block_translators::anthropic::{
-            ChunkContext, convert_to_standard_blocks_with_context,
+            ChunkContext as AnthropicChunkContext,
+            convert_to_standard_blocks_with_context as anthropic_convert,
+        };
+        use crate::messages::block_translators::openai::{
+            OpenAiContext, convert_to_standard_blocks_with_context as openai_convert,
         };
 
         let provider = self
@@ -757,18 +796,62 @@ impl AIMessageChunk {
         let blocks_json = match provider {
             "anthropic" => {
                 // Create context with tool_call_chunks for proper translation
-                let context = ChunkContext {
+                let context = AnthropicChunkContext {
                     tool_call_chunks: self
                         .tool_call_chunks
                         .iter()
                         .filter_map(|tc| serde_json::to_value(tc).ok())
                         .collect(),
                 };
-                convert_to_standard_blocks_with_context(&raw_content, !is_last, Some(&context))
+                anthropic_convert(&raw_content, !is_last, Some(&context))
+            }
+            "openai" => {
+                // Create context with tool_call_chunks and other message data for OpenAI translation
+                let chunk_position = if is_last {
+                    Some("last".to_string())
+                } else {
+                    None
+                };
+                let context = OpenAiContext {
+                    tool_calls: self
+                        .tool_calls
+                        .iter()
+                        .filter_map(|tc| serde_json::to_value(tc).ok())
+                        .collect(),
+                    tool_call_chunks: self
+                        .tool_call_chunks
+                        .iter()
+                        .filter_map(|tc| serde_json::to_value(tc).ok())
+                        .collect(),
+                    invalid_tool_calls: self
+                        .invalid_tool_calls
+                        .iter()
+                        .filter_map(|tc| serde_json::to_value(tc).ok())
+                        .collect(),
+                    additional_kwargs: serde_json::to_value(&self.additional_kwargs)
+                        .unwrap_or_default(),
+                    response_metadata: serde_json::to_value(&self.response_metadata)
+                        .unwrap_or_default(),
+                    message_id: self.id.clone(),
+                    chunk_position,
+                };
+                openai_convert(&raw_content, !is_last, Some(&context))
             }
             _ => {
                 // Default: return content as-is or wrap string in text block
-                raw_content
+                // Also include tool_call_chunks if present
+                let mut blocks = raw_content;
+
+                // Add tool_call_chunks to content_blocks for default case
+                for tc in &self.tool_call_chunks {
+                    if let Ok(mut chunk_value) = serde_json::to_value(tc) {
+                        chunk_value["type"] =
+                            serde_json::Value::String("tool_call_chunk".to_string());
+                        blocks.push(chunk_value);
+                    }
+                }
+
+                blocks
             }
         };
 
