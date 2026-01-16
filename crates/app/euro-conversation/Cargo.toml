@@ -8,7 +8,6 @@ ignored = ["tonic-prost"]
 
 [dependencies]
 agent-chain = { workspace = true }
-agent-chain-eurora = { workspace = true }
 chrono = { workspace = true }
 euro-auth = { workspace = true }
 prost = { workspace = true }
