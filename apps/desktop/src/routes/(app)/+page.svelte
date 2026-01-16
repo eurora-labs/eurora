@@ -57,7 +57,7 @@
 			conversation = new_conv;
 			// console.log('New conversation changed: ', conversation);
 
-			taurpc.personal_db.message.get(conversation.id, 5, 0).then((response) => {
+			taurpc.personal_db.message.get(conversation.id ?? '', 5, 0).then((response) => {
 				messages = response;
 				// console.log('messages: ', messages);
 			});
