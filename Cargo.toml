@@ -5,7 +5,6 @@ members = [
   "crates/backend/be-*",
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
-  "crates/common/agent-chain-eurora",
   "crates/common/agent-chain-macros",
   "crates/common/agent-graph",
   "crates/common/agent-graph-macros",
@@ -25,7 +24,6 @@ license-file = "LICENSE.md"
 [workspace.dependencies]
 agent-chain = { path = "crates/common/agent-chain" }
 agent-chain-core = { path = "crates/common/agent-chain-core" }
-agent-chain-eurora = { path = "crates/common/agent-chain-eurora" }
 agent-chain-macros = { path = "crates/common/agent-chain-macros" }
 agent-graph = { path = "crates/common/agent-graph" }
 agent-graph-macros = { path = "crates/common/agent-graph-macros" }
@@ -43,7 +41,6 @@ be-auth-grpc = { path = "crates/backend/be-auth-grpc" }
 be-auth-service = { path = "crates/backend/be-auth-service" }
 be-conversation-service = { path = "crates/backend/be-conversation-service" }
 be-monolith = { path = "crates/backend/be-monolith" }
-be-prompt-service = { path = "crates/backend/be-prompt-service" }
 be-remote-db = { path = "crates/backend/be-remote-db" }
 be-storage = { path = "crates/backend/be-storage" }
 be-update-service = { path = "crates/backend/be-update-service" }

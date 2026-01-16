@@ -283,27 +283,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "agent-chain-eurora"
-version = "0.0.0"
-dependencies = [
- "agent-chain-core",
- "async-stream",
- "async-trait",
- "futures",
- "prost",
- "prost-types",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "agent-chain-macros"
 version = "0.0.2"
 dependencies = [
@@ -1511,7 +1490,6 @@ dependencies = [
  "be-auth-grpc",
  "be-auth-service",
  "be-conversation-service",
- "be-prompt-service",
  "be-remote-db",
  "be-update-service",
  "dotenv",
@@ -1526,22 +1504,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "be-prompt-service"
-version = "0.0.0"
-dependencies = [
- "agent-chain",
- "agent-chain-core",
- "agent-chain-eurora",
- "anyhow",
- "be-auth-grpc",
- "prost",
- "tokio-stream",
- "tonic",
- "tonic-prost-build",
- "tracing",
 ]
 
 [[package]]
@@ -3492,7 +3454,6 @@ name = "euro-conversation"
 version = "0.0.0"
 dependencies = [
  "agent-chain",
- "agent-chain-eurora",
  "chrono",
  "euro-auth",
  "prost",
@@ -3609,11 +3570,9 @@ dependencies = [
 name = "euro-settings"
 version = "0.0.0"
 dependencies = [
- "agent-chain-eurora",
  "anyhow",
  "dirs 6.0.0",
  "euro-fs",
- "euro-secret",
  "notify",
  "serde",
  "serde_json",
@@ -3632,7 +3591,6 @@ name = "euro-tauri"
 version = "0.0.0"
 dependencies = [
  "agent-chain-core",
- "agent-chain-eurora",
  "anyhow",
  "backtrace",
  "color-thief",
