@@ -152,8 +152,8 @@ impl HumanMessage {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Set the message ID.
@@ -162,8 +162,8 @@ impl HumanMessage {
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get additional kwargs.
@@ -230,13 +230,13 @@ impl HumanMessageChunk {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get additional kwargs.

@@ -2,4 +2,5 @@
 //!
 //! Test structure mirrors `langchain/libs/core/tests/unit_tests/`
 
+mod messages;
 mod utils;

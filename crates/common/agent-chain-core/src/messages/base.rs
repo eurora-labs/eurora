@@ -84,7 +84,7 @@ impl BaseMessage {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
+    pub fn id(&self) -> Option<String> {
         match self {
             BaseMessage::Human(m) => m.id(),
             BaseMessage::System(m) => m.id(),
@@ -97,7 +97,7 @@ impl BaseMessage {
     }
 
     /// Get the message name if present.
-    pub fn name(&self) -> Option<&str> {
+    pub fn name(&self) -> Option<String> {
         match self {
             BaseMessage::Human(m) => m.name(),
             BaseMessage::System(m) => m.name(),
@@ -185,7 +185,7 @@ impl BaseMessage {
                         println!("{}", m.content());
                     }
                     for tc in tool_calls {
-                        println!("Tool Call: {} ({})", tc.name(), tc.id());
+                        println!("Tool Call: {} ({:?})", tc.name(), tc.id());
                         println!("  Args: {}", tc.args());
                     }
                     return;
@@ -297,12 +297,12 @@ impl From<RemoveMessage> for BaseMessage {
 /// Used for message merging operations.
 pub trait HasId {
     /// Get the ID if present.
-    fn get_id(&self) -> Option<&str>;
+    fn get_id(&self) -> Option<String>;
 }
 
 impl HasId for BaseMessage {
-    fn get_id(&self) -> Option<&str> {
-        self.id()
+    fn get_id(&self) -> Option<String> {
+        self.id().clone()
     }
 }
 
@@ -347,7 +347,7 @@ impl BaseMessageChunk {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
+    pub fn id(&self) -> Option<String> {
         match self {
             BaseMessageChunk::AI(m) => m.id(),
             BaseMessageChunk::Human(m) => m.id(),

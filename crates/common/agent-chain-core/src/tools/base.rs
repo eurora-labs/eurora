@@ -129,11 +129,15 @@ pub struct ToolDefinition {
 }
 
 /// How to handle tool errors.
+///
+/// Mirrors Python's `bool | str | Callable[[ToolException], str] | None`.
+/// - `None` or `Bool(false)`: Don't handle errors (re-raise them)
+/// - `Bool(true)`: Return the exception message
+/// - `Message(str)`: Return a specific error message
+/// - `Handler(fn)`: Use a custom function to handle the error
 #[derive(Clone)]
 pub enum HandleToolError {
-    /// Don't handle errors (re-raise them).
-    None,
-    /// Return a generic error message.
+    /// Return the exception message when true, don't handle when false.
     Bool(bool),
     /// Return a specific error message.
     Message(String),
@@ -144,7 +148,6 @@ pub enum HandleToolError {
 impl Debug for HandleToolError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            HandleToolError::None => write!(f, "HandleToolError::None"),
             HandleToolError::Bool(b) => f.debug_tuple("HandleToolError::Bool").field(b).finish(),
             HandleToolError::Message(m) => {
                 f.debug_tuple("HandleToolError::Message").field(m).finish()
@@ -161,11 +164,15 @@ impl Default for HandleToolError {
 }
 
 /// How to handle validation errors.
+///
+/// Mirrors Python's `bool | str | Callable[[ValidationError], str] | None`.
+/// - `None` or `Bool(false)`: Don't handle errors (re-raise them)
+/// - `Bool(true)`: Return a generic "Tool input validation error" message
+/// - `Message(str)`: Return a specific error message
+/// - `Handler(fn)`: Use a custom function to handle the error
 #[derive(Clone)]
 pub enum HandleValidationError {
-    /// Don't handle errors (re-raise them).
-    None,
-    /// Return a generic error message.
+    /// Return a generic error message when true, don't handle when false.
     Bool(bool),
     /// Return a specific error message.
     Message(String),
@@ -176,7 +183,6 @@ pub enum HandleValidationError {
 impl Debug for HandleValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            HandleValidationError::None => write!(f, "HandleValidationError::None"),
             HandleValidationError::Bool(b) => f
                 .debug_tuple("HandleValidationError::Bool")
                 .field(b)
@@ -397,16 +403,17 @@ pub trait BaseTool: Send + Sync + Debug {
     /// Invoke the tool with a ToolCall.
     async fn invoke(&self, tool_call: ToolCall) -> BaseMessage {
         let input = ToolInput::ToolCall(tool_call.clone());
+        let tool_call_id = tool_call.id().unwrap_or_default();
         match self.arun(input, None).await {
             Ok(output) => match output {
-                ToolOutput::String(s) => ToolMessage::new(s, tool_call.id()).into(),
+                ToolOutput::String(s) => ToolMessage::new(s, &tool_call_id).into(),
                 ToolOutput::Message(m) => m.into(),
                 ToolOutput::ContentAndArtifact { content, artifact } => {
-                    ToolMessage::with_artifact(content.to_string(), tool_call.id(), artifact).into()
+                    ToolMessage::with_artifact(content.to_string(), &tool_call_id, artifact).into()
                 }
-                ToolOutput::Json(v) => ToolMessage::new(v.to_string(), tool_call.id()).into(),
+                ToolOutput::Json(v) => ToolMessage::new(v.to_string(), &tool_call_id).into(),
             },
-            Err(e) => ToolMessage::error(e.to_string(), tool_call.id()).into(),
+            Err(e) => ToolMessage::error(e.to_string(), &tool_call_id).into(),
         }
     }
 
@@ -438,20 +445,36 @@ pub fn is_tool_call(input: &Value) -> bool {
 }
 
 /// Handle a tool exception based on the configured flag.
+///
+/// Mirrors Python's `_handle_tool_error`:
+/// - `Bool(false)`: Returns `None` (don't handle, re-raise)
+/// - `Bool(true)`: Returns the exception message (or "Tool execution error" if empty)
+/// - `Message(str)`: Returns the specific message
+/// - `Handler(fn)`: Calls the handler function
 pub fn handle_tool_error_impl(e: &ToolException, flag: &HandleToolError) -> Option<String> {
     match flag {
-        HandleToolError::None => None,
         HandleToolError::Bool(false) => None,
-        HandleToolError::Bool(true) => Some(e.0.clone()),
+        HandleToolError::Bool(true) => {
+            if e.0.is_empty() {
+                Some("Tool execution error".to_string())
+            } else {
+                Some(e.0.clone())
+            }
+        }
         HandleToolError::Message(msg) => Some(msg.clone()),
         HandleToolError::Handler(f) => Some(f(e)),
     }
 }
 
 /// Handle a validation error based on the configured flag.
+///
+/// Mirrors Python's `_handle_validation_error`:
+/// - `Bool(false)`: Returns `None` (don't handle, re-raise)
+/// - `Bool(true)`: Returns "Tool input validation error"
+/// - `Message(str)`: Returns the specific message
+/// - `Handler(fn)`: Calls the handler function
 pub fn handle_validation_error_impl(e: &str, flag: &HandleValidationError) -> Option<String> {
     match flag {
-        HandleValidationError::None => None,
         HandleValidationError::Bool(false) => None,
         HandleValidationError::Bool(true) => Some("Tool input validation error".to_string()),
         HandleValidationError::Message(msg) => Some(msg.clone()),
@@ -459,30 +482,48 @@ pub fn handle_validation_error_impl(e: &str, flag: &HandleValidationError) -> Op
     }
 }
 
-/// Format tool output as appropriate.
+/// Format tool output as a ToolMessage if appropriate.
+///
+/// Mirrors Python's `_format_output`:
+/// - If content is already a ToolMessage (ToolOutput::Message) or tool_call_id is None,
+///   returns the content directly
+/// - Otherwise, wraps content in a ToolMessage with the tool_call_id
 pub fn format_output(
-    content: Value,
+    content: ToolOutput,
     artifact: Option<Value>,
     tool_call_id: Option<&str>,
     name: &str,
-    _status: &str,
+    status: &str,
 ) -> ToolOutput {
-    if let Some(tool_call_id) = tool_call_id {
-        let msg = if let Some(artifact) = artifact {
-            ToolMessage::with_artifact(stringify_content(&content), tool_call_id, artifact)
-        } else {
-            ToolMessage::new(stringify_content(&content), tool_call_id)
-        };
-        ToolOutput::Message(msg.with_name(name))
-    } else {
-        match content {
-            Value::String(s) => ToolOutput::String(s),
-            other => ToolOutput::Json(other),
-        }
+    // If content is already a ToolMessage or tool_call_id is None, return content directly
+    if matches!(content, ToolOutput::Message(_)) || tool_call_id.is_none() {
+        return content;
     }
+
+    let tool_call_id = tool_call_id.expect("tool_call_id should be Some at this point");
+
+    // Convert content to string, using stringify if not already a valid message content type
+    let content_str = match &content {
+        ToolOutput::String(s) => s.clone(),
+        ToolOutput::Json(v) => stringify(v),
+        ToolOutput::Message(_) => unreachable!(),
+        ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
+    };
+
+    let msg = ToolMessage::with_status(content_str, tool_call_id, status).with_name(name);
+
+    let msg = if let Some(artifact) = artifact {
+        msg.with_artifact_value(artifact)
+    } else {
+        msg
+    };
+
+    ToolOutput::Message(msg)
 }
 
 /// Check if content is a valid message content type.
+///
+/// Validates content for OpenAI or Anthropic format tool messages.
 pub fn is_message_content_type(obj: &Value) -> bool {
     match obj {
         Value::String(_) => true,
@@ -492,24 +533,32 @@ pub fn is_message_content_type(obj: &Value) -> bool {
 }
 
 /// Check if object is a valid message content block.
+///
+/// Validates content blocks for OpenAI or Anthropic format.
 pub fn is_message_content_block(obj: &Value) -> bool {
     match obj {
         Value::String(_) => true,
         Value::Object(map) => map
             .get("type")
             .and_then(|t| t.as_str())
-            .map(|t| TOOL_MESSAGE_BLOCK_TYPES.contains(&t))
-            .unwrap_or(false),
+            .is_some_and(|t| TOOL_MESSAGE_BLOCK_TYPES.contains(&t)),
         _ => false,
     }
 }
 
 /// Convert content to string, preferring JSON format.
-pub fn stringify_content(content: &Value) -> String {
+///
+/// Mirrors Python's `_stringify`: tries JSON first, falls back to str().
+pub fn stringify(content: &Value) -> String {
     match content {
         Value::String(s) => s.clone(),
         other => serde_json::to_string(other).unwrap_or_else(|_| other.to_string()),
     }
+}
+
+/// Alias for stringify for backwards compatibility.
+pub fn stringify_content(content: &Value) -> String {
+    stringify(content)
 }
 
 /// Prepare arguments for tool execution.
@@ -521,7 +570,7 @@ pub fn prep_run_args(
 
     match &value {
         ToolInput::ToolCall(tc) => {
-            let tool_call_id = Some(tc.id().to_string());
+            let tool_call_id = tc.id();
             let input = ToolInput::Dict(
                 tc.args()
                     .as_object()
