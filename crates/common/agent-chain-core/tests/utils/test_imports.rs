@@ -59,7 +59,7 @@ const EXPECTED_EXPORTS: &[&str] = &[
     "secret_from_env",
     "build_model_kwargs", // equivalent to Python's "build_extra_kwargs"
     "SecretString",
-    "MockTime", // equivalent to Python's "mock_now"
+    "MockTime",          // equivalent to Python's "mock_now"
     "validate_xor_args", // equivalent to Python's "xor_args"
     "HttpStatusError",
     "NoDefault",
@@ -148,7 +148,10 @@ fn test_all_imports() {
     use agent_chain_core::utils::secret_from_env;
     let _ = secret_from_env(&["TEST"], None, None);
     use agent_chain_core::utils::build_model_kwargs;
-    let _ = build_model_kwargs(std::collections::HashMap::new(), &std::collections::HashSet::new());
+    let _ = build_model_kwargs(
+        std::collections::HashMap::new(),
+        &std::collections::HashSet::new(),
+    );
     use agent_chain_core::utils::MockTime;
     let _ = MockTime::fixed(0);
     use agent_chain_core::utils::validate_xor_args;
@@ -241,8 +244,11 @@ fn test_all_imports() {
 
     // Verify the expected exports list has the right count
     let expected: HashSet<_> = EXPECTED_EXPORTS.iter().collect();
-    assert!(!expected.is_empty(), "Expected exports list should not be empty");
-    
+    assert!(
+        !expected.is_empty(),
+        "Expected exports list should not be empty"
+    );
+
     // Note: We could add more rigorous checking here by introspecting the module,
     // but Rust doesn't provide runtime reflection like Python's __all__.
     // The compile-time checks above are sufficient for verifying exports.
