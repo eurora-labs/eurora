@@ -15,7 +15,6 @@ pub use storage::{StorageStats, TimelineStorage};
 // Internal modules
 mod collector;
 mod config;
-mod db;
 mod error;
 mod manager;
 mod storage;
