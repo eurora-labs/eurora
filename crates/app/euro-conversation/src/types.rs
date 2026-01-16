@@ -1,11 +1,12 @@
 use agent_chain::BaseMessage;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Conversation {
     id: Option<Uuid>,
     title: String,
