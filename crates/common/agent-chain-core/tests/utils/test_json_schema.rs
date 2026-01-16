@@ -569,29 +569,32 @@ fn test_dereference_refs_cyclical_mixed_refs() {
     // This should handle cycles gracefully
     let actual = dereference_refs(&schema, None, None);
 
-    assert_eq!(actual, json!({
-        "$defs": {
-            "Node": {
-                "properties": {
-                    "children": {"items": {"$ref": "#/$defs/Node"}, "type": "array"},
-                    "id": {"type": "string"},
-                    "parent": {"$ref": "#/$defs/Node", "nullable": true},
-                },
-                "type": "object",
-            }
-        },
-        "properties": {
-            "node": {
-                "properties": {
-                    "children": {"items": {}, "type": "array"},
-                    "id": {"type": "string"},
-                    "parent": {"nullable": true},
-                },
-                "type": "object",
-            }
-        },
-        "type": "object",
-    }));
+    assert_eq!(
+        actual,
+        json!({
+            "$defs": {
+                "Node": {
+                    "properties": {
+                        "children": {"items": {"$ref": "#/$defs/Node"}, "type": "array"},
+                        "id": {"type": "string"},
+                        "parent": {"$ref": "#/$defs/Node", "nullable": true},
+                    },
+                    "type": "object",
+                }
+            },
+            "properties": {
+                "node": {
+                    "properties": {
+                        "children": {"items": {}, "type": "array"},
+                        "id": {"type": "string"},
+                        "parent": {"nullable": true},
+                    },
+                    "type": "object",
+                }
+            },
+            "type": "object",
+        })
+    );
 }
 
 #[test]
