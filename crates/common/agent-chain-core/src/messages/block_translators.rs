@@ -6,6 +6,7 @@
 //! This corresponds to `langchain_core/messages/block_translators/` in Python.
 
 pub mod anthropic;
+pub mod openai;
 
 use serde_json::Value;
 
@@ -17,6 +18,7 @@ pub type TranslatorFn = fn(&[Value], bool) -> Vec<Value>;
 pub fn get_translator(provider: &str) -> Option<TranslatorFn> {
     match provider {
         "anthropic" => Some(anthropic::convert_to_standard_blocks),
+        "openai" => Some(openai::convert_to_standard_blocks),
         _ => None,
     }
 }

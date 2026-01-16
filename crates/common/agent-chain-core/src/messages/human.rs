@@ -322,10 +322,26 @@ impl HumanMessage {
             ServerToolCallChunk, ServerToolResult, TextContentBlock, ToolCallBlock,
             ToolCallChunkBlock, VideoContentBlock,
         };
-        use crate::messages::block_translators::anthropic::convert_input_to_standard_blocks;
+        use crate::messages::block_translators::anthropic::convert_input_to_standard_blocks as anthropic_convert;
+        use crate::messages::block_translators::openai::convert_to_v1_from_chat_completions_input;
 
         let raw_content = self.content_list();
-        let blocks_json = convert_input_to_standard_blocks(&raw_content);
+
+        // Try to detect if this is OpenAI Chat Completions format
+        // Check if any blocks are image_url, input_audio, or file type
+        let is_openai_format = raw_content.iter().any(|block| {
+            block
+                .get("type")
+                .and_then(|t| t.as_str())
+                .map(|t| ["image_url", "input_audio", "file"].contains(&t))
+                .unwrap_or(false)
+        });
+
+        let blocks_json = if is_openai_format {
+            convert_to_v1_from_chat_completions_input(&raw_content)
+        } else {
+            anthropic_convert(&raw_content)
+        };
 
         // Deserialize JSON blocks into ContentBlock structs
         // We can't use direct serde deserialization because the enum has #[serde(tag = "type")]

@@ -1,0 +1,1003 @@
+//! Tests for OpenAI block translator.
+//!
+//! Converted from `langchain/libs/core/tests/unit_tests/messages/block_translators/test_openai.py`
+//!
+//! These tests verify that OpenAI-specific content blocks are correctly translated
+//! to the standard v1 content block format via the `content_blocks` property.
+//!
+//! NOTE: These tests use API methods that may not yet exist in the Rust implementation.
+//! The tests are written to match the Python API exactly, serving as a specification
+//! for what needs to be implemented.
+
+use agent_chain_core::messages::block_translators::openai::{
+    OpenAiApi, convert_to_openai_data_block,
+};
+use agent_chain_core::messages::{
+    AIMessage, AIMessageChunk, Annotation, AudioContentBlock, BlockIndex, ContentBlock,
+    FileContentBlock, HumanMessage, ImageContentBlock, NonStandardContentBlock,
+    ReasoningContentBlock, ServerToolCall, ServerToolResult, ServerToolStatus, TextContentBlock,
+    ToolCallBlock, tool_call, tool_call_chunk,
+};
+use serde_json::json;
+use std::collections::HashMap;
+
+/// Helper function to compare content blocks, ignoring auto-generated `id` fields.
+///
+/// This mirrors the Python `_content_blocks_equal_ignore_id` function.
+fn content_blocks_equal_ignore_id(actual: &[ContentBlock], expected: &[ContentBlock]) -> bool {
+    if actual.len() != expected.len() {
+        return false;
+    }
+
+    for (actual_block, expected_block) in actual.iter().zip(expected.iter()) {
+        // Compare blocks, ignoring the id field
+        let actual_without_id = remove_id_from_block(actual_block);
+        let expected_without_id = remove_id_from_block(expected_block);
+
+        if actual_without_id != expected_without_id {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Remove the id field from a content block for comparison purposes.
+fn remove_id_from_block(block: &ContentBlock) -> ContentBlock {
+    match block {
+        ContentBlock::Text(text_block) => ContentBlock::Text(TextContentBlock {
+            id: None,
+            ..text_block.clone()
+        }),
+        ContentBlock::Image(image_block) => ContentBlock::Image(ImageContentBlock {
+            id: None,
+            ..image_block.clone()
+        }),
+        ContentBlock::Audio(audio_block) => ContentBlock::Audio(AudioContentBlock {
+            id: None,
+            ..audio_block.clone()
+        }),
+        ContentBlock::File(file_block) => ContentBlock::File(FileContentBlock {
+            id: None,
+            ..file_block.clone()
+        }),
+        ContentBlock::Reasoning(reasoning_block) => {
+            ContentBlock::Reasoning(ReasoningContentBlock {
+                id: None,
+                ..reasoning_block.clone()
+            })
+        }
+        ContentBlock::ToolCall(tool_call_block) => ContentBlock::ToolCall(ToolCallBlock {
+            id: None,
+            ..tool_call_block.clone()
+        }),
+        ContentBlock::ServerToolCall(server_tool_call) => {
+            ContentBlock::ServerToolCall(ServerToolCall {
+                id: server_tool_call.id.clone(), // Keep server tool call id as it's part of the data
+                ..server_tool_call.clone()
+            })
+        }
+        ContentBlock::ServerToolResult(server_tool_result) => {
+            ContentBlock::ServerToolResult(ServerToolResult {
+                id: None,
+                ..server_tool_result.clone()
+            })
+        }
+        ContentBlock::NonStandard(non_standard) => {
+            ContentBlock::NonStandard(NonStandardContentBlock {
+                id: None,
+                ..non_standard.clone()
+            })
+        }
+        // For other block types, return as-is
+        other => other.clone(),
+    }
+}
+
+// ============================================================================
+// test_convert_to_v1_from_responses
+// ============================================================================
+
+/// Test conversion of OpenAI Responses API content to v1 format.
+///
+/// This test verifies that various OpenAI-specific content block types
+/// (reasoning, function_call, text with annotations, image_generation_call,
+/// file_search_call, etc.) are correctly translated to standard v1 content blocks.
+#[test]
+fn test_convert_to_v1_from_responses() {
+    // Create an AIMessage with OpenAI Responses API-style content blocks
+    let content = vec![
+        json!({"type": "reasoning", "id": "abc123", "summary": []}),
+        json!({
+            "type": "reasoning",
+            "id": "abc234",
+            "summary": [
+                {"type": "summary_text", "text": "foo bar"},
+                {"type": "summary_text", "text": "baz"}
+            ]
+        }),
+        json!({
+            "type": "function_call",
+            "call_id": "call_123",
+            "name": "get_weather",
+            "arguments": r#"{"location": "San Francisco"}"#
+        }),
+        json!({
+            "type": "function_call",
+            "call_id": "call_234",
+            "name": "get_weather_2",
+            "arguments": r#"{"location": "New York"}"#,
+            "id": "fc_123"
+        }),
+        json!({"type": "text", "text": "Hello "}),
+        json!({
+            "type": "text",
+            "text": "world",
+            "annotations": [
+                {"type": "url_citation", "url": "https://example.com"},
+                {
+                    "type": "file_citation",
+                    "filename": "my doc",
+                    "index": 1,
+                    "file_id": "file_123"
+                },
+                {"bar": "baz"}
+            ]
+        }),
+        json!({"type": "image_generation_call", "id": "ig_123", "result": "..."}),
+        json!({
+            "type": "file_search_call",
+            "id": "fs_123",
+            "queries": ["query for file search"],
+            "results": [{"file_id": "file-123"}],
+            "status": "completed"
+        }),
+        json!({"type": "something_else", "foo": "bar"}),
+    ];
+
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert("model_provider".to_string(), json!("openai"));
+
+    let tool_calls = vec![
+        tool_call(
+            "get_weather".to_string(),
+            json!({"location": "San Francisco"}),
+            Some("call_123".to_string()),
+        ),
+        tool_call(
+            "get_weather_2".to_string(),
+            json!({"location": "New York"}),
+            Some("call_234".to_string()),
+        ),
+    ];
+
+    let mut message =
+        AIMessage::with_content_list(content.clone()).with_response_metadata(response_metadata);
+    message.tool_calls = tool_calls;
+
+    // Expected v1 content blocks after translation
+    let expected_content: Vec<ContentBlock> = vec![
+        // reasoning with empty summary
+        ContentBlock::Reasoning(ReasoningContentBlock {
+            block_type: "reasoning".to_string(),
+            id: Some("abc123".to_string()),
+            reasoning: None,
+            index: None,
+            extras: None,
+        }),
+        // reasoning with summary -> exploded into multiple blocks
+        ContentBlock::Reasoning(ReasoningContentBlock {
+            block_type: "reasoning".to_string(),
+            id: Some("abc234".to_string()),
+            reasoning: Some("foo bar".to_string()),
+            index: None,
+            extras: None,
+        }),
+        ContentBlock::Reasoning(ReasoningContentBlock {
+            block_type: "reasoning".to_string(),
+            id: Some("abc234".to_string()),
+            reasoning: Some("baz".to_string()),
+            index: None,
+            extras: None,
+        }),
+        // function_call -> tool_call
+        ContentBlock::ToolCall(ToolCallBlock {
+            block_type: "tool_call".to_string(),
+            id: Some("call_123".to_string()),
+            name: "get_weather".to_string(),
+            args: {
+                let mut args = HashMap::new();
+                args.insert("location".to_string(), json!("San Francisco"));
+                args
+            },
+            index: None,
+            extras: None,
+        }),
+        // function_call with id -> tool_call with extras
+        ContentBlock::ToolCall(ToolCallBlock {
+            block_type: "tool_call".to_string(),
+            id: Some("call_234".to_string()),
+            name: "get_weather_2".to_string(),
+            args: {
+                let mut args = HashMap::new();
+                args.insert("location".to_string(), json!("New York"));
+                args
+            },
+            index: None,
+            extras: Some({
+                let mut extras = HashMap::new();
+                extras.insert("item_id".to_string(), json!("fc_123"));
+                extras
+            }),
+        }),
+        // text -> text
+        ContentBlock::Text(TextContentBlock {
+            block_type: "text".to_string(),
+            id: None,
+            text: "Hello ".to_string(),
+            annotations: None,
+            index: None,
+            extras: None,
+        }),
+        // text with annotations -> text with converted annotations
+        ContentBlock::Text(TextContentBlock {
+            block_type: "text".to_string(),
+            id: None,
+            text: "world".to_string(),
+            annotations: Some(vec![
+                Annotation::Citation {
+                    id: None,
+                    url: Some("https://example.com".to_string()),
+                    title: None,
+                    start_index: None,
+                    end_index: None,
+                    cited_text: None,
+                    extras: None,
+                },
+                Annotation::Citation {
+                    id: None,
+                    url: None,
+                    title: Some("my doc".to_string()),
+                    start_index: None,
+                    end_index: None,
+                    cited_text: None,
+                    extras: Some({
+                        let mut extras = HashMap::new();
+                        extras.insert("file_id".to_string(), json!("file_123"));
+                        extras.insert("index".to_string(), json!(1));
+                        extras
+                    }),
+                },
+                Annotation::NonStandardAnnotation {
+                    id: None,
+                    value: {
+                        let mut value = HashMap::new();
+                        value.insert("bar".to_string(), json!("baz"));
+                        value
+                    },
+                },
+            ]),
+            index: None,
+            extras: None,
+        }),
+        // image_generation_call -> image
+        ContentBlock::Image(ImageContentBlock {
+            block_type: "image".to_string(),
+            id: Some("ig_123".to_string()),
+            file_id: None,
+            mime_type: None,
+            index: None,
+            url: None,
+            base64: Some("...".to_string()),
+            extras: None,
+        }),
+        // file_search_call -> server_tool_call + server_tool_result
+        ContentBlock::ServerToolCall(ServerToolCall {
+            block_type: "server_tool_call".to_string(),
+            id: "fs_123".to_string(),
+            name: "file_search".to_string(),
+            args: {
+                let mut args = HashMap::new();
+                args.insert("queries".to_string(), json!(["query for file search"]));
+                args
+            },
+            index: None,
+            extras: None,
+        }),
+        ContentBlock::ServerToolResult(ServerToolResult {
+            block_type: "server_tool_result".to_string(),
+            id: None,
+            tool_call_id: "fs_123".to_string(),
+            status: ServerToolStatus::Success,
+            output: Some(json!([{"file_id": "file-123"}])),
+            index: None,
+            extras: None,
+        }),
+        // something_else -> non_standard
+        ContentBlock::NonStandard(NonStandardContentBlock {
+            block_type: "non_standard".to_string(),
+            id: None,
+            value: {
+                let mut value = HashMap::new();
+                value.insert("type".to_string(), json!("something_else"));
+                value.insert("foo".to_string(), json!("bar"));
+                value
+            },
+            index: None,
+        }),
+    ];
+
+    // Get content_blocks from message (this calls the translator)
+    let content_blocks = message.content_blocks();
+    assert_eq!(content_blocks, expected_content);
+
+    // Check no mutation - original content should be unchanged
+    assert_ne!(
+        message.content_list(),
+        expected_content
+            .iter()
+            .map(|b| json!(b))
+            .collect::<Vec<_>>()
+    );
+}
+
+// ============================================================================
+// test_convert_to_v1_from_responses_chunk
+// ============================================================================
+
+/// Test conversion of OpenAI Responses API streaming chunks to v1 format.
+///
+/// This test verifies that streaming chunks from OpenAI Responses API are correctly
+/// translated to standard v1 content blocks, including proper handling of
+/// reasoning blocks with summary.
+#[test]
+fn test_convert_to_v1_from_responses_chunk() {
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert("model_provider".to_string(), json!("openai"));
+
+    // Create streaming chunks as they would come from OpenAI Responses API
+    let chunks = vec![
+        AIMessageChunk::with_content_list(vec![
+            json!({"type": "reasoning", "id": "abc123", "summary": [], "index": 0}),
+        ])
+        .with_response_metadata(response_metadata.clone()),
+        AIMessageChunk::with_content_list(vec![json!({
+            "type": "reasoning",
+            "id": "abc234",
+            "summary": [
+                {"type": "summary_text", "text": "foo ", "index": 0}
+            ],
+            "index": 1
+        })])
+        .with_response_metadata(response_metadata.clone()),
+        AIMessageChunk::with_content_list(vec![json!({
+            "type": "reasoning",
+            "id": "abc234",
+            "summary": [
+                {"type": "summary_text", "text": "bar", "index": 0}
+            ],
+            "index": 1
+        })])
+        .with_response_metadata(response_metadata.clone()),
+        AIMessageChunk::with_content_list(vec![json!({
+            "type": "reasoning",
+            "id": "abc234",
+            "summary": [
+                {"type": "summary_text", "text": "baz", "index": 1}
+            ],
+            "index": 1
+        })])
+        .with_response_metadata(response_metadata.clone()),
+    ];
+
+    // Expected content_blocks for each chunk
+    let expected_chunks = [
+        AIMessageChunk::with_content_list(vec![
+            json!({"type": "reasoning", "id": "abc123", "index": "lc_rs_305f30"}),
+        ])
+        .with_response_metadata(response_metadata.clone()),
+        AIMessageChunk::with_content_list(vec![json!({
+            "type": "reasoning",
+            "id": "abc234",
+            "reasoning": "foo ",
+            "index": "lc_rs_315f30"
+        })])
+        .with_response_metadata(response_metadata.clone()),
+        AIMessageChunk::with_content_list(vec![json!({
+            "type": "reasoning",
+            "id": "abc234",
+            "reasoning": "bar",
+            "index": "lc_rs_315f30"
+        })])
+        .with_response_metadata(response_metadata.clone()),
+        AIMessageChunk::with_content_list(vec![json!({
+            "type": "reasoning",
+            "id": "abc234",
+            "reasoning": "baz",
+            "index": "lc_rs_315f31"
+        })])
+        .with_response_metadata(response_metadata.clone()),
+    ];
+
+    // Verify each chunk's content_blocks
+    for (chunk, expected) in chunks.iter().zip(expected_chunks.iter()) {
+        assert_eq!(chunk.content_blocks(), expected.content_blocks());
+    }
+
+    // Merge all chunks
+    let mut full: Option<AIMessageChunk> = None;
+    for chunk in chunks {
+        full = Some(match full {
+            None => chunk,
+            Some(f) => f + chunk,
+        });
+    }
+    let full = full.unwrap();
+
+    // Expected merged content
+    let expected_merged_content = vec![
+        json!({"type": "reasoning", "id": "abc123", "summary": [], "index": 0}),
+        json!({
+            "type": "reasoning",
+            "id": "abc234",
+            "summary": [
+                {"type": "summary_text", "text": "foo bar", "index": 0},
+                {"type": "summary_text", "text": "baz", "index": 1}
+            ],
+            "index": 1
+        }),
+    ];
+    assert_eq!(full.content_list(), expected_merged_content);
+
+    // Expected merged content_blocks
+    let expected_merged_content_blocks = vec![
+        ContentBlock::Reasoning(ReasoningContentBlock {
+            block_type: "reasoning".to_string(),
+            id: Some("abc123".to_string()),
+            reasoning: None,
+            index: Some(BlockIndex::Str("lc_rs_305f30".to_string())),
+            extras: None,
+        }),
+        ContentBlock::Reasoning(ReasoningContentBlock {
+            block_type: "reasoning".to_string(),
+            id: Some("abc234".to_string()),
+            reasoning: Some("foo bar".to_string()),
+            index: Some(BlockIndex::Str("lc_rs_315f30".to_string())),
+            extras: None,
+        }),
+        ContentBlock::Reasoning(ReasoningContentBlock {
+            block_type: "reasoning".to_string(),
+            id: Some("abc234".to_string()),
+            reasoning: Some("baz".to_string()),
+            index: Some(BlockIndex::Str("lc_rs_315f31".to_string())),
+            extras: None,
+        }),
+    ];
+    assert_eq!(full.content_blocks(), expected_merged_content_blocks);
+}
+
+// ============================================================================
+// test_convert_to_v1_from_openai_input
+// ============================================================================
+
+/// Test conversion of OpenAI Chat Completions input content (HumanMessage) to v1 format.
+///
+/// This test verifies that OpenAI-specific input content blocks
+/// (image_url, input_audio, file) are correctly translated to standard v1 content blocks.
+#[test]
+fn test_convert_to_v1_from_openai_input() {
+    let content = vec![
+        json!({"type": "text", "text": "Hello"}),
+        json!({
+            "type": "image_url",
+            "image_url": {"url": "https://example.com/image.png"}
+        }),
+        json!({
+            "type": "image_url",
+            "image_url": {"url": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."}
+        }),
+        json!({
+            "type": "input_audio",
+            "input_audio": {
+                "format": "wav",
+                "data": "<base64 string>"
+            }
+        }),
+        json!({
+            "type": "file",
+            "file": {
+                "filename": "draconomicon.pdf",
+                "file_data": "data:application/pdf;base64,<base64 string>"
+            }
+        }),
+        json!({
+            "type": "file",
+            "file": {"file_id": "<file id>"}
+        }),
+    ];
+
+    let message = HumanMessage::with_content_list(content);
+
+    let expected: Vec<ContentBlock> = vec![
+        // text -> text
+        ContentBlock::Text(TextContentBlock::new("Hello")),
+        // image_url with url -> image
+        ContentBlock::Image(ImageContentBlock {
+            block_type: "image".to_string(),
+            id: None,
+            file_id: None,
+            mime_type: None,
+            index: None,
+            url: Some("https://example.com/image.png".to_string()),
+            base64: None,
+            extras: None,
+        }),
+        // image_url with data URI -> image with base64
+        ContentBlock::Image(ImageContentBlock {
+            block_type: "image".to_string(),
+            id: None,
+            file_id: None,
+            mime_type: Some("image/jpeg".to_string()),
+            index: None,
+            url: None,
+            base64: Some("/9j/4AAQSkZJRg...".to_string()),
+            extras: None,
+        }),
+        // input_audio -> audio
+        ContentBlock::Audio(AudioContentBlock {
+            block_type: "audio".to_string(),
+            id: None,
+            file_id: None,
+            mime_type: Some("audio/wav".to_string()),
+            index: None,
+            url: None,
+            base64: Some("<base64 string>".to_string()),
+            extras: None,
+        }),
+        // file with file_data -> file with base64
+        ContentBlock::File(FileContentBlock {
+            block_type: "file".to_string(),
+            id: None,
+            file_id: None,
+            mime_type: Some("application/pdf".to_string()),
+            index: None,
+            url: None,
+            base64: Some("<base64 string>".to_string()),
+            extras: Some({
+                let mut extras = HashMap::new();
+                extras.insert("filename".to_string(), json!("draconomicon.pdf"));
+                extras
+            }),
+        }),
+        // file with file_id -> file
+        ContentBlock::File(FileContentBlock {
+            block_type: "file".to_string(),
+            id: None,
+            file_id: Some("<file id>".to_string()),
+            mime_type: None,
+            index: None,
+            url: None,
+            base64: None,
+            extras: None,
+        }),
+    ];
+
+    assert!(content_blocks_equal_ignore_id(
+        &message.content_blocks(),
+        &expected
+    ));
+}
+
+// ============================================================================
+// test_compat_responses_v03
+// ============================================================================
+
+/// Test compatibility with v0.3 legacy message format.
+///
+/// This test verifies that messages in the v0.3 format (with reasoning in
+/// additional_kwargs, tool_outputs, refusal, etc.) are correctly translated
+/// to v1 content blocks.
+#[test]
+fn test_compat_responses_v03() {
+    // Create a v0.3 style message
+    let content = vec![json!({
+        "type": "text",
+        "text": "Hello, world!",
+        "annotations": [{"type": "foo"}]
+    })];
+
+    let mut additional_kwargs = HashMap::new();
+    additional_kwargs.insert(
+        "reasoning".to_string(),
+        json!({
+            "type": "reasoning",
+            "id": "rs_123",
+            "summary": [
+                {"type": "summary_text", "text": "summary 1"},
+                {"type": "summary_text", "text": "summary 2"}
+            ]
+        }),
+    );
+    additional_kwargs.insert(
+        "tool_outputs".to_string(),
+        json!([{
+            "type": "web_search_call",
+            "id": "websearch_123",
+            "status": "completed"
+        }]),
+    );
+    additional_kwargs.insert("refusal".to_string(), json!("I cannot assist with that."));
+    additional_kwargs.insert(
+        "__openai_function_call_ids__".to_string(),
+        json!({"call_abc": "fc_abc"}),
+    );
+
+    let mut response_metadata = HashMap::new();
+    response_metadata.insert("id".to_string(), json!("resp_123"));
+    response_metadata.insert("model_provider".to_string(), json!("openai"));
+
+    let tool_calls = vec![tool_call(
+        "my_tool".to_string(),
+        json!({"x": 3}),
+        Some("call_abc".to_string()),
+    )];
+
+    let mut message = AIMessage::with_content_list(content)
+        .with_additional_kwargs(additional_kwargs)
+        .with_response_metadata(response_metadata);
+    message.tool_calls = tool_calls;
+    message.id = Some("msg_123".to_string());
+
+    // Expected v1 content blocks
+    let expected_content: Vec<ContentBlock> = vec![
+        // reasoning from additional_kwargs -> reasoning blocks
+        ContentBlock::Reasoning(ReasoningContentBlock {
+            block_type: "reasoning".to_string(),
+            id: Some("rs_123".to_string()),
+            reasoning: Some("summary 1".to_string()),
+            index: None,
+            extras: None,
+        }),
+        ContentBlock::Reasoning(ReasoningContentBlock {
+            block_type: "reasoning".to_string(),
+            id: Some("rs_123".to_string()),
+            reasoning: Some("summary 2".to_string()),
+            index: None,
+            extras: None,
+        }),
+        // text with annotations
+        ContentBlock::Text(TextContentBlock {
+            block_type: "text".to_string(),
+            id: Some("msg_123".to_string()),
+            text: "Hello, world!".to_string(),
+            annotations: Some(vec![Annotation::NonStandardAnnotation {
+                id: None,
+                value: {
+                    let mut value = HashMap::new();
+                    value.insert("type".to_string(), json!("foo"));
+                    value
+                },
+            }]),
+            index: None,
+            extras: None,
+        }),
+        // refusal -> non_standard
+        ContentBlock::NonStandard(NonStandardContentBlock {
+            block_type: "non_standard".to_string(),
+            id: None,
+            value: {
+                let mut value = HashMap::new();
+                value.insert("type".to_string(), json!("refusal"));
+                value.insert("refusal".to_string(), json!("I cannot assist with that."));
+                value
+            },
+            index: None,
+        }),
+        // tool_call with function_call_id mapping
+        ContentBlock::ToolCall(ToolCallBlock {
+            block_type: "tool_call".to_string(),
+            id: Some("call_abc".to_string()),
+            name: "my_tool".to_string(),
+            args: {
+                let mut args = HashMap::new();
+                args.insert("x".to_string(), json!(3));
+                args
+            },
+            index: None,
+            extras: Some({
+                let mut extras = HashMap::new();
+                extras.insert("item_id".to_string(), json!("fc_abc"));
+                extras
+            }),
+        }),
+        // web_search_call from tool_outputs -> server_tool_call + server_tool_result
+        ContentBlock::ServerToolCall(ServerToolCall {
+            block_type: "server_tool_call".to_string(),
+            id: "websearch_123".to_string(),
+            name: "web_search".to_string(),
+            args: HashMap::new(),
+            index: None,
+            extras: None,
+        }),
+        ContentBlock::ServerToolResult(ServerToolResult {
+            block_type: "server_tool_result".to_string(),
+            id: None,
+            tool_call_id: "websearch_123".to_string(),
+            status: ServerToolStatus::Success,
+            output: None,
+            index: None,
+            extras: None,
+        }),
+    ];
+
+    assert_eq!(message.content_blocks(), expected_content);
+
+    // Test chunks with tool calls
+    let mut additional_kwargs_chunk1 = HashMap::new();
+    additional_kwargs_chunk1.insert(
+        "__openai_function_call_ids__".to_string(),
+        json!({"call_abc": "fc_abc"}),
+    );
+
+    let mut response_metadata_chunk = HashMap::new();
+    response_metadata_chunk.insert("model_provider".to_string(), json!("openai"));
+
+    let chunk_1 = AIMessageChunk::with_content_list(vec![])
+        .with_additional_kwargs(additional_kwargs_chunk1)
+        .with_tool_call_chunks(vec![tool_call_chunk(
+            Some("my_tool".to_string()),
+            Some("".to_string()),
+            Some("call_abc".to_string()),
+            Some(0),
+        )])
+        .with_response_metadata(response_metadata_chunk.clone());
+
+    let expected_chunk1_content = vec![ContentBlock::ToolCallChunk(
+        agent_chain_core::messages::ToolCallChunkBlock {
+            block_type: "tool_call_chunk".to_string(),
+            id: Some("call_abc".to_string()),
+            name: Some("my_tool".to_string()),
+            args: Some("".to_string()),
+            index: Some(BlockIndex::Int(0)),
+            extras: Some({
+                let mut extras = HashMap::new();
+                extras.insert("item_id".to_string(), json!("fc_abc"));
+                extras
+            }),
+        },
+    )];
+    assert_eq!(chunk_1.content_blocks(), expected_chunk1_content);
+
+    // Test chunk 2 without function call ids
+    let mut additional_kwargs_chunk2 = HashMap::new();
+    additional_kwargs_chunk2.insert("__openai_function_call_ids__".to_string(), json!({}));
+
+    let chunk_2 = AIMessageChunk::with_content_list(vec![])
+        .with_additional_kwargs(additional_kwargs_chunk2)
+        .with_tool_call_chunks(vec![tool_call_chunk(
+            None,
+            Some("{".to_string()),
+            None,
+            Some(0),
+        )]);
+
+    let expected_chunk2_content = vec![ContentBlock::ToolCallChunk(
+        agent_chain_core::messages::ToolCallChunkBlock {
+            block_type: "tool_call_chunk".to_string(),
+            id: None,
+            name: None,
+            args: Some("{".to_string()),
+            index: Some(BlockIndex::Int(0)),
+            extras: None,
+        },
+    )];
+    assert_eq!(chunk_2.content_blocks(), expected_chunk2_content);
+
+    // Test merged chunk
+    let merged_chunk = chunk_1 + chunk_2;
+    let expected_merged_content = vec![ContentBlock::ToolCallChunk(
+        agent_chain_core::messages::ToolCallChunkBlock {
+            block_type: "tool_call_chunk".to_string(),
+            id: Some("call_abc".to_string()),
+            name: Some("my_tool".to_string()),
+            args: Some("{".to_string()),
+            index: Some(BlockIndex::Int(0)),
+            extras: Some({
+                let mut extras = HashMap::new();
+                extras.insert("item_id".to_string(), json!("fc_abc"));
+                extras
+            }),
+        },
+    )];
+    assert_eq!(merged_chunk.content_blocks(), expected_merged_content);
+
+    // Test reasoning chunks
+    let mut additional_kwargs_reasoning1 = HashMap::new();
+    additional_kwargs_reasoning1.insert(
+        "reasoning".to_string(),
+        json!({"id": "rs_abc", "summary": [], "type": "reasoning"}),
+    );
+
+    let reasoning_chunk_1 = AIMessageChunk::with_content_list(vec![])
+        .with_additional_kwargs(additional_kwargs_reasoning1)
+        .with_response_metadata(response_metadata_chunk.clone());
+
+    let expected_reasoning1_content = vec![ContentBlock::Reasoning(ReasoningContentBlock {
+        block_type: "reasoning".to_string(),
+        id: Some("rs_abc".to_string()),
+        reasoning: None,
+        index: None,
+        extras: None,
+    })];
+    assert_eq!(
+        reasoning_chunk_1.content_blocks(),
+        expected_reasoning1_content
+    );
+
+    let mut additional_kwargs_reasoning2 = HashMap::new();
+    additional_kwargs_reasoning2.insert(
+        "reasoning".to_string(),
+        json!({
+            "summary": [
+                {"index": 0, "type": "summary_text", "text": "reasoning text"}
+            ]
+        }),
+    );
+
+    let reasoning_chunk_2 = AIMessageChunk::with_content_list(vec![])
+        .with_additional_kwargs(additional_kwargs_reasoning2)
+        .with_response_metadata(response_metadata_chunk.clone());
+
+    let expected_reasoning2_content = vec![ContentBlock::Reasoning(ReasoningContentBlock {
+        block_type: "reasoning".to_string(),
+        id: None,
+        reasoning: Some("reasoning text".to_string()),
+        index: None,
+        extras: None,
+    })];
+    assert_eq!(
+        reasoning_chunk_2.content_blocks(),
+        expected_reasoning2_content
+    );
+
+    // Test merged reasoning chunks
+    let merged_reasoning = reasoning_chunk_1 + reasoning_chunk_2;
+    let expected_merged_reasoning = vec![ContentBlock::Reasoning(ReasoningContentBlock {
+        block_type: "reasoning".to_string(),
+        id: Some("rs_abc".to_string()),
+        reasoning: Some("reasoning text".to_string()),
+        index: None,
+        extras: None,
+    })];
+    assert_eq!(merged_reasoning.content_blocks(), expected_merged_reasoning);
+}
+
+// ============================================================================
+// test_convert_to_openai_data_block
+// ============================================================================
+
+/// Test conversion of standard data blocks to OpenAI format.
+///
+/// This test verifies that standard v1 data content blocks (image, file, audio)
+/// are correctly converted to OpenAI Chat Completions and Responses API formats.
+#[test]
+fn test_convert_to_openai_data_block() {
+    // Chat completions - Image / url
+    let block = json!({
+        "type": "image",
+        "url": "https://example.com/test.png"
+    });
+    let expected = json!({
+        "type": "image_url",
+        "image_url": {"url": "https://example.com/test.png"}
+    });
+    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
+    assert_eq!(result, expected);
+
+    // Chat completions - Image / base64
+    let block = json!({
+        "type": "image",
+        "base64": "<base64 string>",
+        "mime_type": "image/png"
+    });
+    let expected = json!({
+        "type": "image_url",
+        "image_url": {"url": "data:image/png;base64,<base64 string>"}
+    });
+    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
+    assert_eq!(result, expected);
+
+    // Chat completions - File / url (should fail)
+    let block = json!({
+        "type": "file",
+        "url": "https://example.com/test.pdf"
+    });
+    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("does not support"));
+
+    // Chat completions - File / base64
+    let block = json!({
+        "type": "file",
+        "base64": "<base64 string>",
+        "mime_type": "application/pdf",
+        "filename": "test.pdf"
+    });
+    let expected = json!({
+        "type": "file",
+        "file": {
+            "file_data": "data:application/pdf;base64,<base64 string>",
+            "filename": "test.pdf"
+        }
+    });
+    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
+    assert_eq!(result, expected);
+
+    // Chat completions - File / file ID
+    let block = json!({
+        "type": "file",
+        "file_id": "file-abc123"
+    });
+    let expected = json!({"type": "file", "file": {"file_id": "file-abc123"}});
+    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
+    assert_eq!(result, expected);
+
+    // Chat completions - Audio / base64
+    let block = json!({
+        "type": "audio",
+        "base64": "<base64 string>",
+        "mime_type": "audio/wav"
+    });
+    let expected = json!({
+        "type": "input_audio",
+        "input_audio": {"data": "<base64 string>", "format": "wav"}
+    });
+    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
+    assert_eq!(result, expected);
+
+    // Responses API - Image / url
+    let block = json!({
+        "type": "image",
+        "url": "https://example.com/test.png"
+    });
+    let expected = json!({"type": "input_image", "image_url": "https://example.com/test.png"});
+    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
+    assert_eq!(result, expected);
+
+    // Responses API - Image / base64
+    let block = json!({
+        "type": "image",
+        "base64": "<base64 string>",
+        "mime_type": "image/png"
+    });
+    let expected = json!({
+        "type": "input_image",
+        "image_url": "data:image/png;base64,<base64 string>"
+    });
+    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
+    assert_eq!(result, expected);
+
+    // Responses API - File / base64
+    let block = json!({
+        "type": "file",
+        "base64": "<base64 string>",
+        "mime_type": "application/pdf",
+        "filename": "test.pdf"
+    });
+    let expected = json!({
+        "type": "input_file",
+        "file_data": "data:application/pdf;base64,<base64 string>",
+        "filename": "test.pdf"
+    });
+    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
+    assert_eq!(result, expected);
+
+    // Responses API - File / file ID
+    let block = json!({
+        "type": "file",
+        "file_id": "file-abc123"
+    });
+    let expected = json!({"type": "input_file", "file_id": "file-abc123"});
+    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
+    assert_eq!(result, expected);
+}
