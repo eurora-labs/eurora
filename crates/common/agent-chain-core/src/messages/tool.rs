@@ -6,8 +6,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::utils::uuid7;
-
 #[cfg(feature = "specta")]
 use specta::Type;
 
@@ -26,7 +24,7 @@ pub trait ToolOutputMixin {}
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCall {
     /// Unique identifier for this tool call
-    id: String,
+    id: Option<String>,
     /// Name of the tool to call
     name: String,
     /// Arguments for the tool call as a JSON object
@@ -37,7 +35,7 @@ impl ToolCall {
     /// Create a new tool call.
     pub fn new(name: impl Into<String>, args: serde_json::Value) -> Self {
         Self {
-            id: uuid7(None).to_string(),
+            id: None,
             name: name.into(),
             args,
         }
@@ -50,15 +48,15 @@ impl ToolCall {
         args: serde_json::Value,
     ) -> Self {
         Self {
-            id: id.into(),
+            id: Some(id.into()),
             name: name.into(),
             args,
         }
     }
 
     /// Get the tool call ID.
-    pub fn id(&self) -> &str {
-        &self.id
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the tool name.
@@ -204,7 +202,7 @@ impl ToolMessage {
         Self {
             content: content.into(),
             tool_call_id: tool_call_id.into(),
-            id: Some(uuid7(None).to_string()),
+            id: None,
             name: None,
             status: ToolStatus::Success,
             artifact: None,
@@ -243,7 +241,7 @@ impl ToolMessage {
         Self {
             content: content.into(),
             tool_call_id: tool_call_id.into(),
-            id: Some(uuid7(None).to_string()),
+            id: None,
             name: None,
             status: ToolStatus::Error,
             artifact: None,
@@ -261,7 +259,7 @@ impl ToolMessage {
         Self {
             content: content.into(),
             tool_call_id: tool_call_id.into(),
-            id: Some(uuid7(None).to_string()),
+            id: None,
             name: None,
             status: ToolStatus::Success,
             artifact: Some(artifact),
@@ -276,6 +274,40 @@ impl ToolMessage {
         self
     }
 
+    /// Set the artifact for this tool message (builder pattern).
+    pub fn with_artifact_value(mut self, artifact: serde_json::Value) -> Self {
+        self.artifact = Some(artifact);
+        self
+    }
+
+    /// Set the status for this tool message (builder pattern).
+    pub fn with_status_value(mut self, status: ToolStatus) -> Self {
+        self.status = status;
+        self
+    }
+
+    /// Create a new tool message with a specific status.
+    pub fn with_status(
+        content: impl Into<String>,
+        tool_call_id: impl Into<String>,
+        status: &str,
+    ) -> Self {
+        let status = match status {
+            "error" => ToolStatus::Error,
+            _ => ToolStatus::Success,
+        };
+        Self {
+            content: content.into(),
+            tool_call_id: tool_call_id.into(),
+            id: None,
+            name: None,
+            status,
+            artifact: None,
+            additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
+        }
+    }
+
     /// Get the message content.
     pub fn content(&self) -> &str {
         &self.content
@@ -287,13 +319,13 @@ impl ToolMessage {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the tool name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get the status of the tool invocation.
@@ -374,8 +406,8 @@ impl ToolMessageChunk {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the tool name.
