@@ -49,7 +49,7 @@ keyring = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 posthog-rs = { workspace = true }
-prompt-kit = { workspace = true }
+# prompt-kit = { workspace = true }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }
 serde = { workspace = true }
 serde_json = { version = "1.0", features = ["arbitrary_precision", "std"] }
