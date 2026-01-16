@@ -3635,7 +3635,6 @@ dependencies = [
  "euro-fs",
  "euro-secret",
  "notify",
- "prompt-kit",
  "serde",
  "serde_json",
  "serde_json_lenient",
@@ -3675,7 +3674,6 @@ dependencies = [
  "log",
  "parking_lot",
  "posthog-rs",
- "prompt-kit",
  "sentry",
  "serde",
  "serde_json",
@@ -7870,20 +7868,6 @@ checksum = "52717f9a02b6965224f95ca2a81e2e0c5c43baacd28ca057577988930b6c3d5b"
 dependencies = [
  "quote",
  "syn 2.0.112",
-]
-
-[[package]]
-name = "prompt-kit"
-version = "0.0.0"
-dependencies = [
- "agent-chain",
- "agent-chain-eurora",
- "anyhow",
- "euro-chat-client",
- "serde",
- "thiserror 2.0.17",
- "tokio-stream",
- "tracing",
 ]
 
 [[package]]
