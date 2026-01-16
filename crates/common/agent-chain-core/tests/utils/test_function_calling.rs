@@ -20,13 +20,13 @@
 //! create the input schemas at runtime.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::tools::{ArgsSchema, StructuredTool, Tool};
 use agent_chain_core::utils::function_calling::{
-    convert_typed_dict_to_openai_function, convert_to_json_schema, convert_to_openai_function,
-    tool_example_to_messages, FunctionDescription, ToolDescription,
+    FunctionDescription, ToolDescription, convert_to_json_schema, convert_to_openai_function,
+    convert_typed_dict_to_openai_function, tool_example_to_messages,
 };
 
 /// Expected JSON schema for dummy_function
@@ -688,11 +688,7 @@ fn test_convert_to_openai_function_strict_required() {
         .get("parameters")
         .and_then(|p| p.get("required"))
         .and_then(|r| r.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str())
-                .collect::<Vec<_>>()
-        })
+        .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
         .unwrap_or_default();
 
     // With strict=true, all fields should be required
@@ -771,7 +767,10 @@ fn test_multiple_tool_calls() {
         assert_eq!(first_call.get("type").unwrap(), "function");
         let function = first_call.get("function").unwrap();
         assert_eq!(function.get("name").unwrap(), "FakeCall");
-        assert_eq!(function.get("arguments").unwrap(), r#"{"data":"ToolCall1"}"#);
+        assert_eq!(
+            function.get("arguments").unwrap(),
+            r#"{"data":"ToolCall1"}"#
+        );
     }
 }
 
@@ -1029,7 +1028,11 @@ fn test_convert_to_openai_function_from_structured_tool_args_schema_dict() {
 }
 #[test]
 fn test_convert_to_openai_function_from_simple_tool() {
-    let tool = Tool::from_function(|_input: String| Ok("".to_string()), "dummy_function", "test description");
+    let tool = Tool::from_function(
+        |_input: String| Ok("".to_string()),
+        "dummy_function",
+        "test description",
+    );
 
     let expected = json!({
         "name": "dummy_function",
@@ -1116,11 +1119,7 @@ fn test_convert_to_openai_function_comprehensive() {
 
     for (name, input) in test_inputs {
         let actual = convert_to_openai_function(&input, None);
-        assert_eq!(
-            actual, expected,
-            "Failed for input type: {}",
-            name
-        );
+        assert_eq!(actual, expected, "Failed for input type: {}", name);
     }
 }
 
@@ -1515,11 +1514,7 @@ fn test_convert_to_json_schema_comprehensive() {
 
     for (name, input) in test_inputs {
         let actual = convert_to_json_schema(&input, None);
-        assert_eq!(
-            actual, expected,
-            "Failed for input type: {}",
-            name
-        );
+        assert_eq!(actual, expected, "Failed for input type: {}", name);
     }
 }
 
