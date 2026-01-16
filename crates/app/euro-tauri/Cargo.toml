@@ -26,7 +26,7 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-agent-chain-core = { workspace = true, features = ["specta"] }
+agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
 color-thief = "0.2.2"
