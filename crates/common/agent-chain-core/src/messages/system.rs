@@ -3,7 +3,6 @@
 //! This module contains the `SystemMessage` and `SystemMessageChunk` types which represent
 //! system instructions for priming AI behavior. Mirrors `langchain_core.messages.system`.
 
-use crate::utils::uuid7;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -38,7 +37,7 @@ impl SystemMessage {
     pub fn new(content: impl Into<String>) -> Self {
         Self {
             content: content.into(),
-            id: Some(uuid7(None).to_string()),
+            id: None,
             name: None,
             additional_kwargs: HashMap::new(),
         }
@@ -73,13 +72,13 @@ impl SystemMessage {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get additional kwargs.
@@ -138,13 +137,13 @@ impl SystemMessageChunk {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get additional kwargs.

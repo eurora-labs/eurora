@@ -234,7 +234,7 @@ pub fn filter_messages(
             // Check exclusions first
             if let Some(exclude_names) = exclude_names
                 && let Some(name) = msg.name()
-                && exclude_names.contains(&name)
+                && exclude_names.contains(&name.as_str())
             {
                 return false;
             }
@@ -247,30 +247,32 @@ pub fn filter_messages(
 
             if let Some(exclude_ids) = exclude_ids
                 && let Some(id) = msg.id()
-                && exclude_ids.contains(&id)
+                && exclude_ids.contains(&id.as_str())
             {
                 return false;
             }
 
             // Check inclusions (default to including if no criteria given)
-            let include_by_name = include_names
-                .is_none_or(|names| msg.name().is_some_and(|name| names.contains(&name)));
+            // Match Python logic: include if no inclusion criteria are given,
+            // OR if any specified inclusion criterion matches
+            let no_include_criteria =
+                include_names.is_none() && include_types.is_none() && include_ids.is_none();
 
-            let include_by_type =
-                include_types.is_none_or(|types| types.contains(&msg.message_type()));
+            let matches_include_names = include_names.is_some_and(|names| {
+                msg.name()
+                    .is_some_and(|name| names.contains(&name.as_str()))
+            });
 
-            let include_by_id =
-                include_ids.is_none_or(|ids| msg.id().is_some_and(|id| ids.contains(&id)));
+            let matches_include_types =
+                include_types.is_some_and(|types| types.contains(&msg.message_type()));
 
-            // If any inclusion criteria is specified, at least one must match
-            let any_include_specified =
-                include_names.is_some() || include_types.is_some() || include_ids.is_some();
+            let matches_include_ids = include_ids
+                .is_some_and(|ids| msg.id().is_some_and(|id| ids.contains(&id.as_str())));
 
-            if any_include_specified {
-                include_by_name || include_by_type || include_by_id
-            } else {
-                true
-            }
+            no_include_criteria
+                || matches_include_names
+                || matches_include_types
+                || matches_include_ids
         })
         .cloned()
         .collect()
