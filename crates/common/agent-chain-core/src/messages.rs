@@ -42,6 +42,7 @@
 // Submodules - organized like langchain_core.messages
 mod ai;
 mod base;
+pub mod block_translators;
 mod chat;
 mod content;
 mod function;
@@ -54,7 +55,7 @@ mod utils;
 // Re-export from ai
 pub use ai::{
     AIMessage, AIMessageChunk, ChunkPosition, InputTokenDetails, OutputTokenDetails, UsageMetadata,
-    add_usage, backwards_compat_tool_calls, subtract_usage,
+    add_ai_message_chunks, add_usage, backwards_compat_tool_calls, subtract_usage,
 };
 
 // Re-export from base
@@ -136,7 +137,9 @@ pub use tool::{
 
 // Re-export from utils
 pub use utils::{
-    AnyMessage, MessageLikeRepresentation, convert_to_message, convert_to_messages,
-    filter_messages, get_buffer_string, merge_message_runs, message_chunk_to_message,
-    message_from_dict, message_to_dict, messages_from_dict, messages_to_dict,
+    AnyMessage, CountTokensConfig, MessageLikeRepresentation, TextFormat, TrimMessagesConfig,
+    TrimStrategy, convert_to_message, convert_to_messages, convert_to_openai_messages,
+    count_tokens_approximately, filter_messages, get_buffer_string, merge_message_runs,
+    message_chunk_to_message, message_from_dict, message_to_dict, messages_from_dict,
+    messages_to_dict, trim_messages,
 };
