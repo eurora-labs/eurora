@@ -81,17 +81,15 @@ impl ChatApi for ChatApiImpl {
 
         if has_assets {
             let mut messages = Vec::new();
+            let asset_messages = timeline
+                .construct_asset_messages_by_ids(&query.assets)
+                .await;
+            messages.extend(asset_messages);
 
-            messages.extend(
-                timeline
-                    .construct_asset_messages_by_ids(&query.assets)
-                    .await,
-            );
-            messages.extend(
-                timeline
-                    .construct_snapshot_messages_by_ids(&query.assets)
-                    .await,
-            );
+            let snapshot_messages = timeline
+                .construct_snapshot_messages_by_ids(&query.assets)
+                .await;
+            messages.extend(snapshot_messages);
 
             // Make a for loop
             for message in messages {

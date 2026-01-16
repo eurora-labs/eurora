@@ -30,7 +30,7 @@ pub struct PromptService {
 impl Default for PromptService {
     fn default() -> Self {
         let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
-        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4".to_string());
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
 
         let provider = ChatOpenAI::new(&model).api_key(api_key);
 
