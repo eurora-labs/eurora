@@ -26,9 +26,7 @@ use euro_tauri::{
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
     },
-    shared_types::{
-        SharedConversationManager, SharedCurrentConversation, create_shared_database_manager,
-    },
+    shared_types::SharedConversationManager,
 };
 use euro_timeline::TimelineManager;
 use tauri::{
@@ -144,9 +142,6 @@ fn main() {
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
                     tauri_app.manage(Mutex::new(app_settings.clone()));
 
-                    // Ensure empty current conversation exists
-                    tauri_app.manage::<SharedCurrentConversation>(Mutex::new(None));
-
                     tauri::async_runtime::spawn(async move {
                         let _ = initialize_posthog().await.map_err(|e| {
                             error!("Failed to initialize posthog: {}", e);
@@ -257,17 +252,17 @@ fn main() {
 
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let db_manager = match create_shared_database_manager(&db_app_handle).await {
-                            Ok(db) => {
-                                Some(db)
-                            }
-                            Err(e) => {
-                                error!("Failed to initialize personal database manager: {}", e);
-                                None
-                            }
-                        };
-                        if let Some(db_manager) = db_manager {
-                            db_app_handle.manage(db_manager);
+                        // let db_manager = match create_shared_database_manager(&db_app_handle).await {
+                        //     Ok(db) => {
+                        //         Some(db)
+                        //     }
+                        //     Err(e) => {
+                        //         error!("Failed to initialize personal database manager: {}", e);
+                        //         None
+                        //     }
+                        // };
+                        // if let Some(db_manager) = db_manager {
+                        //     db_app_handle.manage(db_manager);
                             let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
 
                             let mut asset_receiver = {
@@ -349,7 +344,7 @@ fn main() {
                                 debug!("Timeline collection started successfully");
                             }
 
-                            }
+                            // }
                     });
 
 
