@@ -72,7 +72,7 @@
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									onclick={() => {
-										switchConversation(item.id);
+										switchConversation(item.id ?? '');
 									}}
 								>
 									{#snippet child({ props })}
