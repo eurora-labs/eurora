@@ -83,7 +83,7 @@ log = "0.4"
 once_cell = "1.21"
 parking_lot = "0.12.5"
 posthog-rs = "0.3.7"
-prompt-kit = { path = "crates/common/prompt-kit" }
+# prompt-kit = { path = "crates/common/prompt-kit" }
 prost = "0.14"
 prost-types = "0.14"
 proto-gen = { path = "crates/common/proto-gen" }
