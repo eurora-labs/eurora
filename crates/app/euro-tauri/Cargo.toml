@@ -33,7 +33,6 @@ backtrace = { version = "0.3.76", optional = true }
 color-thief = "0.2.2"
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
-euro-chat-client = { workspace = true }
 euro-conversation = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
@@ -49,10 +48,9 @@ keyring = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 posthog-rs = { workspace = true }
-# prompt-kit = { workspace = true }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }
 serde = { workspace = true }
-serde_json = { version = "1.0", features = ["arbitrary_precision", "std"] }
+serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
 tauri = { version = "2.9.5", features = ["tray-icon", "unstable"] }

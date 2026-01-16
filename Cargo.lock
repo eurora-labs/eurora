@@ -3488,25 +3488,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-chat-client"
-version = "0.0.0"
-dependencies = [
- "agent-chain-core",
- "agent-chain-eurora",
- "anyhow",
- "async-stream",
- "async-trait",
- "euro-auth",
- "futures",
- "prost",
- "prost-types",
- "serde_json",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
-]
-
-[[package]]
 name = "euro-conversation"
 version = "0.0.0"
 dependencies = [
@@ -3631,7 +3612,6 @@ dependencies = [
  "agent-chain-eurora",
  "anyhow",
  "dirs 6.0.0",
- "euro-chat-client",
  "euro-fs",
  "euro-secret",
  "notify",
@@ -3658,7 +3638,6 @@ dependencies = [
  "color-thief",
  "dotenv",
  "euro-activity",
- "euro-chat-client",
  "euro-conversation",
  "euro-encrypt",
  "euro-native-messaging",
