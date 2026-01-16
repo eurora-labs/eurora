@@ -1,6 +1,5 @@
 use agent_chain_core::BaseMessage;
-use euro_personal_db::PersonalDatabaseManager;
-use tauri::{Manager, Runtime};
+use tauri::Runtime;
 
 #[taurpc::procedures(path = "personal_db.message")]
 pub trait MessageApi {
@@ -19,16 +18,17 @@ pub struct MessageApiImpl;
 impl MessageApi for MessageApiImpl {
     async fn get<R: Runtime>(
         self,
-        app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
+        _app_handle: tauri::AppHandle<R>,
+        _conversation_id: String,
         _limit: Option<u32>,
         _offset: Option<u32>,
     ) -> Result<Vec<BaseMessage>, String> {
-        let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+        Ok(vec![])
+        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
-        personal_db
-            .get_base_messages(&conversation_id)
-            .await
-            .map_err(|e| format!("Failed to get chat messages: {e}"))
+        // personal_db
+        //     .get_base_messages(&conversation_id)
+        //     .await
+        //     .map_err(|e| format!("Failed to get chat messages: {e}"))
     }
 }

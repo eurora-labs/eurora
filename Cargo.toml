@@ -56,7 +56,6 @@ euro-conversation = { path = "crates/app/euro-conversation" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-fs = { path = "crates/app/euro-fs" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
-euro-personal-db = { path = "crates/app/euro-personal-db" }
 euro-screen-position = { path = "crates/app/euro-screen-position" }
 euro-secret = { path = "crates/app/euro-secret" }
 euro-settings = { path = "crates/app/euro-settings" }

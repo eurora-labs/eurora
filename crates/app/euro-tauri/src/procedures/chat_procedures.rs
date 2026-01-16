@@ -1,12 +1,12 @@
 use agent_chain_core::{AIMessage, BaseMessage};
-use euro_personal_db::{Conversation, PersonalDatabaseManager};
+use euro_conversation::Conversation;
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
-use crate::shared_types::{SharedConversationManager, SharedCurrentConversation};
+use crate::shared_types::SharedConversationManager;
 
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
@@ -45,12 +45,12 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        conversation: Conversation,
+        _conversation: Conversation,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
-        let personal_db: &PersonalDatabaseManager =
-            app_handle.state::<PersonalDatabaseManager>().inner();
+        // let personal_db: &PersonalDatabaseManager =
+        //     app_handle.state::<PersonalDatabaseManager>().inner();
         let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
         let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
@@ -263,16 +263,16 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
-        let ai_message: BaseMessage = AIMessage::new(complete_response.clone()).into();
-        let next_seq = personal_db
-            .get_next_sequence_num(&conversation.id)
-            .await
-            .map_err(|e| format!("Failed to get sequence number: {e}"))?;
+        let _ai_message: BaseMessage = AIMessage::new(complete_response.clone()).into();
+        // let next_seq = personal_db
+        //     .get_next_sequence_num(&conversation.id)
+        //     .await
+        //     .map_err(|e| format!("Failed to get sequence number: {e}"))?;
 
-        personal_db
-            .insert_base_message(&conversation.id, &ai_message, next_seq)
-            .await
-            .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+        // personal_db
+        //     .insert_base_message(&conversation.id, &ai_message, next_seq)
+        //     .await
+        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
         Ok(complete_response)
         // Ok("test lol".to_string())
@@ -281,23 +281,28 @@ impl ChatApi for ChatApiImpl {
     async fn switch_conversation<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
+        _conversation_id: String,
     ) -> Result<Conversation, String> {
-        let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
-        let conversation = personal_db
-            .get_conversation(&conversation_id)
+        // let conversation = personal_db
+        //     .get_conversation(&conversation_id)
+        //     .await
+        //     .map_err(|e| format!("Failed to get conversation: {}", e))?;
+
+        // let current = app_handle.state::<SharedCurrentConversation>();
+        // let mut guard = current.lock().await;
+        // *guard = Some(conversation.clone());
+
+        // TauRpcChatApiEventTrigger::new(app_handle.clone())
+        //     .current_conversation_changed(conversation.clone())
+        //     .map_err(|e| e.to_string())?;
+
+        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        let conversation_manager = conversation_state.lock().await;
+        Ok(conversation_manager
+            .get_current_conversation()
             .await
-            .map_err(|e| format!("Failed to get conversation: {}", e))?;
-
-        let current = app_handle.state::<SharedCurrentConversation>();
-        let mut guard = current.lock().await;
-        *guard = Some(conversation.clone());
-
-        TauRpcChatApiEventTrigger::new(app_handle.clone())
-            .current_conversation_changed(conversation.clone())
-            .map_err(|e| e.to_string())?;
-
-        Ok(conversation)
+            .clone())
     }
 }

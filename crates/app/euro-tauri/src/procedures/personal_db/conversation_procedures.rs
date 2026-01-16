@@ -1,8 +1,9 @@
 use agent_chain_core::BaseMessage;
-use euro_personal_db::{Conversation, PersonalDatabaseManager};
+// use euro_personal_db::{Conversation, PersonalDatabaseManager};
+use euro_conversation::Conversation;
 use tauri::{Manager, Runtime};
 
-use crate::shared_types::SharedCurrentConversation;
+use crate::shared_types::SharedConversationManager;
 
 #[taurpc::procedures(path = "personal_db.conversation")]
 pub trait ConversationApi {
@@ -30,49 +31,57 @@ pub struct ConversationApiImpl;
 impl ConversationApi for ConversationApiImpl {
     async fn list<R: Runtime>(
         self,
-        app_handle: tauri::AppHandle<R>,
-        limit: u16,
-        offset: u16,
+        _app_handle: tauri::AppHandle<R>,
+        _limit: u16,
+        _offset: u16,
     ) -> Result<Vec<Conversation>, String> {
-        let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
-        personal_db
-            .list_conversations(limit, offset)
-            .await
-            .map_err(|e| e.to_string())
+        Ok(vec![])
+        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+        // personal_db
+        //     .list_conversations(limit, offset)
+        //     .await
+        //     .map_err(|e| e.to_string())
     }
 
     async fn create<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Conversation, String> {
-        let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
-
-        let conversation = personal_db
-            .insert_empty_conversation()
+        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        let conversation_manager = conversation_state.lock().await;
+        Ok(conversation_manager
+            .get_current_conversation()
             .await
-            .map_err(|e| e.to_string())?;
+            .clone())
+        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
-        let current = app_handle.state::<SharedCurrentConversation>();
-        let mut guard = current.lock().await;
-        *guard = Some(conversation.clone());
+        // let conversation = personal_db
+        //     .insert_empty_conversation()
+        //     .await
+        //     .map_err(|e| e.to_string())?;
 
-        TauRpcConversationApiEventTrigger::new(app_handle.clone())
-            .new_conversation_added(conversation.clone())
-            .map_err(|e| e.to_string())?;
+        // let current = app_handle.state::<SharedCurrentConversation>();
+        // let mut guard = current.lock().await;
+        // *guard = Some(conversation.clone());
 
-        Ok(conversation)
+        // TauRpcConversationApiEventTrigger::new(app_handle.clone())
+        //     .new_conversation_added(conversation.clone())
+        //     .map_err(|e| e.to_string())?;
+
+        // Ok(conversation)
     }
 
     async fn get_messages<R: Runtime>(
         self,
-        app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
+        _app_handle: tauri::AppHandle<R>,
+        _conversation_id: String,
     ) -> Result<Vec<BaseMessage>, String> {
-        let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+        Ok(vec![])
+        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
-        personal_db
-            .get_base_messages(&conversation_id)
-            .await
-            .map_err(|e| format!("Failed to get chat messages: {e}"))
+        // personal_db
+        //     .get_base_messages(&conversation_id)
+        //     .await
+        //     .map_err(|e| format!("Failed to get chat messages: {e}"))
     }
 }
