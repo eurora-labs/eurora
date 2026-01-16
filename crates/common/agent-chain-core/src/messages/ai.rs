@@ -13,7 +13,7 @@ use super::tool::{
     InvalidToolCall, ToolCall, ToolCallChunk, default_tool_chunk_parser, default_tool_parser,
     invalid_tool_call, tool_call,
 };
-use crate::utils::base::{LC_AUTO_PREFIX, LC_ID_PREFIX, ensure_id};
+use crate::utils::base::{LC_AUTO_PREFIX, LC_ID_PREFIX};
 use crate::utils::json::parse_partial_json;
 use crate::utils::merge::{merge_dicts, merge_lists};
 use crate::utils::usage::{dict_int_add_json, dict_int_sub_floor_json};
@@ -170,7 +170,7 @@ impl AIMessage {
     pub fn new(content: impl Into<String>) -> Self {
         Self {
             content: content.into(),
-            id: Some(ensure_id(None)),
+            id: None,
             name: None,
             tool_calls: Vec::new(),
             invalid_tool_calls: Vec::new(),
@@ -205,7 +205,7 @@ impl AIMessage {
     pub fn with_tool_calls(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
         Self {
             content: content.into(),
-            id: Some(ensure_id(None)),
+            id: None,
             name: None,
             tool_calls,
             invalid_tool_calls: Vec::new(),
@@ -243,7 +243,7 @@ impl AIMessage {
     ) -> Self {
         Self {
             content: content.into(),
-            id: Some(ensure_id(None)),
+            id: None,
             name: None,
             tool_calls,
             invalid_tool_calls,
@@ -277,13 +277,13 @@ impl AIMessage {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get the tool calls.
@@ -377,8 +377,8 @@ fn format_tool_calls_repr(
     if !tool_calls.is_empty() {
         lines.push("Tool Calls:".to_string());
         for tc in tool_calls {
-            lines.push(format!("  {} ({})", tc.name(), tc.id()));
-            lines.push(format!(" Call ID: {}", tc.id()));
+            lines.push(format!("  {} ({:?})", tc.name(), tc.id()));
+            lines.push(format!(" Call ID: {:?}", tc.id()));
             lines.push("  Args:".to_string());
             if let serde_json::Value::Object(args) = tc.args() {
                 for (arg, value) in args {
@@ -519,13 +519,13 @@ impl AIMessageChunk {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get the tool calls.
@@ -596,7 +596,7 @@ impl AIMessageChunk {
                     .map(|tc| ToolCallChunk {
                         name: Some(tc.name().to_string()),
                         args: Some(tc.args().to_string()),
-                        id: Some(tc.id().to_string()),
+                        id: tc.id(),
                         index: None,
                     })
                     .collect();
@@ -1353,7 +1353,7 @@ mod tests {
         let result = add_ai_message_chunks(chunk1, vec![chunk2, chunk3]);
 
         // Provider ID should be selected (not lc_* or lc_run-*)
-        assert_eq!(result.id(), Some("provider_id_456"));
+        assert_eq!(result.id(), Some("provider_id_456".to_string()));
     }
 
     #[test]
@@ -1364,6 +1364,6 @@ mod tests {
 
         let result = add_ai_message_chunks(chunk1, vec![chunk2]);
 
-        assert_eq!(result.id(), Some("lc_run-789"));
+        assert_eq!(result.id(), Some("lc_run-789".to_string()));
     }
 }
