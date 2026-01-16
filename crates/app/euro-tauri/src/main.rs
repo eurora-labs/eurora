@@ -236,20 +236,6 @@ fn main() {
 
 
                     let timeline_handle = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let timeline = euro_timeline::TimelineManagerBuilder::new()
-                        .with_activity_storage_config(
-                            euro_activity::ActivityStorageConfig {
-                            base_dir: timeline_handle.path().app_data_dir().unwrap(),
-                            use_content_hash: false,
-                            max_file_size: None,
-                            main_key: main_key.clone(),
-                            service_endpoint: None,
-                        })
-                            .build().await.expect("Failed to create timeline");
-                        timeline_handle.manage(Mutex::new(timeline));
-                    });
-
                     let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         // let db_manager = match create_shared_database_manager(&db_app_handle).await {
@@ -263,6 +249,17 @@ fn main() {
                         // };
                         // if let Some(db_manager) = db_manager {
                         //     db_app_handle.manage(db_manager);
+                        let timeline = euro_timeline::TimelineManagerBuilder::new()
+                        .with_activity_storage_config(
+                            euro_activity::ActivityStorageConfig {
+                            base_dir: timeline_handle.path().app_data_dir().unwrap(),
+                            use_content_hash: false,
+                            max_file_size: None,
+                            main_key: main_key.clone(),
+                            service_endpoint: None,
+                        })
+                            .build().await.expect("Failed to create timeline");
+                        timeline_handle.manage(Mutex::new(timeline));
                             let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
 
                             let mut asset_receiver = {
