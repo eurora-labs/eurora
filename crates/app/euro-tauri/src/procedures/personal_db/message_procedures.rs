@@ -1,4 +1,3 @@
-use agent_chain_core::BaseMessage;
 use tauri::Runtime;
 
 #[taurpc::procedures(path = "personal_db.message")]
@@ -8,7 +7,7 @@ pub trait MessageApi {
         conversation_id: String,
         limit: Option<u32>,
         offset: Option<u32>,
-    ) -> Result<Vec<BaseMessage>, String>;
+    ) -> Result<Vec<String>, String>;
 }
 
 #[derive(Clone)]
@@ -22,7 +21,7 @@ impl MessageApi for MessageApiImpl {
         _conversation_id: String,
         _limit: Option<u32>,
         _offset: Option<u32>,
-    ) -> Result<Vec<BaseMessage>, String> {
+    ) -> Result<Vec<String>, String> {
         Ok(vec![])
         // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
