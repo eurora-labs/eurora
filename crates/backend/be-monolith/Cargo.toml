@@ -11,7 +11,6 @@ be-asset-service = { workspace = true }
 be-auth-grpc = { workspace = true }
 be-auth-service = { workspace = true }
 be-conversation-service = { workspace = true }
-be-prompt-service = { workspace = true }
 be-remote-db = { workspace = true }
 be-update-service = { workspace = true }
 dotenv = { workspace = true }
