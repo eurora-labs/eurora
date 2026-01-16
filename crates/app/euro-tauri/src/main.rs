@@ -27,8 +27,7 @@ use euro_tauri::{
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
     },
     shared_types::{
-        SharedConversationManager, SharedCurrentConversation, SharedPromptKitService,
-        create_shared_database_manager,
+        SharedConversationManager, SharedCurrentConversation, create_shared_database_manager,
     },
 };
 use euro_timeline::TimelineManager;
@@ -145,23 +144,8 @@ fn main() {
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
                     tauri_app.manage(Mutex::new(app_settings.clone()));
 
-                    // Ensure state exists immediately
-                    tauri_app.manage::<SharedPromptKitService>(Mutex::new(None));
-
                     // Ensure empty current conversation exists
                     tauri_app.manage::<SharedCurrentConversation>(Mutex::new(None));
-
-                    let handle = tauri_app.handle().clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Ok(prompt_kit_service) = app_settings.backend.initialize().await {
-                            let service: SharedPromptKitService = Mutex::new(Some(prompt_kit_service));
-                            handle.manage(service);
-                        } else {
-                            let service: SharedPromptKitService = Mutex::new(None);
-                            handle.manage(service);
-                            debug!("No backend available");
-                        }
-                    });
 
                     tauri::async_runtime::spawn(async move {
                         let _ = initialize_posthog().await.map_err(|e| {
