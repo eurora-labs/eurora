@@ -8,8 +8,8 @@ use std::env;
 use serde_json::json;
 
 use agent_chain_core::outputs::GenerationChunk;
-use agent_chain_core::utils::base::{from_env, secret_from_env, EnvError};
-use agent_chain_core::utils::merge::{merge_dicts, MergeError};
+use agent_chain_core::utils::base::{EnvError, from_env, secret_from_env};
+use agent_chain_core::utils::merge::{MergeError, merge_dicts};
 
 // ============================================================================
 // test_merge_dicts
