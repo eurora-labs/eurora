@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type Conversation } from '$lib/bindings/bindings.js';
+	import { type ConversationView } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
@@ -12,24 +12,24 @@
 	import { onMount } from 'svelte';
 
 	const taurpc = inject(TAURPC_SERVICE);
-	let conversations: Conversation[] = $state([]);
+	let conversations: ConversationView[] = $state([]);
 
 	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
 
 	onMount(() => {
 		sidebarState = useSidebar();
 
-		taurpc.personal_db.conversation.list(5, 0).then((res) => {
+		taurpc.conversation.list(5, 0).then((res) => {
 			conversations = res;
 		});
 
-		taurpc.personal_db.conversation.new_conversation_added.on((conversation) => {
+		taurpc.conversation.new_conversation_added.on((conversation) => {
 			conversations = [conversation, ...conversations];
 		});
 	});
 
 	async function createChat() {
-		await taurpc.personal_db.conversation.create();
+		// await taurpc.personal_db.conversation.create();
 	}
 
 	async function switchConversation(id: string) {
