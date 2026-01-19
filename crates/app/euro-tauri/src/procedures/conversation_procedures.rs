@@ -1,8 +1,12 @@
-// use euro_personal_db::{Conversation, PersonalDatabaseManager};
+use crate::shared_types::SharedConversationManager;
 use euro_conversation::{Conversation, ListConversationsRequest};
 use tauri::{Manager, Runtime};
 
-use crate::shared_types::SharedConversationManager;
+#[taurpc::ipc_type]
+pub struct ConversationView {
+    pub id: Option<String>,
+    pub title: String,
+}
 
 #[taurpc::procedures(path = "conversation")]
 pub trait ConversationApi {
@@ -13,7 +17,7 @@ pub trait ConversationApi {
         app_handle: tauri::AppHandle<R>,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<Conversation>, String>;
+    ) -> Result<Vec<ConversationView>, String>;
 
     async fn create<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Conversation, String>;
 
@@ -33,14 +37,19 @@ impl ConversationApi for ConversationApiImpl {
         app_handle: tauri::AppHandle<R>,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<Conversation>, String> {
+    ) -> Result<Vec<ConversationView>, String> {
         let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
         let conversation_manager = conversation_state.lock().await;
 
-        conversation_manager
+        let conversations = conversation_manager
             .list_conversations(ListConversationsRequest { limit, offset })
             .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+
+        Ok(conversations
+            .into_iter()
+            .map(|conversation| conversation.into())
+            .collect())
     }
 
     async fn create<R: Runtime>(
@@ -83,5 +92,14 @@ impl ConversationApi for ConversationApiImpl {
         //     .get_base_messages(&conversation_id)
         //     .await
         //     .map_err(|e| format!("Failed to get chat messages: {e}"))
+    }
+}
+
+impl From<Conversation> for ConversationView {
+    fn from(conversation: Conversation) -> Self {
+        ConversationView {
+            id: conversation.id().map(|id| id.to_string()),
+            title: conversation.title().to_string(),
+        }
     }
 }
