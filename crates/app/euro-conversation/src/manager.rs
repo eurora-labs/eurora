@@ -10,7 +10,7 @@ use agent_chain::HumanMessage;
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
     AddHumanMessageRequest, ChatStreamRequest, CreateConversationRequest, ListConversationsRequest,
-    ListConversationsResponse, proto_conversation_service_client::ProtoConversationServiceClient,
+    proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use tokio::sync::broadcast;
 use tokio_stream::{Stream, StreamExt};
@@ -81,10 +81,15 @@ impl ConversationManager {
     pub async fn list_conversations(
         &self,
         request: ListConversationsRequest,
-    ) -> Result<ListConversationsResponse> {
+    ) -> Result<Vec<Conversation>> {
         let mut client = self.conversation_client.clone();
         let response = client.list_conversations(request).await?.into_inner();
-        Ok(response)
+
+        Ok(response
+            .conversations
+            .into_iter()
+            .map(Conversation::from)
+            .collect())
     }
 
     // pub async fn list_messages(&self, limit: u32, offset: u32) -> Result<Vec<BaseMessage>, Status> {
