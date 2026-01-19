@@ -1,5 +1,6 @@
 // use agent_chain::BaseMessage;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
+use proto_gen::conversation::Conversation as ProtoConversation;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use uuid::Uuid;
@@ -52,4 +53,24 @@ impl Default for Conversation {
 #[derive(Debug, Clone)]
 pub enum ConversationEvent {
     NewConversation { id: Option<Uuid>, title: String },
+}
+
+impl From<ProtoConversation> for Conversation {
+    fn from(c: ProtoConversation) -> Self {
+        let id = Some(Uuid::parse_str(&c.id).expect("Conversation id is not a valid uuid"));
+        let title = c.title;
+        let created_at = c.created_at.expect("created_at is required");
+        let created_at: DateTime<Utc> = Utc
+            .timestamp_opt(created_at.seconds, created_at.nanos as u32)
+            .unwrap();
+        let updated_at = created_at;
+
+        Self {
+            id,
+            title,
+            // messages: Vec::new(),
+            created_at,
+            updated_at,
+        }
+    }
 }
