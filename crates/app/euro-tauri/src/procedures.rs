@@ -1,13 +1,13 @@
 pub mod auth_procedures;
 pub mod chat_procedures;
 pub mod context_chip_procedures;
+pub mod conversation_procedures;
 pub mod monitor_procedures;
 pub mod onboarding_procedures;
-pub mod personal_db;
 pub mod prompt_procedures;
 pub mod settings_procedures;
 pub mod system_procedures;
 pub mod third_party_procedures;
 pub mod timeline_procedures;
 
-pub use personal_db::*;
+// pub use personal_db::*;
