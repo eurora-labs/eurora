@@ -13,5 +13,5 @@ mod converters;
 mod error;
 mod server;
 
-pub use error::{ConversationResult, ConversationServiceError};
+pub use error::{ConversationServiceError, ConversationServiceResult};
 pub use server::{ConversationService, ProtoConversationService, ProtoConversationServiceServer};

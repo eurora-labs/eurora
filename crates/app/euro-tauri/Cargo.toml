@@ -26,18 +26,16 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-agent-chain-core = { workspace = true, features = ["specta"] }
-agent-chain-eurora = { workspace = true }
+agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
 color-thief = "0.2.2"
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
-euro-chat-client = { workspace = true }
 euro-conversation = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
-euro-personal-db = { workspace = true, features = ["specta"] }
+# euro-personal-db = { workspace = true, features = ["specta"] }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-timeline = { workspace = true }
@@ -49,10 +47,9 @@ keyring = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 posthog-rs = { workspace = true }
-prompt-kit = { workspace = true }
 sentry = { workspace = true, features = ["log", "logs", "tracing"] }
 serde = { workspace = true }
-serde_json = { version = "1.0", features = ["arbitrary_precision", "std"] }
+serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.9" }
 tauri = { version = "2.9.5", features = ["tray-icon", "unstable"] }
@@ -68,7 +65,8 @@ tauri-plugin-store = "2"
 tauri-plugin-stronghold = "2.3.1"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
-taurpc = { version = "0.5.2" }
+# taurpc = { version = "0.5.2" }
+taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "feature/improved-compatibility" }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tracing = { workspace = true }
