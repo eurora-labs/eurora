@@ -6,34 +6,22 @@
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import { onMount } from 'svelte';
-	import type { UnlistenFn } from '@tauri-apps/api/event';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	let service_name: string | undefined = $state(undefined);
 
 	onMount(() => {
-		taurpc.prompt
-			.get_service_name()
-			.then((name) => {
-				if (name) {
-					service_name = name;
+		taurpc.auth
+			.is_authenticated()
+			.then((isAuthenticated) => {
+				if (!isAuthenticated) {
+					goto('/onboarding');
 				}
 			})
 			.catch((error) => {
 				goto('/onboarding');
-				console.error('Failed to get service name:', error);
+				console.error('Failed to check authentication:', error);
 			});
-		let unlisten: UnlistenFn;
-		taurpc.prompt.prompt_service_change
-			.on((name) => {
-				service_name = name || undefined;
-			})
-			.then((unlistenFn) => {
-				unlisten = unlistenFn;
-			});
-		return () => {
-			unlisten?.();
-		};
 	});
 
 	function disconnect() {
@@ -42,7 +30,7 @@
 	}
 </script>
 
-<div class="flex items-center justify-end p-4 h-[70px]">
+<div class="flex items-center justify-end p-4 h-17.5]">
 	<div class="flex items-center gap-2">
 		{#if service_name}
 			<DropdownMenu.Root>

@@ -76,7 +76,7 @@
 		"typescript-eslint": "^8.53.1",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.28.0",
+	"packageManager": "pnpm@10.28.1",
 	"engines": {
 		"node": ">=20.11"
 	},
