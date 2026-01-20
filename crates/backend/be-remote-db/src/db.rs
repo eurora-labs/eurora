@@ -14,8 +14,8 @@ use crate::{
         CreateAssetRequest, CreateLoginTokenRequest, CreateMessageRequest,
         CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
         CreateUserRequest, GetActivitiesByTimeRangeRequest, ListActivitiesRequest,
-        ListConversationsRequest, ListMessagesRequest, LoginToken, Message, MessageAsset,
-        NewConversation, OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken,
+        ListConversationsRequest, ListMessages, LoginToken, Message, MessageAsset, NewConversation,
+        OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken,
         UpdateActivityEndTimeRequest, UpdateActivityRequest, UpdateAssetRequest,
         UpdateConversationRequest, UpdateMessageRequest, UpdateOAuthCredentialsRequest,
         UpdatePasswordRequest, UpdateUserRequest, User,
@@ -1411,7 +1411,7 @@ impl DatabaseManager {
     }
 
     /// List messages for a conversation with pagination
-    pub async fn list_messages(&self, request: ListMessagesRequest) -> DbResult<Vec<Message>> {
+    pub async fn list_messages(&self, request: ListMessages) -> DbResult<Vec<Message>> {
         // Clamp limit to max 100
         let limit = request.limit.clamp(1, 100);
 
