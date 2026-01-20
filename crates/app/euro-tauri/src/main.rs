@@ -17,7 +17,7 @@ use euro_tauri::{
         chat_procedures::{ChatApi, ChatApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         conversation_procedures::{ConversationApi, ConversationApiImpl},
-        message_procedures::{MessageApi, MessageApiImpl},
+        // message_procedures::{MessageApi, MessageApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         onboarding_procedures::{OnboardingApi, OnboardingApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
@@ -26,9 +26,7 @@ use euro_tauri::{
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
     },
-    shared_types::{
-        SharedCurrentConversation, SharedPromptKitService, create_shared_database_manager,
-    },
+    shared_types::SharedConversationManager,
 };
 use euro_timeline::TimelineManager;
 use tauri::{
@@ -144,24 +142,6 @@ fn main() {
                     let app_settings = AppSettings::load_from_default_path_creating().unwrap();
                     tauri_app.manage(Mutex::new(app_settings.clone()));
 
-                    // Ensure state exists immediately
-                    tauri_app.manage::<SharedPromptKitService>(Mutex::new(None));
-
-                    // Ensure empty current conversation exists
-                    tauri_app.manage::<SharedCurrentConversation>(Mutex::new(None));
-
-                    let handle = tauri_app.handle().clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Ok(prompt_kit_service) = app_settings.backend.initialize().await {
-                            let service: SharedPromptKitService = Mutex::new(Some(prompt_kit_service));
-                            handle.manage(service);
-                        } else {
-                            let service: SharedPromptKitService = Mutex::new(None);
-                            handle.manage(service);
-                            debug!("No backend available");
-                        }
-                    });
-
                     tauri::async_runtime::spawn(async move {
                         let _ = initialize_posthog().await.map_err(|e| {
                             error!("Failed to initialize posthog: {}", e);
@@ -248,9 +228,27 @@ fn main() {
                         .build(tauri_app)
                         .expect("Failed to create tray icon");
 
+                    let conversation_handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let conversation_manager = euro_conversation::ConversationManager::new().await;
+                        conversation_handle.manage(SharedConversationManager::new(conversation_manager));
+                    });
+
 
                     let timeline_handle = app_handle.clone();
+                    let db_app_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
+                        // let db_manager = match create_shared_database_manager(&db_app_handle).await {
+                        //     Ok(db) => {
+                        //         Some(db)
+                        //     }
+                        //     Err(e) => {
+                        //         error!("Failed to initialize personal database manager: {}", e);
+                        //         None
+                        //     }
+                        // };
+                        // if let Some(db_manager) = db_manager {
+                        //     db_app_handle.manage(db_manager);
                         let timeline = euro_timeline::TimelineManagerBuilder::new()
                         .with_activity_storage_config(
                             euro_activity::ActivityStorageConfig {
@@ -262,21 +260,6 @@ fn main() {
                         })
                             .build().await.expect("Failed to create timeline");
                         timeline_handle.manage(Mutex::new(timeline));
-                    });
-
-                    let db_app_handle = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let db_manager = match create_shared_database_manager(&db_app_handle).await {
-                            Ok(db) => {
-                                Some(db)
-                            }
-                            Err(e) => {
-                                error!("Failed to initialize personal database manager: {}", e);
-                                None
-                            }
-                        };
-                        if let Some(db_manager) = db_manager {
-                            db_app_handle.manage(db_manager);
                             let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
 
                             let mut asset_receiver = {
@@ -358,7 +341,7 @@ fn main() {
                                 debug!("Timeline collection started successfully");
                             }
 
-                            }
+                            // }
                     });
 
 
@@ -466,7 +449,7 @@ fn main() {
                 .merge(SettingsApiImpl.into_handler())
                 .merge(ThirdPartyApiImpl.into_handler())
                 .merge(MonitorApiImpl.into_handler())
-                .merge(MessageApiImpl.into_handler())
+                // .merge(MessageApiImpl.into_handler())
                 .merge(SystemApiImpl.into_handler())
                 .merge(ContextChipApiImpl.into_handler())
                 .merge(PromptApiImpl.into_handler())
