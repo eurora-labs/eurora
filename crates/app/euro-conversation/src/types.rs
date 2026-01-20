@@ -31,6 +31,10 @@ impl Conversation {
         }
         Err(Error::SetId("Conversation ID is already set".to_string()))
     }
+
+    pub fn messages(&self) -> &Vec<BaseMessage> {
+        &self.messages
+    }
 }
 
 impl Default for Conversation {
