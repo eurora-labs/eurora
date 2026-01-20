@@ -2,11 +2,16 @@ syntax = "proto3";
 
 package conversation_service;
 
+import "agent_chain.proto";
 import "google/protobuf/timestamp.proto";
 
 service ProtoConversationService {
+  // Conversation CRUD
   rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+
+  // Messages CRUD
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
   rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
 
   rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
@@ -63,4 +68,14 @@ message AddHumanMessageRequest {
 
 message AddHumanMessageResponse {
   Conversation conversation = 1;
+}
+
+message GetMessagesRequest {
+  string conversation_id = 1;
+  uint32 limit = 2;
+  uint32 offset = 3;
+}
+
+message GetMessagesResponse {
+  repeated agent_chain.ProtoBaseMessage messages = 1;
 }

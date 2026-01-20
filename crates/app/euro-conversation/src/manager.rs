@@ -1,17 +1,15 @@
-use std::pin::Pin;
-
 use crate::{
     Conversation,
     error::{Error, Result},
     types::ConversationEvent,
 };
-use agent_chain::HumanMessage;
-// use agent_chain_core::BaseMessage;
+use agent_chain::{BaseMessage, HumanMessage};
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
-    AddHumanMessageRequest, ChatStreamRequest, CreateConversationRequest, ListConversationsRequest,
-    proto_conversation_service_client::ProtoConversationServiceClient,
+    AddHumanMessageRequest, ChatStreamRequest, CreateConversationRequest, GetMessagesRequest,
+    ListConversationsRequest, proto_conversation_service_client::ProtoConversationServiceClient,
 };
+use std::pin::Pin;
 use tokio::sync::broadcast;
 use tokio_stream::{Stream, StreamExt};
 
@@ -92,11 +90,23 @@ impl ConversationManager {
             .collect())
     }
 
-    // pub async fn list_messages(&self, limit: u32, offset: u32) -> Result<Vec<BaseMessage>, Status> {
-    //     let mut client = self.conversation_client.clone();
-    //     let response = client.list_messages().await?.into_inner();
-    //     Ok(response)
-    // }
+    pub async fn get_current_messages(&self, limit: u32, offset: u32) -> Result<Vec<BaseMessage>> {
+        let mut client = self.conversation_client.clone();
+        let response = client
+            .get_messages(GetMessagesRequest {
+                conversation_id: self.current_conversation.id().unwrap().to_string(),
+                limit,
+                offset,
+            })
+            .await?
+            .into_inner();
+
+        Ok(response
+            .messages
+            .into_iter()
+            .map(BaseMessage::from)
+            .collect())
+    }
 }
 
 impl ConversationManager {
