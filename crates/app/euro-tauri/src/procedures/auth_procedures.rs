@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use tracing::error;
 use url::Url;
 
-use crate::shared_types::SharedAppSettings;
+use crate::shared_types::{SharedAppSettings, SharedUserController};
 
 #[taurpc::ipc_type]
 pub struct LoginToken {
@@ -20,6 +20,8 @@ pub struct LoginToken {
 pub trait AuthApi {
     async fn poll_for_login<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
     async fn get_login_token<R: Runtime>(app_handle: AppHandle<R>) -> Result<LoginToken, String>;
+
+    async fn is_authenticated<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
 }
 
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
@@ -34,8 +36,9 @@ impl AuthApi for AuthApiImpl {
         app_handle: AppHandle<R>,
     ) -> Result<LoginToken, String> {
         // Try to get auth manager from app state
-        if let Some(user_controller) = app_handle.try_state::<euro_user::Controller>() {
-            let (code_verifier, code_challenge) = user_controller
+        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
+            let controller = user_state.lock().await;
+            let (code_verifier, code_challenge) = controller
                 .get_login_tokens()
                 .await
                 .map_err(|e| format!("Failed to get login tokens: {}", e))?;
@@ -66,24 +69,16 @@ impl AuthApi for AuthApiImpl {
     }
 
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        if let Some(user_controller) = app_handle.try_state::<euro_user::Controller>() {
+        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
+            let controller = user_state.lock().await;
             let login_token = secret::retrieve(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
                 .map_err(|e| format!("Failed to retrieve login token: {}", e))?
                 .ok_or_else(|| "Login token not found".to_string())?;
 
-            match user_controller.login_by_login_token(login_token.0).await {
+            match controller.login_by_login_token(login_token.0).await {
                 Ok(_) => {
                     secret::delete(LOGIN_CODE_VERIFIER, secret::Namespace::Global)
                         .map_err(|e| format!("Failed to remove login token: {}", e))?;
-
-                    // let config = EuroraConfig::new(
-                    //     Url::parse(
-                    //         std::env::var("API_BASE_URL")
-                    //             .unwrap_or("https://api.eurora-labs.com".to_string())
-                    //             .as_str(),
-                    //     )
-                    //     .map_err(|e| format!("Invalid API_BASE_URL: {}", e))?,
-                    // );
 
                     let state = app_handle.state::<SharedAppSettings>();
                     let settings = state.lock().await;
@@ -111,6 +106,18 @@ impl AuthApi for AuthApiImpl {
         } else {
             error!("Failed to initialize prompt kit service: Invalid configuration");
 
+            Ok(false)
+        }
+    }
+
+    async fn is_authenticated<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
+        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
+            let controller = user_state.lock().await;
+            match controller.get_or_refresh_access_token().await {
+                Ok(token) => Ok(!token.is_empty()),
+                Err(e) => Err(format!("Failed to get or refresh access token: {}", e)),
+            }
+        } else {
             Ok(false)
         }
     }
