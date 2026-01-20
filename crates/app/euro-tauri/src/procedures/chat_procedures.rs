@@ -205,7 +205,12 @@ impl ChatApi for ChatApiImpl {
             .map_err(|e| format!("Failed to send initial response: {e}"))?;
 
         debug!("Sending chat stream");
-        match conversation_manager.chat_stream(query.text.clone()).await {
+        let stream_result = conversation_manager.chat_stream(query.text.clone()).await;
+        // Drop the MutexGuard to free the lock before consuming the stream,
+        // so other chat operations are not blocked during stream iteration
+        drop(conversation_manager);
+
+        match stream_result {
             Ok(mut stream) => {
                 debug!("Starting to consume stream...");
 
