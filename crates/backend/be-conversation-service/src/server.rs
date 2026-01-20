@@ -20,8 +20,8 @@ use crate::{ConversationServiceResult, converters::convert_db_message_to_base_me
 
 use proto_gen::conversation::{
     AddHumanMessageRequest, AddHumanMessageResponse, ChatStreamRequest, ChatStreamResponse,
-    Conversation, CreateConversationRequest, CreateConversationResponse, ListConversationsRequest,
-    ListConversationsResponse,
+    Conversation, CreateConversationRequest, CreateConversationResponse, GetMessagesRequest,
+    GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
 };
 
 pub use proto_gen::conversation::proto_conversation_service_server::{
@@ -269,5 +269,12 @@ impl ProtoConversationService for ConversationService {
         Ok(Response::new(
             Box::pin(output_stream) as Self::ChatStreamStream
         ))
+    }
+
+    async fn get_messages(
+        &self,
+        _request: Request<GetMessagesRequest>,
+    ) -> Result<Response<GetMessagesResponse>, Status> {
+        todo!()
     }
 }

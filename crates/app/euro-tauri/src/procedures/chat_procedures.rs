@@ -1,5 +1,4 @@
 use agent_chain_core::{AIMessage, BaseMessage};
-use euro_conversation::Conversation;
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
@@ -22,16 +21,11 @@ pub struct Query {
 #[taurpc::procedures(path = "chat")]
 pub trait ChatApi {
     #[taurpc(event)]
-    async fn current_conversation_changed(conversation: Conversation);
-
-    async fn switch_conversation<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
-    ) -> Result<Conversation, String>;
+    async fn current_conversation_changed(conversation: String);
 
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-        conversation: Conversation,
+        _conversation_id: String,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
@@ -45,7 +39,7 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        _conversation: Conversation,
+        _conversation_id: String,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
@@ -276,33 +270,5 @@ impl ChatApi for ChatApiImpl {
 
         Ok(complete_response)
         // Ok("test lol".to_string())
-    }
-
-    async fn switch_conversation<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        _conversation_id: String,
-    ) -> Result<Conversation, String> {
-        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
-
-        // let conversation = personal_db
-        //     .get_conversation(&conversation_id)
-        //     .await
-        //     .map_err(|e| format!("Failed to get conversation: {}", e))?;
-
-        // let current = app_handle.state::<SharedCurrentConversation>();
-        // let mut guard = current.lock().await;
-        // *guard = Some(conversation.clone());
-
-        // TauRpcChatApiEventTrigger::new(app_handle.clone())
-        //     .current_conversation_changed(conversation.clone())
-        //     .map_err(|e| e.to_string())?;
-
-        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
-        let conversation_manager = conversation_state.lock().await;
-        Ok(conversation_manager
-            .get_current_conversation()
-            .await
-            .clone())
     }
 }

@@ -1,17 +1,16 @@
-// use agent_chain::BaseMessage;
+use agent_chain::BaseMessage;
 use chrono::{DateTime, TimeZone, Utc};
 use proto_gen::conversation::Conversation as ProtoConversation;
 use serde::{Deserialize, Serialize};
-use specta::Type;
 use uuid::Uuid;
 
 use crate::error::{Error, Result};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Conversation {
     id: Option<Uuid>,
     title: String,
-    // messages: Vec<BaseMessage>,
+    messages: Vec<BaseMessage>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -43,7 +42,7 @@ impl Default for Conversation {
         Self {
             id: None,
             title,
-            // messages: Vec::new(),
+            messages: Vec::new(),
             created_at,
             updated_at,
         }
@@ -68,7 +67,7 @@ impl From<ProtoConversation> for Conversation {
         Self {
             id,
             title,
-            // messages: Vec::new(),
+            messages: Vec::new(),
             created_at,
             updated_at,
         }

@@ -7832,9 +7832,11 @@ dependencies = [
 name = "proto-gen"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-core",
  "prost",
  "prost-types",
  "serde",
+ "serde_json",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",

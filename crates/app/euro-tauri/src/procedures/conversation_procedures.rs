@@ -6,12 +6,25 @@ use tauri::{Manager, Runtime};
 pub struct ConversationView {
     pub id: Option<String>,
     pub title: String,
+    pub messages: Vec<MessageView>,
+}
+
+#[taurpc::ipc_type]
+pub struct MessageView {
+    pub id: String,
+    pub role: String,
+    pub content: String,
 }
 
 #[taurpc::procedures(path = "conversation")]
 pub trait ConversationApi {
     #[taurpc(event)]
-    async fn new_conversation_added(conversation: Conversation);
+    async fn new_conversation_added(conversation: ConversationView);
+
+    async fn switch_conversation<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
+    ) -> Result<ConversationView, String>;
 
     async fn list<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -19,12 +32,14 @@ pub trait ConversationApi {
         offset: u32,
     ) -> Result<Vec<ConversationView>, String>;
 
-    async fn create<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Conversation, String>;
+    async fn create<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<ConversationView, String>;
 
     async fn get_messages<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         conversation_id: String,
-    ) -> Result<Vec<String>, String>;
+    ) -> Result<Vec<MessageView>, String>;
 }
 
 #[derive(Clone)]
@@ -55,13 +70,15 @@ impl ConversationApi for ConversationApiImpl {
     async fn create<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-    ) -> Result<Conversation, String> {
+    ) -> Result<ConversationView, String> {
         let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
-        let conversation_manager = conversation_state.lock().await;
-        Ok(conversation_manager
-            .get_current_conversation()
-            .await
-            .clone())
+        let _conversation_manager = conversation_state.lock().await;
+
+        // Ok(conversation_manager
+        //     .get_current_conversation()
+        //     .await
+        //     .clone());
+        todo!()
         // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
         // let conversation = personal_db
@@ -82,9 +99,12 @@ impl ConversationApi for ConversationApiImpl {
 
     async fn get_messages<R: Runtime>(
         self,
-        _app_handle: tauri::AppHandle<R>,
+        app_handle: tauri::AppHandle<R>,
         _conversation_id: String,
-    ) -> Result<Vec<String>, String> {
+    ) -> Result<Vec<MessageView>, String> {
+        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        let _conversation_manager = conversation_state.lock().await;
+
         Ok(vec![])
         // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 
@@ -93,6 +113,35 @@ impl ConversationApi for ConversationApiImpl {
         //     .await
         //     .map_err(|e| format!("Failed to get chat messages: {e}"))
     }
+
+    async fn switch_conversation<R: Runtime>(
+        self,
+        _app_handle: tauri::AppHandle<R>,
+        _conversation_id: String,
+    ) -> Result<ConversationView, String> {
+        todo!("Implement switch_conversation")
+        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+
+        // let conversation = personal_db
+        //     .get_conversation(&conversation_id)
+        //     .await
+        //     .map_err(|e| format!("Failed to get conversation: {}", e))?;
+
+        // let current = app_handle.state::<SharedCurrentConversation>();
+        // let mut guard = current.lock().await;
+        // *guard = Some(conversation.clone());
+
+        // TauRpcChatApiEventTrigger::new(app_handle.clone())
+        //     .current_conversation_changed(conversation.clone())
+        //     .map_err(|e| e.to_string())?;
+
+        // let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        // let conversation_manager = conversation_state.lock().await;
+        // Ok(conversation_manager
+        //     .get_current_conversation()
+        //     .await
+        //     .clone())
+    }
 }
 
 impl From<Conversation> for ConversationView {
@@ -100,6 +149,8 @@ impl From<Conversation> for ConversationView {
         ConversationView {
             id: conversation.id().map(|id| id.to_string()),
             title: conversation.title().to_string(),
+            // TODO: Create proper conversion
+            messages: Vec::new(),
         }
     }
 }
