@@ -4,8 +4,8 @@ use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
     CreateMessageRequest as DbCreateMessageRequest, DatabaseManager, GetConversation,
-    GetLastMessagesRequest, ListConversationsRequest as DbListConversationsRequest, MessageType,
-    NewConversation as DbCreateConversationRequest,
+    GetLastMessagesRequest, ListConversationsRequest as DbListConversationsRequest, ListMessages,
+    MessageType, NewConversation as DbCreateConversationRequest,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -273,9 +273,33 @@ impl ProtoConversationService for ConversationService {
 
     async fn get_messages(
         &self,
-        _request: Request<GetMessagesRequest>,
+        request: Request<GetMessagesRequest>,
     ) -> Result<Response<GetMessagesResponse>, Status> {
-        todo!()
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        let messages = self
+            .db
+            .list_messages(ListMessages {
+                conversation_id,
+                user_id,
+                limit: req.limit,
+                offset: req.offset,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        Ok(Response::new(GetMessagesResponse {
+            messages: messages.into_iter().map(|m| m.into()).collect(),
+        }))
     }
 
     async fn get_conversation(
