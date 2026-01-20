@@ -33,6 +33,26 @@ impl ConversationManager {
         }
     }
 
+    pub async fn switch_conversation(&mut self, conversation_id: String) -> Result<&Conversation> {
+        let mut client = self.conversation_client.clone();
+        let conversation = client
+            .get_conversation(GetConversationRequest { conversation_id })
+            .await?
+            .into_inner()
+            .conversation
+            .unwrap();
+
+        self.current_conversation = conversation.into();
+
+        self.conversation_event_tx
+            .send(ConversationEvent::NewConversation {
+                id: self.current_conversation.id(),
+                title: self.current_conversation.title().to_string(),
+            })?;
+
+        Ok(&self.current_conversation)
+    }
+
     pub async fn clear_conversation(&mut self) -> Result<&Conversation> {
         self.current_conversation = Conversation::default();
 
