@@ -7,6 +7,8 @@ description = "Eurora Remote DB"
 [dependencies]
 chrono = { workspace = true, features = ["serde"] }
 ipnet = { version = "2", features = ["serde"] }
+prost-types = { workspace = true }
+proto-gen = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sqlx = { version = "0.8.6", features = [

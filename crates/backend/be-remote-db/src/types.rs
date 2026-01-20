@@ -288,10 +288,17 @@ pub struct Conversation {
 
 /// Request for creating a conversation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateConversationRequest {
+pub struct NewConversation {
     pub id: Option<Uuid>,
     pub user_id: Uuid,
     pub title: Option<String>,
+}
+
+/// Request for getting a conversation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetConversation {
+    pub id: Uuid,
+    pub user_id: Uuid,
 }
 
 /// Request for updating a conversation
