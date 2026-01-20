@@ -291,7 +291,7 @@ pub struct Conversation {
 pub struct NewConversation {
     pub id: Option<Uuid>,
     pub user_id: Uuid,
-    pub title: Option<String>,
+    pub title: String,
 }
 
 /// Request for getting a conversation
