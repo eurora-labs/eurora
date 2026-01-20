@@ -20,9 +20,6 @@ pub struct Query {
 
 #[taurpc::procedures(path = "chat")]
 pub trait ChatApi {
-    #[taurpc(event)]
-    async fn current_conversation_changed(conversation: String);
-
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         _conversation_id: String,
