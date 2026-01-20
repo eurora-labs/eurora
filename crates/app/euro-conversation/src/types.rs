@@ -62,7 +62,10 @@ impl From<ProtoConversation> for Conversation {
         let created_at: DateTime<Utc> = Utc
             .timestamp_opt(created_at.seconds, created_at.nanos as u32)
             .unwrap();
-        let updated_at = created_at;
+        let updated_at = c.updated_at.expect("updated_at is required");
+        let updated_at: DateTime<Utc> = Utc
+            .timestamp_opt(updated_at.seconds, updated_at.nanos as u32)
+            .unwrap();
 
         Self {
             id,
