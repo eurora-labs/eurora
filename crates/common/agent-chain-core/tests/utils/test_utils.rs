@@ -349,7 +349,7 @@ fn test_secret_from_env_with_custom_error_message() {
 // ============================================================================
 
 #[test]
-fn test_generation_chunk_addition_type_error() {
+fn test_generation_chunk_addition_combines_metadata() {
     let mut info1 = HashMap::new();
     info1.insert("len".to_string(), json!(0));
     let chunk1 = GenerationChunk::with_info("", info1);
