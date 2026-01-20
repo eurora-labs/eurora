@@ -1,13 +1,11 @@
-use agent_chain_core::{AIMessage, BaseMessage, HumanMessage};
-use euro_activity::AssetFunctionality;
-use euro_personal_db::{Conversation, NewAsset, PersonalDatabaseManager, UpdateConversation};
+use agent_chain_core::{AIMessage, BaseMessage};
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
-use crate::shared_types::{SharedCurrentConversation, SharedPromptKitService};
+use crate::shared_types::SharedConversationManager;
 
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
@@ -22,17 +20,9 @@ pub struct Query {
 
 #[taurpc::procedures(path = "chat")]
 pub trait ChatApi {
-    #[taurpc(event)]
-    async fn current_conversation_changed(conversation: Conversation);
-
-    async fn switch_conversation<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
-    ) -> Result<Conversation, String>;
-
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-        conversation: Conversation,
+        _conversation_id: String,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
@@ -46,14 +36,16 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        conversation: Conversation,
+        _conversation_id: String,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
-        let personal_db: &PersonalDatabaseManager =
-            app_handle.state::<PersonalDatabaseManager>().inner();
+        // let personal_db: &PersonalDatabaseManager =
+        //     app_handle.state::<PersonalDatabaseManager>().inner();
         let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
         let timeline = timeline_state.lock().await;
+        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        let mut conversation_manager = conversation_state.lock().await;
 
         let event = posthog_rs::Event::new_anon("send_query");
         tauri::async_runtime::spawn(async move {
@@ -61,6 +53,11 @@ impl ChatApi for ChatApiImpl {
                 error!("Failed to capture posthog event: {}", e);
             });
         });
+
+        conversation_manager
+            .ensure_remote_conversation()
+            .await
+            .expect("Failed to ensure remote conversation");
 
         timeline
             .save_current_activity_to_service()
@@ -71,106 +68,132 @@ impl ChatApi for ChatApiImpl {
             info!("Infos: {:?}", infos);
         }
 
-        let mut messages: Vec<BaseMessage> = Vec::new();
-
-        // Add previous messages from this conversation
-        if let Ok((_, previous_messages)) = personal_db
-            .get_conversation_with_messages(&conversation.id)
-            .await
-        {
-            // Collect assets for all messages
-            let mut previous_assets: Vec<euro_personal_db::Asset> = Vec::new();
-            for message in &previous_messages {
-                if let Some(id) = message.id()
-                    && let Ok(assets) = personal_db.get_assets_by_message_id(id).await
-                {
-                    previous_assets.extend(assets);
-                }
-            }
-
-            match timeline.load_assets_from_disk(&previous_assets).await {
-                Ok(recon_assets) => {
-                    for asset in recon_assets {
-                        let message = asset.construct_messages();
-                        messages.extend(message);
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to load assets: {}", e);
-                }
-            }
-
-            messages.extend(previous_messages);
-        }
-
         let has_assets = !query.assets.is_empty();
 
         if has_assets {
-            messages.extend(
-                timeline
-                    .construct_asset_messages_by_ids(&query.assets)
-                    .await,
-            );
-            messages.extend(
-                timeline
-                    .construct_snapshot_messages_by_ids(&query.assets)
-                    .await,
-            );
-        }
+            let mut messages = Vec::new();
+            let asset_messages = timeline
+                .construct_asset_messages_by_ids(&query.assets)
+                .await;
+            messages.extend(asset_messages);
 
-        let user_message: BaseMessage = HumanMessage::new(query.text.clone()).into();
+            let snapshot_messages = timeline
+                .construct_snapshot_messages_by_ids(&query.assets)
+                .await;
+            messages.extend(snapshot_messages);
 
-        // Get next sequence number and save chat message into db
-        let next_seq = personal_db
-            .get_next_sequence_num(&conversation.id)
-            .await
-            .map_err(|e| format!("Failed to get sequence number: {e}"))?;
-
-        let saved_message = personal_db
-            .insert_base_message(&conversation.id, &user_message, next_seq)
-            .await
-            .map_err(|e| format!("Failed to insert chat message: {e}"))?;
-
-        if conversation.title.is_none() {
-            personal_db
-                .update_conversation(UpdateConversation {
-                    id: conversation.id.clone(),
-                    title: Some(query.text.clone().chars().take(35).collect()),
-                })
-                .await
-                .map_err(|e| format!("Failed to update conversation title: {e}"))?;
-        }
-
-        if let Ok(infos) = timeline.save_assets_to_disk_by_ids(&query.assets).await {
-            for info in infos {
-                let relative = info.file_path.to_string_lossy().into_owned();
-                let absolute = info.absolute_path.to_string_lossy().into_owned();
-                let id = info
-                    .file_path
-                    .file_name()
-                    .map(|name| name.to_string_lossy().into_owned());
-                personal_db
-                    .insert_asset(&NewAsset {
-                        id,
-                        activity_id: None,
-                        relative_path: relative,
-                        absolute_path: absolute,
-                        message_id: Some(saved_message.id.clone()),
-                        created_at: Some(info.saved_at),
-                        updated_at: Some(info.saved_at),
-                    })
-                    .await
-                    .expect("Failed to insert asset info");
+            // Make a for loop
+            for message in messages {
+                match &message {
+                    BaseMessage::Human(m) => {
+                        let _ = conversation_manager.add_human_message(m).await;
+                    }
+                    _ => todo!(),
+                }
             }
         }
 
-        messages.push(user_message);
+        // let mut messages: Vec<BaseMessage> = Vec::new();
 
-        let state: tauri::State<SharedPromptKitService> = app_handle.state();
-        let mut guard = state.lock().await;
-        let client = guard
-            .as_mut()
-            .ok_or_else(|| "PromptKitService not initialized".to_string())?;
+        // // Add previous messages from this conversation
+        // if let Ok((_, previous_messages)) = personal_db
+        //     .get_conversation_with_messages(&conversation.id)
+        //     .await
+        // {
+        //     // Collect assets for all messages
+        //     let mut previous_assets: Vec<euro_personal_db::Asset> = Vec::new();
+        //     for message in &previous_messages {
+        //         if let Some(id) = message.id()
+        //             && let Ok(assets) = personal_db.get_assets_by_message_id(id).await
+        //         {
+        //             previous_assets.extend(assets);
+        //         }
+        //     }
+
+        //     match timeline.load_assets_from_disk(&previous_assets).await {
+        //         Ok(recon_assets) => {
+        //             for asset in recon_assets {
+        //                 let message = asset.construct_messages();
+        //                 messages.extend(message);
+        //             }
+        //         }
+        //         Err(e) => {
+        //             error!("Failed to load assets: {}", e);
+        //         }
+        //     }
+
+        //     messages.extend(previous_messages);
+        // }
+
+        // let has_assets = !query.assets.is_empty();
+
+        // if has_assets {
+        //     messages.extend(
+        //         timeline
+        //             .construct_asset_messages_by_ids(&query.assets)
+        //             .await,
+        //     );
+        //     messages.extend(
+        //         timeline
+        //             .construct_snapshot_messages_by_ids(&query.assets)
+        //             .await,
+        //     );
+        // }
+
+        // let user_message: BaseMessage = HumanMessage::new(query.text.clone()).into();
+
+        // // Get next sequence number and save chat message into db
+        // let next_seq = personal_db
+        //     .get_next_sequence_num(&conversation.id)
+        //     .await
+        //     .map_err(|e| format!("Failed to get sequence number: {e}"))?;
+
+        // let saved_message = personal_db
+        //     .insert_base_message(&conversation.id, &user_message, next_seq)
+        //     .await
+        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+
+        // if conversation.title.is_none() {
+        //     personal_db
+        //         .update_conversation(UpdateConversation {
+        //             id: conversation.id.clone(),
+        //             title: Some(query.text.clone().chars().take(35).collect()),
+        //         })
+        //         .await
+        //         .map_err(|e| format!("Failed to update conversation title: {e}"))?;
+        // }
+
+        // if let Ok(infos) = timeline.save_assets_to_disk_by_ids(&query.assets).await {
+        //     for info in infos {
+        //         let relative = info.file_path.to_string_lossy().into_owned();
+        //         let absolute = info.absolute_path.to_string_lossy().into_owned();
+        //         let id = info
+        //             .file_path
+        //             .file_name()
+        //             .map(|name| name.to_string_lossy().into_owned());
+        //         personal_db
+        //             .insert_asset(&NewAsset {
+        //                 id,
+        //                 activity_id: None,
+        //                 relative_path: relative,
+        //                 absolute_path: absolute,
+        //                 message_id: Some(saved_message.id.clone()),
+        //                 created_at: Some(info.saved_at),
+        //                 updated_at: Some(info.saved_at),
+        //             })
+        //             .await
+        //             .expect("Failed to insert asset info");
+        //     }
+        // }
+
+        // messages.push(user_message);
+        // conversation_manager.
+
+        // let state: tauri::State<SharedPromptKitService> = app_handle.state();
+        // let mut guard = state.lock().await;
+        // let client = guard
+        //     .as_mut()
+        //     .ok_or_else(|| "PromptKitService not initialized".to_string())?;
 
         let mut complete_response = String::new();
 
@@ -182,7 +205,12 @@ impl ChatApi for ChatApiImpl {
             .map_err(|e| format!("Failed to send initial response: {e}"))?;
 
         debug!("Sending chat stream");
-        match client.chat_stream(messages).await {
+        let stream_result = conversation_manager.chat_stream(query.text.clone()).await;
+        // Drop the MutexGuard to free the lock before consuming the stream,
+        // so other chat operations are not blocked during stream iteration
+        drop(conversation_manager);
+
+        match stream_result {
             Ok(mut stream) => {
                 debug!("Starting to consume stream...");
 
@@ -231,41 +259,18 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
-        let ai_message: BaseMessage = AIMessage::new(complete_response.clone()).into();
-        let next_seq = personal_db
-            .get_next_sequence_num(&conversation.id)
-            .await
-            .map_err(|e| format!("Failed to get sequence number: {e}"))?;
+        let _ai_message: BaseMessage = AIMessage::new(complete_response.clone()).into();
+        // let next_seq = personal_db
+        //     .get_next_sequence_num(&conversation.id)
+        //     .await
+        //     .map_err(|e| format!("Failed to get sequence number: {e}"))?;
 
-        personal_db
-            .insert_base_message(&conversation.id, &ai_message, next_seq)
-            .await
-            .map_err(|e| format!("Failed to insert chat message: {e}"))?;
+        // personal_db
+        //     .insert_base_message(&conversation.id, &ai_message, next_seq)
+        //     .await
+        //     .map_err(|e| format!("Failed to insert chat message: {e}"))?;
 
         Ok(complete_response)
         // Ok("test lol".to_string())
-    }
-
-    async fn switch_conversation<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
-    ) -> Result<Conversation, String> {
-        let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
-
-        let conversation = personal_db
-            .get_conversation(&conversation_id)
-            .await
-            .map_err(|e| format!("Failed to get conversation: {}", e))?;
-
-        let current = app_handle.state::<SharedCurrentConversation>();
-        let mut guard = current.lock().await;
-        *guard = Some(conversation.clone());
-
-        TauRpcChatApiEventTrigger::new(app_handle.clone())
-            .current_conversation_changed(conversation.clone())
-            .map_err(|e| e.to_string())?;
-
-        Ok(conversation)
     }
 }

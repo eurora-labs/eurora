@@ -7,7 +7,6 @@
 //! Note: FunctionMessage is an older version of ToolMessage and doesn't contain
 //! the `tool_call_id` field. Consider using ToolMessage for new code.
 
-use crate::utils::uuid7;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -54,7 +53,7 @@ impl FunctionMessage {
         Self {
             content: content.into(),
             name: name.into(),
-            id: Some(uuid7(None).to_string()),
+            id: None,
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
@@ -93,8 +92,8 @@ impl FunctionMessage {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get additional kwargs.
@@ -175,8 +174,8 @@ impl FunctionMessageChunk {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get additional kwargs.
