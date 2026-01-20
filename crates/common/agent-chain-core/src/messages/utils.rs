@@ -448,7 +448,7 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
                 "system" => "system",
                 "function" => "function",
                 "tool" => "tool",
-                _ => "chat",
+                _ => "user",
             }
         }
         BaseMessage::Remove(_) => "remove",
