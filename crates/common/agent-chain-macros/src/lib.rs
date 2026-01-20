@@ -155,7 +155,7 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     let result_str = serde_json::to_string(&result).unwrap_or_else(|_| format!("{:?}", result));
 
-                    ::agent_chain::_core::messages::ToolMessage::new(result_str, tool_call.id()).into()
+                    ::agent_chain::_core::messages::ToolMessage::new(result_str, tool_call.id().unwrap_or_default()).into()
                 }
             }
 

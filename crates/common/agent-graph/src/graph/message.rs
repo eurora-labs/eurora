@@ -45,7 +45,7 @@ pub fn add_messages<T: Clone + HasId>(mut left: Vec<T>, right: Vec<T>) -> Vec<T>
     // Merge right into left
     for msg in right {
         if let Some(id) = msg.get_id() {
-            if let Some(&existing_idx) = id_to_idx.get(id) {
+            if let Some(&existing_idx) = id_to_idx.get(&id) {
                 // Replace existing message
                 left[existing_idx] = msg;
             } else {
@@ -94,8 +94,8 @@ mod tests {
     }
 
     impl HasId for TestMessage {
-        fn get_id(&self) -> Option<&str> {
-            self.id.as_deref()
+        fn get_id(&self) -> Option<String> {
+            self.id.clone()
         }
     }
 

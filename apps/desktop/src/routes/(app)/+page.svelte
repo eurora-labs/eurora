@@ -1,10 +1,10 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
 	import {
-		type ResponseChunk,
+		// type ResponseChunk,
 		type Query,
-		type BaseMessage,
-		type Conversation,
+		// type BaseMessage,
+		type ConversationView,
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { executeCommand } from '$lib/commands.js';
@@ -21,8 +21,8 @@
 	import * as Chat from '@eurora/ui/custom-components/chat/index';
 	import { onMount } from 'svelte';
 
-	let conversation = $state<Conversation | null>(null);
-	let messages = $state<BaseMessage[]>([]);
+	let conversation = $state<ConversationView | null>(null);
+	// let messages = $state<BaseMessage[]>([]);
 	// let status = $state<string>('');
 	let taurpc = inject(TAURPC_SERVICE);
 
@@ -53,14 +53,13 @@
 				// goto('/onboarding');
 			});
 
-		taurpc.chat.current_conversation_changed.on((new_conv) => {
+		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
 			// console.log('New conversation changed: ', conversation);
 
-			taurpc.personal_db.message.get(conversation.id, 5, 0).then((response) => {
-				messages = response;
-				// console.log('messages: ', messages);
-			});
+			// taurpc.personal_db.message.get(conversation.id ?? '', 5, 0).then((response) => {
+			// 	messages = response;
+			// });
 		});
 
 		taurpc.timeline.new_assets_event.on((assets) => {
@@ -74,13 +73,14 @@
 
 	function handleEscapeKey(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
-			messages.splice(0, messages.length);
+			// messages.splice(0, messages.length);
 			// console.log('Escape pressed: cleared messages and set conversation to NEW');
 		}
 	}
 
 	// Helper to get content from BaseMessage
-	function getMessageContent(message: BaseMessage): string {
+	// function getMessageContent(message: BaseMessage): string {
+	function getMessageContent(message: any): string {
 		// RemoveMessage doesn't have content
 		if (message.type === 'remove') {
 			return '';
@@ -100,7 +100,8 @@
 	}
 
 	// Helper to check if message is from user/human
-	function isUserMessage(message: BaseMessage): boolean {
+	// function isUserMessage(message: BaseMessage): boolean {
+	function isUserMessage(message: any): boolean {
 		return message.type === 'human';
 	}
 
@@ -114,12 +115,12 @@
 					return;
 				}
 				const query = processQuery(editorRef);
-				messages.push({
-					type: 'human',
-					content: query.text,
-					id: null,
-					additional_kwargs: {},
-				});
+				// messages.push({
+				// 	type: 'human',
+				// 	content: query.text,
+				// 	id: null,
+				// 	additional_kwargs: {},
+				// });
 				// console.log('query', query);
 				searchQuery.text = '';
 				clearQuery(editorRef);
@@ -140,50 +141,55 @@
 				assets: query.assets,
 			};
 			// Create an AI message placeholder for streaming response
-			const aiMessage: BaseMessage = {
-				type: 'ai',
-				content: '',
-				id: null,
-				tool_calls: [],
-				additional_kwargs: {},
-			};
-			messages.push(aiMessage);
-			const agentMessage = messages.at(-1);
-			function onEvent(response: ResponseChunk) {
-				// Append chunk to the last message
-				if (agentMessage && agentMessage.type === 'ai') {
-					agentMessage.content += response.chunk;
-				}
+			// const aiMessage: BaseMessage = {
+			// 	type: 'ai',
+			// 	content: '',
+			// 	id: null,
+			// 	tool_calls: [],
+			// 	additional_kwargs: {},
+			// };
+			// messages.push(aiMessage);
+			// const agentMessage = messages.at(-1);
+			// function onEvent(response: ResponseChunk) {
+			// 	// Append chunk to the last message
+			// 	if (agentMessage && agentMessage.type === 'ai') {
+			// 		agentMessage.content += response.chunk;
+			// 	}
 
-				chatRef?.scrollToBottom();
-			}
+			// 	chatRef?.scrollToBottom();
+			// }
 
 			// If no conversation is selected create a new one
+			// TODO: convert this to new architecture
 			if (!conversation) {
-				conversation = await taurpc.personal_db.conversation.create();
+				// conversation = await taurpc.personal_db.conversation.create();
 				// console.log('conversation', conversation);
+			} else {
+				// Use TauRPC send_query procedure
+				// await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
 			}
 
-			// Use TauRPC send_query procedure
-			await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
+			// // Use TauRPC send_query procedure
+			// await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
 		} catch (error) {
 			console.error('Failed to get answer:', error);
-			messages.push({
-				type: 'system',
-				content: 'Error: Failed to get response from server' + error,
-				id: null,
-				additional_kwargs: {},
-			});
+			// messages.push({
+			// 	type: 'system',
+			// 	content: 'Error: Failed to get response from server' + error,
+			// 	id: null,
+			// 	additional_kwargs: {},
+			// });
 		}
 	}
 </script>
 
-<div
+<!-- <div
 	class="w-full h-full flex flex-col {messages.length === 0
 		? 'justify-center'
 		: 'justify-end'} items-center gap-4"
->
-	{#if messages.length > 0}
+> -->
+<div class="w-full h-full flex flex-col items-center gap-4">
+	<!-- {#if messages.length > 0}
 		<ScrollArea
 			class="w-full max-h-[calc(80vh-100px)] px-6 flex flex-col justify-end items-center gap-4"
 		>
@@ -206,7 +212,7 @@
 				{/each}
 			</Chat.Root>
 		</ScrollArea>
-	{/if}
+	{/if} -->
 
 	<Launcher.Root
 		class="h-fit rounded-[36px] shadow-none flex flex-col p-4 m-0 w-[70%] bg-gray-700"

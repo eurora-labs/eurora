@@ -576,6 +576,7 @@ impl ChatOpenAI {
                                             ImageSource::Base64 { media_type, data } => {
                                                 format!("data:{};base64,{}", media_type, data)
                                             }
+                                            ImageSource::FileId { file_id } => file_id.clone(),
                                         };
                                         let mut image_url = serde_json::json!({ "url": url });
                                         if let Some(d) = detail {
@@ -590,6 +591,7 @@ impl ChatOpenAI {
                                             "image_url": image_url
                                         })
                                     }
+                                    ContentPart::Other(value) => value.clone(),
                                 })
                                 .collect();
                             serde_json::Value::Array(content_parts)
@@ -1000,6 +1002,7 @@ impl ChatOpenAI {
                                             ImageSource::Base64 { media_type, data } => {
                                                 format!("data:{};base64,{}", media_type, data)
                                             }
+                                            ImageSource::FileId { file_id } => file_id.clone(),
                                         };
                                         let mut block = serde_json::json!({
                                             "type": "input_image",
@@ -1014,6 +1017,7 @@ impl ChatOpenAI {
                                         }
                                         block
                                     }
+                                    ContentPart::Other(value) => value.clone(),
                                 })
                                 .collect();
                             serde_json::Value::Array(content_parts)

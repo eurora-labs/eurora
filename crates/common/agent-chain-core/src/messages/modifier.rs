@@ -30,8 +30,8 @@ impl RemoveMessage {
     }
 
     /// Get the ID of the message to be removed.
-    pub fn id(&self) -> Option<&str> {
-        Some(&self.id)
+    pub fn id(&self) -> Option<String> {
+        Some(self.id.clone())
     }
 
     /// Get the target message ID.

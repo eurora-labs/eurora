@@ -7,6 +7,7 @@
 pub mod base;
 pub mod env;
 pub mod formatting;
+pub mod function_calling;
 pub mod html;
 pub mod input;
 pub mod interactive_env;
