@@ -127,7 +127,7 @@ impl HumanMessage {
     /// Create a new human message with a list of content blocks.
     ///
     /// This is used for multimodal content or provider-specific content blocks.
-    /// The content is stored as a JSON array string internally.
+    /// The content is stored as `MessageContent::Parts` derived from the JSON blocks.
     pub fn with_content_list(content: Vec<serde_json::Value>) -> Self {
         // Convert JSON values to ContentParts
         let parts: Vec<ContentPart> = content
@@ -347,11 +347,14 @@ impl HumanMessage {
         // We can't use direct serde deserialization because the enum has #[serde(tag = "type")]
         // which expects externally tagged format, but our JSON has type as a field inside.
         // So we need to manually deserialize based on the type field.
+        //
+        // On deserialization failure, we log a warning and wrap the malformed block
+        // as NonStandardContentBlock with error info, rather than panicking.
         blocks_json
             .into_iter()
             .map(|v| {
                 let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                match block_type {
+                let result = match block_type {
                     "text" => serde_json::from_value::<TextContentBlock>(v.clone())
                         .map(ContentBlock::Text),
                     "reasoning" => serde_json::from_value::<ReasoningContentBlock>(v.clone())
@@ -385,20 +388,46 @@ impl HumanMessage {
                     "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
                         .map(ContentBlock::NonStandard),
                     _ => {
-                        // Unknown type, try to parse as non_standard
-                        eprintln!(
-                            "Unknown block type: {}, treating as non_standard",
-                            block_type
+                        // Unknown type, wrap as non_standard
+                        tracing::warn!(
+                            block_type = %block_type,
+                            json = %v,
+                            "Unknown block type in content_blocks, treating as non_standard"
                         );
                         serde_json::from_value::<NonStandardContentBlock>(v.clone())
                             .map(ContentBlock::NonStandard)
                     }
-                }
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "JSON value: {:?}\nFailed to deserialize ContentBlock of type '{}': {:?}",
-                        v, block_type, e
+                };
+
+                result.unwrap_or_else(|e| {
+                    tracing::warn!(
+                        block_type = %block_type,
+                        error = %e,
+                        json = %v,
+                        "Failed to deserialize ContentBlock in content_blocks, wrapping as non_standard"
                     );
+                    // Wrap the malformed block as NonStandardContentBlock with error info
+                    let mut error_value = std::collections::HashMap::new();
+                    error_value.insert(
+                        "original_json".to_string(),
+                        v.clone(),
+                    );
+                    error_value.insert(
+                        "deserialization_error".to_string(),
+                        serde_json::Value::String(e.to_string()),
+                    );
+                    error_value.insert(
+                        "original_type".to_string(),
+                        serde_json::Value::String(block_type.to_string()),
+                    );
+                    ContentBlock::NonStandard(NonStandardContentBlock {
+                        block_type: "non_standard".to_string(),
+                        id: None,
+                        value: error_value,
+                        index: v.get("index").and_then(|i| {
+                            serde_json::from_value(i.clone()).ok()
+                        }),
+                    })
                 })
             })
             .collect()
