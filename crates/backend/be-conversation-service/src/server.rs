@@ -306,6 +306,7 @@ impl ProtoConversationService for ConversationService {
         &self,
         request: tonic::Request<proto_gen::conversation::GetConversationRequest>,
     ) -> Result<Response<GetConversationResponse>, Status> {
+        info!("Get conversation request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
