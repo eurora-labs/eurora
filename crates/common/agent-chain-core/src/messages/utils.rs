@@ -234,7 +234,7 @@ pub fn filter_messages(
             // Check exclusions first
             if let Some(exclude_names) = exclude_names
                 && let Some(name) = msg.name()
-                && exclude_names.contains(&name)
+                && exclude_names.contains(&name.as_str())
             {
                 return false;
             }
@@ -247,30 +247,32 @@ pub fn filter_messages(
 
             if let Some(exclude_ids) = exclude_ids
                 && let Some(id) = msg.id()
-                && exclude_ids.contains(&id)
+                && exclude_ids.contains(&id.as_str())
             {
                 return false;
             }
 
             // Check inclusions (default to including if no criteria given)
-            let include_by_name = include_names
-                .is_none_or(|names| msg.name().is_some_and(|name| names.contains(&name)));
+            // Match Python logic: include if no inclusion criteria are given,
+            // OR if any specified inclusion criterion matches
+            let no_include_criteria =
+                include_names.is_none() && include_types.is_none() && include_ids.is_none();
 
-            let include_by_type =
-                include_types.is_none_or(|types| types.contains(&msg.message_type()));
+            let matches_include_names = include_names.is_some_and(|names| {
+                msg.name()
+                    .is_some_and(|name| names.contains(&name.as_str()))
+            });
 
-            let include_by_id =
-                include_ids.is_none_or(|ids| msg.id().is_some_and(|id| ids.contains(&id)));
+            let matches_include_types =
+                include_types.is_some_and(|types| types.contains(&msg.message_type()));
 
-            // If any inclusion criteria is specified, at least one must match
-            let any_include_specified =
-                include_names.is_some() || include_types.is_some() || include_ids.is_some();
+            let matches_include_ids = include_ids
+                .is_some_and(|ids| msg.id().is_some_and(|id| ids.contains(&id.as_str())));
 
-            if any_include_specified {
-                include_by_name || include_by_type || include_by_id
-            } else {
-                true
-            }
+            no_include_criteria
+                || matches_include_names
+                || matches_include_types
+                || matches_include_ids
         })
         .cloned()
         .collect()
@@ -341,4 +343,526 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
 /// This corresponds to `message_chunk_to_message` in LangChain Python.
 pub fn message_chunk_to_message(chunk: &BaseMessageChunk) -> BaseMessage {
     chunk.to_message()
+}
+
+// ============================================================================
+// count_tokens_approximately
+// ============================================================================
+
+/// Configuration for approximate token counting.
+#[derive(Debug, Clone)]
+pub struct CountTokensConfig {
+    /// Number of characters per token to use for the approximation.
+    /// One token corresponds to ~4 chars for common English text.
+    pub chars_per_token: f64,
+    /// Number of extra tokens to add per message, e.g. special tokens.
+    pub extra_tokens_per_message: f64,
+    /// Whether to include message names in the count.
+    pub count_name: bool,
+}
+
+impl Default for CountTokensConfig {
+    fn default() -> Self {
+        Self {
+            chars_per_token: 4.0,
+            extra_tokens_per_message: 3.0,
+            count_name: true,
+        }
+    }
+}
+
+/// Approximate the total number of tokens in messages.
+///
+/// The token count includes stringified message content, role, and (optionally) name.
+/// - For AI messages, the token count also includes stringified tool calls.
+/// - For tool messages, the token count also includes the tool call ID.
+///
+/// # Arguments
+///
+/// * `messages` - Slice of messages to count tokens for.
+/// * `config` - Configuration for token counting (use `CountTokensConfig::default()` for defaults).
+///
+/// # Returns
+///
+/// Approximate number of tokens in the messages.
+///
+/// This corresponds to `count_tokens_approximately` in LangChain Python.
+pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokensConfig) -> usize {
+    let mut token_count: f64 = 0.0;
+
+    for message in messages {
+        let mut message_chars: usize = 0;
+
+        // Count content characters
+        message_chars += message.content().len();
+
+        // For AI messages, also count tool calls if present
+        if let BaseMessage::AI(ai_msg) = message
+            && !ai_msg.tool_calls().is_empty()
+        {
+            let tool_calls_str = format!("{:?}", ai_msg.tool_calls());
+            message_chars += tool_calls_str.len();
+        }
+
+        // For tool messages, also count the tool call ID
+        if let BaseMessage::Tool(tool_msg) = message {
+            message_chars += tool_msg.tool_call_id().len();
+        }
+
+        // Add role characters
+        let role = get_message_openai_role(message);
+        message_chars += role.len();
+
+        // Add name if present and config says to count it
+        if config.count_name
+            && let Some(name) = message.name()
+        {
+            message_chars += name.len();
+        }
+
+        // Round up per message to ensure individual message token counts
+        // add up to the total count for a list of messages
+        token_count += (message_chars as f64 / config.chars_per_token).ceil();
+
+        // Add extra tokens per message
+        token_count += config.extra_tokens_per_message;
+    }
+
+    // Round up one more time in case extra_tokens_per_message is a float
+    token_count.ceil() as usize
+}
+
+/// Get the OpenAI role string for a message.
+fn get_message_openai_role(message: &BaseMessage) -> &'static str {
+    match message {
+        BaseMessage::AI(_) => "assistant",
+        BaseMessage::Human(_) => "user",
+        BaseMessage::Tool(_) => "tool",
+        BaseMessage::System(_) => "system",
+        BaseMessage::Function(_) => "function",
+        BaseMessage::Chat(c) => {
+            // Return static strings for common roles, otherwise return a generic one
+            match c.role() {
+                "user" => "user",
+                "assistant" => "assistant",
+                "system" => "system",
+                "function" => "function",
+                "tool" => "tool",
+                _ => "user",
+            }
+        }
+        BaseMessage::Remove(_) => "remove",
+    }
+}
+
+// ============================================================================
+// convert_to_openai_messages
+// ============================================================================
+
+/// Text format options for OpenAI message conversion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TextFormat {
+    /// If a message has a string content, this is left as a string.
+    /// If a message has content blocks that are all of type 'text', these
+    /// are joined with a newline to make a single string.
+    #[default]
+    String,
+    /// If a message has a string content, this is turned into a list
+    /// with a single content block of type 'text'.
+    Block,
+}
+
+/// Convert LangChain messages into OpenAI message dicts.
+///
+/// # Arguments
+///
+/// * `messages` - Slice of messages to convert.
+/// * `text_format` - How to format string or text block contents.
+///
+/// # Returns
+///
+/// A list of OpenAI message dicts as JSON Values.
+///
+/// This corresponds to `convert_to_openai_messages` in LangChain Python.
+pub fn convert_to_openai_messages(
+    messages: &[BaseMessage],
+    text_format: TextFormat,
+) -> Vec<serde_json::Value> {
+    messages
+        .iter()
+        .map(|msg| convert_single_to_openai_message(msg, text_format))
+        .collect()
+}
+
+/// Convert a single message to OpenAI format.
+fn convert_single_to_openai_message(
+    message: &BaseMessage,
+    text_format: TextFormat,
+) -> serde_json::Value {
+    let role = get_message_openai_role(message);
+    let mut oai_msg = serde_json::json!({ "role": role });
+
+    // Add name if present
+    if let Some(name) = message.name() {
+        oai_msg["name"] = serde_json::json!(name);
+    }
+
+    // Add tool_call_id for tool messages
+    if let BaseMessage::Tool(tool_msg) = message {
+        oai_msg["tool_call_id"] = serde_json::json!(tool_msg.tool_call_id());
+    }
+
+    // Add tool_calls for AI messages
+    if let BaseMessage::AI(ai_msg) = message
+        && !ai_msg.tool_calls().is_empty()
+    {
+        let tool_calls: Vec<serde_json::Value> = ai_msg
+            .tool_calls()
+            .iter()
+            .map(|tc| {
+                serde_json::json!({
+                    "type": "function",
+                    "id": tc.id(),
+                    "function": {
+                        "name": tc.name(),
+                        "arguments": serde_json::to_string(&tc.args()).unwrap_or_default(),
+                    }
+                })
+            })
+            .collect();
+        oai_msg["tool_calls"] = serde_json::json!(tool_calls);
+    }
+
+    // Handle content based on text_format
+    let content = message.content();
+    match text_format {
+        TextFormat::String => {
+            oai_msg["content"] = serde_json::json!(content);
+        }
+        TextFormat::Block => {
+            if content.is_empty() {
+                oai_msg["content"] = serde_json::json!([]);
+            } else {
+                oai_msg["content"] = serde_json::json!([{ "type": "text", "text": content }]);
+            }
+        }
+    }
+
+    oai_msg
+}
+
+// ============================================================================
+// trim_messages
+// ============================================================================
+
+/// Strategy for trimming messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TrimStrategy {
+    /// Keep the first `<= max_tokens` tokens of the messages.
+    First,
+    /// Keep the last `<= max_tokens` tokens of the messages.
+    #[default]
+    Last,
+}
+
+/// Configuration for trimming messages.
+#[derive(Debug, Clone)]
+pub struct TrimMessagesConfig<F>
+where
+    F: Fn(&[BaseMessage]) -> usize,
+{
+    /// Maximum token count of trimmed messages.
+    pub max_tokens: usize,
+    /// Function for counting tokens in a list of messages.
+    pub token_counter: F,
+    /// Strategy for trimming.
+    pub strategy: TrimStrategy,
+    /// Whether to split a message if only part can be included.
+    pub allow_partial: bool,
+    /// Whether to keep the SystemMessage if there is one at index 0.
+    /// Only valid with strategy="last".
+    pub include_system: bool,
+}
+
+impl<F> TrimMessagesConfig<F>
+where
+    F: Fn(&[BaseMessage]) -> usize,
+{
+    /// Create a new config with required parameters.
+    pub fn new(max_tokens: usize, token_counter: F) -> Self {
+        Self {
+            max_tokens,
+            token_counter,
+            strategy: TrimStrategy::Last,
+            allow_partial: false,
+            include_system: false,
+        }
+    }
+
+    /// Set the trimming strategy.
+    pub fn with_strategy(mut self, strategy: TrimStrategy) -> Self {
+        self.strategy = strategy;
+        self
+    }
+
+    /// Set whether to allow partial messages.
+    pub fn with_allow_partial(mut self, allow_partial: bool) -> Self {
+        self.allow_partial = allow_partial;
+        self
+    }
+
+    /// Set whether to include the system message.
+    pub fn with_include_system(mut self, include_system: bool) -> Self {
+        self.include_system = include_system;
+        self
+    }
+}
+
+/// Trim messages to be below a token count.
+///
+/// # Arguments
+///
+/// * `messages` - Slice of messages to trim.
+/// * `config` - Configuration for trimming.
+///
+/// # Returns
+///
+/// List of trimmed messages.
+///
+/// This corresponds to `trim_messages` in LangChain Python.
+pub fn trim_messages<F>(
+    messages: &[BaseMessage],
+    config: &TrimMessagesConfig<F>,
+) -> Vec<BaseMessage>
+where
+    F: Fn(&[BaseMessage]) -> usize,
+{
+    if messages.is_empty() {
+        return Vec::new();
+    }
+
+    match config.strategy {
+        TrimStrategy::First => trim_messages_first(messages, config),
+        TrimStrategy::Last => trim_messages_last(messages, config),
+    }
+}
+
+/// Trim messages from the beginning.
+fn trim_messages_first<F>(
+    messages: &[BaseMessage],
+    config: &TrimMessagesConfig<F>,
+) -> Vec<BaseMessage>
+where
+    F: Fn(&[BaseMessage]) -> usize,
+{
+    let messages: Vec<BaseMessage> = messages.to_vec();
+
+    // Check if all messages already fit
+    if (config.token_counter)(&messages) <= config.max_tokens {
+        return messages;
+    }
+
+    // Binary search to find maximum number of complete messages
+    let mut left = 0;
+    let mut right = messages.len();
+
+    while left < right {
+        let mid = (left + right).div_ceil(2);
+        if (config.token_counter)(&messages[..mid]) <= config.max_tokens {
+            left = mid;
+        } else {
+            right = mid - 1;
+        }
+    }
+
+    let idx = left;
+
+    // Handle partial messages if allowed
+    if config.allow_partial && idx < messages.len() {
+        // Try to include part of the next message's content
+        if let Some(partial_msg) = try_partial_message_first(&messages, idx, config) {
+            let mut result = messages[..idx].to_vec();
+            result.push(partial_msg);
+            return result;
+        }
+    }
+
+    messages[..idx].to_vec()
+}
+
+/// Trim messages from the end.
+fn trim_messages_last<F>(
+    messages: &[BaseMessage],
+    config: &TrimMessagesConfig<F>,
+) -> Vec<BaseMessage>
+where
+    F: Fn(&[BaseMessage]) -> usize,
+{
+    let mut messages: Vec<BaseMessage> = messages.to_vec();
+
+    if messages.is_empty() {
+        return messages;
+    }
+
+    // Handle system message preservation
+    let system_message = if config.include_system
+        && !messages.is_empty()
+        && matches!(messages.first(), Some(BaseMessage::System(_)))
+    {
+        Some(messages.remove(0))
+    } else {
+        None
+    };
+
+    // Calculate remaining tokens after system message
+    let remaining_tokens = if let Some(ref sys_msg) = system_message {
+        let sys_tokens = (config.token_counter)(std::slice::from_ref(sys_msg));
+        config.max_tokens.saturating_sub(sys_tokens)
+    } else {
+        config.max_tokens
+    };
+
+    // Reverse and use first strategy
+    messages.reverse();
+
+    // Create a temporary config with adjusted max_tokens
+    let reverse_config = TrimMessagesConfig {
+        max_tokens: remaining_tokens,
+        token_counter: &config.token_counter,
+        strategy: TrimStrategy::First,
+        allow_partial: config.allow_partial,
+        include_system: false,
+    };
+
+    let mut result = trim_messages_first(&messages, &reverse_config);
+
+    // Reverse back
+    result.reverse();
+
+    // Add system message back
+    if let Some(sys_msg) = system_message {
+        result.insert(0, sys_msg);
+    }
+
+    result
+}
+
+/// Try to create a partial message from the first strategy.
+fn try_partial_message_first<F>(
+    messages: &[BaseMessage],
+    idx: usize,
+    config: &TrimMessagesConfig<F>,
+) -> Option<BaseMessage>
+where
+    F: Fn(&[BaseMessage]) -> usize,
+{
+    if idx >= messages.len() {
+        return None;
+    }
+
+    let excluded = &messages[idx];
+    let content = excluded.content();
+
+    if content.is_empty() {
+        return None;
+    }
+
+    // Try to split on newlines (default text splitter)
+    let splits: Vec<&str> = content.split('\n').collect();
+    if splits.len() <= 1 {
+        return None;
+    }
+
+    // Reassemble splits with the newline separator
+    let splits_with_sep: Vec<String> = splits
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            if i < splits.len() - 1 {
+                format!("{}\n", s)
+            } else {
+                s.to_string()
+            }
+        })
+        .collect();
+
+    let base_messages = &messages[..idx];
+
+    // Binary search for max splits we can include
+    let mut left = 0;
+    let mut right = splits_with_sep.len();
+
+    while left < right {
+        let mid = (left + right + 1).div_ceil(2);
+        let partial_content: String = splits_with_sep[..mid].concat();
+        let partial_msg = create_message_with_content(excluded, &partial_content);
+
+        let mut test_messages = base_messages.to_vec();
+        test_messages.push(partial_msg);
+
+        if (config.token_counter)(&test_messages) <= config.max_tokens {
+            left = mid;
+        } else {
+            right = mid - 1;
+        }
+    }
+
+    if left > 0 {
+        let partial_content: String = splits_with_sep[..left].concat();
+        Some(create_message_with_content(excluded, &partial_content))
+    } else {
+        None
+    }
+}
+
+/// Create a message of the same type with different content.
+fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMessage {
+    match original {
+        BaseMessage::Human(m) => {
+            let mut new_msg = HumanMessage::new(content);
+            if let Some(id) = m.id() {
+                new_msg = HumanMessage::with_id(id, content);
+            }
+            BaseMessage::Human(new_msg)
+        }
+        BaseMessage::AI(m) => {
+            let mut new_msg = AIMessage::new(content);
+            if let Some(id) = m.id() {
+                new_msg = AIMessage::with_id(id, content);
+            }
+            BaseMessage::AI(new_msg)
+        }
+        BaseMessage::System(m) => {
+            let mut new_msg = SystemMessage::new(content);
+            if let Some(id) = m.id() {
+                new_msg = SystemMessage::with_id(id, content);
+            }
+            BaseMessage::System(new_msg)
+        }
+        BaseMessage::Tool(m) => {
+            let mut new_msg = ToolMessage::new(content, m.tool_call_id());
+            if let Some(id) = m.id() {
+                new_msg = ToolMessage::with_id(id, content, m.tool_call_id());
+            }
+            BaseMessage::Tool(new_msg)
+        }
+        BaseMessage::Chat(m) => {
+            let mut new_msg = ChatMessage::new(m.role(), content);
+            if let Some(id) = m.id() {
+                new_msg = ChatMessage::with_id(id, m.role(), content);
+            }
+            BaseMessage::Chat(new_msg)
+        }
+        BaseMessage::Function(m) => {
+            let mut new_msg = FunctionMessage::new(m.name(), content);
+            if let Some(id) = m.id() {
+                new_msg = FunctionMessage::with_id(id, m.name(), content);
+            }
+            BaseMessage::Function(new_msg)
+        }
+        BaseMessage::Remove(m) => {
+            // RemoveMessage preserves the same id (which is the target id to remove)
+            BaseMessage::Remove(RemoveMessage::new(m.target_id()))
+        }
+    }
 }
