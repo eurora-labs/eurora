@@ -519,16 +519,6 @@ fn test_trim_messages_last_30_include_system() {
 // ============================================================================
 
 #[test]
-fn test_convert_to_openai_messages_string() {
-    let messages = vec![BaseMessage::Human(HumanMessage::new("Hello"))];
-    let result = convert_to_openai_messages(&messages, TextFormat::String);
-
-    assert_eq!(result.len(), 1);
-    assert_eq!(result[0]["role"], "user");
-    assert_eq!(result[0]["content"], "Hello");
-}
-
-#[test]
 fn test_convert_to_openai_messages_single_message() {
     let messages = vec![BaseMessage::Human(HumanMessage::new("Hello"))];
     let result = convert_to_openai_messages(&messages, TextFormat::String);

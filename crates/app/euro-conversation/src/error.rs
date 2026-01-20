@@ -20,6 +20,9 @@ pub enum Error {
 
     #[error("Conversation not found")]
     ConversationNotFound,
+
+    #[error("Invalid conversation id")]
+    InvalidConversationId,
 }
 
 impl From<SendError<ConversationEvent>> for Error {

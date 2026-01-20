@@ -116,9 +116,12 @@ impl ConversationApi for ConversationApiImpl {
 
     async fn switch_conversation<R: Runtime>(
         self,
-        _app_handle: tauri::AppHandle<R>,
+        app_handle: tauri::AppHandle<R>,
         _conversation_id: String,
     ) -> Result<ConversationView, String> {
+        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        let _conversation_manager = conversation_state.lock().await;
+
         todo!("Implement switch_conversation")
         // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
 

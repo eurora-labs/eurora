@@ -374,7 +374,7 @@ impl AIMessage {
             .into_iter()
             .map(|v| {
                 let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                match block_type {
+                let result = match block_type {
                     "text" => serde_json::from_value::<TextContentBlock>(v.clone())
                         .map(ContentBlock::Text),
                     "reasoning" => serde_json::from_value::<ReasoningContentBlock>(v.clone())
@@ -408,20 +408,46 @@ impl AIMessage {
                     "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
                         .map(ContentBlock::NonStandard),
                     _ => {
-                        // Unknown type, try to parse as non_standard
-                        eprintln!(
-                            "Unknown block type: {}, treating as non_standard",
-                            block_type
+                        // Unknown type, wrap as non_standard
+                        tracing::warn!(
+                            block_type = %block_type,
+                            json = %v,
+                            "Unknown block type in AIMessage::content_blocks, treating as non_standard"
                         );
                         serde_json::from_value::<NonStandardContentBlock>(v.clone())
                             .map(ContentBlock::NonStandard)
                     }
-                }
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "JSON value: {:?}\nFailed to deserialize ContentBlock of type '{}': {:?}",
-                        v, block_type, e
+                };
+
+                result.unwrap_or_else(|e| {
+                    tracing::warn!(
+                        block_type = %block_type,
+                        error = %e,
+                        json = %v,
+                        "Failed to deserialize ContentBlock in AIMessage::content_blocks, wrapping as non_standard"
                     );
+                    // Wrap the malformed block as NonStandardContentBlock with error info
+                    let mut error_value = std::collections::HashMap::new();
+                    error_value.insert(
+                        "original_json".to_string(),
+                        v.clone(),
+                    );
+                    error_value.insert(
+                        "deserialization_error".to_string(),
+                        serde_json::Value::String(e.to_string()),
+                    );
+                    error_value.insert(
+                        "original_type".to_string(),
+                        serde_json::Value::String(block_type.to_string()),
+                    );
+                    ContentBlock::NonStandard(NonStandardContentBlock {
+                        block_type: "non_standard".to_string(),
+                        id: None,
+                        value: error_value,
+                        index: v.get("index").and_then(|i| {
+                            serde_json::from_value(i.clone()).ok()
+                        }),
+                    })
                 })
             })
             .collect()
@@ -870,7 +896,7 @@ impl AIMessageChunk {
             .into_iter()
             .map(|v| {
                 let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                match block_type {
+                let result = match block_type {
                     "text" => serde_json::from_value::<TextContentBlock>(v.clone())
                         .map(ContentBlock::Text),
                     "reasoning" => serde_json::from_value::<ReasoningContentBlock>(v.clone())
@@ -904,20 +930,46 @@ impl AIMessageChunk {
                     "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
                         .map(ContentBlock::NonStandard),
                     _ => {
-                        // Unknown type, try to parse as non_standard
-                        eprintln!(
-                            "Unknown block type: {}, treating as non_standard",
-                            block_type
+                        // Unknown type, wrap as non_standard
+                        tracing::warn!(
+                            block_type = %block_type,
+                            json = %v,
+                            "Unknown block type in AIMessageChunk::content_blocks, treating as non_standard"
                         );
                         serde_json::from_value::<NonStandardContentBlock>(v.clone())
                             .map(ContentBlock::NonStandard)
                     }
-                }
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "JSON value: {:?}\nFailed to deserialize ContentBlock of type '{}': {:?}",
-                        v, block_type, e
+                };
+
+                result.unwrap_or_else(|e| {
+                    tracing::warn!(
+                        block_type = %block_type,
+                        error = %e,
+                        json = %v,
+                        "Failed to deserialize ContentBlock in AIMessageChunk::content_blocks, wrapping as non_standard"
                     );
+                    // Wrap the malformed block as NonStandardContentBlock with error info
+                    let mut error_value = std::collections::HashMap::new();
+                    error_value.insert(
+                        "original_json".to_string(),
+                        v.clone(),
+                    );
+                    error_value.insert(
+                        "deserialization_error".to_string(),
+                        serde_json::Value::String(e.to_string()),
+                    );
+                    error_value.insert(
+                        "original_type".to_string(),
+                        serde_json::Value::String(block_type.to_string()),
+                    );
+                    ContentBlock::NonStandard(NonStandardContentBlock {
+                        block_type: "non_standard".to_string(),
+                        id: None,
+                        value: error_value,
+                        index: v.get("index").and_then(|i| {
+                            serde_json::from_value(i.clone()).ok()
+                        }),
+                    })
                 })
             })
             .collect()

@@ -413,7 +413,7 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
             let mut result = json!({
                 "type": "file",
                 "base64": parsed.data,
-                "mime_type": "application/pdf"
+                "mime_type": parsed.mime_type,
             });
 
             if !all_extras.is_empty() {

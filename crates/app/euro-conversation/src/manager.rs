@@ -93,9 +93,14 @@ impl ConversationManager {
 
     pub async fn get_current_messages(&self, limit: u32, offset: u32) -> Result<Vec<BaseMessage>> {
         let mut client = self.conversation_client.clone();
+        let id = self
+            .current_conversation
+            .id()
+            .ok_or(Error::InvalidConversationId)?;
+
         let response = client
             .get_messages(GetMessagesRequest {
-                conversation_id: self.current_conversation.id().unwrap().to_string(),
+                conversation_id: id.to_string(),
                 limit,
                 offset,
             })
