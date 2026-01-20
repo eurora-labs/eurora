@@ -3,9 +3,9 @@
 use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
-    CreateConversationRequest as DbCreateConversationRequest,
-    CreateMessageRequest as DbCreateMessageRequest, DatabaseManager, GetLastMessagesRequest,
-    ListConversationsRequest as DbListConversationsRequest, MessageType,
+    CreateMessageRequest as DbCreateMessageRequest, DatabaseManager, GetConversation,
+    GetLastMessagesRequest, ListConversationsRequest as DbListConversationsRequest, MessageType,
+    NewConversation as DbCreateConversationRequest,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -20,8 +20,8 @@ use crate::{ConversationServiceResult, converters::convert_db_message_to_base_me
 
 use proto_gen::conversation::{
     AddHumanMessageRequest, AddHumanMessageResponse, ChatStreamRequest, ChatStreamResponse,
-    Conversation, CreateConversationRequest, CreateConversationResponse, GetMessagesRequest,
-    GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
+    Conversation, CreateConversationRequest, CreateConversationResponse, GetConversationResponse,
+    GetMessagesRequest, GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
 };
 
 pub use proto_gen::conversation::proto_conversation_service_server::{
@@ -276,5 +276,34 @@ impl ProtoConversationService for ConversationService {
         _request: Request<GetMessagesRequest>,
     ) -> Result<Response<GetMessagesResponse>, Status> {
         todo!()
+    }
+
+    async fn get_conversation(
+        &self,
+        request: tonic::Request<proto_gen::conversation::GetConversationRequest>,
+    ) -> Result<Response<GetConversationResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        let conversation = self
+            .db
+            .get_conversation(GetConversation {
+                id: conversation_id,
+                user_id,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        Ok(Response::new(GetConversationResponse {
+            conversation: conversation.try_into().ok(),
+        }))
     }
 }

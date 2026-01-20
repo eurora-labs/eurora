@@ -1512,6 +1512,8 @@ version = "0.0.0"
 dependencies = [
  "chrono",
  "ipnet",
+ "prost-types",
+ "proto-gen",
  "serde",
  "serde_json",
  "sqlx",

@@ -7,15 +7,19 @@ use sqlx::{
 };
 use uuid::Uuid;
 
-use crate::types::{
-    Activity, ActivityAsset, ActivityConversation, Asset, Conversation, CreateActivityRequest,
-    CreateAssetRequest, CreateConversationRequest, CreateLoginTokenRequest, CreateMessageRequest,
-    CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
-    CreateUserRequest, GetActivitiesByTimeRangeRequest, ListActivitiesRequest,
-    ListConversationsRequest, ListMessagesRequest, LoginToken, Message, MessageAsset,
-    OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken, UpdateActivityEndTimeRequest,
-    UpdateActivityRequest, UpdateAssetRequest, UpdateConversationRequest, UpdateMessageRequest,
-    UpdateOAuthCredentialsRequest, UpdatePasswordRequest, UpdateUserRequest, User,
+use crate::{
+    GetConversation,
+    types::{
+        Activity, ActivityAsset, ActivityConversation, Asset, Conversation, CreateActivityRequest,
+        CreateAssetRequest, CreateLoginTokenRequest, CreateMessageRequest,
+        CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
+        CreateUserRequest, GetActivitiesByTimeRangeRequest, ListActivitiesRequest,
+        ListConversationsRequest, ListMessagesRequest, LoginToken, Message, MessageAsset,
+        NewConversation, OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken,
+        UpdateActivityEndTimeRequest, UpdateActivityRequest, UpdateAssetRequest,
+        UpdateConversationRequest, UpdateMessageRequest, UpdateOAuthCredentialsRequest,
+        UpdatePasswordRequest, UpdateUserRequest, User,
+    },
 };
 use crate::{GetLastMessagesRequest, error::DbResult};
 #[derive(Debug)]
@@ -1205,10 +1209,7 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new conversation
-    pub async fn create_conversation(
-        &self,
-        request: CreateConversationRequest,
-    ) -> DbResult<Conversation> {
+    pub async fn create_conversation(&self, request: NewConversation) -> DbResult<Conversation> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
@@ -1231,15 +1232,16 @@ impl DatabaseManager {
     }
 
     /// Get a conversation by ID
-    pub async fn get_conversation(&self, conversation_id: Uuid) -> DbResult<Conversation> {
+    pub async fn get_conversation(&self, request: GetConversation) -> DbResult<Conversation> {
         let conversation = sqlx::query_as::<_, Conversation>(
             r#"
             SELECT id, user_id, title, created_at, updated_at
             FROM conversations
-            WHERE id = $1
+            WHERE id = $1 AND user_id = $2
             "#,
         )
-        .bind(conversation_id)
+        .bind(request.id)
+        .bind(request.user_id)
         .fetch_one(&self.pool)
         .await?;
 
