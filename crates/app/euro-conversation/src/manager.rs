@@ -6,8 +6,9 @@ use crate::{
 use agent_chain::{BaseMessage, HumanMessage};
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
-    AddHumanMessageRequest, ChatStreamRequest, CreateConversationRequest, GetMessagesRequest,
-    ListConversationsRequest, proto_conversation_service_client::ProtoConversationServiceClient,
+    AddHumanMessageRequest, ChatStreamRequest, CreateConversationRequest, GetConversationRequest,
+    GetMessagesRequest, ListConversationsRequest,
+    proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::broadcast;
@@ -106,6 +107,20 @@ impl ConversationManager {
             .into_iter()
             .map(BaseMessage::from)
             .collect())
+    }
+
+    pub async fn get_conversation(&self, conversation_id: String) -> Result<Conversation> {
+        let mut client = self.conversation_client.clone();
+        let response = client
+            .get_conversation(GetConversationRequest { conversation_id })
+            .await?
+            .into_inner();
+
+        if let Some(conversation) = response.conversation {
+            Ok(conversation.into())
+        } else {
+            Err(Error::ConversationNotFound)
+        }
     }
 }
 
