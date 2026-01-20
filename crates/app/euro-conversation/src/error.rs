@@ -17,6 +17,9 @@ pub enum Error {
 
     #[error("Could not set conversation id: {0}")]
     SetId(String),
+
+    #[error("Conversation not found")]
+    ConversationNotFound,
 }
 
 impl From<SendError<ConversationEvent>> for Error {
