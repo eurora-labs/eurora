@@ -1,9 +1,9 @@
 //! High-level timeline manager implementation
 
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use agent_chain_core::BaseMessage;
-use euro_activity::{ActivityAsset, SavedAssetInfo, types::SnapshotFunctionality};
+use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
 use tokio::sync::Mutex;
 use tracing::debug;
 
@@ -210,39 +210,6 @@ impl TimelineManager {
         } else {
             Vec::new()
         }
-    }
-
-    /// Load assets from disk
-    pub async fn load_assets_from_disk(
-        &self,
-        paths: &Vec<euro_personal_db::Asset>,
-    ) -> TimelineResult<Vec<ActivityAsset>> {
-        if paths.is_empty() {
-            return Ok(Vec::new());
-        }
-        let mut out = Vec::with_capacity(paths.len());
-        for a in paths {
-            let rel = PathBuf::from(&a.relative_path);
-            let abs = {
-                let storage = self.activity_storage.lock().await;
-                storage.get_absolute_path(&rel)
-            };
-            // NOTE: consider not holding the mutex across .await inside load (see next comment).
-            let asset = {
-                let storage = self.activity_storage.lock().await;
-                storage.load_asset_from_path(&abs).await?
-            };
-            out.push(asset);
-        }
-        Ok(out)
-        // let activity_storage = self.activity_storage.lock().await;
-        // let test_path = paths[0].clone().relative_path;
-        // let path_instance = PathBuf::from(&test_path);
-        // let path = activity_storage.get_absolute_path(&path_instance);
-
-        // let asset = activity_storage.load_asset_from_path(&path).await?;
-
-        // Ok(vec![asset])
     }
 
     /// Save the assets via the be-asset-service

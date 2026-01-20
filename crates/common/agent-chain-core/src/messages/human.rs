@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use specta::Type;
 
 use super::base::merge_content;
-use super::content::{ContentPart, ImageSource, MessageContent};
+use super::content::{ContentBlock, ContentPart, ImageSource, MessageContent};
 
 /// A human message in the conversation.
 ///
@@ -124,6 +124,126 @@ impl HumanMessage {
         ])
     }
 
+    /// Create a new human message with a list of content blocks.
+    ///
+    /// This is used for multimodal content or provider-specific content blocks.
+    /// The content is stored as `MessageContent::Parts` derived from the JSON blocks.
+    pub fn with_content_list(content: Vec<serde_json::Value>) -> Self {
+        // Convert JSON values to ContentParts
+        let parts: Vec<ContentPart> = content
+            .into_iter()
+            .map(|v| {
+                if let Some(obj) = v.as_object() {
+                    let block_type = obj.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                    match block_type {
+                        "text" => {
+                            let text = obj.get("text").and_then(|t| t.as_str()).unwrap_or("");
+                            ContentPart::Text {
+                                text: text.to_string(),
+                            }
+                        }
+                        "image" => {
+                            // Handle various image source formats
+                            if let Some(url) = obj.get("url").and_then(|u| u.as_str()) {
+                                ContentPart::Image {
+                                    source: ImageSource::Url {
+                                        url: url.to_string(),
+                                    },
+                                    detail: None,
+                                }
+                            } else if let Some(base64) = obj.get("base64").and_then(|b| b.as_str())
+                            {
+                                let mime_type = obj
+                                    .get("mime_type")
+                                    .and_then(|m| m.as_str())
+                                    .unwrap_or("image/png");
+                                ContentPart::Image {
+                                    source: ImageSource::Base64 {
+                                        media_type: mime_type.to_string(),
+                                        data: base64.to_string(),
+                                    },
+                                    detail: None,
+                                }
+                            } else if let Some(source) =
+                                obj.get("source").and_then(|s| s.as_object())
+                            {
+                                let source_type =
+                                    source.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                                match source_type {
+                                    "url" => {
+                                        let url = source
+                                            .get("url")
+                                            .and_then(|u| u.as_str())
+                                            .unwrap_or("");
+                                        ContentPart::Image {
+                                            source: ImageSource::Url {
+                                                url: url.to_string(),
+                                            },
+                                            detail: None,
+                                        }
+                                    }
+                                    "base64" => {
+                                        let data = source
+                                            .get("data")
+                                            .and_then(|d| d.as_str())
+                                            .unwrap_or("");
+                                        let media_type = source
+                                            .get("media_type")
+                                            .and_then(|m| m.as_str())
+                                            .unwrap_or("image/png");
+                                        ContentPart::Image {
+                                            source: ImageSource::Base64 {
+                                                media_type: media_type.to_string(),
+                                                data: data.to_string(),
+                                            },
+                                            detail: None,
+                                        }
+                                    }
+                                    "file" => {
+                                        let file_id = source
+                                            .get("file_id")
+                                            .and_then(|f| f.as_str())
+                                            .unwrap_or("");
+                                        ContentPart::Image {
+                                            source: ImageSource::FileId {
+                                                file_id: file_id.to_string(),
+                                            },
+                                            detail: None,
+                                        }
+                                    }
+                                    _ => ContentPart::Other(v.clone()),
+                                }
+                            } else if let Some(id) = obj.get("id").and_then(|i| i.as_str()) {
+                                ContentPart::Image {
+                                    source: ImageSource::FileId {
+                                        file_id: id.to_string(),
+                                    },
+                                    detail: None,
+                                }
+                            } else {
+                                ContentPart::Other(v.clone())
+                            }
+                        }
+                        _ => ContentPart::Other(v.clone()),
+                    }
+                } else if let Some(s) = v.as_str() {
+                    ContentPart::Text {
+                        text: s.to_string(),
+                    }
+                } else {
+                    ContentPart::Other(v.clone())
+                }
+            })
+            .collect();
+
+        Self {
+            content: MessageContent::Parts(parts),
+            id: None,
+            name: None,
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
     /// Set the name for this message.
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
@@ -152,8 +272,8 @@ impl HumanMessage {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Set the message ID.
@@ -162,13 +282,155 @@ impl HumanMessage {
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get additional kwargs.
     pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
         &self.additional_kwargs
+    }
+
+    /// Get the raw content as a list of JSON values.
+    ///
+    /// If the content is a Parts list, it serializes each part to JSON.
+    /// If the content is a string, it returns a single text block.
+    pub fn content_list(&self) -> Vec<serde_json::Value> {
+        match &self.content {
+            MessageContent::Text(s) => {
+                vec![serde_json::json!({"type": "text", "text": s})]
+            }
+            MessageContent::Parts(parts) => parts
+                .iter()
+                .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null))
+                .collect(),
+        }
+    }
+
+    /// Get the content blocks translated to the standard format.
+    ///
+    /// This method translates provider-specific content blocks to the
+    /// standardized LangChain content block format. For HumanMessage,
+    /// this uses the Anthropic input translator since human messages
+    /// often contain Anthropic-specific document/image formats.
+    ///
+    /// This corresponds to `content_blocks` property in LangChain Python.
+    pub fn content_blocks(&self) -> Vec<ContentBlock> {
+        use super::content::{
+            AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
+            NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
+            ServerToolCallChunk, ServerToolResult, TextContentBlock, ToolCallBlock,
+            ToolCallChunkBlock, VideoContentBlock,
+        };
+        use crate::messages::block_translators::anthropic::convert_input_to_standard_blocks as anthropic_convert;
+        use crate::messages::block_translators::openai::convert_to_v1_from_chat_completions_input;
+
+        let raw_content = self.content_list();
+
+        // Try to detect if this is OpenAI Chat Completions format
+        // Check if any blocks are image_url, input_audio, or file type
+        let is_openai_format = raw_content.iter().any(|block| {
+            block
+                .get("type")
+                .and_then(|t| t.as_str())
+                .map(|t| ["image_url", "input_audio", "file"].contains(&t))
+                .unwrap_or(false)
+        });
+
+        let blocks_json = if is_openai_format {
+            convert_to_v1_from_chat_completions_input(&raw_content)
+        } else {
+            anthropic_convert(&raw_content)
+        };
+
+        // Deserialize JSON blocks into ContentBlock structs
+        // We can't use direct serde deserialization because the enum has #[serde(tag = "type")]
+        // which expects externally tagged format, but our JSON has type as a field inside.
+        // So we need to manually deserialize based on the type field.
+        //
+        // On deserialization failure, we log a warning and wrap the malformed block
+        // as NonStandardContentBlock with error info, rather than panicking.
+        blocks_json
+            .into_iter()
+            .map(|v| {
+                let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                let result = match block_type {
+                    "text" => serde_json::from_value::<TextContentBlock>(v.clone())
+                        .map(ContentBlock::Text),
+                    "reasoning" => serde_json::from_value::<ReasoningContentBlock>(v.clone())
+                        .map(ContentBlock::Reasoning),
+                    "tool_call" => serde_json::from_value::<ToolCallBlock>(v.clone())
+                        .map(ContentBlock::ToolCall),
+                    "invalid_tool_call" => {
+                        serde_json::from_value::<InvalidToolCallBlock>(v.clone())
+                            .map(ContentBlock::InvalidToolCall)
+                    }
+                    "tool_call_chunk" => serde_json::from_value::<ToolCallChunkBlock>(v.clone())
+                        .map(ContentBlock::ToolCallChunk),
+                    "image" => serde_json::from_value::<ImageContentBlock>(v.clone())
+                        .map(ContentBlock::Image),
+                    "audio" => serde_json::from_value::<AudioContentBlock>(v.clone())
+                        .map(ContentBlock::Audio),
+                    "video" => serde_json::from_value::<VideoContentBlock>(v.clone())
+                        .map(ContentBlock::Video),
+                    "file" => serde_json::from_value::<FileContentBlock>(v.clone())
+                        .map(ContentBlock::File),
+                    "text-plain" => serde_json::from_value::<PlainTextContentBlock>(v.clone())
+                        .map(ContentBlock::PlainText),
+                    "server_tool_call" => serde_json::from_value::<ServerToolCall>(v.clone())
+                        .map(ContentBlock::ServerToolCall),
+                    "server_tool_call_chunk" => {
+                        serde_json::from_value::<ServerToolCallChunk>(v.clone())
+                            .map(ContentBlock::ServerToolCallChunk)
+                    }
+                    "server_tool_result" => serde_json::from_value::<ServerToolResult>(v.clone())
+                        .map(ContentBlock::ServerToolResult),
+                    "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
+                        .map(ContentBlock::NonStandard),
+                    _ => {
+                        // Unknown type, wrap as non_standard
+                        tracing::warn!(
+                            block_type = %block_type,
+                            json = %v,
+                            "Unknown block type in content_blocks, treating as non_standard"
+                        );
+                        serde_json::from_value::<NonStandardContentBlock>(v.clone())
+                            .map(ContentBlock::NonStandard)
+                    }
+                };
+
+                result.unwrap_or_else(|e| {
+                    tracing::warn!(
+                        block_type = %block_type,
+                        error = %e,
+                        json = %v,
+                        "Failed to deserialize ContentBlock in content_blocks, wrapping as non_standard"
+                    );
+                    // Wrap the malformed block as NonStandardContentBlock with error info
+                    let mut error_value = std::collections::HashMap::new();
+                    error_value.insert(
+                        "original_json".to_string(),
+                        v.clone(),
+                    );
+                    error_value.insert(
+                        "deserialization_error".to_string(),
+                        serde_json::Value::String(e.to_string()),
+                    );
+                    error_value.insert(
+                        "original_type".to_string(),
+                        serde_json::Value::String(block_type.to_string()),
+                    );
+                    ContentBlock::NonStandard(NonStandardContentBlock {
+                        block_type: "non_standard".to_string(),
+                        id: None,
+                        value: error_value,
+                        index: v.get("index").and_then(|i| {
+                            serde_json::from_value(i.clone()).ok()
+                        }),
+                    })
+                })
+            })
+            .collect()
     }
 }
 
@@ -230,13 +492,13 @@ impl HumanMessageChunk {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get additional kwargs.

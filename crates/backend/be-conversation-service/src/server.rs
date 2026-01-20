@@ -1,10 +1,11 @@
 //! Server-side implementation for the Conversation Service.
 
-use agent_chain::{BaseChatModel, BaseMessage, openai::ChatOpenAI};
+use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
-    CreateConversationRequest as DbCreateConversationRequest, DatabaseManager,
-    GetLastMessagesRequest, ListConversationsRequest as DbListConversationsRequest,
+    CreateMessageRequest as DbCreateMessageRequest, DatabaseManager, GetConversation,
+    GetLastMessagesRequest, ListConversationsRequest as DbListConversationsRequest, ListMessages,
+    MessageType, NewConversation as DbCreateConversationRequest,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -15,10 +16,12 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::error::ConversationServiceError;
+use crate::{ConversationServiceResult, converters::convert_db_message_to_base_message};
 
 use proto_gen::conversation::{
-    ChatStreamRequest, ChatStreamResponse, Conversation, CreateConversationRequest,
-    CreateConversationResponse, ListConversationsRequest, ListConversationsResponse,
+    AddHumanMessageRequest, AddHumanMessageResponse, ChatStreamRequest, ChatStreamResponse,
+    Conversation, CreateConversationRequest, CreateConversationResponse, GetConversationResponse,
+    GetMessagesRequest, GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
 };
 
 pub use proto_gen::conversation::proto_conversation_service_server::{
@@ -34,18 +37,18 @@ pub struct ConversationService {
 
 impl ConversationService {
     /// Create a new ConversationService instance
-    pub fn new(db: Arc<DatabaseManager>) -> Self {
+    pub fn from_env(db: Arc<DatabaseManager>) -> ConversationServiceResult<Self> {
         info!("Creating new ConversationService instance");
 
         let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| {
             error!("OPENAI_API_KEY environment variable is not set");
             String::new()
         });
-        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4".to_string());
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
 
         let provider = ChatOpenAI::new(&model).api_key(api_key);
 
-        Self { provider, db }
+        Ok(Self { provider, db })
     }
 
     /// Convert a database Conversation to a proto Conversation
@@ -147,6 +150,56 @@ impl ProtoConversationService for ConversationService {
         }))
     }
 
+    async fn add_human_message(
+        &self,
+        request: Request<AddHumanMessageRequest>,
+    ) -> Result<Response<AddHumanMessageResponse>, Status> {
+        info!("AddHumanMessage request received");
+
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        // Verify the user owns this conversation
+        let conversation = self
+            .db
+            .get_conversation_for_user(conversation_id, user_id)
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        // Save the human message to the database
+        // TODO: Create a proto definition for the message and return that instead
+        let _message = self
+            .db
+            .create_message(DbCreateMessageRequest {
+                id: None,
+                conversation_id,
+                message_type: MessageType::Human,
+                content: serde_json::json!(req.content),
+                tool_call_id: None,
+                tool_calls: None,
+                additional_kwargs: None,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        info!(
+            "Added human message to conversation {} for user {}",
+            conversation_id, user_id
+        );
+
+        Ok(Response::new(AddHumanMessageResponse {
+            conversation: Some(Self::db_conversation_to_proto(conversation)),
+        }))
+    }
+
     async fn chat_stream(
         &self,
         request: Request<ChatStreamRequest>,
@@ -156,6 +209,14 @@ impl ProtoConversationService for ConversationService {
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
+
+        // TODO: Backend driven chat
+        // 1. Get current conversation
+        // 2. Get last messages (the assets should be saved beforehand?)
+        // 3. Get assets and add them to messages
+        // 4. Add user message
+        // 5. Generate response
+
         let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
             ConversationServiceError::InvalidUuid {
                 field: "conversation_id",
@@ -163,7 +224,7 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        let _db_messages = self
+        let db_messages = self
             .db
             .get_last_messages(GetLastMessagesRequest {
                 conversation_id,
@@ -173,14 +234,12 @@ impl ProtoConversationService for ConversationService {
             .await
             .unwrap();
 
-        // let messages: Vec<BaseMessage> = db_messages.into_iter().map(|msg| msg.into()).collect();
+        let mut messages: Vec<BaseMessage> = db_messages
+            .into_iter()
+            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
+            .collect();
 
-        // 1. Get current conversation
-        // 2.
-
-        // Convert ProtoBaseMessage to agent_chain_core::BaseMessage
-        // let messages: Vec<BaseMessage> = req.messages.into_iter().map(|msg| msg.into()).collect();
-        let messages: Vec<BaseMessage> = Vec::new();
+        messages.push(HumanMessage::new(req.content).into());
 
         let openai_stream = self
             .provider
@@ -210,5 +269,65 @@ impl ProtoConversationService for ConversationService {
         Ok(Response::new(
             Box::pin(output_stream) as Self::ChatStreamStream
         ))
+    }
+
+    async fn get_messages(
+        &self,
+        request: Request<GetMessagesRequest>,
+    ) -> Result<Response<GetMessagesResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        let messages = self
+            .db
+            .list_messages(ListMessages {
+                conversation_id,
+                user_id,
+                limit: req.limit,
+                offset: req.offset,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        Ok(Response::new(GetMessagesResponse {
+            messages: messages.into_iter().map(|m| m.into()).collect(),
+        }))
+    }
+
+    async fn get_conversation(
+        &self,
+        request: tonic::Request<proto_gen::conversation::GetConversationRequest>,
+    ) -> Result<Response<GetConversationResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        let conversation = self
+            .db
+            .get_conversation(GetConversation {
+                id: conversation_id,
+                user_id,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        Ok(Response::new(GetConversationResponse {
+            conversation: conversation.try_into().ok(),
+        }))
     }
 }

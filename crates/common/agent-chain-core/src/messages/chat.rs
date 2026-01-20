@@ -91,13 +91,13 @@ impl ChatMessage {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get additional kwargs.
@@ -183,13 +183,13 @@ impl ChatMessageChunk {
     }
 
     /// Get the message ID.
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     /// Get the message name.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
     }
 
     /// Get additional kwargs.
