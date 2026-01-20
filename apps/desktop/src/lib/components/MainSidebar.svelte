@@ -33,7 +33,7 @@
 	}
 
 	async function switchConversation(id: string) {
-		await taurpc.chat.switch_conversation(id);
+		await taurpc.conversation.switch_conversation(id);
 	}
 </script>
 

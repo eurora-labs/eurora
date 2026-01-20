@@ -4,7 +4,7 @@
 		// type ResponseChunk,
 		type Query,
 		// type BaseMessage,
-		type Conversation,
+		type ConversationView,
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { executeCommand } from '$lib/commands.js';
@@ -21,7 +21,7 @@
 	import * as Chat from '@eurora/ui/custom-components/chat/index';
 	import { onMount } from 'svelte';
 
-	let conversation = $state<Conversation | null>(null);
+	let conversation = $state<ConversationView | null>(null);
 	// let messages = $state<BaseMessage[]>([]);
 	// let status = $state<string>('');
 	let taurpc = inject(TAURPC_SERVICE);
@@ -53,7 +53,7 @@
 				// goto('/onboarding');
 			});
 
-		taurpc.chat.current_conversation_changed.on((new_conv) => {
+		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
 			// console.log('New conversation changed: ', conversation);
 
