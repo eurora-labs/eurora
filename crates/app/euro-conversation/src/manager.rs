@@ -40,15 +40,15 @@ impl ConversationManager {
             .await?
             .into_inner()
             .conversation
-            .unwrap();
+            .ok_or(Error::ConversationNotFound)?;
 
         self.current_conversation = conversation.into();
 
-        self.conversation_event_tx
-            .send(ConversationEvent::NewConversation {
-                id: self.current_conversation.id(),
-                title: self.current_conversation.title().to_string(),
-            })?;
+        // self.conversation_event_tx
+        //     .send(ConversationEvent::NewConversation {
+        //         id: self.current_conversation.id(),
+        //         title: self.current_conversation.title().to_string(),
+        //     })?;
 
         Ok(&self.current_conversation)
     }
