@@ -283,27 +283,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "agent-chain-eurora"
-version = "0.0.0"
-dependencies = [
- "agent-chain-core",
- "async-stream",
- "async-trait",
- "futures",
- "prost",
- "prost-types",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "agent-chain-macros"
 version = "0.0.2"
 dependencies = [
@@ -1491,6 +1470,7 @@ dependencies = [
  "prost",
  "prost-types",
  "proto-gen",
+ "serde_json",
  "thiserror 2.0.17",
  "tokio-stream",
  "tonic",
@@ -1509,7 +1489,7 @@ dependencies = [
  "be-asset-service",
  "be-auth-grpc",
  "be-auth-service",
- "be-prompt-service",
+ "be-conversation-service",
  "be-remote-db",
  "be-update-service",
  "dotenv",
@@ -1527,27 +1507,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "be-prompt-service"
-version = "0.0.0"
-dependencies = [
- "agent-chain",
- "agent-chain-core",
- "agent-chain-eurora",
- "anyhow",
- "be-auth-grpc",
- "prost",
- "tokio-stream",
- "tonic",
- "tonic-prost-build",
- "tracing",
-]
-
-[[package]]
 name = "be-remote-db"
 version = "0.0.0"
 dependencies = [
  "chrono",
  "ipnet",
+ "prost-types",
+ "proto-gen",
  "serde",
  "serde_json",
  "sqlx",
@@ -3486,38 +3452,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-chat-client"
-version = "0.0.0"
-dependencies = [
- "agent-chain-core",
- "agent-chain-eurora",
- "anyhow",
- "async-stream",
- "async-trait",
- "euro-auth",
- "futures",
- "prost",
- "prost-types",
- "serde_json",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
-]
-
-[[package]]
 name = "euro-conversation"
 version = "0.0.0"
 dependencies = [
  "agent-chain",
- "agent-chain-eurora",
  "chrono",
  "euro-auth",
  "prost",
  "prost-types",
  "proto-gen",
  "serde",
+ "specta",
  "thiserror 2.0.17",
  "tokio",
+ "tokio-stream",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
@@ -3584,26 +3532,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-personal-db"
-version = "0.0.0"
-dependencies = [
- "agent-chain-core",
- "anyhow",
- "base64 0.22.1",
- "chrono",
- "euro-secret",
- "libsqlite3-sys",
- "rand 0.9.2",
- "serde",
- "serde_json",
- "specta",
- "sqlite-vec",
- "sqlx",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "euro-screen-position"
 version = "0.0.0"
 dependencies = [
@@ -3625,14 +3553,10 @@ dependencies = [
 name = "euro-settings"
 version = "0.0.0"
 dependencies = [
- "agent-chain-eurora",
  "anyhow",
  "dirs 6.0.0",
- "euro-chat-client",
  "euro-fs",
- "euro-secret",
  "notify",
- "prompt-kit",
  "serde",
  "serde_json",
  "serde_json_lenient",
@@ -3650,17 +3574,14 @@ name = "euro-tauri"
 version = "0.0.0"
 dependencies = [
  "agent-chain-core",
- "agent-chain-eurora",
  "anyhow",
  "backtrace",
  "color-thief",
  "dotenv",
  "euro-activity",
- "euro-chat-client",
  "euro-conversation",
  "euro-encrypt",
  "euro-native-messaging",
- "euro-personal-db",
  "euro-secret",
  "euro-settings",
  "euro-timeline",
@@ -3672,7 +3593,6 @@ dependencies = [
  "log",
  "parking_lot",
  "posthog-rs",
- "prompt-kit",
  "sentry",
  "serde",
  "serde_json",
@@ -3708,7 +3628,6 @@ dependencies = [
  "anyhow",
  "chrono",
  "euro-activity",
- "euro-personal-db",
  "focus-tracker",
  "image",
  "keyring",
@@ -5861,8 +5780,6 @@ version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149"
 dependencies = [
- "cc",
- "openssl-sys",
  "pkg-config",
  "vcpkg",
 ]
@@ -7120,15 +7037,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
-name = "openssl-src"
-version = "300.5.2+3.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d270b79e2926f5150189d475bc7e9d2c69f9c4697b185fa917d5a32b792d21b4"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "openssl-sys"
 version = "0.9.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7136,7 +7044,6 @@ checksum = "90096e2e47630d78b7d1c20952dc621f957103f8bc2c8359ec81290d75238571"
 dependencies = [
  "cc",
  "libc",
- "openssl-src",
  "pkg-config",
  "vcpkg",
 ]
@@ -7870,20 +7777,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prompt-kit"
-version = "0.0.0"
-dependencies = [
- "agent-chain",
- "agent-chain-eurora",
- "anyhow",
- "euro-chat-client",
- "serde",
- "thiserror 2.0.17",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
 name = "prost"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7941,9 +7834,11 @@ dependencies = [
 name = "proto-gen"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-core",
  "prost",
  "prost-types",
  "serde",
+ "serde_json",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
@@ -8115,9 +8010,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.42"
+version = "1.0.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a338cc41d27e6cc6dce6cefc13a0729dfbb81c262b1f519331575dd80ef3067f"
+checksum = "dc74d9a594b72ae6656596548f56f667211f8a97b3d4c3d467150794690dc40a"
 dependencies = [
  "proc-macro2",
 ]
@@ -9888,15 +9783,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sqlite-vec"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ec77b84fb8dd5f0f8def127226db83b5d1152c5bf367f09af03998b76ba554a"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "sqlx"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9935,7 +9821,6 @@ dependencies = [
  "native-tls",
  "once_cell",
  "percent-encoding",
- "rustls 0.23.32",
  "serde",
  "serde_json",
  "sha2",
@@ -9946,7 +9831,6 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
- "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -10941,12 +10825,11 @@ dependencies = [
 [[package]]
 name = "taurpc"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86b50200191672e88993412c29a295f55e6b057433fd453d34012087e84777cd"
+source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fimproved-compatibility#043eba003a91cdbb9028ba210425f4cb71e18ab3"
 dependencies = [
  "anyhow",
- "heck 0.5.0",
- "itertools 0.13.0",
+ "heck 0.4.1",
+ "itertools 0.12.1",
  "serde",
  "serde_json",
  "specta",
@@ -10961,8 +10844,7 @@ dependencies = [
 [[package]]
 name = "taurpc-macros"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f022ab395113abbe1f1b4710c670912a84b55571d320a9c67c0fd17765743048"
+source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fimproved-compatibility#043eba003a91cdbb9028ba210425f4cb71e18ab3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -12286,15 +12168,6 @@ name = "webpki-roots"
 version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f20c57d8d7db6d3b86154206ae5d8fba62dd39573114de97c2cb0578251f8e1"
-
-[[package]]
-name = "webpki-roots"
-version = "0.26.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
-dependencies = [
- "webpki-roots 1.0.2",
-]
 
 [[package]]
 name = "webpki-roots"

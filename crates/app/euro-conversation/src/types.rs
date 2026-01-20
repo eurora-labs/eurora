@@ -1,5 +1,6 @@
 use agent_chain::BaseMessage;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
+use proto_gen::conversation::Conversation as ProtoConversation;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -10,7 +11,6 @@ pub struct Conversation {
     id: Option<Uuid>,
     title: String,
     messages: Vec<BaseMessage>,
-
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -30,6 +30,10 @@ impl Conversation {
             return Ok(());
         }
         Err(Error::SetId("Conversation ID is already set".to_string()))
+    }
+
+    pub fn messages(&self) -> &Vec<BaseMessage> {
+        &self.messages
     }
 }
 
@@ -52,4 +56,27 @@ impl Default for Conversation {
 #[derive(Debug, Clone)]
 pub enum ConversationEvent {
     NewConversation { id: Option<Uuid>, title: String },
+}
+
+impl From<ProtoConversation> for Conversation {
+    fn from(c: ProtoConversation) -> Self {
+        let id = Some(Uuid::parse_str(&c.id).expect("Conversation id is not a valid uuid"));
+        let title = c.title;
+        let created_at = c.created_at.expect("created_at is required");
+        let created_at: DateTime<Utc> = Utc
+            .timestamp_opt(created_at.seconds, created_at.nanos as u32)
+            .unwrap();
+        let updated_at = c.updated_at.expect("updated_at is required");
+        let updated_at: DateTime<Utc> = Utc
+            .timestamp_opt(updated_at.seconds, updated_at.nanos as u32)
+            .unwrap();
+
+        Self {
+            id,
+            title,
+            messages: Vec::new(),
+            created_at,
+            updated_at,
+        }
+    }
 }
