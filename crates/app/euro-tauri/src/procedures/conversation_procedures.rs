@@ -1,4 +1,5 @@
 use crate::shared_types::SharedConversationManager;
+use agent_chain_core::BaseMessage;
 use euro_conversation::{Conversation, ListConversationsRequest};
 use tauri::{Manager, Runtime};
 
@@ -103,18 +104,21 @@ impl ConversationApi for ConversationApiImpl {
     async fn get_messages<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        _conversation_id: String,
+        conversation_id: String,
     ) -> Result<Vec<MessageView>, String> {
         let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
-        let _conversation_manager = conversation_state.lock().await;
+        let conversation_manager = conversation_state.lock().await;
 
-        Ok(vec![])
-        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+        let conversation = conversation_manager
+            .get_conversation(conversation_id)
+            .await
+            .map_err(|e| format!("Failed to get conversation: {}", e))?;
 
-        // personal_db
-        //     .get_base_messages(&conversation_id)
-        //     .await
-        //     .map_err(|e| format!("Failed to get chat messages: {e}"))
+        Ok(conversation
+            .messages()
+            .iter()
+            .map(MessageView::from)
+            .collect())
     }
 
     async fn switch_conversation<R: Runtime>(
@@ -155,8 +159,21 @@ impl From<Conversation> for ConversationView {
         ConversationView {
             id: conversation.id().map(|id| id.to_string()),
             title: conversation.title().to_string(),
-            // TODO: Create proper conversion
-            messages: Vec::new(),
+            messages: conversation
+                .messages()
+                .iter()
+                .map(MessageView::from)
+                .collect(),
+        }
+    }
+}
+
+impl From<&BaseMessage> for MessageView {
+    fn from(message: &BaseMessage) -> Self {
+        MessageView {
+            id: message.id().unwrap_or_default(),
+            role: message.message_type().to_string(),
+            content: message.content().to_string(),
         }
     }
 }
