@@ -68,7 +68,11 @@ pub enum DbError {
 
     /// Internal database error (catch-all for underlying sqlx errors)
     #[error("Database error: {0}")]
-    Internal(#[source] sqlx::Error),
+    Database(#[source] sqlx::Error),
+
+    /// Internal error
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 impl DbError {
@@ -178,17 +182,17 @@ impl From<sqlx::Error> for DbError {
                                 .to_string();
                             Self::Query(format!("Foreign key violation: {}", entity_name))
                         }
-                        _ => Self::Internal(sqlx::Error::Database(db_err)),
+                        _ => Self::Database(sqlx::Error::Database(db_err)),
                     }
                 } else {
-                    Self::Internal(sqlx::Error::Database(db_err))
+                    Self::Database(sqlx::Error::Database(db_err))
                 }
             }
             sqlx::Error::PoolTimedOut => Self::Pool("Connection pool timed out".to_string()),
             sqlx::Error::PoolClosed => Self::Pool("Connection pool is closed".to_string()),
             sqlx::Error::Io(io_err) => Self::Connection(io_err.to_string()),
             sqlx::Error::Tls(tls_err) => Self::Connection(format!("TLS error: {}", tls_err)),
-            other => Self::Internal(other),
+            other => Self::Database(other),
         }
     }
 }
