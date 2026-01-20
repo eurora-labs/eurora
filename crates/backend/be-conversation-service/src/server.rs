@@ -5,7 +5,7 @@ use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
     CreateMessageRequest as DbCreateMessageRequest, DatabaseManager, GetConversation,
     GetLastMessagesRequest, ListConversationsRequest as DbListConversationsRequest, ListMessages,
-    MessageType, NewConversation as DbCreateConversationRequest,
+    MessageType, NewConversation,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -90,14 +90,14 @@ impl ProtoConversationService for ConversationService {
         let req = request.into_inner();
 
         let title = if req.title.is_empty() {
-            None
+            "New Chat".to_string()
         } else {
-            Some(req.title)
+            req.title
         };
 
         let conversation = self
             .db
-            .create_conversation(DbCreateConversationRequest {
+            .create_conversation(NewConversation {
                 id: None,
                 user_id,
                 title,
