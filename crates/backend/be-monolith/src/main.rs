@@ -3,7 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 use be_activity_service::{ActivityService, ProtoActivityServiceServer};
 use be_asset_service::{AssetService, ProtoAssetServiceServer};
 use be_auth_service::AuthService;
-use be_prompt_service::PromptService;
+use be_conversation_service::{ConversationService, ProtoConversationServiceServer};
 use dotenv::dotenv;
 use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 // use euro_proto::proto_prompt_service::proto_prompt_service_server::ProtoPromptServiceServer;
@@ -78,11 +78,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let jwt_interceptor = JwtInterceptor::default();
 
     let auth_service = AuthService::new(db_manager.clone(), jwt_interceptor.get_config().clone());
-    let prompt_service = PromptService::default();
     let activity_service = ActivityService::from_env(db_manager.clone())
         .expect("Failed to initialize activity service");
     let assets_service =
-        AssetService::from_env(db_manager).expect("Failed to initialize assets service");
+        AssetService::from_env(db_manager.clone()).expect("Failed to initialize assets service");
+    let conversation_service = ConversationService::from_env(db_manager.clone())
+        .expect("Failed to initialize conversation service");
 
     info!("Starting gRPC server at {}", grpc_addr);
     info!("Starting HTTP server at {}", http_addr);
@@ -116,16 +117,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(GrpcWebLayer::new())
         .add_service(health_service)
         .add_service(ProtoAuthServiceServer::new(auth_service))
-        .add_service(be_prompt_service::get_service(
-            prompt_service,
-            jwt_interceptor.clone(),
-        ))
         .add_service(ProtoActivityServiceServer::with_interceptor(
             activity_service,
             jwt_interceptor.clone(),
         ))
         .add_service(ProtoAssetServiceServer::with_interceptor(
             assets_service,
+            jwt_interceptor.clone(),
+        ))
+        .add_service(ProtoConversationServiceServer::with_interceptor(
+            conversation_service,
             jwt_interceptor.clone(),
         ))
         .serve_with_shutdown(grpc_addr, shutdown_signal);
