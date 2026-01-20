@@ -21,6 +21,9 @@ pub trait ConversationApi {
     #[taurpc(event)]
     async fn new_conversation_added(conversation: ConversationView);
 
+    #[taurpc(event)]
+    async fn current_conversation_changed(conversation: ConversationView);
+
     async fn switch_conversation<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         conversation_id: String,

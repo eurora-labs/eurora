@@ -55,13 +55,13 @@ distinctId: string | null }
 
 export type TimelineAppEvent = { name: string; color: string | null; icon_base64: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"current_conversation_changed":["conversation"],"send_query":["_conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"create":[],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"poll_for_login":[]}', 'chat':'{"send_query":["_conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"create":[],"current_conversation_changed":["conversation"],"get_messages":["conversation_id"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 poll_for_login: () => Promise<boolean>},
-"chat": {current_conversation_changed: (conversation: string) => Promise<void>, 
-send_query: (conversationId: string, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
+"chat": {send_query: (conversationId: string, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "conversation": {create: () => Promise<ConversationView>, 
+current_conversation_changed: (conversation: ConversationView) => Promise<void>, 
 get_messages: (conversationId: string) => Promise<MessageView[]>, 
 list: (limit: number, offset: number) => Promise<ConversationView[]>, 
 new_conversation_added: (conversation: ConversationView) => Promise<void>, 
