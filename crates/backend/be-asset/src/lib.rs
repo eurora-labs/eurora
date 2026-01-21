@@ -5,8 +5,7 @@ pub use error::{AssetError, AssetResult};
 use std::sync::Arc;
 
 use be_remote_db::{
-    CreateAssetRequest as DbCreateAssetRequest, DatabaseManager,
-    UpdateAssetRequest as DbUpdateAssetRequest,
+    DatabaseManager, NewAsset as DbCreateAssetRequest, UpdateAsset as DbUpdateAssetRequest,
 };
 use be_storage::StorageService;
 use chrono::{DateTime, Utc};
