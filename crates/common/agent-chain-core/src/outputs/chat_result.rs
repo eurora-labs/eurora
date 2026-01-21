@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-
 use super::chat_generation::ChatGeneration;
 
 /// Use to represent the result of a chat model call with a single prompt.
