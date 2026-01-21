@@ -1,6 +1,6 @@
 //! Default asset implementation for unsupported activity types
 
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{BaseMessage, SystemMessage};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -100,7 +100,10 @@ impl AssetFunctionality for DefaultAsset {
 
     /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
-        let mut content = format!("I am working with an application called '{}'", self.name);
+        let mut content = format!(
+            "The user is working with an application called '{}'",
+            self.name
+        );
 
         if let Some(description) = &self.description {
             content.push_str(&format!(" - {}", description));
@@ -113,9 +116,9 @@ impl AssetFunctionality for DefaultAsset {
             }
         }
 
-        content.push_str(" and have a question about it.");
+        content.push_str(" and has a question about it.");
 
-        vec![HumanMessage::new(content).into()]
+        vec![SystemMessage::new(content).into()]
     }
 
     /// Get context chip for UI integration (returns None for default assets)
