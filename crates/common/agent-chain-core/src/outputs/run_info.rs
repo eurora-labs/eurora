@@ -7,8 +7,6 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[cfg(feature = "specta")]
-use specta::Type;
 
 /// Class that contains metadata for a single execution of a Chain or model.
 ///
@@ -18,7 +16,7 @@ use specta::Type;
 ///
 /// Users can acquire the run_id information from callbacks or via run_id
 /// information present in the astream_event API (depending on the use case).
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RunInfo {
     /// A unique identifier for the model or chain run.
