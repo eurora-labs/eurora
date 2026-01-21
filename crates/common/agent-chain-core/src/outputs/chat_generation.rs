@@ -9,8 +9,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::ops::Add;
 
-#[cfg(feature = "specta")]
-use specta::Type;
 
 use crate::messages::BaseMessage;
 use crate::utils::merge::merge_dicts;
@@ -26,7 +24,7 @@ use crate::utils::merge::merge_dicts;
 /// Users working with chat models will usually access information via either
 /// `AIMessage` (returned from runnable interfaces) or `LLMResult` (available
 /// via callbacks).
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatGeneration {
     /// The text contents of the output message.
@@ -91,7 +89,7 @@ fn extract_text_from_message(message: &BaseMessage) -> String {
 /// `ChatGeneration` chunk.
 ///
 /// `ChatGeneration` chunks can be concatenated with other `ChatGeneration` chunks.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatGenerationChunk {
     /// The text contents of the output message.

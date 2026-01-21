@@ -6,8 +6,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
 
 use super::base::merge_content;
 use super::content::{ContentBlock, ContentPart, ImageSource, MessageContent};
@@ -19,7 +17,7 @@ use super::content::{ContentBlock, ContentPart, ImageSource, MessageContent};
 /// [`HumanMessage::with_content`] for multimodal messages.
 ///
 /// This corresponds to `HumanMessage` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HumanMessage {
     /// The message content (text or multipart)
@@ -437,7 +435,7 @@ impl HumanMessage {
 /// Human message chunk (yielded when streaming).
 ///
 /// This corresponds to `HumanMessageChunk` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HumanMessageChunk {
     /// The message content (may be partial during streaming)
