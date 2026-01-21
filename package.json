@@ -34,7 +34,7 @@
 		"fix": "eslint --fix .",
 		"format": "prettier --write .",
 		"rustfmt": "cargo +nightly fmt -- --config-path rustfmt-nightly.toml",
-		"generate:licenses": "scripts/generate-licenses.sh",
+		"generate:licenses": "scripts/generate-licenses",
 		"test": "turbo run test --no-daemon",
 		"test:watch": "pnpm --filter @eurora/desktop run test:watch",
 		"test:e2e:web": "turbo run test:e2e:web",
