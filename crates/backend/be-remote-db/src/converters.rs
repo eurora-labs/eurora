@@ -93,10 +93,10 @@ impl From<Message> for ProtoBaseMessage {
                 }
             }
             MessageType::System => {
-                let content = json_to_string_content(&msg.content);
+                let content = json_to_proto_message_content(&msg.content);
                 ProtoBaseMessage {
                     message: Some(proto_base_message::Message::System(ProtoSystemMessage {
-                        content,
+                        content: Some(content),
                         id,
                         name: None,
                         additional_kwargs,
