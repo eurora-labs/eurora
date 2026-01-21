@@ -59,7 +59,7 @@ const ARGS_MAP = { 'auth':'{"get_login_token":[],"is_authenticated":[],"poll_for
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 is_authenticated: () => Promise<boolean>, 
 poll_for_login: () => Promise<boolean>},
-"chat": {send_query: (conversationId: string, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
+"chat": {send_query: (conversationId: string | null, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "conversation": {create: () => Promise<ConversationView>, 
 current_conversation_changed: (conversation: ConversationView) => Promise<void>, 

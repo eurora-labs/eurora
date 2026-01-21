@@ -18,8 +18,9 @@ use crate::error::ConversationServiceError;
 use crate::{ConversationServiceResult, converters::convert_db_message_to_base_message};
 
 use proto_gen::conversation::{
-    AddHumanMessageRequest, AddHumanMessageResponse, ChatStreamRequest, ChatStreamResponse,
-    Conversation, CreateConversationRequest, CreateConversationResponse, GetConversationResponse,
+    AddHumanMessageRequest, AddHumanMessageResponse, AddSystemMessageRequest,
+    AddSystemMessageResponse, ChatStreamRequest, ChatStreamResponse, Conversation,
+    CreateConversationRequest, CreateConversationResponse, GetConversationResponse,
     GetMessagesRequest, GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
 };
 
@@ -195,6 +196,56 @@ impl ProtoConversationService for ConversationService {
         );
 
         Ok(Response::new(AddHumanMessageResponse {
+            conversation: Some(Self::db_conversation_to_proto(conversation)),
+        }))
+    }
+
+    async fn add_system_message(
+        &self,
+        request: Request<AddSystemMessageRequest>,
+    ) -> Result<Response<AddSystemMessageResponse>, Status> {
+        info!("AddSystemMessage request received");
+
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        // Verify the user owns this conversation
+        let conversation = self
+            .db
+            .get_conversation_for_user(conversation_id, user_id)
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        // Save the human message to the database
+        // TODO: Create a proto definition for the message and return that instead
+        let _message = self
+            .db
+            .create_message(NewMessage {
+                id: None,
+                conversation_id,
+                message_type: MessageType::System,
+                content: serde_json::json!(req.content),
+                tool_call_id: None,
+                tool_calls: None,
+                additional_kwargs: None,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        info!(
+            "Added system message to conversation {} for user {}",
+            conversation_id, user_id
+        );
+
+        Ok(Response::new(AddSystemMessageResponse {
             conversation: Some(Self::db_conversation_to_proto(conversation)),
         }))
     }

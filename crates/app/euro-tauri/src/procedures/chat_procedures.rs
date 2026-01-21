@@ -22,7 +22,7 @@ pub struct Query {
 pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-        _conversation_id: String,
+        _conversation_id: Option<String>,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
@@ -36,7 +36,7 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        _conversation_id: String,
+        _conversation_id: Option<String>,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
@@ -85,8 +85,8 @@ impl ChatApi for ChatApiImpl {
             // Make a for loop
             for message in messages {
                 match &message {
-                    BaseMessage::Human(m) => {
-                        let _ = conversation_manager.add_human_message(m).await;
+                    BaseMessage::System(m) => {
+                        let _ = conversation_manager.add_system_message(m).await;
                     }
                     _ => todo!(),
                 }
