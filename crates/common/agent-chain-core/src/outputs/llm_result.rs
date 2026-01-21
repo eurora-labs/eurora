@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-
 use super::chat_generation::{ChatGeneration, ChatGenerationChunk};
 use super::generation::{Generation, GenerationChunk};
 use super::run_info::RunInfo;

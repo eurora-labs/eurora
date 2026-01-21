@@ -8,7 +8,6 @@ use serde_json::Value;
 use std::any::Any;
 use std::collections::HashMap;
 
-
 /// Serialization version.
 pub const LC_VERSION: i32 = 1;
 

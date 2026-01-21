@@ -7,7 +7,6 @@ use crate::utils::uuid7;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-
 use super::base::merge_content;
 
 /// A chat message that can be assigned an arbitrary speaker (role).
