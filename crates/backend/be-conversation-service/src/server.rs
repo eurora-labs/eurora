@@ -3,9 +3,8 @@
 use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
-    CreateMessageRequest as DbCreateMessageRequest, DatabaseManager, GetConversation,
-    GetLastMessagesRequest, ListConversationsRequest as DbListConversationsRequest, ListMessages,
-    MessageType, NewConversation,
+    DatabaseManager, GetConversation, GetLastMessages, ListConversations, ListMessages,
+    MessageType, NewConversation, NewMessage,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -128,7 +127,7 @@ impl ProtoConversationService for ConversationService {
 
         let conversations = self
             .db
-            .list_conversations(DbListConversationsRequest {
+            .list_conversations(ListConversations {
                 user_id,
                 limit: req.limit,
                 offset: req.offset,
@@ -178,7 +177,7 @@ impl ProtoConversationService for ConversationService {
         // TODO: Create a proto definition for the message and return that instead
         let _message = self
             .db
-            .create_message(DbCreateMessageRequest {
+            .create_message(NewMessage {
                 id: None,
                 conversation_id,
                 message_type: MessageType::Human,
@@ -226,7 +225,7 @@ impl ProtoConversationService for ConversationService {
 
         let db_messages = self
             .db
-            .get_last_messages(GetLastMessagesRequest {
+            .get_last_messages(GetLastMessages {
                 conversation_id,
                 user_id,
                 limit: 5,
@@ -275,6 +274,7 @@ impl ProtoConversationService for ConversationService {
         &self,
         request: Request<GetMessagesRequest>,
     ) -> Result<Response<GetMessagesResponse>, Status> {
+        info!("Get messages request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();

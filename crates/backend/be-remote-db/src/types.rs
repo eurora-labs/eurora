@@ -24,7 +24,7 @@ pub struct PasswordCredentials {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateUserRequest {
+pub struct NewUser {
     pub username: String,
     pub email: String,
     pub display_name: Option<String>,
@@ -32,7 +32,7 @@ pub struct CreateUserRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateUserRequest {
+pub struct UpdateUser {
     pub username: Option<String>,
     pub email: Option<String>,
     pub display_name: Option<String>,
@@ -40,7 +40,7 @@ pub struct UpdateUserRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdatePasswordRequest {
+pub struct UpdatePassword {
     pub password_hash: String,
 }
 
@@ -73,7 +73,7 @@ pub struct RefreshToken {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateOAuthCredentialsRequest {
+pub struct CreateOAuthCredentials {
     pub user_id: Uuid,
     pub provider: String,
     pub provider_user_id: String,
@@ -84,14 +84,14 @@ pub struct CreateOAuthCredentialsRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRefreshTokenRequest {
+pub struct CreateRefreshToken {
     pub user_id: Uuid,
     pub token_hash: String,
     pub expires_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateOAuthCredentialsRequest {
+pub struct UpdateOAuthCredentials {
     pub access_token: Option<Vec<u8>>,
     pub refresh_token: Option<Vec<u8>>,
     pub access_token_expiry: Option<DateTime<Utc>>,
@@ -111,7 +111,7 @@ pub struct OAuthState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateOAuthStateRequest {
+pub struct CreateOAuthState {
     pub state: String,
     pub pkce_verifier: String,
     pub redirect_uri: String,
@@ -131,14 +131,14 @@ pub struct LoginToken {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateLoginTokenRequest {
+pub struct CreateLoginToken {
     pub token: String,
     pub user_id: Uuid,
     pub expires_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateLoginTokenRequest {
+pub struct UpdateLoginToken {
     pub user_id: Uuid,
 }
 
@@ -165,7 +165,7 @@ pub struct Asset {
 
 /// Request for creating a new asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateAssetRequest {
+pub struct NewAsset {
     pub id: Uuid,
     pub name: String,
     pub checksum_sha256: Option<Vec<u8>>,
@@ -177,7 +177,7 @@ pub struct CreateAssetRequest {
 
 /// Request for updating an asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateAssetRequest {
+pub struct UpdateAsset {
     pub checksum_sha256: Option<Vec<u8>>,
     pub size_bytes: Option<i64>,
     pub storage_uri: Option<String>,
@@ -222,7 +222,7 @@ pub struct Activity {
 
 /// Request for creating a new activity
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateActivityRequest {
+pub struct NewActivity {
     pub id: Option<Uuid>,
     pub user_id: Uuid,
     pub name: String,
@@ -235,7 +235,7 @@ pub struct CreateActivityRequest {
 
 /// Request for updating an existing activity
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateActivityRequest {
+pub struct UpdateActivity {
     pub id: Uuid,
     pub user_id: Uuid,
     pub name: Option<String>,
@@ -248,7 +248,7 @@ pub struct UpdateActivityRequest {
 
 /// Request for listing activities with pagination
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListActivitiesRequest {
+pub struct ListActivities {
     pub user_id: Uuid,
     pub limit: u32,
     pub offset: u32,
@@ -256,7 +256,7 @@ pub struct ListActivitiesRequest {
 
 /// Request for getting activities by time range
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetActivitiesByTimeRangeRequest {
+pub struct GetActivitiesByTimeRange {
     pub user_id: Uuid,
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
@@ -266,7 +266,7 @@ pub struct GetActivitiesByTimeRangeRequest {
 
 /// Request for updating activity end time
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateActivityEndTimeRequest {
+pub struct UpdateActivityEndTime {
     pub activity_id: Uuid,
     pub user_id: Uuid,
     pub ended_at: DateTime<Utc>,
@@ -303,13 +303,13 @@ pub struct GetConversation {
 
 /// Request for updating a conversation
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateConversationRequest {
+pub struct UpdateConversation {
     pub title: Option<String>,
 }
 
 /// Request for listing conversations with pagination
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListConversationsRequest {
+pub struct ListConversations {
     pub user_id: Uuid,
     pub limit: u32,
     pub offset: u32,
@@ -364,7 +364,7 @@ pub struct Message {
 
 /// Request for creating a new message
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateMessageRequest {
+pub struct NewMessage {
     pub id: Option<Uuid>,
     pub conversation_id: Uuid,
     pub message_type: MessageType,
@@ -376,7 +376,7 @@ pub struct CreateMessageRequest {
 
 /// Request for updating an existing message
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateMessageRequest {
+pub struct UpdateMessage {
     pub content: Option<serde_json::Value>,
     pub tool_call_id: Option<String>,
     pub tool_calls: Option<serde_json::Value>,
@@ -394,7 +394,7 @@ pub struct ListMessages {
 
 /// Request for listing messages the last few messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetLastMessagesRequest {
+pub struct GetLastMessages {
     pub conversation_id: Uuid,
     pub user_id: Uuid,
     pub limit: u32,

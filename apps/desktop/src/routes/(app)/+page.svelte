@@ -4,6 +4,7 @@
 		// type ResponseChunk,
 		type Query,
 		// type BaseMessage,
+		type MessageView,
 		type ConversationView,
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
@@ -22,6 +23,7 @@
 	import { onMount } from 'svelte';
 
 	let conversation = $state<ConversationView | null>(null);
+	let messages = $state<MessageView[]>([]);
 	// let messages = $state<BaseMessage[]>([]);
 	// let status = $state<string>('');
 	let taurpc = inject(TAURPC_SERVICE);
@@ -55,11 +57,12 @@
 
 		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
-			// console.log('New conversation changed: ', conversation);
 
-			// taurpc.personal_db.message.get(conversation.id ?? '', 5, 0).then((response) => {
-			// 	messages = response;
-			// });
+			if (!conversation.id) return;
+
+			taurpc.conversation.get_messages(conversation.id, 5, 0).then((response) => {
+				messages = response;
+			});
 		});
 
 		taurpc.timeline.new_assets_event.on((assets) => {
@@ -115,12 +118,11 @@
 					return;
 				}
 				const query = processQuery(editorRef);
-				// messages.push({
-				// 	type: 'human',
-				// 	content: query.text,
-				// 	id: null,
-				// 	additional_kwargs: {},
-				// });
+				messages.push({
+					id: null,
+					role: 'human',
+					content: query.text,
+				});
 				// console.log('query', query);
 				searchQuery.text = '';
 				clearQuery(editorRef);
@@ -183,13 +185,13 @@
 	}
 </script>
 
-<!-- <div
+<div
 	class="w-full h-full flex flex-col {messages.length === 0
 		? 'justify-center'
 		: 'justify-end'} items-center gap-4"
-> -->
-<div class="w-full h-full flex flex-col items-center gap-4">
-	<!-- {#if messages.length > 0}
+>
+	<!-- <div class="w-full h-full flex flex-col items-center gap-4"> -->
+	{#if messages.length > 0}
 		<ScrollArea
 			class="w-full max-h-[calc(80vh-100px)] px-6 flex flex-col justify-end items-center gap-4"
 		>
@@ -212,7 +214,7 @@
 				{/each}
 			</Chat.Root>
 		</ScrollArea>
-	{/if} -->
+	{/if}
 
 	<Launcher.Root
 		class="h-fit rounded-[36px] shadow-none flex flex-col p-4 m-0 w-[70%] bg-gray-700"
