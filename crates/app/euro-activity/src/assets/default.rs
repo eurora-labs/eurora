@@ -267,7 +267,7 @@ mod tests {
         let messages = AssetFunctionality::construct_messages(&asset);
         let msg = messages[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, BaseMessage::Human(_)));
+        assert!(matches!(msg, BaseMessage::System(_)));
         assert!(chip.is_none());
     }
 }
