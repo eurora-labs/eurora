@@ -46,11 +46,13 @@ jobs:
               if: ${{ github.event_name == 'schedule' }}
               shell: bash
               run: curl "${{ secrets.SENTRY_CRONS }}?status=in_progress"
+
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
                   lfs: true
+
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
@@ -63,6 +65,7 @@ jobs:
                   echo "vitemode=$VITEMODE" >> $GITHUB_ENV
                   echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
                   echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
+
             - name: Calculate next version
               shell: bash
               run: |
@@ -70,21 +73,6 @@ jobs:
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
                   echo "version=$NEXT_VERSION" >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
-            # - name: Calculate next version
-            #   shell: bash
-            #   run: |
-            #       # Default to 0.1.0 if no version is found
-            #       CURRENT_VERSION="0.1.0"
-            #       if [ -f "apps/desktop/package.json" ]; then
-            #         CURRENT_VERSION=$(grep -o '"version": *"[^"]*"' apps/desktop/package.json | cut -d'"' -f4)
-            #       fi
-            #       NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
-            #       {
-            #         echo "version<<EOF"
-            #         echo "$NEXT_VERSION"
-            #         echo "EOF"
-            #       } >> $GITHUB_ENV
-            #       mkdir -p release && echo "$NEXT_VERSION" > release/version
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
@@ -101,12 +89,14 @@ jobs:
               run: pnpm build:desktop -- --mode ${{ env.vitemode }}
               env:
                   SENTRY_RELEASE: ${{ env.version }}
+
             - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               name: Upload pnpm-store contents
               with:
                   name: pnpm-store
                   path: /home/runner/setup-pnpm/node_modules/.bin/store/v3
                   retention-days: 7
+
             - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               name: Upload SvelteKit build output
               with:
@@ -146,14 +136,17 @@ jobs:
             - name: perl -V (before re-install)
               if: runner.os == 'Windows'
               run: which perl && perl -V
+
             - name: Set git to use LF
               if: runner.os == 'Windows'
               run: |
                   git config --global core.autocrlf false
                   git config --global core.eol lf
+
             - name: perl -V
               if: runner.os == 'Windows'
               run: which perl && perl -V
+
             - name: Set Perl environment variables
               if: runner.os == 'Windows'
               run: |
@@ -165,17 +158,29 @@ jobs:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
                   lfs: true
+
             - name: Set Cargo build target to ${{ matrix.target }}
               shell: bash
               if: matrix.target != ''
               run: |
                   echo "CARGO_BUILD_TARGET=${{ matrix.target }}" >> $GITHUB_ENV
                   rustup target add ${{ matrix.target }}
+
             # The cache doesn't pick up the environment variable set above, so we have to set it ourselves.
             - name: Rust Cache ${{ matrix.target }}
               uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
               with:
                   shared-key: app-release-build-${{ github.event.inputs.channel || 'nightly' }}${{ matrix.target }}
+
+            - name: Install cargo-about
+              run: |
+                  if ! command -v cargo-about >/dev/null 2>&1; then
+                  cargo install --locked "cargo-about@0.8"
+                  fi
+
+            - name: Generate third-party license bundle
+              run: ./scripts/generate-licenses ./LICENSES-THIRD-PARTY.md
+
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
 
@@ -185,22 +190,6 @@ jobs:
               run: |
                   echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
                   echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
-
-            # - name: Calculate next version
-            #   shell: bash
-            #   run: |
-            #       # Default to 0.1.0 if no version is found
-            #       CURRENT_VERSION="0.1.0"
-            #       if [ -f "apps/desktop/package.json" ]; then
-            #         CURRENT_VERSION=$(grep -o '"version": *"[^"]*"' apps/desktop/package.json | cut -d'"' -f4)
-            #       fi
-            #       NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
-            #       {
-            #         echo "version<<EOF"
-            #         echo "$NEXT_VERSION"
-            #         echo "EOF"
-            #       } >> $GITHUB_ENV
-            #       mkdir -p release && echo "$NEXT_VERSION" > release/version
 
             - name: Calculate next version
               shell: bash
@@ -256,6 +245,7 @@ jobs:
               with:
                   name: sveltekit-build
                   path: ./apps/desktop/build/
+
             - name: Set release build optimization env vars
               shell: bash
               if: github.event.inputs.channel == 'release'
@@ -263,6 +253,7 @@ jobs:
                   echo "CARGO_PROFILE_RELEASE_LTO=fat" >> $GITHUB_ENV
                   echo "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1" >> $GITHUB_ENV
                   echo "CARGO_PROFILE_RELEASE_OPT_LEVEL=s" >> $GITHUB_ENV
+
             - name: Build binary
               shell: bash
               run: |
@@ -291,6 +282,7 @@ jobs:
                   else
                     echo "artifact_suffix=" >> $GITHUB_ENV
                   fi
+
             - name: Upload Artifacts
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
