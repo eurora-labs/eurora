@@ -147,6 +147,29 @@ impl ConversationManager {
             Err(Error::ConversationNotFound)
         }
     }
+
+    pub async fn get_messages(
+        &self,
+        conversation_id: String,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<BaseMessage>> {
+        let mut client = self.conversation_client.clone();
+        let response = client
+            .get_messages(GetMessagesRequest {
+                conversation_id,
+                limit,
+                offset,
+            })
+            .await?
+            .into_inner();
+
+        Ok(response
+            .messages
+            .into_iter()
+            .map(BaseMessage::from)
+            .collect())
+    }
 }
 
 impl ConversationManager {
