@@ -5,11 +5,8 @@ use std::sync::Arc;
 use be_asset::AssetService;
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
-    CreateActivityRequest as DbCreateActivityRequest, DatabaseManager,
-    GetActivitiesByTimeRangeRequest as DbGetActivitiesByTimeRangeRequest,
-    ListActivitiesRequest as DbListActivitiesRequest,
-    UpdateActivityEndTimeRequest as DbUpdateActivityEndTimeRequest,
-    UpdateActivityRequest as DbUpdateActivityRequest,
+    DatabaseManager, GetActivitiesByTimeRange, ListActivities, NewActivity, UpdateActivity,
+    UpdateActivityEndTime,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -119,7 +116,7 @@ impl ProtoActivityService for ActivityService {
 
         let activities = self
             .db
-            .list_activities(DbListActivitiesRequest {
+            .list_activities(ListActivities {
                 user_id,
                 limit,
                 offset: req.offset,
@@ -190,7 +187,7 @@ impl ProtoActivityService for ActivityService {
 
         let activity = self
             .db
-            .create_activity(DbCreateActivityRequest {
+            .create_activity(NewActivity {
                 id,
                 user_id,
                 name: req.name.clone(),
@@ -230,7 +227,7 @@ impl ProtoActivityService for ActivityService {
         };
 
         self.db
-            .update_activity(DbUpdateActivityRequest {
+            .update_activity(UpdateActivity {
                 id: activity.id,
                 user_id,
                 icon_asset_id: icon_id,
@@ -265,7 +262,7 @@ impl ProtoActivityService for ActivityService {
 
         let activity = self
             .db
-            .update_activity(DbUpdateActivityRequest {
+            .update_activity(UpdateActivity {
                 id: activity_id,
                 user_id,
                 name: req.name.clone(),
@@ -305,7 +302,7 @@ impl ProtoActivityService for ActivityService {
             .ok_or_else(|| ActivityServiceError::invalid_timestamp("ended_at"))?;
 
         self.db
-            .update_activity_end_time(DbUpdateActivityEndTimeRequest {
+            .update_activity_end_time(UpdateActivityEndTime {
                 activity_id,
                 user_id,
                 ended_at,
@@ -393,7 +390,7 @@ impl ProtoActivityService for ActivityService {
 
         let activities = self
             .db
-            .get_activities_by_time_range(DbGetActivitiesByTimeRangeRequest {
+            .get_activities_by_time_range(GetActivitiesByTimeRange {
                 user_id,
                 start_time,
                 end_time,
