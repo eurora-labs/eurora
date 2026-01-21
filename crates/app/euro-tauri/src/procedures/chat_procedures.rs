@@ -75,12 +75,17 @@ impl ChatApi for ChatApiImpl {
             let asset_messages = timeline
                 .construct_asset_messages_by_ids(&query.assets)
                 .await;
-            messages.extend(asset_messages);
+            if let Some(last_asset_message) = asset_messages.last() {
+                messages.push(last_asset_message);
+            }
 
             let snapshot_messages = timeline
                 .construct_snapshot_messages_by_ids(&query.assets)
                 .await;
-            messages.extend(snapshot_messages);
+
+            if let Some(last_snapshot_message) = snapshot_messages.last() {
+                messages.push(last_snapshot_message);
+            }
 
             // Make a for loop
             for message in messages {
