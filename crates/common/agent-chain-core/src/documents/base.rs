@@ -19,7 +19,6 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
 use crate::load::Serializable;
 
 /// Base struct for content used in retrieval and data processing workflows.

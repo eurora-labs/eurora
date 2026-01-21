@@ -5,7 +5,6 @@
 
 use serde::{Deserialize, Serialize};
 
-
 /// Message responsible for deleting other messages.
 ///
 /// This is used to remove messages from a conversation history by their ID.
