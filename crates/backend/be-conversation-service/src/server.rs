@@ -289,7 +289,20 @@ impl ProtoConversationService for ConversationService {
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
-        messages.push(HumanMessage::new(req.content).into());
+        messages.push(HumanMessage::new(req.content.clone()).into());
+
+        self.db
+            .create_message(NewMessage {
+                id: None,
+                conversation_id,
+                message_type: MessageType::Human,
+                content: serde_json::json!(req.content),
+                tool_call_id: None,
+                tool_calls: None,
+                additional_kwargs: None,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
 
         let openai_stream = self
             .provider
