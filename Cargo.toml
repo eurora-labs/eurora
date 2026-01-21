@@ -18,8 +18,8 @@ members = [
 edition = "2024"
 homepage = "https://www.eurora-labs.com"
 repository = "https://github.com/eurora-labs/eurora"
-license = "Functional Source License"
-license-file = "LICENSE.md"
+license = "Sustainable Use License"
+license-file = "LICENSE"
 
 [workspace.dependencies]
 agent-chain = { path = "crates/common/agent-chain" }
