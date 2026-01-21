@@ -7,7 +7,6 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-
 /// Class that contains metadata for a single execution of a Chain or model.
 ///
 /// Defined for backwards compatibility with older versions of langchain_core.

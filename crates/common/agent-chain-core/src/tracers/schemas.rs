@@ -9,7 +9,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-
 /// The type of run.
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
