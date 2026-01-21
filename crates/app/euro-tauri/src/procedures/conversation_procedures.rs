@@ -120,12 +120,11 @@ impl ConversationApi for ConversationApiImpl {
         Ok(messages
             .into_iter()
             .filter_map(|message| match message {
+                // System messages are not meant to be displayed
                 BaseMessage::System(_) => None,
                 _ => Some(MessageView::from(message)),
             })
             .collect())
-
-        // Ok(messages.into_iter().map(MessageView::from).collect())
     }
 
     async fn switch_conversation<R: Runtime>(
