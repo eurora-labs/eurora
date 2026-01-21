@@ -6,7 +6,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-
 use super::base::merge_content;
 use super::content::{ContentBlock, ContentPart, MessageContent};
 
