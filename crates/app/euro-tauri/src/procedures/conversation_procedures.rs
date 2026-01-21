@@ -117,7 +117,15 @@ impl ConversationApi for ConversationApiImpl {
             .await
             .map_err(|e| format!("Failed to get messages: {}", e))?;
 
-        Ok(messages.into_iter().map(MessageView::from).collect())
+        Ok(messages
+            .into_iter()
+            .filter_map(|message| match message {
+                BaseMessage::System(_) => None,
+                _ => Some(MessageView::from(message)),
+            })
+            .collect())
+
+        // Ok(messages.into_iter().map(MessageView::from).collect())
     }
 
     async fn switch_conversation<R: Runtime>(
