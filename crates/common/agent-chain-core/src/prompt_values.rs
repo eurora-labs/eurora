@@ -7,7 +7,6 @@
 
 use serde::{Deserialize, Serialize};
 
-
 use crate::load::Serializable;
 use crate::messages::{
     AnyMessage, BaseMessage, ContentPart, HumanMessage, ImageDetail, ImageSource, get_buffer_string,

@@ -6,7 +6,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-
 /// Mixin trait for objects that tools can return directly.
 ///
 /// If a custom Tool is invoked with a `ToolCall` and the output of custom code is
