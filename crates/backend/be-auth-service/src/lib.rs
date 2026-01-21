@@ -10,8 +10,8 @@ use std::sync::Arc;
 pub use auth_core::Claims;
 use be_auth_grpc::JwtConfig;
 use be_remote_db::{
-    CreateLoginTokenRequest, CreateOAuthCredentialsRequest, CreateOAuthStateRequest,
-    CreateRefreshTokenRequest, CreateUserRequest, DatabaseManager,
+    CreateLoginToken, CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken,
+    DatabaseManager, NewUser,
 };
 use oauth2::TokenResponse as OAuth2TokenResponse;
 use proto_gen::auth::{
@@ -177,7 +177,7 @@ impl AuthService {
             Uuid::parse_str(user_id).map_err(|e| anyhow!("Invalid user ID format: {}", e))?;
 
         let token_hash = self.hash_refresh_token(&refresh_token);
-        let refresh_request = CreateRefreshTokenRequest {
+        let refresh_request = CreateRefreshToken {
             user_id: user_uuid,
             token_hash,
             expires_at: refresh_exp,
@@ -211,7 +211,7 @@ impl AuthService {
             "Attempting to associate login token with user: {}",
             user.username
         );
-        let create_request = CreateLoginTokenRequest {
+        let create_request = CreateLoginToken {
             token: token.to_string(),
             expires_at: Utc::now() + Duration::minutes(20),
             user_id: user.id,
@@ -258,7 +258,7 @@ impl AuthService {
         let password_hash = self.hash_password(password)?;
 
         // Create user request
-        let create_request = CreateUserRequest {
+        let create_request = NewUser {
             username: username.to_string(),
             email: email.to_string(),
             display_name,
@@ -451,7 +451,7 @@ impl AuthService {
                     .get_oauth_credentials_by_provider_and_user("google", user.id)
                     .await
                 {
-                    let update_request = be_remote_db::UpdateOAuthCredentialsRequest {
+                    let update_request = be_remote_db::UpdateOAuthCredentials {
                         access_token: Some(access_token.as_bytes().to_vec()),
                         refresh_token: token_result
                             .refresh_token()
@@ -486,7 +486,7 @@ impl AuthService {
                         );
 
                         // Link OAuth account to existing user
-                        let oauth_request = CreateOAuthCredentialsRequest {
+                        let oauth_request = CreateOAuthCredentials {
                             user_id: user.id,
                             provider: "google".to_string(),
                             provider_user_id: user_info.id.clone(),
@@ -546,7 +546,7 @@ impl AuthService {
                             counter += 1;
                         }
 
-                        let create_request = be_remote_db::CreateUserRequest {
+                        let create_request = be_remote_db::NewUser {
                             username: final_username,
                             email: user_info.email.clone(),
                             display_name: Some(user_info.name.clone()),
@@ -559,7 +559,7 @@ impl AuthService {
                         })?;
 
                         // Create OAuth credentials for the new user
-                        let oauth_request = CreateOAuthCredentialsRequest {
+                        let oauth_request = CreateOAuthCredentials {
                             user_id: new_user.id,
                             provider: "google".to_string(),
                             provider_user_id: user_info.id.clone(),
@@ -767,7 +767,7 @@ impl ProtoAuthService for AuthService {
 
                 // Store OAuth state in database
                 let expires_at = Utc::now() + Duration::minutes(10); // 10 minute expiration
-                let oauth_state_request = CreateOAuthStateRequest {
+                let oauth_state_request = CreateOAuthState {
                     state: state.clone(),
                     pkce_verifier: pkce_verifier.clone(),
                     redirect_uri: google_config.redirect_uri.clone(),
