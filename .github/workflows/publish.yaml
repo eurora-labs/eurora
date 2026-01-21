@@ -173,12 +173,14 @@ jobs:
                   shared-key: app-release-build-${{ github.event.inputs.channel || 'nightly' }}${{ matrix.target }}
 
             - name: Install cargo-about
+              shell: bash
               run: |
                   if ! command -v cargo-about >/dev/null 2>&1; then
                   cargo install --locked "cargo-about@0.8"
                   fi
 
             - name: Generate third-party license bundle
+              shell: bash
               run: ./scripts/generate-licenses ./LICENSES-THIRD-PARTY.md
 
             - name: Init Node Environment
