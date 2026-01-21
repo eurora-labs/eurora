@@ -6,8 +6,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
 
 /// Mixin trait for objects that tools can return directly.
 ///
@@ -20,7 +18,7 @@ pub trait ToolOutputMixin {}
 ///
 /// Represents an AI's request to call a tool. This corresponds to
 /// `ToolCall` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCall {
     /// Unique identifier for this tool call
@@ -74,7 +72,7 @@ impl ToolCall {
 ///
 /// When merging tool call chunks, all string attributes are concatenated.
 /// Chunks are only merged if their values of `index` are equal and not None.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCallChunk {
     /// The name of the tool to be called (may be partial during streaming)
@@ -112,7 +110,7 @@ impl ToolCallChunk {
 ///
 /// Here we add an `error` key to surface errors made during generation
 /// (e.g., invalid JSON arguments.)
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct InvalidToolCall {
     /// The name of the tool to be called
@@ -152,7 +150,7 @@ impl InvalidToolCall {
 /// is encoded inside the `content` field.
 ///
 /// This corresponds to `ToolMessage` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolMessage {
     /// The tool result content
@@ -187,7 +185,7 @@ fn default_status() -> ToolStatus {
 }
 
 /// Status of a tool invocation.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ToolStatus {
@@ -354,7 +352,7 @@ impl ToolOutputMixin for ToolMessage {}
 /// Tool message chunk (yielded when streaming).
 ///
 /// This corresponds to `ToolMessageChunk` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolMessageChunk {
     /// The tool result content (may be partial during streaming)
