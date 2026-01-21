@@ -7,12 +7,12 @@ use tauri::{Manager, Runtime};
 pub struct ConversationView {
     pub id: Option<String>,
     pub title: String,
-    pub messages: Vec<MessageView>,
+    // pub messages: Vec<MessageView>,
 }
 
 #[taurpc::ipc_type]
 pub struct MessageView {
-    pub id: String,
+    pub id: Option<String>,
     pub role: String,
     pub content: String,
 }
@@ -43,6 +43,8 @@ pub trait ConversationApi {
     async fn get_messages<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         conversation_id: String,
+        limit: u32,
+        offset: u32,
     ) -> Result<Vec<MessageView>, String>;
 }
 
@@ -105,20 +107,17 @@ impl ConversationApi for ConversationApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         conversation_id: String,
+        limit: u32,
+        offset: u32,
     ) -> Result<Vec<MessageView>, String> {
         let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
         let conversation_manager = conversation_state.lock().await;
-
-        let conversation = conversation_manager
-            .get_conversation(conversation_id)
+        let messages = conversation_manager
+            .get_messages(conversation_id, limit, offset)
             .await
-            .map_err(|e| format!("Failed to get conversation: {}", e))?;
+            .map_err(|e| format!("Failed to get messages: {}", e))?;
 
-        Ok(conversation
-            .messages()
-            .iter()
-            .map(MessageView::from)
-            .collect())
+        Ok(messages.into_iter().map(MessageView::from).collect())
     }
 
     async fn switch_conversation<R: Runtime>(
@@ -133,6 +132,10 @@ impl ConversationApi for ConversationApiImpl {
             .switch_conversation(conversation_id)
             .await
             .map_err(|e| format!("Failed to get conversation: {}", e))?;
+
+        TauRpcConversationApiEventTrigger::new(app_handle.clone())
+            .current_conversation_changed(conversation.into())
+            .map_err(|e| e.to_string())?;
 
         Ok(conversation.into())
 
@@ -166,11 +169,11 @@ impl From<Conversation> for ConversationView {
         ConversationView {
             id: conversation.id().map(|id| id.to_string()),
             title: conversation.title().to_string(),
-            messages: conversation
-                .messages()
-                .iter()
-                .map(MessageView::from)
-                .collect(),
+            // messages: conversation
+            //     .messages()
+            //     .iter()
+            //     .map(MessageView::from)
+            //     .collect(),
         }
     }
 }
@@ -180,11 +183,11 @@ impl From<&Conversation> for ConversationView {
         ConversationView {
             id: conversation.id().map(|id| id.to_string()),
             title: conversation.title().to_string(),
-            messages: conversation
-                .messages()
-                .iter()
-                .map(MessageView::from)
-                .collect(),
+            // messages: conversation
+            //     .messages()
+            //     .iter()
+            //     .map(MessageView::from)
+            //     .collect(),
         }
     }
 }
@@ -192,7 +195,17 @@ impl From<&Conversation> for ConversationView {
 impl From<&BaseMessage> for MessageView {
     fn from(message: &BaseMessage) -> Self {
         MessageView {
-            id: message.id().unwrap_or_default(),
+            id: message.id(),
+            role: message.message_type().to_string(),
+            content: message.content().to_string(),
+        }
+    }
+}
+
+impl From<BaseMessage> for MessageView {
+    fn from(message: BaseMessage) -> Self {
+        MessageView {
+            id: message.id(),
             role: message.message_type().to_string(),
             content: message.content().to_string(),
         }
