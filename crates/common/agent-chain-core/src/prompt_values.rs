@@ -7,8 +7,6 @@
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "specta")]
-use specta::Type;
 
 use crate::load::Serializable;
 use crate::messages::{
@@ -30,7 +28,7 @@ pub trait PromptValue: Serializable {
 }
 
 /// Image detail level for OpenAI-compatible APIs.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageDetailLevel {
@@ -48,7 +46,7 @@ pub enum ImageDetailLevel {
 /// This follows OpenAI's Chat Completion API's image URL format.
 ///
 /// Corresponds to `ImageURL` TypedDict in Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct ImageURL {
     /// Either a URL of the image or the base64 encoded image data.
@@ -88,7 +86,7 @@ impl ImageURL {
 /// A simple prompt value containing just text content.
 ///
 /// Corresponds to `StringPromptValue` in Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StringPromptValue {
     /// Prompt text.
@@ -137,7 +135,7 @@ impl Serializable for StringPromptValue {
 /// A type of prompt value that is built from messages.
 ///
 /// Corresponds to `ChatPromptValue` in Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatPromptValue {
     /// List of messages.
@@ -193,7 +191,7 @@ impl Serializable for ChatPromptValue {
 /// A prompt value containing an image URL.
 ///
 /// Corresponds to `ImagePromptValue` in Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ImagePromptValue {
     /// Image URL.
@@ -270,7 +268,7 @@ impl Serializable for ImagePromptValue {
 /// For use in external schemas.
 ///
 /// Corresponds to `ChatPromptValueConcrete` in Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatPromptValueConcrete {
     /// Sequence of messages.

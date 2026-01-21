@@ -6,10 +6,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
 
 use super::base::merge_content;
+use super::content::{ContentBlock, ContentPart, MessageContent};
 
 /// A system message in the conversation.
 ///
@@ -17,11 +16,11 @@ use super::base::merge_content;
 /// of input messages. It's used to prime AI behavior with instructions.
 ///
 /// This corresponds to `SystemMessage` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SystemMessage {
-    /// The message content
-    pub content: String,
+    /// The message content (text or multipart)
+    pub content: MessageContent,
     /// Optional unique identifier
     pub id: Option<String>,
     /// Optional name for the message
@@ -33,10 +32,10 @@ pub struct SystemMessage {
 }
 
 impl SystemMessage {
-    /// Create a new system message.
+    /// Create a new system message with simple text content.
     pub fn new(content: impl Into<String>) -> Self {
         Self {
-            content: content.into(),
+            content: MessageContent::Text(content.into()),
             id: None,
             name: None,
             additional_kwargs: HashMap::new(),
@@ -48,12 +47,34 @@ impl SystemMessage {
         self.id = Some(id);
     }
 
-    /// Create a new system message with an explicit ID.
+    /// Create a new system message with simple text content and an explicit ID.
     ///
     /// Use this when deserializing or reconstructing messages where the ID must be preserved.
     pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
-            content: content.into(),
+            content: MessageContent::Text(content.into()),
+            id: Some(id.into()),
+            name: None,
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
+    /// Create a new system message with multipart content.
+    pub fn with_content(parts: Vec<ContentPart>) -> Self {
+        Self {
+            content: MessageContent::Parts(parts),
+            id: None,
+            name: None,
+            additional_kwargs: HashMap::new(),
+        }
+    }
+
+    /// Create a new system message with multipart content and an explicit ID.
+    ///
+    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
+    pub fn with_id_and_content(id: impl Into<String>, parts: Vec<ContentPart>) -> Self {
+        Self {
+            content: MessageContent::Parts(parts),
             id: Some(id.into()),
             name: None,
             additional_kwargs: HashMap::new(),
@@ -66,8 +87,19 @@ impl SystemMessage {
         self
     }
 
-    /// Get the message content.
+    /// Get the message content as text.
+    ///
+    /// For multipart messages, this returns an empty string.
+    /// Use [`message_content()`](Self::message_content) to access the full content.
     pub fn content(&self) -> &str {
+        match &self.content {
+            MessageContent::Text(s) => s,
+            MessageContent::Parts(_) => "",
+        }
+    }
+
+    /// Get the full message content (text or multipart).
+    pub fn message_content(&self) -> &MessageContent {
         &self.content
     }
 
@@ -85,16 +117,120 @@ impl SystemMessage {
     pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
         &self.additional_kwargs
     }
+
+    /// Get the raw content as a list of JSON values.
+    ///
+    /// If the content is a Parts list, it serializes each part to JSON.
+    /// If the content is a string, it returns a single text block.
+    pub fn content_list(&self) -> Vec<serde_json::Value> {
+        match &self.content {
+            MessageContent::Text(s) => {
+                vec![serde_json::json!({"type": "text", "text": s})]
+            }
+            MessageContent::Parts(parts) => parts
+                .iter()
+                .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null))
+                .collect(),
+        }
+    }
+
+    /// Get the content blocks translated to the standard format.
+    ///
+    /// This method translates provider-specific content blocks to the
+    /// standardized LangChain content block format.
+    ///
+    /// This corresponds to `content_blocks` property in LangChain Python.
+    pub fn content_blocks(&self) -> Vec<ContentBlock> {
+        use super::content::{
+            AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
+            NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock,
+            TextContentBlock, ToolCallBlock, ToolCallChunkBlock, VideoContentBlock,
+        };
+
+        let raw_content = self.content_list();
+
+        // Deserialize JSON blocks into ContentBlock structs
+        raw_content
+            .into_iter()
+            .map(|v| {
+                let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                let result = match block_type {
+                    "text" => serde_json::from_value::<TextContentBlock>(v.clone())
+                        .map(ContentBlock::Text),
+                    "reasoning" => serde_json::from_value::<ReasoningContentBlock>(v.clone())
+                        .map(ContentBlock::Reasoning),
+                    "tool_call" => serde_json::from_value::<ToolCallBlock>(v.clone())
+                        .map(ContentBlock::ToolCall),
+                    "invalid_tool_call" => {
+                        serde_json::from_value::<InvalidToolCallBlock>(v.clone())
+                            .map(ContentBlock::InvalidToolCall)
+                    }
+                    "tool_call_chunk" => serde_json::from_value::<ToolCallChunkBlock>(v.clone())
+                        .map(ContentBlock::ToolCallChunk),
+                    "image" => serde_json::from_value::<ImageContentBlock>(v.clone())
+                        .map(ContentBlock::Image),
+                    "audio" => serde_json::from_value::<AudioContentBlock>(v.clone())
+                        .map(ContentBlock::Audio),
+                    "video" => serde_json::from_value::<VideoContentBlock>(v.clone())
+                        .map(ContentBlock::Video),
+                    "file" => serde_json::from_value::<FileContentBlock>(v.clone())
+                        .map(ContentBlock::File),
+                    "text-plain" => serde_json::from_value::<PlainTextContentBlock>(v.clone())
+                        .map(ContentBlock::PlainText),
+                    "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
+                        .map(ContentBlock::NonStandard),
+                    _ => {
+                        // Unknown type, wrap as non_standard
+                        tracing::warn!(
+                            block_type = %block_type,
+                            json = %v,
+                            "Unknown block type in content_blocks, treating as non_standard"
+                        );
+                        serde_json::from_value::<NonStandardContentBlock>(v.clone())
+                            .map(ContentBlock::NonStandard)
+                    }
+                };
+
+                result.unwrap_or_else(|e| {
+                    tracing::warn!(
+                        block_type = %block_type,
+                        error = %e,
+                        json = %v,
+                        "Failed to deserialize ContentBlock in content_blocks, wrapping as non_standard"
+                    );
+                    // Wrap the malformed block as NonStandardContentBlock with error info
+                    let mut error_value = std::collections::HashMap::new();
+                    error_value.insert("original_json".to_string(), v.clone());
+                    error_value.insert(
+                        "deserialization_error".to_string(),
+                        serde_json::Value::String(e.to_string()),
+                    );
+                    error_value.insert(
+                        "original_type".to_string(),
+                        serde_json::Value::String(block_type.to_string()),
+                    );
+                    ContentBlock::NonStandard(NonStandardContentBlock {
+                        block_type: "non_standard".to_string(),
+                        id: None,
+                        value: error_value,
+                        index: v
+                            .get("index")
+                            .and_then(|i| serde_json::from_value(i.clone()).ok()),
+                    })
+                })
+            })
+            .collect()
+    }
 }
 
 /// System message chunk (yielded when streaming).
 ///
 /// This corresponds to `SystemMessageChunk` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SystemMessageChunk {
     /// The message content (may be partial during streaming)
-    content: String,
+    content: MessageContent,
     /// Optional unique identifier
     id: Option<String>,
     /// Optional name for the message
@@ -109,10 +245,10 @@ pub struct SystemMessageChunk {
 }
 
 impl SystemMessageChunk {
-    /// Create a new system message chunk.
+    /// Create a new system message chunk with text content.
     pub fn new(content: impl Into<String>) -> Self {
         Self {
-            content: content.into(),
+            content: MessageContent::Text(content.into()),
             id: None,
             name: None,
             additional_kwargs: HashMap::new(),
@@ -123,7 +259,7 @@ impl SystemMessageChunk {
     /// Create a new system message chunk with an ID.
     pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
-            content: content.into(),
+            content: MessageContent::Text(content.into()),
             id: Some(id.into()),
             name: None,
             additional_kwargs: HashMap::new(),
@@ -131,8 +267,16 @@ impl SystemMessageChunk {
         }
     }
 
-    /// Get the message content.
+    /// Get the message content as text.
     pub fn content(&self) -> &str {
+        match &self.content {
+            MessageContent::Text(s) => s,
+            MessageContent::Parts(_) => "",
+        }
+    }
+
+    /// Get the full message content.
+    pub fn message_content(&self) -> &MessageContent {
         &self.content
     }
 
@@ -158,7 +302,26 @@ impl SystemMessageChunk {
 
     /// Concatenate this chunk with another chunk.
     pub fn concat(&self, other: &SystemMessageChunk) -> SystemMessageChunk {
-        let content = merge_content(&self.content, &other.content);
+        let content = match (&self.content, &other.content) {
+            (MessageContent::Text(a), MessageContent::Text(b)) => {
+                MessageContent::Text(merge_content(a, b))
+            }
+            (MessageContent::Parts(a), MessageContent::Parts(b)) => {
+                let mut parts = a.clone();
+                parts.extend(b.clone());
+                MessageContent::Parts(parts)
+            }
+            (MessageContent::Text(a), MessageContent::Parts(b)) => {
+                let mut parts = vec![ContentPart::Text { text: a.clone() }];
+                parts.extend(b.clone());
+                MessageContent::Parts(parts)
+            }
+            (MessageContent::Parts(a), MessageContent::Text(b)) => {
+                let mut parts = a.clone();
+                parts.push(ContentPart::Text { text: b.clone() });
+                MessageContent::Parts(parts)
+            }
+        };
 
         // Merge additional_kwargs
         let mut additional_kwargs = self.additional_kwargs.clone();

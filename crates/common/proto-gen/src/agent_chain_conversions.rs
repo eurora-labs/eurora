@@ -591,7 +591,7 @@ impl From<ProtoHumanMessageChunk> for HumanMessageChunk {
 impl From<SystemMessage> for ProtoSystemMessage {
     fn from(msg: SystemMessage) -> Self {
         ProtoSystemMessage {
-            content: msg.content,
+            content: Some(msg.content.into()),
             id: msg.id,
             name: msg.name,
             additional_kwargs: hashmap_to_json_string(&msg.additional_kwargs),
@@ -601,9 +601,20 @@ impl From<SystemMessage> for ProtoSystemMessage {
 
 impl From<ProtoSystemMessage> for SystemMessage {
     fn from(proto: ProtoSystemMessage) -> Self {
-        let mut msg = match proto.id {
-            Some(id) => SystemMessage::with_id(id, proto.content),
-            None => SystemMessage::new(proto.content),
+        let content: MessageContent = proto
+            .content
+            .map(Into::into)
+            .unwrap_or(MessageContent::Text(String::new()));
+
+        let mut msg = match content {
+            MessageContent::Text(text) => match proto.id {
+                Some(id) => SystemMessage::with_id(id, text),
+                None => SystemMessage::new(text),
+            },
+            MessageContent::Parts(parts) => match proto.id {
+                Some(id) => SystemMessage::with_id_and_content(id, parts),
+                None => SystemMessage::with_content(parts),
+            },
         };
 
         if let Some(name) = proto.name {
@@ -622,7 +633,7 @@ impl From<ProtoSystemMessage> for SystemMessage {
 impl From<SystemMessageChunk> for ProtoSystemMessageChunk {
     fn from(chunk: SystemMessageChunk) -> Self {
         ProtoSystemMessageChunk {
-            content: chunk.content().to_string(),
+            content: Some(chunk.message_content().clone().into()),
             id: chunk.id(),
             name: chunk.name(),
             additional_kwargs: hashmap_to_json_string(chunk.additional_kwargs()),
@@ -633,9 +644,19 @@ impl From<SystemMessageChunk> for ProtoSystemMessageChunk {
 
 impl From<ProtoSystemMessageChunk> for SystemMessageChunk {
     fn from(proto: ProtoSystemMessageChunk) -> Self {
+        let content: MessageContent = proto
+            .content
+            .map(Into::into)
+            .unwrap_or(MessageContent::Text(String::new()));
+
+        let text = match &content {
+            MessageContent::Text(t) => t.clone(),
+            MessageContent::Parts(_) => String::new(),
+        };
+
         match proto.id {
-            Some(id) => SystemMessageChunk::with_id(id, proto.content),
-            None => SystemMessageChunk::new(proto.content),
+            Some(id) => SystemMessageChunk::with_id(id, text),
+            None => SystemMessageChunk::new(text),
         }
     }
 }

@@ -35,8 +35,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
 
 use crate::utils::base::ensure_id;
 
@@ -50,7 +48,7 @@ use crate::utils::base::ensure_id;
 /// - `Low`: Faster, lower token cost, suitable for simple images
 /// - `High`: More detailed analysis, higher token cost
 /// - `Auto`: Let the model decide based on image size
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageDetail {
@@ -61,7 +59,7 @@ pub enum ImageDetail {
 }
 
 /// Source of an image for multimodal messages.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ImageSource {
@@ -86,7 +84,7 @@ pub enum ImageSource {
 ///
 /// Messages can contain multiple content parts, allowing for mixed text and images.
 /// This corresponds to content blocks in LangChain Python's `langchain_core.messages.content`.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentPart {
@@ -122,7 +120,7 @@ impl From<String> for ContentPart {
 ///
 /// This represents the content field of messages and can be either
 /// a simple string or a list of content parts for multimodal messages.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum MessageContent {
@@ -197,7 +195,7 @@ impl From<Vec<ContentPart>> for MessageContent {
 
 /// Index type that can be either an integer or string.
 /// Used during streaming for block ordering.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum BlockIndex {
@@ -239,7 +237,7 @@ impl From<&str> for BlockIndex {
 ///
 /// In Python this is: `Annotation = Citation | NonStandardAnnotation`
 /// where each variant is a TypedDict with a `type` literal field for discrimination.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Annotation {
@@ -310,7 +308,7 @@ pub type NonStandardAnnotation = Annotation;
 /// Text output from a LLM.
 ///
 /// This typically represents the main text content of a message.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TextContentBlock {
     /// Type of the content block. Always "text".
@@ -350,7 +348,7 @@ impl TextContentBlock {
 ///
 /// This version includes a `type` field for discrimination and is used
 /// as part of content blocks.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCallBlock {
     /// Type of the content block. Always "tool_call".
@@ -385,7 +383,7 @@ impl ToolCallBlock {
 }
 
 /// A chunk of a tool call (yielded when streaming, content block version).
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCallChunkBlock {
     /// Type of the content block. Always "tool_call_chunk".
@@ -428,7 +426,7 @@ impl Default for ToolCallChunkBlock {
 /// Allowance for errors made by LLM (content block version).
 ///
 /// Here we add an `error` key to surface errors made during generation.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct InvalidToolCallBlock {
     /// Type of the content block. Always "invalid_tool_call".
@@ -474,7 +472,7 @@ impl Default for InvalidToolCallBlock {
 /// Tool call that is executed server-side.
 ///
 /// For example: code execution, web search, etc.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServerToolCall {
     /// Type of the content block. Always "server_tool_call".
@@ -513,7 +511,7 @@ impl ServerToolCall {
 }
 
 /// A chunk of a server-side tool call (yielded when streaming).
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServerToolCallChunk {
     /// Type of the content block. Always "server_tool_call_chunk".
@@ -557,7 +555,7 @@ impl Default for ServerToolCallChunk {
 }
 
 /// Execution status of the server-side tool.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ServerToolStatus {
@@ -566,7 +564,7 @@ pub enum ServerToolStatus {
 }
 
 /// Result of a server-side tool call.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServerToolResult {
     /// Type of the content block. Always "server_tool_result".
@@ -622,7 +620,7 @@ impl ServerToolResult {
 ///
 /// Used to represent reasoning/thinking content from AI models that support
 /// chain-of-thought reasoning (e.g., DeepSeek, Ollama, XAI, Groq).
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReasoningContentBlock {
     /// Type of the content block. Always "reasoning".
@@ -673,7 +671,7 @@ impl Default for ReasoningContentBlock {
 }
 
 /// Image data content block.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ImageContentBlock {
     /// Type of the content block. Always "image".
@@ -753,7 +751,7 @@ impl Default for ImageContentBlock {
 }
 
 /// Video data content block.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VideoContentBlock {
     /// Type of the content block. Always "video".
@@ -805,7 +803,7 @@ impl Default for VideoContentBlock {
 }
 
 /// Audio data content block.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AudioContentBlock {
     /// Type of the content block. Always "audio".
@@ -857,7 +855,7 @@ impl Default for AudioContentBlock {
 }
 
 /// Plaintext data content block (e.g., from a `.txt` or `.md` document).
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlainTextContentBlock {
     /// Type of the content block. Always "text-plain".
@@ -923,7 +921,7 @@ impl Default for PlainTextContentBlock {
 ///
 /// This block is intended for files that are not images, audio, or plaintext.
 /// For example, it can be used for PDFs, Word documents, etc.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FileContentBlock {
     /// Type of the content block. Always "file".
@@ -977,7 +975,7 @@ impl Default for FileContentBlock {
 /// Provider-specific content data.
 ///
 /// This block contains data for which there is not yet a standard type.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NonStandardContentBlock {
     /// Type of the content block. Always "non_standard".
@@ -1010,7 +1008,7 @@ impl NonStandardContentBlock {
 // =============================================================================
 
 /// A union of all defined multimodal data ContentBlock types.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum DataContentBlock {
@@ -1027,7 +1025,7 @@ pub enum DataContentBlock {
 }
 
 /// A union of all tool-related ContentBlock types.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum ToolContentBlock {
@@ -1044,7 +1042,7 @@ pub enum ToolContentBlock {
 }
 
 /// A union of all defined ContentBlock types.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum ContentBlock {
