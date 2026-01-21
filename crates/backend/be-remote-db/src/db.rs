@@ -10,18 +10,16 @@ use uuid::Uuid;
 use crate::{
     GetConversation,
     types::{
-        Activity, ActivityAsset, ActivityConversation, Asset, Conversation, CreateActivityRequest,
-        CreateAssetRequest, CreateLoginTokenRequest, CreateMessageRequest,
-        CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
-        CreateUserRequest, GetActivitiesByTimeRangeRequest, ListActivitiesRequest,
-        ListConversationsRequest, ListMessages, LoginToken, Message, MessageAsset, NewConversation,
-        OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken,
-        UpdateActivityEndTimeRequest, UpdateActivityRequest, UpdateAssetRequest,
-        UpdateConversationRequest, UpdateMessageRequest, UpdateOAuthCredentialsRequest,
-        UpdatePasswordRequest, UpdateUserRequest, User,
+        Activity, ActivityAsset, ActivityConversation, Asset, Conversation, CreateLoginToken,
+        CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange,
+        ListActivities, ListConversations, ListMessages, LoginToken, Message, MessageAsset,
+        NewActivity, NewAsset, NewConversation, NewMessage, NewUser, OAuthCredentials, OAuthState,
+        PasswordCredentials, RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateAsset,
+        UpdateConversation, UpdateMessage, UpdateOAuthCredentials, UpdatePassword, UpdateUser,
+        User,
     },
 };
-use crate::{GetLastMessagesRequest, error::DbResult};
+use crate::{GetLastMessages, error::DbResult};
 #[derive(Debug)]
 pub struct DatabaseManager {
     pub pool: PgPool,
@@ -57,7 +55,7 @@ impl DatabaseManager {
     }
 
     // User management methods
-    pub async fn create_user(&self, request: CreateUserRequest) -> DbResult<User> {
+    pub async fn create_user(&self, request: NewUser) -> DbResult<User> {
         let user_id = Uuid::now_v7();
         let password_id = Uuid::now_v7();
         let now = Utc::now();
@@ -148,7 +146,7 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn update_user(&self, user_id: Uuid, request: UpdateUserRequest) -> DbResult<User> {
+    pub async fn update_user(&self, user_id: Uuid, request: UpdateUser) -> DbResult<User> {
         let now = Utc::now();
 
         let user = sqlx::query_as::<_, User>(
@@ -223,7 +221,7 @@ impl DatabaseManager {
     pub async fn update_password(
         &self,
         user_id: Uuid,
-        request: UpdatePasswordRequest,
+        request: UpdatePassword,
     ) -> DbResult<PasswordCredentials> {
         let now = Utc::now();
 
@@ -317,7 +315,7 @@ impl DatabaseManager {
     // OAuth credentials management methods
     pub async fn create_oauth_credentials(
         &self,
-        request: CreateOAuthCredentialsRequest,
+        request: CreateOAuthCredentials,
     ) -> DbResult<OAuthCredentials> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -395,7 +393,7 @@ impl DatabaseManager {
     pub async fn update_oauth_credentials(
         &self,
         id: Uuid,
-        request: UpdateOAuthCredentialsRequest,
+        request: UpdateOAuthCredentials,
     ) -> DbResult<OAuthCredentials> {
         let now = Utc::now();
 
@@ -448,7 +446,7 @@ impl DatabaseManager {
     // Refresh token management methods
     pub async fn create_refresh_token(
         &self,
-        request: CreateRefreshTokenRequest,
+        request: CreateRefreshToken,
     ) -> DbResult<RefreshToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -539,10 +537,7 @@ impl DatabaseManager {
     }
 
     // OAuth state management methods
-    pub async fn create_oauth_state(
-        &self,
-        request: CreateOAuthStateRequest,
-    ) -> DbResult<OAuthState> {
+    pub async fn create_oauth_state(&self, request: CreateOAuthState) -> DbResult<OAuthState> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -611,10 +606,7 @@ impl DatabaseManager {
     }
 
     // Login token management methods
-    pub async fn create_login_token(
-        &self,
-        request: CreateLoginTokenRequest,
-    ) -> DbResult<LoginToken> {
+    pub async fn create_login_token(&self, request: CreateLoginToken) -> DbResult<LoginToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -690,7 +682,7 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new activity
-    pub async fn create_activity(&self, request: CreateActivityRequest) -> DbResult<Activity> {
+    pub async fn create_activity(&self, request: NewActivity) -> DbResult<Activity> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
@@ -755,7 +747,7 @@ impl DatabaseManager {
     }
 
     /// List activities for a user with pagination
-    pub async fn list_activities(&self, request: ListActivitiesRequest) -> DbResult<Vec<Activity>> {
+    pub async fn list_activities(&self, request: ListActivities) -> DbResult<Vec<Activity>> {
         // Clamp limit to max 100
         let limit = request.limit.clamp(1, 100);
 
@@ -778,7 +770,7 @@ impl DatabaseManager {
     }
 
     /// Update an existing activity
-    pub async fn update_activity(&self, request: UpdateActivityRequest) -> DbResult<Activity> {
+    pub async fn update_activity(&self, request: UpdateActivity) -> DbResult<Activity> {
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
@@ -811,10 +803,7 @@ impl DatabaseManager {
     }
 
     /// Update activity end time
-    pub async fn update_activity_end_time(
-        &self,
-        request: UpdateActivityEndTimeRequest,
-    ) -> DbResult<()> {
+    pub async fn update_activity_end_time(&self, request: UpdateActivityEndTime) -> DbResult<()> {
         let now = Utc::now();
 
         sqlx::query(
@@ -871,7 +860,7 @@ impl DatabaseManager {
     /// Get activities by time range for a user
     pub async fn get_activities_by_time_range(
         &self,
-        request: GetActivitiesByTimeRangeRequest,
+        request: GetActivitiesByTimeRange,
     ) -> DbResult<Vec<Activity>> {
         // Clamp limit to max 100
         let limit = request.limit.clamp(1, 100);
@@ -903,11 +892,7 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new asset
-    pub async fn create_asset(
-        &self,
-        user_id: Uuid,
-        request: CreateAssetRequest,
-    ) -> DbResult<Asset> {
+    pub async fn create_asset(&self, user_id: Uuid, request: NewAsset) -> DbResult<Asset> {
         let id = request.id;
         let now = Utc::now();
         let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
@@ -1003,7 +988,7 @@ impl DatabaseManager {
         &self,
         asset_id: Uuid,
         user_id: Uuid,
-        request: UpdateAssetRequest,
+        request: UpdateAsset,
     ) -> DbResult<Asset> {
         let now = Utc::now();
 
@@ -1272,7 +1257,7 @@ impl DatabaseManager {
     /// List conversations for a user with pagination
     pub async fn list_conversations(
         &self,
-        request: ListConversationsRequest,
+        request: ListConversations,
     ) -> DbResult<Vec<Conversation>> {
         // Clamp limit to max 100
         let limit = request.limit.clamp(1, 100);
@@ -1300,7 +1285,7 @@ impl DatabaseManager {
         &self,
         conversation_id: Uuid,
         user_id: Uuid,
-        request: UpdateConversationRequest,
+        request: UpdateConversation,
     ) -> DbResult<Conversation> {
         let now = Utc::now();
 
@@ -1344,7 +1329,7 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new message
-    pub async fn create_message(&self, request: CreateMessageRequest) -> DbResult<Message> {
+    pub async fn create_message(&self, request: NewMessage) -> DbResult<Message> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
         let additional_kwargs = request
@@ -1384,10 +1369,7 @@ impl DatabaseManager {
         Ok(message)
     }
 
-    pub async fn get_last_messages(
-        &self,
-        request: GetLastMessagesRequest,
-    ) -> DbResult<Vec<Message>> {
+    pub async fn get_last_messages(&self, request: GetLastMessages) -> DbResult<Vec<Message>> {
         // Clamp limit to max 100
         let limit = request.limit.clamp(1, 100);
 
@@ -1439,7 +1421,7 @@ impl DatabaseManager {
         &self,
         message_id: Uuid,
         user_id: Uuid,
-        request: UpdateMessageRequest,
+        request: UpdateMessage,
     ) -> DbResult<Message> {
         let now = Utc::now();
 
