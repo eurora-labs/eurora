@@ -105,7 +105,7 @@
 	// Helper to check if message is from user/human
 	// function isUserMessage(message: BaseMessage): boolean {
 	function isUserMessage(message: any): boolean {
-		return message.type === 'human';
+		return message.role === 'human';
 	}
 
 	async function handleKeydown(event: KeyboardEvent) {
