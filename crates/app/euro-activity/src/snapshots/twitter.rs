@@ -1,6 +1,6 @@
 //! Twitter snapshot implementation
 
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{BaseMessage, SystemMessage};
 use euro_native_messaging::types::NativeTwitterSnapshot;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -169,9 +169,9 @@ impl SnapshotFunctionality for TwitterSnapshot {
 
         // Add context about the page/interaction
         if let Some(context) = &self.page_context {
-            content.push_str(&format!("I'm viewing Twitter {} ", context));
+            content.push_str(&format!("User is viewing Twitter {} ", context));
         } else {
-            content.push_str("I'm viewing Twitter ");
+            content.push_str("User is viewing Twitter ");
         }
 
         // Add interaction context
@@ -192,7 +192,8 @@ impl SnapshotFunctionality for TwitterSnapshot {
             }
         }
 
-        content.push_str("and have a question about it. Here are the tweets I'm seeing:\n\n");
+        content
+            .push_str("and has a question about it. Here are the tweets the user is seeing:\n\n");
 
         // Add tweet content
         let tweet_texts: Vec<String> = self
@@ -203,7 +204,7 @@ impl SnapshotFunctionality for TwitterSnapshot {
 
         content.push_str(&tweet_texts.join("\n\n"));
 
-        vec![HumanMessage::new(content).into()]
+        vec![SystemMessage::new(content).into()]
     }
 
     fn get_updated_at(&self) -> u64 {
