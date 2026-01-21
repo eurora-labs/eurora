@@ -1,7 +1,7 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
 	import {
-		// type ResponseChunk,
+		type ResponseChunk,
 		type Query,
 		// type BaseMessage,
 		type MessageView,
@@ -143,34 +143,37 @@
 				assets: query.assets,
 			};
 			// Create an AI message placeholder for streaming response
-			// const aiMessage: BaseMessage = {
-			// 	type: 'ai',
-			// 	content: '',
-			// 	id: null,
-			// 	tool_calls: [],
-			// 	additional_kwargs: {},
-			// };
-			// messages.push(aiMessage);
-			// const agentMessage = messages.at(-1);
-			// function onEvent(response: ResponseChunk) {
-			// 	// Append chunk to the last message
-			// 	if (agentMessage && agentMessage.type === 'ai') {
-			// 		agentMessage.content += response.chunk;
-			// 	}
+			const aiMessage: MessageView = {
+				id: null,
+				role: 'ai',
+				content: '',
+			};
+			messages.push(aiMessage);
+			const agentMessage = messages.at(-1);
 
-			// 	chatRef?.scrollToBottom();
-			// }
+			function onEvent(response: ResponseChunk) {
+				// Append chunk to the last message
+				console.log(agentMessage);
+				if (agentMessage && agentMessage.role === 'ai') {
+					agentMessage.content += response.chunk;
+				}
+
+				chatRef?.scrollToBottom();
+			}
 
 			// If no conversation is selected create a new one
 			// TODO: convert this to new architecture
-			if (!conversation) {
-				// conversation = await taurpc.personal_db.conversation.create();
-				// console.log('conversation', conversation);
-			} else {
-				// Use TauRPC send_query procedure
-				// await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
-			}
+			// if (!conversation) {
+			// conversation = await taurpc.personal_db.conversation.create();
+			// console.log('conversation', conversation);
+			// } else {
+			// Use TauRPC send_query procedure
+			// }
+			// if (!conversation) {
+			// 	return;
+			// }
 
+			await taurpc.chat.send_query(conversation?.id ?? null, onEvent, tauRpcQuery);
 			// // Use TauRPC send_query procedure
 			// await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
 		} catch (error) {
