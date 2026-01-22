@@ -8,7 +8,7 @@ description = "Refactored activity system with enum-based type-safe design"
 ignored = ["humantime-serde", "specta"]
 
 [dependencies]
-agent-chain-core = { workspace = true, features = ["specta"] }
+agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }

@@ -19,7 +19,7 @@
 	onMount(() => {
 		sidebarState = useSidebar();
 
-		taurpc.conversation.list(5, 0).then((res) => {
+		taurpc.conversation.list(10, 0).then((res) => {
 			conversations = res;
 		});
 

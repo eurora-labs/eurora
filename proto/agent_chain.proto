@@ -110,9 +110,10 @@ message ProtoHumanMessageChunk {
 
 // A system message in the conversation.
 // Used to prime AI behavior with instructions.
+// Supports both simple text content and multimodal content with images.
 message ProtoSystemMessage {
-  // The message content (always text)
-  string content = 1;
+  // The message content (text or multipart)
+  ProtoMessageContent content = 1;
 
   // Optional unique identifier
   optional string id = 2;
@@ -127,7 +128,7 @@ message ProtoSystemMessage {
 // System message chunk (yielded when streaming)
 message ProtoSystemMessageChunk {
   // The message content (may be partial during streaming)
-  string content = 1;
+  ProtoMessageContent content = 1;
 
   // Optional unique identifier
   optional string id = 2;
