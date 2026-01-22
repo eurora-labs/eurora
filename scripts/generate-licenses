@@ -56,7 +56,7 @@ echo "Generating Rust dependency licenses via cargo-about"
 # If ALLOW_MISSING_LICENSES is set, do not fail on missing license metadata.
 ARGS=(about generate)
 if [[ -z "${ALLOW_MISSING_LICENSES:-}" ]]; then
-  ARGS+=(--fail-on-missing-license)
+  ARGS+=(--fail)
 fi
 ARGS+=(-c "$CONFIG_FILE" "$TEMPLATE_FILE")
 
