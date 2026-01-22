@@ -23,7 +23,7 @@ use proto_gen::auth::{
 use rand::{TryRngCore, rngs::OsRng};
 use sha2::{Digest, Sha256};
 use tonic::{Request, Response, Status};
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub mod oauth;
@@ -207,10 +207,6 @@ impl AuthService {
     /// Try to associate any pending login tokens with the user
     /// This looks for unused login tokens and associates them with the user
     async fn try_associate_login_token_with_user(&self, user: &be_remote_db::User, token: &str) {
-        debug!(
-            "Attempting to associate login token with user: {}",
-            user.username
-        );
         // Hash the token before storing
         let token_hash = self.hash_login_token(token);
         let create_request = CreateLoginToken {
@@ -221,7 +217,7 @@ impl AuthService {
 
         match self.db.create_login_token(create_request).await {
             Ok(_) => {
-                debug!(
+                info!(
                     "Successfully associated login token with user: {}",
                     user.username
                 );
@@ -257,8 +253,6 @@ impl AuthService {
         password: &str,
         display_name: Option<String>,
     ) -> Result<TokenResponse> {
-        debug!("Attempting to register user: {}", username);
-
         // Check if user already exists
         if self
             .db
@@ -291,8 +285,6 @@ impl AuthService {
             .await
             .map_err(|e| anyhow!("Failed to create user: {}", e))?;
 
-        debug!("User registered successfully: {}", user.username);
-
         // Generate tokens
         let (access_token, refresh_token) = self
             .generate_tokens(&user.id.to_string(), &user.username, &user.email)
@@ -307,12 +299,8 @@ impl AuthService {
 
     /// Refresh an access token using a refresh token
     pub async fn refresh_access_token(&self, refresh_token: &str) -> Result<TokenResponse> {
-        debug!("Attempting to refresh token");
-
         // Hash the provided refresh token to look it up in the database
         let token_hash = self.hash_refresh_token(refresh_token);
-
-        debug!("Hashed refresh token: {:?}", token_hash);
 
         // Get the refresh token from database (this also validates it's not expired/revoked)
         let stored_token = self
@@ -339,8 +327,6 @@ impl AuthService {
             .generate_tokens(&user.id.to_string(), &user.username, &user.email)
             .await?;
 
-        debug!("Token refreshed successfully for user: {}", user.username);
-
         Ok(TokenResponse {
             access_token,
             refresh_token: new_refresh_token,
@@ -352,7 +338,6 @@ impl AuthService {
         &self,
         creds: ThirdPartyCredentials,
     ) -> Result<Response<TokenResponse>, Status> {
-        debug!("Handling Google login");
         // Extract code and state from credentials
         let code = &creds.code;
         let state = &creds.state;
@@ -383,13 +368,6 @@ impl AuthService {
             error!("Failed to consume OAuth state: {}", e);
             // Continue anyway, as the state was valid
         }
-
-        debug!("OAuth state validated successfully for state: {}", state);
-
-        // Extract PKCE verifier for token exchange
-        // let pkce_verifier = oauth_state.pkce_verifier.clone();
-
-        debug!("Exchanging authorization code for access token");
 
         // Create OAuth client for token exchange
         let google_config = oauth::google::GoogleOAuthConfig::from_env().map_err(|e| {
@@ -446,15 +424,12 @@ impl AuthService {
             })?;
 
         let access_token = token_result.access_token().secret();
-        debug!("Successfully obtained access token from Google");
 
         // Get user info from Google
         let user_info = self.get_google_user_info(access_token).await.map_err(|e| {
             error!("Failed to get user info from Google: {}", e);
             Status::internal("Failed to retrieve user information")
         })?;
-
-        debug!("Retrieved user info for: {}", user_info.email);
 
         // Check if user exists by OAuth provider first
         let existing_user_by_oauth = self
@@ -464,8 +439,6 @@ impl AuthService {
 
         let user = match existing_user_by_oauth {
             Ok(user) => {
-                debug!("Found existing user by OAuth: {}", user.username);
-
                 // Update OAuth credentials with new tokens
                 if let Ok(oauth_creds) = self
                     .db
@@ -501,11 +474,6 @@ impl AuthService {
 
                 match existing_user_by_email {
                     Ok(user) => {
-                        debug!(
-                            "Found existing user by email, linking OAuth: {}",
-                            user.username
-                        );
-
                         // Link OAuth account to existing user
                         let oauth_request = CreateOAuthCredentials {
                             user_id: user.id,
@@ -542,9 +510,6 @@ impl AuthService {
                             error!("Challenge method is missing");
                             return Err(Status::unauthenticated("Challenge method is missing"));
                         }
-
-                        // Create new user from Google info
-                        debug!("Creating new user from Google OAuth: {}", user_info.email);
 
                         // Generate username from email (before @ symbol) or use name
                         let username = user_info
@@ -620,8 +585,6 @@ impl AuthService {
                 Status::internal("Token generation error")
             })?;
 
-        debug!("Google OAuth login successful for user: {}", user.username);
-
         let response = TokenResponse {
             access_token,
             refresh_token,
@@ -636,7 +599,7 @@ impl AuthService {
         &self,
         access_token: &str,
     ) -> Result<oauth::google::GoogleUserInfo> {
-        debug!("Fetching user info from Google");
+        info!("Fetching user info from Google");
 
         let client = reqwest::Client::new();
         let response = client
@@ -656,8 +619,6 @@ impl AuthService {
             .await
             .map_err(|e| anyhow!("Failed to parse user info response: {}", e))?;
 
-        debug!("Successfully fetched user info for: {}", user_info.email);
-
         Ok(user_info)
     }
 
@@ -665,7 +626,7 @@ impl AuthService {
         &self,
         _creds: ThirdPartyCredentials,
     ) -> Result<Response<TokenResponse>, Status> {
-        debug!("Handling GitHub login");
+        info!("Handling GitHub login");
         todo!()
     }
 }
@@ -769,7 +730,7 @@ impl ProtoAuthService for AuthService {
 
         let auth_url = match provider {
             Provider::Google => {
-                debug!("Generating Google OAuth URL");
+                info!("Generating Google OAuth URL");
 
                 let google_client = create_google_oauth_client().map_err(|e| {
                     error!("Failed to create Google OAuth client: {}", e);
@@ -813,10 +774,6 @@ impl ProtoAuthService for AuthService {
                         Status::internal("Failed to generate OAuth URL")
                     })?;
 
-                debug!(
-                    "Generated Google OAuth URL successfully with state: {}",
-                    state
-                );
                 url
             }
             Provider::Github => {
@@ -860,13 +817,6 @@ impl ProtoAuthService for AuthService {
         let code_challenge = self.code_verifier_to_challenge(&code_verifier);
         let token_hash = self.hash_login_token(&code_challenge);
 
-        debug!(
-            "Looking up login token: code_verifier_len={}, code_challenge={}, hash_len={}",
-            code_verifier.len(),
-            code_challenge,
-            token_hash.len()
-        );
-
         // Get the login token from database
         let login_token = match self.db.get_login_token_by_hash(&token_hash).await {
             Ok(login_token) => login_token,
@@ -909,11 +859,6 @@ impl ProtoAuthService for AuthService {
             }
         };
 
-        debug!(
-            "Login by login token successful for user: {}",
-            user.username
-        );
-
         let response = TokenResponse {
             access_token,
             refresh_token,
@@ -939,8 +884,6 @@ impl AuthService {
                 "Login and password cannot be empty",
             ));
         }
-
-        debug!("Attempting login for: {}", login);
 
         // Try to find user by username or email
         let user = if login.contains('@') {
@@ -991,8 +934,6 @@ impl AuthService {
                 return Err(Status::internal("Authentication error"));
             }
         };
-
-        debug!("Login successful for user: {}", user.username);
 
         let response = TokenResponse {
             access_token,
