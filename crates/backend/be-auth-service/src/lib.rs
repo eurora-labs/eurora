@@ -11,7 +11,7 @@ pub use auth_core::Claims;
 use be_auth_grpc::JwtConfig;
 use be_remote_db::{
     CreateLoginToken, CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken,
-    DatabaseManager, NewUser,
+    DatabaseManager, NewUser, OAuthProvider,
 };
 use oauth2::TokenResponse as OAuth2TokenResponse;
 use proto_gen::auth::{
@@ -118,11 +118,11 @@ impl AuthService {
         verify(password, hash).map_err(|e| anyhow!("Failed to verify password: {}", e))
     }
 
-    /// Hash a refresh token for secure storage
-    fn hash_refresh_token(&self, token: &str) -> String {
+    /// Hash a refresh token for secure storage (returns raw 32-byte hash)
+    fn hash_refresh_token(&self, token: &str) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update(token.as_bytes());
-        format!("{:x}", hasher.finalize())
+        hasher.finalize().to_vec()
     }
 
     /// Generate JWT tokens (access and refresh)
@@ -211,8 +211,10 @@ impl AuthService {
             "Attempting to associate login token with user: {}",
             user.username
         );
+        // Hash the token before storing
+        let token_hash = self.hash_login_token(token);
         let create_request = CreateLoginToken {
-            token: token.to_string(),
+            token_hash,
             expires_at: Utc::now() + Duration::minutes(20),
             user_id: user.id,
         };
@@ -220,14 +222,31 @@ impl AuthService {
         match self.db.create_login_token(create_request).await {
             Ok(_) => {
                 debug!(
-                    "Successfully associated login token '{}' with user: {}",
-                    token, user.username
+                    "Successfully associated login token with user: {}",
+                    user.username
                 );
             }
             Err(e) => {
                 error!("Failed to update login token with user_id: {}", e);
             }
         }
+    }
+
+    /// Hash a login token (code_challenge) for secure storage (returns raw 32-byte hash)
+    /// The token should be the code_challenge, not the code_verifier
+    fn hash_login_token(&self, token: &str) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.update(token.as_bytes());
+        hasher.finalize().to_vec()
+    }
+
+    /// Convert a code_verifier to code_challenge using PKCE S256 method
+    /// This computes: base64url_no_pad(sha256(code_verifier))
+    fn code_verifier_to_challenge(&self, code_verifier: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(code_verifier.as_bytes());
+        let hash = hasher.finalize();
+        URL_SAFE_NO_PAD.encode(hash)
     }
 
     /// Register a new user (not in proto yet, but implementing for completeness)
@@ -292,6 +311,8 @@ impl AuthService {
 
         // Hash the provided refresh token to look it up in the database
         let token_hash = self.hash_refresh_token(refresh_token);
+
+        debug!("Hashed refresh token: {:?}", token_hash);
 
         // Get the refresh token from database (this also validates it's not expired/revoked)
         let stored_token = self
@@ -438,7 +459,7 @@ impl AuthService {
         // Check if user exists by OAuth provider first
         let existing_user_by_oauth = self
             .db
-            .get_user_by_oauth_provider("google", &user_info.id)
+            .get_user_by_oauth_provider(OAuthProvider::Google, &user_info.id)
             .await;
 
         let user = match existing_user_by_oauth {
@@ -448,7 +469,7 @@ impl AuthService {
                 // Update OAuth credentials with new tokens
                 if let Ok(oauth_creds) = self
                     .db
-                    .get_oauth_credentials_by_provider_and_user("google", user.id)
+                    .get_oauth_credentials_by_provider_and_user(OAuthProvider::Google, user.id)
                     .await
                 {
                     let update_request = be_remote_db::UpdateOAuthCredentials {
@@ -488,7 +509,7 @@ impl AuthService {
                         // Link OAuth account to existing user
                         let oauth_request = CreateOAuthCredentials {
                             user_id: user.id,
-                            provider: "google".to_string(),
+                            provider: OAuthProvider::Google,
                             provider_user_id: user_info.id.clone(),
                             access_token: Some(access_token.as_bytes().to_vec()),
                             refresh_token: token_result
@@ -561,7 +582,7 @@ impl AuthService {
                         // Create OAuth credentials for the new user
                         let oauth_request = CreateOAuthCredentials {
                             user_id: new_user.id,
-                            provider: "google".to_string(),
+                            provider: OAuthProvider::Google,
                             provider_user_id: user_info.id.clone(),
                             access_token: Some(access_token.as_bytes().to_vec()),
                             refresh_token: token_result
@@ -766,10 +787,12 @@ impl ProtoAuthService for AuthService {
                 })?;
 
                 // Store OAuth state in database
+                // The PKCE verifier should be encrypted by the application layer before storage
+                // For now, we'll store it as bytes (in production, this should be encrypted)
                 let expires_at = Utc::now() + Duration::minutes(10); // 10 minute expiration
                 let oauth_state_request = CreateOAuthState {
                     state: state.clone(),
-                    pkce_verifier: pkce_verifier.clone(),
+                    pkce_verifier: pkce_verifier.as_bytes().to_vec(),
                     redirect_uri: google_config.redirect_uri.clone(),
                     ip_address: None, // Could be extracted from request metadata if needed
                     expires_at,
@@ -824,57 +847,52 @@ impl ProtoAuthService for AuthService {
         info!("Login by login token request received");
 
         let req = request.into_inner();
-        let token = req.token;
+        let code_verifier = req.token;
 
-        if token.is_empty() {
+        if code_verifier.is_empty() {
             warn!("Login by login token request received with empty token");
             return Err(Status::invalid_argument("Login token is required"));
         }
 
-        // Hash the token
-        let mut hasher = Sha256::new();
-        hasher.update(token);
-        let code_challenge = hasher.finalize();
-        let token = URL_SAFE_NO_PAD.encode(code_challenge);
+        // The desktop app sends the code_verifier, but the web app stored the code_challenge.
+        // We need to convert code_verifier to code_challenge using PKCE S256 method,
+        // then hash that for the database lookup.
+        let code_challenge = self.code_verifier_to_challenge(&code_verifier);
+        let token_hash = self.hash_login_token(&code_challenge);
+
+        debug!(
+            "Looking up login token: code_verifier_len={}, code_challenge={}, hash_len={}",
+            code_verifier.len(),
+            code_challenge,
+            token_hash.len()
+        );
 
         // Get the login token from database
-        let login_token = match self.db.get_login_token_by_token(&token).await {
+        let login_token = match self.db.get_login_token_by_hash(&token_hash).await {
             Ok(login_token) => login_token,
             Err(_) => {
-                warn!("Login token not found or expired: {}", token);
+                warn!("Login token not found or expired");
                 return Err(Status::unauthenticated("Invalid or expired login token"));
             }
         };
 
-        // Check if user_id is empty (token not associated with user)
-        if login_token.user_id.is_none() {
-            debug!(
-                "Login token not yet associated with user, client should keep polling: {}",
-                token
-            );
-            return Err(Status::unavailable(
-                "Login token pending user authentication",
-            ));
-        }
-
         // Check if token is already consumed
         if login_token.consumed {
-            warn!("Login token already consumed: {}", token);
+            warn!("Login token already consumed");
             return Err(Status::unauthenticated("Invalid login token"));
         }
 
-        // Get the user associated with the token
-        let user_id = login_token.user_id.unwrap();
-        let user = match self.db.get_user_by_id(user_id).await {
+        // Get the user associated with the token (user_id is now required, not optional)
+        let user = match self.db.get_user_by_id(login_token.user_id).await {
             Ok(user) => user,
             Err(_) => {
-                error!("User not found for login token: {}", token);
+                error!("User not found for login token");
                 return Err(Status::internal("User not found"));
             }
         };
 
         // Mark the token as consumed
-        if let Err(e) = self.db.consume_login_token(&token).await {
+        if let Err(e) = self.db.consume_login_token(&token_hash).await {
             error!("Failed to consume login token: {}", e);
             return Err(Status::internal("Failed to process login token"));
         }
