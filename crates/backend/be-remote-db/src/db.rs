@@ -15,7 +15,7 @@ use crate::{
         ListActivities, ListConversations, ListMessages, LoginToken, Message, MessageAsset,
         NewActivity, NewAsset, NewConversation, NewMessage, NewUser, OAuthCredentials, OAuthState,
         PasswordCredentials, RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateAsset,
-        UpdateConversation, UpdateMessage, UpdateOAuthCredentials, User,
+        UpdateMessage, UpdateOAuthCredentials, User,
     },
 };
 use crate::{GetLastMessages, error::DbResult};
@@ -161,48 +161,6 @@ impl DatabaseManager {
         Ok(credentials)
     }
 
-    // Authentication helper methods
-    pub async fn authenticate_user(
-        &self,
-        username_or_email: &str,
-        password_hash: &str,
-    ) -> DbResult<Option<User>> {
-        let user_result = sqlx::query_as::<_, User>(
-            r#"
-            SELECT u.id, u.username, u.email, u.display_name, u.email_verified, u.created_at, u.updated_at
-            FROM users u
-            INNER JOIN password_credentials pc ON u.id = pc.user_id
-            WHERE (u.username = $1 OR u.email = $1) AND pc.password_hash = $2
-            "#,
-        )
-        .bind(username_or_email)
-        .bind(password_hash)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(user_result)
-    }
-
-    pub async fn verify_email(&self, user_id: Uuid) -> DbResult<User> {
-        let now = Utc::now();
-
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            UPDATE users
-            SET email_verified = true,
-                updated_at = $2
-            WHERE id = $1
-            RETURNING id, username, email, display_name, email_verified, created_at, updated_at
-            "#,
-        )
-        .bind(user_id)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(user)
-    }
-
     // Utility methods
     pub async fn user_exists_by_username(&self, username: &str) -> DbResult<bool> {
         let count: (i64,) = sqlx::query_as(
@@ -281,27 +239,6 @@ impl DatabaseManager {
         )
         .bind(provider)
         .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(oauth_creds)
-    }
-
-    pub async fn get_oauth_credentials_by_provider_user_id(
-        &self,
-        provider: &str,
-        provider_user_id: &str,
-    ) -> DbResult<OAuthCredentials> {
-        let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
-            r#"
-            SELECT id, user_id, provider, provider_user_id, access_token,
-                   refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
-            FROM oauth_credentials
-            WHERE provider = $1 AND provider_user_id = $2
-            "#,
-        )
-        .bind(provider)
-        .bind(provider_user_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -423,37 +360,6 @@ impl DatabaseManager {
         Ok(())
     }
 
-    pub async fn revoke_all_user_refresh_tokens(&self, user_id: Uuid) -> DbResult<()> {
-        let now = Utc::now();
-
-        sqlx::query(
-            r#"
-            UPDATE refresh_tokens
-            SET revoked = true, updated_at = $2
-            WHERE user_id = $1 AND revoked = false
-            "#,
-        )
-        .bind(user_id)
-        .bind(now)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn cleanup_expired_refresh_tokens(&self) -> DbResult<u64> {
-        let result = sqlx::query(
-            r#"
-            DELETE FROM refresh_tokens
-            WHERE expires_at < now()
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected())
-    }
-
     // OAuth state management methods
     pub async fn create_oauth_state(&self, request: CreateOAuthState) -> DbResult<OAuthState> {
         let id = Uuid::now_v7();
@@ -508,19 +414,6 @@ impl DatabaseManager {
         .await?;
 
         Ok(())
-    }
-
-    pub async fn cleanup_expired_oauth_states(&self) -> DbResult<u64> {
-        let result = sqlx::query(
-            r#"
-            DELETE FROM oauth_state
-            WHERE expires_at < now()
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected())
     }
 
     // Login token management methods
@@ -582,19 +475,6 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
-    pub async fn cleanup_expired_login_tokens(&self) -> DbResult<u64> {
-        let result = sqlx::query(
-            r#"
-            DELETE FROM login_tokens
-            WHERE expires_at < now()
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected())
-    }
-
     // =========================================================================
     // Activity Management Methods
     // =========================================================================
@@ -621,22 +501,6 @@ impl DatabaseManager {
         .bind(request.ended_at)
         .bind(now)
         .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(activity)
-    }
-
-    /// Get an activity by ID
-    pub async fn get_activity(&self, activity_id: Uuid) -> DbResult<Activity> {
-        let activity = sqlx::query_as::<_, Activity>(
-            r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
-            FROM activities
-            WHERE id = $1
-            "#,
-        )
-        .bind(activity_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -834,22 +698,6 @@ impl DatabaseManager {
         .bind(&metadata)
         .bind(now)
         .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(asset)
-    }
-
-    /// Get an asset by ID
-    pub async fn get_asset(&self, asset_id: Uuid) -> DbResult<Asset> {
-        let asset = sqlx::query_as::<_, Asset>(
-            r#"
-            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
-            FROM assets
-            WHERE id = $1
-            "#,
-        )
-        .bind(asset_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -1219,34 +1067,6 @@ impl DatabaseManager {
         .await?;
 
         Ok(conversations)
-    }
-
-    /// Update an existing conversation
-    pub async fn update_conversation(
-        &self,
-        conversation_id: Uuid,
-        user_id: Uuid,
-        request: UpdateConversation,
-    ) -> DbResult<Conversation> {
-        let now = Utc::now();
-
-        let conversation = sqlx::query_as::<_, Conversation>(
-            r#"
-            UPDATE conversations
-            SET title = COALESCE($3, title),
-                updated_at = $4
-            WHERE id = $1 AND user_id = $2
-            RETURNING id, user_id, title, created_at, updated_at
-            "#,
-        )
-        .bind(conversation_id)
-        .bind(user_id)
-        .bind(&request.title)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(conversation)
     }
 
     /// Delete a conversation (will cascade delete all messages)
