@@ -1,12 +1,4 @@
-use std::time::Duration;
-
-use chrono::{DateTime, Utc};
-use sqlx::{
-    migrate::MigrateDatabase,
-    postgres::{PgPool, PgPoolOptions},
-};
-use uuid::Uuid;
-
+use crate::error::DbResult;
 use crate::{
     GetConversation,
     types::{
@@ -17,7 +9,14 @@ use crate::{
         RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateOAuthCredentials, User,
     },
 };
-use crate::{GetLastMessages, error::DbResult};
+use chrono::{DateTime, Utc};
+use sqlx::{
+    migrate::MigrateDatabase,
+    postgres::{PgPool, PgPoolOptions},
+};
+use std::time::Duration;
+use uuid::Uuid;
+
 #[derive(Debug)]
 pub struct DatabaseManager {
     pub pool: PgPool,
@@ -857,28 +856,6 @@ impl DatabaseManager {
         Ok(message)
     }
 
-    pub async fn get_last_messages(&self, request: GetLastMessages) -> DbResult<Vec<Message>> {
-        // Clamp limit to max 100
-        let limit = request.limit.clamp(1, 100);
-
-        let messages = sqlx::query_as::<_, Message>(
-                   r#"
-                   SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
-                   FROM messages m
-                   WHERE m.conversation_id = $1 AND m.user_id = $2
-                   ORDER BY m.id DESC
-                   LIMIT $3
-                   "#,
-               )
-               .bind(request.conversation_id)
-               .bind(request.user_id)
-               .bind(limit as i64)
-               .fetch_all(&self.pool)
-               .await?;
-
-        Ok(messages)
-    }
-
     /// List messages for a conversation with pagination
     pub async fn list_messages(&self, request: ListMessages) -> DbResult<Vec<Message>> {
         // Clamp limit to max 100
@@ -890,12 +867,13 @@ impl DatabaseManager {
                     FROM messages m
                     WHERE m.conversation_id = $1 AND m.user_id = $2
                     ORDER BY m.id ASC
-                    LIMIT $3
+                    LIMIT $3 OFFSET $4
                     "#,
                 )
                 .bind(request.conversation_id)
                 .bind(request.user_id)
                 .bind(limit as i64)
+                .bind(request.offset as i64)
                 .fetch_all(&self.pool)
                 .await?;
 
