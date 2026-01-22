@@ -246,13 +246,6 @@ impl ProtoConversationService for ConversationService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        // TODO: Backend driven chat
-        // 1. Get current conversation
-        // 2. Get last messages (the assets should be saved beforehand?)
-        // 3. Get assets and add them to messages
-        // 4. Add user message
-        // 5. Generate response
-
         let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
             ConversationServiceError::InvalidUuid {
                 field: "conversation_id",
@@ -262,7 +255,7 @@ impl ProtoConversationService for ConversationService {
 
         let db_messages = self
             .db
-            .list_messages(ListMessages {
+            .list_messages_desc(ListMessages {
                 conversation_id,
                 user_id,
                 limit: 5,
