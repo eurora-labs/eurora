@@ -58,9 +58,9 @@
 		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
 
-			if (!conversation.id) return;
+			if (!new_conv.id) return;
 
-			taurpc.conversation.get_messages(conversation.id, 5, 0).then((response) => {
+			taurpc.conversation.get_messages(new_conv.id, 5, 0).then((response) => {
 				messages = response;
 			});
 		});
