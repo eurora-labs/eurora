@@ -8,9 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 use super::chat_generation::{ChatGeneration, ChatGenerationChunk};
 use super::generation::{Generation, GenerationChunk};
 use super::run_info::RunInfo;
@@ -18,7 +15,7 @@ use super::run_info::RunInfo;
 /// Enum representing different types of generations.
 ///
 /// This allows LLMResult to hold different generation types.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum GenerationType {
@@ -61,7 +58,7 @@ impl From<ChatGenerationChunk> for GenerationType {
 /// Both chat models and LLMs generate an LLMResult object. This object contains the
 /// generated outputs and any additional information that the model provider wants to
 /// return.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LLMResult {
     /// Generated outputs.
