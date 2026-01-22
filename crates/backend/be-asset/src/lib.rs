@@ -4,7 +4,7 @@ pub use error::{AssetError, AssetResult};
 
 use std::sync::Arc;
 
-use be_remote_db::{DatabaseManager, NewAsset as DbCreateAssetRequest};
+use be_remote_db::{DatabaseManager, NewAsset};
 use be_storage::StorageService;
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -98,7 +98,6 @@ impl AssetService {
             hex::encode(&checksum_sha256)
         );
 
-        // Generate new asset ID
         let asset_id = Uuid::now_v7();
 
         // Upload content to storage
@@ -120,8 +119,9 @@ impl AssetService {
             .map_err(AssetError::InvalidMetadata)?;
 
         // Create database record
-        let db_request = DbCreateAssetRequest {
-            id: asset_id,
+        let db_request = NewAsset {
+            id: Some(asset_id),
+            user_id,
             name: req.name,
             checksum_sha256: Some(checksum_sha256),
             size_bytes: Some(size_bytes),
@@ -130,14 +130,10 @@ impl AssetService {
             metadata,
         };
 
-        let asset = self
-            .db
-            .create_asset(user_id, db_request)
-            .await
-            .map_err(|e| {
-                error!("Failed to create asset in database: {}", e);
-                AssetError::DatabaseCreate(e)
-            })?;
+        let asset = self.db.create_asset(db_request).await.map_err(|e| {
+            error!("Failed to create asset in database: {}", e);
+            AssetError::DatabaseCreate(e)
+        })?;
 
         // Link to activity if activity_id provided
         if let Some(activity_id_str) = &req.activity_id {
