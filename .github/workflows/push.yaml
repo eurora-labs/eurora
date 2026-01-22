@@ -147,7 +147,7 @@ jobs:
             - name: Cargo Clippy
               run: |
                   rustup component add clippy
-                  cargo clippy --workspace --all-targets -- -D warnings
+                  ./scripts/clippy.sh
 
     rust-test:
         needs: changes
