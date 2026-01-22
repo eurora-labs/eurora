@@ -9,15 +9,6 @@ use proto_gen::agent_chain::{
 };
 use uuid::Uuid;
 
-// #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-// pub struct Conversation {
-//     pub id: Uuid,
-//     pub user_id: Uuid,
-//     pub title: Option<String>,
-//     pub created_at: DateTime<Utc>,
-//     pub updated_at: DateTime<Utc>,
-// }
-
 impl TryFrom<proto_gen::conversation::Conversation> for Conversation {
     type Error = DbError;
 
