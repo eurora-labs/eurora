@@ -167,7 +167,8 @@ pub struct Asset {
 /// Request for creating a new asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewAsset {
-    pub id: Uuid,
+    pub id: Option<Uuid>,
+    pub user_id: Uuid,
     pub name: String,
     pub checksum_sha256: Option<Vec<u8>>,
     pub size_bytes: Option<i64>,
