@@ -1,6 +1,6 @@
-use crate::error::DbResult;
 use crate::{
-    GetConversation,
+    GetConversation, PaginationParams,
+    error::DbResult,
     types::{
         Activity, ActivityAsset, Asset, Conversation, CreateLoginToken, CreateOAuthCredentials,
         CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange, ListActivities,
@@ -528,10 +528,11 @@ impl DatabaseManager {
     }
 
     /// List activities for a user with pagination
-    pub async fn list_activities(&self, request: ListActivities) -> DbResult<Vec<Activity>> {
-        // Clamp limit to max 100
-        let limit = request.limit.clamp(1, 100);
-
+    pub async fn list_activities(
+        &self,
+        request: ListActivities,
+        params: PaginationParams,
+    ) -> DbResult<Vec<Activity>> {
         let activities = sqlx::query_as::<_, Activity>(
             r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
@@ -542,8 +543,8 @@ impl DatabaseManager {
             "#,
         )
         .bind(request.user_id)
-        .bind(limit as i64)
-        .bind(request.offset as i64)
+        .bind(params.limit())
+        .bind(params.offset())
         .fetch_all(&self.pool)
         .await?;
 
@@ -643,10 +644,8 @@ impl DatabaseManager {
     pub async fn get_activities_by_time_range(
         &self,
         request: GetActivitiesByTimeRange,
+        params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
-        // Clamp limit to max 100
-        let limit = request.limit.clamp(1, 100);
-
         let activities = sqlx::query_as::<_, Activity>(
             r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
@@ -661,8 +660,8 @@ impl DatabaseManager {
         .bind(request.user_id)
         .bind(request.start_time)
         .bind(request.end_time)
-        .bind(limit as i64)
-        .bind(request.offset as i64)
+        .bind(params.limit())
+        .bind(params.offset())
         .fetch_all(&self.pool)
         .await?;
 
@@ -787,22 +786,21 @@ impl DatabaseManager {
     pub async fn list_conversations(
         &self,
         request: ListConversations,
+        params: PaginationParams,
     ) -> DbResult<Vec<Conversation>> {
-        // Clamp limit to max 100
-        let limit = request.limit.clamp(1, 100);
-
         let conversations = sqlx::query_as::<_, Conversation>(
             r#"
             SELECT id, user_id, title, created_at, updated_at
             FROM conversations
             WHERE user_id = $1
-            ORDER BY updated_at DESC
-            LIMIT $2 OFFSET $3
+            ORDER BY id $2
+            LIMIT $3 OFFSET $4
             "#,
         )
         .bind(request.user_id)
-        .bind(limit as i64)
-        .bind(request.offset as i64)
+        .bind(params.order().to_string())
+        .bind(params.limit())
+        .bind(params.offset())
         .fetch_all(&self.pool)
         .await?;
 
@@ -859,45 +857,25 @@ impl DatabaseManager {
     }
 
     /// List messages for a conversation with pagination
-    pub async fn list_messages_desc(&self, request: ListMessages) -> DbResult<Vec<Message>> {
-        let limit = request.limit.clamp(1, 100);
-
+    pub async fn list_messages(
+        &self,
+        request: ListMessages,
+        params: PaginationParams,
+    ) -> DbResult<Vec<Message>> {
         let messages = sqlx::query_as::<_, Message>(
                     r#"
                     SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
                     FROM messages m
                     WHERE m.conversation_id = $1 AND m.user_id = $2
-                    ORDER BY m.id DESC
-                    LIMIT $3 OFFSET $4
+                    ORDER BY m.id $3
+                    LIMIT $4 OFFSET $5
                     "#,
                 )
                 .bind(request.conversation_id)
                 .bind(request.user_id)
-                .bind(limit as i64)
-                .bind(request.offset as i64)
-                .fetch_all(&self.pool)
-                .await?;
-
-        Ok(messages)
-    }
-
-    /// List messages for a conversation with pagination
-    pub async fn list_messages(&self, request: ListMessages) -> DbResult<Vec<Message>> {
-        let limit = request.limit.clamp(1, 100);
-
-        let messages = sqlx::query_as::<_, Message>(
-                    r#"
-                    SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
-                    FROM messages m
-                    WHERE m.conversation_id = $1 AND m.user_id = $2
-                    ORDER BY m.id ASC
-                    LIMIT $3 OFFSET $4
-                    "#,
-                )
-                .bind(request.conversation_id)
-                .bind(request.user_id)
-                .bind(limit as i64)
-                .bind(request.offset as i64)
+                .bind(params.order().to_string())
+                .bind(params.limit())
+                .bind(params.offset())
                 .fetch_all(&self.pool)
                 .await?;
 
