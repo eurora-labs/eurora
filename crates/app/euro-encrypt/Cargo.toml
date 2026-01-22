@@ -1,6 +1,8 @@
 [package]
 name = "euro-encrypt"
 version = "0.0.0"
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+license-file = "LICENSE"
 edition.workspace = true
 description = "Handle user encryption and related functionalities"
 
