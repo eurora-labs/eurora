@@ -2,8 +2,8 @@ use std::env;
 
 use anyhow::{Result, anyhow};
 use oauth2::{
-    AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, RevocationUrl, Scope, TokenUrl,
-    basic::BasicClient,
+    AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl, RevocationUrl,
+    Scope, TokenUrl, basic::BasicClient,
 };
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
@@ -87,10 +87,14 @@ impl GoogleOAuthClient {
         Ok((authorize_url.to_string(), csrf_state.secret().clone()))
     }
 
-    /// Generate the authorization URL for Google OAuth with a custom state
+    /// Generate the authorization URL for Google OAuth with a custom state and PKCE verifier
     /// Returns the authorization_url
-    pub fn get_authorization_url_with_state(&self, state: &str) -> Result<String> {
-        info!("Generating Google OAuth authorization URL with custom state");
+    pub fn get_authorization_url_with_state_and_pkce(
+        &self,
+        state: &str,
+        pkce_verifier: &str,
+    ) -> Result<String> {
+        info!("Generating Google OAuth authorization URL with custom state and PKCE");
 
         let google_client_id = ClientId::new(self.config.client_id.clone());
         let google_client_secret = ClientSecret::new(self.config.client_secret.clone());
@@ -115,16 +119,21 @@ impl GoogleOAuthClient {
             )
             .set_redirect_uri(redirect_url);
 
-        // Generate the authorization URL with custom state
+        // Generate PKCE challenge from the verifier
+        let pkce_code_verifier = oauth2::PkceCodeVerifier::new(pkce_verifier.to_string());
+        let pkce_challenge = PkceCodeChallenge::from_code_verifier_sha256(&pkce_code_verifier);
+
+        // Generate the authorization URL with custom state and PKCE challenge
         let (authorize_url, _) = client
             .authorize_url(|| CsrfToken::new(state.to_string()))
             // Request access to OpenID Connect scopes for user authentication
             .add_scope(Scope::new("openid".to_string()))
             .add_scope(Scope::new("email".to_string()))
             .add_scope(Scope::new("profile".to_string()))
+            .set_pkce_challenge(pkce_challenge)
             .url();
 
-        info!("Generated authorization URL with custom state",);
+        info!("Generated authorization URL with custom state and PKCE");
 
         Ok(authorize_url.to_string())
     }

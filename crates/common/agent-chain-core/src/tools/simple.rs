@@ -257,8 +257,8 @@ impl BaseTool for Tool {
     fn args(&self) -> HashMap<String, Value> {
         // For backwards compatibility, if the function signature is ambiguous,
         // assume it takes a single string input.
-        if self.args_schema.is_some() {
-            return self.args_schema.as_ref().unwrap().properties();
+        if let Some(args_schema) = &self.args_schema {
+            return args_schema.properties();
         }
         let mut props = HashMap::new();
         props.insert(
