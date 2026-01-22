@@ -4,13 +4,6 @@
 --              Designed to work seamlessly with agent-chain message types
 
 ----------------------------------------------------------------
--- Enable pg_uuidv7 extension for UUID v7 support
--- UUID v7 is time-ordered which is better for database performance (clustering)
--- Install on server: See https://github.com/fboulnois/pg_uuidv7
-----------------------------------------------------------------
-CREATE EXTENSION IF NOT EXISTS "pg_uuidv7";
-
-----------------------------------------------------------------
 -- Create ENUM type for message types
 -- Matches agent-chain-core's BaseMessage variants that are stored
 ----------------------------------------------------------------
@@ -21,7 +14,7 @@ CREATE TYPE message_type AS ENUM ('human', 'system', 'ai', 'tool');
 -- Stores chat conversation metadata linked to users
 ----------------------------------------------------------------
 CREATE TABLE conversations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
     title VARCHAR(500),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -39,7 +32,7 @@ CREATE TABLE conversations (
 -- Stores agent-chain BaseMessage types in a normalized form
 ----------------------------------------------------------------
 CREATE TABLE messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    id UUID PRIMARY KEY,
     conversation_id UUID NOT NULL,
     user_id UUID NOT NULL,
     message_type message_type NOT NULL,
@@ -74,9 +67,14 @@ CREATE TABLE messages (
         ON DELETE CASCADE,
 
     -- ToolMessage must have tool_call_id
-    CONSTRAINT ck_messages_tool_call_id
+    CONSTRAINT messages_chk_tool_call_id
         CHECK (message_type != 'tool' OR tool_call_id IS NOT NULL)
 );
+
+----------------------------------------------------------------
+-- Create ENUM type for asset status
+----------------------------------------------------------------
+CREATE TYPE asset_status AS ENUM ('pending', 'uploaded', 'processing', 'ready', 'failed', 'deleted');
 
 ----------------------------------------------------------------
 -- Create assets table (MUST be created before activities)
@@ -84,7 +82,7 @@ CREATE TABLE messages (
 -- Actual file content stored externally (e.g., S3, filesystem)
 ----------------------------------------------------------------
 CREATE TABLE assets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
 
     name TEXT NOT NULL,
@@ -95,7 +93,7 @@ CREATE TABLE assets (
     storage_backend TEXT NOT NULL, -- Backend used for storage (e.g., S3, filesystem)
     storage_uri TEXT NOT NULL, -- Path to the file, could be s3 path or local server
 
-    status TEXT NOT NULL DEFAULT 'uploaded',
+    status asset_status NOT NULL DEFAULT 'uploaded',
 
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -110,7 +108,7 @@ CREATE TABLE assets (
         ON DELETE CASCADE,
 
     -- SHA256 length check
-    CONSTRAINT assets_sha256_len CHECK (checksum_sha256 IS NULL OR octet_length(checksum_sha256) = 32)
+    CONSTRAINT assets_chk_sha256_len CHECK (checksum_sha256 IS NULL OR octet_length(checksum_sha256) = 32)
 );
 
 ----------------------------------------------------------------
@@ -118,7 +116,7 @@ CREATE TABLE assets (
 -- Tracks application/process usage (e.g., desktop apps, browser tabs)
 ----------------------------------------------------------------
 CREATE TABLE activities (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
     name VARCHAR(500) NOT NULL,
     icon_asset_id UUID,
@@ -332,5 +330,6 @@ COMMENT ON TABLE message_assets IS 'Links messages to their attached assets';
 COMMENT ON COLUMN message_assets.message_id IS 'Foreign key to messages table';
 COMMENT ON COLUMN message_assets.asset_id IS 'Foreign key to assets table';
 
--- Enum type
+-- Enum types
 COMMENT ON TYPE message_type IS 'Enum for message types matching agent-chain BaseMessage variants';
+COMMENT ON TYPE asset_status IS 'Enum for asset lifecycle status - extend via ALTER TYPE ADD VALUE';
