@@ -1,16 +1,17 @@
 use agent_chain::{
-    AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolCall, ToolMessage,
-    messages::MessageContent,
+    AIMessage, BaseMessage, HumanMessage, MessageContent, SystemMessage, ToolCall, ToolMessage,
 };
 use be_remote_db::{Message, MessageType};
 
 use crate::{ConversationServiceError, ConversationServiceResult};
 
-/// Convert a database Message to an agent-chain BaseMessage.
+/// Convert a database message to a BaseMessage.
 ///
-/// The database stores content as JSONB with the following formats:
-/// - Human: `MessageContent` enum (`{"Text": "..."}` or `{"Parts": [...]}`)
-/// - System/AI/Tool: Simple string stored as JSON string (e.g., `"Hello"`)
+/// The database stores content as JSONB which can be:
+/// - A simple JSON string: `"hello"` -> `MessageContent::Text`
+/// - A MessageContent object: `{"Text": "..."}` or `{"Parts": [...]}` -> `MessageContent`
+///
+/// This function handles all message types: Human, System, AI, and Tool.
 pub fn convert_db_message_to_base_message(
     db_message: Message,
 ) -> ConversationServiceResult<BaseMessage> {
@@ -18,142 +19,82 @@ pub fn convert_db_message_to_base_message(
 
     match db_message.message_type {
         MessageType::Human => {
-            // Human messages use MessageContent format in the database
-            let message_content: MessageContent =
-                serde_json::from_value(db_message.content.clone()).map_err(|e| {
-                    ConversationServiceError::Internal(format!(
-                        "Failed to deserialize HumanMessage content: {}",
-                        e
-                    ))
-                })?;
-
-            let mut human_message = HumanMessage {
-                content: message_content,
-                id: Some(id),
-                name: None,
-                additional_kwargs: Default::default(),
+            let content = parse_message_content(&db_message.content)?;
+            let message = match content {
+                MessageContent::Text(text) => HumanMessage::with_id(id, text),
+                MessageContent::Parts(parts) => HumanMessage::with_id_and_content(id, parts),
             };
-
-            // Parse additional_kwargs if present
-            if let Some(kwargs) = db_message.additional_kwargs.as_object() {
-                for (k, v) in kwargs {
-                    human_message.additional_kwargs.insert(k.clone(), v.clone());
-                }
-            }
-
-            Ok(BaseMessage::Human(human_message))
+            Ok(BaseMessage::Human(message))
         }
-
         MessageType::System => {
-            // System messages store content as a JSON string
-            let content = extract_string_content(&db_message.content)?;
-
-            let mut system_message = SystemMessage::with_id(id, content);
-
-            // Parse additional_kwargs if present
-            if let Some(kwargs) = db_message.additional_kwargs.as_object() {
-                for (k, v) in kwargs {
-                    system_message
-                        .additional_kwargs
-                        .insert(k.clone(), v.clone());
-                }
-            }
-
-            Ok(BaseMessage::System(system_message))
+            let content = parse_message_content(&db_message.content)?;
+            let message = match content {
+                MessageContent::Text(text) => SystemMessage::with_id(id, text),
+                MessageContent::Parts(parts) => SystemMessage::with_id_and_content(id, parts),
+            };
+            Ok(BaseMessage::System(message))
         }
-
         MessageType::Ai => {
-            // AI messages store content as a JSON string
-            let content = extract_string_content(&db_message.content)?;
-
-            // Parse tool_calls if present
-            let tool_calls = if let Some(tc_value) = db_message.tool_calls {
-                parse_tool_calls(&tc_value)?
-            } else {
-                Vec::new()
-            };
-
-            let mut ai_message = if tool_calls.is_empty() {
-                AIMessage::with_id(&id, content)
-            } else {
-                AIMessage::with_id_and_tool_calls(&id, content, tool_calls)
-            };
-
-            // Parse additional_kwargs if present
-            if let Some(kwargs) = db_message.additional_kwargs.as_object() {
-                for (k, v) in kwargs {
-                    ai_message.additional_kwargs.insert(k.clone(), v.clone());
-                }
-            }
-
-            Ok(BaseMessage::AI(ai_message))
+            let content = parse_ai_content(&db_message.content)?;
+            let tool_calls = parse_tool_calls(&db_message.tool_calls)?;
+            let message = AIMessage::with_id_and_tool_calls(id, content, tool_calls);
+            Ok(BaseMessage::AI(message))
         }
-
         MessageType::Tool => {
-            // Tool messages store content as a JSON string
-            let content = extract_string_content(&db_message.content)?;
-
-            let tool_call_id = db_message.tool_call_id.unwrap_or_default();
-
-            let mut tool_message = ToolMessage::with_id(&id, content, tool_call_id);
-
-            // Parse additional_kwargs if present
-            if let Some(kwargs) = db_message.additional_kwargs.as_object() {
-                for (k, v) in kwargs {
-                    tool_message.additional_kwargs.insert(k.clone(), v.clone());
-                }
-            }
-
-            Ok(BaseMessage::Tool(tool_message))
+            let content = parse_ai_content(&db_message.content)?;
+            let tool_call_id = db_message.tool_call_id.ok_or_else(|| {
+                ConversationServiceError::Internal("Tool message missing tool_call_id".to_string())
+            })?;
+            let message = ToolMessage::with_id(id, content, tool_call_id);
+            Ok(BaseMessage::Tool(message))
         }
     }
 }
 
-/// Extract string content from a JSON value.
+/// Parse message content from JSON value for Human/System messages.
 ///
-/// The database stores simple string content as a JSON string (e.g., `"Hello"`),
-/// so we need to extract the inner string value.
-fn extract_string_content(content: &serde_json::Value) -> ConversationServiceResult<String> {
-    match content {
-        serde_json::Value::String(s) => Ok(s.clone()),
-        // Handle case where content might be stored as an object with a "text" field
-        serde_json::Value::Object(obj) => {
-            if let Some(serde_json::Value::String(text)) = obj.get("text") {
-                Ok(text.clone())
-            } else if let Some(serde_json::Value::String(text)) = obj.get("Text") {
-                Ok(text.clone())
-            } else {
-                // Fallback: serialize the entire object as a string
-                Ok(serde_json::to_string(content).unwrap_or_default())
-            }
-        }
-        // For any other type, convert to string representation
-        _ => Ok(content.to_string()),
+/// Handles two formats:
+/// 1. A plain JSON string: `"hello"` -> `MessageContent::Text("hello")`
+/// 2. A serialized MessageContent: `{"Text": "..."}` or `{"Parts": [...]}`
+fn parse_message_content(content: &serde_json::Value) -> ConversationServiceResult<MessageContent> {
+    // If it's a plain string, convert directly to text content
+    if let Some(text) = content.as_str() {
+        return Ok(MessageContent::Text(text.to_string()));
     }
+
+    // Otherwise, try to deserialize as MessageContent
+    serde_json::from_value(content.clone()).map_err(|e| {
+        ConversationServiceError::Internal(format!("Failed to parse message content: {}", e))
+    })
 }
 
-/// Parse tool calls from a JSON value.
-fn parse_tool_calls(value: &serde_json::Value) -> ConversationServiceResult<Vec<ToolCall>> {
-    let tool_calls_array = value.as_array().ok_or_else(|| {
-        ConversationServiceError::Internal("tool_calls is not an array".to_string())
-    })?;
-
-    let mut tool_calls = Vec::new();
-    for tc in tool_calls_array {
-        let name = tc
-            .get("name")
-            .and_then(|n| n.as_str())
-            .unwrap_or("")
-            .to_string();
-        let args = tc.get("args").cloned().unwrap_or(serde_json::json!({}));
-        let id = tc.get("id").and_then(|i| i.as_str()).map(String::from);
-
-        let tool_call = match id {
-            Some(id) => ToolCall::with_id(id, name, args),
-            None => ToolCall::new(name, args),
-        };
-        tool_calls.push(tool_call);
+/// Parse content from JSON value for AI/Tool messages.
+///
+/// AI and Tool messages store content as a simple string.
+/// Handles two formats:
+/// 1. A plain JSON string: `"hello"` -> `"hello"`
+/// 2. Any other JSON value: serialized to string
+fn parse_ai_content(content: &serde_json::Value) -> ConversationServiceResult<String> {
+    // If it's a plain string, return it directly
+    if let Some(text) = content.as_str() {
+        return Ok(text.to_string());
     }
 
-    Ok(tool_calls)
+    // Otherwise, serialize the JSON value to a string
+    Ok(serde_json::to_string(content).unwrap_or_default())
+}
+
+/// Parse tool calls from an optional JSON value.
+///
+/// The database stores tool_calls as a JSON array of ToolCall objects.
+fn parse_tool_calls(
+    tool_calls: &Option<serde_json::Value>,
+) -> ConversationServiceResult<Vec<ToolCall>> {
+    match tool_calls {
+        None => Ok(Vec::new()),
+        Some(serde_json::Value::Null) => Ok(Vec::new()),
+        Some(value) => serde_json::from_value(value.clone()).map_err(|e| {
+            ConversationServiceError::Internal(format!("Failed to parse tool calls: {}", e))
+        }),
+    }
 }
