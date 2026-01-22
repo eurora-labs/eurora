@@ -1,10 +1,9 @@
 [package]
 name = "euro-vision"
 version = "0.0.0"
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
-license-file = "LICENSE"
 edition.workspace = true
 description = "Vision util for capturing screen, window and ocr'ing"
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }

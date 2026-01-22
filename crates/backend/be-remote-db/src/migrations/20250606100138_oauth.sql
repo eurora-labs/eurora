@@ -3,32 +3,30 @@
 -- Adds oauth_credentials and refresh_tokens tables
 
 ----------------------------------------------------------------
--- Enable UUID extension if not already enabled
+-- Create ENUM type for OAuth providers (extensible via ALTER TYPE)
 ----------------------------------------------------------------
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE TYPE oauth_provider AS ENUM ('google', 'github');
 
 ----------------------------------------------------------------
 -- oauth_credentials : stores provider identifiers + tokens
 ----------------------------------------------------------------
 CREATE TABLE oauth_credentials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
-    provider VARCHAR(16) NOT NULL,
+    provider oauth_provider NOT NULL,
     provider_user_id VARCHAR(255) NOT NULL,
     access_token BYTEA,
     refresh_token BYTEA,
     access_token_expiry TIMESTAMP WITH TIME ZONE,
     scope TEXT,
-    issued_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    issued_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_oauth_credentials_user_id
         FOREIGN KEY (user_id)
         REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT ck_oauth_provider CHECK (provider IN ('google', 'github'))
+        ON DELETE CASCADE
 );
 
 ----------------------------------------------------------------
@@ -44,19 +42,23 @@ CREATE UNIQUE INDEX idx_oauth_credentials_provider_userid
 -- refresh_tokens : backend-issued long-lived tokens
 ----------------------------------------------------------------
 CREATE TABLE refresh_tokens (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
-    token_hash TEXT NOT NULL,
-    issued_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    -- SHA-256 hash stored as 32 bytes (256 bits)
+    token_hash BYTEA NOT NULL,
+    issued_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    revoked BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    revoked BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_refresh_tokens_user_id
         FOREIGN KEY (user_id)
         REFERENCES users(id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+    
+    -- SHA-256 produces exactly 32 bytes
+    CONSTRAINT refresh_tokens_chk_hash_len CHECK (octet_length(token_hash) = 32)
 );
 
 ----------------------------------------------------------------
@@ -65,19 +67,23 @@ CREATE TABLE refresh_tokens (
 CREATE INDEX idx_refresh_tokens_user_id
     ON refresh_tokens(user_id);
 
+-- Unique index for token lookups during validation (each token hash must be unique)
+CREATE UNIQUE INDEX idx_refresh_tokens_token_hash
+    ON refresh_tokens(token_hash);
+
 CREATE INDEX idx_refresh_tokens_active
     ON refresh_tokens(user_id)
     WHERE revoked = false;
 
 ----------------------------------------------------------------
--- updated_at triggers
+-- updated_at triggers (using consistent naming: update_<table>_updated_at)
 ----------------------------------------------------------------
-CREATE TRIGGER trg_oauth_credentials_updated
+CREATE TRIGGER update_oauth_credentials_updated_at
     BEFORE UPDATE ON oauth_credentials
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER trg_refresh_tokens_updated
+CREATE TRIGGER update_refresh_tokens_updated_at
     BEFORE UPDATE ON refresh_tokens
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
@@ -85,12 +91,13 @@ CREATE TRIGGER trg_refresh_tokens_updated
 ----------------------------------------------------------------
 -- Documentation comments
 ----------------------------------------------------------------
+COMMENT ON TYPE oauth_provider IS 'Enum for OAuth providers - extend via ALTER TYPE ADD VALUE';
 COMMENT ON TABLE oauth_credentials IS 'External OAuth account bindings and provider tokens';
-COMMENT ON COLUMN oauth_credentials.provider IS 'OAuth provider name (google|github)';
+COMMENT ON COLUMN oauth_credentials.provider IS 'OAuth provider (google|github) - uses oauth_provider enum';
 COMMENT ON COLUMN oauth_credentials.provider_user_id IS 'Sub/UID received from provider';
 COMMENT ON COLUMN oauth_credentials.access_token IS 'Encrypted Google/GitHub access token';
 COMMENT ON COLUMN oauth_credentials.refresh_token IS 'Encrypted provider refresh token';
 
 COMMENT ON TABLE refresh_tokens IS 'Backend-issued refresh tokens for session management';
-COMMENT ON COLUMN refresh_tokens.token_hash IS 'SHA-256 of refresh token + server secret';
+COMMENT ON COLUMN refresh_tokens.token_hash IS 'SHA-256 hash (32 bytes) of refresh token';
 COMMENT ON COLUMN refresh_tokens.revoked IS 'True if token manually or automatically revoked';

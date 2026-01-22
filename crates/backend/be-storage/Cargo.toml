@@ -1,10 +1,9 @@
 [package]
 name = "be-storage"
 version = "0.0.0"
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
-license-file = "LICENSE"
 edition.workspace = true
 description = "Eurora Storage API"
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 hex = { workspace = true }

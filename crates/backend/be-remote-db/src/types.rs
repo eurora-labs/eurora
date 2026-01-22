@@ -62,7 +62,7 @@ pub struct User {
     pub display_name: Option<String>,
     pub email_verified: bool,
     pub created_at: DateTime<Utc>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -71,7 +71,8 @@ pub struct PasswordCredentials {
     pub user_id: Uuid,
     #[serde(skip_serializing)]
     pub password_hash: String,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,11 +97,29 @@ pub struct UpdatePassword {
     pub password_hash: String,
 }
 
+/// OAuth provider enum matching the database enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[sqlx(type_name = "oauth_provider", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum OAuthProvider {
+    Google,
+    Github,
+}
+
+impl std::fmt::Display for OAuthProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OAuthProvider::Google => write!(f, "google"),
+            OAuthProvider::Github => write!(f, "github"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct OAuthCredentials {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub provider: String,
+    pub provider: OAuthProvider,
     pub provider_user_id: String,
     pub access_token: Option<Vec<u8>>,
     pub refresh_token: Option<Vec<u8>>,
@@ -115,8 +134,9 @@ pub struct OAuthCredentials {
 pub struct RefreshToken {
     pub id: Uuid,
     pub user_id: Uuid,
+    /// SHA-256 hash stored as 32 bytes
     #[serde(skip_serializing)]
-    pub token_hash: String,
+    pub token_hash: Vec<u8>,
     pub issued_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub revoked: bool,
@@ -127,7 +147,7 @@ pub struct RefreshToken {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateOAuthCredentials {
     pub user_id: Uuid,
-    pub provider: String,
+    pub provider: OAuthProvider,
     pub provider_user_id: String,
     pub access_token: Option<Vec<u8>>,
     pub refresh_token: Option<Vec<u8>>,
@@ -138,7 +158,8 @@ pub struct CreateOAuthCredentials {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateRefreshToken {
     pub user_id: Uuid,
-    pub token_hash: String,
+    /// SHA-256 hash stored as 32 bytes
+    pub token_hash: Vec<u8>,
     pub expires_at: DateTime<Utc>,
 }
 
@@ -154,18 +175,22 @@ pub struct UpdateOAuthCredentials {
 pub struct OAuthState {
     pub id: Uuid,
     pub state: String,
-    pub pkce_verifier: String,
+    /// Encrypted PKCE verifier stored as bytes (application handles encryption)
+    #[serde(skip_serializing)]
+    pub pkce_verifier: Vec<u8>,
     pub redirect_uri: String,
     pub ip_address: Option<ipnet::IpNet>,
     pub consumed: bool,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateOAuthState {
     pub state: String,
-    pub pkce_verifier: String,
+    /// Encrypted PKCE verifier (application must encrypt before storing)
+    pub pkce_verifier: Vec<u8>,
     pub redirect_uri: String,
     pub ip_address: Option<ipnet::IpNet>,
     pub expires_at: DateTime<Utc>,
@@ -174,17 +199,20 @@ pub struct CreateOAuthState {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct LoginToken {
     pub id: Uuid,
-    pub token: String,
+    /// SHA-256 hash of the token (32 bytes)
+    #[serde(skip_serializing)]
+    pub token_hash: Vec<u8>,
     pub consumed: bool,
     pub expires_at: DateTime<Utc>,
-    pub user_id: Option<Uuid>,
+    pub user_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateLoginToken {
-    pub token: String,
+    /// SHA-256 hash of the token (32 bytes)
+    pub token_hash: Vec<u8>,
     pub user_id: Uuid,
     pub expires_at: DateTime<Utc>,
 }
@@ -198,6 +226,33 @@ pub struct UpdateLoginToken {
 // Asset Types
 // =============================================================================
 
+/// Asset status enum matching the database enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[sqlx(type_name = "asset_status", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum AssetStatus {
+    Pending,
+    #[default]
+    Uploaded,
+    Processing,
+    Ready,
+    Failed,
+    Deleted,
+}
+
+impl std::fmt::Display for AssetStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AssetStatus::Pending => write!(f, "pending"),
+            AssetStatus::Uploaded => write!(f, "uploaded"),
+            AssetStatus::Processing => write!(f, "processing"),
+            AssetStatus::Ready => write!(f, "ready"),
+            AssetStatus::Failed => write!(f, "failed"),
+            AssetStatus::Deleted => write!(f, "deleted"),
+        }
+    }
+}
+
 /// Represents a file asset (screenshots, attachments, etc.)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Asset {
@@ -209,7 +264,7 @@ pub struct Asset {
     pub checksum_sha256: Option<Vec<u8>>,
     pub storage_backend: String,
     pub storage_uri: String,
-    pub status: String,
+    pub status: AssetStatus,
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -226,6 +281,7 @@ pub struct NewAsset {
     pub storage_uri: String,
     pub storage_backend: String,
     pub mime_type: String,
+    pub status: Option<AssetStatus>,
     pub metadata: Option<serde_json::Value>,
 }
 
@@ -236,6 +292,7 @@ pub struct UpdateAsset {
     pub size_bytes: Option<i64>,
     pub storage_uri: Option<String>,
     pub mime_type: Option<String>,
+    pub status: Option<AssetStatus>,
     pub metadata: Option<serde_json::Value>,
 }
 
