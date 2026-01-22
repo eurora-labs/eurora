@@ -208,9 +208,20 @@ impl AuthService {
 
     /// Try to associate any pending login tokens with the user
     /// This looks for unused login tokens and associates them with the user
-    async fn try_associate_login_token_with_user(&self, user: &be_remote_db::User, token: &str) {
-        // Hash the token before storing
-        let token_hash = self.hash_login_token(token);
+    ///
+    /// IMPORTANT: The `token` parameter is expected to be a code_challenge (already transformed
+    /// from code_verifier using PKCE S256 method on the client side), NOT a raw code_verifier.
+    /// This matches the verification logic in `login_by_login_token` where the desktop client
+    /// sends a code_verifier which gets converted to code_challenge before lookup.
+    async fn try_associate_login_token_with_user(
+        &self,
+        user: &be_remote_db::User,
+        code_challenge: &str,
+    ) {
+        // Hash the code_challenge for secure storage.
+        // The code_challenge is already the result of base64url_no_pad(sha256(code_verifier))
+        // performed by the client, so we just hash it for database storage.
+        let token_hash = self.hash_login_token(code_challenge);
         let create_request = CreateLoginToken {
             token_hash,
             expires_at: Utc::now() + Duration::minutes(20),
