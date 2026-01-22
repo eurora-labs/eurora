@@ -1,4 +1,3 @@
-
 # Eurora
 
 Welcome to Eurora, a context aware, cross-platform, fully private and open source AI platform.
@@ -9,6 +8,10 @@ We're a community driven project, and we welcome contributions from anyone who i
 
 ## License 
 Eurora is [fair-code](https://faircode.io/) distributed under the [Sustainable Use License](https://github.com/eurora-labs/eurora/blob/main/LICENSE-SUL-1.0), with each version re-licensed as [Apache-2.0](https://github.com/eurora-labs/eurora/blob/main/LICENSE-APACHE-2.0) two years after its release.
+
+Our primary goal is to provide the community with a powerful and extensible AI platform that can run on your own home hardware, while rivaling the industry leaders in terms of performance and features. 
+
+Main points of Sustainable Use License (SUL) are:
 
 - *Source Available*: Always visible source code
 - *Self-Hostable*: Deploy anywhere
