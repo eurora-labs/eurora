@@ -30,7 +30,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub enum StorageConfig {
     /// Local filesystem storage
-    Filesystem { root: String },
+    FS { root: String },
     /// S3 storage
     S3 {
         bucket: String,
@@ -43,7 +43,7 @@ pub enum StorageConfig {
 
 impl Default for StorageConfig {
     fn default() -> Self {
-        StorageConfig::Filesystem {
+        StorageConfig::FS {
             root: "./assets".to_string(),
         }
     }
@@ -82,7 +82,7 @@ impl StorageConfig {
             _ => {
                 let root = std::env::var("ASSET_STORAGE_FS_ROOT")
                     .unwrap_or_else(|_| "./assets".to_string());
-                Ok(StorageConfig::Filesystem { root })
+                Ok(StorageConfig::FS { root })
             }
         }
     }
@@ -120,7 +120,7 @@ impl StorageService {
     /// Create an OpenDAL operator based on the configuration
     fn create_operator(config: &StorageConfig) -> StorageResult<Operator> {
         match config {
-            StorageConfig::Filesystem { root } => {
+            StorageConfig::FS { root } => {
                 debug!("Creating filesystem storage operator with root: {}", root);
 
                 // Ensure the directory exists
@@ -303,6 +303,14 @@ impl StorageService {
     pub fn operator(&self) -> &Operator {
         &self.operator
     }
+
+    /// Get the string representation of the storage backend
+    pub fn get_backend_name(&self) -> &str {
+        match self.config {
+            StorageConfig::S3 { .. } => "s3",
+            StorageConfig::FS { .. } => "fs",
+        }
+    }
 }
 
 #[cfg(test)]
@@ -351,7 +359,7 @@ mod tests {
     fn test_storage_config_default() {
         let config = StorageConfig::default();
         match config {
-            StorageConfig::Filesystem { root } => {
+            StorageConfig::FS { root } => {
                 assert_eq!(root, "./assets");
             }
             _ => panic!("Expected Filesystem config"),

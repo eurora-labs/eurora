@@ -173,6 +173,7 @@ pub struct NewAsset {
     pub checksum_sha256: Option<Vec<u8>>,
     pub size_bytes: Option<i64>,
     pub storage_uri: String,
+    pub storage_backend: String,
     pub mime_type: String,
     pub metadata: Option<serde_json::Value>,
 }
