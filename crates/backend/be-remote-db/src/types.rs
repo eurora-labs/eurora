@@ -395,14 +395,6 @@ pub struct ListMessages {
     pub offset: u32,
 }
 
-/// Request for listing messages the last few messages
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetLastMessages {
-    pub conversation_id: Uuid,
-    pub user_id: Uuid,
-    pub limit: u32,
-}
-
 // =============================================================================
 // Junction Types (Activity-Conversation)
 // =============================================================================

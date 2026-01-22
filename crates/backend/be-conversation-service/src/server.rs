@@ -3,8 +3,8 @@
 use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
-    DatabaseManager, GetConversation, GetLastMessages, ListConversations, ListMessages,
-    MessageType, NewConversation, NewMessage,
+    DatabaseManager, GetConversation, ListConversations, ListMessages, MessageType,
+    NewConversation, NewMessage,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -262,10 +262,11 @@ impl ProtoConversationService for ConversationService {
 
         let db_messages = self
             .db
-            .get_last_messages(GetLastMessages {
+            .list_messages(ListMessages {
                 conversation_id,
                 user_id,
                 limit: 5,
+                offset: 0,
             })
             .await
             .unwrap();
