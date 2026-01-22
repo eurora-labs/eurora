@@ -22,7 +22,7 @@ concurrency:
     cancel-in-progress: true
 
 env:
-    RUST_VERSION: nightly
+    RUSTUP_TOOLCHAIN: stable
     REGISTRY: ghcr.io
     IMAGE_NAME: ${{ github.repository }}/be-monolith
 
@@ -33,11 +33,6 @@ jobs:
             - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   persist-credentials: false
-
-            - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
-              with:
-                  toolchain: nightly
-                  components: rustfmt, clippy
 
             - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
               with:
@@ -50,14 +45,6 @@ jobs:
                     libpango1.0-dev libatk1.0-dev libgdk-pixbuf-2.0-dev libcairo2-dev \
                     pkg-config libjavascriptcoregtk-4.1-dev libsoup-3.0-dev \
                     libwebkit2gtk-4.1-dev libpipewire-0.3-dev
-
-            - run:
-                  cargo fmt --all -- --check
-                  # - name: Run clippy
-                  # run: cargo clippy --all-targets --all-features -- -D warnings
-
-                  # - name: Run tests
-                  # run: cargo test --workspace
 
             - name: Build monolith
               run: cargo build --release --package be-monolith
