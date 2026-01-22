@@ -692,7 +692,7 @@ impl DatabaseManager {
         .bind(&request.mime_type)
         .bind(request.size_bytes)
         .bind(&request.checksum_sha256)
-        .bind("fs")
+        .bind(&request.storage_backend)
         .bind(&request.storage_uri)
         .bind("uploaded")
         .bind(&metadata)
