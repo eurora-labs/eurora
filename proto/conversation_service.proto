@@ -14,6 +14,7 @@ service ProtoConversationService {
   // Messages CRUD
   rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
   rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
+  rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
 
   rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
 }
@@ -68,7 +69,7 @@ message AddHumanMessageRequest {
 }
 
 message AddHumanMessageResponse {
-  Conversation conversation = 1;
+  agent_chain.ProtoBaseMessage message = 1;
 }
 
 message GetMessagesRequest {
@@ -87,4 +88,13 @@ message GetConversationRequest {
 
 message GetConversationResponse {
   Conversation conversation = 1;
+}
+
+message AddSystemMessageRequest {
+  string conversation_id = 1;
+  string content = 2;
+}
+
+message AddSystemMessageResponse {
+  agent_chain.ProtoBaseMessage message = 1;
 }

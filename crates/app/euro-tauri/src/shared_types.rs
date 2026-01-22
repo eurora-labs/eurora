@@ -4,3 +4,4 @@ use tokio::sync::Mutex;
 
 pub type SharedAppSettings = Mutex<AppSettings>;
 pub type SharedConversationManager = Mutex<ConversationManager>;
+pub type SharedUserController = Mutex<euro_user::Controller>;

@@ -9,15 +9,6 @@ use proto_gen::agent_chain::{
 };
 use uuid::Uuid;
 
-// #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-// pub struct Conversation {
-//     pub id: Uuid,
-//     pub user_id: Uuid,
-//     pub title: Option<String>,
-//     pub created_at: DateTime<Utc>,
-//     pub updated_at: DateTime<Utc>,
-// }
-
 impl TryFrom<proto_gen::conversation::Conversation> for Conversation {
     type Error = DbError;
 
@@ -93,10 +84,10 @@ impl From<Message> for ProtoBaseMessage {
                 }
             }
             MessageType::System => {
-                let content = json_to_string_content(&msg.content);
+                let content = json_to_proto_message_content(&msg.content);
                 ProtoBaseMessage {
                     message: Some(proto_base_message::Message::System(ProtoSystemMessage {
-                        content,
+                        content: Some(content),
                         id,
                         name: None,
                         additional_kwargs,

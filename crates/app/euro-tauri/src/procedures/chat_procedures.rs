@@ -22,7 +22,7 @@ pub struct Query {
 pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-        _conversation_id: String,
+        _conversation_id: Option<String>,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
@@ -36,7 +36,7 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        _conversation_id: String,
+        _conversation_id: Option<String>,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
@@ -75,18 +75,23 @@ impl ChatApi for ChatApiImpl {
             let asset_messages = timeline
                 .construct_asset_messages_by_ids(&query.assets)
                 .await;
-            messages.extend(asset_messages);
+            if let Some(last_asset_message) = asset_messages.last() {
+                messages.push(last_asset_message);
+            }
 
             let snapshot_messages = timeline
                 .construct_snapshot_messages_by_ids(&query.assets)
                 .await;
-            messages.extend(snapshot_messages);
+
+            if let Some(last_snapshot_message) = snapshot_messages.last() {
+                messages.push(last_snapshot_message);
+            }
 
             // Make a for loop
             for message in messages {
                 match &message {
-                    BaseMessage::Human(m) => {
-                        let _ = conversation_manager.add_human_message(m).await;
+                    BaseMessage::System(m) => {
+                        let _ = conversation_manager.add_system_message(m).await;
                     }
                     _ => todo!(),
                 }

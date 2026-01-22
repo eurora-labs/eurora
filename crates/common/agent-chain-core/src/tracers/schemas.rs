@@ -9,11 +9,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 /// The type of run.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum RunType {
@@ -67,7 +64,7 @@ impl From<&str> for RunType {
 }
 
 /// A run event.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunEvent {
     /// The name of the event.
@@ -112,7 +109,7 @@ impl RunEvent {
 ///
 /// This struct contains all information about a run including its inputs,
 /// outputs, timing, hierarchy, and metadata.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Run {
     /// The unique ID of the run.
