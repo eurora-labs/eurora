@@ -1,29 +1,21 @@
-## Overview of licenses
-
-This section summarizes how many dependencies use each license.
+## Overview of licenses:
 
 {{#each overview}}
-- {{name}} ({{count}})
+* {{name}} ({{count}})
 {{/each}}
 
-## Third-party Rust dependency licenses
-
-The following section lists all license texts for Eurora's Rust dependencies,
-grouped by license.
-
+### All license texts:
 {{#each licenses}}
----
 
-### {{name}} (`{{id}}`)
+#### {{name}}
 
-Used by:
+##### Used by:
 
 {{#each used_by}}
-- {{crate.name}} {{crate.version}}
+* [{{crate.name}} {{crate.version}}]({{#if crate.repository}} {{crate.repository}} {{else}} https://crates.io/crates/{{crate.name}} {{/if}})
 {{/each}}
 
-License text:
-
-```text
 {{text}}
+
+--------------------------------------------------------------------------------
 {{/each}}
