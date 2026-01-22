@@ -10,12 +10,12 @@ use uuid::Uuid;
 use crate::{
     GetConversation,
     types::{
-        Activity, ActivityAsset, ActivityConversation, Asset, Conversation, CreateLoginToken,
-        CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange,
-        ListActivities, ListConversations, ListMessages, LoginToken, Message, MessageAsset,
-        NewActivity, NewAsset, NewConversation, NewMessage, NewUser, OAuthCredentials, OAuthState,
-        PasswordCredentials, RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateAsset,
-        UpdateMessage, UpdateOAuthCredentials, User,
+        Activity, ActivityAsset, Asset, Conversation, CreateLoginToken, CreateOAuthCredentials,
+        CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange, ListActivities,
+        ListConversations, ListMessages, LoginToken, Message, MessageAsset, NewActivity, NewAsset,
+        NewConversation, NewMessage, NewUser, OAuthCredentials, OAuthState, PasswordCredentials,
+        RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateAsset, UpdateOAuthCredentials,
+        User,
     },
 };
 use crate::{GetLastMessages, error::DbResult};
@@ -1069,31 +1069,11 @@ impl DatabaseManager {
         Ok(conversations)
     }
 
-    /// Delete a conversation (will cascade delete all messages)
-    pub async fn delete_conversation(&self, conversation_id: Uuid, user_id: Uuid) -> DbResult<()> {
-        sqlx::query(
-            r#"
-            DELETE FROM conversations
-            WHERE id = $1 AND user_id = $2
-            "#,
-        )
-        .bind(conversation_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
     // =========================================================================
     // Message Management Methods
     // =========================================================================
 
     /// Create a new message
-    /// Uses a single database call with CTE to:
-    /// 1. Verify the conversation belongs to the user
-    /// 2. Insert the message with user_id
-    /// 3. Update the conversation's updated_at timestamp
     pub async fn create_message(&self, request: NewMessage) -> DbResult<Message> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
@@ -1181,192 +1161,5 @@ impl DatabaseManager {
                 .await?;
 
         Ok(messages)
-    }
-
-    /// Update an existing message
-    pub async fn update_message(
-        &self,
-        message_id: Uuid,
-        user_id: Uuid,
-        request: UpdateMessage,
-    ) -> DbResult<Message> {
-        let now = Utc::now();
-
-        let message = sqlx::query_as::<_, Message>(
-            r#"
-            UPDATE messages m
-            SET content = COALESCE($3, m.content),
-                tool_call_id = COALESCE($4, m.tool_call_id),
-                tool_calls = COALESCE($5, m.tool_calls),
-                additional_kwargs = COALESCE($6, m.additional_kwargs),
-                updated_at = $7
-            WHERE m.id = $1 AND m.user_id = $2
-            RETURNING m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
-            "#,
-        )
-        .bind(message_id)
-        .bind(user_id)
-        .bind(&request.content)
-        .bind(&request.tool_call_id)
-        .bind(&request.tool_calls)
-        .bind(&request.additional_kwargs)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(message)
-    }
-
-    /// Delete a message
-    /// Uses direct user_id check for access control
-    pub async fn delete_message(&self, message_id: Uuid, user_id: Uuid) -> DbResult<()> {
-        sqlx::query(
-            r#"
-            DELETE FROM messages
-            WHERE id = $1 AND user_id = $2
-            "#,
-        )
-        .bind(message_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    /// Delete all messages in a conversation
-    pub async fn delete_all_messages_in_conversation(
-        &self,
-        conversation_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<u64> {
-        let result = sqlx::query(
-            r#"
-            DELETE FROM messages
-            WHERE conversation_id = $1 AND user_id = $2
-            "#,
-        )
-        .bind(conversation_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected())
-    }
-
-    // =========================================================================
-    // Activity-Conversation Linking Methods
-    // =========================================================================
-
-    /// Link an activity to a conversation
-    /// Verifies that both the activity and conversation belong to the specified user
-    pub async fn link_activity_to_conversation(
-        &self,
-        activity_id: Uuid,
-        conversation_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<ActivityConversation> {
-        let now = Utc::now();
-
-        // Use CTE to verify ownership of both activity and conversation before linking
-        let activity_conversation = sqlx::query_as::<_, ActivityConversation>(
-            r#"
-            WITH verified_activity AS (
-                SELECT id FROM activities WHERE id = $1 AND user_id = $3
-            ),
-            verified_conversation AS (
-                SELECT id FROM conversations WHERE id = $2 AND user_id = $3
-            )
-            INSERT INTO activity_conversations (activity_id, conversation_id, created_at)
-            SELECT va.id, vc.id, $4
-            FROM verified_activity va, verified_conversation vc
-            RETURNING activity_id, conversation_id, created_at
-            "#,
-        )
-        .bind(activity_id)
-        .bind(conversation_id)
-        .bind(user_id)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(activity_conversation)
-    }
-
-    /// Unlink an activity from a conversation
-    /// Verifies that both the activity and conversation belong to the specified user
-    pub async fn unlink_activity_from_conversation(
-        &self,
-        activity_id: Uuid,
-        conversation_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<()> {
-        // Use CTE to verify ownership before deleting
-        sqlx::query(
-            r#"
-            WITH verified_activity AS (
-                SELECT id FROM activities WHERE id = $1 AND user_id = $3
-            ),
-            verified_conversation AS (
-                SELECT id FROM conversations WHERE id = $2 AND user_id = $3
-            )
-            DELETE FROM activity_conversations
-            WHERE activity_id = (SELECT id FROM verified_activity)
-              AND conversation_id = (SELECT id FROM verified_conversation)
-            "#,
-        )
-        .bind(activity_id)
-        .bind(conversation_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    /// Get all conversations linked to an activity
-    pub async fn get_conversations_by_activity_id(
-        &self,
-        activity_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<Vec<Conversation>> {
-        let conversations = sqlx::query_as::<_, Conversation>(
-            r#"
-            SELECT c.id, c.user_id, c.title, c.created_at, c.updated_at
-            FROM conversations c
-            INNER JOIN activity_conversations ac ON c.id = ac.conversation_id
-            WHERE ac.activity_id = $1 AND c.user_id = $2
-            ORDER BY c.updated_at DESC
-            "#,
-        )
-        .bind(activity_id)
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(conversations)
-    }
-
-    /// Get all activities linked to a conversation
-    pub async fn get_activities_by_conversation_id(
-        &self,
-        conversation_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<Vec<Activity>> {
-        let activities = sqlx::query_as::<_, Activity>(
-            r#"
-            SELECT a.id, a.user_id, a.name, a.icon_asset_id, a.process_name, a.window_title, a.started_at, a.ended_at, a.created_at, a.updated_at
-            FROM activities a
-            INNER JOIN activity_conversations ac ON a.id = ac.activity_id
-            WHERE ac.conversation_id = $1 AND a.user_id = $2
-            ORDER BY a.started_at DESC
-            "#,
-        )
-        .bind(conversation_id)
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(activities)
     }
 }
