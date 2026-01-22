@@ -19,7 +19,6 @@ edition = "2024"
 homepage = "https://www.eurora-labs.com"
 repository = "https://github.com/eurora-labs/eurora"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
-license-file = "LICENSE"
 
 [workspace.dependencies]
 agent-chain = { path = "crates/common/agent-chain" }
