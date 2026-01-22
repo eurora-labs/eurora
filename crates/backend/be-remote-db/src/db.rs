@@ -15,8 +15,7 @@ use crate::{
         ListActivities, ListConversations, ListMessages, LoginToken, Message, MessageAsset,
         NewActivity, NewAsset, NewConversation, NewMessage, NewUser, OAuthCredentials, OAuthState,
         PasswordCredentials, RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateAsset,
-        UpdateConversation, UpdateMessage, UpdateOAuthCredentials, UpdatePassword, UpdateUser,
-        User,
+        UpdateConversation, UpdateMessage, UpdateOAuthCredentials, User,
     },
 };
 use crate::{GetLastMessages, error::DbResult};
@@ -146,62 +145,6 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn update_user(&self, user_id: Uuid, request: UpdateUser) -> DbResult<User> {
-        let now = Utc::now();
-
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            UPDATE users
-            SET username = COALESCE($2, username),
-                email = COALESCE($3, email),
-                display_name = COALESCE($4, display_name),
-                email_verified = COALESCE($5, email_verified),
-                updated_at = $6
-            WHERE id = $1
-            RETURNING id, username, email, display_name, email_verified, created_at, updated_at
-            "#,
-        )
-        .bind(user_id)
-        .bind(&request.username)
-        .bind(&request.email)
-        .bind(&request.display_name)
-        .bind(request.email_verified)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(user)
-    }
-
-    pub async fn delete_user(&self, user_id: Uuid) -> DbResult<()> {
-        // Due to CASCADE DELETE constraint, this will also delete password_credentials
-        sqlx::query(
-            r#"
-            DELETE FROM users
-            WHERE id = $1
-            "#,
-        )
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn list_users(&self) -> DbResult<Vec<User>> {
-        let users = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users
-            ORDER BY created_at DESC
-            "#,
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(users)
-    }
-
     // Password credentials management methods
     pub async fn get_password_credentials(&self, user_id: Uuid) -> DbResult<PasswordCredentials> {
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
@@ -212,31 +155,6 @@ impl DatabaseManager {
             "#,
         )
         .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(credentials)
-    }
-
-    pub async fn update_password(
-        &self,
-        user_id: Uuid,
-        request: UpdatePassword,
-    ) -> DbResult<PasswordCredentials> {
-        let now = Utc::now();
-
-        let credentials = sqlx::query_as::<_, PasswordCredentials>(
-            r#"
-            UPDATE password_credentials
-            SET password_hash = $2,
-                updated_at = $3
-            WHERE user_id = $1
-            RETURNING id, user_id, password_hash, updated_at
-            "#,
-        )
-        .bind(user_id)
-        .bind(&request.password_hash)
-        .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
@@ -1080,22 +998,33 @@ impl DatabaseManager {
     }
 
     /// Link an asset to a message
+    /// Verifies that both the message and asset belong to the specified user
     pub async fn link_asset_to_message(
         &self,
         message_id: Uuid,
         asset_id: Uuid,
+        user_id: Uuid,
     ) -> DbResult<MessageAsset> {
         let now = Utc::now();
 
+        // Use CTE to verify ownership of both message and asset before linking
         let message_asset = sqlx::query_as::<_, MessageAsset>(
             r#"
+            WITH verified_message AS (
+                SELECT id FROM messages WHERE id = $1 AND user_id = $3
+            ),
+            verified_asset AS (
+                SELECT id FROM assets WHERE id = $2 AND user_id = $3
+            )
             INSERT INTO message_assets (message_id, asset_id, created_at)
-            VALUES ($1, $2, $3)
+            SELECT vm.id, va.id, $4
+            FROM verified_message vm, verified_asset va
             RETURNING message_id, asset_id, created_at
             "#,
         )
         .bind(message_id)
         .bind(asset_id)
+        .bind(user_id)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -1104,19 +1033,30 @@ impl DatabaseManager {
     }
 
     /// Unlink an asset from a message
+    /// Verifies that both the message and asset belong to the specified user
     pub async fn unlink_asset_from_message(
         &self,
         message_id: Uuid,
         asset_id: Uuid,
+        user_id: Uuid,
     ) -> DbResult<()> {
+        // Use CTE to verify ownership before deleting
         sqlx::query(
             r#"
+            WITH verified_message AS (
+                SELECT id FROM messages WHERE id = $1 AND user_id = $3
+            ),
+            verified_asset AS (
+                SELECT id FROM assets WHERE id = $2 AND user_id = $3
+            )
             DELETE FROM message_assets
-            WHERE message_id = $1 AND asset_id = $2
+            WHERE message_id = (SELECT id FROM verified_message)
+              AND asset_id = (SELECT id FROM verified_asset)
             "#,
         )
         .bind(message_id)
         .bind(asset_id)
+        .bind(user_id)
         .execute(&self.pool)
         .await?;
 
@@ -1124,22 +1064,33 @@ impl DatabaseManager {
     }
 
     /// Link an asset to an activity
+    /// Verifies that both the activity and asset belong to the specified user
     pub async fn link_asset_to_activity(
         &self,
         activity_id: Uuid,
         asset_id: Uuid,
+        user_id: Uuid,
     ) -> DbResult<ActivityAsset> {
         let now = Utc::now();
 
+        // Use CTE to verify ownership of both activity and asset before linking
         let activity_asset = sqlx::query_as::<_, ActivityAsset>(
             r#"
+            WITH verified_activity AS (
+                SELECT id FROM activities WHERE id = $1 AND user_id = $3
+            ),
+            verified_asset AS (
+                SELECT id FROM assets WHERE id = $2 AND user_id = $3
+            )
             INSERT INTO activity_assets (activity_id, asset_id, created_at)
-            VALUES ($1, $2, $3)
+            SELECT va.id, vas.id, $4
+            FROM verified_activity va, verified_asset vas
             RETURNING activity_id, asset_id, created_at
             "#,
         )
         .bind(activity_id)
         .bind(asset_id)
+        .bind(user_id)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -1148,19 +1099,30 @@ impl DatabaseManager {
     }
 
     /// Unlink an asset from an activity
+    /// Verifies that both the activity and asset belong to the specified user
     pub async fn unlink_asset_from_activity(
         &self,
         activity_id: Uuid,
         asset_id: Uuid,
+        user_id: Uuid,
     ) -> DbResult<()> {
+        // Use CTE to verify ownership before deleting
         sqlx::query(
             r#"
+            WITH verified_activity AS (
+                SELECT id FROM activities WHERE id = $1 AND user_id = $3
+            ),
+            verified_asset AS (
+                SELECT id FROM assets WHERE id = $2 AND user_id = $3
+            )
             DELETE FROM activity_assets
-            WHERE activity_id = $1 AND asset_id = $2
+            WHERE activity_id = (SELECT id FROM verified_activity)
+              AND asset_id = (SELECT id FROM verified_asset)
             "#,
         )
         .bind(activity_id)
         .bind(asset_id)
+        .bind(user_id)
         .execute(&self.pool)
         .await?;
 
@@ -1227,27 +1189,6 @@ impl DatabaseManager {
         )
         .bind(request.id)
         .bind(request.user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(conversation)
-    }
-
-    /// Get a conversation by ID for a specific user
-    pub async fn get_conversation_for_user(
-        &self,
-        conversation_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<Conversation> {
-        let conversation = sqlx::query_as::<_, Conversation>(
-            r#"
-            SELECT id, user_id, title, created_at, updated_at
-            FROM conversations
-            WHERE id = $1 AND user_id = $2
-            "#,
-        )
-        .bind(conversation_id)
-        .bind(user_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -1329,6 +1270,10 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new message
+    /// Uses a single database call with CTE to:
+    /// 1. Verify the conversation belongs to the user
+    /// 2. Insert the message with user_id
+    /// 3. Update the conversation's updated_at timestamp
     pub async fn create_message(&self, request: NewMessage) -> DbResult<Message> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
@@ -1338,13 +1283,28 @@ impl DatabaseManager {
 
         let message = sqlx::query_as::<_, Message>(
             r#"
-            INSERT INTO messages (id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
+            WITH verified_conversation AS (
+                SELECT id FROM conversations
+                WHERE id = $2 AND user_id = $3
+            ),
+            updated_conversation AS (
+                UPDATE conversations
+                SET updated_at = $10
+                WHERE id = (SELECT id FROM verified_conversation)
+                RETURNING id
+            ),
+            inserted_message AS (
+                INSERT INTO messages (id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at)
+                SELECT $1, vc.id, $3, $4, $5, $6, $7, $8, $9, $10
+                FROM verified_conversation vc
+                RETURNING id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
+            )
+            SELECT * FROM inserted_message
             "#,
         )
         .bind(id)
         .bind(request.conversation_id)
+        .bind(request.user_id)
         .bind(request.message_type)
         .bind(&request.content)
         .bind(&request.tool_call_id)
@@ -1353,17 +1313,6 @@ impl DatabaseManager {
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
-        .await?;
-
-        // Update conversation's updated_at timestamp
-        sqlx::query(
-            r#"
-            UPDATE conversations SET updated_at = $2 WHERE id = $1
-            "#,
-        )
-        .bind(request.conversation_id)
-        .bind(now)
-        .execute(&self.pool)
         .await?;
 
         Ok(message)
@@ -1375,10 +1324,9 @@ impl DatabaseManager {
 
         let messages = sqlx::query_as::<_, Message>(
                    r#"
-                   SELECT m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
+                   SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
                    FROM messages m
-                   INNER JOIN conversations c ON m.conversation_id = c.id
-                   WHERE m.conversation_id = $1 AND c.user_id = $2
+                   WHERE m.conversation_id = $1 AND m.user_id = $2
                    ORDER BY m.id DESC
                    LIMIT $3
                    "#,
@@ -1399,10 +1347,9 @@ impl DatabaseManager {
 
         let messages = sqlx::query_as::<_, Message>(
                     r#"
-                    SELECT m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
+                    SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
                     FROM messages m
-                    INNER JOIN conversations c ON m.conversation_id = c.id
-                    WHERE m.conversation_id = $1 AND c.user_id = $2
+                    WHERE m.conversation_id = $1 AND m.user_id = $2
                     ORDER BY m.id ASC
                     LIMIT $3
                     "#,
@@ -1433,9 +1380,8 @@ impl DatabaseManager {
                 tool_calls = COALESCE($5, m.tool_calls),
                 additional_kwargs = COALESCE($6, m.additional_kwargs),
                 updated_at = $7
-            FROM conversations c
-            WHERE m.id = $1 AND m.conversation_id = c.id AND c.user_id = $2
-            RETURNING m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
+            WHERE m.id = $1 AND m.user_id = $2
+            RETURNING m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
             "#,
         )
         .bind(message_id)
@@ -1452,12 +1398,12 @@ impl DatabaseManager {
     }
 
     /// Delete a message
+    /// Uses direct user_id check for access control
     pub async fn delete_message(&self, message_id: Uuid, user_id: Uuid) -> DbResult<()> {
         sqlx::query(
             r#"
-            DELETE FROM messages m
-            USING conversations c
-            WHERE m.id = $1 AND m.conversation_id = c.id AND c.user_id = $2
+            DELETE FROM messages
+            WHERE id = $1 AND user_id = $2
             "#,
         )
         .bind(message_id)
@@ -1474,18 +1420,14 @@ impl DatabaseManager {
         conversation_id: Uuid,
         user_id: Uuid,
     ) -> DbResult<u64> {
-        // First verify the user owns the conversation
-        let _ = self
-            .get_conversation_for_user(conversation_id, user_id)
-            .await?;
-
         let result = sqlx::query(
             r#"
             DELETE FROM messages
-            WHERE conversation_id = $1
+            WHERE conversation_id = $1 AND user_id = $2
             "#,
         )
         .bind(conversation_id)
+        .bind(user_id)
         .execute(&self.pool)
         .await?;
 
@@ -1497,22 +1439,33 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Link an activity to a conversation
+    /// Verifies that both the activity and conversation belong to the specified user
     pub async fn link_activity_to_conversation(
         &self,
         activity_id: Uuid,
         conversation_id: Uuid,
+        user_id: Uuid,
     ) -> DbResult<ActivityConversation> {
         let now = Utc::now();
 
+        // Use CTE to verify ownership of both activity and conversation before linking
         let activity_conversation = sqlx::query_as::<_, ActivityConversation>(
             r#"
+            WITH verified_activity AS (
+                SELECT id FROM activities WHERE id = $1 AND user_id = $3
+            ),
+            verified_conversation AS (
+                SELECT id FROM conversations WHERE id = $2 AND user_id = $3
+            )
             INSERT INTO activity_conversations (activity_id, conversation_id, created_at)
-            VALUES ($1, $2, $3)
+            SELECT va.id, vc.id, $4
+            FROM verified_activity va, verified_conversation vc
             RETURNING activity_id, conversation_id, created_at
             "#,
         )
         .bind(activity_id)
         .bind(conversation_id)
+        .bind(user_id)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -1521,19 +1474,30 @@ impl DatabaseManager {
     }
 
     /// Unlink an activity from a conversation
+    /// Verifies that both the activity and conversation belong to the specified user
     pub async fn unlink_activity_from_conversation(
         &self,
         activity_id: Uuid,
         conversation_id: Uuid,
+        user_id: Uuid,
     ) -> DbResult<()> {
+        // Use CTE to verify ownership before deleting
         sqlx::query(
             r#"
+            WITH verified_activity AS (
+                SELECT id FROM activities WHERE id = $1 AND user_id = $3
+            ),
+            verified_conversation AS (
+                SELECT id FROM conversations WHERE id = $2 AND user_id = $3
+            )
             DELETE FROM activity_conversations
-            WHERE activity_id = $1 AND conversation_id = $2
+            WHERE activity_id = (SELECT id FROM verified_activity)
+              AND conversation_id = (SELECT id FROM verified_conversation)
             "#,
         )
         .bind(activity_id)
         .bind(conversation_id)
+        .bind(user_id)
         .execute(&self.pool)
         .await?;
 
