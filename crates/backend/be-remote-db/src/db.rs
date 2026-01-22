@@ -533,21 +533,23 @@ impl DatabaseManager {
         request: ListActivities,
         params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
-        let activities = sqlx::query_as::<_, Activity>(
+        let query = format!(
             r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
-            ORDER BY started_at $2
-            LIMIT $3 OFFSET $4
+            ORDER BY started_at {}
+            LIMIT $2 OFFSET $3
             "#,
-        )
-        .bind(request.user_id)
-        .bind(params.order().to_string())
-        .bind(params.limit())
-        .bind(params.offset())
-        .fetch_all(&self.pool)
-        .await?;
+            params.order()
+        );
+
+        let activities = sqlx::query_as::<_, Activity>(&query)
+            .bind(request.user_id)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(activities)
     }
@@ -647,25 +649,27 @@ impl DatabaseManager {
         request: GetActivitiesByTimeRange,
         params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
-        let activities = sqlx::query_as::<_, Activity>(
+        let query = format!(
             r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
               AND started_at >= $2
               AND started_at <= $3
-            ORDER BY started_at $4
-            LIMIT $5 OFFSET $6
+            ORDER BY started_at {}
+            LIMIT $4 OFFSET $5
             "#,
-        )
-        .bind(request.user_id)
-        .bind(request.start_time)
-        .bind(request.end_time)
-        .bind(params.order().to_string())
-        .bind(params.limit())
-        .bind(params.offset())
-        .fetch_all(&self.pool)
-        .await?;
+            params.order()
+        );
+
+        let activities = sqlx::query_as::<_, Activity>(&query)
+            .bind(request.user_id)
+            .bind(request.start_time)
+            .bind(request.end_time)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(activities)
     }
@@ -790,21 +794,23 @@ impl DatabaseManager {
         request: ListConversations,
         params: PaginationParams,
     ) -> DbResult<Vec<Conversation>> {
-        let conversations = sqlx::query_as::<_, Conversation>(
+        let query = format!(
             r#"
             SELECT id, user_id, title, created_at, updated_at
             FROM conversations
             WHERE user_id = $1
-            ORDER BY id $2
-            LIMIT $3 OFFSET $4
+            ORDER BY id {}
+            LIMIT $2 OFFSET $3
             "#,
-        )
-        .bind(request.user_id)
-        .bind(params.order().to_string())
-        .bind(params.limit())
-        .bind(params.offset())
-        .fetch_all(&self.pool)
-        .await?;
+            params.order()
+        );
+
+        let conversations = sqlx::query_as::<_, Conversation>(&query)
+            .bind(request.user_id)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(conversations)
     }
@@ -864,22 +870,24 @@ impl DatabaseManager {
         request: ListMessages,
         params: PaginationParams,
     ) -> DbResult<Vec<Message>> {
-        let messages = sqlx::query_as::<_, Message>(
-                    r#"
-                    SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
-                    FROM messages m
-                    WHERE m.conversation_id = $1 AND m.user_id = $2
-                    ORDER BY m.id $3
-                    LIMIT $4 OFFSET $5
-                    "#,
-                )
-                .bind(request.conversation_id)
-                .bind(request.user_id)
-                .bind(params.order().to_string())
-                .bind(params.limit())
-                .bind(params.offset())
-                .fetch_all(&self.pool)
-                .await?;
+        let query = format!(
+            r#"
+            SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
+            FROM messages m
+            WHERE m.conversation_id = $1 AND m.user_id = $2
+            ORDER BY m.id {}
+            LIMIT $3 OFFSET $4
+            "#,
+            params.order()
+        );
+
+        let messages = sqlx::query_as::<_, Message>(&query)
+            .bind(request.conversation_id)
+            .bind(request.user_id)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(messages)
     }

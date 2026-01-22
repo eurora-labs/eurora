@@ -392,7 +392,7 @@ impl ProtoActivityService for ActivityService {
                     start_time,
                     end_time,
                 },
-                PaginationParams::new(req.limit, req.offset, "DESC".to_string()),
+                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
             )
             .await
             .map_err(ActivityServiceError::from)?;

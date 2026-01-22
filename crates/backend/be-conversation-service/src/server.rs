@@ -259,7 +259,7 @@ impl ProtoConversationService for ConversationService {
                     conversation_id,
                     user_id,
                 },
-                PaginationParams::new(5, 0, "ASC".to_string()),
+                PaginationParams::new(0, 5, "ASC".to_string()),
             )
             .await
             .unwrap();
@@ -284,6 +284,8 @@ impl ProtoConversationService for ConversationService {
             })
             .await
             .map_err(ConversationServiceError::from)?;
+
+        info!("Messages: {:?}", messages);
 
         let openai_stream = self
             .provider
@@ -366,7 +368,7 @@ impl ProtoConversationService for ConversationService {
                     conversation_id,
                     user_id,
                 },
-                PaginationParams::new(req.limit, req.offset, "DESC".to_string()),
+                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
             )
             .await
             .map_err(ConversationServiceError::from)?;
