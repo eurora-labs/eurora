@@ -1,6 +1,8 @@
 [package]
 name = "be-auth-grpc"
 version = "0.0.0"
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+license-file = "LICENSE"
 edition.workspace = true
 
 [package.metadata.cargo-machete]
