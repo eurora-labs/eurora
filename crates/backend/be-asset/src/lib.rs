@@ -207,7 +207,7 @@ impl AssetService {
                 Uuid::parse_str(activity_id_str).map_err(AssetError::InvalidActivityId)?;
 
             self.db
-                .link_asset_to_activity(activity_id, asset.id)
+                .link_asset_to_activity(activity_id, asset.id, user_id)
                 .await
                 .map_err(|e| {
                     error!("Failed to link asset to activity: {}", e);
@@ -458,15 +458,10 @@ impl AssetService {
 
         let asset_id = Uuid::parse_str(&req.asset_id).map_err(AssetError::InvalidAssetId)?;
 
-        // Verify the asset belongs to the user
-        self.db
-            .get_asset_for_user(asset_id, user_id)
-            .await
-            .map_err(|_| AssetError::AssetNotOwned)?;
-
+        // The database method now verifies ownership of both message and asset
         let message_asset = self
             .db
-            .link_asset_to_message(message_id, asset_id)
+            .link_asset_to_message(message_id, asset_id, user_id)
             .await
             .map_err(|e| {
                 error!("Failed to link asset to message: {}", e);
@@ -494,14 +489,9 @@ impl AssetService {
 
         let asset_id = Uuid::parse_str(&req.asset_id).map_err(AssetError::InvalidAssetId)?;
 
-        // Verify the asset belongs to the user
+        // The database method now verifies ownership of both message and asset
         self.db
-            .get_asset_for_user(asset_id, user_id)
-            .await
-            .map_err(|_| AssetError::AssetNotOwned)?;
-
-        self.db
-            .unlink_asset_from_message(message_id, asset_id)
+            .unlink_asset_from_message(message_id, asset_id, user_id)
             .await
             .map_err(|e| {
                 error!("Failed to unlink asset from message: {}", e);
@@ -528,15 +518,10 @@ impl AssetService {
 
         let asset_id = Uuid::parse_str(&req.asset_id).map_err(AssetError::InvalidAssetId)?;
 
-        // Verify the asset belongs to the user
-        self.db
-            .get_asset_for_user(asset_id, user_id)
-            .await
-            .map_err(|_| AssetError::AssetNotOwned)?;
-
+        // The database method now verifies ownership of both activity and asset
         let activity_asset = self
             .db
-            .link_asset_to_activity(activity_id, asset_id)
+            .link_asset_to_activity(activity_id, asset_id, user_id)
             .await
             .map_err(|e| {
                 error!("Failed to link asset to activity: {}", e);
@@ -565,14 +550,9 @@ impl AssetService {
 
         let asset_id = Uuid::parse_str(&req.asset_id).map_err(AssetError::InvalidAssetId)?;
 
-        // Verify the asset belongs to the user
+        // The database method now verifies ownership of both activity and asset
         self.db
-            .get_asset_for_user(asset_id, user_id)
-            .await
-            .map_err(|_| AssetError::AssetNotOwned)?;
-
-        self.db
-            .unlink_asset_from_activity(activity_id, asset_id)
+            .unlink_asset_from_activity(activity_id, asset_id, user_id)
             .await
             .map_err(|e| {
                 error!("Failed to unlink asset from activity: {}", e);
