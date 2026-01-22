@@ -1403,7 +1403,7 @@ impl DatabaseManager {
                     FROM messages m
                     INNER JOIN conversations c ON m.conversation_id = c.id
                     WHERE m.conversation_id = $1 AND c.user_id = $2
-                    ORDER BY m.id DESC
+                    ORDER BY m.id ASC
                     LIMIT $3
                     "#,
                 )
