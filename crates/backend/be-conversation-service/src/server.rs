@@ -327,8 +327,7 @@ impl ProtoConversationService for ConversationService {
             }
 
             // Save the AI message to the database after stream completes
-            if !full_content.is_empty() {
-                if let Err(e) = db
+            if !full_content.is_empty() && let Err(e) = db
                     .create_message(NewMessage {
                         id: None,
                         conversation_id,
@@ -343,7 +342,6 @@ impl ProtoConversationService for ConversationService {
                 {
                     error!("Failed to save AI message to database: {}", e);
                 }
-            }
         };
 
         Ok(Response::new(

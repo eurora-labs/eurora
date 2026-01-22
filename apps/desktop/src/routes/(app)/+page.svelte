@@ -153,7 +153,6 @@
 
 			function onEvent(response: ResponseChunk) {
 				// Append chunk to the last message
-				console.log(agentMessage);
 				if (agentMessage && agentMessage.role === 'ai') {
 					agentMessage.content += response.chunk;
 				}
