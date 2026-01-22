@@ -167,20 +167,13 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        // Verify the user owns this conversation
-        let conversation = self
-            .db
-            .get_conversation_for_user(conversation_id, user_id)
-            .await
-            .map_err(ConversationServiceError::from)?;
-
         // Save the human message to the database
-        // TODO: Create a proto definition for the message and return that instead
-        let _message = self
+        let message = self
             .db
             .create_message(NewMessage {
                 id: None,
                 conversation_id,
+                user_id,
                 message_type: MessageType::Human,
                 content: serde_json::json!(req.content),
                 tool_call_id: None,
@@ -196,7 +189,7 @@ impl ProtoConversationService for ConversationService {
         );
 
         Ok(Response::new(AddHumanMessageResponse {
-            conversation: Some(Self::db_conversation_to_proto(conversation)),
+            message: Some(message.into()),
         }))
     }
 
@@ -217,20 +210,13 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        // Verify the user owns this conversation
-        let conversation = self
-            .db
-            .get_conversation_for_user(conversation_id, user_id)
-            .await
-            .map_err(ConversationServiceError::from)?;
-
-        // Save the human message to the database
-        // TODO: Create a proto definition for the message and return that instead
-        let _message = self
+        // Save the system message to the database
+        let message = self
             .db
             .create_message(NewMessage {
                 id: None,
                 conversation_id,
+                user_id,
                 message_type: MessageType::System,
                 content: serde_json::json!(req.content),
                 tool_call_id: None,
@@ -246,7 +232,7 @@ impl ProtoConversationService for ConversationService {
         );
 
         Ok(Response::new(AddSystemMessageResponse {
-            conversation: Some(Self::db_conversation_to_proto(conversation)),
+            message: Some(message.into()),
         }))
     }
 
@@ -295,6 +281,7 @@ impl ProtoConversationService for ConversationService {
             .create_message(NewMessage {
                 id: None,
                 conversation_id,
+                user_id,
                 message_type: MessageType::Human,
                 content: serde_json::json!(req.content),
                 tool_call_id: None,
@@ -313,21 +300,51 @@ impl ProtoConversationService for ConversationService {
                 Status::internal(e.to_string())
             })?;
 
-        let output_stream = openai_stream.map(|result| match result {
-            Ok(chunk) => {
-                // AIMessageChunk has content() method for getting the text content
-                // We determine finality by empty content or chunk_position
-                let content = chunk.content().to_string();
-                // TODO: Don't rely on empty string for finality
-                let is_final = content.is_empty();
+        let db = self.db.clone();
+        let output_stream = async_stream::try_stream! {
+            tokio::pin!(openai_stream);
+            let mut full_content = String::new();
 
-                Ok(ChatStreamResponse {
-                    chunk: content,
-                    is_final,
-                })
+            while let Some(result) = openai_stream.next().await {
+                match result {
+                    Ok(chunk) => {
+                        // AIMessageChunk has content() method for getting the text content
+                        // We determine finality by empty content or chunk_position
+                        let content = chunk.content().to_string();
+                        full_content.push_str(&content);
+                        // TODO: Don't rely on empty string for finality
+                        let is_final = content.is_empty();
+
+                        yield ChatStreamResponse {
+                            chunk: content,
+                            is_final,
+                        };
+                    }
+                    Err(e) => {
+                        Err(Status::internal(e.to_string()))?;
+                    }
+                }
             }
-            Err(e) => Err(Status::internal(e.to_string())),
-        });
+
+            // Save the AI message to the database after stream completes
+            if !full_content.is_empty() {
+                if let Err(e) = db
+                    .create_message(NewMessage {
+                        id: None,
+                        conversation_id,
+                        user_id,
+                        message_type: MessageType::Ai,
+                        content: serde_json::json!(full_content),
+                        tool_call_id: None,
+                        tool_calls: None,
+                        additional_kwargs: None,
+                    })
+                    .await
+                {
+                    error!("Failed to save AI message to database: {}", e);
+                }
+            }
+        };
 
         Ok(Response::new(
             Box::pin(output_stream) as Self::ChatStreamStream

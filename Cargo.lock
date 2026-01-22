@@ -1463,6 +1463,7 @@ name = "be-conversation-service"
 version = "0.0.0"
 dependencies = [
  "agent-chain",
+ "async-stream",
  "be-auth-grpc",
  "be-remote-db",
  "chrono",
@@ -1471,6 +1472,7 @@ dependencies = [
  "proto-gen",
  "serde_json",
  "thiserror 2.0.17",
+ "tokio",
  "tokio-stream",
  "tonic",
  "tonic-prost",

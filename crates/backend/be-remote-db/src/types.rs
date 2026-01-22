@@ -367,6 +367,7 @@ pub struct Message {
 pub struct NewMessage {
     pub id: Option<Uuid>,
     pub conversation_id: Uuid,
+    pub user_id: Uuid,
     pub message_type: MessageType,
     pub content: serde_json::Value,
     pub tool_call_id: Option<String>,
