@@ -3,51 +3,42 @@
 -- Description: Creates users and password_credentials tables for authentication
 
 ----------------------------------------------------------------
--- Enable UUID extension if not already enabled
-----------------------------------------------------------------
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-----------------------------------------------------------------
 -- Create users table
 ----------------------------------------------------------------
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     display_name VARCHAR(255),
-    email_verified BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+    email_verified BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
 ----------------------------------------------------------------
 -- Create password_credentials table
 ----------------------------------------------------------------
 CREATE TABLE password_credentials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     
     -- Foreign key constraint
-    CONSTRAINT fk_password_credentials_user_id 
-        FOREIGN KEY (user_id) 
-        REFERENCES users(id) 
+    CONSTRAINT fk_password_credentials_user_id
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
         ON DELETE CASCADE
 );
 
 ----------------------------------------------------------------
 -- Create indexes for performance
+-- Note: username and email indexes are not needed as UNIQUE constraint
+-- automatically creates an index in PostgreSQL
 ----------------------------------------------------------------
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_password_credentials_user_id ON password_credentials(user_id);
-
-----------------------------------------------------------------
--- Create unique constraint to ensure one-to-one relationship
-----------------------------------------------------------------
-CREATE UNIQUE INDEX idx_password_credentials_user_id_unique ON password_credentials(user_id);
+-- Create unique constraint to ensure one-to-one relationship (one password per user)
+CREATE UNIQUE INDEX idx_password_credentials_user_id ON password_credentials(user_id);
 
 ----------------------------------------------------------------
 -- Add trigger to automatically update updated_at timestamp for users table
