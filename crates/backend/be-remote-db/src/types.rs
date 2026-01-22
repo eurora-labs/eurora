@@ -3,6 +3,57 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SortOrder {
+    Asc,
+    Desc,
+}
+
+impl std::fmt::Display for SortOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SortOrder::Asc => write!(f, "ASC"),
+            SortOrder::Desc => write!(f, "DESC"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginationParams {
+    offset: u32,
+    limit: u32,
+    order: SortOrder,
+}
+
+impl PaginationParams {
+    pub const MAX_LIMIT: u32 = 100;
+
+    pub fn new(offset: u32, limit: u32, order: String) -> Self {
+        let order = match order.to_lowercase().as_str() {
+            "asc" => SortOrder::Asc,
+            "desc" => SortOrder::Desc,
+            _ => panic!("Invalid sort order"),
+        };
+        Self {
+            offset,
+            limit: limit.min(Self::MAX_LIMIT),
+            order,
+        }
+    }
+
+    pub fn offset(&self) -> i64 {
+        self.offset as i64
+    }
+
+    pub fn limit(&self) -> i64 {
+        self.limit as i64
+    }
+
+    pub fn order(&self) -> &SortOrder {
+        &self.order
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: Uuid,
@@ -253,8 +304,6 @@ pub struct UpdateActivity {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListActivities {
     pub user_id: Uuid,
-    pub limit: u32,
-    pub offset: u32,
 }
 
 /// Request for getting activities by time range
@@ -263,8 +312,6 @@ pub struct GetActivitiesByTimeRange {
     pub user_id: Uuid,
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
-    pub limit: u32,
-    pub offset: u32,
 }
 
 /// Request for updating activity end time
@@ -314,8 +361,6 @@ pub struct UpdateConversation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListConversations {
     pub user_id: Uuid,
-    pub limit: u32,
-    pub offset: u32,
 }
 
 // =============================================================================
@@ -393,8 +438,6 @@ pub struct UpdateMessage {
 pub struct ListMessages {
     pub conversation_id: Uuid,
     pub user_id: Uuid,
-    pub limit: u32,
-    pub offset: u32,
 }
 
 // =============================================================================

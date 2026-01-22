@@ -4,7 +4,7 @@ use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
     DatabaseManager, GetConversation, ListConversations, ListMessages, MessageType,
-    NewConversation, NewMessage,
+    NewConversation, NewMessage, PaginationParams,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -128,11 +128,10 @@ impl ProtoConversationService for ConversationService {
 
         let conversations = self
             .db
-            .list_conversations(ListConversations {
-                user_id,
-                limit: req.limit,
-                offset: req.offset,
-            })
+            .list_conversations(
+                ListConversations { user_id },
+                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
+            )
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -255,12 +254,13 @@ impl ProtoConversationService for ConversationService {
 
         let db_messages = self
             .db
-            .list_messages_desc(ListMessages {
-                conversation_id,
-                user_id,
-                limit: 5,
-                offset: 0,
-            })
+            .list_messages(
+                ListMessages {
+                    conversation_id,
+                    user_id,
+                },
+                PaginationParams::new(5, 0, "ASC".to_string()),
+            )
             .await
             .unwrap();
 
@@ -361,12 +361,13 @@ impl ProtoConversationService for ConversationService {
 
         let messages = self
             .db
-            .list_messages(ListMessages {
-                conversation_id,
-                user_id,
-                limit: req.limit,
-                offset: req.offset,
-            })
+            .list_messages(
+                ListMessages {
+                    conversation_id,
+                    user_id,
+                },
+                PaginationParams::new(req.limit, req.offset, "DESC".to_string()),
+            )
             .await
             .map_err(ConversationServiceError::from)?;
 
