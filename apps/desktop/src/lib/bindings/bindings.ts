@@ -4,11 +4,11 @@ import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurp
 type TAURI_CHANNEL<T> = (response: T) => void
 
 
-export type AppSettings = { 
+export type AppSettings = {
 /**
  * General settings
  */
-general: GeneralSettings; 
+general: GeneralSettings;
 /**
  * Telemetry settings
  */
@@ -21,7 +21,7 @@ export type ContextChip = { id: string; extension_id: string; name: string; attr
 
 export type ConversationView = { id: string | null; title: string }
 
-export type GeneralSettings = { 
+export type GeneralSettings = {
 /**
  * Whether to start the app on autostart
  */
@@ -35,19 +35,19 @@ export type Query = { text: string; assets: string[] }
 
 export type ResponseChunk = { chunk: string }
 
-export type TelemetrySettings = { considered: boolean; 
+export type TelemetrySettings = { considered: boolean;
 /**
  * Anonymous metrics
  */
-anonymousMetrics: boolean; 
+anonymousMetrics: boolean;
 /**
  * Anonymous error reporting
  */
-anonymousErrors: boolean; 
+anonymousErrors: boolean;
 /**
  * Non-anonymous metrics
  */
-nonAnonymousMetrics: boolean; 
+nonAnonymousMetrics: boolean;
 /**
  * Distinct ID, if non-anonymous metrics are enabled
  */
@@ -56,35 +56,35 @@ distinctId: string | null }
 export type TimelineAppEvent = { name: string; color: string | null; icon_base64: string | null }
 
 const ARGS_MAP = { 'auth':'{"get_login_token":[],"is_authenticated":[],"poll_for_login":[]}', 'chat':'{"send_query":["_conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"create":[],"current_conversation_changed":["conversation"],"get_messages":["conversation_id","limit","offset"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_grpc_server_connection":["server_address"],"list_activities":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
-export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
-is_authenticated: () => Promise<boolean>, 
+export type Router = { "auth": {get_login_token: () => Promise<LoginToken>,
+is_authenticated: () => Promise<boolean>,
 poll_for_login: () => Promise<boolean>},
 "chat": {send_query: (conversationId: string | null, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
 "context_chip": {get: () => Promise<ContextChip[]>},
-"conversation": {create: () => Promise<ConversationView>, 
-current_conversation_changed: (conversation: ConversationView) => Promise<void>, 
-get_messages: (conversationId: string, limit: number, offset: number) => Promise<MessageView[]>, 
-list: (limit: number, offset: number) => Promise<ConversationView[]>, 
-new_conversation_added: (conversation: ConversationView) => Promise<void>, 
+"conversation": {create: () => Promise<ConversationView>,
+current_conversation_changed: (conversation: ConversationView) => Promise<void>,
+get_messages: (conversationId: string, limit: number, offset: number) => Promise<MessageView[]>,
+list: (limit: number, offset: number) => Promise<ConversationView[]>,
+new_conversation_added: (conversation: ConversationView) => Promise<void>,
 switch_conversation: (conversationId: string) => Promise<ConversationView>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "onboarding": {get_browser_extension_download_url: () => Promise<string>},
-"prompt": {disconnect: () => Promise<null>, 
-get_service_name: () => Promise<string>, 
-prompt_service_change: (serviceName: string | null) => Promise<void>, 
-switch_to_ollama: (baseUrl: string, model: string) => Promise<null>, 
+"prompt": {disconnect: () => Promise<null>,
+get_service_name: () => Promise<string>,
+prompt_service_change: (serviceName: string | null) => Promise<void>,
+switch_to_ollama: (baseUrl: string, model: string) => Promise<null>,
 switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<null>},
-"settings": {get_all_settings: () => Promise<AppSettings>, 
-get_general_settings: () => Promise<GeneralSettings>, 
-get_telemetry_settings: () => Promise<TelemetrySettings>, 
-set_general_settings: (generalSettings: GeneralSettings) => Promise<GeneralSettings>, 
+"settings": {get_all_settings: () => Promise<AppSettings>,
+get_general_settings: () => Promise<GeneralSettings>,
+get_telemetry_settings: () => Promise<TelemetrySettings>,
+set_general_settings: (generalSettings: GeneralSettings) => Promise<GeneralSettings>,
 set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<TelemetrySettings>},
-"system": {check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
+"system": {check_grpc_server_connection: (serverAddress: string | null) => Promise<string>,
 list_activities: () => Promise<ContextChip[]>},
-"third_party": {check_api_key_exists: () => Promise<boolean>, 
+"third_party": {check_api_key_exists: () => Promise<boolean>,
 save_api_key: (apiKey: string) => Promise<null>},
-"timeline": {list: () => Promise<string[]>, 
-new_app_event: (event: TimelineAppEvent) => Promise<void>, 
+"timeline": {list: () => Promise<string[]>,
+new_app_event: (event: TimelineAppEvent) => Promise<void>,
 new_assets_event: (chips: ContextChip[]) => Promise<void>} };
 
 
