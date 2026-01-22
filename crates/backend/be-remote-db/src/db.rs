@@ -538,11 +538,12 @@ impl DatabaseManager {
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
-            ORDER BY started_at DESC
-            LIMIT $2 OFFSET $3
+            ORDER BY started_at $2
+            LIMIT $3 OFFSET $4
             "#,
         )
         .bind(request.user_id)
+        .bind(params.order().to_string())
         .bind(params.limit())
         .bind(params.offset())
         .fetch_all(&self.pool)
@@ -653,13 +654,14 @@ impl DatabaseManager {
             WHERE user_id = $1
               AND started_at >= $2
               AND started_at <= $3
-            ORDER BY started_at DESC
-            LIMIT $4 OFFSET $5
+            ORDER BY started_at $4
+            LIMIT $5 OFFSET $6
             "#,
         )
         .bind(request.user_id)
         .bind(request.start_time)
         .bind(request.end_time)
+        .bind(params.order().to_string())
         .bind(params.limit())
         .bind(params.offset())
         .fetch_all(&self.pool)
