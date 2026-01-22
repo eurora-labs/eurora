@@ -5,8 +5,8 @@ use std::sync::Arc;
 use be_asset::AssetService;
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
-    DatabaseManager, GetActivitiesByTimeRange, ListActivities, NewActivity, UpdateActivity,
-    UpdateActivityEndTime,
+    DatabaseManager, GetActivitiesByTimeRange, ListActivities, NewActivity, PaginationParams,
+    UpdateActivity, UpdateActivityEndTime,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -112,15 +112,13 @@ impl ProtoActivityService for ActivityService {
         let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
-        let limit = if req.limit == 0 { 50 } else { req.limit };
 
         let activities = self
             .db
-            .list_activities(ListActivities {
-                user_id,
-                limit,
-                offset: req.offset,
-            })
+            .list_activities(
+                ListActivities { user_id },
+                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
+            )
             .await
             .map_err(ActivityServiceError::from)?;
 
@@ -386,17 +384,16 @@ impl ProtoActivityService for ActivityService {
             .and_then(timestamp_to_datetime)
             .ok_or_else(|| ActivityServiceError::invalid_timestamp("end_time"))?;
 
-        let limit = if req.limit == 0 { 50 } else { req.limit };
-
         let activities = self
             .db
-            .get_activities_by_time_range(GetActivitiesByTimeRange {
-                user_id,
-                start_time,
-                end_time,
-                limit,
-                offset: req.offset,
-            })
+            .get_activities_by_time_range(
+                GetActivitiesByTimeRange {
+                    user_id,
+                    start_time,
+                    end_time,
+                },
+                PaginationParams::new(req.limit, req.offset, "DESC".to_string()),
+            )
             .await
             .map_err(ActivityServiceError::from)?;
 
