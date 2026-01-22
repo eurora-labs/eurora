@@ -8,6 +8,7 @@ ignored = ["tonic-prost"]
 
 [dependencies]
 agent-chain = { workspace = true, features = ["openai"] }
+async-stream = { workspace = true }
 be-auth-grpc = { workspace = true }
 be-remote-db = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
@@ -15,6 +16,7 @@ prost = { workspace = true }
 prost-types = { workspace = true }
 proto-gen = { workspace = true, features = ["server"] }
 thiserror = { workspace = true }
+tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
