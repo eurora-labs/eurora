@@ -7,9 +7,6 @@ use crate::utils::uuid7;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 use super::base::merge_content;
 
 /// A chat message that can be assigned an arbitrary speaker (role).
@@ -18,7 +15,7 @@ use super::base::merge_content;
 /// by the standard message types (Human, AI, System, Tool).
 ///
 /// This corresponds to `ChatMessage` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatMessage {
     /// The message content
@@ -123,7 +120,7 @@ impl ChatMessage {
 /// Chat message chunk (yielded when streaming).
 ///
 /// This corresponds to `ChatMessageChunk` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatMessageChunk {
     /// The message content (may be partial during streaming)

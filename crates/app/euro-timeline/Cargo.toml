@@ -5,7 +5,7 @@ edition.workspace = true
 description = "Timeline storage for capturing system state over time"
 
 [dependencies]
-agent-chain-core = { workspace = true, features = ["specta"] }
+agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-activity = { workspace = true }

@@ -1,6 +1,6 @@
 //! YouTube snapshot implementation
 
-use agent_chain_core::{BaseMessage, ContentPart, HumanMessage, ImageSource};
+use agent_chain_core::{BaseMessage, ContentPart, ImageSource, SystemMessage};
 use euro_native_messaging::types::NativeYoutubeSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -139,7 +139,7 @@ impl SnapshotFunctionality for YoutubeSnapshot {
             });
         }
 
-        vec![HumanMessage::with_content(content_parts).into()]
+        vec![SystemMessage::with_content(content_parts).into()]
     }
 
     fn get_updated_at(&self) -> u64 {

@@ -9,9 +9,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::ops::Add;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 use crate::utils::merge::merge_dicts;
 
 /// A single text generation output.
@@ -26,7 +23,7 @@ use crate::utils::merge::merge_dicts;
 /// LangChain users working with chat models will usually access information via
 /// `AIMessage` (returned from runnable interfaces) or `LLMResult` (available
 /// via callbacks). Please refer to `AIMessage` and `LLMResult` for more information.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Generation {
     /// Generated text output.
@@ -92,7 +89,7 @@ impl Default for Generation {
 }
 
 /// `GenerationChunk`, which can be concatenated with other Generation chunks.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GenerationChunk {
     /// Generated text output.

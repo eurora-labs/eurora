@@ -12,8 +12,8 @@ pub enum Error {
     #[error("Could not send event: {0}")]
     SendEvent(#[source] SendError<ConversationEvent>),
 
-    #[error("Could not save conversation: {0}")]
-    SaveConversation(#[source] Status),
+    #[error("Transport error: {0}")]
+    Transport(#[source] Status),
 
     #[error("Could not set conversation id: {0}")]
     SetId(String),
@@ -33,7 +33,7 @@ impl From<SendError<ConversationEvent>> for Error {
 
 impl From<Status> for Error {
     fn from(err: Status) -> Self {
-        Error::SaveConversation(err)
+        Error::Transport(err)
     }
 }
 
