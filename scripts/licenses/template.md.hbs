@@ -1,0 +1,29 @@
+## Overview of licenses
+
+This section summarizes how many dependencies use each license.
+
+{{#each overview}}
+- {{name}} ({{count}})
+{{/each}}
+
+## Third-party Rust dependency licenses
+
+The following section lists all license texts for Eurora's Rust dependencies,
+grouped by license.
+
+{{#each licenses}}
+---
+
+### {{name}} (`{{id}}`)
+
+Used by:
+
+{{#each used_by}}
+- {{crate.name}} {{crate.version}}
+{{/each}}
+
+License text:
+
+```text
+{{text}}
+{{/each}}

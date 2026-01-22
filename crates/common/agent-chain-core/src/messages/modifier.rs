@@ -5,14 +5,11 @@
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 /// Message responsible for deleting other messages.
 ///
 /// This is used to remove messages from a conversation history by their ID.
 /// This corresponds to `RemoveMessage` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RemoveMessage {
     /// The ID of the message to remove

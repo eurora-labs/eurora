@@ -3,9 +3,8 @@
 use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
-    CreateMessageRequest as DbCreateMessageRequest, DatabaseManager, GetConversation,
-    GetLastMessagesRequest, ListConversationsRequest as DbListConversationsRequest, ListMessages,
-    MessageType, NewConversation as DbCreateConversationRequest,
+    DatabaseManager, GetConversation, ListConversations, ListMessages, MessageType,
+    NewConversation, NewMessage, PaginationParams,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -19,8 +18,9 @@ use crate::error::ConversationServiceError;
 use crate::{ConversationServiceResult, converters::convert_db_message_to_base_message};
 
 use proto_gen::conversation::{
-    AddHumanMessageRequest, AddHumanMessageResponse, ChatStreamRequest, ChatStreamResponse,
-    Conversation, CreateConversationRequest, CreateConversationResponse, GetConversationResponse,
+    AddHumanMessageRequest, AddHumanMessageResponse, AddSystemMessageRequest,
+    AddSystemMessageResponse, ChatStreamRequest, ChatStreamResponse, Conversation,
+    CreateConversationRequest, CreateConversationResponse, GetConversationResponse,
     GetMessagesRequest, GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
 };
 
@@ -90,14 +90,14 @@ impl ProtoConversationService for ConversationService {
         let req = request.into_inner();
 
         let title = if req.title.is_empty() {
-            None
+            "New Chat".to_string()
         } else {
-            Some(req.title)
+            req.title
         };
 
         let conversation = self
             .db
-            .create_conversation(DbCreateConversationRequest {
+            .create_conversation(NewConversation {
                 id: None,
                 user_id,
                 title,
@@ -128,11 +128,10 @@ impl ProtoConversationService for ConversationService {
 
         let conversations = self
             .db
-            .list_conversations(DbListConversationsRequest {
-                user_id,
-                limit: req.limit,
-                offset: req.offset,
-            })
+            .list_conversations(
+                ListConversations { user_id },
+                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
+            )
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -167,20 +166,13 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        // Verify the user owns this conversation
-        let conversation = self
-            .db
-            .get_conversation_for_user(conversation_id, user_id)
-            .await
-            .map_err(ConversationServiceError::from)?;
-
         // Save the human message to the database
-        // TODO: Create a proto definition for the message and return that instead
-        let _message = self
+        let message = self
             .db
-            .create_message(DbCreateMessageRequest {
+            .create_message(NewMessage {
                 id: None,
                 conversation_id,
+                user_id,
                 message_type: MessageType::Human,
                 content: serde_json::json!(req.content),
                 tool_call_id: None,
@@ -196,7 +188,50 @@ impl ProtoConversationService for ConversationService {
         );
 
         Ok(Response::new(AddHumanMessageResponse {
-            conversation: Some(Self::db_conversation_to_proto(conversation)),
+            message: Some(message.into()),
+        }))
+    }
+
+    async fn add_system_message(
+        &self,
+        request: Request<AddSystemMessageRequest>,
+    ) -> Result<Response<AddSystemMessageResponse>, Status> {
+        info!("AddSystemMessage request received");
+
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        // Save the system message to the database
+        let message = self
+            .db
+            .create_message(NewMessage {
+                id: None,
+                conversation_id,
+                user_id,
+                message_type: MessageType::System,
+                content: serde_json::json!(req.content),
+                tool_call_id: None,
+                tool_calls: None,
+                additional_kwargs: None,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        info!(
+            "Added system message to conversation {} for user {}",
+            conversation_id, user_id
+        );
+
+        Ok(Response::new(AddSystemMessageResponse {
+            message: Some(message.into()),
         }))
     }
 
@@ -210,13 +245,6 @@ impl ProtoConversationService for ConversationService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        // TODO: Backend driven chat
-        // 1. Get current conversation
-        // 2. Get last messages (the assets should be saved beforehand?)
-        // 3. Get assets and add them to messages
-        // 4. Add user message
-        // 5. Generate response
-
         let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
             ConversationServiceError::InvalidUuid {
                 field: "conversation_id",
@@ -226,11 +254,13 @@ impl ProtoConversationService for ConversationService {
 
         let db_messages = self
             .db
-            .get_last_messages(GetLastMessagesRequest {
-                conversation_id,
-                user_id,
-                limit: 5,
-            })
+            .list_messages(
+                ListMessages {
+                    conversation_id,
+                    user_id,
+                },
+                PaginationParams::new(0, 5, "ASC".to_string()),
+            )
             .await
             .unwrap();
 
@@ -239,7 +269,23 @@ impl ProtoConversationService for ConversationService {
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
-        messages.push(HumanMessage::new(req.content).into());
+        messages.push(HumanMessage::new(req.content.clone()).into());
+
+        self.db
+            .create_message(NewMessage {
+                id: None,
+                conversation_id,
+                user_id,
+                message_type: MessageType::Human,
+                content: serde_json::json!(req.content),
+                tool_call_id: None,
+                tool_calls: None,
+                additional_kwargs: None,
+            })
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        info!("Messages: {:?}", messages);
 
         let openai_stream = self
             .provider
@@ -250,21 +296,49 @@ impl ProtoConversationService for ConversationService {
                 Status::internal(e.to_string())
             })?;
 
-        let output_stream = openai_stream.map(|result| match result {
-            Ok(chunk) => {
-                // AIMessageChunk has content() method for getting the text content
-                // We determine finality by empty content or chunk_position
-                let content = chunk.content().to_string();
-                // TODO: Don't rely on empty string for finality
-                let is_final = content.is_empty();
+        let db = self.db.clone();
+        let output_stream = async_stream::try_stream! {
+            tokio::pin!(openai_stream);
+            let mut full_content = String::new();
 
-                Ok(ChatStreamResponse {
-                    chunk: content,
-                    is_final,
-                })
+            while let Some(result) = openai_stream.next().await {
+                match result {
+                    Ok(chunk) => {
+                        // AIMessageChunk has content() method for getting the text content
+                        // We determine finality by empty content or chunk_position
+                        let content = chunk.content().to_string();
+                        full_content.push_str(&content);
+                        // TODO: Don't rely on empty string for finality
+                        let is_final = content.is_empty();
+
+                        yield ChatStreamResponse {
+                            chunk: content,
+                            is_final,
+                        };
+                    }
+                    Err(e) => {
+                        Err(Status::internal(e.to_string()))?;
+                    }
+                }
             }
-            Err(e) => Err(Status::internal(e.to_string())),
-        });
+
+            // Save the AI message to the database after stream completes
+            if !full_content.is_empty() && let Err(e) = db
+                    .create_message(NewMessage {
+                        id: None,
+                        conversation_id,
+                        user_id,
+                        message_type: MessageType::Ai,
+                        content: serde_json::json!(full_content),
+                        tool_call_id: None,
+                        tool_calls: None,
+                        additional_kwargs: None,
+                    })
+                    .await
+                {
+                    error!("Failed to save AI message to database: {}", e);
+                }
+        };
 
         Ok(Response::new(
             Box::pin(output_stream) as Self::ChatStreamStream
@@ -275,6 +349,7 @@ impl ProtoConversationService for ConversationService {
         &self,
         request: Request<GetMessagesRequest>,
     ) -> Result<Response<GetMessagesResponse>, Status> {
+        info!("Get messages request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
@@ -288,12 +363,13 @@ impl ProtoConversationService for ConversationService {
 
         let messages = self
             .db
-            .list_messages(ListMessages {
-                conversation_id,
-                user_id,
-                limit: req.limit,
-                offset: req.offset,
-            })
+            .list_messages(
+                ListMessages {
+                    conversation_id,
+                    user_id,
+                },
+                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
+            )
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -306,6 +382,7 @@ impl ProtoConversationService for ConversationService {
         &self,
         request: tonic::Request<proto_gen::conversation::GetConversationRequest>,
     ) -> Result<Response<GetConversationResponse>, Status> {
+        info!("Get conversation request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
