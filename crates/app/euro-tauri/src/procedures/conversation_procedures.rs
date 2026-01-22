@@ -138,7 +138,7 @@ impl ConversationApi for ConversationApiImpl {
         let conversation = conversation_manager
             .switch_conversation(conversation_id)
             .await
-            .map_err(|e| format!("Failed to get conversation: {}", e))?;
+            .map_err(|e| format!("Failed to switch conversation: {}", e))?;
 
         TauRpcConversationApiEventTrigger::new(app_handle.clone())
             .current_conversation_changed(conversation.into())
