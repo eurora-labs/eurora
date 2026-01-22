@@ -33,6 +33,7 @@ pub struct NewUser {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateUser {
+    pub id: Uuid,
     pub username: Option<String>,
     pub email: Option<String>,
     pub display_name: Option<String>,
@@ -347,6 +348,7 @@ impl std::fmt::Display for MessageType {
 pub struct Message {
     pub id: Uuid,
     pub conversation_id: Uuid,
+    pub user_id: Uuid,
     pub message_type: MessageType,
     /// Content stored as JSONB
     /// For human: MessageContent (can be {"Text": "..."} or {"Parts": [...]})
