@@ -1,10 +1,9 @@
 [package]
 name = "be-remote-db"
 version = "0.0.0"
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
-license-file = "LICENSE"
 edition.workspace = true
 description = "Eurora Remote DB"
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 chrono = { workspace = true, features = ["serde"] }

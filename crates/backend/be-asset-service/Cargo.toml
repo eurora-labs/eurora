@@ -1,10 +1,9 @@
 [package]
 name = "be-asset-service"
 version = "0.0.0"
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
-license-file = "LICENSE"
 edition.workspace = true
 description = "Eurora Asset Service - gRPC service for managing user file assets"
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [package.metadata.cargo-machete]
 ignored = ["tonic-prost"]
