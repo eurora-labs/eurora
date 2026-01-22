@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{BaseMessage, SystemMessage};
 use async_trait::async_trait;
 use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet};
 use serde::{Deserialize, Serialize};
@@ -107,8 +107,8 @@ impl AssetFunctionality for TwitterAsset {
         };
 
         let mut text = format!(
-            "I am looking at Twitter {} content titled '{}' and have a question about it. \
-                         Here are the tweets I'm seeing: \n\n{}",
+            "The user is looking at Twitter {} content titled '{}' and has a question about it. \
+                         Here are the tweets they're seeing: \n\n{}",
             context_description,
             self.title,
             tweet_texts.join("\n\n")
@@ -120,7 +120,7 @@ impl AssetFunctionality for TwitterAsset {
             ));
         }
 
-        vec![HumanMessage::new(text).into()]
+        vec![SystemMessage::new(text).into()]
     }
 
     /// Get context chip for UI integration
@@ -444,7 +444,7 @@ mod tests {
         let messages = AssetFunctionality::construct_messages(&asset);
         let msg = messages[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, BaseMessage::Human(_)));
+        assert!(matches!(msg, BaseMessage::System(_)));
         assert!(chip.is_some());
     }
 }

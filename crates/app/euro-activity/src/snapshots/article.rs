@@ -1,6 +1,6 @@
 //! Article snapshot implementation
 
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{BaseMessage, SystemMessage};
 use euro_native_messaging::types::NativeArticleSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -105,20 +105,23 @@ impl SnapshotFunctionality for ArticleSnapshot {
 
         if let Some(highlight) = &self.highlight {
             content.push_str(&format!(
-                "I highlighted the following text: \"{}\"",
+                "user highlighted the following text: \"{}\"",
                 highlight
             ));
         } else if let Some(selection) = &self.selection_text {
-            content.push_str(&format!("I selected the following text: \"{}\"", selection));
+            content.push_str(&format!(
+                "user selected the following text: \"{}\"",
+                selection
+            ));
         } else {
-            content.push_str("I'm reading an article");
+            content.push_str("user is reading an article");
         }
 
         if let Some(url) = &self.page_url {
             content.push_str(&format!(" (from: {})", url));
         }
 
-        vec![HumanMessage::new(content).into()]
+        vec![SystemMessage::new(content).into()]
     }
 
     fn get_updated_at(&self) -> u64 {
