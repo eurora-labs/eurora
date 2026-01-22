@@ -1,9 +1,8 @@
 [package]
 name = "be-auth-service"
 version = "0.0.0"
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
-license-file = "LICENSE"
 edition.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
 
 [dependencies]
@@ -13,6 +12,7 @@ base64 = { workspace = true }
 bcrypt = "0.17"
 be-auth-grpc = { workspace = true }
 be-remote-db = { workspace = true }
+chacha20poly1305 = "0.10"
 chrono = { workspace = true, features = ["serde"] }
 hex = { workspace = true }
 jsonwebtoken = { workspace = true }
@@ -23,6 +23,7 @@ rand = { workspace = true }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { workspace = true, features = ["derive"] }
 sha2 = "0.10"
+thiserror = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
