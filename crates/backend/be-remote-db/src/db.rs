@@ -2,14 +2,15 @@ use crate::{
     GetConversation, PaginationParams,
     error::DbResult,
     types::{
-        Activity, ActivityAsset, Asset, Conversation, CreateLoginToken, CreateOAuthCredentials,
-        CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange, ListActivities,
-        ListConversations, ListMessages, LoginToken, Message, NewActivity, NewAsset,
-        NewConversation, NewMessage, NewUser, OAuthCredentials, OAuthState, PasswordCredentials,
-        RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateOAuthCredentials, User,
+        Activity, ActivityAsset, Asset, AssetStatus, Conversation, CreateLoginToken,
+        CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange,
+        ListActivities, ListConversations, ListMessages, LoginToken, Message, NewActivity,
+        NewAsset, NewConversation, NewMessage, NewUser, OAuthCredentials, OAuthProvider,
+        OAuthState, PasswordCredentials, RefreshToken, UpdateActivity, UpdateActivityEndTime,
+        UpdateOAuthCredentials, User,
     },
 };
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use sqlx::{
     migrate::MigrateDatabase,
     postgres::{PgPool, PgPoolOptions},
@@ -73,21 +74,22 @@ impl DatabaseManager {
         .bind(&request.display_name)
         .bind(false) // email_verified defaults to false
         .bind(now)
-        .bind(None::<DateTime<Utc>>) // updated_at is null initially
+        .bind(now) // updated_at is NOT NULL, set to now initially
         .fetch_one(&mut *tx)
         .await?;
 
         // Insert password credentials
         sqlx::query(
             r#"
-            INSERT INTO password_credentials (id, user_id, password_hash, updated_at)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO password_credentials (id, user_id, password_hash, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5)
             "#,
         )
         .bind(password_id)
         .bind(user_id)
         .bind(&request.password_hash)
-        .bind(None::<DateTime<Utc>>) // updated_at is null initially
+        .bind(now) // created_at
+        .bind(now) // updated_at is NOT NULL, set to now initially
         .execute(&mut *tx)
         .await?;
 
@@ -146,7 +148,7 @@ impl DatabaseManager {
     pub async fn get_password_credentials(&self, user_id: Uuid) -> DbResult<PasswordCredentials> {
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
             r#"
-            SELECT id, user_id, password_hash, updated_at
+            SELECT id, user_id, password_hash, created_at, updated_at
             FROM password_credentials
             WHERE user_id = $1
             "#,
@@ -206,7 +208,7 @@ impl DatabaseManager {
         )
         .bind(id)
         .bind(request.user_id)
-        .bind(&request.provider)
+        .bind(request.provider)
         .bind(&request.provider_user_id)
         .bind(&request.access_token)
         .bind(&request.refresh_token)
@@ -223,7 +225,7 @@ impl DatabaseManager {
 
     pub async fn get_oauth_credentials_by_provider_and_user(
         &self,
-        provider: &str,
+        provider: OAuthProvider,
         user_id: Uuid,
     ) -> DbResult<OAuthCredentials> {
         let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
@@ -276,7 +278,7 @@ impl DatabaseManager {
 
     pub async fn get_user_by_oauth_provider(
         &self,
-        provider: &str,
+        provider: OAuthProvider,
         provider_user_id: &str,
     ) -> DbResult<User> {
         let user = sqlx::query_as::<_, User>(
@@ -324,7 +326,7 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
-    pub async fn get_refresh_token_by_hash(&self, token_hash: &str) -> DbResult<RefreshToken> {
+    pub async fn get_refresh_token_by_hash(&self, token_hash: &[u8]) -> DbResult<RefreshToken> {
         let refresh_token = sqlx::query_as::<_, RefreshToken>(
             r#"
             SELECT id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at
@@ -339,7 +341,7 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
-    pub async fn revoke_refresh_token(&self, token_hash: &str) -> DbResult<RefreshToken> {
+    pub async fn revoke_refresh_token(&self, token_hash: &[u8]) -> DbResult<RefreshToken> {
         let now = Utc::now();
 
         let refresh_token = sqlx::query_as::<_, RefreshToken>(
@@ -365,9 +367,9 @@ impl DatabaseManager {
 
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
+            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at
             "#,
         )
         .bind(id)
@@ -376,6 +378,7 @@ impl DatabaseManager {
         .bind(&request.redirect_uri)
         .bind(request.ip_address)
         .bind(false) // consumed defaults to false
+        .bind(now)
         .bind(now)
         .bind(request.expires_at)
         .fetch_one(&self.pool)
@@ -387,7 +390,7 @@ impl DatabaseManager {
     pub async fn get_oauth_state_by_state(&self, state: &str) -> DbResult<OAuthState> {
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
+            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at
             FROM oauth_state
             WHERE state = $1 AND consumed = false AND expires_at > now()
             "#,
@@ -400,15 +403,18 @@ impl DatabaseManager {
     }
 
     pub async fn consume_oauth_state(&self, state: &str) -> DbResult<OAuthState> {
+        let now = Utc::now();
+
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
             UPDATE oauth_state
-            SET consumed = true
+            SET consumed = true, updated_at = $2
             WHERE state = $1 AND consumed = false AND expires_at > now()
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at
             "#,
         )
         .bind(state)
+        .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
@@ -422,13 +428,13 @@ impl DatabaseManager {
 
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
-            INSERT INTO login_tokens (id, token, expires_at, user_id, consumed, created_at, updated_at)
+            INSERT INTO login_tokens (id, token_hash, expires_at, user_id, consumed, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
+            RETURNING id, token_hash, consumed, expires_at, user_id, created_at, updated_at
             "#,
         )
         .bind(id)
-        .bind(&request.token)
+        .bind(&request.token_hash)
         .bind(request.expires_at)
         .bind(request.user_id)
         .bind(false) // consumed starts as false
@@ -440,33 +446,33 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
-    pub async fn get_login_token_by_token(&self, token: &str) -> DbResult<LoginToken> {
+    pub async fn get_login_token_by_hash(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
-            SELECT id, token, consumed, expires_at, user_id, created_at, updated_at
+            SELECT id, token_hash, consumed, expires_at, user_id, created_at, updated_at
             FROM login_tokens
-            WHERE token = $1 AND consumed = false AND expires_at > now()
+            WHERE token_hash = $1 AND consumed = false AND expires_at > now()
             "#,
         )
-        .bind(token)
+        .bind(token_hash)
         .fetch_one(&self.pool)
         .await?;
 
         Ok(login_token)
     }
 
-    pub async fn consume_login_token(&self, token: &str) -> DbResult<LoginToken> {
+    pub async fn consume_login_token(&self, token_hash: &[u8]) -> DbResult<LoginToken> {
         let now = Utc::now();
 
         let login_token = sqlx::query_as::<_, LoginToken>(
             r#"
             UPDATE login_tokens
             SET consumed = true, updated_at = $2
-            WHERE token = $1 AND expires_at > now()
-            RETURNING id, token, consumed, expires_at, user_id, created_at, updated_at
+            WHERE token_hash = $1 AND consumed = false AND expires_at > now()
+            RETURNING id, token_hash, consumed, expires_at, user_id, created_at, updated_at
             "#,
         )
-        .bind(token)
+        .bind(token_hash)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -683,6 +689,7 @@ impl DatabaseManager {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
         let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
+        let status = request.status.unwrap_or(AssetStatus::Uploaded);
 
         let asset = sqlx::query_as::<_, Asset>(
             r#"
@@ -699,7 +706,7 @@ impl DatabaseManager {
         .bind(&request.checksum_sha256)
         .bind(&request.storage_backend)
         .bind(&request.storage_uri)
-        .bind("uploaded")
+        .bind(status)
         .bind(&metadata)
         .bind(now)
         .bind(now)
