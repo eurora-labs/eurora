@@ -29,7 +29,7 @@ use uuid::Uuid;
 pub mod crypto;
 pub mod oauth;
 
-use crypto::encrypt_pkce_verifier;
+use crypto::{decrypt_pkce_verifier, encrypt_pkce_verifier};
 use oauth::google::create_google_oauth_client;
 
 /// The main authentication service
@@ -355,7 +355,7 @@ impl AuthService {
         }
 
         // Validate and consume the OAuth state
-        let _oauth_state = match self.db.get_oauth_state_by_state(state).await {
+        let oauth_state = match self.db.get_oauth_state_by_state(state).await {
             Ok(oauth_state) => oauth_state,
             Err(_) => {
                 warn!("Invalid or expired OAuth state: {}", state);
@@ -364,6 +364,12 @@ impl AuthService {
                 ));
             }
         };
+
+        // Decrypt the PKCE verifier from the stored OAuth state
+        let pkce_verifier = decrypt_pkce_verifier(&oauth_state.pkce_verifier).map_err(|e| {
+            error!("Failed to decrypt PKCE verifier: {}", e);
+            Status::internal("Failed to process OAuth state")
+        })?;
 
         // Consume the state to prevent replay attacks
         if let Err(e) = self.db.consume_oauth_state(state).await {
@@ -417,7 +423,7 @@ impl AuthService {
 
         let token_result = client
             .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
-            // .set_pkce_verifier(oauth2::PkceCodeVerifier::new(pkce_verifier))
+            .set_pkce_verifier(oauth2::PkceCodeVerifier::new(pkce_verifier))
             .request_async(&http_client)
             .await
             .map_err(|e| {
@@ -776,7 +782,7 @@ impl ProtoAuthService for AuthService {
                     })?;
 
                 google_client
-                    .get_authorization_url_with_state(&state)
+                    .get_authorization_url_with_state_and_pkce(&state, &pkce_verifier)
                     .map_err(|e| {
                         error!("Failed to generate Google OAuth URL: {}", e);
                         Status::internal("Failed to generate OAuth URL")
