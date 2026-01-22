@@ -468,7 +468,7 @@ impl DatabaseManager {
             r#"
             UPDATE login_tokens
             SET consumed = true, updated_at = $2
-            WHERE token_hash = $1 AND expires_at > now()
+            WHERE token_hash = $1 AND consumed = false AND expires_at > now()
             RETURNING id, token_hash, consumed, expires_at, user_id, created_at, updated_at
             "#,
         )
