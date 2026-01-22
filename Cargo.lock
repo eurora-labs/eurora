@@ -3463,7 +3463,6 @@ dependencies = [
  "prost-types",
  "proto-gen",
  "serde",
- "specta",
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
