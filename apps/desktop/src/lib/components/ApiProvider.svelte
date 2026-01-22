@@ -67,7 +67,7 @@
 	<Card.Content class="space-y-4">
 		<Label for="api-provider">Provider</Label>
 		<Select.Root type="single" name="api-provider" bind:value={apiProvider}>
-			<Select.Trigger class="w-[180px]">
+			<Select.Trigger class="w-45">
 				{triggerContent}
 			</Select.Trigger>
 			<Select.Content>
@@ -85,7 +85,7 @@
 		<Input id="api-key" type="password" placeholder="Enter your API key" bind:value={apiKey} />
 		<Label for="model">Model</Label>
 		<Select.Root type="single" name="model" bind:value={model}>
-			<Select.Trigger class="w-[180px]">
+			<Select.Trigger class="w-45">
 				{modelTriggerContent}
 			</Select.Trigger>
 			<Select.Content>

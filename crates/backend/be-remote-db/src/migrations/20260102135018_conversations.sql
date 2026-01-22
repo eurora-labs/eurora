@@ -41,6 +41,7 @@ CREATE TABLE conversations (
 CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
     conversation_id UUID NOT NULL,
+    user_id UUID NOT NULL,
     message_type message_type NOT NULL,
 
     -- Content stored as JSONB for efficient querying
@@ -61,10 +62,15 @@ CREATE TABLE messages (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
 
-    -- Foreign key constraint
+    -- Foreign key constraints
     CONSTRAINT fk_messages_conversation_id
         FOREIGN KEY (conversation_id)
         REFERENCES conversations(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_messages_user_id
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
         ON DELETE CASCADE,
 
     -- ToolMessage must have tool_call_id
@@ -213,6 +219,7 @@ CREATE INDEX idx_conversations_user_updated ON conversations(user_id, updated_at
 
 -- Messages indexes
 CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX idx_messages_user_id ON messages(user_id);
 CREATE INDEX idx_messages_type ON messages(message_type);
 -- GIN index for JSONB content queries (if needed for full-text search later)
 CREATE INDEX idx_messages_content ON messages USING GIN (content jsonb_path_ops);
@@ -279,6 +286,7 @@ COMMENT ON COLUMN conversations.updated_at IS 'Timestamp when conversation was l
 COMMENT ON TABLE messages IS 'Messages within conversations - stores agent-chain BaseMessage types';
 COMMENT ON COLUMN messages.id IS 'Primary key UUID for message';
 COMMENT ON COLUMN messages.conversation_id IS 'Foreign key to conversations table';
+COMMENT ON COLUMN messages.user_id IS 'Foreign key to users table - owner of the message for access control';
 COMMENT ON COLUMN messages.message_type IS 'Type of message: human, system, ai, or tool';
 COMMENT ON COLUMN messages.content IS 'Message content as JSONB - structure depends on message_type';
 COMMENT ON COLUMN messages.tool_call_id IS 'For tool messages: ID of the tool call this responds to';

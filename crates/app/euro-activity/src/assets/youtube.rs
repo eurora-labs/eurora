@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{BaseMessage, SystemMessage};
 use async_trait::async_trait;
 use euro_native_messaging::NativeYoutubeAsset;
 use serde::{Deserialize, Serialize};
@@ -94,7 +94,7 @@ impl AssetFunctionality for YoutubeAsset {
     /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         let content = format!(
-            "I am watching a YouTube video titled '{}' and have a question about it. \
+            "The user is watching a YouTube video titled '{}'. \
              Here's the transcript of the video: \n {}",
             self.title,
             self.transcript
@@ -103,7 +103,7 @@ impl AssetFunctionality for YoutubeAsset {
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        vec![HumanMessage::new(content).into()]
+        vec![SystemMessage::new(content).into()]
     }
 
     /// Get context chip for UI integration
@@ -268,7 +268,7 @@ mod tests {
         let messages = AssetFunctionality::construct_messages(&asset);
         let msg = messages[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, BaseMessage::Human(_)));
+        assert!(matches!(msg, BaseMessage::System(_)));
         assert!(chip.is_some());
     }
 }

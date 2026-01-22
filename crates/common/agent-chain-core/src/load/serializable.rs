@@ -8,14 +8,11 @@ use serde_json::Value;
 use std::any::Any;
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 /// Serialization version.
 pub const LC_VERSION: i32 = 1;
 
 /// Base serialized structure containing common fields.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BaseSerialized {
     /// The version of the serialization format.
@@ -44,7 +41,7 @@ impl Default for BaseSerialized {
 /// Serialized constructor representation.
 ///
 /// Used when an object can be serialized and reconstructed from its constructor.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SerializedConstructor {
     /// The version of the serialization format.
@@ -93,7 +90,7 @@ impl SerializedConstructor {
 /// Serialized secret representation.
 ///
 /// Used to represent secret values that should not be serialized directly.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SerializedSecret {
     /// The version of the serialization format.
@@ -132,7 +129,7 @@ impl SerializedSecret {
 /// Serialized not implemented representation.
 ///
 /// Used when an object cannot be serialized.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SerializedNotImplemented {
     /// The version of the serialization format.
@@ -174,7 +171,7 @@ impl SerializedNotImplemented {
 }
 
 /// Union type for all serialized representations.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Serialized {
@@ -190,7 +187,7 @@ pub enum Serialized {
 }
 
 /// Data for SerializedConstructor without the type tag.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SerializedConstructorData {
     /// The version of the serialization format.
@@ -208,7 +205,7 @@ pub struct SerializedConstructorData {
 }
 
 /// Data for SerializedSecret without the type tag.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SerializedSecretData {
     /// The version of the serialization format.
@@ -224,7 +221,7 @@ pub struct SerializedSecretData {
 }
 
 /// Data for SerializedNotImplemented without the type tag.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SerializedNotImplementedData {
     /// The version of the serialization format.

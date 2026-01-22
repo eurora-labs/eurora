@@ -7,9 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 use super::ai::{AIMessage, AIMessageChunk};
 use super::chat::{ChatMessage, ChatMessageChunk};
 use super::content::ReasoningContentBlock;
@@ -23,7 +20,7 @@ use crate::utils::merge::merge_lists;
 /// A unified message type that can represent any message role.
 ///
 /// This corresponds to `BaseMessage` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum BaseMessage {
@@ -309,7 +306,7 @@ impl HasId for BaseMessage {
 /// A message chunk enum that represents streaming message chunks.
 ///
 /// This corresponds to `BaseMessageChunk` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum BaseMessageChunk {

@@ -10,9 +10,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 use super::base::merge_content;
 
 /// A function message in the conversation.
@@ -25,7 +22,7 @@ use super::base::merge_content;
 /// to request multiple tool calls in parallel.
 ///
 /// This corresponds to `FunctionMessage` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FunctionMessage {
     /// The message content (result of the function)
@@ -119,7 +116,7 @@ impl FunctionMessage {
 /// Function message chunk (yielded when streaming).
 ///
 /// This corresponds to `FunctionMessageChunk` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FunctionMessageChunk {
     /// The message content (may be partial during streaming)

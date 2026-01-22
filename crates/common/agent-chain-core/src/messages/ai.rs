@@ -6,9 +6,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 use super::content::ContentBlock;
 use super::tool::{
     InvalidToolCall, ToolCall, ToolCallChunk, default_tool_chunk_parser, default_tool_parser,
@@ -22,7 +19,7 @@ use crate::utils::usage::{dict_int_add_json, dict_int_sub_floor_json};
 /// Breakdown of input token counts.
 ///
 /// Does *not* need to sum to full input token count. Does *not* need to have all keys.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct InputTokenDetails {
     /// Audio input tokens.
@@ -39,7 +36,7 @@ pub struct InputTokenDetails {
 /// Breakdown of output token counts.
 ///
 /// Does *not* need to sum to full output token count. Does *not* need to have all keys.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct OutputTokenDetails {
     /// Audio output tokens.
@@ -53,7 +50,7 @@ pub struct OutputTokenDetails {
 /// Usage metadata for a message, such as token counts.
 ///
 /// This is a standard representation of token usage that is consistent across models.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct UsageMetadata {
     /// Count of input (or prompt) tokens. Sum of all input token types.
@@ -139,7 +136,7 @@ impl UsageMetadata {
 /// (e.g., tool calls, usage metadata).
 ///
 /// This corresponds to `AIMessage` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AIMessage {
     /// The message content
@@ -588,7 +585,7 @@ fn format_tool_calls_repr(
 ///
 /// If a chunk with `chunk_position="last"` is aggregated into a stream,
 /// `tool_call_chunks` in message content will be parsed into `tool_calls`.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ChunkPosition {
@@ -602,7 +599,7 @@ pub enum ChunkPosition {
 /// build up a complete AIMessage.
 ///
 /// This corresponds to `AIMessageChunk` in LangChain Python.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AIMessageChunk {
     /// The message content (may be partial during streaming)

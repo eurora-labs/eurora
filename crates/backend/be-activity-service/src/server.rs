@@ -5,11 +5,7 @@ use std::sync::Arc;
 use be_asset::AssetService;
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
-    CreateActivityRequest as DbCreateActivityRequest, DatabaseManager,
-    GetActivitiesByTimeRangeRequest as DbGetActivitiesByTimeRangeRequest,
-    ListActivitiesRequest as DbListActivitiesRequest,
-    UpdateActivityEndTimeRequest as DbUpdateActivityEndTimeRequest,
-    UpdateActivityRequest as DbUpdateActivityRequest,
+    DatabaseManager, ListActivities, NewActivity, PaginationParams, UpdateActivity,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -21,9 +17,8 @@ use uuid::Uuid;
 use crate::error::{ActivityResult, ActivityServiceError};
 
 use proto_gen::activity::{
-    Activity, ActivityResponse, DeleteActivityRequest, GetActivitiesByTimeRangeRequest,
-    GetActivityRequest, InsertActivityRequest, ListActivitiesRequest, ListActivitiesResponse,
-    UpdateActivityEndTimeRequest, UpdateActivityRequest,
+    Activity, ActivityResponse, InsertActivityRequest, ListActivitiesRequest,
+    ListActivitiesResponse,
 };
 
 pub use proto_gen::activity::proto_activity_service_server::{
@@ -88,11 +83,6 @@ fn timestamp_to_datetime(ts: &Timestamp) -> Option<DateTime<Utc>> {
     DateTime::from_timestamp(ts.seconds, ts.nanos as u32)
 }
 
-/// Parse an activity ID from a string.
-fn parse_activity_id(id: &str) -> Result<Uuid, ActivityServiceError> {
-    Uuid::parse_str(id).map_err(|e| ActivityServiceError::invalid_uuid("activity_id", e))
-}
-
 /// Parse an optional UUID from a string.
 fn parse_optional_uuid(
     value: Option<&String>,
@@ -115,15 +105,13 @@ impl ProtoActivityService for ActivityService {
         let user_id = parse_user_id(claims)?;
 
         let req = request.into_inner();
-        let limit = if req.limit == 0 { 50 } else { req.limit };
 
         let activities = self
             .db
-            .list_activities(DbListActivitiesRequest {
-                user_id,
-                limit,
-                offset: req.offset,
-            })
+            .list_activities(
+                ListActivities { user_id },
+                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
+            )
             .await
             .map_err(ActivityServiceError::from)?;
 
@@ -138,31 +126,6 @@ impl ProtoActivityService for ActivityService {
 
         Ok(Response::new(ListActivitiesResponse {
             activities: proto_activities,
-        }))
-    }
-
-    async fn get_activity(
-        &self,
-        request: Request<GetActivityRequest>,
-    ) -> Result<Response<ActivityResponse>, Status> {
-        info!("GetActivity request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-
-        let req = request.into_inner();
-        let activity_id = parse_activity_id(&req.id)?;
-
-        let activity = self
-            .db
-            .get_activity_for_user(activity_id, user_id)
-            .await
-            .map_err(ActivityServiceError::from)?;
-
-        debug!("Retrieved activity {} for user {}", activity_id, user_id);
-
-        Ok(Response::new(ActivityResponse {
-            activity: Some(Self::db_activity_to_proto(&activity)),
         }))
     }
 
@@ -190,7 +153,7 @@ impl ProtoActivityService for ActivityService {
 
         let activity = self
             .db
-            .create_activity(DbCreateActivityRequest {
+            .create_activity(NewActivity {
                 id,
                 user_id,
                 name: req.name.clone(),
@@ -230,7 +193,7 @@ impl ProtoActivityService for ActivityService {
         };
 
         self.db
-            .update_activity(DbUpdateActivityRequest {
+            .update_activity(UpdateActivity {
                 id: activity.id,
                 user_id,
                 icon_asset_id: icon_id,
@@ -243,177 +206,6 @@ impl ProtoActivityService for ActivityService {
 
         Ok(Response::new(ActivityResponse {
             activity: Some(Self::db_activity_to_proto(&activity)),
-        }))
-    }
-
-    async fn update_activity(
-        &self,
-        request: Request<UpdateActivityRequest>,
-    ) -> Result<Response<ActivityResponse>, Status> {
-        info!("UpdateActivity request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-
-        let req = request.into_inner();
-
-        let activity_id = parse_activity_id(&req.id)?;
-        let icon_asset_id = parse_optional_uuid(req.icon_asset_id.as_ref(), "icon_asset_id")?;
-
-        let started_at = req.started_at.as_ref().and_then(timestamp_to_datetime);
-        let ended_at = req.ended_at.as_ref().and_then(timestamp_to_datetime);
-
-        let activity = self
-            .db
-            .update_activity(DbUpdateActivityRequest {
-                id: activity_id,
-                user_id,
-                name: req.name.clone(),
-                icon_asset_id,
-                process_name: req.process_name.clone(),
-                window_title: req.window_title.clone(),
-                started_at,
-                ended_at,
-            })
-            .await
-            .map_err(ActivityServiceError::from)?;
-
-        debug!("Updated activity {} for user {}", activity_id, user_id);
-
-        Ok(Response::new(ActivityResponse {
-            activity: Some(Self::db_activity_to_proto(&activity)),
-        }))
-    }
-
-    async fn update_activity_end_time(
-        &self,
-        request: Request<UpdateActivityEndTimeRequest>,
-    ) -> Result<Response<()>, Status> {
-        info!("UpdateActivityEndTime request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-
-        let req = request.into_inner();
-
-        let activity_id = parse_activity_id(&req.activity_id)?;
-
-        let ended_at = req
-            .ended_at
-            .as_ref()
-            .and_then(timestamp_to_datetime)
-            .ok_or_else(|| ActivityServiceError::invalid_timestamp("ended_at"))?;
-
-        self.db
-            .update_activity_end_time(DbUpdateActivityEndTimeRequest {
-                activity_id,
-                user_id,
-                ended_at,
-            })
-            .await
-            .map_err(ActivityServiceError::from)?;
-
-        debug!(
-            "Updated end time for activity {} for user {}",
-            activity_id, user_id
-        );
-
-        Ok(Response::new(()))
-    }
-
-    async fn get_last_active_activity(
-        &self,
-        request: Request<()>,
-    ) -> Result<Response<ActivityResponse>, Status> {
-        info!("GetLastActiveActivity request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-
-        let activity = self
-            .db
-            .get_last_active_activity(user_id)
-            .await
-            .map_err(ActivityServiceError::from)?;
-
-        debug!("Retrieved last active activity for user {}", user_id);
-
-        Ok(Response::new(ActivityResponse {
-            activity: activity.as_ref().map(Self::db_activity_to_proto),
-        }))
-    }
-
-    async fn delete_activity(
-        &self,
-        request: Request<DeleteActivityRequest>,
-    ) -> Result<Response<()>, Status> {
-        info!("DeleteActivity request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-
-        let req = request.into_inner();
-
-        let activity_id = parse_activity_id(&req.id)?;
-
-        self.db
-            .delete_activity(activity_id, user_id)
-            .await
-            .map_err(ActivityServiceError::from)?;
-
-        debug!("Deleted activity {} for user {}", activity_id, user_id);
-
-        Ok(Response::new(()))
-    }
-
-    async fn get_activities_by_time_range(
-        &self,
-        request: Request<GetActivitiesByTimeRangeRequest>,
-    ) -> Result<Response<ListActivitiesResponse>, Status> {
-        info!("GetActivitiesByTimeRange request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-
-        let req = request.into_inner();
-
-        let start_time = req
-            .start_time
-            .as_ref()
-            .and_then(timestamp_to_datetime)
-            .ok_or_else(|| ActivityServiceError::invalid_timestamp("start_time"))?;
-
-        let end_time = req
-            .end_time
-            .as_ref()
-            .and_then(timestamp_to_datetime)
-            .ok_or_else(|| ActivityServiceError::invalid_timestamp("end_time"))?;
-
-        let limit = if req.limit == 0 { 50 } else { req.limit };
-
-        let activities = self
-            .db
-            .get_activities_by_time_range(DbGetActivitiesByTimeRangeRequest {
-                user_id,
-                start_time,
-                end_time,
-                limit,
-                offset: req.offset,
-            })
-            .await
-            .map_err(ActivityServiceError::from)?;
-
-        let proto_activities: Vec<Activity> =
-            activities.iter().map(Self::db_activity_to_proto).collect();
-
-        debug!(
-            "Listed {} activities in time range for user {}",
-            proto_activities.len(),
-            user_id
-        );
-
-        Ok(Response::new(ListActivitiesResponse {
-            activities: proto_activities,
         }))
     }
 }
