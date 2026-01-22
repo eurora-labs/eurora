@@ -1,6 +1,8 @@
 [package]
 name = "be-monolith"
 version = "0.0.1"
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+license-file = "LICENSE"
 edition.workspace = true
 publish = false
 
