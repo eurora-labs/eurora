@@ -128,6 +128,7 @@ impl AssetService {
             storage_uri,
             storage_backend: self.storage.get_backend_name().to_string(),
             mime_type: req.mime_type,
+            status: None, // Uses default (Uploaded)
             metadata,
         };
 
