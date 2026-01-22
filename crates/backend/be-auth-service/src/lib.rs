@@ -26,8 +26,10 @@ use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+pub mod crypto;
 pub mod oauth;
 
+use crypto::encrypt_pkce_verifier;
 use oauth::google::create_google_oauth_client;
 
 /// The main authentication service
@@ -747,13 +749,19 @@ impl ProtoAuthService for AuthService {
                     Status::internal("OAuth configuration error")
                 })?;
 
-                // Store OAuth state in database
-                // The PKCE verifier should be encrypted by the application layer before storage
-                // For now, we'll store it as bytes (in production, this should be encrypted)
+                // Store OAuth state in database with encrypted PKCE verifier
                 let expires_at = Utc::now() + Duration::minutes(10); // 10 minute expiration
+
+                // Encrypt the PKCE verifier before storing
+                let encrypted_pkce_verifier =
+                    encrypt_pkce_verifier(&pkce_verifier).map_err(|e| {
+                        error!("Failed to encrypt PKCE verifier: {}", e);
+                        Status::internal("Failed to secure OAuth state")
+                    })?;
+
                 let oauth_state_request = CreateOAuthState {
                     state: state.clone(),
-                    pkce_verifier: pkce_verifier.as_bytes().to_vec(),
+                    pkce_verifier: encrypted_pkce_verifier,
                     redirect_uri: google_config.redirect_uri.clone(),
                     ip_address: None, // Could be extracted from request metadata if needed
                     expires_at,
@@ -767,14 +775,12 @@ impl ProtoAuthService for AuthService {
                         Status::internal("Failed to store OAuth state")
                     })?;
 
-                let url = google_client
+                google_client
                     .get_authorization_url_with_state(&state)
                     .map_err(|e| {
                         error!("Failed to generate Google OAuth URL: {}", e);
                         Status::internal("Failed to generate OAuth URL")
-                    })?;
-
-                url
+                    })?
             }
             Provider::Github => {
                 warn!("GitHub OAuth not implemented yet");
