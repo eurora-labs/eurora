@@ -45,8 +45,7 @@ impl DatabaseManager {
     }
 
     async fn run_migrations(pool: &PgPool) -> DbResult<()> {
-        let mut migrator = sqlx::migrate!("./src/migrations");
-        migrator.set_ignore_missing(true);
+        let migrator = sqlx::migrate!("./src/migrations");
         migrator.run(pool).await?;
         Ok(())
     }
@@ -340,22 +339,23 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
-    pub async fn revoke_refresh_token(&self, token_hash: &str) -> DbResult<()> {
+    pub async fn revoke_refresh_token(&self, token_hash: &str) -> DbResult<RefreshToken> {
         let now = Utc::now();
 
-        sqlx::query(
+        let refresh_token = sqlx::query_as::<_, RefreshToken>(
             r#"
             UPDATE refresh_tokens
             SET revoked = true, updated_at = $2
-            WHERE token_hash = $1
+            WHERE token_hash = $1 AND revoked = false
+            RETURNING id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at
             "#,
         )
         .bind(token_hash)
         .bind(now)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
 
-        Ok(())
+        Ok(refresh_token)
     }
 
     // OAuth state management methods
@@ -399,19 +399,20 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
-    pub async fn consume_oauth_state(&self, state: &str) -> DbResult<()> {
-        sqlx::query(
+    pub async fn consume_oauth_state(&self, state: &str) -> DbResult<OAuthState> {
+        let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
             UPDATE oauth_state
             SET consumed = true
-            WHERE state = $1
+            WHERE state = $1 AND consumed = false AND expires_at > now()
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
             "#,
         )
         .bind(state)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
 
-        Ok(())
+        Ok(oauth_state)
     }
 
     // Login token management methods
@@ -444,7 +445,7 @@ impl DatabaseManager {
             r#"
             SELECT id, token, consumed, expires_at, user_id, created_at, updated_at
             FROM login_tokens
-            WHERE token = $1 AND expires_at > now()
+            WHERE token = $1 AND consumed = false AND expires_at > now()
             "#,
         )
         .bind(token)
@@ -622,19 +623,20 @@ impl DatabaseManager {
     }
 
     /// Delete an activity
-    pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<()> {
-        sqlx::query(
+    pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<Activity> {
+        let activity = sqlx::query_as::<_, Activity>(
             r#"
             DELETE FROM activities
             WHERE id = $1 AND user_id = $2
+            RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             "#,
         )
         .bind(activity_id)
         .bind(user_id)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
 
-        Ok(())
+        Ok(activity)
     }
 
     /// Get activities by time range for a user
@@ -672,8 +674,8 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new asset
-    pub async fn create_asset(&self, user_id: Uuid, request: NewAsset) -> DbResult<Asset> {
-        let id = request.id;
+    pub async fn create_asset(&self, request: NewAsset) -> DbResult<Asset> {
+        let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
         let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
 
@@ -685,7 +687,7 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(user_id)
+        .bind(request.user_id)
         .bind(&request.name)
         .bind(&request.mime_type)
         .bind(request.size_bytes)
