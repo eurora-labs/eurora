@@ -19,9 +19,6 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 use crate::load::Serializable;
 
 /// Base struct for content used in retrieval and data processing workflows.
@@ -30,7 +27,7 @@ use crate::load::Serializable;
 ///
 /// For multimodal content in **chat messages** (images, audio sent to/from LLMs),
 /// use the `messages` module content blocks instead.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct BaseMedia {
     /// An optional identifier for the document.
@@ -100,7 +97,7 @@ impl BaseMedia {
 ///     .build()
 ///     .unwrap();
 /// ```
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Blob {
     /// An optional identifier for the blob.
@@ -134,7 +131,7 @@ fn default_encoding() -> String {
 }
 
 /// Data stored in a Blob.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum BlobData {
@@ -446,7 +443,7 @@ fn guess_mime_type(path: &Path) -> Option<String> {
 ///         ("source".to_string(), serde_json::json!("https://example.com"))
 ///     ]));
 /// ```
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Document {
     /// String text content of the document.

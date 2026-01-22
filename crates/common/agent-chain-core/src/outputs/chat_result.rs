@@ -8,9 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 use super::chat_generation::ChatGeneration;
 
 /// Use to represent the result of a chat model call with a single prompt.
@@ -23,7 +20,7 @@ use super::chat_generation::ChatGeneration;
 /// `AIMessage` (returned from runnable interfaces) or `LLMResult` (available
 /// via callbacks). Please refer to the `AIMessage` and `LLMResult` schema documentation
 /// for more information.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct ChatResult {
     /// List of the chat generations.

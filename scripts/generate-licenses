@@ -1,0 +1,67 @@
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Version of cargo-about you expect. Change as you upgrade.
+CARGO_ABOUT_VERSION="${CARGO_ABOUT_VERSION:-0.7}"
+
+# Resolve repo root as the parent of this script directory.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Output file, default to assets/licenses.md in the repo root.
+OUTPUT_FILE="${1:-"$REPO_ROOT/assets/licenses.md"}"
+
+TEMPLATE_FILE="$REPO_ROOT/scripts/licenses/template.md.hbs"
+CONFIG_FILE="$REPO_ROOT/scripts/licenses/eurora-licenses.toml"
+
+cd "$REPO_ROOT"
+
+mkdir -p "$(dirname "$OUTPUT_FILE")"
+
+echo "Generating Eurora license file at: $OUTPUT_FILE"
+
+# Start with a fresh file.
+: > "$OUTPUT_FILE"
+
+# Theme licenses (if present)
+if [[ -f "assets/themes/LICENSES" ]]; then
+  echo -e "# ###### THEME LICENSES ######\n" >> "$OUTPUT_FILE"
+  cat "assets/themes/LICENSES" >> "$OUTPUT_FILE"
+  echo -e "\n" >> "$OUTPUT_FILE"
+fi
+
+# Icon licenses (if present)
+if [[ -f "assets/icons/LICENSES" ]]; then
+  echo -e "# ###### ICON LICENSES ######\n" >> "$OUTPUT_FILE"
+  cat "assets/icons/LICENSES" >> "$OUTPUT_FILE"
+  echo -e "\n" >> "$OUTPUT_FILE"
+fi
+
+# Font licenses (optional, if you use assets/fonts/LICENSES)
+if [[ -f "assets/fonts/LICENSES" ]]; then
+  echo -e "# ###### FONT LICENSES ######\n" >> "$OUTPUT_FILE"
+  cat "assets/fonts/LICENSES" >> "$OUTPUT_FILE"
+  echo -e "\n" >> "$OUTPUT_FILE"
+fi
+
+echo -e "# ###### CODE LICENSES ######\n" >> "$OUTPUT_FILE"
+
+# Ensure cargo-about is available (similar to what Zed does in various packaging scripts). :contentReference[oaicite:7]{index=7}
+if ! command -v cargo-about >/dev/null 2>&1; then
+  echo "cargo-about not found, installing cargo-about@${CARGO_ABOUT_VERSION}..."
+  cargo install --locked "cargo-about@${CARGO_ABOUT_VERSION}"
+fi
+
+echo "Generating Rust dependency licenses via cargo-about"
+
+# If ALLOW_MISSING_LICENSES is set, do not fail on missing license metadata.
+ARGS=(about generate)
+if [[ -z "${ALLOW_MISSING_LICENSES:-}" ]]; then
+  ARGS+=(--fail-on-missing-license)
+fi
+ARGS+=(-c "$CONFIG_FILE" "$TEMPLATE_FILE")
+
+cargo "${ARGS[@]}" >> "$OUTPUT_FILE"
+
+echo "License generation complete."
+echo "Wrote: $OUTPUT_FILE"

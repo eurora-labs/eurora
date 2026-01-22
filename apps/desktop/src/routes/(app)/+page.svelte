@@ -1,9 +1,10 @@
 <script lang="ts">
 	import 'katex/dist/katex.min.css';
 	import {
-		// type ResponseChunk,
+		type ResponseChunk,
 		type Query,
 		// type BaseMessage,
+		type MessageView,
 		type ConversationView,
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
@@ -22,6 +23,7 @@
 	import { onMount } from 'svelte';
 
 	let conversation = $state<ConversationView | null>(null);
+	let messages = $state<MessageView[]>([]);
 	// let messages = $state<BaseMessage[]>([]);
 	// let status = $state<string>('');
 	let taurpc = inject(TAURPC_SERVICE);
@@ -55,11 +57,12 @@
 
 		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
-			// console.log('New conversation changed: ', conversation);
 
-			// taurpc.personal_db.message.get(conversation.id ?? '', 5, 0).then((response) => {
-			// 	messages = response;
-			// });
+			if (!new_conv.id) return;
+
+			taurpc.conversation.get_messages(new_conv.id, 5, 0).then((response) => {
+				messages = response;
+			});
 		});
 
 		taurpc.timeline.new_assets_event.on((assets) => {
@@ -102,7 +105,7 @@
 	// Helper to check if message is from user/human
 	// function isUserMessage(message: BaseMessage): boolean {
 	function isUserMessage(message: any): boolean {
-		return message.type === 'human';
+		return message.role === 'human';
 	}
 
 	async function handleKeydown(event: KeyboardEvent) {
@@ -115,12 +118,11 @@
 					return;
 				}
 				const query = processQuery(editorRef);
-				// messages.push({
-				// 	type: 'human',
-				// 	content: query.text,
-				// 	id: null,
-				// 	additional_kwargs: {},
-				// });
+				messages.push({
+					id: null,
+					role: 'human',
+					content: query.text,
+				});
 				// console.log('query', query);
 				searchQuery.text = '';
 				clearQuery(editorRef);
@@ -141,34 +143,36 @@
 				assets: query.assets,
 			};
 			// Create an AI message placeholder for streaming response
-			// const aiMessage: BaseMessage = {
-			// 	type: 'ai',
-			// 	content: '',
-			// 	id: null,
-			// 	tool_calls: [],
-			// 	additional_kwargs: {},
-			// };
-			// messages.push(aiMessage);
-			// const agentMessage = messages.at(-1);
-			// function onEvent(response: ResponseChunk) {
-			// 	// Append chunk to the last message
-			// 	if (agentMessage && agentMessage.type === 'ai') {
-			// 		agentMessage.content += response.chunk;
-			// 	}
+			const aiMessage: MessageView = {
+				id: null,
+				role: 'ai',
+				content: '',
+			};
+			messages.push(aiMessage);
+			const agentMessage = messages.at(-1);
 
-			// 	chatRef?.scrollToBottom();
-			// }
+			function onEvent(response: ResponseChunk) {
+				// Append chunk to the last message
+				if (agentMessage && agentMessage.role === 'ai') {
+					agentMessage.content += response.chunk;
+				}
+
+				chatRef?.scrollToBottom();
+			}
 
 			// If no conversation is selected create a new one
 			// TODO: convert this to new architecture
-			if (!conversation) {
-				// conversation = await taurpc.personal_db.conversation.create();
-				// console.log('conversation', conversation);
-			} else {
-				// Use TauRPC send_query procedure
-				// await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
-			}
+			// if (!conversation) {
+			// conversation = await taurpc.personal_db.conversation.create();
+			// console.log('conversation', conversation);
+			// } else {
+			// Use TauRPC send_query procedure
+			// }
+			// if (!conversation) {
+			// 	return;
+			// }
 
+			await taurpc.chat.send_query(conversation?.id ?? null, onEvent, tauRpcQuery);
 			// // Use TauRPC send_query procedure
 			// await taurpc.chat.send_query(conversation, onEvent, tauRpcQuery);
 		} catch (error) {
@@ -183,13 +187,13 @@
 	}
 </script>
 
-<!-- <div
+<div
 	class="w-full h-full flex flex-col {messages.length === 0
 		? 'justify-center'
 		: 'justify-end'} items-center gap-4"
-> -->
-<div class="w-full h-full flex flex-col items-center gap-4">
-	<!-- {#if messages.length > 0}
+>
+	<!-- <div class="w-full h-full flex flex-col items-center gap-4"> -->
+	{#if messages.length > 0}
 		<ScrollArea
 			class="w-full max-h-[calc(80vh-100px)] px-6 flex flex-col justify-end items-center gap-4"
 		>
@@ -212,7 +216,7 @@
 				{/each}
 			</Chat.Root>
 		</ScrollArea>
-	{/if} -->
+	{/if}
 
 	<Launcher.Root
 		class="h-fit rounded-[36px] shadow-none flex flex-col p-4 m-0 w-[70%] bg-gray-700"

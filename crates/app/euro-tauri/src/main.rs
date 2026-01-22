@@ -10,6 +10,7 @@ use euro_native_messaging::create_browser_bridge_client;
 // use euro_personal_db::{Activity, PersonalDatabaseManager};
 use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::TimelineAppEvent;
+use euro_tauri::shared_types::SharedUserController;
 use euro_tauri::{
     WindowState, create_window,
     procedures::{
@@ -355,7 +356,8 @@ fn main() {
                                 e
                             })
                             .unwrap();
-                        app_handle_user.manage(user_controller);
+                        app_handle_user.manage(SharedUserController::new(user_controller));
+                        // app_handle_user.manage(user_controller);
                     });
 
 

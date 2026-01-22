@@ -23,9 +23,9 @@ export default defineConfig({
 		// ship sourcemaps for better sentry error reports
 		sourcemap: true,
 	},
-	optimizeDeps: {
-		exclude: ['@eurora/ui'],
-	},
+	// optimizeDeps: {
+	// 	exclude: ['@eurora/ui'],
+	// },
 
 	// test: {
 	// 	workspace: [

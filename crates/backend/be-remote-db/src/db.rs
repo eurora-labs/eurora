@@ -1,27 +1,22 @@
-use std::time::Duration;
-
+use crate::{
+    GetConversation, PaginationParams,
+    error::DbResult,
+    types::{
+        Activity, ActivityAsset, Asset, Conversation, CreateLoginToken, CreateOAuthCredentials,
+        CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange, ListActivities,
+        ListConversations, ListMessages, LoginToken, Message, NewActivity, NewAsset,
+        NewConversation, NewMessage, NewUser, OAuthCredentials, OAuthState, PasswordCredentials,
+        RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateOAuthCredentials, User,
+    },
+};
 use chrono::{DateTime, Utc};
 use sqlx::{
     migrate::MigrateDatabase,
     postgres::{PgPool, PgPoolOptions},
 };
+use std::time::Duration;
 use uuid::Uuid;
 
-use crate::{
-    GetConversation,
-    types::{
-        Activity, ActivityAsset, ActivityConversation, Asset, Conversation, CreateActivityRequest,
-        CreateAssetRequest, CreateLoginTokenRequest, CreateMessageRequest,
-        CreateOAuthCredentialsRequest, CreateOAuthStateRequest, CreateRefreshTokenRequest,
-        CreateUserRequest, GetActivitiesByTimeRangeRequest, ListActivitiesRequest,
-        ListConversationsRequest, ListMessages, LoginToken, Message, MessageAsset, NewConversation,
-        OAuthCredentials, OAuthState, PasswordCredentials, RefreshToken,
-        UpdateActivityEndTimeRequest, UpdateActivityRequest, UpdateAssetRequest,
-        UpdateConversationRequest, UpdateMessageRequest, UpdateOAuthCredentialsRequest,
-        UpdatePasswordRequest, UpdateUserRequest, User,
-    },
-};
-use crate::{GetLastMessagesRequest, error::DbResult};
 #[derive(Debug)]
 pub struct DatabaseManager {
     pub pool: PgPool,
@@ -50,14 +45,13 @@ impl DatabaseManager {
     }
 
     async fn run_migrations(pool: &PgPool) -> DbResult<()> {
-        let mut migrator = sqlx::migrate!("./src/migrations");
-        migrator.set_ignore_missing(true);
+        let migrator = sqlx::migrate!("./src/migrations");
         migrator.run(pool).await?;
         Ok(())
     }
 
     // User management methods
-    pub async fn create_user(&self, request: CreateUserRequest) -> DbResult<User> {
+    pub async fn create_user(&self, request: NewUser) -> DbResult<User> {
         let user_id = Uuid::now_v7();
         let password_id = Uuid::now_v7();
         let now = Utc::now();
@@ -148,62 +142,6 @@ impl DatabaseManager {
         Ok(user)
     }
 
-    pub async fn update_user(&self, user_id: Uuid, request: UpdateUserRequest) -> DbResult<User> {
-        let now = Utc::now();
-
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            UPDATE users
-            SET username = COALESCE($2, username),
-                email = COALESCE($3, email),
-                display_name = COALESCE($4, display_name),
-                email_verified = COALESCE($5, email_verified),
-                updated_at = $6
-            WHERE id = $1
-            RETURNING id, username, email, display_name, email_verified, created_at, updated_at
-            "#,
-        )
-        .bind(user_id)
-        .bind(&request.username)
-        .bind(&request.email)
-        .bind(&request.display_name)
-        .bind(request.email_verified)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(user)
-    }
-
-    pub async fn delete_user(&self, user_id: Uuid) -> DbResult<()> {
-        // Due to CASCADE DELETE constraint, this will also delete password_credentials
-        sqlx::query(
-            r#"
-            DELETE FROM users
-            WHERE id = $1
-            "#,
-        )
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn list_users(&self) -> DbResult<Vec<User>> {
-        let users = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users
-            ORDER BY created_at DESC
-            "#,
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(users)
-    }
-
     // Password credentials management methods
     pub async fn get_password_credentials(&self, user_id: Uuid) -> DbResult<PasswordCredentials> {
         let credentials = sqlx::query_as::<_, PasswordCredentials>(
@@ -218,73 +156,6 @@ impl DatabaseManager {
         .await?;
 
         Ok(credentials)
-    }
-
-    pub async fn update_password(
-        &self,
-        user_id: Uuid,
-        request: UpdatePasswordRequest,
-    ) -> DbResult<PasswordCredentials> {
-        let now = Utc::now();
-
-        let credentials = sqlx::query_as::<_, PasswordCredentials>(
-            r#"
-            UPDATE password_credentials
-            SET password_hash = $2,
-                updated_at = $3
-            WHERE user_id = $1
-            RETURNING id, user_id, password_hash, updated_at
-            "#,
-        )
-        .bind(user_id)
-        .bind(&request.password_hash)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(credentials)
-    }
-
-    // Authentication helper methods
-    pub async fn authenticate_user(
-        &self,
-        username_or_email: &str,
-        password_hash: &str,
-    ) -> DbResult<Option<User>> {
-        let user_result = sqlx::query_as::<_, User>(
-            r#"
-            SELECT u.id, u.username, u.email, u.display_name, u.email_verified, u.created_at, u.updated_at
-            FROM users u
-            INNER JOIN password_credentials pc ON u.id = pc.user_id
-            WHERE (u.username = $1 OR u.email = $1) AND pc.password_hash = $2
-            "#,
-        )
-        .bind(username_or_email)
-        .bind(password_hash)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(user_result)
-    }
-
-    pub async fn verify_email(&self, user_id: Uuid) -> DbResult<User> {
-        let now = Utc::now();
-
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            UPDATE users
-            SET email_verified = true,
-                updated_at = $2
-            WHERE id = $1
-            RETURNING id, username, email, display_name, email_verified, created_at, updated_at
-            "#,
-        )
-        .bind(user_id)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(user)
     }
 
     // Utility methods
@@ -317,7 +188,7 @@ impl DatabaseManager {
     // OAuth credentials management methods
     pub async fn create_oauth_credentials(
         &self,
-        request: CreateOAuthCredentialsRequest,
+        request: CreateOAuthCredentials,
     ) -> DbResult<OAuthCredentials> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -371,31 +242,10 @@ impl DatabaseManager {
         Ok(oauth_creds)
     }
 
-    pub async fn get_oauth_credentials_by_provider_user_id(
-        &self,
-        provider: &str,
-        provider_user_id: &str,
-    ) -> DbResult<OAuthCredentials> {
-        let oauth_creds = sqlx::query_as::<_, OAuthCredentials>(
-            r#"
-            SELECT id, user_id, provider, provider_user_id, access_token,
-                   refresh_token, access_token_expiry, scope, issued_at, created_at, updated_at
-            FROM oauth_credentials
-            WHERE provider = $1 AND provider_user_id = $2
-            "#,
-        )
-        .bind(provider)
-        .bind(provider_user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(oauth_creds)
-    }
-
     pub async fn update_oauth_credentials(
         &self,
         id: Uuid,
-        request: UpdateOAuthCredentialsRequest,
+        request: UpdateOAuthCredentials,
     ) -> DbResult<OAuthCredentials> {
         let now = Utc::now();
 
@@ -448,7 +298,7 @@ impl DatabaseManager {
     // Refresh token management methods
     pub async fn create_refresh_token(
         &self,
-        request: CreateRefreshTokenRequest,
+        request: CreateRefreshToken,
     ) -> DbResult<RefreshToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
@@ -489,60 +339,27 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
-    pub async fn revoke_refresh_token(&self, token_hash: &str) -> DbResult<()> {
+    pub async fn revoke_refresh_token(&self, token_hash: &str) -> DbResult<RefreshToken> {
         let now = Utc::now();
 
-        sqlx::query(
+        let refresh_token = sqlx::query_as::<_, RefreshToken>(
             r#"
             UPDATE refresh_tokens
             SET revoked = true, updated_at = $2
-            WHERE token_hash = $1
+            WHERE token_hash = $1 AND revoked = false
+            RETURNING id, user_id, token_hash, issued_at, expires_at, revoked, created_at, updated_at
             "#,
         )
         .bind(token_hash)
         .bind(now)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
 
-        Ok(())
-    }
-
-    pub async fn revoke_all_user_refresh_tokens(&self, user_id: Uuid) -> DbResult<()> {
-        let now = Utc::now();
-
-        sqlx::query(
-            r#"
-            UPDATE refresh_tokens
-            SET revoked = true, updated_at = $2
-            WHERE user_id = $1 AND revoked = false
-            "#,
-        )
-        .bind(user_id)
-        .bind(now)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn cleanup_expired_refresh_tokens(&self) -> DbResult<u64> {
-        let result = sqlx::query(
-            r#"
-            DELETE FROM refresh_tokens
-            WHERE expires_at < now()
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected())
+        Ok(refresh_token)
     }
 
     // OAuth state management methods
-    pub async fn create_oauth_state(
-        &self,
-        request: CreateOAuthStateRequest,
-    ) -> DbResult<OAuthState> {
+    pub async fn create_oauth_state(&self, request: CreateOAuthState) -> DbResult<OAuthState> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -582,39 +399,24 @@ impl DatabaseManager {
         Ok(oauth_state)
     }
 
-    pub async fn consume_oauth_state(&self, state: &str) -> DbResult<()> {
-        sqlx::query(
+    pub async fn consume_oauth_state(&self, state: &str) -> DbResult<OAuthState> {
+        let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
             UPDATE oauth_state
             SET consumed = true
-            WHERE state = $1
+            WHERE state = $1 AND consumed = false AND expires_at > now()
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, expires_at
             "#,
         )
         .bind(state)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
 
-        Ok(())
-    }
-
-    pub async fn cleanup_expired_oauth_states(&self) -> DbResult<u64> {
-        let result = sqlx::query(
-            r#"
-            DELETE FROM oauth_state
-            WHERE expires_at < now()
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected())
+        Ok(oauth_state)
     }
 
     // Login token management methods
-    pub async fn create_login_token(
-        &self,
-        request: CreateLoginTokenRequest,
-    ) -> DbResult<LoginToken> {
+    pub async fn create_login_token(&self, request: CreateLoginToken) -> DbResult<LoginToken> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
@@ -643,7 +445,7 @@ impl DatabaseManager {
             r#"
             SELECT id, token, consumed, expires_at, user_id, created_at, updated_at
             FROM login_tokens
-            WHERE token = $1 AND expires_at > now()
+            WHERE token = $1 AND consumed = false AND expires_at > now()
             "#,
         )
         .bind(token)
@@ -672,25 +474,12 @@ impl DatabaseManager {
         Ok(login_token)
     }
 
-    pub async fn cleanup_expired_login_tokens(&self) -> DbResult<u64> {
-        let result = sqlx::query(
-            r#"
-            DELETE FROM login_tokens
-            WHERE expires_at < now()
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected())
-    }
-
     // =========================================================================
     // Activity Management Methods
     // =========================================================================
 
     /// Create a new activity
-    pub async fn create_activity(&self, request: CreateActivityRequest) -> DbResult<Activity> {
+    pub async fn create_activity(&self, request: NewActivity) -> DbResult<Activity> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
 
@@ -711,22 +500,6 @@ impl DatabaseManager {
         .bind(request.ended_at)
         .bind(now)
         .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(activity)
-    }
-
-    /// Get an activity by ID
-    pub async fn get_activity(&self, activity_id: Uuid) -> DbResult<Activity> {
-        let activity = sqlx::query_as::<_, Activity>(
-            r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
-            FROM activities
-            WHERE id = $1
-            "#,
-        )
-        .bind(activity_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -755,30 +528,34 @@ impl DatabaseManager {
     }
 
     /// List activities for a user with pagination
-    pub async fn list_activities(&self, request: ListActivitiesRequest) -> DbResult<Vec<Activity>> {
-        // Clamp limit to max 100
-        let limit = request.limit.clamp(1, 100);
-
-        let activities = sqlx::query_as::<_, Activity>(
+    pub async fn list_activities(
+        &self,
+        request: ListActivities,
+        params: PaginationParams,
+    ) -> DbResult<Vec<Activity>> {
+        let query = format!(
             r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
-            ORDER BY started_at DESC
+            ORDER BY started_at {}
             LIMIT $2 OFFSET $3
             "#,
-        )
-        .bind(request.user_id)
-        .bind(limit as i64)
-        .bind(request.offset as i64)
-        .fetch_all(&self.pool)
-        .await?;
+            params.order()
+        );
+
+        let activities = sqlx::query_as::<_, Activity>(&query)
+            .bind(request.user_id)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(activities)
     }
 
     /// Update an existing activity
-    pub async fn update_activity(&self, request: UpdateActivityRequest) -> DbResult<Activity> {
+    pub async fn update_activity(&self, request: UpdateActivity) -> DbResult<Activity> {
         let now = Utc::now();
 
         let activity = sqlx::query_as::<_, Activity>(
@@ -811,10 +588,7 @@ impl DatabaseManager {
     }
 
     /// Update activity end time
-    pub async fn update_activity_end_time(
-        &self,
-        request: UpdateActivityEndTimeRequest,
-    ) -> DbResult<()> {
+    pub async fn update_activity_end_time(&self, request: UpdateActivityEndTime) -> DbResult<()> {
         let now = Utc::now();
 
         sqlx::query(
@@ -853,47 +627,49 @@ impl DatabaseManager {
     }
 
     /// Delete an activity
-    pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<()> {
-        sqlx::query(
+    pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<Activity> {
+        let activity = sqlx::query_as::<_, Activity>(
             r#"
             DELETE FROM activities
             WHERE id = $1 AND user_id = $2
+            RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             "#,
         )
         .bind(activity_id)
         .bind(user_id)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
 
-        Ok(())
+        Ok(activity)
     }
 
     /// Get activities by time range for a user
     pub async fn get_activities_by_time_range(
         &self,
-        request: GetActivitiesByTimeRangeRequest,
+        request: GetActivitiesByTimeRange,
+        params: PaginationParams,
     ) -> DbResult<Vec<Activity>> {
-        // Clamp limit to max 100
-        let limit = request.limit.clamp(1, 100);
-
-        let activities = sqlx::query_as::<_, Activity>(
+        let query = format!(
             r#"
             SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
               AND started_at >= $2
               AND started_at <= $3
-            ORDER BY started_at DESC
+            ORDER BY started_at {}
             LIMIT $4 OFFSET $5
             "#,
-        )
-        .bind(request.user_id)
-        .bind(request.start_time)
-        .bind(request.end_time)
-        .bind(limit as i64)
-        .bind(request.offset as i64)
-        .fetch_all(&self.pool)
-        .await?;
+            params.order()
+        );
+
+        let activities = sqlx::query_as::<_, Activity>(&query)
+            .bind(request.user_id)
+            .bind(request.start_time)
+            .bind(request.end_time)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(activities)
     }
@@ -903,12 +679,8 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new asset
-    pub async fn create_asset(
-        &self,
-        user_id: Uuid,
-        request: CreateAssetRequest,
-    ) -> DbResult<Asset> {
-        let id = request.id;
+    pub async fn create_asset(&self, request: NewAsset) -> DbResult<Asset> {
+        let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
         let metadata = request.metadata.unwrap_or_else(|| serde_json::json!({}));
 
@@ -920,12 +692,12 @@ impl DatabaseManager {
             "#,
         )
         .bind(id)
-        .bind(user_id)
+        .bind(request.user_id)
         .bind(&request.name)
         .bind(&request.mime_type)
         .bind(request.size_bytes)
         .bind(&request.checksum_sha256)
-        .bind("fs")
+        .bind(&request.storage_backend)
         .bind(&request.storage_uri)
         .bind("uploaded")
         .bind(&metadata)
@@ -937,271 +709,39 @@ impl DatabaseManager {
         Ok(asset)
     }
 
-    /// Get an asset by ID
-    pub async fn get_asset(&self, asset_id: Uuid) -> DbResult<Asset> {
-        let asset = sqlx::query_as::<_, Asset>(
-            r#"
-            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
-            FROM assets
-            WHERE id = $1
-            "#,
-        )
-        .bind(asset_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(asset)
-    }
-
-    /// Get an asset by ID for a specific user
-    pub async fn get_asset_for_user(&self, asset_id: Uuid, user_id: Uuid) -> DbResult<Asset> {
-        let asset = sqlx::query_as::<_, Asset>(
-            r#"
-            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
-            FROM assets
-            WHERE id = $1 AND user_id = $2
-            "#,
-        )
-        .bind(asset_id)
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(asset)
-    }
-
-    /// List assets for a user with pagination
-    pub async fn list_assets(
-        &self,
-        user_id: Uuid,
-        limit: u32,
-        offset: u32,
-    ) -> DbResult<Vec<Asset>> {
-        // Clamp limit to max 100
-        let limit = limit.clamp(1, 100);
-
-        let assets = sqlx::query_as::<_, Asset>(
-            r#"
-            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
-            FROM assets
-            WHERE user_id = $1
-            ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-        )
-        .bind(user_id)
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(assets)
-    }
-
-    /// Update an asset
-    pub async fn update_asset(
-        &self,
-        asset_id: Uuid,
-        user_id: Uuid,
-        request: UpdateAssetRequest,
-    ) -> DbResult<Asset> {
-        let now = Utc::now();
-
-        let asset = sqlx::query_as::<_, Asset>(
-            r#"
-            UPDATE assets
-            SET checksum_sha256 = COALESCE($3, checksum_sha256),
-                size_bytes = COALESCE($4, size_bytes),
-                storage_uri = COALESCE($5, storage_uri),
-                mime_type = COALESCE($6, mime_type),
-                metadata = COALESCE($7, metadata),
-                updated_at = $8
-            WHERE id = $1 AND user_id = $2
-            RETURNING id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
-            "#,
-        )
-        .bind(asset_id)
-        .bind(user_id)
-        .bind(&request.checksum_sha256)
-        .bind(request.size_bytes)
-        .bind(&request.storage_uri)
-        .bind(&request.mime_type)
-        .bind(&request.metadata)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(asset)
-    }
-
-    /// Delete an asset
-    pub async fn delete_asset(&self, asset_id: Uuid, user_id: Uuid) -> DbResult<()> {
-        sqlx::query(
-            r#"
-            DELETE FROM assets
-            WHERE id = $1 AND user_id = $2
-            "#,
-        )
-        .bind(asset_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    /// Get assets by message ID
-    pub async fn get_assets_by_message_id(
-        &self,
-        message_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<Vec<Asset>> {
-        let assets = sqlx::query_as::<_, Asset>(
-            r#"
-            SELECT a.id, a.user_id, a.name, a.mime_type, a.size_bytes, a.checksum_sha256, a.storage_backend, a.storage_uri, a.status, a.metadata, a.created_at, a.updated_at
-            FROM assets a
-            INNER JOIN message_assets ma ON a.id = ma.asset_id
-            WHERE ma.message_id = $1 AND a.user_id = $2
-            "#,
-        )
-        .bind(message_id)
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(assets)
-    }
-
-    /// Get assets by activity ID
-    pub async fn get_assets_by_activity_id(
-        &self,
-        activity_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<Vec<Asset>> {
-        let assets = sqlx::query_as::<_, Asset>(
-            r#"
-            SELECT a.id, a.user_id, a.name, a.mime_type, a.size_bytes, a.checksum_sha256, a.storage_backend, a.storage_uri, a.status, a.metadata, a.created_at, a.updated_at
-            FROM assets a
-            INNER JOIN activity_assets aa ON a.id = aa.asset_id
-            WHERE aa.activity_id = $1 AND a.user_id = $2
-            "#,
-        )
-        .bind(activity_id)
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(assets)
-    }
-
-    /// Link an asset to a message
-    pub async fn link_asset_to_message(
-        &self,
-        message_id: Uuid,
-        asset_id: Uuid,
-    ) -> DbResult<MessageAsset> {
-        let now = Utc::now();
-
-        let message_asset = sqlx::query_as::<_, MessageAsset>(
-            r#"
-            INSERT INTO message_assets (message_id, asset_id, created_at)
-            VALUES ($1, $2, $3)
-            RETURNING message_id, asset_id, created_at
-            "#,
-        )
-        .bind(message_id)
-        .bind(asset_id)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(message_asset)
-    }
-
-    /// Unlink an asset from a message
-    pub async fn unlink_asset_from_message(
-        &self,
-        message_id: Uuid,
-        asset_id: Uuid,
-    ) -> DbResult<()> {
-        sqlx::query(
-            r#"
-            DELETE FROM message_assets
-            WHERE message_id = $1 AND asset_id = $2
-            "#,
-        )
-        .bind(message_id)
-        .bind(asset_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
     /// Link an asset to an activity
+    /// Verifies that both the activity and asset belong to the specified user
     pub async fn link_asset_to_activity(
         &self,
         activity_id: Uuid,
         asset_id: Uuid,
+        user_id: Uuid,
     ) -> DbResult<ActivityAsset> {
         let now = Utc::now();
 
+        // Use CTE to verify ownership of both activity and asset before linking
         let activity_asset = sqlx::query_as::<_, ActivityAsset>(
             r#"
+            WITH verified_activity AS (
+                SELECT id FROM activities WHERE id = $1 AND user_id = $3
+            ),
+            verified_asset AS (
+                SELECT id FROM assets WHERE id = $2 AND user_id = $3
+            )
             INSERT INTO activity_assets (activity_id, asset_id, created_at)
-            VALUES ($1, $2, $3)
+            SELECT va.id, vas.id, $4
+            FROM verified_activity va, verified_asset vas
             RETURNING activity_id, asset_id, created_at
             "#,
         )
         .bind(activity_id)
         .bind(asset_id)
+        .bind(user_id)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
         Ok(activity_asset)
-    }
-
-    /// Unlink an asset from an activity
-    pub async fn unlink_asset_from_activity(
-        &self,
-        activity_id: Uuid,
-        asset_id: Uuid,
-    ) -> DbResult<()> {
-        sqlx::query(
-            r#"
-            DELETE FROM activity_assets
-            WHERE activity_id = $1 AND asset_id = $2
-            "#,
-        )
-        .bind(activity_id)
-        .bind(asset_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    /// Find asset by SHA256 hash for deduplication
-    pub async fn find_asset_by_sha256(
-        &self,
-        user_id: Uuid,
-        checksum_sha256: &[u8],
-    ) -> DbResult<Option<Asset>> {
-        let asset = sqlx::query_as::<_, Asset>(
-            r#"
-            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
-            FROM assets
-            WHERE user_id = $1 AND checksum_sha256 = $2
-            LIMIT 1
-            "#,
-        )
-        .bind(user_id)
-        .bind(checksum_sha256)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(asset)
     }
 
     // =========================================================================
@@ -1248,95 +788,31 @@ impl DatabaseManager {
         Ok(conversation)
     }
 
-    /// Get a conversation by ID for a specific user
-    pub async fn get_conversation_for_user(
-        &self,
-        conversation_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<Conversation> {
-        let conversation = sqlx::query_as::<_, Conversation>(
-            r#"
-            SELECT id, user_id, title, created_at, updated_at
-            FROM conversations
-            WHERE id = $1 AND user_id = $2
-            "#,
-        )
-        .bind(conversation_id)
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(conversation)
-    }
-
     /// List conversations for a user with pagination
     pub async fn list_conversations(
         &self,
-        request: ListConversationsRequest,
+        request: ListConversations,
+        params: PaginationParams,
     ) -> DbResult<Vec<Conversation>> {
-        // Clamp limit to max 100
-        let limit = request.limit.clamp(1, 100);
-
-        let conversations = sqlx::query_as::<_, Conversation>(
+        let query = format!(
             r#"
             SELECT id, user_id, title, created_at, updated_at
             FROM conversations
             WHERE user_id = $1
-            ORDER BY updated_at DESC
+            ORDER BY id {}
             LIMIT $2 OFFSET $3
             "#,
-        )
-        .bind(request.user_id)
-        .bind(limit as i64)
-        .bind(request.offset as i64)
-        .fetch_all(&self.pool)
-        .await?;
+            params.order()
+        );
+
+        let conversations = sqlx::query_as::<_, Conversation>(&query)
+            .bind(request.user_id)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(conversations)
-    }
-
-    /// Update an existing conversation
-    pub async fn update_conversation(
-        &self,
-        conversation_id: Uuid,
-        user_id: Uuid,
-        request: UpdateConversationRequest,
-    ) -> DbResult<Conversation> {
-        let now = Utc::now();
-
-        let conversation = sqlx::query_as::<_, Conversation>(
-            r#"
-            UPDATE conversations
-            SET title = COALESCE($3, title),
-                updated_at = $4
-            WHERE id = $1 AND user_id = $2
-            RETURNING id, user_id, title, created_at, updated_at
-            "#,
-        )
-        .bind(conversation_id)
-        .bind(user_id)
-        .bind(&request.title)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(conversation)
-    }
-
-    /// Delete a conversation (will cascade delete all messages)
-    pub async fn delete_conversation(&self, conversation_id: Uuid, user_id: Uuid) -> DbResult<()> {
-        sqlx::query(
-            r#"
-            DELETE FROM conversations
-            WHERE id = $1 AND user_id = $2
-            "#,
-        )
-        .bind(conversation_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
     }
 
     // =========================================================================
@@ -1344,7 +820,7 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new message
-    pub async fn create_message(&self, request: CreateMessageRequest) -> DbResult<Message> {
+    pub async fn create_message(&self, request: NewMessage) -> DbResult<Message> {
         let id = request.id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
         let additional_kwargs = request
@@ -1353,13 +829,28 @@ impl DatabaseManager {
 
         let message = sqlx::query_as::<_, Message>(
             r#"
-            INSERT INTO messages (id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, conversation_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
+            WITH verified_conversation AS (
+                SELECT id FROM conversations
+                WHERE id = $2 AND user_id = $3
+            ),
+            updated_conversation AS (
+                UPDATE conversations
+                SET updated_at = $10
+                WHERE id = (SELECT id FROM verified_conversation)
+                RETURNING id
+            ),
+            inserted_message AS (
+                INSERT INTO messages (id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at)
+                SELECT $1, vc.id, $3, $4, $5, $6, $7, $8, $9, $10
+                FROM verified_conversation vc
+                RETURNING id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
+            )
+            SELECT * FROM inserted_message
             "#,
         )
         .bind(id)
         .bind(request.conversation_id)
+        .bind(request.user_id)
         .bind(request.message_type)
         .bind(&request.content)
         .bind(&request.tool_call_id)
@@ -1370,237 +861,34 @@ impl DatabaseManager {
         .fetch_one(&self.pool)
         .await?;
 
-        // Update conversation's updated_at timestamp
-        sqlx::query(
-            r#"
-            UPDATE conversations SET updated_at = $2 WHERE id = $1
-            "#,
-        )
-        .bind(request.conversation_id)
-        .bind(now)
-        .execute(&self.pool)
-        .await?;
-
         Ok(message)
-    }
-
-    pub async fn get_last_messages(
-        &self,
-        request: GetLastMessagesRequest,
-    ) -> DbResult<Vec<Message>> {
-        // Clamp limit to max 100
-        let limit = request.limit.clamp(1, 100);
-
-        let messages = sqlx::query_as::<_, Message>(
-                   r#"
-                   SELECT m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
-                   FROM messages m
-                   INNER JOIN conversations c ON m.conversation_id = c.id
-                   WHERE m.conversation_id = $1 AND c.user_id = $2
-                   ORDER BY m.id DESC
-                   LIMIT $3
-                   "#,
-               )
-               .bind(request.conversation_id)
-               .bind(request.user_id)
-               .bind(limit as i64)
-               .fetch_all(&self.pool)
-               .await?;
-
-        Ok(messages)
     }
 
     /// List messages for a conversation with pagination
-    pub async fn list_messages(&self, request: ListMessages) -> DbResult<Vec<Message>> {
-        // Clamp limit to max 100
-        let limit = request.limit.clamp(1, 100);
-
-        let messages = sqlx::query_as::<_, Message>(
-                    r#"
-                    SELECT m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
-                    FROM messages m
-                    INNER JOIN conversations c ON m.conversation_id = c.id
-                    WHERE m.conversation_id = $1 AND c.user_id = $2
-                    ORDER BY m.id DESC
-                    LIMIT $3
-                    "#,
-                )
-                .bind(request.conversation_id)
-                .bind(request.user_id)
-                .bind(limit as i64)
-                .fetch_all(&self.pool)
-                .await?;
-
-        Ok(messages)
-    }
-
-    /// Update an existing message
-    pub async fn update_message(
+    pub async fn list_messages(
         &self,
-        message_id: Uuid,
-        user_id: Uuid,
-        request: UpdateMessageRequest,
-    ) -> DbResult<Message> {
-        let now = Utc::now();
-
-        let message = sqlx::query_as::<_, Message>(
+        request: ListMessages,
+        params: PaginationParams,
+    ) -> DbResult<Vec<Message>> {
+        let query = format!(
             r#"
-            UPDATE messages m
-            SET content = COALESCE($3, m.content),
-                tool_call_id = COALESCE($4, m.tool_call_id),
-                tool_calls = COALESCE($5, m.tool_calls),
-                additional_kwargs = COALESCE($6, m.additional_kwargs),
-                updated_at = $7
-            FROM conversations c
-            WHERE m.id = $1 AND m.conversation_id = c.id AND c.user_id = $2
-            RETURNING m.id, m.conversation_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
+            SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
+            FROM messages m
+            WHERE m.conversation_id = $1 AND m.user_id = $2
+            ORDER BY m.id {}
+            LIMIT $3 OFFSET $4
             "#,
-        )
-        .bind(message_id)
-        .bind(user_id)
-        .bind(&request.content)
-        .bind(&request.tool_call_id)
-        .bind(&request.tool_calls)
-        .bind(&request.additional_kwargs)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
+            params.order()
+        );
 
-        Ok(message)
-    }
-
-    /// Delete a message
-    pub async fn delete_message(&self, message_id: Uuid, user_id: Uuid) -> DbResult<()> {
-        sqlx::query(
-            r#"
-            DELETE FROM messages m
-            USING conversations c
-            WHERE m.id = $1 AND m.conversation_id = c.id AND c.user_id = $2
-            "#,
-        )
-        .bind(message_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    /// Delete all messages in a conversation
-    pub async fn delete_all_messages_in_conversation(
-        &self,
-        conversation_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<u64> {
-        // First verify the user owns the conversation
-        let _ = self
-            .get_conversation_for_user(conversation_id, user_id)
+        let messages = sqlx::query_as::<_, Message>(&query)
+            .bind(request.conversation_id)
+            .bind(request.user_id)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
             .await?;
 
-        let result = sqlx::query(
-            r#"
-            DELETE FROM messages
-            WHERE conversation_id = $1
-            "#,
-        )
-        .bind(conversation_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected())
-    }
-
-    // =========================================================================
-    // Activity-Conversation Linking Methods
-    // =========================================================================
-
-    /// Link an activity to a conversation
-    pub async fn link_activity_to_conversation(
-        &self,
-        activity_id: Uuid,
-        conversation_id: Uuid,
-    ) -> DbResult<ActivityConversation> {
-        let now = Utc::now();
-
-        let activity_conversation = sqlx::query_as::<_, ActivityConversation>(
-            r#"
-            INSERT INTO activity_conversations (activity_id, conversation_id, created_at)
-            VALUES ($1, $2, $3)
-            RETURNING activity_id, conversation_id, created_at
-            "#,
-        )
-        .bind(activity_id)
-        .bind(conversation_id)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(activity_conversation)
-    }
-
-    /// Unlink an activity from a conversation
-    pub async fn unlink_activity_from_conversation(
-        &self,
-        activity_id: Uuid,
-        conversation_id: Uuid,
-    ) -> DbResult<()> {
-        sqlx::query(
-            r#"
-            DELETE FROM activity_conversations
-            WHERE activity_id = $1 AND conversation_id = $2
-            "#,
-        )
-        .bind(activity_id)
-        .bind(conversation_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    /// Get all conversations linked to an activity
-    pub async fn get_conversations_by_activity_id(
-        &self,
-        activity_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<Vec<Conversation>> {
-        let conversations = sqlx::query_as::<_, Conversation>(
-            r#"
-            SELECT c.id, c.user_id, c.title, c.created_at, c.updated_at
-            FROM conversations c
-            INNER JOIN activity_conversations ac ON c.id = ac.conversation_id
-            WHERE ac.activity_id = $1 AND c.user_id = $2
-            ORDER BY c.updated_at DESC
-            "#,
-        )
-        .bind(activity_id)
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(conversations)
-    }
-
-    /// Get all activities linked to a conversation
-    pub async fn get_activities_by_conversation_id(
-        &self,
-        conversation_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<Vec<Activity>> {
-        let activities = sqlx::query_as::<_, Activity>(
-            r#"
-            SELECT a.id, a.user_id, a.name, a.icon_asset_id, a.process_name, a.window_title, a.started_at, a.ended_at, a.created_at, a.updated_at
-            FROM activities a
-            INNER JOIN activity_conversations ac ON a.id = ac.activity_id
-            WHERE ac.conversation_id = $1 AND a.user_id = $2
-            ORDER BY a.started_at DESC
-            "#,
-        )
-        .bind(conversation_id)
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(activities)
+        Ok(messages)
     }
 }

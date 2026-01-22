@@ -22,4 +22,4 @@ sqlx = { version = "0.8.6", features = [
   "uuid",
 ] }
 thiserror = { workspace = true }
-uuid = { workspace = true, features = ["serde", "v4", "v7"] }
+uuid = { workspace = true, features = ["serde", "v7"] }

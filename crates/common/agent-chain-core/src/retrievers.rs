@@ -38,9 +38,6 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[cfg(feature = "specta")]
-use specta::Type;
-
 use crate::callbacks::{
     AsyncCallbackManager, AsyncCallbackManagerForRetrieverRun, CallbackManager,
     CallbackManagerForRetrieverRun,
@@ -56,7 +53,7 @@ pub type RetrieverInput = String;
 pub type RetrieverOutput = Vec<Document>;
 
 /// LangSmith parameters for tracing.
-#[cfg_attr(feature = "specta", derive(Type))]
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct LangSmithRetrieverParams {
     /// Retriever name.

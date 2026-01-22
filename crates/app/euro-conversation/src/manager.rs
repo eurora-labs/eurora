@@ -3,11 +3,11 @@ use crate::{
     error::{Error, Result},
     types::ConversationEvent,
 };
-use agent_chain::{BaseMessage, HumanMessage};
+use agent_chain::{BaseMessage, HumanMessage, SystemMessage};
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
-    AddHumanMessageRequest, ChatStreamRequest, CreateConversationRequest, GetConversationRequest,
-    GetMessagesRequest, ListConversationsRequest,
+    AddHumanMessageRequest, AddSystemMessageRequest, ChatStreamRequest, CreateConversationRequest,
+    GetConversationRequest, GetMessagesRequest, ListConversationsRequest,
     proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use std::pin::Pin;
@@ -31,6 +31,26 @@ impl ConversationManager {
             conversation_client,
             conversation_event_tx,
         }
+    }
+
+    pub async fn switch_conversation(&mut self, conversation_id: String) -> Result<&Conversation> {
+        let mut client = self.conversation_client.clone();
+        let conversation = client
+            .get_conversation(GetConversationRequest { conversation_id })
+            .await?
+            .into_inner()
+            .conversation
+            .ok_or(Error::ConversationNotFound)?;
+
+        self.current_conversation = conversation.into();
+
+        // self.conversation_event_tx
+        //     .send(ConversationEvent::NewConversation {
+        //         id: self.current_conversation.id(),
+        //         title: self.current_conversation.title().to_string(),
+        //     })?;
+
+        Ok(&self.current_conversation)
     }
 
     pub async fn clear_conversation(&mut self) -> Result<&Conversation> {
@@ -127,6 +147,29 @@ impl ConversationManager {
             Err(Error::ConversationNotFound)
         }
     }
+
+    pub async fn get_messages(
+        &self,
+        conversation_id: String,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<BaseMessage>> {
+        let mut client = self.conversation_client.clone();
+        let response = client
+            .get_messages(GetMessagesRequest {
+                conversation_id,
+                limit,
+                offset,
+            })
+            .await?
+            .into_inner();
+
+        Ok(response
+            .messages
+            .into_iter()
+            .map(BaseMessage::from)
+            .collect())
+    }
 }
 
 impl ConversationManager {
@@ -134,6 +177,17 @@ impl ConversationManager {
         let mut client = self.conversation_client.clone();
         client
             .add_human_message(AddHumanMessageRequest {
+                conversation_id: self.current_conversation.id().unwrap().to_string(),
+                content: message.content().to_string(),
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn add_system_message(&mut self, message: &SystemMessage) -> Result<()> {
+        let mut client = self.conversation_client.clone();
+        client
+            .add_system_message(AddSystemMessageRequest {
                 conversation_id: self.current_conversation.id().unwrap().to_string(),
                 content: message.content().to_string(),
             })

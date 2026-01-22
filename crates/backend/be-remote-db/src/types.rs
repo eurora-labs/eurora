@@ -3,6 +3,57 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SortOrder {
+    Asc,
+    Desc,
+}
+
+impl std::fmt::Display for SortOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SortOrder::Asc => write!(f, "ASC"),
+            SortOrder::Desc => write!(f, "DESC"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginationParams {
+    offset: u32,
+    limit: u32,
+    order: SortOrder,
+}
+
+impl PaginationParams {
+    pub const MAX_LIMIT: u32 = 100;
+
+    pub fn new(offset: u32, limit: u32, order: String) -> Self {
+        let order = match order.to_lowercase().as_str() {
+            "asc" => SortOrder::Asc,
+            "desc" => SortOrder::Desc,
+            _ => panic!("Invalid sort order"),
+        };
+        Self {
+            offset,
+            limit: limit.min(Self::MAX_LIMIT),
+            order,
+        }
+    }
+
+    pub fn offset(&self) -> i64 {
+        self.offset as i64
+    }
+
+    pub fn limit(&self) -> i64 {
+        self.limit as i64
+    }
+
+    pub fn order(&self) -> &SortOrder {
+        &self.order
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: Uuid,
@@ -24,7 +75,7 @@ pub struct PasswordCredentials {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateUserRequest {
+pub struct NewUser {
     pub username: String,
     pub email: String,
     pub display_name: Option<String>,
@@ -32,7 +83,8 @@ pub struct CreateUserRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateUserRequest {
+pub struct UpdateUser {
+    pub id: Uuid,
     pub username: Option<String>,
     pub email: Option<String>,
     pub display_name: Option<String>,
@@ -40,7 +92,7 @@ pub struct UpdateUserRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdatePasswordRequest {
+pub struct UpdatePassword {
     pub password_hash: String,
 }
 
@@ -73,7 +125,7 @@ pub struct RefreshToken {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateOAuthCredentialsRequest {
+pub struct CreateOAuthCredentials {
     pub user_id: Uuid,
     pub provider: String,
     pub provider_user_id: String,
@@ -84,14 +136,14 @@ pub struct CreateOAuthCredentialsRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRefreshTokenRequest {
+pub struct CreateRefreshToken {
     pub user_id: Uuid,
     pub token_hash: String,
     pub expires_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateOAuthCredentialsRequest {
+pub struct UpdateOAuthCredentials {
     pub access_token: Option<Vec<u8>>,
     pub refresh_token: Option<Vec<u8>>,
     pub access_token_expiry: Option<DateTime<Utc>>,
@@ -111,7 +163,7 @@ pub struct OAuthState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateOAuthStateRequest {
+pub struct CreateOAuthState {
     pub state: String,
     pub pkce_verifier: String,
     pub redirect_uri: String,
@@ -131,14 +183,14 @@ pub struct LoginToken {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateLoginTokenRequest {
+pub struct CreateLoginToken {
     pub token: String,
     pub user_id: Uuid,
     pub expires_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateLoginTokenRequest {
+pub struct UpdateLoginToken {
     pub user_id: Uuid,
 }
 
@@ -165,19 +217,21 @@ pub struct Asset {
 
 /// Request for creating a new asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateAssetRequest {
-    pub id: Uuid,
+pub struct NewAsset {
+    pub id: Option<Uuid>,
+    pub user_id: Uuid,
     pub name: String,
     pub checksum_sha256: Option<Vec<u8>>,
     pub size_bytes: Option<i64>,
     pub storage_uri: String,
+    pub storage_backend: String,
     pub mime_type: String,
     pub metadata: Option<serde_json::Value>,
 }
 
 /// Request for updating an asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateAssetRequest {
+pub struct UpdateAsset {
     pub checksum_sha256: Option<Vec<u8>>,
     pub size_bytes: Option<i64>,
     pub storage_uri: Option<String>,
@@ -222,7 +276,7 @@ pub struct Activity {
 
 /// Request for creating a new activity
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateActivityRequest {
+pub struct NewActivity {
     pub id: Option<Uuid>,
     pub user_id: Uuid,
     pub name: String,
@@ -235,7 +289,7 @@ pub struct CreateActivityRequest {
 
 /// Request for updating an existing activity
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateActivityRequest {
+pub struct UpdateActivity {
     pub id: Uuid,
     pub user_id: Uuid,
     pub name: Option<String>,
@@ -248,25 +302,21 @@ pub struct UpdateActivityRequest {
 
 /// Request for listing activities with pagination
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListActivitiesRequest {
+pub struct ListActivities {
     pub user_id: Uuid,
-    pub limit: u32,
-    pub offset: u32,
 }
 
 /// Request for getting activities by time range
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetActivitiesByTimeRangeRequest {
+pub struct GetActivitiesByTimeRange {
     pub user_id: Uuid,
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
-    pub limit: u32,
-    pub offset: u32,
 }
 
 /// Request for updating activity end time
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateActivityEndTimeRequest {
+pub struct UpdateActivityEndTime {
     pub activity_id: Uuid,
     pub user_id: Uuid,
     pub ended_at: DateTime<Utc>,
@@ -291,7 +341,7 @@ pub struct Conversation {
 pub struct NewConversation {
     pub id: Option<Uuid>,
     pub user_id: Uuid,
-    pub title: Option<String>,
+    pub title: String,
 }
 
 /// Request for getting a conversation
@@ -303,16 +353,14 @@ pub struct GetConversation {
 
 /// Request for updating a conversation
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateConversationRequest {
+pub struct UpdateConversation {
     pub title: Option<String>,
 }
 
 /// Request for listing conversations with pagination
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListConversationsRequest {
+pub struct ListConversations {
     pub user_id: Uuid,
-    pub limit: u32,
-    pub offset: u32,
 }
 
 // =============================================================================
@@ -347,6 +395,7 @@ impl std::fmt::Display for MessageType {
 pub struct Message {
     pub id: Uuid,
     pub conversation_id: Uuid,
+    pub user_id: Uuid,
     pub message_type: MessageType,
     /// Content stored as JSONB
     /// For human: MessageContent (can be {"Text": "..."} or {"Parts": [...]})
@@ -364,9 +413,10 @@ pub struct Message {
 
 /// Request for creating a new message
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateMessageRequest {
+pub struct NewMessage {
     pub id: Option<Uuid>,
     pub conversation_id: Uuid,
+    pub user_id: Uuid,
     pub message_type: MessageType,
     pub content: serde_json::Value,
     pub tool_call_id: Option<String>,
@@ -376,7 +426,7 @@ pub struct CreateMessageRequest {
 
 /// Request for updating an existing message
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UpdateMessageRequest {
+pub struct UpdateMessage {
     pub content: Option<serde_json::Value>,
     pub tool_call_id: Option<String>,
     pub tool_calls: Option<serde_json::Value>,
@@ -388,16 +438,6 @@ pub struct UpdateMessageRequest {
 pub struct ListMessages {
     pub conversation_id: Uuid,
     pub user_id: Uuid,
-    pub limit: u32,
-    pub offset: u32,
-}
-
-/// Request for listing messages the last few messages
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetLastMessagesRequest {
-    pub conversation_id: Uuid,
-    pub user_id: Uuid,
-    pub limit: u32,
 }
 
 // =============================================================================
