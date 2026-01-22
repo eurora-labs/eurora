@@ -176,7 +176,7 @@ jobs:
               shell: bash
               run: |
                   if ! command -v cargo-about >/dev/null 2>&1; then
-                  cargo install --locked "cargo-about@0.8"
+                  cargo install --locked "cargo-about@^0.8"
                   fi
 
             - name: Generate third-party license bundle
