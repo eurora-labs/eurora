@@ -113,7 +113,6 @@ pub fn encrypt_pkce_verifier(verifier: &str) -> Result<Vec<u8>, CryptoError> {
 /// - The encryption key is not set or invalid
 /// - The encrypted data format is invalid
 /// - Decryption fails (e.g., tampered data)
-#[allow(dead_code)]
 pub fn decrypt_pkce_verifier(encrypted: &[u8]) -> Result<String, CryptoError> {
     if encrypted.len() < NONCE_SIZE {
         return Err(CryptoError::InvalidFormat);
@@ -139,16 +138,21 @@ pub fn decrypt_pkce_verifier(encrypted: &[u8]) -> Result<String, CryptoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    // Mutex to serialize tests that modify the environment variable
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
+    const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     #[test]
     fn test_encrypt_decrypt_roundtrip() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
         // Set a test encryption key
-        // SAFETY: This is a test-only operation in a single-threaded test context
+        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
-            std::env::set_var(
-                "PKCE_ENCRYPTION_KEY",
-                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            );
+            std::env::set_var("PKCE_ENCRYPTION_KEY", TEST_KEY);
         }
 
         let verifier = "test_pkce_verifier_12345";
@@ -165,7 +169,7 @@ mod tests {
         assert_eq!(verifier, decrypted);
 
         // Clean up
-        // SAFETY: This is a test-only operation in a single-threaded test context
+        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
         }
@@ -173,12 +177,11 @@ mod tests {
 
     #[test]
     fn test_decrypt_tampered_data_fails() {
-        // SAFETY: This is a test-only operation in a single-threaded test context
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
-            std::env::set_var(
-                "PKCE_ENCRYPTION_KEY",
-                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            );
+            std::env::set_var("PKCE_ENCRYPTION_KEY", TEST_KEY);
         }
 
         let verifier = "test_pkce_verifier";
@@ -193,7 +196,7 @@ mod tests {
         let result = decrypt_pkce_verifier(&encrypted);
         assert!(result.is_err());
 
-        // SAFETY: This is a test-only operation in a single-threaded test context
+        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
         }
@@ -201,7 +204,9 @@ mod tests {
 
     #[test]
     fn test_missing_key_returns_error() {
-        // SAFETY: This is a test-only operation in a single-threaded test context
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
         }
@@ -212,7 +217,9 @@ mod tests {
 
     #[test]
     fn test_invalid_key_length_returns_error() {
-        // SAFETY: This is a test-only operation in a single-threaded test context
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::set_var("PKCE_ENCRYPTION_KEY", "0123456789abcdef"); // Too short
         }
@@ -220,7 +227,7 @@ mod tests {
         let result = encrypt_pkce_verifier("test");
         assert!(matches!(result, Err(CryptoError::InvalidKeyLength(_))));
 
-        // SAFETY: This is a test-only operation in a single-threaded test context
+        // SAFETY: This is a test-only operation protected by mutex
         unsafe {
             std::env::remove_var("PKCE_ENCRYPTION_KEY");
         }
