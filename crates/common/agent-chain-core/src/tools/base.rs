@@ -13,7 +13,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::error::Result;
-use crate::messages::{BaseMessage, MessageLikeTrait, ToolCall, ToolMessage};
+use crate::messages::{BaseMessage, BaseMessageTrait, ToolCall, ToolMessage};
 use crate::runnables::{RunnableConfig, ensure_config};
 
 /// Arguments that are filtered out from tool schemas.

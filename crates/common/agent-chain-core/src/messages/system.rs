@@ -362,7 +362,7 @@ impl std::ops::Add for SystemMessageChunk {
     }
 }
 
-impl super::base::MessageLikeTrait for SystemMessage {
+impl super::base::BaseMessageTrait for SystemMessage {
     fn content(&self) -> &str {
         SystemMessage::content(self)
     }

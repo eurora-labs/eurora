@@ -127,9 +127,9 @@ pub use language_models::{
 
 // Re-export message types
 pub use messages::{
-    AIMessage, AnyMessage, BaseMessage, ContentPart, HasId, HumanMessage, ImageDetail, ImageSource,
-    MergeableContent, MessageContent, SystemMessage, ToolCall, ToolMessage, convert_to_message,
-    convert_to_messages,
+    AIMessage, AnyMessage, BaseMessage, BaseMessageTrait, ContentPart, HasId, HumanMessage,
+    ImageDetail, ImageSource, MergeableContent, MessageContent, SystemMessage, ToolCall,
+    ToolMessage, convert_to_message, convert_to_messages,
 };
 
 // Re-export tool types

@@ -26,7 +26,7 @@ use crate::utils::merge::merge_lists;
 ///
 /// Each message type implements this trait in its own module file.
 #[enum_dispatch(BaseMessage)]
-pub trait MessageLikeTrait {
+pub trait BaseMessageTrait {
     /// Get the message content as a string reference.
     ///
     /// For messages with multimodal content, this returns the first text content
