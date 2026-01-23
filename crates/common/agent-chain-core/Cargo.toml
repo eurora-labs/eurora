@@ -23,6 +23,7 @@ tokio = { version = "1", features = ["sync"] }
 tracing = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4", "v7"] }
+enum_dispatch = "0.3"
 
 [dev-dependencies]
 tempfile = { workspace = true }

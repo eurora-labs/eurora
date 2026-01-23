@@ -3,6 +3,7 @@
 //! This module contains the core `BaseMessage` enum and related traits,
 //! mirroring `langchain_core.messages.base`.
 
+use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -17,10 +18,41 @@ use super::system::{SystemMessage, SystemMessageChunk};
 use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
 use crate::utils::merge::merge_lists;
 
+/// Core trait for message-like types, enabling enum_dispatch for BaseMessage.
+///
+/// This trait defines the common interface that all message types must implement
+/// to be used with BaseMessage. It enables efficient static dispatch through
+/// enum_dispatch instead of dynamic dispatch.
+///
+/// Each message type implements this trait in its own module file.
+#[enum_dispatch(BaseMessage)]
+pub trait MessageLikeTrait {
+    /// Get the message content as a string reference.
+    ///
+    /// For messages with multimodal content, this returns the first text content
+    /// or an empty string.
+    fn content(&self) -> &str;
+
+    /// Get the message ID.
+    fn id(&self) -> Option<String>;
+
+    /// Get the message name if present.
+    fn name(&self) -> Option<String>;
+
+    /// Set id of the message
+    fn set_id(&mut self, id: String);
+
+    /// Get additional kwargs if present.
+    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>>;
+}
+
 /// A unified message type that can represent any message role.
 ///
 /// This corresponds to `BaseMessage` in LangChain Python.
-
+///
+/// This enum uses `enum_dispatch` for efficient static dispatch of common
+/// message operations through the `MessageLike` trait.
+#[enum_dispatch]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum BaseMessage {
@@ -48,22 +80,6 @@ pub enum BaseMessage {
 }
 
 impl BaseMessage {
-    /// Get the message content as a string reference.
-    ///
-    /// For messages with multimodal content, this returns the first text content
-    /// or an empty string.
-    pub fn content(&self) -> &str {
-        match self {
-            BaseMessage::Human(m) => m.content(),
-            BaseMessage::System(m) => m.content(),
-            BaseMessage::AI(m) => m.content(),
-            BaseMessage::Tool(m) => m.content(),
-            BaseMessage::Chat(m) => m.content(),
-            BaseMessage::Function(m) => m.content(),
-            BaseMessage::Remove(_) => "",
-        }
-    }
-
     /// Get the text content of the message as a string.
     ///
     /// This extracts text from both simple string content and list content
@@ -77,45 +93,6 @@ impl BaseMessage {
             BaseMessage::Chat(m) => m.content().to_string(),
             BaseMessage::Function(m) => m.content().to_string(),
             BaseMessage::Remove(_) => String::new(),
-        }
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> Option<String> {
-        match self {
-            BaseMessage::Human(m) => m.id(),
-            BaseMessage::System(m) => m.id(),
-            BaseMessage::AI(m) => m.id(),
-            BaseMessage::Tool(m) => m.id(),
-            BaseMessage::Chat(m) => m.id(),
-            BaseMessage::Function(m) => m.id(),
-            BaseMessage::Remove(m) => m.id(),
-        }
-    }
-
-    /// Get the message name if present.
-    pub fn name(&self) -> Option<String> {
-        match self {
-            BaseMessage::Human(m) => m.name(),
-            BaseMessage::System(m) => m.name(),
-            BaseMessage::AI(m) => m.name(),
-            BaseMessage::Tool(m) => m.name(),
-            BaseMessage::Chat(m) => m.name(),
-            BaseMessage::Function(_) => None,
-            BaseMessage::Remove(_) => None,
-        }
-    }
-
-    /// Set id of the message
-    pub fn set_id(&mut self, id: String) {
-        match self {
-            BaseMessage::Human(m) => m.set_id(id),
-            BaseMessage::System(m) => m.set_id(id),
-            BaseMessage::AI(m) => m.set_id(id),
-            BaseMessage::Tool(m) => m.set_id(id),
-            BaseMessage::Chat(m) => m.set_id(id),
-            BaseMessage::Function(m) => m.set_id(id),
-            BaseMessage::Remove(m) => m.set_id(id),
         }
     }
 
@@ -245,48 +222,6 @@ impl BaseMessage {
         };
 
         format!("{}{}\n\n{}", title, name_line, self.content())
-    }
-}
-
-impl From<HumanMessage> for BaseMessage {
-    fn from(msg: HumanMessage) -> Self {
-        BaseMessage::Human(msg)
-    }
-}
-
-impl From<SystemMessage> for BaseMessage {
-    fn from(msg: SystemMessage) -> Self {
-        BaseMessage::System(msg)
-    }
-}
-
-impl From<AIMessage> for BaseMessage {
-    fn from(msg: AIMessage) -> Self {
-        BaseMessage::AI(msg)
-    }
-}
-
-impl From<ToolMessage> for BaseMessage {
-    fn from(msg: ToolMessage) -> Self {
-        BaseMessage::Tool(msg)
-    }
-}
-
-impl From<ChatMessage> for BaseMessage {
-    fn from(msg: ChatMessage) -> Self {
-        BaseMessage::Chat(msg)
-    }
-}
-
-impl From<FunctionMessage> for BaseMessage {
-    fn from(msg: FunctionMessage) -> Self {
-        BaseMessage::Function(msg)
-    }
-}
-
-impl From<RemoveMessage> for BaseMessage {
-    fn from(msg: RemoveMessage) -> Self {
-        BaseMessage::Remove(msg)
     }
 }
 

@@ -542,6 +542,7 @@ impl BaseChatPromptTemplate for FewShotChatMessagePromptTemplate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::MessageLikeTrait;
 
     #[test]
     fn test_few_shot_prompt_template() {

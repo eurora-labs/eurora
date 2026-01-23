@@ -314,7 +314,7 @@ impl Serializable for ChatPromptValueConcrete {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messages::{AIMessage, SystemMessage};
+    use crate::messages::{AIMessage, SystemMessage, MessageLikeTrait};
 
     #[test]
     fn test_string_prompt_value() {

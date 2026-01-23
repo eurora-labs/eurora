@@ -11,7 +11,7 @@ use futures::StreamExt;
 use futures::stream::BoxStream;
 
 use crate::error::Result;
-use crate::messages::BaseMessage;
+use crate::messages::{BaseMessage, MessageLikeTrait};
 use crate::outputs::{ChatGenerationChunk, Generation, GenerationChunk};
 use crate::runnables::RunnableConfig;
 
