@@ -4934,7 +4934,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "system-configuration 0.6.1",
  "tokio",
  "tower-service",
@@ -7968,7 +7968,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash 2.1.1",
  "rustls 0.23.32",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
@@ -8005,7 +8005,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -10824,12 +10824,12 @@ dependencies = [
 
 [[package]]
 name = "taurpc"
-version = "0.5.2"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fimproved-compatibility#043eba003a91cdbb9028ba210425f4cb71e18ab3"
+version = "0.6.0"
+source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fimproved-compatibility#1539787f504caf476741838ded43539a77703be3"
 dependencies = [
  "anyhow",
- "heck 0.4.1",
- "itertools 0.12.1",
+ "heck 0.5.0",
+ "itertools 0.14.0",
  "serde",
  "serde_json",
  "specta",
@@ -10843,8 +10843,8 @@ dependencies = [
 
 [[package]]
 name = "taurpc-macros"
-version = "0.5.2"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fimproved-compatibility#043eba003a91cdbb9028ba210425f4cb71e18ab3"
+version = "0.6.0"
+source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fimproved-compatibility#1539787f504caf476741838ded43539a77703be3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -12258,7 +12258,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
