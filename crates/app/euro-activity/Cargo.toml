@@ -44,7 +44,7 @@ tokio = { workspace = true, features = [
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
-url = { version = "2.5.7" }
+url = { version = "2.5.8" }
 usvg = { version = "0.45" }
 uuid = { workspace = true }
 

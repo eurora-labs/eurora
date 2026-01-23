@@ -20,4 +20,4 @@ tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["derive"] }
 
 [dev-dependencies]
-tokio = { version = "1.48", features = ["macros", "rt"] }
+tokio = { version = "1.49", features = ["macros", "rt"] }
