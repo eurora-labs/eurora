@@ -571,7 +571,7 @@ impl std::ops::Add for HumanMessageChunk {
     }
 }
 
-impl super::base::MessageLikeTrait for HumanMessage {
+impl super::base::BaseMessageTrait for HumanMessage {
     fn content(&self) -> &str {
         HumanMessage::content(self)
     }

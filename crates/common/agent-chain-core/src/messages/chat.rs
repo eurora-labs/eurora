@@ -254,7 +254,7 @@ impl std::ops::Add for ChatMessageChunk {
     }
 }
 
-impl super::base::MessageLikeTrait for ChatMessage {
+impl super::base::BaseMessageTrait for ChatMessage {
     fn content(&self) -> &str {
         ChatMessage::content(self)
     }

@@ -9,7 +9,9 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::messages::{AIMessage, BaseMessage, ChatMessage, HumanMessage, SystemMessage, MessageLikeTrait};
+use crate::messages::{
+    AIMessage, BaseMessage, BaseMessageTrait, ChatMessage, HumanMessage, SystemMessage,
+};
 use crate::utils::input::get_colored_text;
 use crate::utils::interactive_env::is_interactive_env;
 

@@ -238,7 +238,7 @@ impl std::ops::Add for FunctionMessageChunk {
     }
 }
 
-impl super::base::MessageLikeTrait for FunctionMessage {
+impl super::base::BaseMessageTrait for FunctionMessage {
     fn content(&self) -> &str {
         FunctionMessage::content(self)
     }

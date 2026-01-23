@@ -1604,7 +1604,7 @@ pub fn backwards_compat_tool_calls(
     (tool_calls, invalid_tool_calls, tool_call_chunks)
 }
 
-impl super::base::MessageLikeTrait for AIMessage {
+impl super::base::BaseMessageTrait for AIMessage {
     fn content(&self) -> &str {
         AIMessage::content(self)
     }

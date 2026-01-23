@@ -813,7 +813,7 @@ impl BaseChatModel for ParrotFakeChatModel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messages::{HumanMessage, MessageLikeTrait};
+    use crate::messages::{BaseMessageTrait, HumanMessage};
 
     #[tokio::test]
     async fn test_fake_messages_list_chat_model() {

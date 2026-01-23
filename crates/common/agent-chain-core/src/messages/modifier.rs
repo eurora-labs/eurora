@@ -43,7 +43,7 @@ impl RemoveMessage {
     }
 }
 
-impl super::base::MessageLikeTrait for RemoveMessage {
+impl super::base::BaseMessageTrait for RemoveMessage {
     fn content(&self) -> &str {
         ""
     }
