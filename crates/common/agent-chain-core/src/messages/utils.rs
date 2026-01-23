@@ -4,7 +4,7 @@
 //! for working with messages. Mirrors `langchain_core.messages.utils`.
 
 use super::ai::AIMessage;
-use super::base::{BaseMessage, BaseMessageChunk};
+use super::base::{BaseMessage, BaseMessageChunk, MessageLikeTrait};
 use super::chat::ChatMessage;
 use super::function::FunctionMessage;
 use super::human::HumanMessage;

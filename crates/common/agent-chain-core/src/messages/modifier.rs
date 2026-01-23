@@ -4,6 +4,7 @@
 //! such as `RemoveMessage`. Mirrors `langchain_core.messages.modifier`.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Message responsible for deleting other messages.
 ///
@@ -39,5 +40,27 @@ impl RemoveMessage {
     /// Set the message ID.
     pub fn set_id(&mut self, id: String) {
         self.id = id;
+    }
+}
+
+impl super::base::MessageLikeTrait for RemoveMessage {
+    fn content(&self) -> &str {
+        ""
+    }
+
+    fn id(&self) -> Option<String> {
+        RemoveMessage::id(self)
+    }
+
+    fn name(&self) -> Option<String> {
+        None
+    }
+
+    fn set_id(&mut self, id: String) {
+        RemoveMessage::set_id(self, id)
+    }
+
+    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
+        None
     }
 }

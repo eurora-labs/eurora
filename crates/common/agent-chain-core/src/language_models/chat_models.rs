@@ -22,7 +22,7 @@ use crate::callbacks::{
     AsyncCallbackManagerForLLMRun, BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks,
 };
 use crate::error::{Error, Result};
-use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, UsageMetadata};
+use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, MessageLikeTrait, UsageMetadata};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, Generation, LLMResult};
 use crate::rate_limiters::BaseRateLimiter;
 use crate::tools::{BaseTool, ToolDefinition};

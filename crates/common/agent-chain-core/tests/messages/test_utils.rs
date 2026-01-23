@@ -4,6 +4,7 @@
 
 use agent_chain_core::messages::{
     AIMessage, BaseMessage, CountTokensConfig, HumanMessage, SystemMessage, TextFormat,
+    MessageLikeTrait,
     ToolMessage, TrimMessagesConfig, TrimStrategy, convert_to_messages, convert_to_openai_messages,
     count_tokens_approximately, filter_messages, get_buffer_string, merge_message_runs,
     trim_messages,
