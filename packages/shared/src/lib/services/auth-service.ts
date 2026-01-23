@@ -12,13 +12,19 @@ import {
 import { createClient, type Client } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
 
+const VITE_API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL;
+
+if (!VITE_API_BASE_URL) {
+	throw new Error('VITE_API_BASE_URL environment variable is required but not defined');
+}
+
 class AuthService {
 	private readonly client: Client<typeof ProtoAuthService>;
 	constructor() {
 		this.client = createClient(
 			ProtoAuthService,
 			createGrpcWebTransport({
-				baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:50051',
+				baseUrl: VITE_API_BASE_URL,
 				useBinaryFormat: true,
 			}),
 		);
