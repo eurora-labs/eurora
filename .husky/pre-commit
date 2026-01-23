@@ -1,0 +1,26 @@
+# # Identify all staged files that match the desired extensions.
+# STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|jsx|ts|tsx|svelte|css|pcss)$' || true)
+
+# # If there's nothing to format/lint, bail out early.
+# if [ -z "$STAGED_FILES" ]; then
+#   echo "No staged files to process."
+#   exit 0
+# fi
+
+# echo "Running Prettier on these files:"
+# echo "$STAGED_FILES"
+# pnpm prettier $STAGED_FILES --write 
+
+# echo "Running ESLint on these files:"
+# echo "$STAGED_FILES"
+# pnpm eslint $STAGED_FILES --fix
+# ESLINT_EXIT_CODE=$?
+
+# if [ $ESLINT_EXIT_CODE -ne 0 ]; then
+#   echo "ESLint found errors. Aborting commit."
+#   exit 1
+# fi
+
+# # Re-add potentially changed files so they’re included in the commit
+# echo "Re-adding files to commit..."
+# git add $STAGED_FILES

@@ -45,7 +45,7 @@ fi
 
 echo -e "# ###### CODE LICENSES ######\n" >> "$OUTPUT_FILE"
 
-# Ensure cargo-about is available. :contentReference[oaicite:7]{index=7}
+# Ensure cargo-about is available (similar to what Zed does in various packaging scripts). :contentReference[oaicite:7]{index=7}
 if ! command -v cargo-about >/dev/null 2>&1; then
   echo "cargo-about not found, installing cargo-about@${CARGO_ABOUT_VERSION}..."
   cargo install --locked "cargo-about@${CARGO_ABOUT_VERSION}"
