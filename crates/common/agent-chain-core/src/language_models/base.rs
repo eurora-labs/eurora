@@ -14,7 +14,7 @@ use serde_json::Value;
 use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
-use crate::messages::{AIMessage, BaseMessage};
+use crate::messages::{AIMessage, BaseMessage, BaseMessageTrait};
 use crate::outputs::LLMResult;
 
 /// Parameters for LangSmith tracing.

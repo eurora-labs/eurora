@@ -570,3 +570,25 @@ impl std::ops::Add for HumanMessageChunk {
         self.concat(&other)
     }
 }
+
+impl super::base::BaseMessageTrait for HumanMessage {
+    fn content(&self) -> &str {
+        HumanMessage::content(self)
+    }
+
+    fn id(&self) -> Option<String> {
+        HumanMessage::id(self)
+    }
+
+    fn name(&self) -> Option<String> {
+        HumanMessage::name(self)
+    }
+
+    fn set_id(&mut self, id: String) {
+        HumanMessage::set_id(self, id)
+    }
+
+    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
+        Some(HumanMessage::additional_kwargs(self))
+    }
+}
