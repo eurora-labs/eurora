@@ -19,13 +19,22 @@
 	onMount(() => {
 		sidebarState = useSidebar();
 
-		taurpc.conversation.list(10, 0).then((res) => {
-			conversations = res;
-		});
+		taurpc.auth
+			.is_authenticated()
+			.then((isAuthenticated) => {
+				// Don't get conversation lists if not authenticated
+				if (!isAuthenticated) return;
+				taurpc.conversation.list(10, 0).then((res) => {
+					conversations = res;
+				});
 
-		taurpc.conversation.new_conversation_added.on((conversation) => {
-			conversations = [conversation, ...conversations];
-		});
+				taurpc.conversation.new_conversation_added.on((conversation) => {
+					conversations = [conversation, ...conversations];
+				});
+			})
+			.catch((error) => {
+				console.error('Failed to check authentication:', error);
+			});
 	});
 
 	async function createChat() {
