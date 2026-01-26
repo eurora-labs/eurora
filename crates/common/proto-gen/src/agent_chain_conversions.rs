@@ -825,7 +825,8 @@ impl From<ProtoToolMessage> for ToolMessage {
             msg = msg.with_artifact_value(artifact);
         }
 
-        msg = msg.with_status_value(status);
+        let status_string: String = status.into();
+        msg = msg.with_status(status_string.as_str());
         msg.additional_kwargs = json_string_to_hashmap(&proto.additional_kwargs);
         msg.response_metadata = json_string_to_hashmap(&proto.response_metadata);
         msg

@@ -7,7 +7,8 @@
 //! Note: FunctionMessage is an older version of ToolMessage and doesn't contain
 //! the `tool_call_id` field. Consider using ToolMessage for new code.
 
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::base::merge_content;
@@ -23,7 +24,7 @@ use super::base::merge_content;
 ///
 /// This corresponds to `FunctionMessage` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct FunctionMessage {
     /// The message content (result of the function)
     pub content: String,
@@ -39,14 +40,32 @@ pub struct FunctionMessage {
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
+impl Serialize for FunctionMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(6))?;
+
+        map.serialize_entry("type", "function")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("name", &self.name)?;
+        map.serialize_entry("id", &self.id)?;
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
+}
+
 impl FunctionMessage {
     /// Create a new function message.
     ///
     /// # Arguments
     ///
-    /// * `name` - The name of the function that was executed.
     /// * `content` - The result of the function execution.
-    pub fn new(name: impl Into<String>, content: impl Into<String>) -> Self {
+    /// * `name` - The name of the function that was executed.
+    pub fn new(content: impl Into<String>, name: impl Into<String>) -> Self {
         Self {
             content: content.into(),
             name: name.into(),
@@ -66,8 +85,8 @@ impl FunctionMessage {
     /// Use this when deserializing or reconstructing messages where the ID must be preserved.
     pub fn with_id(
         id: impl Into<String>,
-        name: impl Into<String>,
         content: impl Into<String>,
+        name: impl Into<String>,
     ) -> Self {
         Self {
             content: content.into(),
@@ -76,6 +95,24 @@ impl FunctionMessage {
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
+    }
+
+    /// Set additional kwargs (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set response metadata (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
+        self
     }
 
     /// Get the message content.
@@ -103,13 +140,14 @@ impl FunctionMessage {
         &self.response_metadata
     }
 
-    /// Set response metadata.
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "function"
+    }
+
+    /// Get the text content of the message.
+    pub fn text(&self) -> &str {
+        self.content()
     }
 }
 
@@ -117,7 +155,7 @@ impl FunctionMessage {
 ///
 /// This corresponds to `FunctionMessageChunk` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct FunctionMessageChunk {
     /// The message content (may be partial during streaming)
     content: String,
@@ -133,9 +171,27 @@ pub struct FunctionMessageChunk {
     response_metadata: HashMap<String, serde_json::Value>,
 }
 
+impl Serialize for FunctionMessageChunk {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(6))?;
+
+        map.serialize_entry("type", "FunctionMessageChunk")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("name", &self.name)?;
+        map.serialize_entry("id", &self.id)?;
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
+}
+
 impl FunctionMessageChunk {
     /// Create a new function message chunk.
-    pub fn new(name: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(content: impl Into<String>, name: impl Into<String>) -> Self {
         Self {
             content: content.into(),
             name: name.into(),
@@ -148,8 +204,8 @@ impl FunctionMessageChunk {
     /// Create a new function message chunk with an ID.
     pub fn with_id(
         id: impl Into<String>,
-        name: impl Into<String>,
         content: impl Into<String>,
+        name: impl Into<String>,
     ) -> Self {
         Self {
             content: content.into(),
@@ -158,6 +214,24 @@ impl FunctionMessageChunk {
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
+    }
+
+    /// Set additional kwargs (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set response metadata (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
+        self
     }
 
     /// Get the message content.
@@ -183,6 +257,16 @@ impl FunctionMessageChunk {
     /// Get response metadata.
     pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
         &self.response_metadata
+    }
+
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "FunctionMessageChunk"
+    }
+
+    /// Get the text content of the message.
+    pub fn text(&self) -> &str {
+        self.content()
     }
 
     /// Concatenate this chunk with another chunk.

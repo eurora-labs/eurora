@@ -3,7 +3,8 @@
 //! This module contains the `HumanMessage` and `HumanMessageChunk` types which represent
 //! messages from the user. Mirrors `langchain_core.messages.human`.
 
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::base::merge_content;
@@ -17,7 +18,7 @@ use super::content::{ContentBlock, ContentPart, ImageSource, MessageContent};
 ///
 /// This corresponds to `HumanMessage` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct HumanMessage {
     /// The message content (text or multipart)
     pub content: MessageContent,
@@ -29,6 +30,33 @@ pub struct HumanMessage {
     /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    /// Response metadata
+    #[serde(default)]
+    pub response_metadata: HashMap<String, serde_json::Value>,
+}
+
+impl Serialize for HumanMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 5; // type, content, id, additional_kwargs, response_metadata
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        let mut map = serializer.serialize_map(Some(field_count))?;
+
+        map.serialize_entry("type", "human")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("id", &self.id)?;
+        if let Some(ref name) = self.name {
+            map.serialize_entry("name", name)?;
+        }
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
 }
 
 impl HumanMessage {
@@ -39,6 +67,7 @@ impl HumanMessage {
             id: None,
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -51,6 +80,7 @@ impl HumanMessage {
             id: Some(id.into()),
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -77,6 +107,7 @@ impl HumanMessage {
             id: None,
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -89,6 +120,7 @@ impl HumanMessage {
             id: Some(id.into()),
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -238,6 +270,7 @@ impl HumanMessage {
             id: None,
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -245,6 +278,41 @@ impl HumanMessage {
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
+    }
+
+    /// Set the additional kwargs for this message (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set the response metadata for this message (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
+        self
+    }
+
+    /// Get response metadata.
+    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
+
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "human"
+    }
+
+    /// Get the text content of the message.
+    ///
+    /// This is the same as `content()` for simple text messages.
+    pub fn text(&self) -> &str {
+        self.content()
     }
 
     /// Get the message content as text.
@@ -435,7 +503,7 @@ impl HumanMessage {
 ///
 /// This corresponds to `HumanMessageChunk` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct HumanMessageChunk {
     /// The message content (may be partial during streaming)
     content: MessageContent,
@@ -450,6 +518,30 @@ pub struct HumanMessageChunk {
     /// Response metadata
     #[serde(default)]
     response_metadata: HashMap<String, serde_json::Value>,
+}
+
+impl Serialize for HumanMessageChunk {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 5; // type, content, id, additional_kwargs, response_metadata
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        let mut map = serializer.serialize_map(Some(field_count))?;
+
+        map.serialize_entry("type", "HumanMessageChunk")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("id", &self.id)?;
+        if let Some(ref name) = self.name {
+            map.serialize_entry("name", name)?;
+        }
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
 }
 
 impl HumanMessageChunk {
@@ -473,6 +565,40 @@ impl HumanMessageChunk {
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
+    }
+
+    /// Set the name for this chunk (builder pattern).
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Set the additional kwargs for this chunk (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set the response metadata for this chunk (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
+        self
+    }
+
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "HumanMessageChunk"
+    }
+
+    /// Get the text content of the chunk.
+    pub fn text(&self) -> &str {
+        self.content()
     }
 
     /// Get the message content as text.
@@ -559,6 +685,7 @@ impl HumanMessageChunk {
             id: self.id.clone(),
             name: self.name.clone(),
             additional_kwargs: self.additional_kwargs.clone(),
+            response_metadata: self.response_metadata.clone(),
         }
     }
 }
@@ -568,6 +695,18 @@ impl std::ops::Add for HumanMessageChunk {
 
     fn add(self, other: HumanMessageChunk) -> HumanMessageChunk {
         self.concat(&other)
+    }
+}
+
+impl std::iter::Sum for HumanMessageChunk {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|a, b| a + b).unwrap_or_else(|| HumanMessageChunk::new(""))
+    }
+}
+
+impl From<HumanMessageChunk> for HumanMessage {
+    fn from(chunk: HumanMessageChunk) -> Self {
+        chunk.to_message()
     }
 }
 
