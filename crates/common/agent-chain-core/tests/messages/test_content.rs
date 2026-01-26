@@ -2,7 +2,7 @@
 //!
 //! Converted from `langchain/libs/core/tests/unit_tests/messages/test_content.py`
 
-use agent_chain_core::messages::{is_data_content_block, KNOWN_BLOCK_TYPES};
+use agent_chain_core::messages::{KNOWN_BLOCK_TYPES, is_data_content_block};
 use serde_json::json;
 
 // ============================================================================
@@ -121,7 +121,8 @@ fn test_tool_call_is_not_data_block() {
 
 #[test]
 fn test_v0_style_image_block_with_source_type_url() {
-    let block = json!({"type": "image", "source_type": "url", "url": "https://example.com/img.png"});
+    let block =
+        json!({"type": "image", "source_type": "url", "url": "https://example.com/img.png"});
     assert!(is_data_content_block(&block));
 }
 

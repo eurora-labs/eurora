@@ -234,7 +234,11 @@ fn test_tool_call_with_complex_args() {
         "nested": {"key": "value"},
         "list": [1, 2, 3],
     });
-    let tc = tool_call("test_tool", complex_args.clone(), Some("call-123".to_string()));
+    let tc = tool_call(
+        "test_tool",
+        complex_args.clone(),
+        Some("call-123".to_string()),
+    );
     assert_eq!(tc.args(), &complex_args);
 }
 
@@ -282,12 +286,7 @@ fn test_tool_call_chunk_partial_args() {
         Some("123".to_string()),
         Some(0),
     );
-    let tc2 = tool_call_chunk(
-        None,
-        Some(r#""value"}"#.to_string()),
-        None,
-        Some(0),
-    );
+    let tc2 = tool_call_chunk(None, Some(r#""value"}"#.to_string()), None, Some(0));
     assert_eq!(tc1.args, Some(r#"{"key":"#.to_string()));
     assert_eq!(tc2.args, Some(r#""value"}"#.to_string()));
 }

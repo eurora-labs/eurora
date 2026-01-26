@@ -700,7 +700,8 @@ impl std::ops::Add for HumanMessageChunk {
 
 impl std::iter::Sum for HumanMessageChunk {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.reduce(|a, b| a + b).unwrap_or_else(|| HumanMessageChunk::new(""))
+        iter.reduce(|a, b| a + b)
+            .unwrap_or_else(|| HumanMessageChunk::new(""))
     }
 }
 
