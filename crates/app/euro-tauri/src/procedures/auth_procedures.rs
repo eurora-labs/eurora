@@ -111,14 +111,21 @@ impl AuthApi for AuthApiImpl {
     }
 
     async fn is_authenticated<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
-            let controller = user_state.lock().await;
-            match controller.get_or_refresh_access_token().await {
-                Ok(token) => Ok(!token.is_empty()),
-                Err(e) => Err(format!("Failed to get or refresh access token: {}", e)),
+        // Retry for up to 5 seconds if user state is not initialized
+        const MAX_RETRIES: u32 = 50;
+        const RETRY_DELAY_MS: u64 = 100;
+
+        for _ in 0..MAX_RETRIES {
+            if let Some(user_state) = app_handle.try_state::<SharedUserController>() {
+                let controller = user_state.lock().await;
+                return match controller.get_or_refresh_access_token().await {
+                    Ok(token) => Ok(!token.is_empty()),
+                    Err(e) => Err(format!("Failed to get or refresh access token: {}", e)),
+                };
             }
-        } else {
-            Ok(false)
+            tokio::time::sleep(std::time::Duration::from_millis(RETRY_DELAY_MS)).await;
         }
+
+        Ok(false)
     }
 }
