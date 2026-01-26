@@ -102,7 +102,7 @@ mod tests {
     fn test_tool_message_roundtrip() {
         let original = ToolMessage::with_id("msg_999", "Search results: ...", "call_456")
             .with_name("search")
-            .with_status_value(ToolStatus::Success);
+            .with_status("success");
 
         let proto: ProtoToolMessage = original.clone().into();
         let roundtrip: ToolMessage = proto.into();

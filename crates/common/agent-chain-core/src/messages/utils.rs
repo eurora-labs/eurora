@@ -56,14 +56,23 @@ pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix
 /// Convert a message to a dictionary representation.
 ///
 /// This corresponds to `message_to_dict` in LangChain Python.
+/// The dict will have a `type` key with the message type and a `data` key
+/// with the message data as a dict (all fields serialized).
 pub fn message_to_dict(message: &BaseMessage) -> serde_json::Value {
+    // Serialize the inner message directly to avoid the duplicate "type" field
+    // that would occur from BaseMessage's #[serde(tag = "type")] attribute
+    let data = match message {
+        BaseMessage::Human(m) => serde_json::to_value(m).unwrap_or_default(),
+        BaseMessage::System(m) => serde_json::to_value(m).unwrap_or_default(),
+        BaseMessage::AI(m) => serde_json::to_value(m).unwrap_or_default(),
+        BaseMessage::Tool(m) => serde_json::to_value(m).unwrap_or_default(),
+        BaseMessage::Chat(m) => serde_json::to_value(m).unwrap_or_default(),
+        BaseMessage::Function(m) => serde_json::to_value(m).unwrap_or_default(),
+        BaseMessage::Remove(m) => serde_json::to_value(m).unwrap_or_default(),
+    };
     serde_json::json!({
         "type": message.message_type(),
-        "data": {
-            "content": message.content(),
-            "id": message.id(),
-            "name": message.name(),
-        }
+        "data": data
     })
 }
 
