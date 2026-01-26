@@ -95,7 +95,10 @@ fn test_empty_content() {
 #[test]
 fn test_developer_role_via_additional_kwargs() {
     let mut additional_kwargs = std::collections::HashMap::new();
-    additional_kwargs.insert("__openai_role__".to_string(), serde_json::json!("developer"));
+    additional_kwargs.insert(
+        "__openai_role__".to_string(),
+        serde_json::json!("developer"),
+    );
 
     let msg =
         SystemMessage::new("Developer instructions").with_additional_kwargs(additional_kwargs);
@@ -222,15 +225,15 @@ fn test_chunk_add_different_chunk_type() {
     // Instead, we test that we can convert chunks to messages and work with them.
     let chunk1 = SystemMessageChunk::with_id("1", "Hello");
     let chunk2 = HumanMessageChunk::new(" world");
-    
+
     // Convert to messages and verify content
     let msg1 = chunk1.to_message();
     let msg2: agent_chain_core::messages::HumanMessage = chunk2.into();
-    
+
     // Verify both messages have their content
     assert_eq!(msg1.content(), "Hello");
     assert_eq!(msg2.content(), " world");
-    
+
     // We can concatenate content strings manually
     let combined_content = format!("{}{}", msg1.content(), msg2.content());
     assert_eq!(combined_content, "Hello world");
@@ -249,7 +252,10 @@ fn test_chunk_text_property() {
 #[test]
 fn test_developer_role_preserved_in_serialization() {
     let mut additional_kwargs = std::collections::HashMap::new();
-    additional_kwargs.insert("__openai_role__".to_string(), serde_json::json!("developer"));
+    additional_kwargs.insert(
+        "__openai_role__".to_string(),
+        serde_json::json!("developer"),
+    );
 
     let msg =
         SystemMessage::new("Developer instructions").with_additional_kwargs(additional_kwargs);
@@ -271,13 +277,18 @@ fn test_multiple_system_messages_with_different_roles() {
     let system_msg = SystemMessage::new("System instructions");
 
     let mut dev_kwargs = std::collections::HashMap::new();
-    dev_kwargs.insert("__openai_role__".to_string(), serde_json::json!("developer"));
+    dev_kwargs.insert(
+        "__openai_role__".to_string(),
+        serde_json::json!("developer"),
+    );
     let developer_msg =
         SystemMessage::new("Developer instructions").with_additional_kwargs(dev_kwargs);
 
-    assert!(!system_msg
-        .additional_kwargs()
-        .contains_key("__openai_role__"));
+    assert!(
+        !system_msg
+            .additional_kwargs()
+            .contains_key("__openai_role__")
+    );
     assert_eq!(
         developer_msg
             .additional_kwargs()

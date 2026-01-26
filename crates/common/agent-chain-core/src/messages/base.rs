@@ -120,8 +120,7 @@ impl<'de> Deserialize<'de> for BaseMessage {
                     fields.insert(key, value);
                 }
 
-                let message_type =
-                    message_type.ok_or_else(|| de::Error::missing_field("type"))?;
+                let message_type = message_type.ok_or_else(|| de::Error::missing_field("type"))?;
 
                 let json_value = Value::Object(fields);
 
@@ -163,7 +162,9 @@ impl<'de> Deserialize<'de> for BaseMessage {
                     }
                     _ => Err(de::Error::unknown_variant(
                         &message_type,
-                        &["human", "system", "ai", "tool", "chat", "function", "remove"],
+                        &[
+                            "human", "system", "ai", "tool", "chat", "function", "remove",
+                        ],
                     )),
                 }
             }
@@ -397,8 +398,7 @@ impl<'de> Deserialize<'de> for BaseMessageChunk {
                     fields.insert(key, value);
                 }
 
-                let message_type =
-                    message_type.ok_or_else(|| de::Error::missing_field("type"))?;
+                let message_type = message_type.ok_or_else(|| de::Error::missing_field("type"))?;
 
                 let json_value = Value::Object(fields);
 

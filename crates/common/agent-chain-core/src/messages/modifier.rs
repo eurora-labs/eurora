@@ -7,7 +7,6 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
-
 /// Message responsible for deleting other messages.
 ///
 /// This is used to remove messages from a conversation history by their ID.

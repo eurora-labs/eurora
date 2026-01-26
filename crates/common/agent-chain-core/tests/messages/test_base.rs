@@ -3,8 +3,8 @@
 //! Converted from `langchain/libs/core/tests/unit_tests/messages/test_base.py`
 
 use agent_chain_core::messages::{
-    AIMessage, BaseMessage, HumanMessage, HumanMessageChunk, SystemMessage,
-    SystemMessageChunk, merge_content, message_to_dict, messages_to_dict,
+    AIMessage, BaseMessage, HumanMessage, HumanMessageChunk, SystemMessage, SystemMessageChunk,
+    merge_content, message_to_dict, messages_to_dict,
 };
 use serde_json::json;
 
