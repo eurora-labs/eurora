@@ -59,19 +59,19 @@ pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix
 /// The dict will have a `type` key with the message type and a `data` key
 /// with the message data as a dict (all fields serialized).
 pub fn message_to_dict(message: &BaseMessage) -> serde_json::Value {
-    // Serialize the inner message directly to avoid the duplicate "type" field
-    // that would occur from BaseMessage's #[serde(tag = "type")] attribute
-    let data = match message {
-        BaseMessage::Human(m) => serde_json::to_value(m).unwrap_or_default(),
-        BaseMessage::System(m) => serde_json::to_value(m).unwrap_or_default(),
-        BaseMessage::AI(m) => serde_json::to_value(m).unwrap_or_default(),
-        BaseMessage::Tool(m) => serde_json::to_value(m).unwrap_or_default(),
-        BaseMessage::Chat(m) => serde_json::to_value(m).unwrap_or_default(),
-        BaseMessage::Function(m) => serde_json::to_value(m).unwrap_or_default(),
-        BaseMessage::Remove(m) => serde_json::to_value(m).unwrap_or_default(),
-    };
+    // Serialize the message using serde - this includes the "type" field
+    let mut data = serde_json::to_value(message).unwrap_or_default();
+
+    // Extract the type from the serialized data (it's included by the Serialize impl)
+    let msg_type = message.message_type();
+
+    // Remove the "type" field from data since we'll put it at the top level
+    if let Some(obj) = data.as_object_mut() {
+        obj.remove("type");
+    }
+
     serde_json::json!({
-        "type": message.message_type(),
+        "type": msg_type,
         "data": data
     })
 }
@@ -96,65 +96,16 @@ pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, Str
         .get("data")
         .ok_or_else(|| "Message dict must contain 'data' key".to_string())?;
 
-    let content = data.get("content").and_then(|c| c.as_str()).unwrap_or("");
-
-    let id = data.get("id").and_then(|i| i.as_str());
-
-    match msg_type {
-        "human" => {
-            let msg = match id {
-                Some(id) => HumanMessage::with_id(id, content),
-                None => HumanMessage::new(content),
-            };
-            Ok(BaseMessage::Human(msg))
-        }
-        "ai" => {
-            let msg = match id {
-                Some(id) => AIMessage::with_id(id, content),
-                None => AIMessage::new(content),
-            };
-            Ok(BaseMessage::AI(msg))
-        }
-        "system" => {
-            let msg = match id {
-                Some(id) => SystemMessage::with_id(id, content),
-                None => SystemMessage::new(content),
-            };
-            Ok(BaseMessage::System(msg))
-        }
-        "tool" => {
-            let tool_call_id = data
-                .get("tool_call_id")
-                .and_then(|t| t.as_str())
-                .unwrap_or("");
-            let msg = match id {
-                Some(id) => ToolMessage::with_id(id, content, tool_call_id),
-                None => ToolMessage::new(content, tool_call_id),
-            };
-            Ok(BaseMessage::Tool(msg))
-        }
-        "chat" => {
-            let role = data.get("role").and_then(|r| r.as_str()).unwrap_or("chat");
-            let msg = match id {
-                Some(id) => ChatMessage::with_id(id, role, content),
-                None => ChatMessage::new(role, content),
-            };
-            Ok(BaseMessage::Chat(msg))
-        }
-        "function" => {
-            let name = data.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            let msg = match id {
-                Some(id) => FunctionMessage::with_id(id, name, content),
-                None => FunctionMessage::new(name, content),
-            };
-            Ok(BaseMessage::Function(msg))
-        }
-        "remove" => {
-            let id = id.ok_or_else(|| "RemoveMessage requires an id".to_string())?;
-            Ok(BaseMessage::Remove(RemoveMessage::new(id)))
-        }
-        _ => Err(format!("Unknown message type: {}", msg_type)),
+    // Merge the type field into the data for deserialization
+    // The BaseMessage deserializer expects the type field to be present
+    let mut merged_data = data.clone();
+    if let Some(obj) = merged_data.as_object_mut() {
+        obj.insert("type".to_string(), serde_json::Value::String(msg_type.to_string()));
     }
+
+    // Use serde deserialization
+    serde_json::from_value(merged_data)
+        .map_err(|e| format!("Failed to deserialize message of type '{}': {}", msg_type, e))
 }
 
 /// Convert a sequence of message dicts to messages.
