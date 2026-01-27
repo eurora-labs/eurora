@@ -158,8 +158,8 @@
 }
 
 .ProseMirror-icon svg {
-	fill: currentColor;
 	height: 1em;
+	fill: currentColor;
 }
 
 .ProseMirror-icon span {
