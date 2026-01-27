@@ -2,7 +2,6 @@
 	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
-	import Menubar from '$lib/components/Menubar.svelte';
 	import { inject } from '@eurora/shared/context';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
@@ -37,11 +36,11 @@
 	}
 </script>
 
-<Menubar />
+<!-- <Menubar /> -->
 <Sidebar.Provider open={false}>
 	<MainSidebar />
 	<Sidebar.Inset>
-		<div class="flex flex-col h-[calc(100vh-70px)]">
+		<div class="flex flex-col h-screen">
 			<div class="flex-1">{@render children?.()}</div>
 			<div class="flex flex-col w-full">
 				<Timeline.Root class="w-full" bind:open={timelineOpen} defaultOpen={false}>
