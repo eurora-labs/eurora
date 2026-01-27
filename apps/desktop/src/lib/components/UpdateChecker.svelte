@@ -52,8 +52,8 @@
 				id: toastId,
 				description: String(error),
 			});
-			isUpdating = false;
 		}
+		isUpdating = false;
 	}
 
 	onMount(() => {
