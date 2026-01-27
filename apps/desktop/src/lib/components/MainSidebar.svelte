@@ -2,19 +2,25 @@
 	import { type ConversationView } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { inject } from '@eurora/shared/context';
+	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
+	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import CircleUserRoundIcon from '@lucide/svelte/icons/circle-user-round';
+	import PowerIcon from '@lucide/svelte/icons/power';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	let conversations: ConversationView[] = $state([]);
 
 	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
+	let quitDialogOpen = $state(false);
 
 	onMount(() => {
 		sidebarState = useSidebar();
@@ -43,6 +49,22 @@
 
 	async function switchConversation(id: string) {
 		await taurpc.conversation.switch_conversation(id);
+	}
+
+	async function quit() {
+		quitDialogOpen = false;
+		taurpc.system.quit().catch((error) => {
+			console.error('Failed to quit application:', error);
+			toast.error(`The app encountered the following error: ${error}`, {
+				description: 'Please quit manually from the tray menu.',
+				duration: 5000,
+				cancel: {
+					label: 'Ok',
+					onClick: () => {},
+				},
+			});
+			console.error('Failed to quit application:', error);
+		});
 	}
 </script>
 
@@ -134,9 +156,18 @@
 						{/snippet}
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content side="top" class="w-(--bits-dropdown-menu-anchor-width)">
+						<DropdownMenu.Item onclick={() => (quitDialogOpen = true)}>
+							{#snippet child({ props })}
+								<a {...props}>
+									<PowerIcon />
+									<span>Quit</span>
+								</a>
+							{/snippet}
+						</DropdownMenu.Item>
 						<DropdownMenu.Item>
 							{#snippet child({ props })}
 								<a {...props} href="/settings">
+									<SettingsIcon />
 									<span>Settings</span>
 								</a>
 							{/snippet}
@@ -147,3 +178,25 @@
 		</Sidebar.Menu>
 	</Sidebar.Footer>
 </Sidebar.Root>
+
+<Dialog.Root bind:open={quitDialogOpen}>
+	<Dialog.Content class="sm:max-w-100">
+		<div class="flex gap-4">
+			<div class="shrink-0">
+				<EuroraLogo class="size-12" />
+			</div>
+			<div class="flex flex-col text-left">
+				<Dialog.Header class="text-left">
+					<Dialog.Title class="text-left">Quit Application</Dialog.Title>
+					<Dialog.Description class="text-left">
+						Are you sure you want to quit? Any unsaved changes will be lost.
+					</Dialog.Description>
+				</Dialog.Header>
+			</div>
+		</div>
+		<Dialog.Footer class="gap-2 sm:gap-0">
+			<Dialog.Close class={buttonVariants({ variant: 'outline' })}>Cancel</Dialog.Close>
+			<Button variant="destructive" onclick={quit}>Quit</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
