@@ -34,8 +34,6 @@
 			open = defaultOpen;
 		}
 	});
-
-	export { TimelineProps };
 </script>
 
 <div class="flex flex-col {className}">
