@@ -3621,12 +3621,10 @@ name = "euro-timeline"
 version = "0.0.0"
 dependencies = [
  "agent-chain-core",
- "anyhow",
  "chrono",
  "euro-activity",
  "focus-tracker",
  "image",
- "keyring",
  "rustls 0.23.36",
  "serde",
  "thiserror 2.0.18",

@@ -1,10 +1,7 @@
 //! Timeline collector service implementation
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 use euro_activity::DefaultStrategy;
@@ -15,11 +12,10 @@ use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,
 };
-use tracing::{debug, error, warn};
+use tracing::{debug, error};
 
 use crate::{
     ActivityStrategy,
-    config::CollectorConfig,
     error::{TimelineError, TimelineResult},
     storage::TimelineStorage,
 };
@@ -39,18 +35,10 @@ pub struct CollectorService {
     storage: Arc<Mutex<TimelineStorage>>,
     /// Current collection task handle
     current_task: Option<JoinHandle<()>>,
-    /// Configuration for the collector
-    config: CollectorConfig,
-    /// Focus tracking configuration
-    focus_config: crate::config::FocusTrackingConfig,
-    /// Channel for focus events
-    focus_sender: Option<mpsc::UnboundedSender<FocusedWindow>>,
     /// Focus tracking task handle
     focus_thread_handle: Option<JoinHandle<()>>,
     /// Shutdown signal for focus thread
     focus_shutdown_signal: Option<Arc<AtomicBool>>,
-    /// Restart attempt counter
-    restart_attempts: u32,
     /// Broadcast channel for focus change events
     activity_event_tx: broadcast::Sender<ActivityEvent>,
     /// Broadcast channel for new assets event
@@ -58,30 +46,6 @@ pub struct CollectorService {
 }
 
 impl CollectorService {
-    /// Create a new collector service
-    pub fn new(storage: Arc<Mutex<TimelineStorage>>, config: CollectorConfig) -> Self {
-        debug!(
-            "Creating collector service with interval: {:?}",
-            config.collection_interval
-        );
-
-        let (activity_event_tx, _) = broadcast::channel(100);
-        let (assets_event_tx, _) = broadcast::channel(100);
-
-        Self {
-            storage,
-            current_task: None,
-            config,
-            focus_config: crate::config::FocusTrackingConfig::default(),
-            focus_sender: None,
-            focus_thread_handle: None,
-            focus_shutdown_signal: None,
-            restart_attempts: 0,
-            activity_event_tx,
-            assets_event_tx,
-        }
-    }
-
     /// Create a new collector service with full timeline config
     pub fn new_with_timeline_config(
         storage: Arc<Mutex<TimelineStorage>>,
@@ -98,12 +62,8 @@ impl CollectorService {
         Self {
             storage,
             current_task: None,
-            config: timeline_config.collector,
-            focus_config: timeline_config.focus_tracking,
-            focus_sender: None,
             focus_thread_handle: None,
             focus_shutdown_signal: None,
-            restart_attempts: 0,
             activity_event_tx,
             assets_event_tx,
         }
@@ -119,82 +79,7 @@ impl CollectorService {
 
         self.start_focus_tracking().await?;
 
-        self.restart_attempts = 0;
         Ok(())
-    }
-
-    /// Stop the collection service
-    pub async fn stop(&mut self) -> TimelineResult<()> {
-        if !self.is_running() {
-            return Err(TimelineError::NotRunning);
-        }
-
-        debug!("Stopping timeline collection service");
-
-        // Stop the current task
-        if let Some(task) = self.current_task.take() {
-            task.abort();
-
-            // Wait for the task to finish with a timeout
-            match tokio::time::timeout(Duration::from_secs(5), task).await {
-                Ok(result) => {
-                    if let Err(e) = result
-                        && !e.is_cancelled()
-                    {
-                        warn!("Collection task ended with error: {}", e);
-                    }
-                }
-                Err(_) => {
-                    warn!("Collection task did not stop within timeout");
-                }
-            }
-        }
-
-        // Stop focus tracking thread
-        if let Some(shutdown_signal) = self.focus_shutdown_signal.take() {
-            shutdown_signal.store(true, Ordering::Relaxed);
-
-            if let Some(thread_handle) = self.focus_thread_handle.take() {
-                // Give the task a moment to see the shutdown signal
-                tokio::time::sleep(Duration::from_millis(100)).await;
-
-                // Abort the blocking task and wait for it to finish
-                thread_handle.abort();
-                match thread_handle.await {
-                    Ok(()) => {
-                        debug!("Focus tracking task stopped gracefully");
-                    }
-                    Err(e) if e.is_cancelled() => {
-                        debug!("Focus tracking task was cancelled");
-                    }
-                    Err(e) => {
-                        warn!("Focus tracking task ended with error: {}", e);
-                    }
-                }
-            }
-        }
-
-        // Clear focus sender
-        self.focus_sender = None;
-
-        debug!("Timeline collection service stopped");
-        Ok(())
-    }
-
-    /// Restart the collection service
-    pub async fn restart(&mut self) -> TimelineResult<()> {
-        debug!("Restarting timeline collection service");
-
-        if self.is_running() {
-            self.stop().await?;
-        }
-
-        // Add delay before restart if configured
-        if !self.config.restart_delay.is_zero() {
-            tokio::time::sleep(self.config.restart_delay).await;
-        }
-
-        self.start().await
     }
 
     /// Check if the collector is currently running
@@ -202,34 +87,6 @@ impl CollectorService {
         self.current_task
             .as_ref()
             .is_some_and(|task| !task.is_finished())
-    }
-
-    /// Update collector configuration
-    pub fn update_config(&mut self, config: CollectorConfig) {
-        debug!("Updating collector configuration");
-        self.config = config;
-    }
-
-    /// Update focus tracking configuration
-    pub fn update_focus_config(&mut self, focus_config: crate::config::FocusTrackingConfig) {
-        debug!("Updating focus tracking configuration");
-        self.focus_config = focus_config;
-    }
-
-    /// Update configuration from timeline config
-    pub fn update_from_timeline_config(&mut self, timeline_config: crate::config::TimelineConfig) {
-        debug!("Updating collector from timeline configuration");
-        self.config = timeline_config.collector;
-        self.focus_config = timeline_config.focus_tracking;
-    }
-
-    /// Get collector statistics
-    pub fn get_stats(&self) -> CollectorStats {
-        CollectorStats {
-            is_running: self.is_running(),
-            collection_interval: self.config.collection_interval,
-            restart_attempts: self.restart_attempts,
-        }
     }
 
     /// Subscribe to activity events
@@ -360,35 +217,6 @@ impl CollectorService {
 
         Ok(())
     }
-
-    /// Handle restart with exponential backoff
-    #[allow(dead_code)]
-    async fn handle_restart_with_backoff(&mut self) -> TimelineResult<()> {
-        if !self.config.auto_restart_on_error {
-            return Err(TimelineError::Collection(
-                "Auto-restart is disabled".to_string(),
-            ));
-        }
-
-        if self.restart_attempts >= self.config.max_restart_attempts {
-            return Err(TimelineError::Collection(format!(
-                "Maximum restart attempts ({}) exceeded",
-                self.config.max_restart_attempts
-            )));
-        }
-
-        self.restart_attempts += 1;
-
-        // Exponential backoff
-        let delay = self.config.restart_delay * (2_u32.pow(self.restart_attempts - 1));
-        warn!(
-            "Restarting collector service in {:?} (attempt {})",
-            delay, self.restart_attempts
-        );
-
-        tokio::time::sleep(delay).await;
-        self.restart().await
-    }
 }
 
 impl Drop for CollectorService {
@@ -406,30 +234,5 @@ impl Drop for CollectorService {
         if let Some(thread_handle) = self.focus_thread_handle.take() {
             thread_handle.abort();
         }
-    }
-}
-
-/// Statistics about the collector service
-#[derive(Debug, Clone)]
-pub struct CollectorStats {
-    /// Whether the collector is currently running
-    pub is_running: bool,
-    /// Collection interval
-    pub collection_interval: Duration,
-    /// Number of restart attempts
-    pub restart_attempts: u32,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_collector_creation() {
-        let storage = Arc::new(Mutex::new(TimelineStorage::default()));
-        let config = CollectorConfig::default();
-
-        let collector = CollectorService::new(storage, config);
-        assert!(!collector.is_running());
     }
 }
