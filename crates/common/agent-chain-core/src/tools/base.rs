@@ -409,7 +409,8 @@ pub trait BaseTool: Send + Sync + Debug {
                 ToolOutput::String(s) => ToolMessage::new(s, &tool_call_id).into(),
                 ToolOutput::Message(m) => m.into(),
                 ToolOutput::ContentAndArtifact { content, artifact } => {
-                    ToolMessage::with_artifact(content.to_string(), &tool_call_id, artifact).into()
+                    ToolMessage::new_with_artifact(stringify(&content), &tool_call_id, artifact)
+                        .into()
                 }
                 ToolOutput::Json(v) => ToolMessage::new(v.to_string(), &tool_call_id).into(),
             },
@@ -510,10 +511,11 @@ pub fn format_output(
         ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
     };
 
-    let msg = ToolMessage::with_status(content_str, tool_call_id, status).with_name(name);
+    let msg =
+        ToolMessage::with_status_constructor(content_str, tool_call_id, status).with_name(name);
 
     let msg = if let Some(artifact) = artifact {
-        msg.with_artifact_value(artifact)
+        msg.with_artifact(artifact)
     } else {
         msg
     };
