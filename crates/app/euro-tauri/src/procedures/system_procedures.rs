@@ -157,8 +157,6 @@ impl SystemApi for SystemApiImpl {
     }
 
     async fn quit<R: Runtime>(self, app_handle: tauri::AppHandle<R>) -> Result<(), String> {
-        debug!("Quitting application...");
-
         app_handle.exit(0);
         Ok(())
     }
