@@ -100,12 +100,19 @@ pub fn message_from_dict(message: &serde_json::Value) -> Result<BaseMessage, Str
     // The BaseMessage deserializer expects the type field to be present
     let mut merged_data = data.clone();
     if let Some(obj) = merged_data.as_object_mut() {
-        obj.insert("type".to_string(), serde_json::Value::String(msg_type.to_string()));
+        obj.insert(
+            "type".to_string(),
+            serde_json::Value::String(msg_type.to_string()),
+        );
     }
 
     // Use serde deserialization
-    serde_json::from_value(merged_data)
-        .map_err(|e| format!("Failed to deserialize message of type '{}': {}", msg_type, e))
+    serde_json::from_value(merged_data).map_err(|e| {
+        format!(
+            "Failed to deserialize message of type '{}': {}",
+            msg_type, e
+        )
+    })
 }
 
 /// Convert a sequence of message dicts to messages.
