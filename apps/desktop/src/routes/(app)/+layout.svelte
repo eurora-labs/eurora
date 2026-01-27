@@ -2,7 +2,6 @@
 	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
-	import Menubar from '$lib/components/Menubar.svelte';
 	import { inject } from '@eurora/shared/context';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
