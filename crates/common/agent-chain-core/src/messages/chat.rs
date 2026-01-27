@@ -41,14 +41,14 @@ impl Serialize for ChatMessage {
     where
         S: Serializer,
     {
-        // Count the number of fields to serialize
-        let mut field_count = 5; // content, role, id, additional_kwargs, response_metadata
+        let mut field_count = 5;
         if self.name.is_some() {
             field_count += 1;
         }
-        // Add 1 for the type field in additional_kwargs
-        let mut map = serializer.serialize_map(Some(field_count))?;
+        // Add 1 for additional type field
+        field_count += 1;
 
+        let mut map = serializer.serialize_map(Some(field_count))?;
         map.serialize_entry("type", "chat")?;
         map.serialize_entry("content", &self.content)?;
         map.serialize_entry("role", &self.role)?;
@@ -57,7 +57,6 @@ impl Serialize for ChatMessage {
             map.serialize_entry("name", name)?;
         }
 
-        // Merge the type into additional_kwargs during serialization
         let additional_kwargs_with_type = self.additional_kwargs.clone();
         map.serialize_entry("additional_kwargs", &additional_kwargs_with_type)?;
 
@@ -196,13 +195,14 @@ impl Serialize for ChatMessageChunk {
     where
         S: Serializer,
     {
-        // Count the number of fields to serialize
-        let mut field_count = 5; // content, role, id, additional_kwargs, response_metadata
+        let mut field_count = 5;
         if self.name.is_some() {
             field_count += 1;
         }
-        let mut map = serializer.serialize_map(Some(field_count))?;
+        // Add 1 for additional type field
+        field_count += 1;
 
+        let mut map = serializer.serialize_map(Some(field_count))?;
         map.serialize_entry("type", "ChatMessageChunk")?;
         map.serialize_entry("content", &self.content)?;
         map.serialize_entry("role", &self.role)?;
