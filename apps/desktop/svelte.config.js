@@ -11,7 +11,7 @@ const config = {
 	kit: {
 		alias: {
 			$styles: './src/styles',
-			$components: './src/components',
+			$components: './src/lib/components',
 		},
 		adapter: adapter({
 			pages: 'build',
