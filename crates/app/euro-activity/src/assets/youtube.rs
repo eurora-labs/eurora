@@ -63,23 +63,6 @@ impl YoutubeAsset {
             current_time: asset.current_time,
         })
     }
-
-    /// Get transcript text at a specific time
-    pub fn get_transcript_at_time(&self, time: f32) -> Option<&str> {
-        self.transcript
-            .iter()
-            .find(|line| line.start <= time && time < line.start + line.duration)
-            .map(|line| line.text.as_str())
-    }
-
-    /// Get all transcript text as a single string
-    pub fn get_full_transcript(&self) -> String {
-        self.transcript
-            .iter()
-            .map(|line| line.text.clone())
-            .collect::<Vec<String>>()
-            .join(" ")
-    }
 }
 
 impl AssetFunctionality for YoutubeAsset {
@@ -183,60 +166,6 @@ mod tests {
         assert_eq!(asset.title, "Test Video");
         assert_eq!(asset.current_time, 1.5);
         assert_eq!(asset.transcript.len(), 2);
-    }
-
-    #[test]
-    fn test_transcript_at_time() {
-        let transcript = vec![
-            TranscriptLine {
-                text: "Hello world".to_string(),
-                start: 0.0,
-                duration: 2.0,
-            },
-            TranscriptLine {
-                text: "This is a test".to_string(),
-                start: 2.0,
-                duration: 3.0,
-            },
-        ];
-
-        let asset = YoutubeAsset::new(
-            "test-id".to_string(),
-            "https://youtube.com/watch?v=test".to_string(),
-            "Test Video".to_string(),
-            transcript,
-            1.5,
-        );
-
-        assert_eq!(asset.get_transcript_at_time(1.0), Some("Hello world"));
-        assert_eq!(asset.get_transcript_at_time(3.0), Some("This is a test"));
-        assert_eq!(asset.get_transcript_at_time(10.0), None);
-    }
-
-    #[test]
-    fn test_full_transcript() {
-        let transcript = vec![
-            TranscriptLine {
-                text: "Hello".to_string(),
-                start: 0.0,
-                duration: 1.0,
-            },
-            TranscriptLine {
-                text: "world".to_string(),
-                start: 1.0,
-                duration: 1.0,
-            },
-        ];
-
-        let asset = YoutubeAsset::new(
-            "test-id".to_string(),
-            "https://youtube.com/watch?v=test".to_string(),
-            "Test Video".to_string(),
-            transcript,
-            0.0,
-        );
-
-        assert_eq!(asset.get_full_transcript(), "Hello world");
     }
 
     #[test]
