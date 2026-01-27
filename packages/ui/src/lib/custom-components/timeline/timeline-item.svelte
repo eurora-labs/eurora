@@ -16,8 +16,6 @@
 			borderColor = color ?? 'black';
 		}
 	});
-
-	export { TimelineItemProps };
 </script>
 
 <div class="relative w-full min-w-25 flex items-center justify-center rounded-2xl">
