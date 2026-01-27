@@ -1,33 +1,23 @@
 //! Timeline collector service implementation
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
+use crate::{
+    ActivityStrategy,
+    error::{TimelineError, TimelineResult},
+    storage::TimelineStorage,
+    types::ActivityEvent,
 };
-
 use euro_activity::DefaultStrategy;
 use euro_activity::strategies::ActivityReport;
 use euro_activity::{ContextChip, strategies::ActivityStrategyFunctionality};
 use focus_tracker::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use tokio::{
     sync::{Mutex, RwLock, broadcast, mpsc},
     task::JoinHandle,
 };
 use tracing::{debug, error};
-
-use crate::{
-    ActivityStrategy,
-    error::{TimelineError, TimelineResult},
-    storage::TimelineStorage,
-};
-
-/// Event emitted when focus changes to a new application
-#[derive(Debug, Clone)]
-pub struct ActivityEvent {
-    /// The name of the activity
-    pub name: String,
-    /// The icon of the application (if available)
-    pub icon: Option<image::RgbaImage>,
-}
 
 /// Service responsible for collecting activities and managing the collection lifecycle
 pub struct CollectorService {
