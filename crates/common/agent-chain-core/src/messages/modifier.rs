@@ -32,12 +32,14 @@ impl Serialize for RemoveMessage {
     where
         S: Serializer,
     {
-        let mut field_count = 4;
+        let mut field_count = 3;
         if self.name.is_some() {
             field_count += 1;
         }
-        let mut map = serializer.serialize_map(Some(field_count))?;
+        // Add 1 for additional type field
+        field_count += 1;
 
+        let mut map = serializer.serialize_map(Some(field_count))?;
         map.serialize_entry("type", "remove")?;
         map.serialize_entry("id", &self.id)?;
         if self.name.is_some() {

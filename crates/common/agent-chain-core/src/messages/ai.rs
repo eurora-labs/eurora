@@ -169,13 +169,16 @@ impl Serialize for AIMessage {
     where
         S: Serializer,
     {
-        let mut field_count = 7;
+        let mut field_count = 6;
         if self.name.is_some() {
             field_count += 1;
         }
         if self.usage_metadata.is_some() {
             field_count += 1;
         }
+        // Add 1 for additional type field
+        field_count += 1;
+
         let mut map = serializer.serialize_map(Some(field_count))?;
 
         map.serialize_entry("type", "ai")?;
@@ -678,7 +681,7 @@ impl Serialize for AIMessageChunk {
     where
         S: Serializer,
     {
-        let mut field_count = 8;
+        let mut field_count = 7;
         if self.name.is_some() {
             field_count += 1;
         }
@@ -688,6 +691,9 @@ impl Serialize for AIMessageChunk {
         if self.chunk_position.is_some() {
             field_count += 1;
         }
+        // Add 1 for additional type field
+        field_count += 1;
+
         let mut map = serializer.serialize_map(Some(field_count))?;
 
         map.serialize_entry("type", "AIMessageChunk")?;

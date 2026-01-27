@@ -185,15 +185,17 @@ impl Serialize for ToolMessage {
     where
         S: Serializer,
     {
-        let mut field_count = 7;
+        let mut field_count = 6;
         if self.name.is_some() {
             field_count += 1;
         }
         if self.artifact.is_some() {
             field_count += 1;
         }
-        let mut map = serializer.serialize_map(Some(field_count))?;
+        // Add 1 for additional type field
+        field_count += 1;
 
+        let mut map = serializer.serialize_map(Some(field_count))?;
         map.serialize_entry("type", "tool")?;
         map.serialize_entry("content", &self.content)?;
         map.serialize_entry("tool_call_id", &self.tool_call_id)?;
@@ -480,15 +482,17 @@ impl Serialize for ToolMessageChunk {
     where
         S: Serializer,
     {
-        let mut field_count = 7;
+        let mut field_count = 6;
         if self.name.is_some() {
             field_count += 1;
         }
         if self.artifact.is_some() {
             field_count += 1;
         }
-        let mut map = serializer.serialize_map(Some(field_count))?;
+        // Add 1 for additional type field
+        field_count += 1;
 
+        let mut map = serializer.serialize_map(Some(field_count))?;
         map.serialize_entry("type", "ToolMessageChunk")?;
         map.serialize_entry("content", &self.content)?;
         map.serialize_entry("tool_call_id", &self.tool_call_id)?;

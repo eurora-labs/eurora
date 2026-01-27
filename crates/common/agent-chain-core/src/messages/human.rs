@@ -40,12 +40,14 @@ impl Serialize for HumanMessage {
     where
         S: Serializer,
     {
-        let mut field_count = 5; // type, content, id, additional_kwargs, response_metadata
+        let mut field_count = 4;
         if self.name.is_some() {
             field_count += 1;
         }
-        let mut map = serializer.serialize_map(Some(field_count))?;
+        // Add 1 for additional type field
+        field_count += 1;
 
+        let mut map = serializer.serialize_map(Some(field_count))?;
         map.serialize_entry("type", "human")?;
         map.serialize_entry("content", &self.content)?;
         map.serialize_entry("id", &self.id)?;
@@ -525,12 +527,14 @@ impl Serialize for HumanMessageChunk {
     where
         S: Serializer,
     {
-        let mut field_count = 5; // type, content, id, additional_kwargs, response_metadata
+        let mut field_count = 4;
         if self.name.is_some() {
             field_count += 1;
         }
-        let mut map = serializer.serialize_map(Some(field_count))?;
+        // Add 1 for additional type field
+        field_count += 1;
 
+        let mut map = serializer.serialize_map(Some(field_count))?;
         map.serialize_entry("type", "HumanMessageChunk")?;
         map.serialize_entry("content", &self.content)?;
         map.serialize_entry("id", &self.id)?;
