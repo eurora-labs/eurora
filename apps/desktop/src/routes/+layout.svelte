@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '$styles/styles.css';
 	import { initDependencies } from '$lib/bootstrap/deps.js';
+	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
@@ -20,4 +21,5 @@
 	{@render children?.()}
 </main>
 
+<UpdateChecker />
 <Toaster />
