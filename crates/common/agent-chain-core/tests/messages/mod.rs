@@ -4,4 +4,13 @@
 
 mod block_translators;
 mod test_ai;
+mod test_base;
+mod test_chat;
+mod test_content;
+mod test_function;
+mod test_human;
+mod test_imports;
+mod test_modifier;
+mod test_system;
+mod test_tool;
 mod test_utils;

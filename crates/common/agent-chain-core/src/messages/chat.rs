@@ -4,7 +4,8 @@
 //! messages with an arbitrary speaker role. Mirrors `langchain_core.messages.chat`.
 
 use crate::utils::uuid7;
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::base::merge_content;
@@ -16,7 +17,7 @@ use super::base::merge_content;
 ///
 /// This corresponds to `ChatMessage` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ChatMessage {
     /// The message content
     pub content: String,
@@ -35,9 +36,39 @@ pub struct ChatMessage {
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
+impl Serialize for ChatMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 5;
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        // Add 1 for additional type field
+        field_count += 1;
+
+        let mut map = serializer.serialize_map(Some(field_count))?;
+        map.serialize_entry("type", "chat")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("role", &self.role)?;
+        map.serialize_entry("id", &self.id)?;
+        if let Some(ref name) = self.name {
+            map.serialize_entry("name", name)?;
+        }
+
+        let additional_kwargs_with_type = self.additional_kwargs.clone();
+        map.serialize_entry("additional_kwargs", &additional_kwargs_with_type)?;
+
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
+}
+
 impl ChatMessage {
-    /// Create a new chat message with the given role.
-    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
+    /// Create a new chat message with the given content and role.
+    pub fn new(content: impl Into<String>, role: impl Into<String>) -> Self {
         Self {
             content: content.into(),
             role: role.into(),
@@ -58,8 +89,8 @@ impl ChatMessage {
     /// Use this when deserializing or reconstructing messages where the ID must be preserved.
     pub fn with_id(
         id: impl Into<String>,
-        role: impl Into<String>,
         content: impl Into<String>,
+        role: impl Into<String>,
     ) -> Self {
         Self {
             content: content.into(),
@@ -71,9 +102,27 @@ impl ChatMessage {
         }
     }
 
-    /// Set the name for this message.
+    /// Set the name for this message (builder pattern).
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    /// Set additional kwargs (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set response metadata (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
         self
     }
 
@@ -107,13 +156,14 @@ impl ChatMessage {
         &self.response_metadata
     }
 
-    /// Set response metadata.
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "chat"
+    }
+
+    /// Get the text content of the message.
+    pub fn text(&self) -> &str {
+        self.content()
     }
 }
 
@@ -121,7 +171,7 @@ impl ChatMessage {
 ///
 /// This corresponds to `ChatMessageChunk` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ChatMessageChunk {
     /// The message content (may be partial during streaming)
     content: String,
@@ -140,9 +190,40 @@ pub struct ChatMessageChunk {
     response_metadata: HashMap<String, serde_json::Value>,
 }
 
+impl Serialize for ChatMessageChunk {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 5;
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        // Add 1 for additional type field
+        field_count += 1;
+
+        let mut map = serializer.serialize_map(Some(field_count))?;
+        map.serialize_entry("type", "ChatMessageChunk")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("role", &self.role)?;
+        map.serialize_entry("id", &self.id)?;
+        if let Some(ref name) = self.name {
+            map.serialize_entry("name", name)?;
+        }
+
+        // Merge the type into additional_kwargs during serialization
+        let additional_kwargs_with_type = self.additional_kwargs.clone();
+        map.serialize_entry("additional_kwargs", &additional_kwargs_with_type)?;
+
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
+}
+
 impl ChatMessageChunk {
-    /// Create a new chat message chunk with the given role.
-    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
+    /// Create a new chat message chunk with the given content and role.
+    pub fn new(content: impl Into<String>, role: impl Into<String>) -> Self {
         Self {
             content: content.into(),
             role: role.into(),
@@ -156,8 +237,8 @@ impl ChatMessageChunk {
     /// Create a new chat message chunk with an ID.
     pub fn with_id(
         id: impl Into<String>,
-        role: impl Into<String>,
         content: impl Into<String>,
+        role: impl Into<String>,
     ) -> Self {
         Self {
             content: content.into(),
@@ -167,6 +248,24 @@ impl ChatMessageChunk {
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
+    }
+
+    /// Set additional kwargs (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set response metadata (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
+        self
     }
 
     /// Get the message content.
@@ -197,6 +296,16 @@ impl ChatMessageChunk {
     /// Get response metadata.
     pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
         &self.response_metadata
+    }
+
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "ChatMessageChunk"
+    }
+
+    /// Get the text content of the message.
+    pub fn text(&self) -> &str {
+        self.content()
     }
 
     /// Concatenate this chunk with another chunk.

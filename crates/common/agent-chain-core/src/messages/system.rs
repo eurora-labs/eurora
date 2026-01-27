@@ -3,7 +3,8 @@
 //! This module contains the `SystemMessage` and `SystemMessageChunk` types which represent
 //! system instructions for priming AI behavior. Mirrors `langchain_core.messages.system`.
 
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::base::merge_content;
@@ -16,7 +17,7 @@ use super::content::{ContentBlock, ContentPart, MessageContent};
 ///
 /// This corresponds to `SystemMessage` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct SystemMessage {
     /// The message content (text or multipart)
     pub content: MessageContent,
@@ -28,6 +29,35 @@ pub struct SystemMessage {
     /// Additional metadata
     #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    /// Response metadata
+    #[serde(default)]
+    pub response_metadata: HashMap<String, serde_json::Value>,
+}
+
+impl Serialize for SystemMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 4;
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        // Add 1 for additional type field
+        field_count += 1;
+
+        let mut map = serializer.serialize_map(Some(field_count))?;
+        map.serialize_entry("type", "system")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("id", &self.id)?;
+        if let Some(ref name) = self.name {
+            map.serialize_entry("name", name)?;
+        }
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
 }
 
 impl SystemMessage {
@@ -38,6 +68,7 @@ impl SystemMessage {
             id: None,
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -55,6 +86,7 @@ impl SystemMessage {
             id: Some(id.into()),
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -65,6 +97,7 @@ impl SystemMessage {
             id: None,
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -77,6 +110,7 @@ impl SystemMessage {
             id: Some(id.into()),
             name: None,
             additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
         }
     }
 
@@ -84,6 +118,36 @@ impl SystemMessage {
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
+    }
+
+    /// Set the additional kwargs for this message (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set the response metadata for this message (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
+        self
+    }
+
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "system"
+    }
+
+    /// Get the text content of the message.
+    ///
+    /// This is the same as `content()` for simple text messages.
+    pub fn text(&self) -> &str {
+        self.content()
     }
 
     /// Get the message content as text.
@@ -115,6 +179,11 @@ impl SystemMessage {
     /// Get additional kwargs.
     pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
         &self.additional_kwargs
+    }
+
+    /// Get response metadata.
+    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
     }
 
     /// Get the raw content as a list of JSON values.
@@ -226,7 +295,7 @@ impl SystemMessage {
 ///
 /// This corresponds to `SystemMessageChunk` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct SystemMessageChunk {
     /// The message content (may be partial during streaming)
     content: MessageContent,
@@ -241,6 +310,32 @@ pub struct SystemMessageChunk {
     /// Response metadata
     #[serde(default)]
     response_metadata: HashMap<String, serde_json::Value>,
+}
+
+impl Serialize for SystemMessageChunk {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 4;
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        // Add 1 for additional type field
+        field_count += 1;
+
+        let mut map = serializer.serialize_map(Some(field_count))?;
+        map.serialize_entry("type", "SystemMessageChunk")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("id", &self.id)?;
+        if let Some(ref name) = self.name {
+            map.serialize_entry("name", name)?;
+        }
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
 }
 
 impl SystemMessageChunk {
@@ -264,6 +359,40 @@ impl SystemMessageChunk {
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
+    }
+
+    /// Set the name for this chunk (builder pattern).
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Set the additional kwargs for this chunk (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set the response metadata for this chunk (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.response_metadata = response_metadata;
+        self
+    }
+
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "SystemMessageChunk"
+    }
+
+    /// Get the text content of the chunk.
+    pub fn text(&self) -> &str {
+        self.content()
     }
 
     /// Get the message content as text.
@@ -350,6 +479,7 @@ impl SystemMessageChunk {
             id: self.id.clone(),
             name: self.name.clone(),
             additional_kwargs: self.additional_kwargs.clone(),
+            response_metadata: self.response_metadata.clone(),
         }
     }
 }

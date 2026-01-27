@@ -3,7 +3,8 @@
 //! This module contains the `AIMessage` and `AIMessageChunk` types which represent
 //! messages from an AI model. Mirrors `langchain_core.messages.ai`.
 
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::content::ContentBlock;
@@ -137,7 +138,7 @@ impl UsageMetadata {
 ///
 /// This corresponds to `AIMessage` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct AIMessage {
     /// The message content
     pub content: String,
@@ -161,6 +162,41 @@ pub struct AIMessage {
     /// Response metadata (e.g., response headers, logprobs, token counts, model name)
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
+}
+
+impl Serialize for AIMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 6;
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        if self.usage_metadata.is_some() {
+            field_count += 1;
+        }
+        // Add 1 for additional type field
+        field_count += 1;
+
+        let mut map = serializer.serialize_map(Some(field_count))?;
+
+        map.serialize_entry("type", "ai")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("id", &self.id)?;
+        if self.name.is_some() {
+            map.serialize_entry("name", &self.name)?;
+        }
+        map.serialize_entry("tool_calls", &self.tool_calls)?;
+        map.serialize_entry("invalid_tool_calls", &self.invalid_tool_calls)?;
+        if self.usage_metadata.is_some() {
+            map.serialize_entry("usage_metadata", &self.usage_metadata)?;
+        }
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
 }
 
 impl AIMessage {
@@ -540,6 +576,11 @@ impl AIMessage {
 
         lines.join("\n").trim().to_string()
     }
+
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "ai"
+    }
 }
 
 /// Helper function to format tool calls for pretty_repr.
@@ -600,7 +641,7 @@ pub enum ChunkPosition {
 ///
 /// This corresponds to `AIMessageChunk` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct AIMessageChunk {
     /// The message content (may be partial during streaming)
     content: String,
@@ -633,6 +674,48 @@ pub struct AIMessageChunk {
     /// `tool_call_chunks` in message content will be parsed into `tool_calls`.
     #[serde(skip_serializing_if = "Option::is_none")]
     chunk_position: Option<ChunkPosition>,
+}
+
+impl Serialize for AIMessageChunk {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 7;
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        if self.usage_metadata.is_some() {
+            field_count += 1;
+        }
+        if self.chunk_position.is_some() {
+            field_count += 1;
+        }
+        // Add 1 for additional type field
+        field_count += 1;
+
+        let mut map = serializer.serialize_map(Some(field_count))?;
+
+        map.serialize_entry("type", "AIMessageChunk")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("id", &self.id)?;
+        if self.name.is_some() {
+            map.serialize_entry("name", &self.name)?;
+        }
+        map.serialize_entry("tool_calls", &self.tool_calls)?;
+        map.serialize_entry("invalid_tool_calls", &self.invalid_tool_calls)?;
+        map.serialize_entry("tool_call_chunks", &self.tool_call_chunks)?;
+        if self.usage_metadata.is_some() {
+            map.serialize_entry("usage_metadata", &self.usage_metadata)?;
+        }
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+        if self.chunk_position.is_some() {
+            map.serialize_entry("chunk_position", &self.chunk_position)?;
+        }
+
+        map.end()
+    }
 }
 
 impl AIMessageChunk {
