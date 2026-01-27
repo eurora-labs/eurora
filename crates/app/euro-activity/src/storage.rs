@@ -11,15 +11,11 @@ use proto_gen::activity::{
 };
 use proto_gen::asset::{CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient};
 use serde::{Deserialize, Serialize};
-use std::{
-    io::Cursor,
-    path::{Path, PathBuf},
-};
-use tokio::fs;
+use std::{io::Cursor, path::PathBuf};
 use tonic::Status;
 use tracing::{debug, error};
 
-use crate::{Activity, ActivityAsset, ActivityError, AssetFunctionality, error::ActivityResult};
+use crate::{Activity, ActivityAsset, ActivityError, error::ActivityResult};
 
 /// Configuration for asset storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,20 +107,6 @@ impl ActivityStorage {
         }
     }
 
-    // /// Create with default configuration
-    // pub fn with_base_dir<P: Into<PathBuf>>(base_dir: P) -> Self {
-    //     let mut config = ActivityStorageConfig::default();
-    //     config.base_dir = base_dir.into();
-    //     Self::new(config)
-    // }
-
-    /// Retrieve asset by path
-    pub async fn load_asset_from_path(&self, path: &Path) -> ActivityResult<ActivityAsset> {
-        let asset =
-            euro_encrypt::load_encrypted_file::<ActivityAsset>(&self.config.main_key, path).await?;
-        Ok(asset)
-    }
-
     /// Save all assets of an activity to service by ids
     pub async fn save_activity_to_service(
         &self,
@@ -182,39 +164,6 @@ impl ActivityStorage {
             let saved_info = self.save_asset_to_service(asset).await?;
             saved_assets.push(saved_info);
             // }
-        }
-
-        Ok(saved_assets)
-    }
-
-    /// Save all assets of an activity to disk by ids
-    pub async fn save_assets_to_disk_by_ids(
-        &self,
-        activity: &Activity,
-        ids: &[String],
-    ) -> ActivityResult<Vec<SavedAssetInfo>> {
-        let mut saved_assets = Vec::new();
-
-        for asset in &activity.assets {
-            if ids.contains(&asset.get_id().to_string()) {
-                let saved_info = self.save_asset(asset).await?;
-                saved_assets.push(saved_info);
-            }
-        }
-
-        Ok(saved_assets)
-    }
-
-    /// Save all assets of an activity to disk
-    pub async fn save_assets_to_disk(
-        &self,
-        activity: &Activity,
-    ) -> ActivityResult<Vec<SavedAssetInfo>> {
-        let mut saved_assets = Vec::new();
-
-        for asset in &activity.assets {
-            let saved_info = self.save_asset(asset).await?;
-            saved_assets.push(saved_info);
         }
 
         Ok(saved_assets)
@@ -319,21 +268,6 @@ impl ActivityStorage {
 
         path.push(filename);
         Ok(path)
-    }
-
-    /// Get the storage configuration
-    pub fn get_config(&self) -> &ActivityStorageConfig {
-        &self.config
-    }
-
-    /// Check if an asset exists in storage
-    pub async fn asset_exists(&self, file_path: &Path) -> bool {
-        (fs::try_exists(self.config.base_dir.join(file_path)).await).unwrap_or_default()
-    }
-
-    /// Get the absolute path for a relative asset path
-    pub fn get_absolute_path(&self, file_path: &Path) -> PathBuf {
-        self.config.base_dir.join(file_path)
     }
 }
 

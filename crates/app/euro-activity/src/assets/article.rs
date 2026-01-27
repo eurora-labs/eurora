@@ -65,35 +65,6 @@ impl ArticleAsset {
             word_count,
         })
     }
-
-    /// Get a preview of the article content (first N words)
-    pub fn get_preview(&self, word_limit: usize) -> String {
-        let words: Vec<&str> = self.content.split_whitespace().collect();
-        if words.len() <= word_limit {
-            self.content.clone()
-        } else {
-            let preview_words = &words[..word_limit];
-            format!("{}...", preview_words.join(" "))
-        }
-    }
-
-    /// Get estimated reading time in minutes
-    pub fn get_estimated_reading_time(&self) -> usize {
-        // Average reading speed is about 200-250 words per minute
-        // Using 225 as a middle ground
-        (self.word_count as f64 / 225.0).ceil() as usize
-    }
-
-    /// Check if the article contains a specific keyword
-    pub fn contains_keyword(&self, keyword: &str) -> bool {
-        let keyword_lower = keyword.to_lowercase();
-        self.title.to_lowercase().contains(&keyword_lower)
-            || self.content.to_lowercase().contains(&keyword_lower)
-            || self
-                .author
-                .as_ref()
-                .is_some_and(|author| author.to_lowercase().contains(&keyword_lower))
-    }
 }
 
 impl AssetFunctionality for ArticleAsset {
@@ -214,70 +185,6 @@ mod tests {
         );
 
         assert_eq!(asset.word_count, 5);
-    }
-
-    #[test]
-    fn test_preview() {
-        let asset = ArticleAsset::new(
-            "test-id".to_string(),
-            "https://example.com/article".to_string(),
-            "Test Article".to_string(),
-            "This is a long article with many words that should be truncated".to_string(),
-            None,
-            None,
-        );
-
-        let preview = asset.get_preview(5);
-        assert_eq!(preview, "This is a long article...");
-
-        let full_preview = asset.get_preview(20);
-        assert_eq!(full_preview, asset.content);
-    }
-
-    #[test]
-    fn test_estimated_reading_time() {
-        let short_content = "Short article.".to_string();
-        let asset = ArticleAsset::new(
-            "test-id".to_string(),
-            "https://example.com/article".to_string(),
-            "Test Article".to_string(),
-            short_content,
-            None,
-            None,
-        );
-
-        assert_eq!(asset.get_estimated_reading_time(), 1);
-
-        // Test with longer content (450 words should be 2 minutes)
-        let long_content = "word ".repeat(450);
-        let long_asset = ArticleAsset::new(
-            "test-id".to_string(),
-            "https://example.com/article".to_string(),
-            "Test Article".to_string(),
-            long_content,
-            None,
-            None,
-        );
-
-        assert_eq!(long_asset.get_estimated_reading_time(), 2);
-    }
-
-    #[test]
-    fn test_keyword_search() {
-        let asset = ArticleAsset::new(
-            "test-id".to_string(),
-            "https://example.com/article".to_string(),
-            "Rust Programming".to_string(),
-            "This article discusses Rust programming language features.".to_string(),
-            Some("Jane Doe".to_string()),
-            None,
-        );
-
-        assert!(asset.contains_keyword("rust"));
-        assert!(asset.contains_keyword("Rust"));
-        assert!(asset.contains_keyword("programming"));
-        assert!(asset.contains_keyword("jane"));
-        assert!(!asset.contains_keyword("python"));
     }
 
     #[test]
