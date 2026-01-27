@@ -1,76 +1,58 @@
 //! High-level timeline manager implementation
 
-use std::sync::Arc;
-
 use agent_chain_core::BaseMessage;
+use bon::bon;
 use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::{
-    ActivityStorage, ActivityStorageConfig, AssetFunctionality, ContextChip, TimelineError,
+    ActivityStorage, AssetFunctionality, ContextChip, TimelineError,
     collector::{ActivityEvent, CollectorService},
     config::TimelineConfig,
     error::TimelineResult,
     storage::TimelineStorage,
 };
 
-/// Builder for creating TimelineManager instances
-pub struct TimelineManagerBuilder {
-    activity_storage_config: Option<ActivityStorageConfig>,
-}
+// /// Builder for creating TimelineManager instances
+// pub struct TimelineManagerBuilder {}
 
-impl TimelineManagerBuilder {
-    /// Create a new builder with default settings
-    pub fn new() -> Self {
-        Self {
-            activity_storage_config: None,
-        }
-    }
+// impl TimelineManagerBuilder {
+//     /// Create a new builder with default settings
+//     pub fn new() -> Self {
+//         Self {}
+//     }
 
-    /// Set the activity storage configuration
-    pub fn with_activity_storage_config(mut self, config: ActivityStorageConfig) -> Self {
-        self.activity_storage_config = Some(config);
-        self
-    }
+//     /// Build the TimelineManager
+//     pub async fn build(self) -> TimelineResult<TimelineManager> {
+//         let timeline_config = TimelineConfig::default();
+//         let activity_storage_config = self.activity_storage_config.unwrap_or_default();
 
-    /// Build the TimelineManager
-    pub async fn build(self) -> TimelineResult<TimelineManager> {
-        let timeline_config = TimelineConfig::default();
-        let activity_storage_config = self.activity_storage_config.unwrap_or_default();
+//         // Validate configuration
+//         timeline_config.validate()?;
 
-        // Validate configuration
-        timeline_config.validate()?;
+//         debug!(
+//             "Creating timeline manager with config: {:?}",
+//             timeline_config
+//         );
 
-        debug!(
-            "Creating timeline manager with config: {:?}",
-            timeline_config
-        );
+//         let storage = Arc::new(Mutex::new(TimelineStorage::new(
+//             timeline_config.storage.clone(),
+//         )));
 
-        let storage = Arc::new(Mutex::new(TimelineStorage::new(
-            timeline_config.storage.clone(),
-        )));
+//         let collector =
+//             CollectorService::new_with_timeline_config(Arc::clone(&storage), timeline_config);
 
-        let collector =
-            CollectorService::new_with_timeline_config(Arc::clone(&storage), timeline_config);
+//         Ok(TimelineManager { storage, collector })
+//     }
+// }
 
-        let activity_storage = Arc::new(Mutex::new(
-            ActivityStorage::new(activity_storage_config).await,
-        ));
-
-        Ok(TimelineManager {
-            storage,
-            collector,
-            activity_storage,
-        })
-    }
-}
-
-impl Default for TimelineManagerBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// impl Default for TimelineManagerBuilder {
+//     fn default() -> Self {
+//         Self::new()
+//     }
+// }
 
 /// High-level timeline manager that provides a simple API for timeline operations
 pub struct TimelineManager {
@@ -82,10 +64,25 @@ pub struct TimelineManager {
     pub collector: CollectorService,
 }
 
+#[bon]
 impl TimelineManager {
-    /// Create a new builder for TimelineManager
-    pub fn builder() -> TimelineManagerBuilder {
-        TimelineManagerBuilder::new()
+    #[builder]
+    pub async fn new() -> TimelineResult<Self> {
+        let timeline_config = TimelineConfig::default();
+        timeline_config.validate()?;
+        let storage = Arc::new(Mutex::new(TimelineStorage::new(
+            timeline_config.storage.clone(),
+        )));
+
+        let collector =
+            CollectorService::new_with_timeline_config(Arc::clone(&storage), timeline_config);
+        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new().await));
+
+        Ok(TimelineManager {
+            storage,
+            activity_storage,
+            collector,
+        })
     }
 
     /// Start the timeline manager (begins activity collection)

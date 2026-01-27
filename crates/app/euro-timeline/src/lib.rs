@@ -5,10 +5,10 @@ pub use config::TimelineConfig;
 pub use error::{TimelineError, TimelineResult};
 // Re-export activity types for convenience
 pub use euro_activity::{
-    Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStorage,
-    ActivityStorageConfig, ActivityStrategy, AssetFunctionality, ContextChip,
+    Activity, ActivityAsset, ActivityError, ActivitySnapshot, ActivityStorage, ActivityStrategy,
+    AssetFunctionality, ContextChip,
 };
-pub use manager::{TimelineManager, TimelineManagerBuilder};
+pub use manager::TimelineManager;
 
 // Internal modules
 mod collector;

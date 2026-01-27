@@ -4,10 +4,7 @@
 )]
 
 use dotenv::dotenv;
-// use euro_conversation::{ChatMessage, Conversation, ConversationStorage};
-use euro_encrypt::MainKey;
 use euro_native_messaging::create_browser_bridge_client;
-// use euro_personal_db::{Activity, PersonalDatabaseManager};
 use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::TimelineAppEvent;
 use euro_tauri::shared_types::SharedUserController;
@@ -124,9 +121,6 @@ fn main() {
                         });
                     });
 
-                    // If no main key is available, generate a new one
-                    let main_key = MainKey::new().expect("Failed to generate main key");
-
                     // #[cfg(all(desktop, not(debug_assertions)))]
                     if app_settings.general.autostart && !started_by_autostart {
                         use tauri_plugin_autostart::MacosLauncher;
@@ -219,16 +213,7 @@ fn main() {
                         // };
                         // if let Some(db_manager) = db_manager {
                         //     db_app_handle.manage(db_manager);
-                        let timeline = euro_timeline::TimelineManagerBuilder::new()
-                        .with_activity_storage_config(
-                            euro_activity::ActivityStorageConfig {
-                            base_dir: timeline_handle.path().app_data_dir().unwrap(),
-                            use_content_hash: false,
-                            max_file_size: None,
-                            main_key: main_key.clone(),
-                            service_endpoint: None,
-                        })
-                            .build().await.expect("Failed to create timeline");
+                        let timeline = euro_timeline::TimelineManager::builder().build().await.expect("Failed to create timeline");
                         timeline_handle.manage(Mutex::new(timeline));
                             let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
 
