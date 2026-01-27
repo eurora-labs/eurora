@@ -14,6 +14,7 @@
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	let conversations: ConversationView[] = $state([]);
@@ -51,7 +52,19 @@
 	}
 
 	async function quit() {
-		await taurpc.system.quit();
+		quitDialogOpen = false;
+		taurpc.system.quit().catch((error) => {
+			console.error('Failed to quit application:', error);
+			toast.error(`The app encountered the following error: ${error}`, {
+				description: 'Please quit manually from the tray menu.',
+				duration: 5000,
+				cancel: {
+					label: 'Ok',
+					onClick: () => {},
+				},
+			});
+			console.error('Failed to quit application:', error);
+		});
 	}
 </script>
 
@@ -167,9 +180,9 @@
 </Sidebar.Root>
 
 <Dialog.Root bind:open={quitDialogOpen}>
-	<Dialog.Content class="sm:max-w-[400px]">
+	<Dialog.Content class="sm:max-w-100">
 		<div class="flex gap-4">
-			<div class="flex-shrink-0">
+			<div class="shrink-0">
 				<EuroraLogo class="size-12" />
 			</div>
 			<div class="flex flex-col text-left">
