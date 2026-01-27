@@ -30,6 +30,8 @@ pub trait SystemApi {
     ) -> Result<Option<UpdateInfo>, String>;
 
     async fn install_update<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
+
+    async fn quit<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
 }
 
 #[derive(Clone)]
@@ -152,5 +154,10 @@ impl SystemApi for SystemApiImpl {
             debug!("No update available to install");
             Err("No update available to install".to_string())
         }
+    }
+
+    async fn quit<R: Runtime>(self, app_handle: tauri::AppHandle<R>) -> Result<(), String> {
+        app_handle.exit(0);
+        Ok(())
     }
 }
