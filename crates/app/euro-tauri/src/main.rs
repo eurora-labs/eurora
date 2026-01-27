@@ -36,34 +36,9 @@ use tauri::{
     tray::TrayIconBuilder,
 };
 use tauri_plugin_log::{Target, TargetKind, fern};
-use tauri_plugin_updater::UpdaterExt;
 use taurpc::Router;
 use tokio::sync::Mutex;
 use tracing::{debug, error};
-
-async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
-    if let Some(update) = app.updater()?.check().await? {
-        let mut downloaded = 0;
-
-        // alternatively we could also call update.download() and update.install() separately
-        update
-            .download_and_install(
-                |chunk_length, content_length| {
-                    downloaded += chunk_length;
-                    debug!("downloaded {downloaded} from {content_length:?}");
-                },
-                || {
-                    debug!("download finished");
-                },
-            )
-            .await?;
-
-        debug!("update installed");
-        app.restart();
-    }
-
-    Ok(())
-}
 
 async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
     let posthog_key = option_env!("POSTHOG_API_KEY");
@@ -151,12 +126,6 @@ fn main() {
 
                     // If no main key is available, generate a new one
                     let main_key = MainKey::new().expect("Failed to generate main key");
-
-                    let handle = tauri_app.handle().clone();
-                    tauri::async_runtime::spawn(async move {
-                        update(handle).await.unwrap();
-                    });
-
 
                     // #[cfg(all(desktop, not(debug_assertions)))]
                     if app_settings.general.autostart && !started_by_autostart {

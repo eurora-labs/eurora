@@ -1,8 +1,20 @@
 use euro_activity::ContextChip;
 use euro_timeline::TimelineManager;
+use serde::{Deserialize, Serialize};
+use specta::Type;
 use tauri::{Manager, Runtime};
+use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
-use tracing::debug;
+use tracing::{debug, error};
+
+/// Information about an available update
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct UpdateInfo {
+    /// The version string of the available update
+    pub version: String,
+    /// Release notes or changelog for the update (if available)
+    pub body: Option<String>,
+}
 
 #[taurpc::procedures(path = "system")]
 pub trait SystemApi {
@@ -12,6 +24,12 @@ pub trait SystemApi {
     async fn list_activities<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String>;
+
+    async fn check_for_update<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<Option<UpdateInfo>, String>;
+
+    async fn install_update<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
 }
 
 #[derive(Clone)]
@@ -57,5 +75,82 @@ impl SystemApi for SystemApiImpl {
         let limited_activities = activities.into_iter().take(5).collect::<Vec<ContextChip>>();
 
         Ok(limited_activities)
+    }
+
+    async fn check_for_update<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<Option<UpdateInfo>, String> {
+        debug!("Checking for updates...");
+
+        let updater = app_handle.updater().map_err(|e| {
+            error!("Failed to get updater: {}", e);
+            format!("Failed to get updater: {}", e)
+        })?;
+
+        match updater.check().await {
+            Ok(Some(update)) => {
+                debug!("Update available: {}", update.version);
+                Ok(Some(UpdateInfo {
+                    version: update.version.clone(),
+                    body: update.body.clone(),
+                }))
+            }
+            Ok(None) => {
+                debug!("No update available");
+                Ok(None)
+            }
+            Err(e) => {
+                error!("Failed to check for updates: {}", e);
+                Err(format!("Failed to check for updates: {}", e))
+            }
+        }
+    }
+
+    async fn install_update<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<(), String> {
+        debug!("Installing update...");
+
+        let updater = app_handle.updater().map_err(|e| {
+            error!("Failed to get updater: {}", e);
+            format!("Failed to get updater: {}", e)
+        })?;
+
+        let update = updater.check().await.map_err(|e| {
+            error!("Failed to check for updates: {}", e);
+            format!("Failed to check for updates: {}", e)
+        })?;
+
+        if let Some(update) = update {
+            debug!(
+                "Downloading and installing update version: {}",
+                update.version
+            );
+
+            update
+                .download_and_install(
+                    |chunk_length, content_length| {
+                        debug!("Downloaded {} from {:?}", chunk_length, content_length);
+                    },
+                    || {
+                        debug!("Download finished");
+                    },
+                )
+                .await
+                .map_err(|e| {
+                    error!("Failed to download and install update: {}", e);
+                    format!("Failed to download and install update: {}", e)
+                })?;
+
+            debug!("Update installed, restarting application");
+            app_handle.restart();
+            #[allow(unreachable_code)]
+            Ok(())
+        } else {
+            debug!("No update available to install");
+            Err("No update available to install".to_string())
+        }
     }
 }
