@@ -1,5 +1,5 @@
 {
-	"allowed_origins": ["chrome-extension://bagamdmkmgflajpfehjgancnbngignfp/"],
+	"allowed_origins": ["chrome-extension://bfndcocdeinignobnnjplgoggmgebihm/"],
 	"description": "Eurora Native Messaging Host",
 	"name": "com.eurora.app",
 	"path": "euro-native-messaging.exe",
