@@ -368,7 +368,7 @@ impl ProtoConversationService for ConversationService {
                     conversation_id,
                     user_id,
                 },
-                PaginationParams::new(req.offset, req.limit, "DESC".to_string()),
+                PaginationParams::new(req.offset, req.limit, "ASC".to_string()),
             )
             .await
             .map_err(ConversationServiceError::from)?;
