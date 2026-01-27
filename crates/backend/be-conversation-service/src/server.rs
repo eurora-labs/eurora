@@ -1,5 +1,6 @@
 //! Server-side implementation for the Conversation Service.
 
+use agent_chain::openai::BuiltinTool;
 use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
@@ -46,7 +47,9 @@ impl ConversationService {
         });
         let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
 
-        let provider = ChatOpenAI::new(&model).api_key(api_key);
+        let provider = ChatOpenAI::new(&model)
+            .with_builtin_tools(vec![BuiltinTool::WebSearch])
+            .api_key(api_key);
 
         Ok(Self { provider, db })
     }
@@ -259,7 +262,7 @@ impl ProtoConversationService for ConversationService {
                     conversation_id,
                     user_id,
                 },
-                PaginationParams::new(0, 5, "ASC".to_string()),
+                PaginationParams::new(0, 5, "DESC".to_string()),
             )
             .await
             .unwrap();
@@ -284,8 +287,6 @@ impl ProtoConversationService for ConversationService {
             })
             .await
             .map_err(ConversationServiceError::from)?;
-
-        info!("Messages: {:?}", messages);
 
         let openai_stream = self
             .provider
