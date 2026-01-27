@@ -3,7 +3,8 @@
 //! This module contains types for tool calls and tool messages,
 //! mirroring `langchain_core.messages.tool`.
 
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 /// Mixin trait for objects that tools can return directly.
@@ -150,7 +151,7 @@ impl InvalidToolCall {
 ///
 /// This corresponds to `ToolMessage` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ToolMessage {
     /// The tool result content
     pub content: String,
@@ -179,6 +180,40 @@ pub struct ToolMessage {
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
+impl Serialize for ToolMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 6;
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        if self.artifact.is_some() {
+            field_count += 1;
+        }
+        // Add 1 for additional type field
+        field_count += 1;
+
+        let mut map = serializer.serialize_map(Some(field_count))?;
+        map.serialize_entry("type", "tool")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("tool_call_id", &self.tool_call_id)?;
+        map.serialize_entry("id", &self.id)?;
+        if self.name.is_some() {
+            map.serialize_entry("name", &self.name)?;
+        }
+        map.serialize_entry("status", &self.status)?;
+        if self.artifact.is_some() {
+            map.serialize_entry("artifact", &self.artifact)?;
+        }
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
+}
+
 fn default_status() -> ToolStatus {
     ToolStatus::Success
 }
@@ -191,6 +226,40 @@ pub enum ToolStatus {
     #[default]
     Success,
     Error,
+}
+
+impl PartialEq<str> for ToolStatus {
+    fn eq(&self, other: &str) -> bool {
+        matches!(
+            (self, other),
+            (ToolStatus::Success, "success") | (ToolStatus::Error, "error")
+        )
+    }
+}
+
+impl From<String> for ToolStatus {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "success" => ToolStatus::Success,
+            "error" => ToolStatus::Error,
+            _ => ToolStatus::default(),
+        }
+    }
+}
+
+impl From<ToolStatus> for String {
+    fn from(value: ToolStatus) -> Self {
+        match value {
+            ToolStatus::Success => "success".to_string(),
+            ToolStatus::Error => "error".to_string(),
+        }
+    }
+}
+
+impl PartialEq<&str> for ToolStatus {
+    fn eq(&self, other: &&str) -> bool {
+        self == *other
+    }
 }
 
 impl ToolMessage {
@@ -247,8 +316,8 @@ impl ToolMessage {
         }
     }
 
-    /// Create a new tool message with an artifact.
-    pub fn with_artifact(
+    /// Create a new tool message with an artifact (constructor style).
+    pub fn new_with_artifact(
         content: impl Into<String>,
         tool_call_id: impl Into<String>,
         artifact: serde_json::Value,
@@ -265,26 +334,10 @@ impl ToolMessage {
         }
     }
 
-    /// Set the name for this tool message.
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Set the artifact for this tool message (builder pattern).
-    pub fn with_artifact_value(mut self, artifact: serde_json::Value) -> Self {
-        self.artifact = Some(artifact);
-        self
-    }
-
-    /// Set the status for this tool message (builder pattern).
-    pub fn with_status_value(mut self, status: ToolStatus) -> Self {
-        self.status = status;
-        self
-    }
-
-    /// Create a new tool message with a specific status.
-    pub fn with_status(
+    /// Create a new tool message with a specific status (constructor style).
+    ///
+    /// Used by tools/base.rs for format_output.
+    pub fn with_status_constructor(
         content: impl Into<String>,
         tool_call_id: impl Into<String>,
         status: &str,
@@ -303,6 +356,33 @@ impl ToolMessage {
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
+    }
+
+    /// Set the name for this tool message (builder pattern).
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Set the artifact for this tool message (builder pattern).
+    pub fn with_artifact(mut self, artifact: serde_json::Value) -> Self {
+        self.artifact = Some(artifact);
+        self
+    }
+
+    /// Set the artifact for this tool message (builder pattern, alias for with_artifact).
+    pub fn with_artifact_value(mut self, artifact: serde_json::Value) -> Self {
+        self.artifact = Some(artifact);
+        self
+    }
+
+    /// Set the status for this tool message (builder pattern).
+    pub fn with_status(mut self, status: &str) -> Self {
+        self.status = match status {
+            "error" => ToolStatus::Error,
+            _ => ToolStatus::Success,
+        };
+        self
     }
 
     /// Get the message content.
@@ -344,6 +424,26 @@ impl ToolMessage {
     pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
         &self.response_metadata
     }
+
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "tool"
+    }
+
+    /// Get the text content of the message.
+    pub fn text(&self) -> &str {
+        self.content()
+    }
+
+    /// Set the artifact for this message (builder pattern on self).
+    pub fn set_artifact(&mut self, artifact: serde_json::Value) {
+        self.artifact = Some(artifact);
+    }
+
+    /// Set the status for this message (builder pattern on self).
+    pub fn set_status(&mut self, status: ToolStatus) {
+        self.status = status;
+    }
 }
 
 impl ToolOutputMixin for ToolMessage {}
@@ -352,7 +452,7 @@ impl ToolOutputMixin for ToolMessage {}
 ///
 /// This corresponds to `ToolMessageChunk` in LangChain Python.
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ToolMessageChunk {
     /// The tool result content (may be partial during streaming)
     content: String,
@@ -377,6 +477,40 @@ pub struct ToolMessageChunk {
     response_metadata: HashMap<String, serde_json::Value>,
 }
 
+impl Serialize for ToolMessageChunk {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_count = 6;
+        if self.name.is_some() {
+            field_count += 1;
+        }
+        if self.artifact.is_some() {
+            field_count += 1;
+        }
+        // Add 1 for additional type field
+        field_count += 1;
+
+        let mut map = serializer.serialize_map(Some(field_count))?;
+        map.serialize_entry("type", "ToolMessageChunk")?;
+        map.serialize_entry("content", &self.content)?;
+        map.serialize_entry("tool_call_id", &self.tool_call_id)?;
+        map.serialize_entry("id", &self.id)?;
+        if self.name.is_some() {
+            map.serialize_entry("name", &self.name)?;
+        }
+        map.serialize_entry("status", &self.status)?;
+        if self.artifact.is_some() {
+            map.serialize_entry("artifact", &self.artifact)?;
+        }
+        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
+        map.serialize_entry("response_metadata", &self.response_metadata)?;
+
+        map.end()
+    }
+}
+
 impl ToolMessageChunk {
     /// Create a new tool message chunk.
     pub fn new(content: impl Into<String>, tool_call_id: impl Into<String>) -> Self {
@@ -390,6 +524,45 @@ impl ToolMessageChunk {
             additional_kwargs: HashMap::new(),
             response_metadata: HashMap::new(),
         }
+    }
+
+    /// Create a new tool message chunk with an explicit ID.
+    pub fn with_id(
+        id: impl Into<String>,
+        content: impl Into<String>,
+        tool_call_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            content: content.into(),
+            tool_call_id: tool_call_id.into(),
+            id: Some(id.into()),
+            name: None,
+            status: ToolStatus::Success,
+            artifact: None,
+            additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
+        }
+    }
+
+    /// Set the artifact for this chunk (builder pattern).
+    pub fn with_artifact(mut self, artifact: serde_json::Value) -> Self {
+        self.artifact = Some(artifact);
+        self
+    }
+
+    /// Set the status for this chunk (builder pattern).
+    pub fn with_status(mut self, status: &str) -> Self {
+        self.status = match status {
+            "error" => ToolStatus::Error,
+            _ => ToolStatus::Success,
+        };
+        self
+    }
+
+    /// Set the response metadata for this chunk (builder pattern).
+    pub fn with_response_metadata(mut self, metadata: HashMap<String, serde_json::Value>) -> Self {
+        self.response_metadata = metadata;
+        self
     }
 
     /// Get the message content.
@@ -422,8 +595,27 @@ impl ToolMessageChunk {
         self.artifact.as_ref()
     }
 
+    /// Get response metadata.
+    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
+
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "ToolMessageChunk"
+    }
+
     /// Concatenate this chunk with another chunk.
+    ///
+    /// Panics if the tool_call_ids don't match.
     pub fn concat(&self, other: &ToolMessageChunk) -> ToolMessageChunk {
+        if self.tool_call_id != other.tool_call_id {
+            panic!(
+                "Cannot concatenate ToolMessageChunks with different tool_call_ids: '{}' vs '{}'",
+                self.tool_call_id, other.tool_call_id
+            );
+        }
+
         let mut content = self.content.clone();
         content.push_str(&other.content);
 
@@ -434,6 +626,14 @@ impl ToolMessageChunk {
             ToolStatus::Success
         };
 
+        // Merge response_metadata
+        let mut response_metadata = self.response_metadata.clone();
+        for (k, v) in &other.response_metadata {
+            response_metadata
+                .entry(k.clone())
+                .or_insert_with(|| v.clone());
+        }
+
         ToolMessageChunk {
             content,
             tool_call_id: self.tool_call_id.clone(),
@@ -442,7 +642,7 @@ impl ToolMessageChunk {
             status,
             artifact: self.artifact.clone().or_else(|| other.artifact.clone()),
             additional_kwargs: self.additional_kwargs.clone(),
-            response_metadata: self.response_metadata.clone(),
+            response_metadata,
         }
     }
 
