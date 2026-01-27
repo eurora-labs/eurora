@@ -7,9 +7,10 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 agent-chain-core = { workspace = true }
+# euro-personal-db = { workspace = true }
+bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-activity = { workspace = true }
-# euro-personal-db = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
 image = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

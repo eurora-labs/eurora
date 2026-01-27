@@ -2,8 +2,6 @@
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use euro_auth::AuthedChannel;
-use euro_encrypt::{MainKey, encrypt_file_contents};
-use euro_fs::create_dirs_then_write;
 use prost_types::Timestamp;
 use proto_gen::activity::{
     ActivityResponse, InsertActivityRequest,
@@ -16,35 +14,6 @@ use tonic::Status;
 use tracing::{debug, error};
 
 use crate::{Activity, ActivityAsset, ActivityError, error::ActivityResult};
-
-/// Configuration for asset storage
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActivityStorageConfig {
-    /// Base directory for storing assets
-    pub base_dir: PathBuf,
-    /// Whether to use content hashing for deduplication
-    pub use_content_hash: bool,
-    /// Maximum file size in bytes (None for no limit)
-    pub max_file_size: Option<u64>,
-    /// Master key
-    pub main_key: MainKey,
-    /// Remote assets service endpoint (e.g., "http://localhost:50051")
-    #[serde(default)]
-    pub service_endpoint: Option<String>,
-}
-
-impl Default for ActivityStorageConfig {
-    fn default() -> Self {
-        let main_key = MainKey::new().expect("Failed to generate main key");
-        Self {
-            base_dir: dirs::data_dir().unwrap_or_else(|| PathBuf::from("./assets")),
-            use_content_hash: true,
-            max_file_size: Some(100 * 1024 * 1024), // 100MB default limit
-            main_key,
-            service_endpoint: None,
-        }
-    }
-}
 
 /// Information about a saved asset
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,12 +57,11 @@ pub trait SaveableAsset {
 pub struct ActivityStorage {
     activity_client: ProtoActivityServiceClient<AuthedChannel>,
     asset_client: ProtoAssetServiceClient<AuthedChannel>,
-    config: ActivityStorageConfig,
 }
 
 impl ActivityStorage {
     /// Create a new asset storage manager
-    pub async fn new(config: ActivityStorageConfig) -> Self {
+    pub async fn new() -> Self {
         let channel = euro_auth::get_authed_channel().await;
         let asset_client = ProtoAssetServiceClient::new(channel);
 
@@ -103,7 +71,6 @@ impl ActivityStorage {
         Self {
             activity_client,
             asset_client,
-            config,
         }
     }
 
@@ -220,125 +187,5 @@ impl ActivityStorage {
             file_size,
             saved_at: chrono::Utc::now(),
         })
-    }
-
-    /// Save an asset to disk
-    pub async fn save_asset(&self, asset: &ActivityAsset) -> ActivityResult<SavedAssetInfo> {
-        // Serialize the entire ActivityAsset enum, not just the individual asset
-        let mut bytes = serde_json::to_vec(asset)?;
-
-        bytes = encrypt_file_contents(&self.config.main_key, &bytes, asset.get_asset_type())
-            .await
-            .map_err(ActivityError::Encryption)?;
-
-        // Make a placeholder filepath
-        let file_path = self.generate_asset_path(asset, None)?;
-        let absolute_path = self.config.base_dir.join(&file_path);
-        let final_path = self.config.base_dir.join(&absolute_path);
-        debug!("Saving asset to {}", final_path.display());
-        create_dirs_then_write(&final_path, &bytes)?;
-
-        Ok(SavedAssetInfo {
-            file_path,
-            absolute_path,
-            content_hash: None,
-            file_size: 0,
-            saved_at: chrono::Utc::now(),
-        })
-    }
-
-    /// Generate a file path for an asset
-    fn generate_asset_path(
-        &self,
-        asset: &ActivityAsset,
-        content_hash: Option<&str>,
-    ) -> ActivityResult<PathBuf> {
-        let mut path = PathBuf::new();
-        path.push("assets");
-        path.push(sanitize_filename(asset.get_asset_type()));
-
-        let filename = if let Some(hash) = content_hash {
-            // Use content hash for deduplication
-            hash[..16].to_string()
-        } else {
-            // Use sanitized unique ID + sanitized display name
-            // let _sanitized_name = sanitize_filename(&asset.get_display_name());
-            sanitize_filename(&asset.get_unique_id()).to_string()
-        };
-
-        path.push(filename);
-        Ok(path)
-    }
-}
-
-/// Sanitize a filename by removing/replacing invalid characters
-fn sanitize_filename(name: &str) -> String {
-    // Replace reserved and control characters
-    let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
-    let mut sanitized: String = name
-        .chars()
-        .map(|c| if c.is_control() { '_' } else { c })
-        .collect();
-    for ch in invalid_chars {
-        sanitized = sanitized.replace(ch, "_");
-    }
-
-    // Collapse whitespace to single spaces
-    sanitized = sanitized.split_whitespace().collect::<Vec<_>>().join(" ");
-
-    // Trim leading/trailing dots and spaces
-    sanitized = sanitized
-        .trim_matches(|c: char| c == '.' || c == ' ')
-        .to_string();
-
-    // Limit length to avoid filesystem issues
-    if sanitized.chars().count() > 100 {
-        sanitized = sanitized.chars().take(100).collect();
-    }
-
-    // Fallback to a default name if empty
-    if sanitized.trim().is_empty() {
-        "unnamed".to_string()
-    } else {
-        sanitized
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Mock asset for testing
-    #[allow(dead_code)]
-    struct MockAsset {
-        id: String,
-        name: String,
-        content: String,
-    }
-
-    #[async_trait]
-    impl SaveableAsset for MockAsset {
-        fn get_asset_type(&self) -> &'static str {
-            "mock"
-        }
-
-        async fn serialize_content(&self) -> ActivityResult<Vec<u8>> {
-            Ok(self.content.as_bytes().to_vec())
-        }
-
-        fn get_unique_id(&self) -> String {
-            self.id.clone()
-        }
-
-        fn get_display_name(&self) -> String {
-            self.name.clone()
-        }
-    }
-
-    #[tokio::test]
-    async fn test_filename_sanitization() {
-        let invalid_name = "Test/Asset\\With:Invalid*Characters?";
-        let sanitized = sanitize_filename(invalid_name);
-        assert_eq!(sanitized, "Test_Asset_With_Invalid_Characters_");
     }
 }
