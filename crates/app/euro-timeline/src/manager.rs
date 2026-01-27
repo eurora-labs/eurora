@@ -8,51 +8,9 @@ use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::{
-    ActivityStorage, AssetFunctionality, ContextChip, TimelineError,
-    collector::{ActivityEvent, CollectorService},
-    config::TimelineConfig,
-    error::TimelineResult,
-    storage::TimelineStorage,
+    ActivityStorage, AssetFunctionality, ContextChip, TimelineError, collector::CollectorService,
+    config::TimelineConfig, error::TimelineResult, storage::TimelineStorage, types::ActivityEvent,
 };
-
-// /// Builder for creating TimelineManager instances
-// pub struct TimelineManagerBuilder {}
-
-// impl TimelineManagerBuilder {
-//     /// Create a new builder with default settings
-//     pub fn new() -> Self {
-//         Self {}
-//     }
-
-//     /// Build the TimelineManager
-//     pub async fn build(self) -> TimelineResult<TimelineManager> {
-//         let timeline_config = TimelineConfig::default();
-//         let activity_storage_config = self.activity_storage_config.unwrap_or_default();
-
-//         // Validate configuration
-//         timeline_config.validate()?;
-
-//         debug!(
-//             "Creating timeline manager with config: {:?}",
-//             timeline_config
-//         );
-
-//         let storage = Arc::new(Mutex::new(TimelineStorage::new(
-//             timeline_config.storage.clone(),
-//         )));
-
-//         let collector =
-//             CollectorService::new_with_timeline_config(Arc::clone(&storage), timeline_config);
-
-//         Ok(TimelineManager { storage, collector })
-//     }
-// }
-
-// impl Default for TimelineManagerBuilder {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }
 
 /// High-level timeline manager that provides a simple API for timeline operations
 pub struct TimelineManager {
