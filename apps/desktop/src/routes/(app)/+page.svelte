@@ -60,7 +60,7 @@
 
 			if (!new_conv.id) return;
 
-			taurpc.conversation.get_messages(new_conv.id, 5, 0).then((response) => {
+			taurpc.conversation.get_messages(new_conv.id, 50, 0).then((response) => {
 				messages = response;
 			});
 		});
