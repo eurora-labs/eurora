@@ -26,6 +26,7 @@ url = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4", "v7"] }
 
 [dev-dependencies]
+serial_test = "3"
 tempfile = { workspace = true }
 tokio = { version = "1", features = ["macros", "rt"] }
 
