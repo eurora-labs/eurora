@@ -57,7 +57,7 @@ impl ChatApi for ChatApiImpl {
             .await
             .expect("Failed to ensure remote conversation");
 
-        if let Ok(_) = timeline.save_current_activity_to_service().await {
+        if timeline.save_current_activity_to_service().await.is_ok() {
             if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
                 info!("Infos: {:?}", infos);
             }
