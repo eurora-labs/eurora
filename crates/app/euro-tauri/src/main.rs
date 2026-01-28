@@ -32,10 +32,10 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-use tauri_plugin_log::{Target, TargetKind, fern};
+use tauri_plugin_log::{Target, TargetKind, fern::colors::ColoredLevelConfig};
 use taurpc::Router;
 use tokio::sync::Mutex;
-use tracing::{debug, error};
+use log::{debug, error};
 
 async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
     let posthog_key = option_env!("POSTHOG_API_KEY");
@@ -73,16 +73,8 @@ fn main() {
         ));
     }
 
-    let sentry_logger = sentry::integrations::log::SentryLogger::new()
+    let _sentry_logger = sentry::integrations::log::SentryLogger::new()
         .filter(|_md| sentry::integrations::log::LogFilter::Log);
-
-    // let mut writer = std::io::Cursor::new(Vec::<u8>::new());
-    let writer = Box::new(sentry_logger) as Box<dyn log::Log>;
-    let dispatcher = fern::Dispatch::new()
-        .level(log::LevelFilter::Info)
-        .chain(std::io::stdout())
-        .chain(writer);
-    let custom_target = Target::new(TargetKind::Dispatch(dispatcher));
 
     // Regular application startup
     let tauri_context = generate_context!();
@@ -346,9 +338,26 @@ fn main() {
                 // )
                 .plugin(
                     tauri_plugin_log::Builder::new()
-                            .filter(|metadata| metadata.target().starts_with("euro_") || metadata.target().starts_with("webview") || metadata.level() == log::Level::Warn)
-                            // .level(log::LevelFilter::Info)
-                            .target(custom_target)
+                            .filter(|metadata| {
+                                let target = metadata.target();
+                                // Allow all logs from euro-* crates (Rust converts hyphens to underscores in module paths)
+                                let is_euro_crate = target.starts_with("euro_");
+                                // Allow all logs from common folder crates
+                                let is_common_crate = target.starts_with("agent_chain")
+                                    || target.starts_with("agent_graph")
+                                    || target.starts_with("auth_core")
+                                    || target.starts_with("focus_tracker")
+                                    || target.starts_with("proto_gen");
+                                // Allow webview logs
+                                let is_webview = target.starts_with("webview");
+                                // For third-party crates, only allow warnings and above
+                                let is_warning_or_above = metadata.level() <= log::Level::Warn;
+                                
+                                is_euro_crate || is_common_crate || is_webview || is_warning_or_above
+                            })
+                            .level(log::LevelFilter::Trace)
+                            .target(Target::new(TargetKind::Stdout))
+                            .with_colors(ColoredLevelConfig::default())
                             .build()
                 )
                 .plugin(tauri_plugin_shell::init())
