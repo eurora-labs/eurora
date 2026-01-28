@@ -10,14 +10,15 @@ service ProtoConversationService {
   rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
   rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
-  rpc GetConversationTitle(GetConversationTitleRequest) returns (GetConversationTitleResponse);
 
   // Messages CRUD
   rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
   rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
   rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
 
+  // AI Calls
   rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
+  rpc GenerateConversationTitle(GenerateConversationTitleRequest) returns (GenerateConversationTitleResponse);
 }
 
 message CreateConversationRequest {
@@ -100,11 +101,10 @@ message AddSystemMessageResponse {
   agent_chain.ProtoBaseMessage message = 1;
 }
 
-message GetConversationTitleRequest {
+message GenerateConversationTitleRequest {
   string conversation_id = 1;
-  string content = 2;
 }
 
-message GetConversationTitleResponse {
+message GenerateConversationTitleResponse {
   string title = 1;
 }

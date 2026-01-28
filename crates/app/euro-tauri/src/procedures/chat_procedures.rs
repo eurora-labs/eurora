@@ -5,7 +5,10 @@ use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
-use crate::shared_types::SharedConversationManager;
+use crate::{
+    procedures::conversation_procedures::TauRpcConversationApiEventTrigger,
+    shared_types::SharedConversationManager,
+};
 
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
@@ -22,7 +25,7 @@ pub struct Query {
 pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
-        _conversation_id: Option<String>,
+        conversation_id: Option<String>,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String>;
@@ -36,7 +39,7 @@ impl ChatApi for ChatApiImpl {
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
-        _conversation_id: Option<String>,
+        conversation_id: Option<String>,
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
@@ -52,10 +55,15 @@ impl ChatApi for ChatApiImpl {
             });
         });
 
-        conversation_manager
-            .ensure_remote_conversation()
-            .await
-            .expect("Failed to ensure remote conversation");
+        if conversation_id.is_none() {
+            let conversation = conversation_manager
+                .ensure_remote_conversation()
+                .await
+                .expect("Failed to ensure remote conversation");
+            TauRpcConversationApiEventTrigger::new(app_handle.clone())
+                .new_conversation_added(conversation.into())
+                .expect("Failed to trigger new conversation added event");
+        }
 
         if timeline.save_current_activity_to_service().await.is_ok() {
             if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
