@@ -88,6 +88,7 @@ pub use language_models::{
     ChatModelConfig,
     ChatStream,
     DisableStreaming,
+    FakeChatModel,
     FakeListChatModel,
     FakeListChatModelError,
     // Fake implementations for testing
