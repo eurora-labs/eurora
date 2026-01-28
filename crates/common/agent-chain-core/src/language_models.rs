@@ -49,8 +49,8 @@ mod utils;
 
 // Re-export base types
 pub use base::{
-    BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput,
+    BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelInput,
+    LanguageModelOutput, get_verbosity,
 };
 
 // Re-export chat model types
@@ -70,8 +70,8 @@ pub use llms::{BaseLLM, LLM, LLMConfig, get_prompts_from_cache, update_cache};
 pub use fake::{FakeListLLM, FakeListLLMError, FakeStreamingListLLM};
 
 pub use fake_chat_models::{
-    FakeListChatModel, FakeListChatModelError, FakeMessagesListChatModel, GenericFakeChatModel,
-    ParrotFakeChatModel,
+    FakeChatModel, FakeListChatModel, FakeListChatModelError, FakeMessagesListChatModel,
+    GenericFakeChatModel, ParrotFakeChatModel,
 };
 
 // Re-export model profile types
