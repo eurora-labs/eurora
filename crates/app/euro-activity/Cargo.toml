@@ -25,7 +25,7 @@ humantime-serde = { workspace = true }
 image = { workspace = true }
 prost-types = { workspace = true }
 proto-gen = { workspace = true }
-regex = "1.12.2"
+regex = { workspace = true }
 resvg = { version = "0.45" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
