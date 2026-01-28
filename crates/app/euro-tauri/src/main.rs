@@ -27,6 +27,7 @@ use euro_tauri::{
     shared_types::SharedConversationManager,
 };
 use euro_timeline::TimelineManager;
+use log::{debug, error};
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
@@ -35,7 +36,6 @@ use tauri::{
 use tauri_plugin_log::{Target, TargetKind, fern::colors::ColoredLevelConfig};
 use taurpc::Router;
 use tokio::sync::Mutex;
-use log::{debug, error};
 
 async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
     let posthog_key = option_env!("POSTHOG_API_KEY");
@@ -352,7 +352,6 @@ fn main() {
                                 let is_webview = target.starts_with("webview");
                                 // For third-party crates, only allow warnings and above
                                 let is_warning_or_above = metadata.level() <= log::Level::Warn;
-                                
                                 is_euro_crate || is_common_crate || is_webview || is_warning_or_above
                             })
                             .level(log::LevelFilter::Trace)

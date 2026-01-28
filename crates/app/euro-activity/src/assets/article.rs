@@ -21,36 +21,21 @@ pub struct ArticleAsset {
     pub url: String,
     pub title: String,
     pub content: String,
-    pub author: Option<String>,
-    pub published_date: Option<String>,
-    pub word_count: usize,
 }
 
 impl ArticleAsset {
     /// Create a new article asset
-    pub fn new(
-        id: String,
-        url: String,
-        title: String,
-        content: String,
-        author: Option<String>,
-        published_date: Option<String>,
-    ) -> Self {
-        let word_count = content.split_whitespace().count();
+    pub fn new(id: String, url: String, title: String, content: String) -> Self {
         Self {
             id,
             url,
             title,
             content,
-            author,
-            published_date,
-            word_count,
         }
     }
 
     /// Try to create from protocol buffer state
     pub fn try_from(asset: NativeArticleAsset) -> Result<Self, ActivityError> {
-        let word_count = asset.content.split_whitespace().count();
         Ok(ArticleAsset {
             id: uuid::Uuid::new_v4().to_string(),
             url: asset.url,
@@ -60,9 +45,6 @@ impl ArticleAsset {
                 asset.title
             },
             content: asset.text_content,
-            author: None,
-            published_date: None,
-            word_count,
         })
     }
 }
@@ -83,10 +65,6 @@ impl AssetFunctionality for ArticleAsset {
             self.title
         );
 
-        if let Some(author) = &self.author {
-            content.push_str(&format!(" The article is by {}.", author));
-        }
-
         content.push_str(&format!(
             " Here's the text content of the article: \n {}",
             self.content
@@ -96,13 +74,8 @@ impl AssetFunctionality for ArticleAsset {
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
-        // info!("Getting context chip for article: {:?}", &self.url);
         let parsed_url = url::Url::parse(&self.url).ok()?;
         let domain = parsed_url.host_str().unwrap_or_default().to_string();
-        // Take title between - and :
-        // let title = self.title.clone();
-        // let title = title.split('-').nth(1)?.trim().to_string();
-        // let title = title.split(':').nth(0)?.trim().to_string();
         Some(ContextChip {
             id: self.id.clone(),
             // name: "article".to_string(),
@@ -163,28 +136,10 @@ mod tests {
             "https://example.com/article".to_string(),
             "Test Article".to_string(),
             "This is a test article with some content.".to_string(),
-            Some("Test Author".to_string()),
-            Some("2024-01-01".to_string()),
         );
 
         assert_eq!(asset.id, "test-id");
         assert_eq!(asset.title, "Test Article");
-        assert_eq!(asset.author, Some("Test Author".to_string()));
-        assert_eq!(asset.word_count, 8_usize);
-    }
-
-    #[test]
-    fn test_word_count() {
-        let asset = ArticleAsset::new(
-            "test-id".to_string(),
-            "https://example.com/article".to_string(),
-            "Test Article".to_string(),
-            "One two three four five".to_string(),
-            None,
-            None,
-        );
-
-        assert_eq!(asset.word_count, 5);
     }
 
     #[test]
@@ -194,8 +149,6 @@ mod tests {
             "https://example.com/article".to_string(),
             "Test Article".to_string(),
             "Content".to_string(),
-            None,
-            None,
         );
 
         let chip = asset.get_context_chip().unwrap();
@@ -212,8 +165,6 @@ mod tests {
             "https://example.com/article".to_string(),
             "Test Article".to_string(),
             "This is a test article with some content.".to_string(),
-            Some("Test Author".to_string()),
-            Some("2024-01-01".to_string()),
         );
         let messages = AssetFunctionality::construct_messages(&asset);
         let msg = messages[0].clone();
