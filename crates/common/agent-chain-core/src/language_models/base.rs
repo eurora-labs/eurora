@@ -14,6 +14,7 @@ use serde_json::Value;
 use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
+use crate::globals::get_verbose;
 use crate::messages::{AIMessage, BaseMessage, BaseMessageTrait};
 use crate::outputs::LLMResult;
 
@@ -88,6 +89,14 @@ impl LangSmithParams {
         self.ls_stop = Some(stop);
         self
     }
+}
+
+/// Get the global verbosity setting.
+///
+/// This is a helper function that returns the global verbose setting.
+/// Python equivalent: `_get_verbosity()` in `langchain_core.language_models.base`
+pub fn get_verbosity() -> bool {
+    get_verbose()
 }
 
 use crate::prompt_values::{ChatPromptValue, ImagePromptValue, StringPromptValue};
@@ -227,6 +236,11 @@ impl LanguageModelOutput {
     }
 }
 
+/// Custom tokenizer function type.
+///
+/// This is used when a custom tokenizer is provided for get_token_ids.
+pub type CustomGetTokenIds = fn(&str) -> Vec<u32>;
+
 /// Configuration for a language model.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LanguageModelConfig {
@@ -239,6 +253,8 @@ pub struct LanguageModelConfig {
     pub cache: Option<bool>,
 
     /// Whether to print verbose output.
+    ///
+    /// If `None` at initialization, will default to global verbose setting.
     #[serde(default)]
     pub verbose: bool,
 
@@ -249,6 +265,12 @@ pub struct LanguageModelConfig {
     /// Metadata to add to the run trace.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, Value>>,
+
+    /// Custom function for tokenizing text.
+    ///
+    /// If provided, this function will be used instead of the default tokenizer.
+    #[serde(skip)]
+    pub custom_get_token_ids: Option<CustomGetTokenIds>,
 }
 
 impl LanguageModelConfig {
@@ -278,6 +300,15 @@ impl LanguageModelConfig {
     /// Set metadata.
     pub fn with_metadata(mut self, metadata: HashMap<String, Value>) -> Self {
         self.metadata = Some(metadata);
+        self
+    }
+
+    /// Set a custom tokenizer function.
+    ///
+    /// If provided, this function will be used instead of the default tokenizer
+    /// when calling `get_token_ids` on a model using this configuration.
+    pub fn with_custom_get_token_ids(mut self, tokenizer: CustomGetTokenIds) -> Self {
+        self.custom_get_token_ids = Some(tokenizer);
         self
     }
 }
