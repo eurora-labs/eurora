@@ -21,35 +21,35 @@ pub fn parse_data_uri(uri: &str) -> Option<DataUriInfo> {
     if !uri.starts_with("data:") {
         return None;
     }
-    
+
     let without_prefix = &uri[5..]; // Remove "data:"
-    
+
     let parts: Vec<&str> = without_prefix.splitn(2, ';').collect();
     if parts.len() != 2 {
         return None;
     }
-    
+
     let mime_type = parts[0];
     if mime_type.is_empty() {
         return None;
     }
-    
+
     let remaining = parts[1];
     let data_parts: Vec<&str> = remaining.splitn(2, ',').collect();
     if data_parts.len() != 2 {
         return None;
     }
-    
+
     let encoding = data_parts[0];
     if encoding != "base64" {
         return None;
     }
-    
+
     let data = data_parts[1];
     if data.is_empty() {
         return None;
     }
-    
+
     Some(DataUriInfo {
         source_type: "base64".to_string(),
         mime_type: mime_type.to_string(),
@@ -58,59 +58,58 @@ pub fn parse_data_uri(uri: &str) -> Option<DataUriInfo> {
 }
 
 /// Check if a block is an OpenAI data block
-pub fn is_openai_data_block(block: &HashMap<String, serde_json::Value>, filter: Option<&str>) -> bool {
+pub fn is_openai_data_block(
+    block: &HashMap<String, serde_json::Value>,
+    filter: Option<&str>,
+) -> bool {
     let block_type = match block.get("type") {
         Some(serde_json::Value::String(t)) => t,
         _ => return false,
     };
-    
+
     // Check filter if provided
     if let Some(f) = filter {
         match (block_type.as_str(), f) {
-            ("image_url", "image") => {},
-            ("input_audio", "audio") => {},
-            ("file", "file") => {},
+            ("image_url", "image") => {}
+            ("input_audio", "audio") => {}
+            ("file", "file") => {}
             _ => return false,
         }
     }
-    
+
     match block_type.as_str() {
         "image_url" => {
             // Must have image_url.url
-            if let Some(image_url) = block.get("image_url") {
-                if let Some(obj) = image_url.as_object() {
-                    if let Some(url) = obj.get("url") {
-                        if url.is_string() {
-                            // Check for extra keys (only type, image_url, and optionally detail allowed)
-                            let allowed_keys = if block.contains_key("detail") { 3 } else { 2 };
-                            return block.len() == allowed_keys;
-                        }
-                    }
-                }
+            if let Some(image_url) = block.get("image_url")
+                && let Some(obj) = image_url.as_object()
+                && let Some(url) = obj.get("url")
+                && url.is_string()
+            {
+                // Check for extra keys (only type, image_url, and optionally detail allowed)
+                let allowed_keys = if block.contains_key("detail") { 3 } else { 2 };
+                return block.len() == allowed_keys;
             }
             false
         }
         "input_audio" => {
             // Must have input_audio.data and input_audio.format
-            if let Some(input_audio) = block.get("input_audio") {
-                if let Some(obj) = input_audio.as_object() {
-                    if let Some(data) = obj.get("data") {
-                        if let Some(format) = obj.get("format") {
-                            return data.is_string() && format.is_string() && block.len() == 2;
-                        }
-                    }
-                }
+            if let Some(input_audio) = block.get("input_audio")
+                && let Some(obj) = input_audio.as_object()
+                && let Some(data) = obj.get("data")
+                && let Some(format) = obj.get("format")
+            {
+                return data.is_string() && format.is_string() && block.len() == 2;
             }
             false
         }
         "file" => {
             // Must have file.file_data or file.file_id
-            if let Some(file) = block.get("file") {
-                if let Some(obj) = file.as_object() {
-                    let has_file_data = obj.get("file_data").map_or(false, |v| v.is_string());
-                    let has_file_id = obj.get("file_id").map_or(false, |v| v.is_string());
-                    return (has_file_data || has_file_id) && block.len() == 2;
-                }
+            if let Some(file) = block.get("file")
+                && let Some(obj) = file.as_object()
+            {
+                let has_file_data = obj.get("file_data").is_some_and(|v| v.is_string());
+                let has_file_id = obj.get("file_id").is_some_and(|v| v.is_string());
+                return (has_file_data || has_file_id) && block.len() == 2;
             }
             false
         }
@@ -124,7 +123,10 @@ mod test_is_openai_data_block {
     use serde_json::json;
 
     fn to_hashmap(value: serde_json::Value) -> HashMap<String, serde_json::Value> {
-        value.as_object().unwrap().iter()
+        value
+            .as_object()
+            .unwrap()
+            .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
     }
@@ -137,7 +139,7 @@ mod test_is_openai_data_block {
             "type": "image_url",
             "image_url": {"url": "https://example.com/image.png"},
         }));
-        assert_eq!(is_openai_data_block(&block, None), true);
+        assert!(is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -147,7 +149,7 @@ mod test_is_openai_data_block {
             "image_url": {"url": "https://example.com/image.png", "detail": "high"},
             "detail": "high",
         }));
-        assert_eq!(is_openai_data_block(&block, None), true);
+        assert!(is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -156,7 +158,7 @@ mod test_is_openai_data_block {
             "type": "image_url",
             "image_url": {"url": "https://example.com/image.png"},
         }));
-        assert_eq!(is_openai_data_block(&block, Some("image")), true);
+        assert!(is_openai_data_block(&block, Some("image")));
     }
 
     #[test]
@@ -165,7 +167,7 @@ mod test_is_openai_data_block {
             "type": "image_url",
             "image_url": {"url": "https://example.com/image.png"},
         }));
-        assert_eq!(is_openai_data_block(&block, Some("audio")), false);
+        assert!(!is_openai_data_block(&block, Some("audio")));
     }
 
     #[test]
@@ -174,7 +176,7 @@ mod test_is_openai_data_block {
             "type": "image_url",
             "image_url": {"url": "https://example.com/image.png"},
         }));
-        assert_eq!(is_openai_data_block(&block, Some("file")), false);
+        assert!(!is_openai_data_block(&block, Some("file")));
     }
 
     #[test]
@@ -183,7 +185,7 @@ mod test_is_openai_data_block {
             "type": "image_url",
             "image_url": {},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -192,7 +194,7 @@ mod test_is_openai_data_block {
             "type": "image_url",
             "image_url": {"url": 123},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -201,7 +203,7 @@ mod test_is_openai_data_block {
             "type": "image_url",
             "image_url": "https://example.com/image.png",
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -211,7 +213,7 @@ mod test_is_openai_data_block {
             "image_url": {"url": "https://example.com/image.png"},
             "extra_key": "value",
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     // --- Input audio blocks ---
@@ -222,7 +224,7 @@ mod test_is_openai_data_block {
             "type": "input_audio",
             "input_audio": {"data": "base64data", "format": "wav"},
         }));
-        assert_eq!(is_openai_data_block(&block, None), true);
+        assert!(is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -231,7 +233,7 @@ mod test_is_openai_data_block {
             "type": "input_audio",
             "input_audio": {"data": "base64data", "format": "mp3"},
         }));
-        assert_eq!(is_openai_data_block(&block, Some("audio")), true);
+        assert!(is_openai_data_block(&block, Some("audio")));
     }
 
     #[test]
@@ -240,7 +242,7 @@ mod test_is_openai_data_block {
             "type": "input_audio",
             "input_audio": {"data": "base64data", "format": "wav"},
         }));
-        assert_eq!(is_openai_data_block(&block, Some("image")), false);
+        assert!(!is_openai_data_block(&block, Some("image")));
     }
 
     #[test]
@@ -249,7 +251,7 @@ mod test_is_openai_data_block {
             "type": "input_audio",
             "input_audio": {"format": "wav"},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -258,7 +260,7 @@ mod test_is_openai_data_block {
             "type": "input_audio",
             "input_audio": {"data": "base64data"},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -267,7 +269,7 @@ mod test_is_openai_data_block {
             "type": "input_audio",
             "input_audio": {"data": 123, "format": "wav"},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -276,7 +278,7 @@ mod test_is_openai_data_block {
             "type": "input_audio",
             "input_audio": {"data": "base64data", "format": 123},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -285,7 +287,7 @@ mod test_is_openai_data_block {
             "type": "input_audio",
             "input_audio": "base64data",
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     // --- File blocks ---
@@ -296,7 +298,7 @@ mod test_is_openai_data_block {
             "type": "file",
             "file": {"file_data": "base64data"},
         }));
-        assert_eq!(is_openai_data_block(&block, None), true);
+        assert!(is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -305,7 +307,7 @@ mod test_is_openai_data_block {
             "type": "file",
             "file": {"file_id": "file-123"},
         }));
-        assert_eq!(is_openai_data_block(&block, None), true);
+        assert!(is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -314,7 +316,7 @@ mod test_is_openai_data_block {
             "type": "file",
             "file": {"file_data": "base64data"},
         }));
-        assert_eq!(is_openai_data_block(&block, Some("file")), true);
+        assert!(is_openai_data_block(&block, Some("file")));
     }
 
     #[test]
@@ -323,7 +325,7 @@ mod test_is_openai_data_block {
             "type": "file",
             "file": {"file_data": "base64data"},
         }));
-        assert_eq!(is_openai_data_block(&block, Some("image")), false);
+        assert!(!is_openai_data_block(&block, Some("image")));
     }
 
     #[test]
@@ -332,7 +334,7 @@ mod test_is_openai_data_block {
             "type": "file",
             "file": {"filename": "test.pdf"},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -341,7 +343,7 @@ mod test_is_openai_data_block {
             "type": "file",
             "file": {"file_data": 123},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -350,7 +352,7 @@ mod test_is_openai_data_block {
             "type": "file",
             "file": {"file_id": 123},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -359,7 +361,7 @@ mod test_is_openai_data_block {
             "type": "file",
             "file": "base64data",
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     // --- Invalid/unknown types ---
@@ -370,7 +372,7 @@ mod test_is_openai_data_block {
             "type": "unknown",
             "data": "something",
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -379,7 +381,7 @@ mod test_is_openai_data_block {
             "type": "text",
             "text": "Hello world",
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
@@ -387,13 +389,13 @@ mod test_is_openai_data_block {
         let block = to_hashmap(json!({
             "image_url": {"url": "https://example.com/image.png"},
         }));
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 
     #[test]
     fn test_empty_block() {
         let block: HashMap<String, serde_json::Value> = HashMap::new();
-        assert_eq!(is_openai_data_block(&block, None), false);
+        assert!(!is_openai_data_block(&block, None));
     }
 }
 
@@ -497,37 +499,32 @@ mod test_parse_data_uri {
 mod test_ensure_message_copy {
     // Tests for _ensure_message_copy function
     // Python equivalent: TestEnsureMessageCopy
-    
+
     #[test]
+    #[ignore = "TODO: Implement once HumanMessage and message copying are available"]
     fn test_creates_copy_when_same_reference() {
         // Test that a copy is created when message and formatted_message are same
         // Python equivalent: test_creates_copy_when_same_reference()
-        
-        // TODO: Implement once HumanMessage and message copying are available
         // Expected behavior:
         // let message = HumanMessage::new(vec![ContentBlock::Text("Hello")]);
         // let formatted_message = &message; // Same reference
         // let result = ensure_message_copy(&message, formatted_message);
         // assert!(result != &message);
-        assert!(true, "Placeholder for test_creates_copy_when_same_reference");
     }
-    
+
     #[test]
+    #[ignore = "TODO: Implement once message copying is available"]
     fn test_returns_existing_copy_when_different_reference() {
         // Test that existing copy is returned when already different
         // Python equivalent: test_returns_existing_copy_when_different_reference()
-        
-        // TODO: Implement once message copying is available
-        assert!(true, "Placeholder for test_returns_existing_copy_when_different_reference");
     }
-    
+
     #[test]
     fn test_content_is_shallow_copied() {
         // Test that content list is shallow copied
         // Python equivalent: test_content_is_shallow_copied()
-        
+
         // TODO: Implement once message content handling is available
-        assert!(true, "Placeholder for test_content_is_shallow_copied");
     }
 }
 
@@ -535,12 +532,12 @@ mod test_ensure_message_copy {
 mod test_update_content_block {
     // Tests for _update_content_block function
     // Python equivalent: TestUpdateContentBlock
-    
+
     #[test]
     fn test_updates_content_block_at_index() {
         // Test updating content block at specific index
         // Python equivalent: test_updates_content_block_at_index()
-        
+
         // TODO: Implement once message content mutation is available
         // Expected behavior:
         // let mut message = HumanMessage::new(vec![
@@ -550,16 +547,14 @@ mod test_update_content_block {
         // let new_block = ContentBlock::Image { url: "https://example.com/image.png" };
         // update_content_block(&mut message, 1, new_block);
         // assert_eq!(message.content[1], new_block);
-        assert!(true, "Placeholder for test_updates_content_block_at_index");
     }
-    
+
     #[test]
     fn test_updates_first_block() {
         // Test updating first content block
         // Python equivalent: test_updates_first_block()
-        
+
         // TODO: Implement once message content mutation is available
-        assert!(true, "Placeholder for test_updates_first_block");
     }
 }
 
@@ -567,54 +562,47 @@ mod test_update_content_block {
 mod test_update_message_content_to_blocks {
     // Tests for _update_message_content_to_blocks function
     // Python equivalent: TestUpdateMessageContentToBlocks
-    
+
     #[test]
+    #[ignore = "TODO: Implement once content block versioning is available"]
     fn test_updates_content_to_content_blocks() {
         // Test that content is updated to content_blocks format
         // Python equivalent: test_updates_content_to_content_blocks()
-        
-        // TODO: Implement once content block versioning is available
         // Expected behavior:
         // let message = AIMessage::new("Hello world");
         // let result = update_message_content_to_blocks(&message, "v1");
         // assert_eq!(result.content, message.content_blocks);
         // assert_eq!(result.response_metadata["output_version"], "v1");
-        assert!(true, "Placeholder for test_updates_content_to_content_blocks");
     }
-    
+
     #[test]
     fn test_preserves_original_message() {
         // Test that original message is not modified
         // Python equivalent: test_preserves_original_message()
-        
+
         // TODO: Implement once message immutability is enforced
-        assert!(true, "Placeholder for test_preserves_original_message");
     }
-    
+
     #[test]
     fn test_with_complex_content() {
         // Test with complex content blocks
         // Python equivalent: test_with_complex_content()
-        
+
         // TODO: Implement once complex content blocks are available
-        assert!(true, "Placeholder for test_with_complex_content");
     }
-    
+
     #[test]
     fn test_with_different_output_version() {
         // Test with different output version string
         // Python equivalent: test_with_different_output_version()
-        
+
         // TODO: Implement once output versioning is available
-        assert!(true, "Placeholder for test_with_different_output_version");
     }
-    
+
     #[test]
+    #[ignore = "TODO: Implement once response_metadata is available"]
     fn test_preserves_existing_response_metadata() {
         // Test that existing response_metadata is preserved
         // Python equivalent: test_preserves_existing_response_metadata()
-        
-        // TODO: Implement once response_metadata is available
-        assert!(true, "Placeholder for test_preserves_existing_response_metadata");
     }
 }

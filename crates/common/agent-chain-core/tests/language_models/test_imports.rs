@@ -30,10 +30,14 @@ fn test_all_imports() {
     // Note: This test validates that the expected types/functions are available
     // The actual implementation would check these exports exist in the module
     // For now, this serves as documentation of what should be exported
-    
+
     // In Rust, we'd typically use type assertions to verify exports exist:
     // let _: fn() -> BaseLanguageModel;
     // But since the types don't exist yet, we just document them here
-    
-    assert_eq!(EXPECTED_ALL.len(), 19, "Expected 19 exports from language_models module");
+
+    assert_eq!(
+        EXPECTED_ALL.len(),
+        19,
+        "Expected 19 exports from language_models module"
+    );
 }
