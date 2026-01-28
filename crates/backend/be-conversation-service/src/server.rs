@@ -22,7 +22,8 @@ use proto_gen::conversation::{
     AddHumanMessageRequest, AddHumanMessageResponse, AddSystemMessageRequest,
     AddSystemMessageResponse, ChatStreamRequest, ChatStreamResponse, Conversation,
     CreateConversationRequest, CreateConversationResponse, GetConversationResponse,
-    GetMessagesRequest, GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
+    GetConversationTitleRequest, GetConversationTitleResponse, GetMessagesRequest,
+    GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
 };
 
 pub use proto_gen::conversation::proto_conversation_service_server::{
@@ -32,7 +33,8 @@ pub use proto_gen::conversation::proto_conversation_service_server::{
 /// The main conversation service
 #[derive(Debug)]
 pub struct ConversationService {
-    provider: ChatOpenAI,
+    chat_provider: ChatOpenAI,
+    _title_provider: ChatOpenAI,
     db: Arc<DatabaseManager>,
 }
 
@@ -47,11 +49,17 @@ impl ConversationService {
         });
         let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
 
-        let provider = ChatOpenAI::new(&model)
+        let chat_provider = ChatOpenAI::new(&model)
             .with_builtin_tools(vec![BuiltinTool::WebSearch])
-            .api_key(api_key);
+            .api_key(api_key.clone());
 
-        Ok(Self { provider, db })
+        let _title_provider = ChatOpenAI::new("gpt-4.1-mini").api_key(api_key.clone());
+
+        Ok(Self {
+            chat_provider,
+            _title_provider,
+            db,
+        })
     }
 
     /// Convert a database Conversation to a proto Conversation
@@ -255,11 +263,6 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
-        debug!(
-            "ChatStream: user_id = {}, conversation_id = {}",
-            user_id, conversation_id
-        );
-
         let db_messages = self
             .db
             .list_messages(
@@ -294,7 +297,7 @@ impl ProtoConversationService for ConversationService {
             .map_err(ConversationServiceError::from)?;
 
         let openai_stream = self
-            .provider
+            .chat_provider
             .astream(messages.into(), None)
             .await
             .map_err(|e| {
@@ -412,5 +415,45 @@ impl ProtoConversationService for ConversationService {
         Ok(Response::new(GetConversationResponse {
             conversation: conversation.try_into().ok(),
         }))
+    }
+
+    async fn get_conversation_title(
+        &self,
+        request: tonic::Request<GetConversationTitleRequest>,
+    ) -> Result<Response<GetConversationTitleResponse>, Status> {
+        info!("Get conversation title request received");
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        let db_messages = self
+            .db
+            .list_messages(
+                ListMessages {
+                    conversation_id,
+                    user_id,
+                },
+                PaginationParams::new(0, 5, "DESC".to_string()),
+            )
+            .await
+            .unwrap();
+
+        let mut messages: Vec<BaseMessage> = db_messages
+            .into_iter()
+            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
+            .collect();
+
+        messages.push(HumanMessage::new(req.content.clone()).into());
+
+        let title = "New Chat".to_string();
+        // let title = self.title_provider.chat(messages).await.unwrap();
+        Ok(Response::new(GetConversationTitleResponse { title }))
     }
 }
