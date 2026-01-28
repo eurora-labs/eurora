@@ -11,6 +11,7 @@ use agent_chain_core::language_models::{
 };
 use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
 use agent_chain_core::prompt_values::StringPromptValue;
+use serial_test::serial;
 
 #[cfg(test)]
 mod test_lang_smith_params {
@@ -167,6 +168,7 @@ mod test_get_verbosity {
     use super::*;
 
     #[test]
+    #[serial]
     fn test_get_verbosity_returns_global_verbose() {
         // Test get_verbosity returns global verbose setting
         // Python equivalent: test_get_verbosity_returns_global_verbose()
@@ -187,6 +189,7 @@ mod test_get_verbosity {
     }
 
     #[test]
+    #[serial]
     fn test_get_verbosity_matches_get_verbose() {
         // Test that get_verbosity() matches get_verbose()
         let original = get_verbose();

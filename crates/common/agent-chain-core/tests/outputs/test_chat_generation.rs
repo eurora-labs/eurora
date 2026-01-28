@@ -155,7 +155,7 @@ mod test_chat_generation_chunk {
 
     /// Test concatenating empty list using merge function.
     #[test]
-    fn test_add_empty_list() {
+    fn test_merge_single_chunk_via_function() {
         let msg = AIMessage::new("test");
         let chunk = ChatGenerationChunk::new(msg.into());
         // In Rust, we use merge_chat_generation_chunks for list merging
