@@ -103,8 +103,9 @@ message AddSystemMessageResponse {
 
 message GenerateConversationTitleRequest {
   string conversation_id = 1;
+  string content = 2;
 }
 
 message GenerateConversationTitleResponse {
-  string title = 1;
+  Conversation conversation = 1;
 }

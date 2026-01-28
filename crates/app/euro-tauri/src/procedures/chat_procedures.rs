@@ -47,6 +47,7 @@ impl ChatApi for ChatApiImpl {
         let timeline = timeline_state.lock().await;
         let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
         let mut conversation_manager = conversation_state.lock().await;
+        let mut conversation_id = conversation_id;
 
         let event = posthog_rs::Event::new_anon("send_query");
         tauri::async_runtime::spawn(async move {
@@ -60,6 +61,7 @@ impl ChatApi for ChatApiImpl {
                 .ensure_remote_conversation()
                 .await
                 .expect("Failed to ensure remote conversation");
+            conversation_id = Some(conversation.id().unwrap().to_string());
             TauRpcConversationApiEventTrigger::new(app_handle.clone())
                 .new_conversation_added(conversation.into())
                 .expect("Failed to trigger new conversation added event");
@@ -102,6 +104,27 @@ impl ChatApi for ChatApiImpl {
                     }
                 }
             }
+        }
+
+        // Create new thread to handle conversation title generation
+        let title_app_handle = app_handle.clone();
+        let content = query.text.clone();
+        if let Some(id) = conversation_id {
+            tokio::spawn(async move {
+                let app_handle = title_app_handle.clone();
+                let conversation_state: tauri::State<SharedConversationManager> =
+                    app_handle.state();
+                let conversation_manager = conversation_state.lock().await;
+                let conversation = conversation_manager
+                    .generate_conversation_title(id, content)
+                    .await
+                    .map_err(|e| format!("Failed to generate conversation title: {e}"));
+                if let Ok(conversation) = conversation {
+                    TauRpcConversationApiEventTrigger::new(title_app_handle)
+                        .conversation_title_changed(conversation.into())
+                        .expect("Failed to send conversation title");
+                }
+            });
         }
 
         let mut complete_response = String::new();

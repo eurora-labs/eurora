@@ -456,6 +456,8 @@ impl ProtoConversationService for ConversationService {
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
+        messages.push(HumanMessage::new(req.content).into());
+
         // Add a system message to front
         messages.push(
             SystemMessage::new(
@@ -479,7 +481,8 @@ impl ProtoConversationService for ConversationService {
         let title_words: Vec<&str> = message.content.split_whitespace().collect();
         let title = title_words[..title_words.len().min(6)].join(" ");
 
-        self.db
+        let conversation = self
+            .db
             .update_conversation()
             .id(conversation_id)
             .user_id(user_id)
@@ -488,6 +491,8 @@ impl ProtoConversationService for ConversationService {
             .await
             .unwrap();
 
-        Ok(Response::new(GenerateConversationTitleResponse { title }))
+        Ok(Response::new(GenerateConversationTitleResponse {
+            conversation: Some(Self::db_conversation_to_proto(conversation)),
+        }))
     }
 }

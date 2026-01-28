@@ -81,7 +81,7 @@ impl ConversationManager {
                 self.current_conversation
                     .set_id(uuid::Uuid::parse_str(&conversation.id).unwrap())?;
             }
-            Ok(Conversation::default())
+            Ok(conversation.into())
         } else {
             Err(Error::CreateConversation(
                 "Server did not return the saved conversation".to_string(),
@@ -173,14 +173,26 @@ impl ConversationManager {
             .collect())
     }
 
-    pub async fn generate_conversation_title(&self, conversation_id: String) -> Result<String> {
+    pub async fn generate_conversation_title(
+        &self,
+        conversation_id: String,
+        content: String,
+    ) -> Result<Conversation> {
         let mut client = self.conversation_client.clone();
         let response = client
-            .generate_conversation_title(GenerateConversationTitleRequest { conversation_id })
+            .generate_conversation_title(GenerateConversationTitleRequest {
+                conversation_id,
+                content,
+            })
             .await?
             .into_inner();
 
-        Ok(response.title)
+        match response.conversation {
+            Some(conversation) => Ok(conversation.into()),
+            None => Err(Error::UpdateConversation(
+                "Conversation title could not be generated".to_string(),
+            )),
+        }
     }
 }
 
