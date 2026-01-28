@@ -19,18 +19,18 @@ pub struct ModelProfile {
     pub video_inputs: Option<bool>,
     pub image_tool_message: Option<bool>,
     pub pdf_tool_message: Option<bool>,
-    
+
     // Output constraints
     pub max_output_tokens: Option<i64>,
     pub reasoning_output: Option<bool>,
     pub image_outputs: Option<bool>,
     pub audio_outputs: Option<bool>,
     pub video_outputs: Option<bool>,
-    
+
     // Tool calling
     pub tool_calling: Option<bool>,
     pub tool_choice: Option<bool>,
-    
+
     // Structured output
     pub structured_output: Option<bool>,
 }
@@ -39,7 +39,7 @@ pub struct ModelProfile {
 pub type ModelProfileRegistry = HashMap<String, ModelProfile>;
 
 #[cfg(test)]
-mod test_model_profile {
+mod model_profile_tests {
     use super::*;
 
     #[test]
@@ -54,18 +54,18 @@ mod test_model_profile {
             video_inputs: Some(false),
             image_tool_message: Some(true),
             pdf_tool_message: Some(false),
-            
+
             // Output constraints
             max_output_tokens: Some(4096),
             reasoning_output: Some(true),
             image_outputs: Some(false),
             audio_outputs: Some(true),
             video_outputs: Some(false),
-            
+
             // Tool calling
             tool_calling: Some(true),
             tool_choice: Some(true),
-            
+
             // Structured output
             structured_output: Some(true),
         };
@@ -146,7 +146,7 @@ mod test_model_profile {
     #[test]
     fn test_model_profile_empty() {
         let profile = ModelProfile::default();
-        
+
         assert_eq!(profile.max_input_tokens, None);
         assert_eq!(profile.tool_calling, None);
         assert_eq!(profile.structured_output, None);
@@ -255,14 +255,17 @@ mod test_model_profile_registry {
         );
 
         assert!(registry.contains_key("gpt-4"));
-        assert_eq!(registry.get("gpt-4").unwrap().max_input_tokens, Some(128000));
+        assert_eq!(
+            registry.get("gpt-4").unwrap().max_input_tokens,
+            Some(128000)
+        );
         assert_eq!(registry.get("gpt-4").unwrap().tool_calling, Some(true));
     }
 
     #[test]
     fn test_model_profile_registry_multiple_models() {
         let mut registry: ModelProfileRegistry = HashMap::new();
-        
+
         registry.insert(
             "gpt-4".to_string(),
             ModelProfile {
@@ -272,7 +275,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "gpt-3.5-turbo".to_string(),
             ModelProfile {
@@ -282,7 +285,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "claude-3-opus".to_string(),
             ModelProfile {
@@ -295,15 +298,24 @@ mod test_model_profile_registry {
         );
 
         assert_eq!(registry.len(), 3);
-        assert_eq!(registry.get("gpt-4").unwrap().max_input_tokens, Some(128000));
-        assert_eq!(registry.get("gpt-3.5-turbo").unwrap().max_input_tokens, Some(16385));
-        assert_eq!(registry.get("claude-3-opus").unwrap().pdf_inputs, Some(true));
+        assert_eq!(
+            registry.get("gpt-4").unwrap().max_input_tokens,
+            Some(128000)
+        );
+        assert_eq!(
+            registry.get("gpt-3.5-turbo").unwrap().max_input_tokens,
+            Some(16385)
+        );
+        assert_eq!(
+            registry.get("claude-3-opus").unwrap().pdf_inputs,
+            Some(true)
+        );
     }
 
     #[test]
     fn test_model_profile_registry_lookup() {
         let mut registry: ModelProfileRegistry = HashMap::new();
-        
+
         registry.insert(
             "model-a".to_string(),
             ModelProfile {
@@ -311,7 +323,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "model-b".to_string(),
             ModelProfile {
@@ -334,16 +346,14 @@ mod test_model_profile_registry {
             max_input_tokens: Some(0),
             ..Default::default()
         };
-        let result = registry
-            .get("model-c")
-            .unwrap_or(&default_profile);
+        let result = registry.get("model-c").unwrap_or(&default_profile);
         assert_eq!(result.max_input_tokens, Some(0));
     }
 
     #[test]
     fn test_model_profile_registry_iteration() {
         let mut registry: ModelProfileRegistry = HashMap::new();
-        
+
         registry.insert(
             "model-1".to_string(),
             ModelProfile {
@@ -351,7 +361,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "model-2".to_string(),
             ModelProfile {
@@ -359,7 +369,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "model-3".to_string(),
             ModelProfile {
@@ -384,7 +394,7 @@ mod test_model_profile_registry {
     #[test]
     fn test_model_profile_registry_update() {
         let mut registry: ModelProfileRegistry = HashMap::new();
-        
+
         registry.insert(
             "model-a".to_string(),
             ModelProfile {
@@ -414,14 +424,17 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        assert_eq!(registry.get("model-a").unwrap().max_input_tokens, Some(1500));
+        assert_eq!(
+            registry.get("model-a").unwrap().max_input_tokens,
+            Some(1500)
+        );
         assert_eq!(registry.get("model-a").unwrap().image_inputs, Some(true));
     }
 
     #[test]
     fn test_model_profile_registry_delete() {
         let mut registry: ModelProfileRegistry = HashMap::new();
-        
+
         registry.insert(
             "model-a".to_string(),
             ModelProfile {
@@ -429,7 +442,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "model-b".to_string(),
             ModelProfile {
@@ -447,7 +460,7 @@ mod test_model_profile_registry {
     #[test]
     fn test_model_profile_registry_with_version_suffixes() {
         let mut registry: ModelProfileRegistry = HashMap::new();
-        
+
         registry.insert(
             "gpt-4-0613".to_string(),
             ModelProfile {
@@ -455,7 +468,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "gpt-4-1106-preview".to_string(),
             ModelProfile {
@@ -463,7 +476,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "gpt-4-turbo-2024-04-09".to_string(),
             ModelProfile {
@@ -472,15 +485,27 @@ mod test_model_profile_registry {
             },
         );
 
-        assert_eq!(registry.get("gpt-4-0613").unwrap().max_input_tokens, Some(8192));
-        assert_eq!(registry.get("gpt-4-1106-preview").unwrap().max_input_tokens, Some(128000));
-        assert_eq!(registry.get("gpt-4-turbo-2024-04-09").unwrap().max_input_tokens, Some(128000));
+        assert_eq!(
+            registry.get("gpt-4-0613").unwrap().max_input_tokens,
+            Some(8192)
+        );
+        assert_eq!(
+            registry.get("gpt-4-1106-preview").unwrap().max_input_tokens,
+            Some(128000)
+        );
+        assert_eq!(
+            registry
+                .get("gpt-4-turbo-2024-04-09")
+                .unwrap()
+                .max_input_tokens,
+            Some(128000)
+        );
     }
 
     #[test]
     fn test_model_profile_registry_provider_namespaced() {
         let mut registry: ModelProfileRegistry = HashMap::new();
-        
+
         registry.insert(
             "openai/gpt-4".to_string(),
             ModelProfile {
@@ -489,7 +514,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "anthropic/claude-3-opus".to_string(),
             ModelProfile {
@@ -498,7 +523,7 @@ mod test_model_profile_registry {
                 ..Default::default()
             },
         );
-        
+
         registry.insert(
             "google/gemini-pro".to_string(),
             ModelProfile {
