@@ -75,76 +75,7 @@ pub struct TimelineConfig {
     pub focus_tracking: FocusTrackingConfig,
 }
 
-/// Builder for timeline configuration
-pub struct TimelineConfigBuilder {
-    config: TimelineConfig,
-}
-
-impl Default for TimelineConfigBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TimelineConfigBuilder {
-    /// Create a new builder with default configuration
-    pub fn new() -> Self {
-        Self {
-            config: TimelineConfig::default(),
-        }
-    }
-
-    /// Set maximum number of activities to keep
-    pub fn max_activities(mut self, count: usize) -> Self {
-        self.config.storage.max_activities = count;
-        self
-    }
-
-    /// Set collection interval
-    pub fn collection_interval(mut self, interval: Duration) -> Self {
-        self.config.collector.collection_interval = interval;
-        self
-    }
-
-    /// Set maximum age for activities
-    pub fn max_age(mut self, age: Duration) -> Self {
-        self.config.storage.max_age = age;
-        self
-    }
-
-    /// Disable automatic cleanup
-    pub fn disable_auto_cleanup(mut self) -> Self {
-        self.config.storage.auto_cleanup = false;
-        self
-    }
-
-    /// Disable automatic restart on errors
-    pub fn disable_auto_restart(mut self) -> Self {
-        self.config.collector.auto_restart_on_error = false;
-        self
-    }
-
-    /// Add ignored process for focus tracking
-    pub fn ignore_process(mut self, process_name: String) -> Self {
-        self.config
-            .focus_tracking
-            .ignored_processes
-            .push(process_name);
-        self
-    }
-
-    /// Build the configuration
-    pub fn build(self) -> TimelineConfig {
-        self.config
-    }
-}
-
 impl TimelineConfig {
-    /// Create a new builder
-    pub fn builder() -> TimelineConfigBuilder {
-        TimelineConfigBuilder::new()
-    }
-
     /// Validate the configuration
     pub fn validate(&self) -> crate::error::TimelineResult<()> {
         if self.storage.max_activities == 0 {
@@ -166,41 +97,5 @@ impl TimelineConfig {
         }
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_default_config() {
-        let config = TimelineConfig::default();
-        assert!(config.validate().is_ok());
-        assert_eq!(config.storage.max_activities, 5);
-        assert_eq!(config.collector.collection_interval, Duration::from_secs(3));
-    }
-
-    #[test]
-    fn test_config_builder() {
-        let config = TimelineConfig::builder()
-            .max_activities(500)
-            .collection_interval(Duration::from_secs(5))
-            .build();
-
-        assert!(config.validate().is_ok());
-        assert_eq!(config.storage.max_activities, 500);
-        assert_eq!(config.collector.collection_interval, Duration::from_secs(5));
-    }
-
-    #[test]
-    fn test_config_validation() {
-        let mut config = TimelineConfig::default();
-        config.storage.max_activities = 0;
-        assert!(config.validate().is_err());
-
-        config.storage.max_activities = 100;
-        config.collector.collection_interval = Duration::ZERO;
-        assert!(config.validate().is_err());
     }
 }

@@ -37,6 +37,14 @@
 				taurpc.conversation.new_conversation_added.on((conversation) => {
 					conversations = [conversation, ...conversations];
 				});
+
+				taurpc.conversation.conversation_title_changed.on((conversation) => {
+					for (const c of conversations) {
+						if (c.id === conversation.id) {
+							c.title = conversation.title;
+						}
+					}
+				});
 			})
 			.catch((error) => {
 				console.error('Failed to check authentication:', error);

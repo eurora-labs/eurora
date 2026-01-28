@@ -10,6 +10,7 @@ use crate::{
         UpdateOAuthCredentials, User,
     },
 };
+use bon::bon;
 use chrono::Utc;
 use sqlx::{
     migrate::MigrateDatabase,
@@ -23,6 +24,7 @@ pub struct DatabaseManager {
     pub pool: PgPool,
 }
 
+#[bon]
 impl DatabaseManager {
     pub async fn new(database_url: &str) -> DbResult<Self> {
         // Create the database if it doesn't exist
@@ -789,6 +791,34 @@ impl DatabaseManager {
         )
         .bind(request.id)
         .bind(request.user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(conversation)
+    }
+
+    /// Update a conversation
+    #[builder]
+    pub async fn update_conversation(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+        title: String,
+    ) -> DbResult<Conversation> {
+        let now = Utc::now().naive_utc();
+
+        let conversation = sqlx::query_as::<_, Conversation>(
+            r#"
+            UPDATE conversations
+            SET title = $1, updated_at = $2
+            WHERE id = $3 AND user_id = $4
+            RETURNING id, user_id, title, created_at, updated_at
+            "#,
+        )
+        .bind(&title)
+        .bind(now)
+        .bind(id)
+        .bind(user_id)
         .fetch_one(&self.pool)
         .await?;
 

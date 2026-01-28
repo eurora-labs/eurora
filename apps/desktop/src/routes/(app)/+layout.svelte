@@ -2,6 +2,7 @@
 	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
+	import Menubar from '$lib/components/Menubar.svelte';
 	import { inject } from '@eurora/shared/context';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
@@ -17,9 +18,6 @@
 		if (document) {
 			document.body.classList.add(`${platform()}-app`);
 		}
-		// taurpcService.timeline.list().then((items) => {
-		// 	timelineItems = items;
-		// });
 
 		taurpcService.timeline.new_app_event.on((e) => {
 			// Limit the items to 5
@@ -36,7 +34,7 @@
 	}
 </script>
 
-<!-- <Menubar /> -->
+<Menubar />
 <Sidebar.Provider open={false}>
 	<MainSidebar />
 	<Sidebar.Inset>

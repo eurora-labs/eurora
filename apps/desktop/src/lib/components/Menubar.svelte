@@ -20,7 +20,3 @@
 			});
 	});
 </script>
-
-<div class="flex items-center justify-end p-4 h-17.5">
-	<div class="flex items-center gap-2"></div>
-</div>

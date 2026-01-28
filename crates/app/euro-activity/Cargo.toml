@@ -16,18 +16,16 @@ base64 = { workspace = true }
 cfg-if = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 dashmap = "6.1.0"
-dirs = { workspace = true }
 enum_dispatch = { workspace = true }
 euro-auth = { workspace = true }
 euro-encrypt = { workspace = true }
-euro-fs = { workspace = true }
 euro-native-messaging = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
 humantime-serde = { workspace = true }
 image = { workspace = true }
 prost-types = { workspace = true }
 proto-gen = { workspace = true }
-regex = "1.12.2"
+regex = { workspace = true }
 resvg = { version = "0.45" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
