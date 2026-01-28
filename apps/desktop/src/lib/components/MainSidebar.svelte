@@ -36,21 +36,14 @@
 
 				taurpc.conversation.new_conversation_added.on((conversation) => {
 					conversations = [conversation, ...conversations];
+				});
 
-					// sleep for 2 seconds
-					const sleep = new Promise((resolve) => setTimeout(resolve, 2000));
-					sleep.then(() => {
-						if (!conversation.id) {
-							return;
+				taurpc.conversation.conversation_title_changed.on((conversation) => {
+					for (const c of conversations) {
+						if (c.id === conversation.id) {
+							c.title = conversation.title;
 						}
-
-						taurpc.conversation
-							.generate_conversation_title(conversation.id)
-							.then((title) => {
-								conversation.title = title;
-								conversations[0].title = title;
-							});
-					});
+					}
 				});
 			})
 			.catch((error) => {

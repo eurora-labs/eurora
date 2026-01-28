@@ -22,6 +22,9 @@ pub trait ConversationApi {
     async fn new_conversation_added(conversation: ConversationView);
 
     #[taurpc(event)]
+    async fn conversation_title_changed(conversation: ConversationView);
+
+    #[taurpc(event)]
     async fn current_conversation_changed(conversation: ConversationView);
 
     async fn switch_conversation<R: Runtime>(
@@ -45,11 +48,6 @@ pub trait ConversationApi {
         limit: u32,
         offset: u32,
     ) -> Result<Vec<MessageView>, String>;
-
-    async fn generate_conversation_title<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
-    ) -> Result<String, String>;
 }
 
 #[derive(Clone)]
@@ -149,20 +147,6 @@ impl ConversationApi for ConversationApiImpl {
             .map_err(|e| e.to_string())?;
 
         Ok(conversation.into())
-    }
-
-    async fn generate_conversation_title<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        conversation_id: String,
-    ) -> Result<String, String> {
-        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
-        let conversation_manager = conversation_state.lock().await;
-
-        conversation_manager
-            .generate_conversation_title(conversation_id)
-            .await
-            .map_err(|e| e.to_string())
     }
 }
 
