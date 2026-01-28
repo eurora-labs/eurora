@@ -264,6 +264,11 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
+        debug!(
+            "ChatStream: user_id = {}, conversation_id = {}",
+            user_id, conversation_id
+        );
+
         let db_messages = self
             .db
             .list_messages(
