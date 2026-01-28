@@ -1492,6 +1492,7 @@ dependencies = [
 name = "be-remote-db"
 version = "0.0.0"
 dependencies = [
+ "bon",
  "chrono",
  "ipnet",
  "prost-types",

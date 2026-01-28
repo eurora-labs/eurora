@@ -1,5 +1,6 @@
 //! Server-side implementation for the Conversation Service.
 
+use agent_chain::SystemMessage;
 use agent_chain::openai::BuiltinTool;
 use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
@@ -21,8 +22,8 @@ use crate::{ConversationServiceResult, converters::convert_db_message_to_base_me
 use proto_gen::conversation::{
     AddHumanMessageRequest, AddHumanMessageResponse, AddSystemMessageRequest,
     AddSystemMessageResponse, ChatStreamRequest, ChatStreamResponse, Conversation,
-    CreateConversationRequest, CreateConversationResponse, GetConversationResponse,
-    GetConversationTitleRequest, GetConversationTitleResponse, GetMessagesRequest,
+    CreateConversationRequest, CreateConversationResponse, GenerateConversationTitleRequest,
+    GenerateConversationTitleResponse, GetConversationResponse, GetMessagesRequest,
     GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
 };
 
@@ -417,11 +418,11 @@ impl ProtoConversationService for ConversationService {
         }))
     }
 
-    async fn get_conversation_title(
+    async fn generate_conversation_title(
         &self,
-        request: tonic::Request<GetConversationTitleRequest>,
-    ) -> Result<Response<GetConversationTitleResponse>, Status> {
-        info!("Get conversation title request received");
+        request: tonic::Request<GenerateConversationTitleRequest>,
+    ) -> Result<Response<GenerateConversationTitleResponse>, Status> {
+        info!("Generate conversation title request received");
         let claims = extract_claims(&request)?;
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
@@ -450,10 +451,38 @@ impl ProtoConversationService for ConversationService {
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
-        messages.push(HumanMessage::new(req.content.clone()).into());
+        // Add a system message to front
+        messages.push(
+            SystemMessage::new(
+                "Generate a title for the past conversation. Your task is:
+                - Return a concise title, max 6 words.
+                - No quotation marks.
+                - Use sentence case.
+                - Summarize the main topic, not the tone.
+                - If the topic is unclear, use a generic title.
+                Output only the title text.
+                "
+                .to_string(),
+            )
+            .into(),
+        );
 
-        let title = "New Chat".to_string();
-        // let title = self.title_provider.chat(messages).await.unwrap();
-        Ok(Response::new(GetConversationTitleResponse { title }))
+        // let title = "New Chat".to_string();
+        let message = self._title_provider.invoke(messages.into()).await.unwrap();
+        // let title = message.content;
+        // Reduce title to max 6 words
+        let title_words: Vec<&str> = message.content.split_whitespace().collect();
+        let title = title_words[..title_words.len().min(6)].join(" ");
+
+        self.db
+            .update_conversation()
+            .id(conversation_id)
+            .user_id(user_id)
+            .title(title.clone())
+            .call()
+            .await
+            .unwrap();
+
+        Ok(Response::new(GenerateConversationTitleResponse { title }))
     }
 }

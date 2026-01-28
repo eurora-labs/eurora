@@ -7,7 +7,6 @@ use tauri::{Manager, Runtime};
 pub struct ConversationView {
     pub id: Option<String>,
     pub title: String,
-    // pub messages: Vec<MessageView>,
 }
 
 #[taurpc::ipc_type]
@@ -46,6 +45,11 @@ pub trait ConversationApi {
         limit: u32,
         offset: u32,
     ) -> Result<Vec<MessageView>, String>;
+
+    async fn generate_conversation_title<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
+    ) -> Result<String, String>;
 }
 
 #[derive(Clone)]
@@ -145,29 +149,20 @@ impl ConversationApi for ConversationApiImpl {
             .map_err(|e| e.to_string())?;
 
         Ok(conversation.into())
+    }
 
-        // todo!("Implement switch_conversation")
-        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
+    async fn generate_conversation_title<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        conversation_id: String,
+    ) -> Result<String, String> {
+        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        let conversation_manager = conversation_state.lock().await;
 
-        // let conversation = personal_db
-        //     .get_conversation(&conversation_id)
-        //     .await
-        //     .map_err(|e| format!("Failed to get conversation: {}", e))?;
-
-        // let current = app_handle.state::<SharedCurrentConversation>();
-        // let mut guard = current.lock().await;
-        // *guard = Some(conversation.clone());
-
-        // TauRpcChatApiEventTrigger::new(app_handle.clone())
-        //     .current_conversation_changed(conversation.clone())
-        //     .map_err(|e| e.to_string())?;
-
-        // let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
-        // let conversation_manager = conversation_state.lock().await;
-        // Ok(conversation_manager
-        //     .get_current_conversation()
-        //     .await
-        //     .clone())
+        conversation_manager
+            .generate_conversation_title(conversation_id)
+            .await
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -176,11 +171,6 @@ impl From<Conversation> for ConversationView {
         ConversationView {
             id: conversation.id().map(|id| id.to_string()),
             title: conversation.title().to_string(),
-            // messages: conversation
-            //     .messages()
-            //     .iter()
-            //     .map(MessageView::from)
-            //     .collect(),
         }
     }
 }
