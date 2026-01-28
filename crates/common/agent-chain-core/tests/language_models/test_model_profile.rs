@@ -1,42 +1,7 @@
 //! Tests for model_profile module.
-//!
-//! Mirrors `langchain/libs/core/tests/unit_tests/language_models/test_model_profile.py`
 
+use agent_chain_core::{ModelProfile, ModelProfileRegistry};
 use std::collections::HashMap;
-
-// Note: These types would be defined in the actual language_models module
-// For now, we define them here to match the Python TypedDict structure
-
-/// ModelProfile represents capabilities and constraints of a language model
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ModelProfile {
-    // Input constraints
-    pub max_input_tokens: Option<i64>,
-    pub image_inputs: Option<bool>,
-    pub image_url_inputs: Option<bool>,
-    pub pdf_inputs: Option<bool>,
-    pub audio_inputs: Option<bool>,
-    pub video_inputs: Option<bool>,
-    pub image_tool_message: Option<bool>,
-    pub pdf_tool_message: Option<bool>,
-
-    // Output constraints
-    pub max_output_tokens: Option<i64>,
-    pub reasoning_output: Option<bool>,
-    pub image_outputs: Option<bool>,
-    pub audio_outputs: Option<bool>,
-    pub video_outputs: Option<bool>,
-
-    // Tool calling
-    pub tool_calling: Option<bool>,
-    pub tool_choice: Option<bool>,
-
-    // Structured output
-    pub structured_output: Option<bool>,
-}
-
-/// ModelProfileRegistry is a map of model names to their profiles
-pub type ModelProfileRegistry = HashMap<String, ModelProfile>;
 
 #[cfg(test)]
 mod model_profile_tests {
