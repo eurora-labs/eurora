@@ -23,6 +23,7 @@ euro-native-messaging = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
 humantime-serde = { workspace = true }
 image = { workspace = true }
+prost = { workspace = true }
 prost-types = { workspace = true }
 proto-gen = { workspace = true }
 regex = { workspace = true }
@@ -41,6 +42,7 @@ tokio = { workspace = true, features = [
 ] }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
+tonic-prost = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
 usvg = { version = "0.45" }
@@ -48,6 +50,9 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true }
 
 [features]
 default = []
