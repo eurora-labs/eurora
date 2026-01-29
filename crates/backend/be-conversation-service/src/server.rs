@@ -35,7 +35,7 @@ pub use proto_gen::conversation::proto_conversation_service_server::{
 #[derive(Debug)]
 pub struct ConversationService {
     chat_provider: ChatOpenAI,
-    _title_provider: ChatOpenAI,
+    title_provider: ChatOpenAI,
     db: Arc<DatabaseManager>,
 }
 
@@ -58,7 +58,7 @@ impl ConversationService {
 
         Ok(Self {
             chat_provider,
-            _title_provider,
+            title_provider: _title_provider,
             db,
         })
     }
@@ -458,7 +458,6 @@ impl ProtoConversationService for ConversationService {
 
         messages.push(HumanMessage::new(req.content).into());
 
-        // Add a system message to front
         messages.push(
             SystemMessage::new(
                 "Generate a title for the past conversation. Your task is:
@@ -474,11 +473,11 @@ impl ProtoConversationService for ConversationService {
             .into(),
         );
 
-        // let title = "New Chat".to_string();
-        let message = self._title_provider.invoke(messages.into()).await.unwrap();
-        // let title = message.content;
-        // Reduce title to max 6 words
-        let title_words: Vec<&str> = message.content.split_whitespace().collect();
+        let title = match self.title_provider.invoke(messages.into()).await {
+            Ok(message) => message.content,
+            Err(_) => "New Chat".to_string(),
+        };
+        let title_words: Vec<&str> = title.split_whitespace().collect();
         let title = title_words[..title_words.len().min(6)].join(" ");
 
         let conversation = self

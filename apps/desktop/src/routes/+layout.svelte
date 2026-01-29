@@ -37,7 +37,11 @@
 		if (!isExternal) return;
 
 		event.preventDefault();
-		await openUrl(href);
+		try {
+			await openUrl(href);
+		} catch (error) {
+			console.error('Failed to open URL:', error);
+		}
 	}
 </script>
 

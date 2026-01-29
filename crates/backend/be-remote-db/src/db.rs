@@ -805,7 +805,7 @@ impl DatabaseManager {
         user_id: Uuid,
         title: String,
     ) -> DbResult<Conversation> {
-        let now = Utc::now().naive_utc();
+        let now = Utc::now();
 
         let conversation = sqlx::query_as::<_, Conversation>(
             r#"
