@@ -3453,7 +3453,6 @@ dependencies = [
  "tonic-prost",
  "tonic-prost-build",
  "tracing",
- "tracing-subscriber",
  "url",
  "usvg",
  "uuid",
