@@ -9,6 +9,7 @@ ignored = ["tonic-prost"]
 
 [dependencies]
 anyhow = { workspace = true }
+async-stream = "0.3"
 base64 = { workspace = true }
 ctrlc = "3.5.1"
 enum_dispatch = { workspace = true }

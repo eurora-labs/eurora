@@ -30,7 +30,8 @@ export type Kind =
 	| { Response: ResponseFrame }
 	| { Event: EventFrame }
 	| { Error: ErrorFrame }
-	| { Cancel: CancelFrame };
+	| { Cancel: CancelFrame }
+	| { Register: RegisterFrame };
 
 export type NativeArticleAsset = {
 	url: string;
@@ -78,6 +79,8 @@ export type NativeYoutubeSnapshot = {
 	video_frame_width: number;
 	video_frame_height: number;
 };
+
+export type RegisterFrame = { host_pid: number; browser_pid: number };
 
 export type RequestFrame = {
 	id: number;

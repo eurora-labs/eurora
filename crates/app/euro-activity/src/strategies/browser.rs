@@ -1,4 +1,8 @@
 //! Browser strategy implementation for the refactored activity system
+//!
+//! This module implements a gRPC server that accepts connections from multiple
+//! native messaging hosts (euro-native-messaging). Each host registers with its
+//! browser PID, allowing the server to route requests to the correct browser.
 
 pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
@@ -11,32 +15,33 @@ use crate::{
 };
 use async_trait::async_trait;
 use dashmap::DashMap;
-use euro_native_messaging::proto::GetParentPidRequest;
-use euro_native_messaging::proto::RequestFrame;
-use euro_native_messaging::proto::ResponseFrame;
-use euro_native_messaging::{
-    Channel, NativeMessage, create_browser_bridge_client,
-    server::{BrowserBridgeClient, Frame, FrameKind},
-};
+use euro_native_messaging::NativeMessage;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use tokio::sync::RwLock;
 use tokio::sync::broadcast;
-use tokio::sync::{Mutex, mpsc, oneshot};
-use tonic::Status;
+use tokio::sync::{mpsc, oneshot};
+use tonic::transport::Server;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
-mod server;
+pub mod server;
 
 mod proto {
     tonic::include_proto!("browser_bridge");
 }
 
-pub type NativeMessengersRegistry = Arc<RwLock<HashMap<u32, mpsc::Sender<Result<Frame, Status>>>>>;
+pub use proto::{
+    EventFrame, Frame, RegisterFrame, RequestFrame, ResponseFrame,
+    browser_bridge_server::BrowserBridgeServer, frame::Kind as FrameKind,
+};
+
+pub use server::BrowserBridgeService;
+
+/// The port for the browser bridge gRPC server
+pub const BROWSER_BRIDGE_PORT: &str = "1431";
 
 /// Wrapper for pending request sender
 struct PendingRequest {
@@ -65,24 +70,32 @@ impl PendingRequest {
 }
 
 /// Browser strategy for collecting web browser activity data
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct BrowserStrategy {
-    #[serde(skip)]
-    pub registry: NativeMessengersRegistry,
     #[serde(skip)]
     tracking_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
     #[serde(skip)]
     sender: Option<mpsc::UnboundedSender<ActivityReport>>,
 
-    // Bidirectional stream components
+    /// The gRPC server service that handles native messenger connections
     #[serde(skip)]
-    stream_tx: Option<mpsc::UnboundedSender<Frame>>,
+    bridge_service: Option<BrowserBridgeService>,
+
+    /// Handle to the gRPC server task
+    #[serde(skip)]
+    server_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
+
+    /// Pending requests waiting for responses
     #[serde(skip)]
     pending_requests: Option<Arc<DashMap<u32, PendingRequest>>>,
+
+    /// Counter for generating unique request IDs
     #[serde(skip)]
     request_id_counter: Option<Arc<AtomicU32>>,
+
+    /// Handle for the frame handler task
     #[serde(skip)]
-    stream_task_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
+    frame_handler_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 
     #[serde(skip)]
     activity_event_tx: Option<broadcast::Sender<Frame>>,
@@ -92,149 +105,174 @@ pub struct BrowserStrategy {
 
     #[serde(skip)]
     active_browser: Option<String>,
-
-    /// gRPC client for browser bridge communication
-    #[serde(skip)]
-    bridge_client: Option<BrowserBridgeClient<Channel>>,
 }
 
 impl BrowserStrategy {
-    /// Creates thin network layer to manage incoming and outgoing requests
-    async fn initialize_browser_communication(&mut self) -> ActivityResult<()> {
-        let mut client = create_browser_bridge_client().await.map_err(|e| {
-            ActivityError::Network(format!("Failed to create browser bridge client: {}", e))
-        })?;
+    /// Creates and starts the gRPC server that accepts native messenger connections
+    async fn initialize_server(&mut self) -> ActivityResult<()> {
+        let service = BrowserBridgeService::new();
+        let service_clone = service.clone();
 
-        let activity_event_tx: broadcast::Sender<Frame> = broadcast::channel(100).0;
-
-        let (tx, rx) = mpsc::unbounded_channel::<Frame>();
         let pending_requests = Arc::new(DashMap::<u32, PendingRequest>::new());
         let request_id_counter = Arc::new(AtomicU32::new(1));
+        let activity_event_tx: broadcast::Sender<Frame> = broadcast::channel(100).0;
 
+        // Subscribe to frames from native messengers
+        let mut frames_rx = service.subscribe_to_frames();
         let pending_requests_clone = Arc::clone(&pending_requests);
-
-        let response = client
-            .open(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
-            .await
-            .map_err(|e| {
-                error!("Failed to open bidirectional browser channel: {}", e);
-                ActivityError::Network("Failed to open browser bridge client".to_string())
-            })?;
-        let mut inbound_stream = response.into_inner();
-
         let activity_event_tx_clone = activity_event_tx.clone();
 
-        let stream_task = tokio::spawn(async move {
-            debug!("Stream handler task started");
-            while let Ok(Some(frame)) = inbound_stream.message().await {
-                let kind = frame.kind.unwrap();
+        // Start the frame handler task
+        let frame_handler = tokio::spawn(async move {
+            debug!("Frame handler task started");
+            while let Ok((browser_pid, frame)) = frames_rx.recv().await {
+                let kind = match &frame.kind {
+                    Some(k) => k.clone(),
+                    None => {
+                        warn!(
+                            "Received frame with no kind from browser PID {}",
+                            browser_pid
+                        );
+                        continue;
+                    }
+                };
+
                 match kind {
-                    FrameKind::Request(frame) => {
+                    FrameKind::Request(req_frame) => {
                         debug!(
-                            "Received request frame: id={}, action={}",
-                            frame.id, frame.action
+                            "Received request frame from browser PID {}: id={}, action={}",
+                            browser_pid, req_frame.id, req_frame.action
                         );
                         // For now, log unsupported requests from browser extension
-                        // In the future, this could handle requests initiated by the extension
                         warn!(
                             "Received unsupported request from browser extension: action={}",
-                            frame.action
+                            req_frame.action
                         );
                     }
-                    FrameKind::Response(frame) => {
+                    FrameKind::Response(resp_frame) => {
                         // Match response to pending request
-                        if let Some((_, pending_request)) = pending_requests_clone.remove(&frame.id)
+                        if let Some((_, pending_request)) =
+                            pending_requests_clone.remove(&resp_frame.id)
                         {
-                            if let Err(err) = pending_request.send(frame.into()) {
+                            let frame = Frame {
+                                kind: Some(FrameKind::Response(resp_frame.clone())),
+                            };
+                            if let Err(err) = pending_request.send(frame) {
                                 warn!("Failed to send frame to waiting request: {:?}", err);
                             }
                         } else {
                             debug!(
                                 "Received frame with no pending request: id={} action={}",
-                                frame.id.clone(),
-                                frame.action.clone(),
+                                resp_frame.id, resp_frame.action,
                             );
-                            let _ = activity_event_tx_clone.send(frame.into());
+                            let frame = Frame {
+                                kind: Some(FrameKind::Response(resp_frame)),
+                            };
+                            let _ = activity_event_tx_clone.send(frame);
                         }
                     }
-                    FrameKind::Event(frame) => {
+                    FrameKind::Event(evt_frame) => {
                         // Broadcast event frames to activity tracking
-                        debug!("Received event frame: action={}", frame.action.clone());
-                        let _ = activity_event_tx_clone.send(frame.into());
+                        debug!("Received event frame: action={}", evt_frame.action);
+                        let frame = Frame {
+                            kind: Some(FrameKind::Event(evt_frame)),
+                        };
+                        let _ = activity_event_tx_clone.send(frame);
                     }
-                    FrameKind::Error(frame) => {
+                    FrameKind::Error(err_frame) => {
                         error!(
                             "Received error frame: id={}, message={}",
-                            frame.id, frame.message
+                            err_frame.id, err_frame.message
                         );
                         // Match error to pending request if applicable
-                        if let Some((_, pending_request)) = pending_requests_clone.remove(&frame.id)
-                            && let Err(err) = pending_request.send(frame.into())
+                        if let Some((_, pending_request)) =
+                            pending_requests_clone.remove(&err_frame.id)
                         {
-                            warn!("Failed to send error frame to waiting request: {:?}", err);
+                            let frame = Frame {
+                                kind: Some(FrameKind::Error(err_frame)),
+                            };
+                            if let Err(err) = pending_request.send(frame) {
+                                warn!("Failed to send error frame to waiting request: {:?}", err);
+                            }
                         }
                     }
-                    FrameKind::Cancel(frame) => {
-                        debug!("Received cancel frame: id={}", frame.id);
+                    FrameKind::Cancel(cancel_frame) => {
+                        debug!("Received cancel frame: id={}", cancel_frame.id);
                         // Remove pending request if it exists
-                        if pending_requests_clone.remove(&frame.id).is_some() {
-                            debug!("Cancelled pending request: id={}", frame.id);
+                        if pending_requests_clone.remove(&cancel_frame.id).is_some() {
+                            debug!("Cancelled pending request: id={}", cancel_frame.id);
                         }
+                    }
+                    FrameKind::Register(_) => {
+                        // Registration is handled by the server's Open method
+                        debug!("Received register frame (should be handled by server)");
                     }
                 }
             }
-            debug!("Stream handler task ended");
+            debug!("Frame handler task ended");
         });
 
-        self.stream_tx = Some(tx);
+        // Start the gRPC server
+        let server_handle = tokio::spawn(async move {
+            let addr = format!("[::1]:{}", BROWSER_BRIDGE_PORT)
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap();
+
+            info!("Starting Browser Bridge gRPC server at {}", addr);
+
+            if let Err(e) = Server::builder()
+                .add_service(BrowserBridgeServer::new(service_clone))
+                .serve(addr)
+                .await
+            {
+                error!("Browser Bridge gRPC server error: {}", e);
+            }
+            info!("Browser Bridge gRPC server ended");
+        });
+
+        self.bridge_service = Some(service);
+        self.server_handle = Some(Arc::new(server_handle));
         self.pending_requests = Some(pending_requests);
         self.request_id_counter = Some(request_id_counter);
-        self.stream_task_handle = Some(Arc::new(stream_task));
+        self.frame_handler_handle = Some(Arc::new(frame_handler));
         self.activity_event_tx = Some(activity_event_tx);
-        self.bridge_client = Some(client);
 
         Ok(())
     }
 
-    /// Validates that the focused window's process is the parent process of the native messaging host.
-    /// This ensures we're tracking the correct browser instance that started the extension.
+    /// Validates that the focused window's process is registered as a native messenger.
+    /// This ensures we're tracking a browser that has the extension installed.
     async fn validate_browser_pid(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
-        let client = self
-            .bridge_client
-            .as_mut()
-            .ok_or_else(|| ActivityError::Strategy("Bridge client not initialized".to_string()))?;
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::Strategy("Bridge service not initialized".to_string()))?;
 
-        let response = client
-            .get_parent_pid(GetParentPidRequest {})
-            .await
-            .map_err(|e| {
-                ActivityError::Network(format!("Failed to get parent PID from bridge: {}", e))
-            })?;
-
-        let parent_pid = response.into_inner().parent_pid;
         let focus_pid = focus_window.process_id;
 
-        debug!(
-            "Validating browser PID: focus_window.process_id={}, bridge.parent_pid={}",
-            focus_pid, parent_pid
-        );
-
-        if focus_pid != parent_pid {
-            warn!(
-                "Browser PID mismatch: focused window PID {} does not match native messaging host parent PID {}",
-                focus_pid, parent_pid
+        // Check if this browser PID is registered
+        if service.is_registered(focus_pid).await {
+            info!(
+                "Browser PID {} is registered with native messenger",
+                focus_pid
             );
-            return Err(ActivityError::Strategy(format!(
-                "Cannot support this browser process: PID {} does not match the browser that started the extension (PID {})",
-                focus_pid, parent_pid
-            )));
+            // Set this as the active browser PID
+            service.set_active_browser_pid(focus_pid);
+            Ok(())
+        } else {
+            let registered_pids = service.get_registered_pids().await;
+            warn!(
+                "Browser PID {} is not registered. Currently registered PIDs: {:?}",
+                focus_pid, registered_pids
+            );
+            Err(ActivityError::Strategy(format!(
+                "Browser PID {} does not have a registered native messenger. \
+                 Make sure the browser extension is installed and active.",
+                focus_pid
+            )))
         }
-
-        info!(
-            "Browser PID validated successfully: PID {} matches native messaging host parent",
-            focus_pid
-        );
-        Ok(())
     }
 
     async fn init_collection(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
@@ -247,30 +285,45 @@ impl BrowserStrategy {
         let mut activity_receiver = self.activity_event_tx.clone().unwrap().subscribe();
         let _default_icon = focus_window.icon.clone();
         let mut strategy = self.clone();
-        let last_url: Arc<Mutex<Option<Url>>> = Arc::new(Mutex::new(None));
+        let last_url: Arc<tokio::sync::Mutex<Option<Url>>> =
+            Arc::new(tokio::sync::Mutex::new(None));
 
         let handle = tokio::spawn(async move {
             let last_url = Arc::clone(&last_url);
 
             while let Ok(frame) = activity_receiver.recv().await {
-                let kind = frame.kind.unwrap();
+                let kind = match frame.kind {
+                    Some(k) => k,
+                    None => continue,
+                };
                 let payload = match kind {
                     FrameKind::Response(frame) => frame.payload,
                     FrameKind::Event(frame) => frame.payload,
                     _ => None,
                 };
-                let native_asset = serde_json::from_str::<NativeMessage>(&payload.unwrap())
-                    .map_err(|e| -> ActivityError { ActivityError::from(e) })
-                    .unwrap();
+                let Some(payload_str) = payload else {
+                    continue;
+                };
+                let native_asset = match serde_json::from_str::<NativeMessage>(&payload_str) {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        warn!("Failed to parse native message: {}", e);
+                        continue;
+                    }
+                };
 
                 let event = match native_asset {
                     NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
                     _ => {
-                        panic!("Unexpected native asset type");
+                        warn!("Unexpected native asset type");
+                        continue;
                     }
                 };
                 let mut prev = last_url.lock().await;
-                let url = Url::parse(&event.url.clone().unwrap()).unwrap();
+                let url = match Url::parse(&event.url.clone().unwrap_or_default()) {
+                    Ok(u) => u,
+                    Err(_) => continue,
+                };
                 if let Some(prev_url) = prev.take()
                     && prev_url.domain() == url.domain()
                 {
@@ -285,7 +338,7 @@ impl BrowserStrategy {
                     e
                 });
                 let activity = Activity::new(
-                    event.url.unwrap().clone(),
+                    event.url.unwrap_or_default(),
                     icon,
                     "".to_string(),
                     assets.unwrap_or_default(),
@@ -308,10 +361,10 @@ impl BrowserStrategy {
         Ok(())
     }
 
-    /// Create a new browser strategy
+    /// Create a new browser strategy and start the gRPC server
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = BrowserStrategy::default();
-        strategy.initialize_browser_communication().await?;
+        strategy.initialize_server().await?;
 
         Ok(strategy)
     }
@@ -335,7 +388,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         focus_window: &FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
-        // Validate that the focused browser PID matches the native messaging host's parent PID
+        // Validate that the focused browser PID has a registered native messenger
         self.validate_browser_pid(focus_window).await?;
 
         self.sender = Some(sender.clone());
@@ -436,8 +489,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             }
         }
 
-        // Clean up stream task
-        if let Some(handle) = self.stream_task_handle.take()
+        // Clean up frame handler task
+        if let Some(handle) = self.frame_handler_handle.take()
             && let Ok(handle) = Arc::try_unwrap(handle)
         {
             handle.abort();
@@ -449,6 +502,9 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         {
             handle.abort();
         }
+
+        // Note: We don't stop the gRPC server here as it should keep running
+        // to accept new connections from native messengers
 
         Ok(())
     }
@@ -529,10 +585,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 impl BrowserStrategy {
     /// Helper method to send a request frame and wait for response
     async fn send_request(&self, action: &str) -> ActivityResult<ResponseFrame> {
-        let stream_tx = self
-            .stream_tx
+        let service = self
+            .bridge_service
             .as_ref()
-            .ok_or_else(|| ActivityError::invalid_data("No stream sender available"))?;
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
 
         let pending_requests = self
             .pending_requests
@@ -565,18 +621,22 @@ impl BrowserStrategy {
             request_id, action
         );
 
-        stream_tx
-            .send(request_frame.into())
-            .map_err(|_| ActivityError::invalid_data("Failed to send request frame"))?;
+        // Send to the active native messenger
+        let frame = Frame {
+            kind: Some(FrameKind::Request(request_frame)),
+        };
+        service.send_to_active(frame).await.map_err(|e| {
+            ActivityError::invalid_data(format!("Failed to send request frame: {}", e))
+        })?;
 
         // Wait for response with timeout
         match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
-            Ok(Ok(frame)) => match frame.kind.unwrap() {
-                FrameKind::Response(frame) => {
+            Ok(Ok(frame)) => match frame.kind {
+                Some(FrameKind::Response(frame)) => {
                     debug!("Received response for request {}", request_id);
                     Ok(frame)
                 }
-                FrameKind::Error(frame) => Err(ActivityError::invalid_data(format!(
+                Some(FrameKind::Error(frame)) => Err(ActivityError::invalid_data(format!(
                     "Browser error: {}",
                     frame.message
                 ))),
