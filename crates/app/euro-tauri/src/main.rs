@@ -333,9 +333,7 @@ fn main() {
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
-                // .plugin(
-                //     tauri_plugin_sentry::init(&sentry_client)
-                // )
+                .plugin(tauri_plugin_opener::init())
                 .plugin(
                     tauri_plugin_log::Builder::new()
                             .filter(|metadata| {

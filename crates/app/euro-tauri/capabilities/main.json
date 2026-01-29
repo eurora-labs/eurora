@@ -7,6 +7,8 @@
 	"permissions": [
 		"core:default",
 		"core:window:allow-start-dragging",
+		"opener:allow-open-url",
+        "opener:allow-default-urls",
 		"core:window:default",
 		"core:window:allow-hide",
 		"core:window:allow-show",
