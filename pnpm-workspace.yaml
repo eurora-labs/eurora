@@ -9,7 +9,7 @@ packages:
 catalog:
     '@tailwindcss/postcss': ^4.1.18
     '@vitest/ui': 3.2.4
-    '@lucide/svelte': ^0.562.0
+    '@lucide/svelte': ^0.563.1
     postcss: ^8.5.6
     tailwindcss: ^4.1.18
     vite: 6.4.1
@@ -21,7 +21,7 @@ catalogs:
     svelte:
         '@sentry/sveltekit': 8.55.0
         '@sveltejs/adapter-static': 3.0.10
-        '@sveltejs/kit': 2.50.0
+        '@sveltejs/kit': 2.50.1
         '@sveltejs/vite-plugin-svelte': 5.1.1
-        svelte: 5.47.1
+        svelte: 5.48.5
         svelte-check: 4.3.5
