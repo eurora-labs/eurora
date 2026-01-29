@@ -65,7 +65,7 @@ impl From<NativeMetadata> for StrategyMetadata {
 
 /// Enum containing all possible activity strategies
 #[enum_dispatch(ActivityStrategyFunctionality)]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum ActivityStrategy {
     BrowserStrategy,
     DefaultStrategy,
