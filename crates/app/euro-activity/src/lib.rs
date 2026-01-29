@@ -29,7 +29,7 @@ pub use error::{ActivityError, ActivityResult};
 // Re-export snapshot types
 pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSnapshot};
 // Re-export storage types
-pub use storage::{ActivityStorage, ActivityStorageConfig, SaveableAsset, SavedAssetInfo};
+pub use storage::{ActivityStorage, SaveableAsset, SavedAssetInfo};
 pub use strategies::ActivityStrategy;
 // Re-export strategy types
 pub use strategies::{ActivityReport, BrowserStrategy, DefaultStrategy, NoStrategy};

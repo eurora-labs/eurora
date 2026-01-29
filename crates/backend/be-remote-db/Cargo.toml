@@ -6,6 +6,7 @@ description = "Eurora Remote DB"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
+bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 ipnet = { version = "2", features = ["serde"] }
 prost-types = { workspace = true }

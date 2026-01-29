@@ -1051,7 +1051,17 @@ async fn test_generate_basic() {
     let messages1 = vec![BaseMessage::Human(HumanMessage::new("test1"))];
     let messages2 = vec![BaseMessage::Human(HumanMessage::new("test2"))];
 
-    let result = model.generate(vec![messages1, messages2], None, None).await;
+    let result = model
+        .generate(
+            vec![messages1, messages2],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await;
 
     assert!(result.is_ok());
     let llm_result = result.unwrap();

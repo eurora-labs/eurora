@@ -192,11 +192,8 @@
 		? 'justify-center'
 		: 'justify-end'} items-center gap-4"
 >
-	<!-- <div class="w-full h-full flex flex-col items-center gap-4"> -->
 	{#if messages.length > 0}
-		<ScrollArea
-			class="w-full max-h-[calc(80vh-100px)] px-6 flex flex-col justify-end items-center gap-4"
-		>
+		<ScrollArea class="w-full px-6 flex flex-col justify-end items-center gap-4">
 			<Chat.Root
 				bind:this={chatRef}
 				class="w-full h-full flex flex-col gap-4 overflow-hidden"

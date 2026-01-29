@@ -4,10 +4,7 @@
 )]
 
 use dotenv::dotenv;
-// use euro_conversation::{ChatMessage, Conversation, ConversationStorage};
-use euro_encrypt::MainKey;
 use euro_native_messaging::create_browser_bridge_client;
-// use euro_personal_db::{Activity, PersonalDatabaseManager};
 use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::TimelineAppEvent;
 use euro_tauri::shared_types::SharedUserController;
@@ -30,15 +27,15 @@ use euro_tauri::{
     shared_types::SharedConversationManager,
 };
 use euro_timeline::TimelineManager;
+use log::{debug, error};
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-use tauri_plugin_log::{Target, TargetKind, fern};
+use tauri_plugin_log::{Target, TargetKind, fern::colors::ColoredLevelConfig};
 use taurpc::Router;
 use tokio::sync::Mutex;
-use tracing::{debug, error};
 
 async fn initialize_posthog() -> Result<(), posthog_rs::Error> {
     let posthog_key = option_env!("POSTHOG_API_KEY");
@@ -76,16 +73,8 @@ fn main() {
         ));
     }
 
-    let sentry_logger = sentry::integrations::log::SentryLogger::new()
+    let _sentry_logger = sentry::integrations::log::SentryLogger::new()
         .filter(|_md| sentry::integrations::log::LogFilter::Log);
-
-    // let mut writer = std::io::Cursor::new(Vec::<u8>::new());
-    let writer = Box::new(sentry_logger) as Box<dyn log::Log>;
-    let dispatcher = fern::Dispatch::new()
-        .level(log::LevelFilter::Info)
-        .chain(std::io::stdout())
-        .chain(writer);
-    let custom_target = Target::new(TargetKind::Dispatch(dispatcher));
 
     // Regular application startup
     let tauri_context = generate_context!();
@@ -123,9 +112,6 @@ fn main() {
                             error!("Failed to initialize posthog: {}", e);
                         });
                     });
-
-                    // If no main key is available, generate a new one
-                    let main_key = MainKey::new().expect("Failed to generate main key");
 
                     // #[cfg(all(desktop, not(debug_assertions)))]
                     if app_settings.general.autostart && !started_by_autostart {
@@ -219,16 +205,7 @@ fn main() {
                         // };
                         // if let Some(db_manager) = db_manager {
                         //     db_app_handle.manage(db_manager);
-                        let timeline = euro_timeline::TimelineManagerBuilder::new()
-                        .with_activity_storage_config(
-                            euro_activity::ActivityStorageConfig {
-                            base_dir: timeline_handle.path().app_data_dir().unwrap(),
-                            use_content_hash: false,
-                            max_file_size: None,
-                            main_key: main_key.clone(),
-                            service_endpoint: None,
-                        })
-                            .build().await.expect("Failed to create timeline");
+                        let timeline = euro_timeline::TimelineManager::builder().build().await.expect("Failed to create timeline");
                         timeline_handle.manage(Mutex::new(timeline));
                             let timeline_mutex = db_app_handle.state::<Mutex<TimelineManager>>();
 
@@ -356,18 +333,38 @@ fn main() {
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
-                // .plugin(
-                //     tauri_plugin_sentry::init(&sentry_client)
-                // )
+                .plugin(tauri_plugin_opener::init())
                 .plugin(
                     tauri_plugin_log::Builder::new()
-                            .filter(|metadata| metadata.target().starts_with("euro_") || metadata.target().starts_with("webview") || metadata.level() == log::Level::Warn)
-                            // .level(log::LevelFilter::Info)
-                            .target(custom_target)
+                            .filter(|metadata| {
+                                let target = metadata.target();
+                                // Allow all logs from euro-* crates (Rust converts hyphens to underscores in module paths)
+                                let is_euro_crate = target.starts_with("euro_");
+                                // Allow all logs from common folder crates
+                                let is_common_crate = target.starts_with("agent_chain")
+                                    || target.starts_with("agent_graph")
+                                    || target.starts_with("auth_core")
+                                    || target.starts_with("focus_tracker")
+                                    || target.starts_with("proto_gen");
+                                // Allow webview logs
+                                let is_webview = target.starts_with("webview");
+                                // For third-party crates, only allow warnings and above
+                                let is_warning_or_above = metadata.level() <= log::Level::Warn;
+                                is_euro_crate || is_common_crate || is_webview || is_warning_or_above
+                            })
+                            .level(log::LevelFilter::Trace)
+                            .target(Target::new(TargetKind::Stdout))
+                            .with_colors(ColoredLevelConfig::default())
                             .build()
                 )
                 .plugin(tauri_plugin_shell::init())
-                .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
+                .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+                    if let Some(window) = app.get_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                }))
                 .on_window_event(|window, event| match event {
                     #[cfg(target_os = "macos")]
                     tauri::WindowEvent::CloseRequested { .. } => {
