@@ -60,7 +60,7 @@ fn get_parent_pid_impl() -> u32 {
     }
 
     #[link(name = "kernel32")]
-    extern "system" {
+    unsafe extern "system" {
         fn CreateToolhelp32Snapshot(dwFlags: u32, th32ProcessID: u32) -> isize;
         fn Process32FirstW(hSnapshot: isize, lppe: *mut PROCESSENTRY32W) -> i32;
         fn Process32NextW(hSnapshot: isize, lppe: *mut PROCESSENTRY32W) -> i32;
