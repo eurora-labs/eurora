@@ -4,7 +4,6 @@
 )]
 
 use dotenv::dotenv;
-use euro_native_messaging::create_browser_bridge_client;
 use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::TimelineAppEvent;
 use euro_tauri::shared_types::SharedUserController;
