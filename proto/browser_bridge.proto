@@ -3,6 +3,14 @@ package browser_bridge;
 
 service BrowserBridge {
     rpc Open(stream Frame) returns (stream Frame);
+    rpc GetParentPid(GetParentPidRequest) returns (GetParentPidResponse);
+}
+
+message GetParentPidRequest {}
+
+message GetParentPidResponse {
+    // The PID of the process that started the native messaging host
+    uint32 parent_pid = 1;
 }
 
 message Frame {

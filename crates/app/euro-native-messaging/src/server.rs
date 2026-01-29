@@ -5,8 +5,9 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::info;
 
+use crate::parent_pid;
 pub use crate::types::proto::{
-    EventFrame, Frame, RequestFrame, ResponseFrame,
+    EventFrame, Frame, GetParentPidRequest, GetParentPidResponse, RequestFrame, ResponseFrame,
     browser_bridge_client::BrowserBridgeClient,
     browser_bridge_server::{BrowserBridge, BrowserBridgeServer},
     frame::Kind as FrameKind,
@@ -88,5 +89,17 @@ impl BrowserBridge for BrowserBridgeService {
 
         let out_stream = ReceiverStream::new(rx_to_client);
         Ok(Response::new(Box::pin(out_stream) as Self::OpenStream))
+    }
+
+    async fn get_parent_pid(
+        &self,
+        _request: Request<GetParentPidRequest>,
+    ) -> Result<Response<GetParentPidResponse>, Status> {
+        let parent_pid = parent_pid::get_parent_pid();
+        info!(
+            "GetParentPid request received, returning parent PID: {}",
+            parent_pid
+        );
+        Ok(Response::new(GetParentPidResponse { parent_pid }))
     }
 }

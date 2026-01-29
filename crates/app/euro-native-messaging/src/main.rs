@@ -5,6 +5,7 @@ use anyhow::Result;
 use euro_native_messaging::PORT;
 // use euro_native_messaging::server_o;
 use euro_native_messaging::{
+    parent_pid,
     server::{self, Frame},
     utils::{ensure_single_instance, generate_typescript_definitions, read_framed, write_framed},
 };
@@ -21,6 +22,10 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Capture parent PID immediately at startup, before any other processing.
+    // This records the PID of the browser process that started this native messaging host.
+    parent_pid::capture_parent_pid();
+
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
         .parse_lossy("euro_=trace,hyper=off,tokio=off"); // keep yours, silence deps

@@ -1,6 +1,7 @@
 use anyhow::Result;
 pub use tonic::transport::Channel;
 
+pub mod parent_pid;
 pub mod server;
 pub mod types;
 pub mod utils;
