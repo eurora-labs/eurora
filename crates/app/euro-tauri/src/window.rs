@@ -1,4 +1,6 @@
 use tauri::AppHandle;
+use tauri_plugin_opener::OpenerExt;
+use url::Url;
 
 pub(crate) mod state {
 
@@ -67,6 +69,7 @@ pub fn create(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
+    let navigation_handler = handle.clone();
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,
@@ -75,6 +78,7 @@ pub fn create(
     .resizable(true)
     .title(handle.package_info().name.clone())
     .disable_drag_drop_handler()
+    .on_navigation(move |url| prevent_in_app_navigation(url, &navigation_handler))
     .min_inner_size(800.0, 600.0)
     .inner_size(1160.0, 720.0)
     .build()?;
@@ -87,6 +91,7 @@ pub fn create(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
+    let navigation_handler = handle.clone();
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,
@@ -96,9 +101,35 @@ pub fn create(
     .title(handle.package_info().name.clone())
     .min_inner_size(800.0, 600.0)
     .inner_size(1160.0, 720.0)
+    .on_navigation(move |url| prevent_in_app_navigation(url, &navigation_handler))
     .hidden_title(true)
     .disable_drag_drop_handler()
     .title_bar_style(tauri::TitleBarStyle::Overlay)
     .build()?;
     Ok(window)
+}
+
+fn prevent_in_app_navigation(url: &Url, handle: &AppHandle) -> bool {
+    // 1. Internal app URLs
+    let is_internal =
+        // bundled app (production)
+        url.scheme() == "tauri"
+        // dev server (SvelteKit/Tauri dev)
+        || (tauri::is_dev()
+            && url.scheme() == "http"
+            && url.host_str() == Some("localhost"));
+
+    if is_internal {
+        return true; // let the webview load your app
+    }
+
+    // 2. True external links → open in system browser
+    let is_http = url.scheme() == "http" || url.scheme() == "https";
+    if is_http {
+        let _ = handle.opener().open_url(url.to_string(), None::<&str>);
+        return false; // cancel navigation inside the Tauri webview
+    }
+
+    // 3. Anything else: allow (or tighten if you need)
+    true
 }

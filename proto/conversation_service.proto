@@ -16,7 +16,9 @@ service ProtoConversationService {
   rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
   rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
 
+  // AI Calls
   rpc ChatStream(ChatStreamRequest) returns (stream ChatStreamResponse);
+  rpc GenerateConversationTitle(GenerateConversationTitleRequest) returns (GenerateConversationTitleResponse);
 }
 
 message CreateConversationRequest {
@@ -97,4 +99,13 @@ message AddSystemMessageRequest {
 
 message AddSystemMessageResponse {
   agent_chain.ProtoBaseMessage message = 1;
+}
+
+message GenerateConversationTitleRequest {
+  string conversation_id = 1;
+  string content = 2;
+}
+
+message GenerateConversationTitleResponse {
+  Conversation conversation = 1;
 }

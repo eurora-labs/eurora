@@ -47,17 +47,6 @@ impl PdfAsset {
             content: asset.content,
         })
     }
-
-    /// Get a preview of the Pdf content (first N words)
-    pub fn get_preview(&self, word_limit: usize) -> String {
-        let words: Vec<&str> = self.content.split_whitespace().collect();
-        if words.len() <= word_limit {
-            self.content.clone()
-        } else {
-            let preview_words = &words[..word_limit];
-            format!("{}...", preview_words.join(" "))
-        }
-    }
 }
 
 impl AssetFunctionality for PdfAsset {
@@ -143,22 +132,6 @@ mod tests {
 
         assert_eq!(asset.id, "test-id");
         assert_eq!(asset.title, "Test Pdf");
-    }
-
-    #[test]
-    fn test_preview() {
-        let asset = PdfAsset::new(
-            "test-id".to_string(),
-            "https://example.com/Pdf".to_string(),
-            "Test Pdf".to_string(),
-            "This is a long Pdf with many words that should be truncated".to_string(),
-        );
-
-        let preview = asset.get_preview(5);
-        assert_eq!(preview, "This is a long Pdf...");
-
-        let full_preview = asset.get_preview(20);
-        assert_eq!(full_preview, asset.content);
     }
 
     #[test]

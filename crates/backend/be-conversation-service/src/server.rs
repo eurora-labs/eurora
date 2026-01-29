@@ -1,5 +1,6 @@
 //! Server-side implementation for the Conversation Service.
 
+use agent_chain::SystemMessage;
 use agent_chain::openai::BuiltinTool;
 use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
@@ -21,8 +22,9 @@ use crate::{ConversationServiceResult, converters::convert_db_message_to_base_me
 use proto_gen::conversation::{
     AddHumanMessageRequest, AddHumanMessageResponse, AddSystemMessageRequest,
     AddSystemMessageResponse, ChatStreamRequest, ChatStreamResponse, Conversation,
-    CreateConversationRequest, CreateConversationResponse, GetConversationResponse,
-    GetMessagesRequest, GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
+    CreateConversationRequest, CreateConversationResponse, GenerateConversationTitleRequest,
+    GenerateConversationTitleResponse, GetConversationResponse, GetMessagesRequest,
+    GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
 };
 
 pub use proto_gen::conversation::proto_conversation_service_server::{
@@ -32,7 +34,8 @@ pub use proto_gen::conversation::proto_conversation_service_server::{
 /// The main conversation service
 #[derive(Debug)]
 pub struct ConversationService {
-    provider: ChatOpenAI,
+    chat_provider: ChatOpenAI,
+    title_provider: ChatOpenAI,
     db: Arc<DatabaseManager>,
 }
 
@@ -47,11 +50,17 @@ impl ConversationService {
         });
         let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
 
-        let provider = ChatOpenAI::new(&model)
+        let chat_provider = ChatOpenAI::new(&model)
             .with_builtin_tools(vec![BuiltinTool::WebSearch])
-            .api_key(api_key);
+            .api_key(api_key.clone());
 
-        Ok(Self { provider, db })
+        let _title_provider = ChatOpenAI::new("gpt-4.1-mini").api_key(api_key.clone());
+
+        Ok(Self {
+            chat_provider,
+            title_provider: _title_provider,
+            db,
+        })
     }
 
     /// Convert a database Conversation to a proto Conversation
@@ -255,6 +264,11 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
+        debug!(
+            "ChatStream: user_id = {}, conversation_id = {}",
+            user_id, conversation_id
+        );
+
         let db_messages = self
             .db
             .list_messages(
@@ -289,7 +303,7 @@ impl ProtoConversationService for ConversationService {
             .map_err(ConversationServiceError::from)?;
 
         let openai_stream = self
-            .provider
+            .chat_provider
             .astream(messages.into(), None)
             .await
             .map_err(|e| {
@@ -406,6 +420,78 @@ impl ProtoConversationService for ConversationService {
 
         Ok(Response::new(GetConversationResponse {
             conversation: conversation.try_into().ok(),
+        }))
+    }
+
+    async fn generate_conversation_title(
+        &self,
+        request: tonic::Request<GenerateConversationTitleRequest>,
+    ) -> Result<Response<GenerateConversationTitleResponse>, Status> {
+        info!("Generate conversation title request received");
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        let db_messages = self
+            .db
+            .list_messages(
+                ListMessages {
+                    conversation_id,
+                    user_id,
+                },
+                PaginationParams::new(0, 5, "DESC".to_string()),
+            )
+            .await
+            .unwrap();
+
+        let mut messages: Vec<BaseMessage> = db_messages
+            .into_iter()
+            .map(|msg| convert_db_message_to_base_message(msg).unwrap())
+            .collect();
+
+        messages.push(HumanMessage::new(req.content).into());
+
+        messages.push(
+            SystemMessage::new(
+                "Generate a title for the past conversation. Your task is:
+                - Return a concise title, max 6 words.
+                - No quotation marks.
+                - Use sentence case.
+                - Summarize the main topic, not the tone.
+                - If the topic is unclear, use a generic title.
+                Output only the title text.
+                "
+                .to_string(),
+            )
+            .into(),
+        );
+
+        let title = match self.title_provider.invoke(messages.into()).await {
+            Ok(message) => message.content,
+            Err(_) => "New Chat".to_string(),
+        };
+        let title_words: Vec<&str> = title.split_whitespace().collect();
+        let title = title_words[..title_words.len().min(6)].join(" ");
+
+        let conversation = self
+            .db
+            .update_conversation()
+            .id(conversation_id)
+            .user_id(user_id)
+            .title(title.clone())
+            .call()
+            .await
+            .unwrap();
+
+        Ok(Response::new(GenerateConversationTitleResponse {
+            conversation: Some(Self::db_conversation_to_proto(conversation)),
         }))
     }
 }

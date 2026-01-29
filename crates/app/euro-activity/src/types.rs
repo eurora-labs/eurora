@@ -10,14 +10,13 @@ use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
 use euro_native_messaging::NativeMessage;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
     assets::{ArticleAsset, DefaultAsset, PdfAsset, TwitterAsset, YoutubeAsset},
     error::ActivityResult,
     snapshots::*,
-    storage::{ActivityStorage, SaveableAsset, SavedAssetInfo},
+    storage::SaveableAsset,
 };
 
 /// Context chip for UI integration
@@ -217,29 +216,5 @@ impl Activity {
     /// Mark the activity as ended
     pub fn end_activity(&mut self) {
         self.end = Some(Utc::now());
-    }
-
-    /// Serialize the assets into bytes
-    pub async fn serialize_assets(&self) -> ActivityResult<Vec<Vec<u8>>> {
-        let mut serialized_assets = Vec::new();
-
-        debug!("Serializing {} assets", &self.assets.len());
-        for asset in &self.assets {
-            serialized_assets.push(asset.serialize_content().await?);
-        }
-        Ok(serialized_assets)
-    }
-
-    /// Save a specific asset by index to disk
-    pub async fn save_asset_by_index(
-        &self,
-        index: usize,
-        storage: &ActivityStorage,
-    ) -> ActivityResult<Option<SavedAssetInfo>> {
-        if let Some(asset) = self.assets.get(index) {
-            Ok(Some(storage.save_asset(asset).await?))
-        } else {
-            Ok(None)
-        }
     }
 }

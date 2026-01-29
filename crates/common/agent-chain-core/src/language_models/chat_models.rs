@@ -565,41 +565,380 @@ pub trait BaseChatModel: BaseLanguageModel {
     /// * `messages` - List of message lists.
     /// * `stop` - Stop words to use when generating.
     /// * `callbacks` - Callbacks to pass through.
+    /// * `tags` - Tags to apply.
+    /// * `metadata` - Metadata to apply.
+    /// * `run_name` - Name of the run.
+    /// * `run_id` - ID of the run.
     ///
     /// # Returns
     ///
     /// An `LLMResult` containing a list of candidate `ChatGeneration` objects.
+    #[allow(clippy::too_many_arguments)]
     async fn generate(
         &self,
         messages: Vec<Vec<BaseMessage>>,
         stop: Option<Vec<String>>,
-        _callbacks: Option<Callbacks>,
+        callbacks: Option<Callbacks>,
+        tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, Value>>,
+        _run_name: Option<String>,
+        run_id: Option<uuid::Uuid>,
     ) -> Result<LLMResult> {
-        let mut all_generations: Vec<Vec<GenerationType>> = Vec::new();
+        use crate::callbacks::CallbackManager;
+        use crate::outputs::RunInfo;
 
-        for message_list in messages {
-            let result = self._generate(message_list, stop.clone(), None).await?;
-            all_generations.push(result.generations.into_iter().map(|e| e.into()).collect());
+        // Get invocation params and options
+        let params = self._get_invocation_params(stop.as_deref(), None);
+        let _options = {
+            let mut opts = HashMap::new();
+            if let Some(ref s) = stop {
+                opts.insert(
+                    "stop".to_string(),
+                    Value::Array(s.iter().map(|x| Value::String(x.clone())).collect()),
+                );
+            }
+            opts
+        };
+
+        // Get inheritable metadata including LangSmith params
+        let mut inheritable_metadata = metadata.clone().unwrap_or_default();
+        let ls_params = self.get_chat_ls_params(stop.as_deref());
+        if let Some(provider) = ls_params.ls_provider {
+            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
+        }
+        if let Some(model_name) = ls_params.ls_model_name {
+            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
+        }
+        if let Some(model_type) = ls_params.ls_model_type {
+            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        Ok(LLMResult::new(all_generations))
+        // Configure callback manager
+        let callback_manager = CallbackManager::configure(
+            callbacks,
+            self.callbacks().cloned(),
+            tags,
+            self.config().tags.clone(),
+            Some(inheritable_metadata),
+            self.config().metadata.clone(),
+            self.config().verbose,
+        );
+
+        // Start chat model runs
+        let run_managers = callback_manager.on_chat_model_start(&params, &messages, run_id);
+
+        // Process each message list
+        let mut results = Vec::new();
+        for (i, message_list) in messages.iter().enumerate() {
+            let run_manager = run_managers.get(i);
+
+            match self
+                ._generate_with_cache(message_list.clone(), stop.clone(), run_manager)
+                .await
+            {
+                Ok(result) => {
+                    results.push(result);
+                }
+                Err(e) => {
+                    // Report error to run manager
+                    if let Some(rm) = run_manager {
+                        rm.on_llm_error(&e);
+                    }
+                    return Err(e);
+                }
+            }
+        }
+
+        // Create flattened outputs for on_llm_end callbacks
+        let flattened_outputs: Vec<LLMResult> = results
+            .iter()
+            .map(|res| LLMResult {
+                generations: vec![res.generations.iter().cloned().map(|g| g.into()).collect()],
+                llm_output: res.llm_output.clone(),
+                run: None,
+                result_type: "LLMResult".to_string(),
+            })
+            .collect();
+
+        // Combine LLM outputs
+        let llm_outputs: Vec<Option<HashMap<String, Value>>> =
+            results.iter().map(|res| res.llm_output.clone()).collect();
+        let combined_llm_output = self._combine_llm_outputs(&llm_outputs);
+
+        // Collect all generations
+        let generations: Vec<Vec<GenerationType>> = results
+            .into_iter()
+            .map(|res| res.generations.into_iter().map(|g| g.into()).collect())
+            .collect();
+
+        // Create final output
+        let mut output = LLMResult {
+            generations,
+            llm_output: if combined_llm_output.is_empty() {
+                None
+            } else {
+                Some(combined_llm_output)
+            },
+            run: None,
+            result_type: "LLMResult".to_string(),
+        };
+
+        // Call on_llm_end for each run manager and collect run info
+        let mut run_infos = Vec::new();
+        for (run_manager, flattened_output) in run_managers.iter().zip(flattened_outputs.iter()) {
+            // Convert flattened_output to ChatResult for on_llm_end
+            // Extract the first generation if available
+            if let Some(gen_list) = flattened_output.generations.first()
+                && let Some(generation) = gen_list.first()
+                && let GenerationType::ChatGeneration(chat_gen) = generation
+            {
+                let chat_result = crate::outputs::ChatResult::new(vec![chat_gen.clone()]);
+                run_manager.on_llm_end(&chat_result);
+            }
+            run_infos.push(RunInfo::new(run_manager.run_id()));
+        }
+
+        // Attach run info to output
+        if !run_infos.is_empty() {
+            output.run = Some(run_infos);
+        }
+
+        Ok(output)
     }
 
     /// Async version of `generate`.
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` - List of message lists.
+    /// * `stop` - Stop words to use when generating.
+    /// * `callbacks` - Callbacks to pass through.
+    /// * `tags` - Tags to apply.
+    /// * `metadata` - Metadata to apply.
+    /// * `run_name` - Name of the run.
+    /// * `run_id` - ID of the run.
+    ///
+    /// # Returns
+    ///
+    /// An `LLMResult` containing a list of candidate `ChatGeneration` objects.
+    #[allow(clippy::too_many_arguments)]
     async fn agenerate(
         &self,
         messages: Vec<Vec<BaseMessage>>,
         stop: Option<Vec<String>>,
-        _callbacks: Option<Callbacks>,
+        callbacks: Option<Callbacks>,
+        tags: Option<Vec<String>>,
+        metadata: Option<HashMap<String, Value>>,
+        _run_name: Option<String>,
+        run_id: Option<uuid::Uuid>,
     ) -> Result<LLMResult> {
-        let mut all_generations: Vec<Vec<GenerationType>> = Vec::new();
+        use crate::callbacks::AsyncCallbackManager;
+        use crate::outputs::RunInfo;
 
-        for message_list in messages {
-            let result = self._agenerate(message_list, stop.clone(), None).await?;
-            all_generations.push(result.generations.into_iter().map(|e| e.into()).collect());
+        // Get invocation params and options
+        let params = self._get_invocation_params(stop.as_deref(), None);
+        let _options = {
+            let mut opts = HashMap::new();
+            if let Some(ref s) = stop {
+                opts.insert(
+                    "stop".to_string(),
+                    Value::Array(s.iter().map(|x| Value::String(x.clone())).collect()),
+                );
+            }
+            opts
+        };
+
+        // Get inheritable metadata including LangSmith params
+        let mut inheritable_metadata = metadata.clone().unwrap_or_default();
+        let ls_params = self.get_chat_ls_params(stop.as_deref());
+        if let Some(provider) = ls_params.ls_provider {
+            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
+        }
+        if let Some(model_name) = ls_params.ls_model_name {
+            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
+        }
+        if let Some(model_type) = ls_params.ls_model_type {
+            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
         }
 
-        Ok(LLMResult::new(all_generations))
+        // Configure async callback manager
+        let callback_manager = AsyncCallbackManager::configure(
+            callbacks,
+            self.callbacks().cloned(),
+            tags,
+            self.config().tags.clone(),
+            Some(inheritable_metadata),
+            self.config().metadata.clone(),
+            self.config().verbose,
+        );
+
+        // Start chat model runs
+        let run_managers = callback_manager
+            .on_chat_model_start(&params, &messages, run_id)
+            .await;
+
+        // Process each message list sequentially
+        let mut results = Vec::new();
+        for (i, message_list) in messages.iter().enumerate() {
+            let run_manager = run_managers.get(i);
+
+            match self
+                ._agenerate_with_cache(message_list.clone(), stop.clone(), run_manager)
+                .await
+            {
+                Ok(result) => {
+                    results.push(result);
+                }
+                Err(e) => {
+                    // Report error to run manager
+                    // Note: We use get_sync() because on_llm_error takes &dyn Error which is not Sync,
+                    // and we can't hold a non-Sync reference across an await point.
+                    if let Some(rm) = run_manager {
+                        rm.get_sync().on_llm_error(&e);
+                    }
+                    return Err(e);
+                }
+            }
+        }
+
+        // Create flattened outputs for on_llm_end callbacks
+        let flattened_outputs: Vec<LLMResult> = results
+            .iter()
+            .map(|res| LLMResult {
+                generations: vec![res.generations.iter().cloned().map(|g| g.into()).collect()],
+                llm_output: res.llm_output.clone(),
+                run: None,
+                result_type: "LLMResult".to_string(),
+            })
+            .collect();
+
+        // Combine LLM outputs
+        let llm_outputs: Vec<Option<HashMap<String, Value>>> =
+            results.iter().map(|res| res.llm_output.clone()).collect();
+        let combined_llm_output = self._combine_llm_outputs(&llm_outputs);
+
+        // Collect all generations
+        let generations: Vec<Vec<GenerationType>> = results
+            .into_iter()
+            .map(|res| res.generations.into_iter().map(|g| g.into()).collect())
+            .collect();
+
+        // Create final output
+        let mut output = LLMResult {
+            generations,
+            llm_output: if combined_llm_output.is_empty() {
+                None
+            } else {
+                Some(combined_llm_output)
+            },
+            run: None,
+            result_type: "LLMResult".to_string(),
+        };
+
+        // Call on_llm_end for each run manager and collect run info
+        let mut run_infos = Vec::new();
+        for (run_manager, flattened_output) in run_managers.iter().zip(flattened_outputs.iter()) {
+            // Extract the first generation if available
+            if let Some(gen_list) = flattened_output.generations.first()
+                && let Some(generation) = gen_list.first()
+                && let GenerationType::ChatGeneration(chat_gen) = generation
+            {
+                let chat_result = crate::outputs::ChatResult::new(vec![chat_gen.clone()]);
+                run_manager.on_llm_end(&chat_result).await;
+            }
+            run_infos.push(RunInfo::new(run_manager.run_id()));
+        }
+
+        // Attach run info to output
+        if !run_infos.is_empty() {
+            output.run = Some(run_infos);
+        }
+
+        Ok(output)
+    }
+
+    /// Generate with cache support.
+    ///
+    /// This method checks the cache before calling `_generate` and caches the result.
+    /// It also handles streaming if appropriate.
+    async fn _generate_with_cache(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        run_manager: Option<&CallbackManagerForLLMRun>,
+    ) -> Result<crate::outputs::ChatResult> {
+        // Check cache (if caching is enabled)
+        // Note: Full cache implementation would check self.cache() here
+        // For now, we skip cache check since it requires async cache lookup
+
+        // Apply rate limiter after cache check
+        if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
+            rate_limiter.acquire(true);
+        }
+
+        // Check if streaming should be used
+        if self._should_stream(false, false, None, run_manager.map(|rm| rm.handlers())) {
+            // Use streaming
+            let stream_result = self._stream(messages.clone(), stop.clone(), run_manager);
+            match stream_result {
+                Ok(stream) => {
+                    // Collect stream and merge chunks
+                    let chat_result = agenerate_from_stream(stream).await?;
+                    return Ok(chat_result);
+                }
+                Err(Error::NotImplemented(_)) => {
+                    // Fall through to non-streaming
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        // Non-streaming path
+        let result = self._generate(messages, stop, run_manager).await?;
+        Ok(result)
+    }
+
+    /// Async generate with cache support.
+    ///
+    /// This method checks the cache before calling `_agenerate` and caches the result.
+    /// It also handles streaming if appropriate.
+    async fn _agenerate_with_cache(
+        &self,
+        messages: Vec<BaseMessage>,
+        stop: Option<Vec<String>>,
+        run_manager: Option<&AsyncCallbackManagerForLLMRun>,
+    ) -> Result<crate::outputs::ChatResult> {
+        // Check cache (if caching is enabled)
+        // Note: Full cache implementation would check self.cache() here
+        // For now, we skip cache check since it requires async cache lookup
+
+        // Apply rate limiter after cache check
+        if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
+            rate_limiter.aacquire(true).await;
+        }
+
+        // Check if streaming should be used
+        if self._should_stream(true, false, None, run_manager.map(|rm| rm.handlers())) {
+            // Use async streaming
+            let stream_result = self
+                ._astream(messages.clone(), stop.clone(), run_manager)
+                .await;
+            match stream_result {
+                Ok(stream) => {
+                    // Collect stream and merge chunks
+                    let chat_result = agenerate_from_stream(stream).await?;
+                    return Ok(chat_result);
+                }
+                Err(Error::NotImplemented(_)) => {
+                    // Fall through to non-streaming
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        // Non-streaming path
+        let result = self._agenerate(messages, stop, run_manager).await?;
+        Ok(result)
     }
 
     /// Async call helper.
@@ -611,7 +950,9 @@ pub trait BaseChatModel: BaseLanguageModel {
         stop: Option<Vec<String>>,
         callbacks: Option<Callbacks>,
     ) -> Result<BaseMessage> {
-        let result = self.agenerate(vec![messages], stop, callbacks).await?;
+        let result = self
+            .agenerate(vec![messages], stop, callbacks, None, None, None, None)
+            .await?;
 
         if result.generations.is_empty() || result.generations[0].is_empty() {
             return Err(Error::Other("No generations returned".into()));
