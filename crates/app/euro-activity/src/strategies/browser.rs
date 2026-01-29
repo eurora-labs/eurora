@@ -2,25 +2,41 @@
 
 pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
+use crate::strategies::{ActivityReport, StrategyMetadata};
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
+use crate::{
+    Activity, ActivityError,
+    error::ActivityResult,
+    types::{ActivityAsset, ActivitySnapshot},
+};
 use async_trait::async_trait;
 use dashmap::DashMap;
+use euro_native_messaging::proto::GetParentPidRequest;
 use euro_native_messaging::proto::RequestFrame;
 use euro_native_messaging::proto::ResponseFrame;
 use euro_native_messaging::{
-    NativeMessage, create_browser_bridge_client,
-    server::{Frame, FrameKind},
+    Channel, NativeMessage, create_browser_bridge_client,
+    server::{BrowserBridgeClient, Frame, FrameKind},
 };
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use tokio::sync::RwLock;
 use tokio::sync::broadcast;
 use tokio::sync::{Mutex, mpsc, oneshot};
+use tonic::Status;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
-use crate::strategies::{ActivityReport, StrategyMetadata};
+mod server;
+
+mod proto {
+    tonic::include_proto!("browser_bridge");
+}
+
+pub type NativeMessengersRegistry = Arc<RwLock<HashMap<u32, mpsc::Sender<Result<Frame, Status>>>>>;
 
 /// Wrapper for pending request sender
 struct PendingRequest {
@@ -48,15 +64,11 @@ impl PendingRequest {
     }
 }
 
-use crate::{
-    Activity, ActivityError,
-    error::ActivityResult,
-    types::{ActivityAsset, ActivitySnapshot},
-};
-
 /// Browser strategy for collecting web browser activity data
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BrowserStrategy {
+    #[serde(skip)]
+    pub registry: NativeMessengersRegistry,
     #[serde(skip)]
     tracking_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
     #[serde(skip)]
@@ -80,6 +92,10 @@ pub struct BrowserStrategy {
 
     #[serde(skip)]
     active_browser: Option<String>,
+
+    /// gRPC client for browser bridge communication
+    #[serde(skip)]
+    bridge_client: Option<BrowserBridgeClient<Channel>>,
 }
 
 impl BrowserStrategy {
@@ -175,7 +191,49 @@ impl BrowserStrategy {
         self.request_id_counter = Some(request_id_counter);
         self.stream_task_handle = Some(Arc::new(stream_task));
         self.activity_event_tx = Some(activity_event_tx);
+        self.bridge_client = Some(client);
 
+        Ok(())
+    }
+
+    /// Validates that the focused window's process is the parent process of the native messaging host.
+    /// This ensures we're tracking the correct browser instance that started the extension.
+    async fn validate_browser_pid(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
+        let client = self
+            .bridge_client
+            .as_mut()
+            .ok_or_else(|| ActivityError::Strategy("Bridge client not initialized".to_string()))?;
+
+        let response = client
+            .get_parent_pid(GetParentPidRequest {})
+            .await
+            .map_err(|e| {
+                ActivityError::Network(format!("Failed to get parent PID from bridge: {}", e))
+            })?;
+
+        let parent_pid = response.into_inner().parent_pid;
+        let focus_pid = focus_window.process_id;
+
+        debug!(
+            "Validating browser PID: focus_window.process_id={}, bridge.parent_pid={}",
+            focus_pid, parent_pid
+        );
+
+        if focus_pid != parent_pid {
+            warn!(
+                "Browser PID mismatch: focused window PID {} does not match native messaging host parent PID {}",
+                focus_pid, parent_pid
+            );
+            return Err(ActivityError::Strategy(format!(
+                "Cannot support this browser process: PID {} does not match the browser that started the extension (PID {})",
+                focus_pid, parent_pid
+            )));
+        }
+
+        info!(
+            "Browser PID validated successfully: PID {} matches native messaging host parent",
+            focus_pid
+        );
         Ok(())
     }
 
@@ -277,6 +335,9 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         focus_window: &FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
+        // Validate that the focused browser PID matches the native messaging host's parent PID
+        self.validate_browser_pid(focus_window).await?;
+
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
         self.active_browser = Some(process_name.clone());
