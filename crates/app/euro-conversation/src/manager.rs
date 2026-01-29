@@ -7,8 +7,8 @@ use agent_chain::{BaseMessage, HumanMessage, SystemMessage};
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
     AddHumanMessageRequest, AddSystemMessageRequest, ChatStreamRequest, CreateConversationRequest,
-    GetConversationRequest, GetMessagesRequest, ListConversationsRequest,
-    proto_conversation_service_client::ProtoConversationServiceClient,
+    GenerateConversationTitleRequest, GetConversationRequest, GetMessagesRequest,
+    ListConversationsRequest, proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::broadcast;
@@ -81,7 +81,7 @@ impl ConversationManager {
                 self.current_conversation
                     .set_id(uuid::Uuid::parse_str(&conversation.id).unwrap())?;
             }
-            Ok(Conversation::default())
+            Ok(conversation.into())
         } else {
             Err(Error::CreateConversation(
                 "Server did not return the saved conversation".to_string(),
@@ -89,12 +89,14 @@ impl ConversationManager {
         }
     }
 
-    pub async fn ensure_remote_conversation(&mut self) -> Result<()> {
+    pub async fn ensure_remote_conversation(&mut self) -> Result<Conversation> {
         if self.current_conversation.id().is_none() {
             let request = CreateConversationRequest::default();
-            self.save_current_conversation(request).await?;
+            let conversation = self.save_current_conversation(request).await?;
+            return Ok(conversation);
         }
-        Ok(())
+
+        Ok(self.current_conversation.clone())
     }
 
     pub async fn list_conversations(
@@ -169,6 +171,28 @@ impl ConversationManager {
             .into_iter()
             .map(BaseMessage::from)
             .collect())
+    }
+
+    pub async fn generate_conversation_title(
+        &self,
+        conversation_id: String,
+        content: String,
+    ) -> Result<Conversation> {
+        let mut client = self.conversation_client.clone();
+        let response = client
+            .generate_conversation_title(GenerateConversationTitleRequest {
+                conversation_id,
+                content,
+            })
+            .await?
+            .into_inner();
+
+        match response.conversation {
+            Some(conversation) => Ok(conversation.into()),
+            None => Err(Error::UpdateConversation(
+                "Conversation title could not be generated".to_string(),
+            )),
+        }
     }
 }
 

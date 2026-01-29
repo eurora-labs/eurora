@@ -9,6 +9,9 @@ pub enum Error {
     #[error("Failed to create conversation: {0}")]
     CreateConversation(String),
 
+    #[error("Failed to update conversation: {0}")]
+    UpdateConversation(String),
+
     #[error("Could not send event: {0}")]
     SendEvent(#[source] SendError<ConversationEvent>),
 

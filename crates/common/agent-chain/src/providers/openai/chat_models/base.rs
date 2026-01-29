@@ -1359,9 +1359,60 @@ impl BaseChatModel for ChatOpenAI {
         self.generate_with_tools_internal(messages, tools, tool_choice, stop)
             .await
     }
+
+    /// Invoke the model with input and optional stop sequences.
+    ///
+    /// This overrides the default `BaseChatModel::invoke` to support stop sequences.
+    async fn invoke(&self, input: LanguageModelInput) -> Result<AIMessage> {
+        self.invoke_with_stop(input, None).await
+    }
 }
 
 impl ChatOpenAI {
+    /// Invoke the model with input and optional stop sequences.
+    ///
+    /// This is the primary method for generating a response from the model.
+    /// It converts the input to messages and calls the internal generate method.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input to the model (string, messages, or PromptValue).
+    /// * `stop` - Optional stop sequences that will cause the model to stop generating.
+    ///
+    /// # Returns
+    ///
+    /// An `AIMessage` containing the model's response.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use agent_chain::providers::openai::ChatOpenAI;
+    /// use agent_chain_core::language_models::LanguageModelInput;
+    ///
+    /// let model = ChatOpenAI::new("gpt-4o");
+    /// let response = model.invoke_with_stop(
+    ///     LanguageModelInput::from("Hello, world!"),
+    ///     Some(vec!["STOP".to_string()]),
+    /// ).await?;
+    /// ```
+    pub async fn invoke_with_stop(
+        &self,
+        input: LanguageModelInput,
+        stop: Option<Vec<String>>,
+    ) -> Result<AIMessage> {
+        let messages = input.to_messages();
+        let result = self._generate_internal(messages, stop, None).await?;
+
+        if result.generations.is_empty() {
+            return Err(Error::other("No generations returned"));
+        }
+
+        match result.generations[0].message.clone() {
+            BaseMessage::AI(message) => Ok(message),
+            _ => Err(Error::other("Unexpected message type")),
+        }
+    }
+
     /// Internal generate implementation.
     async fn _generate_internal(
         &self,
