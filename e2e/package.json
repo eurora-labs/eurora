@@ -3,8 +3,8 @@
 	"type": "module",
 	"private": true,
 	"devDependencies": {
-		"@playwright/test": "1.57.0",
-		"@types/chrome": "^0.1.34",
+		"@playwright/test": "1.58.0",
+		"@types/chrome": "^0.1.36",
 		"@types/node": "^24.10.9",
 		"@wdio/cli": "^9.23.2",
 		"@wdio/globals": "^9.23.0",
