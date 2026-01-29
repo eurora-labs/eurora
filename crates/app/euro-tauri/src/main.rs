@@ -319,16 +319,16 @@ fn main() {
 
 
                     // Initialize IPC client
-                    let ipc_handle = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        match create_browser_bridge_client().await {
-                            Ok(ipc_client) => {
-                                ipc_handle.manage(ipc_client.clone());
-                                debug!("gRPC IPC client initialized");
-                            }
-                            Err(e) => error!("Failed to initialize gRPC IPC client: {}", e),
-                        }
-                    });
+                    // let ipc_handle = app_handle.clone();
+                    // tauri::async_runtime::spawn(async move {
+                    //     match create_browser_bridge_client().await {
+                    //         Ok(ipc_client) => {
+                    //             ipc_handle.manage(ipc_client.clone());
+                    //             debug!("gRPC IPC client initialized");
+                    //         }
+                    //         Err(e) => error!("Failed to initialize gRPC IPC client: {}", e),
+                    //     }
+                    // });
 
                     Ok(())
                 })

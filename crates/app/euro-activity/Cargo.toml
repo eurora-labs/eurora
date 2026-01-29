@@ -48,9 +48,6 @@ url = { workspace = true }
 usvg = { version = "0.45" }
 uuid = { workspace = true }
 
-[dev-dependencies]
-tracing-subscriber = { workspace = true }
-
 [build-dependencies]
 tonic-prost-build = { workspace = true }
 
