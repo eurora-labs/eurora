@@ -7,7 +7,6 @@ use tauri::{Manager, Runtime};
 pub struct ConversationView {
     pub id: Option<String>,
     pub title: String,
-    // pub messages: Vec<MessageView>,
 }
 
 #[taurpc::ipc_type]
@@ -21,6 +20,9 @@ pub struct MessageView {
 pub trait ConversationApi {
     #[taurpc(event)]
     async fn new_conversation_added(conversation: ConversationView);
+
+    #[taurpc(event)]
+    async fn conversation_title_changed(conversation: ConversationView);
 
     #[taurpc(event)]
     async fn current_conversation_changed(conversation: ConversationView);
@@ -145,29 +147,6 @@ impl ConversationApi for ConversationApiImpl {
             .map_err(|e| e.to_string())?;
 
         Ok(conversation.into())
-
-        // todo!("Implement switch_conversation")
-        // let personal_db = app_handle.state::<PersonalDatabaseManager>().inner();
-
-        // let conversation = personal_db
-        //     .get_conversation(&conversation_id)
-        //     .await
-        //     .map_err(|e| format!("Failed to get conversation: {}", e))?;
-
-        // let current = app_handle.state::<SharedCurrentConversation>();
-        // let mut guard = current.lock().await;
-        // *guard = Some(conversation.clone());
-
-        // TauRpcChatApiEventTrigger::new(app_handle.clone())
-        //     .current_conversation_changed(conversation.clone())
-        //     .map_err(|e| e.to_string())?;
-
-        // let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
-        // let conversation_manager = conversation_state.lock().await;
-        // Ok(conversation_manager
-        //     .get_current_conversation()
-        //     .await
-        //     .clone())
     }
 }
 
@@ -176,11 +155,6 @@ impl From<Conversation> for ConversationView {
         ConversationView {
             id: conversation.id().map(|id| id.to_string()),
             title: conversation.title().to_string(),
-            // messages: conversation
-            //     .messages()
-            //     .iter()
-            //     .map(MessageView::from)
-            //     .collect(),
         }
     }
 }

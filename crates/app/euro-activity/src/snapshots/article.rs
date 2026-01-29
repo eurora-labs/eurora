@@ -52,46 +52,6 @@ impl ArticleSnapshot {
             updated_at: now,
         })
     }
-
-    /// Update the timestamp
-    pub fn touch(&mut self) {
-        self.updated_at = chrono::Utc::now().timestamp() as u64;
-    }
-
-    /// Check if the snapshot has any content
-    pub fn has_content(&self) -> bool {
-        self.highlight.is_some() || self.selection_text.is_some()
-    }
-
-    /// Get the primary content (highlight or selection)
-    pub fn get_primary_content(&self) -> Option<&str> {
-        self.highlight.as_deref().or(self.selection_text.as_deref())
-    }
-
-    /// Get content length
-    pub fn get_content_length(&self) -> usize {
-        self.get_primary_content()
-            .map_or(0, |content| content.len())
-    }
-
-    /// Check if content contains a keyword
-    pub fn contains_keyword(&self, keyword: &str) -> bool {
-        let keyword_lower = keyword.to_lowercase();
-
-        if let Some(content) = self.get_primary_content()
-            && content.to_lowercase().contains(&keyword_lower)
-        {
-            return true;
-        }
-
-        if let Some(title) = &self.page_title
-            && title.to_lowercase().contains(&keyword_lower)
-        {
-            return true;
-        }
-
-        false
-    }
 }
 
 impl SnapshotFunctionality for ArticleSnapshot {
@@ -162,7 +122,6 @@ mod tests {
         assert_eq!(snapshot.highlight, Some("Highlighted text".to_string()));
         assert!(snapshot.created_at > 0);
         assert_eq!(snapshot.created_at, snapshot.updated_at);
-        assert!(snapshot.has_content());
     }
 
     #[test]
@@ -185,56 +144,6 @@ mod tests {
     }
 
     #[test]
-    fn test_primary_content() {
-        let with_highlight = ArticleSnapshot::new(
-            None,
-            Some("Highlighted text".to_string()),
-            Some("Selected text".to_string()),
-            Some("https://example.com/article".to_string()),
-            Some("Test Article".to_string()),
-        );
-        assert_eq!(
-            with_highlight.get_primary_content(),
-            Some("Highlighted text")
-        );
-
-        let with_selection =
-            ArticleSnapshot::new(None, None, Some("Selection".to_string()), None, None);
-        assert_eq!(with_selection.get_primary_content(), Some("Selection"));
-
-        let empty = ArticleSnapshot::new(None, None, None, None, None);
-        assert_eq!(empty.get_primary_content(), None);
-        assert!(!empty.has_content());
-    }
-
-    #[test]
-    fn test_content_length() {
-        let snapshot =
-            ArticleSnapshot::new(None, Some("Hello world".to_string()), None, None, None);
-        assert_eq!(snapshot.get_content_length(), 11);
-
-        let empty = ArticleSnapshot::new(None, None, None, None, None);
-        assert_eq!(empty.get_content_length(), 0);
-    }
-
-    #[test]
-    fn test_keyword_search() {
-        let snapshot = ArticleSnapshot::new(
-            None,
-            Some("Rust programming language".to_string()),
-            None,
-            None,
-            Some("Learning Rust".to_string()),
-        );
-
-        assert!(snapshot.contains_keyword("rust"));
-        assert!(snapshot.contains_keyword("Rust"));
-        assert!(snapshot.contains_keyword("programming"));
-        assert!(snapshot.contains_keyword("learning"));
-        assert!(!snapshot.contains_keyword("python"));
-    }
-
-    #[test]
     fn test_message_construction() {
         let snapshot = ArticleSnapshot::new(
             None,
@@ -250,16 +159,5 @@ mod tests {
         assert!(text.contains("Test Article"));
         assert!(text.contains("Important quote"));
         assert!(text.contains("https://example.com"));
-    }
-
-    #[test]
-    fn test_touch_updates_timestamp() {
-        let mut snapshot = ArticleSnapshot::new(None, Some("Test".to_string()), None, None, None);
-        let original_updated_at = snapshot.updated_at;
-
-        std::thread::sleep(std::time::Duration::from_millis(1));
-        snapshot.touch();
-
-        assert!(snapshot.updated_at >= original_updated_at);
     }
 }
