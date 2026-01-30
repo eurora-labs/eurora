@@ -1,8 +1,13 @@
 //! Browser strategy implementation for the refactored activity system
 //!
-//! This module implements a gRPC server that accepts connections from multiple
-//! native messaging hosts (euro-native-messaging). Each host registers with its
-//! browser PID, allowing the server to route requests to the correct browser.
+//! This module uses the singleton gRPC server from `euro_browser` crate to accept
+//! connections from multiple native messaging hosts (euro-native-messaging). Each
+//! host registers with its browser PID, allowing the server to route requests to
+//! the correct browser.
+//!
+//! The gRPC server is managed by the TimelineManager and runs as long as the manager
+//! is alive. The BrowserStrategy only connects to the singleton service but does not
+//! manage its lifecycle.
 
 pub use crate::strategies::ActivityStrategyFunctionality;
 pub use crate::strategies::processes::*;
@@ -18,30 +23,17 @@ use dashmap::DashMap;
 use euro_native_messaging::NativeMessage;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
-use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::broadcast;
 use tokio::sync::{mpsc, oneshot};
-use tonic::transport::Server;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
-pub mod server;
-
-mod proto {
-    tonic::include_proto!("browser_bridge");
-}
-
-pub use proto::{
-    EventFrame, Frame, RegisterFrame, RequestFrame, ResponseFrame,
-    browser_bridge_server::BrowserBridgeServer, frame::Kind as FrameKind,
+// Re-export the singleton service and types from euro_browser crate
+pub use euro_browser::{
+    BrowserBridgeServer, BrowserBridgeService, Frame, FrameKind, RequestFrame, ResponseFrame,
 };
-
-pub use server::BrowserBridgeService;
-
-/// The port for the browser bridge gRPC server
-pub const BROWSER_BRIDGE_PORT: &str = "1431";
 
 /// Wrapper for pending request sender
 struct PendingRequest {
@@ -70,6 +62,10 @@ impl PendingRequest {
 }
 
 /// Browser strategy for collecting web browser activity data
+///
+/// The gRPC server is managed as a global singleton that persists independently
+/// of the strategy lifecycle. This allows connections from native messengers to
+/// be maintained even when tracking stops.
 #[derive(Clone, Serialize, Deserialize, Default)]
 pub struct BrowserStrategy {
     #[serde(skip)]
@@ -77,13 +73,10 @@ pub struct BrowserStrategy {
     #[serde(skip)]
     sender: Option<mpsc::UnboundedSender<ActivityReport>>,
 
-    /// The gRPC server service that handles native messenger connections
+    /// Reference to the global singleton bridge service
+    /// Note: The actual service is stored globally and accessed via BrowserBridgeService::get_or_init()
     #[serde(skip)]
-    bridge_service: Option<BrowserBridgeService>,
-
-    /// Handle to the gRPC server task
-    #[serde(skip)]
-    server_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
+    bridge_service: Option<&'static BrowserBridgeService>,
 
     /// Pending requests waiting for responses
     #[serde(skip)]
@@ -108,10 +101,14 @@ pub struct BrowserStrategy {
 }
 
 impl BrowserStrategy {
-    /// Creates and starts the gRPC server that accepts native messenger connections
-    async fn initialize_server(&mut self) -> ActivityResult<()> {
-        let service = BrowserBridgeService::new();
-        let service_clone = service.clone();
+    /// Initializes the browser strategy by connecting to the singleton service
+    ///
+    /// The gRPC server is managed by the TimelineManager. This method only connects
+    /// to the singleton service and sets up the frame handler for this strategy instance.
+    /// The server should already be running when this is called.
+    async fn initialize_service(&mut self) -> ActivityResult<()> {
+        // Get the global singleton service instance (server is started by TimelineManager)
+        let service = BrowserBridgeService::get_or_init().await;
 
         let pending_requests = Arc::new(DashMap::<u32, PendingRequest>::new());
         let request_id_counter = Arc::new(AtomicU32::new(1));
@@ -212,28 +209,7 @@ impl BrowserStrategy {
             debug!("Frame handler task ended");
         });
 
-        // Start the gRPC server
-        let server_handle = tokio::spawn(async move {
-            let addr = format!("[::1]:{}", BROWSER_BRIDGE_PORT)
-                .to_socket_addrs()
-                .unwrap()
-                .next()
-                .unwrap();
-
-            info!("Starting Browser Bridge gRPC server at {}", addr);
-
-            if let Err(e) = Server::builder()
-                .add_service(BrowserBridgeServer::new(service_clone))
-                .serve(addr)
-                .await
-            {
-                error!("Browser Bridge gRPC server error: {}", e);
-            }
-            info!("Browser Bridge gRPC server ended");
-        });
-
         self.bridge_service = Some(service);
-        self.server_handle = Some(Arc::new(server_handle));
         self.pending_requests = Some(pending_requests);
         self.request_id_counter = Some(request_id_counter);
         self.frame_handler_handle = Some(Arc::new(frame_handler));
@@ -244,6 +220,7 @@ impl BrowserStrategy {
 
     /// Validates that the focused window's process is registered as a native messenger.
     /// This ensures we're tracking a browser that has the extension installed.
+    #[allow(dead_code)]
     async fn validate_browser_pid(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
         let service = self
             .bridge_service
@@ -361,19 +338,13 @@ impl BrowserStrategy {
         Ok(())
     }
 
-    /// Create a new browser strategy and start the gRPC server
+    /// Create a new browser strategy and connect to the singleton service
+    ///
+    /// Note: The gRPC server must be started by the TimelineManager before creating
+    /// a BrowserStrategy. This method only connects to the existing singleton service.
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = BrowserStrategy::default();
-        strategy.initialize_server().await?;
-
-        // let metadata = strategy
-        //     .clone()
-        //     .bridge_service
-        //     .unwrap()
-        //     .get_metadata()
-        //     .await
-        //     .unwrap();
-        // info!("Browser metadata: {:?}", metadata);
+        strategy.initialize_service().await?;
 
         Ok(strategy)
     }

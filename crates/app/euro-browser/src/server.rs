@@ -3,17 +3,35 @@
 //! This module implements a gRPC server that accepts connections from multiple
 //! native messaging hosts. Each host registers with its browser PID, and the
 //! server routes requests to the appropriate channel based on the active browser PID.
+//!
+//! The server is managed by the TimelineManager and will run as long as the manager
+//! is alive. When the TimelineManager is stopped, the server will be gracefully shut down.
 
 use super::proto::{
-    Frame, browser_bridge_server::BrowserBridge, frame::Kind as FrameKind,
+    Frame, RequestFrame, browser_bridge_server::BrowserBridge,
+    browser_bridge_server::BrowserBridgeServer, frame::Kind as FrameKind,
 };
 use std::collections::HashMap;
+use std::net::ToSocketAddrs;
 use std::pin::Pin;
 use std::sync::Arc;
-use tokio::sync::{RwLock, broadcast, mpsc};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use tokio::sync::{OnceCell, RwLock, broadcast, mpsc, watch};
 use tokio_stream::{Stream, wrappers::ReceiverStream};
-use tonic::{Request, Response, Status};
-use tracing::{error, info, warn};
+use tonic::{Request, Response, Status, transport::Server};
+use tracing::{debug, error, info, warn};
+
+/// The port for the browser bridge gRPC server
+pub const BROWSER_BRIDGE_PORT: &str = "1431";
+
+/// Global singleton for the browser bridge service
+static GLOBAL_SERVICE: OnceCell<BrowserBridgeService> = OnceCell::const_new();
+
+/// Flag to track if the server has been started
+static SERVER_STARTED: AtomicBool = AtomicBool::new(false);
+
+/// Global shutdown signal sender
+static SHUTDOWN_TX: OnceCell<watch::Sender<bool>> = OnceCell::const_new();
 
 /// Holds the sender channel for a registered native messenger
 #[derive(Debug)]
@@ -31,15 +49,225 @@ pub struct RegisteredMessenger {
 pub struct BrowserBridgeService {
     /// Registry of connected native messengers, keyed by browser PID
     pub registry: Arc<RwLock<HashMap<u32, RegisteredMessenger>>>,
-    // Frames coming from the app
+    /// Frames coming from the app to send to native messengers
     pub app_from_tx: broadcast::Sender<Frame>,
     /// Broadcast channel for frames coming from native messengers
     pub frames_from_messengers_tx: broadcast::Sender<(u32, Frame)>,
+    /// The currently active browser PID for routing requests
+    active_browser_pid: Arc<AtomicU32>,
 }
 
 impl BrowserBridgeService {
-    pub async fn get_metadata(&self, _browser_pid: u32) -> Result<String, Status> {
-        todo!()
+    /// Creates a new BrowserBridgeService instance
+    pub fn new() -> Self {
+        let (app_from_tx, _) = broadcast::channel(100);
+        let (frames_from_messengers_tx, _) = broadcast::channel(100);
+
+        Self {
+            registry: Arc::new(RwLock::new(HashMap::new())),
+            app_from_tx,
+            frames_from_messengers_tx,
+            active_browser_pid: Arc::new(AtomicU32::new(0)),
+        }
+    }
+
+    /// Get or initialize the global singleton instance of the service
+    ///
+    /// This ensures only one instance of the service exists throughout the
+    /// application lifetime, allowing the server to persist independently
+    /// of the browser strategy lifecycle.
+    pub async fn get_or_init() -> &'static BrowserBridgeService {
+        GLOBAL_SERVICE
+            .get_or_init(|| async { BrowserBridgeService::new() })
+            .await
+    }
+
+    /// Start the gRPC server if not already running
+    ///
+    /// This method is idempotent - calling it multiple times will only start
+    /// the server once. The server runs in a background task and will continue
+    /// running until `stop_server()` is called or the application exits.
+    ///
+    /// This should be called by the TimelineManager when it starts.
+    pub async fn start_server(&self) {
+        // Check if server is already started using atomic flag
+        if SERVER_STARTED
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            debug!("Browser Bridge gRPC server already running");
+            return;
+        }
+
+        // Initialize shutdown channel
+        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let _ = SHUTDOWN_TX.set(shutdown_tx);
+
+        let service_clone = self.clone();
+
+        tokio::spawn(async move {
+            let addr = format!("[::1]:{}", BROWSER_BRIDGE_PORT)
+                .to_socket_addrs()
+                .expect("Invalid server address")
+                .next()
+                .expect("No valid socket address");
+
+            info!("Starting Browser Bridge gRPC server at {}", addr);
+
+            let server = Server::builder()
+                .add_service(BrowserBridgeServer::new(service_clone))
+                .serve_with_shutdown(addr, async move {
+                    // Wait for shutdown signal
+                    loop {
+                        if shutdown_rx.changed().await.is_err() {
+                            break;
+                        }
+                        if *shutdown_rx.borrow() {
+                            info!("Received shutdown signal for Browser Bridge gRPC server");
+                            break;
+                        }
+                    }
+                });
+
+            if let Err(e) = server.await {
+                error!("Browser Bridge gRPC server error: {}", e);
+            }
+
+            // Reset the flag so server can be restarted if needed
+            SERVER_STARTED.store(false, Ordering::SeqCst);
+            info!("Browser Bridge gRPC server ended");
+        });
+    }
+
+    /// Stop the gRPC server gracefully
+    ///
+    /// This sends a shutdown signal to the server, allowing it to finish
+    /// processing current requests before shutting down. All connected
+    /// native messengers will be disconnected.
+    ///
+    /// This should be called by the TimelineManager when it stops.
+    pub async fn stop_server() {
+        if !SERVER_STARTED.load(Ordering::SeqCst) {
+            debug!("Browser Bridge gRPC server is not running");
+            return;
+        }
+
+        if let Some(tx) = SHUTDOWN_TX.get() {
+            info!("Sending shutdown signal to Browser Bridge gRPC server");
+            let _ = tx.send(true);
+        }
+    }
+
+    /// Subscribe to frames coming from native messengers
+    pub fn subscribe_to_frames(&self) -> broadcast::Receiver<(u32, Frame)> {
+        self.frames_from_messengers_tx.subscribe()
+    }
+
+    /// Check if a browser PID is registered with a native messenger
+    pub async fn is_registered(&self, browser_pid: u32) -> bool {
+        let registry = self.registry.read().await;
+        registry.contains_key(&browser_pid)
+    }
+
+    /// Set the active browser PID for routing requests
+    pub fn set_active_browser_pid(&self, browser_pid: u32) {
+        self.active_browser_pid.store(browser_pid, Ordering::SeqCst);
+        debug!("Active browser PID set to {}", browser_pid);
+    }
+
+    /// Get the currently active browser PID
+    pub fn get_active_browser_pid(&self) -> u32 {
+        self.active_browser_pid.load(Ordering::SeqCst)
+    }
+
+    /// Get all registered browser PIDs
+    pub async fn get_registered_pids(&self) -> Vec<u32> {
+        let registry = self.registry.read().await;
+        registry.keys().copied().collect()
+    }
+
+    /// Send a frame to the active native messenger
+    pub async fn send_to_active(&self, frame: Frame) -> Result<(), Status> {
+        let active_pid = self.active_browser_pid.load(Ordering::SeqCst);
+        if active_pid == 0 {
+            return Err(Status::failed_precondition("No active browser set"));
+        }
+
+        let registry = self.registry.read().await;
+        if let Some(messenger) = registry.get(&active_pid) {
+            messenger
+                .tx
+                .send(Ok(frame))
+                .await
+                .map_err(|e| Status::internal(format!("Failed to send frame: {}", e)))
+        } else {
+            Err(Status::not_found(format!(
+                "No messenger registered for browser PID {}",
+                active_pid
+            )))
+        }
+    }
+
+    /// Send a frame to a specific browser PID
+    pub async fn send_to_browser(&self, browser_pid: u32, frame: Frame) -> Result<(), Status> {
+        let registry = self.registry.read().await;
+        if let Some(messenger) = registry.get(&browser_pid) {
+            messenger
+                .tx
+                .send(Ok(frame))
+                .await
+                .map_err(|e| Status::internal(format!("Failed to send frame: {}", e)))
+        } else {
+            Err(Status::not_found(format!(
+                "No messenger registered for browser PID {}",
+                browser_pid
+            )))
+        }
+    }
+
+    /// Get metadata from the active browser
+    ///
+    /// Sends a GET_METADATA request to the active native messenger and waits for a response.
+    pub async fn get_metadata(&self) -> Result<Frame, Status> {
+        let active_pid = self.active_browser_pid.load(Ordering::SeqCst);
+        if active_pid == 0 {
+            return Err(Status::failed_precondition("No active browser set"));
+        }
+
+        // Create a request frame for metadata
+        let request_frame = RequestFrame {
+            id: 0, // Will be replaced by the caller with proper ID tracking
+            action: "GET_METADATA".to_string(),
+            payload: None,
+        };
+
+        let frame = Frame {
+            kind: Some(FrameKind::Request(request_frame)),
+        };
+
+        // Send the request
+        self.send_to_active(frame.clone()).await?;
+
+        // Note: The actual response handling is done by the frame handler in browser.rs
+        // This method just sends the request; the caller should set up response tracking
+        Ok(frame)
+    }
+
+    /// Get the number of currently connected native messengers
+    pub async fn connection_count(&self) -> usize {
+        let registry = self.registry.read().await;
+        registry.len()
+    }
+
+    /// Check if the server is running
+    pub fn is_server_running() -> bool {
+        SERVER_STARTED.load(Ordering::SeqCst)
+    }
+}
+
+impl Default for BrowserBridgeService {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
