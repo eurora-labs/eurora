@@ -23,6 +23,7 @@ pub use server::{BROWSER_BRIDGE_PORT, BrowserBridgeService, RegisteredMessenger}
 /// and starts the server. Should be called when TimelineManager starts.
 pub async fn start_browser_bridge_server() {
     let service = BrowserBridgeService::get_or_init().await;
+    service.start_frame_handler();
     service.start_server().await;
 }
 

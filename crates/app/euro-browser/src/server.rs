@@ -8,15 +8,17 @@
 //! is alive. When the TimelineManager is stopped, the server will be gracefully shut down.
 
 use super::proto::{
-    Frame, RequestFrame, browser_bridge_server::BrowserBridge,
+    Frame, RequestFrame, ResponseFrame, browser_bridge_server::BrowserBridge,
     browser_bridge_server::BrowserBridgeServer, frame::Kind as FrameKind,
 };
+use dashmap::DashMap;
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use tokio::sync::{OnceCell, RwLock, broadcast, mpsc, watch};
+use std::time::Duration;
+use tokio::sync::{OnceCell, RwLock, broadcast, mpsc, oneshot, watch};
 use tokio_stream::{Stream, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, transport::Server};
 use tracing::{debug, error, info, warn};
@@ -32,6 +34,35 @@ static SERVER_STARTED: AtomicBool = AtomicBool::new(false);
 
 /// Global shutdown signal sender
 static SHUTDOWN_TX: OnceCell<watch::Sender<bool>> = OnceCell::const_new();
+
+/// Default timeout for request-response operations
+const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Wrapper for pending request sender
+struct PendingRequest {
+    sender: oneshot::Sender<Frame>,
+}
+
+impl std::fmt::Debug for PendingRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PendingRequest")
+            .field("sender", &"oneshot::Sender<Frame>")
+            .finish()
+    }
+}
+
+impl PendingRequest {
+    fn new(sender: oneshot::Sender<Frame>) -> Self {
+        Self { sender }
+    }
+
+    fn send(self, frame: Frame) -> Result<(), ()> {
+        if self.sender.send(frame).is_err() {
+            error!("Failed to send frame to waiting request");
+        }
+        Ok(())
+    }
+}
 
 /// Holds the sender channel for a registered native messenger
 #[derive(Debug)]
@@ -53,8 +84,12 @@ pub struct BrowserBridgeService {
     pub app_from_tx: broadcast::Sender<Frame>,
     /// Broadcast channel for frames coming from native messengers
     pub frames_from_messengers_tx: broadcast::Sender<(u32, Frame)>,
-    /// The currently active browser PID for routing requests
-    active_browser_pid: Arc<AtomicU32>,
+    /// Pending requests waiting for responses, keyed by request ID
+    pending_requests: Arc<DashMap<u32, PendingRequest>>,
+    /// Counter for generating unique request IDs
+    request_id_counter: Arc<AtomicU32>,
+    /// Handle for the frame handler task
+    frame_handler_handle: Arc<OnceCell<tokio::task::JoinHandle<()>>>,
 }
 
 impl BrowserBridgeService {
@@ -67,8 +102,101 @@ impl BrowserBridgeService {
             registry: Arc::new(RwLock::new(HashMap::new())),
             app_from_tx,
             frames_from_messengers_tx,
-            active_browser_pid: Arc::new(AtomicU32::new(0)),
+            pending_requests: Arc::new(DashMap::new()),
+            request_id_counter: Arc::new(AtomicU32::new(1)),
+            frame_handler_handle: Arc::new(OnceCell::new()),
         }
+    }
+
+    /// Start the frame handler task that routes responses to pending requests
+    ///
+    /// This task listens for frames from native messengers and routes responses
+    /// to their corresponding pending requests. It should be started once when
+    /// the service is initialized.
+    pub fn start_frame_handler(&self) {
+        let pending_requests = Arc::clone(&self.pending_requests);
+        let frames_from_messengers_tx = self.frames_from_messengers_tx.clone();
+        let mut frames_rx = frames_from_messengers_tx.subscribe();
+
+        let handle = tokio::spawn(async move {
+            debug!("Frame handler task started");
+            while let Ok((browser_pid, frame)) = frames_rx.recv().await {
+                let kind = match &frame.kind {
+                    Some(k) => k.clone(),
+                    None => {
+                        warn!(
+                            "Received frame with no kind from browser PID {}",
+                            browser_pid
+                        );
+                        continue;
+                    }
+                };
+
+                match kind {
+                    FrameKind::Request(req_frame) => {
+                        debug!(
+                            "Received request frame from browser PID {}: id={}, action={}",
+                            browser_pid, req_frame.id, req_frame.action
+                        );
+                        // For now, log unsupported requests from browser extension
+                        warn!(
+                            "Received unsupported request from browser extension: action={}",
+                            req_frame.action
+                        );
+                    }
+                    FrameKind::Response(resp_frame) => {
+                        // Match response to pending request
+                        if let Some((_, pending_request)) = pending_requests.remove(&resp_frame.id)
+                        {
+                            let frame = Frame {
+                                kind: Some(FrameKind::Response(resp_frame.clone())),
+                            };
+                            if let Err(err) = pending_request.send(frame) {
+                                warn!("Failed to send frame to waiting request: {:?}", err);
+                            }
+                        } else {
+                            debug!(
+                                "Received frame with no pending request: id={} action={}",
+                                resp_frame.id, resp_frame.action,
+                            );
+                        }
+                    }
+                    FrameKind::Event(evt_frame) => {
+                        // Event frames are broadcast to subscribers, no special handling needed here
+                        debug!("Received event frame: action={}", evt_frame.action);
+                    }
+                    FrameKind::Error(err_frame) => {
+                        error!(
+                            "Received error frame: id={}, message={}",
+                            err_frame.id, err_frame.message
+                        );
+                        // Match error to pending request if applicable
+                        if let Some((_, pending_request)) = pending_requests.remove(&err_frame.id) {
+                            let frame = Frame {
+                                kind: Some(FrameKind::Error(err_frame)),
+                            };
+                            if let Err(err) = pending_request.send(frame) {
+                                warn!("Failed to send error frame to waiting request: {:?}", err);
+                            }
+                        }
+                    }
+                    FrameKind::Cancel(cancel_frame) => {
+                        debug!("Received cancel frame: id={}", cancel_frame.id);
+                        // Remove pending request if it exists
+                        if pending_requests.remove(&cancel_frame.id).is_some() {
+                            debug!("Cancelled pending request: id={}", cancel_frame.id);
+                        }
+                    }
+                    FrameKind::Register(_) => {
+                        // Registration is handled by the server's Open method
+                        debug!("Received register frame (should be handled by server)");
+                    }
+                }
+            }
+            debug!("Frame handler task ended");
+        });
+
+        let _ = self.frame_handler_handle.set(handle);
     }
 
     /// Get or initialize the global singleton instance of the service
@@ -169,43 +297,10 @@ impl BrowserBridgeService {
         registry.contains_key(&browser_pid)
     }
 
-    /// Set the active browser PID for routing requests
-    pub fn set_active_browser_pid(&self, browser_pid: u32) {
-        self.active_browser_pid.store(browser_pid, Ordering::SeqCst);
-        debug!("Active browser PID set to {}", browser_pid);
-    }
-
-    /// Get the currently active browser PID
-    pub fn get_active_browser_pid(&self) -> u32 {
-        self.active_browser_pid.load(Ordering::SeqCst)
-    }
-
     /// Get all registered browser PIDs
     pub async fn get_registered_pids(&self) -> Vec<u32> {
         let registry = self.registry.read().await;
         registry.keys().copied().collect()
-    }
-
-    /// Send a frame to the active native messenger
-    pub async fn send_to_active(&self, frame: Frame) -> Result<(), Status> {
-        let active_pid = self.active_browser_pid.load(Ordering::SeqCst);
-        if active_pid == 0 {
-            return Err(Status::failed_precondition("No active browser set"));
-        }
-
-        let registry = self.registry.read().await;
-        if let Some(messenger) = registry.get(&active_pid) {
-            messenger
-                .tx
-                .send(Ok(frame))
-                .await
-                .map_err(|e| Status::internal(format!("Failed to send frame: {}", e)))
-        } else {
-            Err(Status::not_found(format!(
-                "No messenger registered for browser PID {}",
-                active_pid
-            )))
-        }
     }
 
     /// Send a frame to a specific browser PID
@@ -225,32 +320,99 @@ impl BrowserBridgeService {
         }
     }
 
-    /// Get metadata from the active browser
+    /// Send a request to a specific browser and wait for a response
     ///
-    /// Sends a GET_METADATA request to the active native messenger and waits for a response.
-    pub async fn get_metadata(&self) -> Result<Frame, Status> {
-        let active_pid = self.active_browser_pid.load(Ordering::SeqCst);
-        if active_pid == 0 {
-            return Err(Status::failed_precondition("No active browser set"));
-        }
+    /// This method handles the full request-response cycle:
+    /// 1. Generates a unique request ID
+    /// 2. Registers a pending request
+    /// 3. Sends the request frame
+    /// 4. Waits for the response with timeout
+    /// 5. Returns the response frame
+    pub async fn send_request(
+        &self,
+        browser_pid: u32,
+        action: &str,
+        payload: Option<String>,
+    ) -> Result<ResponseFrame, Status> {
+        // Generate unique request ID
+        let request_id = self.request_id_counter.fetch_add(1, Ordering::SeqCst);
 
-        // Create a request frame for metadata
+        // Create oneshot channel for response
+        let (tx, rx) = oneshot::channel();
+
+        // Register pending request
+        self.pending_requests
+            .insert(request_id, PendingRequest::new(tx));
+
+        // Create and send request frame
         let request_frame = RequestFrame {
-            id: 0, // Will be replaced by the caller with proper ID tracking
-            action: "GET_METADATA".to_string(),
-            payload: None,
+            id: request_id,
+            action: action.to_string(),
+            payload,
         };
+
+        debug!(
+            "Sending request frame: id={}, action={}, browser_pid={}",
+            request_id, action, browser_pid
+        );
 
         let frame = Frame {
             kind: Some(FrameKind::Request(request_frame)),
         };
 
-        // Send the request
-        self.send_to_active(frame.clone()).await?;
+        if let Err(e) = self.send_to_browser(browser_pid, frame).await {
+            // Clean up pending request on send failure
+            self.pending_requests.remove(&request_id);
+            return Err(e);
+        }
 
-        // Note: The actual response handling is done by the frame handler in browser.rs
-        // This method just sends the request; the caller should set up response tracking
-        Ok(frame)
+        // Wait for response with timeout
+        match tokio::time::timeout(DEFAULT_REQUEST_TIMEOUT, rx).await {
+            Ok(Ok(frame)) => match frame.kind {
+                Some(FrameKind::Response(response_frame)) => {
+                    debug!("Received response for request {}", request_id);
+                    Ok(response_frame)
+                }
+                Some(FrameKind::Error(error_frame)) => Err(Status::internal(format!(
+                    "Browser error: {}",
+                    error_frame.message
+                ))),
+                _ => Err(Status::internal("Unexpected frame kind in response")),
+            },
+            Ok(Err(_)) => {
+                error!("Response channel closed for request {}", request_id);
+                Err(Status::internal("Response channel closed"))
+            }
+            Err(_) => {
+                error!("Timeout waiting for response to request {}", request_id);
+                // Clean up pending request on timeout
+                self.pending_requests.remove(&request_id);
+                Err(Status::deadline_exceeded("Request timeout"))
+            }
+        }
+    }
+
+    /// Get metadata from a specific browser
+    ///
+    /// Sends a GET_METADATA request to the specified native messenger and waits for a response.
+    pub async fn get_metadata(&self, browser_pid: u32) -> Result<ResponseFrame, Status> {
+        self.send_request(browser_pid, "GET_METADATA", None).await
+    }
+
+    /// Generate assets from a specific browser
+    ///
+    /// Sends a GENERATE_ASSETS request to the specified native messenger and waits for a response.
+    pub async fn generate_assets(&self, browser_pid: u32) -> Result<ResponseFrame, Status> {
+        self.send_request(browser_pid, "GENERATE_ASSETS", None)
+            .await
+    }
+
+    /// Generate a snapshot from a specific browser
+    ///
+    /// Sends a GENERATE_SNAPSHOT request to the specified native messenger and waits for a response.
+    pub async fn generate_snapshot(&self, browser_pid: u32) -> Result<ResponseFrame, Status> {
+        self.send_request(browser_pid, "GENERATE_SNAPSHOT", None)
+            .await
     }
 
     /// Get the number of currently connected native messengers

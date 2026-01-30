@@ -19,47 +19,19 @@ use crate::{
     types::{ActivityAsset, ActivitySnapshot},
 };
 use async_trait::async_trait;
-use dashmap::DashMap;
 use euro_native_messaging::NativeMessage;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::broadcast;
-use tokio::sync::{mpsc, oneshot};
-use tracing::{debug, error, info, warn};
+use tokio::sync::mpsc;
+use tracing::{debug, info, warn};
 use url::Url;
 
 // Re-export the singleton service and types from euro_browser crate
 pub use euro_browser::{
     BrowserBridgeServer, BrowserBridgeService, Frame, FrameKind, RequestFrame, ResponseFrame,
 };
-
-/// Wrapper for pending request sender
-struct PendingRequest {
-    sender: oneshot::Sender<Frame>,
-}
-
-impl std::fmt::Debug for PendingRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PendingRequest")
-            .field("sender", &"oneshot::Sender<Frame>")
-            .finish()
-    }
-}
-
-impl PendingRequest {
-    fn new(sender: oneshot::Sender<Frame>) -> Self {
-        Self { sender }
-    }
-
-    fn send(self, frame: Frame) -> Result<(), ()> {
-        if self.sender.send(frame).is_err() {
-            error!("Failed to send frame to waiting request");
-        }
-        Ok(())
-    }
-}
 
 /// Browser strategy for collecting web browser activity data
 ///
@@ -78,18 +50,6 @@ pub struct BrowserStrategy {
     #[serde(skip)]
     bridge_service: Option<&'static BrowserBridgeService>,
 
-    /// Pending requests waiting for responses
-    #[serde(skip)]
-    pending_requests: Option<Arc<DashMap<u32, PendingRequest>>>,
-
-    /// Counter for generating unique request IDs
-    #[serde(skip)]
-    request_id_counter: Option<Arc<AtomicU32>>,
-
-    /// Handle for the frame handler task
-    #[serde(skip)]
-    frame_handler_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
-
     #[serde(skip)]
     activity_event_tx: Option<broadcast::Sender<Frame>>,
 
@@ -98,121 +58,24 @@ pub struct BrowserStrategy {
 
     #[serde(skip)]
     active_browser: Option<String>,
+
+    /// The currently active browser PID for routing requests
+    #[serde(skip)]
+    active_browser_pid: Option<u32>,
 }
 
 impl BrowserStrategy {
     /// Initializes the browser strategy by connecting to the singleton service
     ///
     /// The gRPC server is managed by the TimelineManager. This method only connects
-    /// to the singleton service and sets up the frame handler for this strategy instance.
-    /// The server should already be running when this is called.
+    /// to the singleton service. The server should already be running when this is called.
     async fn initialize_service(&mut self) -> ActivityResult<()> {
         // Get the global singleton service instance (server is started by TimelineManager)
         let service = BrowserBridgeService::get_or_init().await;
 
-        let pending_requests = Arc::new(DashMap::<u32, PendingRequest>::new());
-        let request_id_counter = Arc::new(AtomicU32::new(1));
         let activity_event_tx: broadcast::Sender<Frame> = broadcast::channel(100).0;
 
-        // Subscribe to frames from native messengers
-        let mut frames_rx = service.subscribe_to_frames();
-        let pending_requests_clone = Arc::clone(&pending_requests);
-        let activity_event_tx_clone = activity_event_tx.clone();
-
-        // Start the frame handler task
-        let frame_handler = tokio::spawn(async move {
-            debug!("Frame handler task started");
-            while let Ok((browser_pid, frame)) = frames_rx.recv().await {
-                let kind = match &frame.kind {
-                    Some(k) => k.clone(),
-                    None => {
-                        warn!(
-                            "Received frame with no kind from browser PID {}",
-                            browser_pid
-                        );
-                        continue;
-                    }
-                };
-
-                match kind {
-                    FrameKind::Request(req_frame) => {
-                        debug!(
-                            "Received request frame from browser PID {}: id={}, action={}",
-                            browser_pid, req_frame.id, req_frame.action
-                        );
-                        // For now, log unsupported requests from browser extension
-                        warn!(
-                            "Received unsupported request from browser extension: action={}",
-                            req_frame.action
-                        );
-                    }
-                    FrameKind::Response(resp_frame) => {
-                        // Match response to pending request
-                        if let Some((_, pending_request)) =
-                            pending_requests_clone.remove(&resp_frame.id)
-                        {
-                            let frame = Frame {
-                                kind: Some(FrameKind::Response(resp_frame.clone())),
-                            };
-                            if let Err(err) = pending_request.send(frame) {
-                                warn!("Failed to send frame to waiting request: {:?}", err);
-                            }
-                        } else {
-                            debug!(
-                                "Received frame with no pending request: id={} action={}",
-                                resp_frame.id, resp_frame.action,
-                            );
-                            let frame = Frame {
-                                kind: Some(FrameKind::Response(resp_frame)),
-                            };
-                            let _ = activity_event_tx_clone.send(frame);
-                        }
-                    }
-                    FrameKind::Event(evt_frame) => {
-                        // Broadcast event frames to activity tracking
-                        debug!("Received event frame: action={}", evt_frame.action);
-                        let frame = Frame {
-                            kind: Some(FrameKind::Event(evt_frame)),
-                        };
-                        let _ = activity_event_tx_clone.send(frame);
-                    }
-                    FrameKind::Error(err_frame) => {
-                        error!(
-                            "Received error frame: id={}, message={}",
-                            err_frame.id, err_frame.message
-                        );
-                        // Match error to pending request if applicable
-                        if let Some((_, pending_request)) =
-                            pending_requests_clone.remove(&err_frame.id)
-                        {
-                            let frame = Frame {
-                                kind: Some(FrameKind::Error(err_frame)),
-                            };
-                            if let Err(err) = pending_request.send(frame) {
-                                warn!("Failed to send error frame to waiting request: {:?}", err);
-                            }
-                        }
-                    }
-                    FrameKind::Cancel(cancel_frame) => {
-                        debug!("Received cancel frame: id={}", cancel_frame.id);
-                        // Remove pending request if it exists
-                        if pending_requests_clone.remove(&cancel_frame.id).is_some() {
-                            debug!("Cancelled pending request: id={}", cancel_frame.id);
-                        }
-                    }
-                    FrameKind::Register(_) => {
-                        // Registration is handled by the server's Open method
-                        debug!("Received register frame (should be handled by server)");
-                    }
-                }
-            }
-            debug!("Frame handler task ended");
-        });
-
         self.bridge_service = Some(service);
-        self.pending_requests = Some(pending_requests);
-        self.request_id_counter = Some(request_id_counter);
-        self.frame_handler_handle = Some(Arc::new(frame_handler));
         self.activity_event_tx = Some(activity_event_tx);
 
         Ok(())
@@ -236,7 +99,7 @@ impl BrowserStrategy {
                 focus_pid
             );
             // Set this as the active browser PID
-            service.set_active_browser_pid(focus_pid);
+            self.active_browser_pid = Some(focus_pid);
             Ok(())
         } else {
             let registered_pids = service.get_registered_pids().await;
@@ -374,6 +237,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
         self.active_browser = Some(process_name.clone());
+        self.active_browser_pid = Some(focus_window.process_id);
 
         match self.get_metadata().await {
             Ok(metadata) => {
@@ -461,19 +325,13 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
         debug!("Browser strategy stopping tracking");
         self.active_browser = None;
+        self.active_browser_pid = None;
 
         if let Some(handle) = self.tracking_handle.take() {
             // Try to unwrap Arc, if we're the only owner, abort the task
             if let Ok(handle) = Arc::try_unwrap(handle) {
                 handle.abort();
             }
-        }
-
-        // Clean up frame handler task
-        if let Some(handle) = self.frame_handler_handle.take()
-            && let Ok(handle) = Arc::try_unwrap(handle)
-        {
-            handle.abort();
         }
 
         // Clean up snapshot collection task
@@ -493,7 +351,18 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
         debug!("Retrieving assets for browser strategy");
 
-        let response_frame = self.send_request("GENERATE_ASSETS").await?;
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
+
+        let browser_pid = self
+            .active_browser_pid
+            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+
+        let response_frame = service.generate_assets(browser_pid).await.map_err(|e| {
+            ActivityError::invalid_data(format!("Failed to generate assets: {}", e))
+        })?;
 
         let Some(payload) = response_frame.payload else {
             warn!("No payload in assets response");
@@ -512,7 +381,18 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
     /// Retrieve snapshots from the browser
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        let response_frame = self.send_request("GENERATE_SNAPSHOT").await?;
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
+
+        let browser_pid = self
+            .active_browser_pid
+            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+
+        let response_frame = service.generate_snapshot(browser_pid).await.map_err(|e| {
+            ActivityError::invalid_data(format!("Failed to generate snapshot: {}", e))
+        })?;
 
         let Some(payload) = response_frame.payload else {
             warn!("No payload in snapshot response");
@@ -536,15 +416,14 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             .as_ref()
             .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
 
-        let frame = service
-            .get_metadata()
+        let browser_pid = self
+            .active_browser_pid
+            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
+
+        let response_frame = service
+            .get_metadata(browser_pid)
             .await
             .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
-
-        let Some(FrameKind::Response(response_frame)) = frame.kind else {
-            warn!("Unexpected frame kind in metadata response");
-            return Ok(StrategyMetadata::default());
-        };
 
         let Some(payload) = response_frame.payload else {
             warn!("No payload in metadata response");
@@ -576,78 +455,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 }
 
 impl BrowserStrategy {
-    /// Helper method to send a request frame and wait for response
-    async fn send_request(&self, action: &str) -> ActivityResult<ResponseFrame> {
-        let service = self
-            .bridge_service
-            .as_ref()
-            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
-
-        let pending_requests = self
-            .pending_requests
-            .as_ref()
-            .ok_or_else(|| ActivityError::invalid_data("No pending requests map available"))?;
-
-        let request_id_counter = self
-            .request_id_counter
-            .as_ref()
-            .ok_or_else(|| ActivityError::invalid_data("No request ID counter available"))?;
-
-        // Generate unique request ID
-        let request_id = request_id_counter.fetch_add(1, Ordering::SeqCst);
-
-        // Create oneshot channel for response
-        let (tx, rx) = oneshot::channel();
-
-        // Register pending request
-        pending_requests.insert(request_id, PendingRequest::new(tx));
-
-        // Create and send request frame
-        let request_frame = RequestFrame {
-            id: request_id,
-            action: action.to_string(),
-            payload: None,
-        };
-
-        debug!(
-            "Sending request frame: id={}, command={}",
-            request_id, action
-        );
-
-        // Send to the active native messenger
-        let frame = Frame {
-            kind: Some(FrameKind::Request(request_frame)),
-        };
-        service.send_to_active(frame).await.map_err(|e| {
-            ActivityError::invalid_data(format!("Failed to send request frame: {}", e))
-        })?;
-
-        // Wait for response with timeout
-        match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
-            Ok(Ok(frame)) => match frame.kind {
-                Some(FrameKind::Response(frame)) => {
-                    debug!("Received response for request {}", request_id);
-                    Ok(frame)
-                }
-                Some(FrameKind::Error(frame)) => Err(ActivityError::invalid_data(format!(
-                    "Browser error: {}",
-                    frame.message
-                ))),
-                _ => Err(ActivityError::invalid_data("Unexpected frame kind")),
-            },
-            Ok(Err(_)) => {
-                error!("Response channel closed for request {}", request_id);
-                Err(ActivityError::invalid_data("Response channel closed"))
-            }
-            Err(_) => {
-                error!("Timeout waiting for response to request {}", request_id);
-                // Clean up pending request on timeout
-                pending_requests.remove(&request_id);
-                Err(ActivityError::invalid_data("Request timeout"))
-            }
-        }
-    }
-
     fn collect_snapshots(&mut self) {
         let sender = match self.sender.clone() {
             Some(sender) => sender,
