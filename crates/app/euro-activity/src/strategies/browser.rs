@@ -222,8 +222,8 @@ impl StrategySupport for BrowserStrategy {
 
 #[async_trait]
 impl ActivityStrategyFunctionality for BrowserStrategy {
-    fn can_handle_process(&self, process_name: &str) -> bool {
-        BrowserStrategy::get_supported_processes().contains(&process_name)
+    fn can_handle_process(&self, focus_window: &FocusedWindow) -> bool {
+        BrowserStrategy::get_supported_processes().contains(&focus_window.process_name.as_str())
     }
 
     async fn start_tracking(
@@ -274,21 +274,27 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         Ok(())
     }
 
-    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool> {
+    async fn handle_process_change(
+        &mut self,
+        focus_window: &FocusedWindow,
+    ) -> ActivityResult<bool> {
         debug!(
             "Browser strategy handling process change to: {}",
-            process_name
+            focus_window.process_name
         );
 
         // Check if this strategy can handle the new process
-        if self.can_handle_process(process_name) {
-            debug!("Browser strategy can continue handling: {}", process_name);
-            if self.active_browser.as_deref() != Some(process_name) {
-                info!(
-                    "Detected new browser {} that is not being tracked. Ignoring.",
-                    process_name
-                );
-                return Ok(true);
+        if self.can_handle_process(focus_window) {
+            debug!(
+                "Browser strategy can continue handling: {}",
+                focus_window.process_name
+            );
+            if self.active_browser_pid == Some(focus_window.process_id) {
+                info!("Detected the same browser. Ignoring...",);
+                // return Ok(true);
+            } else {
+                self.active_browser_pid = Some(focus_window.process_id);
+                self.active_browser = Some(focus_window.process_name.to_string());
             }
 
             if let Some(sender) = self.sender.clone() {
@@ -297,7 +303,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                         let activity = Activity::new(
                             metadata.url.unwrap_or_default(),
                             metadata.icon,
-                            process_name.to_string(),
+                            focus_window.process_name.to_string(),
                             vec![],
                         );
                         if sender.send(ActivityReport::NewActivity(activity)).is_err() {
@@ -305,6 +311,16 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                         }
                     }
                     Err(err) => {
+                        let activity = Activity::new(
+                            focus_window.process_name.clone(),
+                            focus_window.icon.clone(),
+                            focus_window.process_name.clone(),
+                            vec![],
+                        );
+                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                            warn!("Failed to send new activity report - receiver dropped");
+                        }
+
                         warn!("Failed to get metadata: {}", err);
                     }
                 }
@@ -314,7 +330,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         } else {
             debug!(
                 "Browser strategy cannot handle: {}, stopping tracking",
-                process_name
+                focus_window.process_name
             );
             // Properly stop tracking to abort the listener task
             self.stop_tracking().await?;

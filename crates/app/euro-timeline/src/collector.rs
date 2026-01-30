@@ -170,7 +170,7 @@ impl CollectorService {
                         if new_focus != *prev {
                             let mut strategy_write = strategy_for_update.write().await;
 
-                            match strategy_write.handle_process_change(&process_name).await {
+                            match strategy_write.handle_process_change(&window).await {
                                 Ok(true) => {
                                     debug!("Strategy can continue handling: {}", process_name);
                                 }
