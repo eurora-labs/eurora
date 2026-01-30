@@ -6,7 +6,7 @@ use euro_native_messaging::PORT;
 use euro_native_messaging::{
     parent_pid,
     server::{BrowserBridgeClient, Frame, FrameKind, RegisterFrame},
-    utils::{ensure_single_instance, generate_typescript_definitions, read_framed, write_framed},
+    utils::{generate_typescript_definitions, read_framed, write_framed},
 };
 use tokio::sync::{broadcast, mpsc};
 use tonic::transport::Channel;
@@ -20,7 +20,7 @@ use tracing_subscriber::{
 };
 
 /// Retry interval for connecting to the server
-const RETRY_INTERVAL_SECS: u64 = 5;
+const RETRY_INTERVAL_SECS: u64 = 2;
 
 /// Connect to the gRPC server with retry logic
 async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
@@ -69,9 +69,6 @@ async fn main() -> Result<()> {
     if args.len() > 1 && args[1] == "--generate_specta" {
         return generate_typescript_definitions();
     }
-
-    // Ensure only one instance is running
-    ensure_single_instance()?;
 
     let browser_pid = parent_pid::get_parent_pid();
     let host_pid = std::process::id();
