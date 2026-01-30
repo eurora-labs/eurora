@@ -3486,6 +3486,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-browser"
+version = "0.0.0"
+dependencies = [
+ "agent-chain-core",
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "cfg-if",
+ "chrono",
+ "dashmap",
+ "enum_dispatch",
+ "euro-auth",
+ "euro-encrypt",
+ "euro-native-messaging",
+ "focus-tracker",
+ "humantime-serde",
+ "image",
+ "prost",
+ "prost-types",
+ "proto-gen",
+ "regex",
+ "resvg",
+ "serde",
+ "serde_json",
+ "specta",
+ "taurpc",
+ "thiserror 2.0.18",
+ "tiny-skia",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+ "tracing",
+ "url",
+ "usvg",
+ "uuid",
+]
+
+[[package]]
 name = "euro-conversation"
 version = "0.0.0"
 dependencies = [

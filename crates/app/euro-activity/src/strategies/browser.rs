@@ -366,6 +366,15 @@ impl BrowserStrategy {
         let mut strategy = BrowserStrategy::default();
         strategy.initialize_server().await?;
 
+        // let metadata = strategy
+        //     .clone()
+        //     .bridge_service
+        //     .unwrap()
+        //     .get_metadata()
+        //     .await
+        //     .unwrap();
+        // info!("Browser metadata: {:?}", metadata);
+
         Ok(strategy)
     }
 }
@@ -389,7 +398,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
         // Validate that the focused browser PID has a registered native messenger
-        self.validate_browser_pid(focus_window).await?;
+        // self.validate_browser_pid(focus_window).await?;
 
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
@@ -551,7 +560,20 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         debug!("Retrieving metadata for browser strategy");
 
-        let response_frame = self.send_request("GET_METADATA").await?;
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
+
+        let frame = service
+            .get_metadata()
+            .await
+            .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
+
+        let Some(FrameKind::Response(response_frame)) = frame.kind else {
+            warn!("Unexpected frame kind in metadata response");
+            return Ok(StrategyMetadata::default());
+        };
 
         let Some(payload) = response_frame.payload else {
             warn!("No payload in metadata response");
