@@ -64,8 +64,7 @@ tauri-plugin-store = "2"
 tauri-plugin-stronghold = "2.3.1"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
-# taurpc = { version = "0.5.2" }
-taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "feature/improved-compatibility" }
+taurpc = { version = "0.6.0" }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tracing = { workspace = true }
