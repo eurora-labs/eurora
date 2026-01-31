@@ -45,3 +45,106 @@ pub struct ReleaseInfoResponse {
     /// Sorted alphabetically by platform name
     pub platforms: BTreeMap<String, PlatformInfo>,
 }
+
+// ============================================================================
+// Browser Extension Types
+// ============================================================================
+
+/// Supported browser types for extensions
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BrowserType {
+    Firefox,
+    Chrome,
+    Safari,
+}
+
+impl BrowserType {
+    /// Get the S3 directory name for this browser type
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            BrowserType::Firefox => "firefox",
+            BrowserType::Chrome => "chrome",
+            BrowserType::Safari => "safari",
+        }
+    }
+
+    /// Parse from string
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "firefox" => Some(BrowserType::Firefox),
+            "chrome" | "chromium" => Some(BrowserType::Chrome),
+            "safari" => Some(BrowserType::Safari),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for BrowserType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Release channel for browser extensions
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExtensionChannel {
+    Release,
+    Nightly,
+}
+
+impl ExtensionChannel {
+    /// Get the S3 directory name for this channel
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ExtensionChannel::Release => "release",
+            ExtensionChannel::Nightly => "nightly",
+        }
+    }
+
+    /// Parse from string
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "release" | "stable" => Some(ExtensionChannel::Release),
+            "nightly" | "dev" | "development" => Some(ExtensionChannel::Nightly),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ExtensionChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Path parameters for the extension release endpoint
+#[derive(Deserialize, Debug)]
+pub struct ExtensionReleaseParams {
+    pub channel: String, // "release" or "nightly"
+}
+
+/// Browser-specific extension download information
+/// Similar to PlatformInfo but for browser extensions
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BrowserExtensionInfo {
+    /// Version string for this browser's extension
+    pub version: String,
+    /// Download URL for the extension package
+    pub url: String,
+}
+
+/// Response for the /extensions/{channel} endpoint
+/// Contains the latest extension versions for all browsers in a channel
+/// Mirrors the structure of ReleaseInfoResponse for desktop releases
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ExtensionReleaseResponse {
+    /// The release channel (release, nightly)
+    pub channel: String,
+    /// ISO 8601 timestamp of the most recent publication across all browsers
+    pub pub_date: String,
+    /// Map of browser identifiers (firefox, chrome, safari) to their extension info
+    /// Sorted alphabetically by browser name
+    pub browsers: BTreeMap<String, BrowserExtensionInfo>,
+}
