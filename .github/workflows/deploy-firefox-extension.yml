@@ -60,8 +60,8 @@ jobs:
             - name: Calculate next version
               shell: bash
               env:
-                  CHANNEL: ${{ env.channel }}
-                  BUMP: ${{ env.bump }}
+                  CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
                   # Fetch current version from API
                   CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/extensions/${CHANNEL}" | jq -r '.browsers.firefox.version // "0.5.0"')"
@@ -85,7 +85,7 @@ jobs:
               id: firefox-id
               shell: bash
               env:
-                  CHANNEL: ${{ env.channel }}
+                  CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
               run: |
                   if [ "$CHANNEL" == "release" ]; then
                     FIREFOX_ID="{271903fe-1905-4636-b47f-6f0873dc97f8}"
