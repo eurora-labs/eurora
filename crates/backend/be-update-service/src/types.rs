@@ -112,8 +112,8 @@ impl std::str::FromStr for ExtensionChannel {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "release" | "stable" => Ok(ExtensionChannel::Release),
-            "nightly" | "dev" | "development" => Ok(ExtensionChannel::Nightly),
+            "release" => Ok(ExtensionChannel::Release),
+            "nightly" => Ok(ExtensionChannel::Nightly),
             _ => Err(format!("Unknown extension channel: {}", s)),
         }
     }
