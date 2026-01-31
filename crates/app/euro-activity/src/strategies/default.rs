@@ -1,6 +1,7 @@
 //! Default strategy implementation for unsupported applications
 
 use async_trait::async_trait;
+use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::debug;
@@ -28,14 +29,14 @@ impl StrategySupport for DefaultStrategy {
 
 #[async_trait]
 impl ActivityStrategyFunctionality for DefaultStrategy {
-    fn can_handle_process(&self, _process_name: &str) -> bool {
+    fn can_handle_process(&self, _focus_window: &FocusedWindow) -> bool {
         // DefaultStrategy is a fallback that doesn't actively handle processes
         false
     }
 
     async fn start_tracking(
         &mut self,
-        focus_window: &focus_tracker::FocusedWindow,
+        focus_window: &FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
         debug!(
@@ -57,10 +58,13 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         Ok(())
     }
 
-    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool> {
+    async fn handle_process_change(
+        &mut self,
+        focus_window: &FocusedWindow,
+    ) -> ActivityResult<bool> {
         debug!(
             "Default strategy handling process change to: {}",
-            process_name
+            focus_window.process_name
         );
         // DefaultStrategy cannot handle process changes, request strategy switch
         Ok(false)

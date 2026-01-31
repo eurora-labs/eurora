@@ -35,7 +35,7 @@
 </script>
 
 <Menubar />
-<Sidebar.Provider open={false}>
+<Sidebar.Provider open={true}>
 	<MainSidebar />
 	<Sidebar.Inset>
 		<div class="flex flex-col h-screen">
