@@ -15,7 +15,6 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 cfg-if = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-dashmap = "6.1.0"
 enum_dispatch = { workspace = true }
 euro-auth = { workspace = true }
 euro-browser = { workspace = true }
@@ -41,9 +40,7 @@ tokio = { workspace = true, features = [
   "macros",
   "rt-multi-thread",
 ] }
-tokio-stream = { workspace = true }
 tonic = { workspace = true }
-tonic-prost = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
 usvg = { version = "0.45" }
