@@ -12,7 +12,7 @@ use tracing::{debug, instrument, warn};
 use crate::{
     error::error_to_http_response,
     service::AppState,
-    types::{ReleaseParams, UpdateParams},
+    types::{ExtensionReleaseParams, ReleaseParams, UpdateParams},
 };
 
 /// Handler for the update endpoint
@@ -93,6 +93,57 @@ pub async fn get_release_handler(
         }
         Err(e) => {
             warn!("Release info request failed: {}", e);
+            let (status, error_response) = error_to_http_response(&e);
+            (status, error_response).into_response()
+        }
+    }
+}
+
+// ============================================================================
+// Browser Extension Handlers
+// ============================================================================
+
+/// Handler for getting extension releases for a specific channel
+/// GET /extensions/{channel}
+/// Returns the latest versions of all browser extensions for the specified channel
+///
+/// Example response:
+/// ```json
+/// {
+///   "channel": "release",
+///   "pub_date": "2026-01-31T10:00:00Z",
+///   "browsers": {
+///     "chrome": { "version": "1.2.3", "url": "https://..." },
+///     "firefox": { "version": "1.2.3", "url": "https://..." },
+///     "safari": { "version": "1.2.3", "url": "https://..." }
+///   }
+/// }
+/// ```
+#[instrument(skip(state), fields(channel = %params.channel))]
+pub async fn get_extension_release_handler(
+    State(state): State<Arc<AppState>>,
+    Path(params): Path<ExtensionReleaseParams>,
+) -> Response {
+    debug!(
+        "Processing extension release request: channel={}",
+        params.channel
+    );
+
+    match state.get_extension_release(&params.channel).await {
+        Ok(Some(release_info)) => {
+            debug!(
+                "Extension release found: channel={}, browsers={}",
+                release_info.channel,
+                release_info.browsers.len()
+            );
+            (StatusCode::OK, Json(release_info)).into_response()
+        }
+        Ok(None) => {
+            debug!("No extensions found for channel: {}", params.channel);
+            StatusCode::NOT_FOUND.into_response()
+        }
+        Err(e) => {
+            warn!("Extension release request failed: {}", e);
             let (status, error_response) = error_to_http_response(&e);
             (status, error_response).into_response()
         }

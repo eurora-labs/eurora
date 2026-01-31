@@ -2,6 +2,9 @@
 //!
 //! A Tauri-compatible update service that serves application updates from AWS S3.
 //! Supports multiple channels (nightly, release, beta) and cross-platform builds.
+//!
+//! Also provides browser extension version checking for Firefox, Chrome, and Safari
+//! with support for release and nightly channels.
 
 use std::sync::Arc;
 
@@ -17,16 +20,22 @@ pub mod service;
 pub mod types;
 pub mod utils;
 
-use handlers::{check_update_handler, get_release_handler};
 use service::AppState;
 
 /// Create the axum router
 pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
-        .route("/releases/{channel}", get(get_release_handler))
+        // Desktop app update routes
+        .route("/releases/{channel}", get(handlers::get_release_handler))
         .route(
             "/releases/{channel}/{target_arch}/{current_version}",
-            get(check_update_handler),
+            get(handlers::check_update_handler),
+        )
+        // Browser extension routes
+        // GET /extensions/{channel} - returns all browsers for a channel
+        .route(
+            "/extensions/{channel}",
+            get(handlers::get_extension_release_handler),
         )
         .layer(
             ServiceBuilder::new()
@@ -53,4 +62,11 @@ pub async fn init_update_service(bucket_name: String) -> Result<Router> {
 
 // Re-export commonly used types
 pub use error::{ErrorResponse, NoUpdateResponse, UpdateServiceError};
-pub use types::{PlatformInfo, ReleaseInfoResponse, ReleaseParams, UpdateParams, UpdateResponse};
+pub use types::{
+    BrowserExtensionInfo, BrowserType, ExtensionChannel, ExtensionReleaseParams,
+    ExtensionReleaseResponse, PlatformInfo, ReleaseInfoResponse, ReleaseParams, UpdateParams,
+    UpdateResponse,
+};
+
+// Re-export handler for direct use
+pub use handlers::get_extension_release_handler;
