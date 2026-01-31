@@ -1,38 +1,44 @@
-name: Deploy Firefox Extension
-
+name: 'Publish Firefox Extension'
+env:
+    RUSTUP_TOOLCHAIN: stable
+permissions:
+    contents: read # Required for checkout
+    actions: read # Required for downloading artifacts
 on:
-    # Manual trigger
     workflow_dispatch:
         inputs:
             channel:
                 type: choice
                 required: true
-                description: Release channel
-                default: production
+                description: channel
+                default: nightly
                 options:
-                    - production
-                    - beta
-            version:
-                type: string
+                    - release
+                    - nightly
+            bump:
+                type: choice
                 required: true
-                description: Extension version (e.g., 0.1.0)
-
-    # Trigger on tags matching extension release pattern
-    push:
-        tags:
-            - 'firefox/v*.*.*'
+                description: update type
+                default: patch
+                options:
+                    - undefined
+                    - patch
+                    - minor
+                    - major
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
 jobs:
-    build-and-deploy:
+    build-firefox:
         runs-on: ubuntu-latest
-        permissions:
-            contents: write
         environment:
             name: firefox-addons
+
+        outputs:
+            version: ${{ env.version }}
+            channel: ${{ env.channel }}
 
         steps:
             - name: Checkout code
@@ -41,6 +47,28 @@ jobs:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
                   lfs: true
+
+            - name: Consume input variables
+              shell: bash
+              env:
+                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
+              run: |
+                  echo "channel=$INPUT_CHANNEL" >> $GITHUB_ENV
+                  echo "bump=$INPUT_BUMP" >> $GITHUB_ENV
+
+            - name: Calculate next version
+              shell: bash
+              env:
+                  CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  BUMP: ${{ github.event.inputs.bump || 'patch' }}
+              run: |
+                  # Fetch current version from API
+                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/extensions/${CHANNEL}" | jq -r '.browsers.firefox.version // "0.5.0"')"
+                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP}")
+                  echo "version=$NEXT_VERSION" >> $GITHUB_ENV
+                  mkdir -p release && echo "$NEXT_VERSION" > release/version
+                  echo "Firefox extension version: $NEXT_VERSION (previous: $CURRENT_VERSION)"
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
@@ -53,36 +81,13 @@ jobs:
             - name: Compile Protobuf
               run: pnpm proto:typescript
 
-            - name: Extract version from input or tag
-              id: version
-              shell: bash
-              env:
-                  EVENT_NAME: ${{ github.event_name }}
-                  GITHUB_REF: ${{ github.ref }}
-                  INPUT_VERSION: ${{ github.event.inputs.version }}
-              run: |
-                  if [ "$EVENT_NAME" == "push" ]; then
-                    # Extract version from tag (e.g., firefox/v0.1.0 -> 0.1.0)
-                    VERSION="${GITHUB_REF#refs/tags/firefox/v}"
-                  else
-                    VERSION="$INPUT_VERSION"
-                  fi
-                  if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}([-\+][0-9A-Za-z\.-]+)?$ ]]; then
-                    echo "Invalid version: $VERSION" >&2
-                    exit 1
-                  fi
-                  printf "version=%s\n" "$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "Firefox version: $VERSION"
-
             - name: Determine Firefox extension ID
               id: firefox-id
               shell: bash
               env:
-                  EVENT_NAME: ${{ github.event_name }}
-                  CHANNEL: ${{ github.event.inputs.channel }}
+                  CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
               run: |
-                  # Use production ID for production channel or tag push, dev ID for beta
-                  if [ "$EVENT_NAME" == "push" ] || [ "$CHANNEL" == "production" ]; then
+                  if [ "$CHANNEL" == "release" ]; then
                     FIREFOX_ID="{271903fe-1905-4636-b47f-6f0873dc97f8}"
                     echo "Using production Firefox extension ID"
                   else
@@ -95,36 +100,65 @@ jobs:
               run: pnpm run build:firefox
               env:
                   NODE_ENV: production
-                  VERSION: ${{ steps.version.outputs.version }}
+                  VERSION: ${{ env.version }}
                   FIREFOX_EXTENSION_ID: ${{ steps.firefox-id.outputs.firefox_id }}
 
             - name: Create Firefox extension zip
               shell: bash
               run: |
                   cd apps/browser/dist/firefox
-                  zip -r ../../../../firefox-extension.zip . -x "*.git*" -x "*.zip"
+                  zip -r ../../../../release/firefox-extension.zip . -x "*.git*" -x "*.zip"
                   cd ../../../..
-                  echo "Created firefox-extension.zip"
-                  ls -lh firefox-extension.zip
+                  echo "Created release/firefox-extension.zip"
+                  ls -lh release/firefox-extension.zip
 
-            - name: Upload artifact
+            - name: Upload Artifacts
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
-                  name: firefox-extension-${{ steps.version.outputs.version }}
-                  path: firefox-extension.zip
-                  retention-days: 30
+                  name: '${{ env.channel }}-firefox-${{ github.run_number }}'
+                  path: release/
+                  if-no-files-found: error
+
+    publish-firefox:
+        needs: [build-firefox]
+        runs-on: ubuntu-latest
+        environment:
+            name: firefox-addons
+        permissions:
+            contents: write # Required for creating and pushing git tags
+
+        steps:
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: true
+
+            - name: Download artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: '${{ needs.build-firefox.outputs.channel }}-firefox-${{ github.run_number }}'
+                  path: release
+
+            - name: Extract version and extension
+              shell: bash
+              run: |
+                  VERSION="$(cat release/version)"
+                  echo "version=$VERSION" >> $GITHUB_ENV
+                  # Extract the extension zip for signing
+                  mkdir -p extension-source
+                  unzip release/firefox-extension.zip -d extension-source
 
             - name: Install web-ext
               run: npm install -g web-ext@8.10.0
 
             - name: Sign and publish to Firefox Add-ons
-              if: github.event.inputs.channel == 'production' || github.event_name == 'push'
+              if: needs.build-firefox.outputs.channel == 'release'
               shell: bash
               env:
                   WEB_EXT_API_KEY: ${{ secrets.FIREFOX_API_KEY }}
                   WEB_EXT_API_SECRET: ${{ secrets.FIREFOX_API_SECRET }}
               run: |
-                  cd apps/browser/dist/firefox
+                  cd extension-source
 
                   # Sign and submit the Firefox extension
                   web-ext sign \
@@ -135,46 +169,91 @@ jobs:
 
                   echo "Extension signed and submitted to Firefox Add-ons store"
 
-            - name: Sign for beta channel
-              if: github.event.inputs.channel == 'beta'
+            - name: Sign for nightly channel
+              if: needs.build-firefox.outputs.channel == 'nightly'
               shell: bash
               env:
                   WEB_EXT_API_KEY: ${{ secrets.FIREFOX_API_KEY }}
                   WEB_EXT_API_SECRET: ${{ secrets.FIREFOX_API_SECRET }}
               run: |
-                  cd apps/browser/dist/firefox
+                  cd extension-source
 
-                  # Sign and submit to unlisted (beta) channel
+                  # Sign and submit to unlisted (nightly) channel
                   web-ext sign \
                     --channel=unlisted \
                     --api-key="$WEB_EXT_API_KEY" \
                     --api-secret="$WEB_EXT_API_SECRET" \
                     --timeout=900000
 
-                  echo "Extension signed for beta channel"
+                  echo "Extension signed for nightly channel"
 
-            - name: Create GitHub Release
-              if: github.event_name == 'push'
-              uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+            - name: Prepare S3 payload
+              shell: bash
+              run: |
+                  rm -rf release-s3
+                  mkdir -p release-s3
+                  # Copy the signed XPI if it exists, otherwise use the zip
+                  if ls extension-source/web-ext-artifacts/*.xpi 1> /dev/null 2>&1; then
+                    cp extension-source/web-ext-artifacts/*.xpi release-s3/eurora.xpi
+                  fi
+                  cp release/firefox-extension.zip release-s3/
+
+            - uses: shallwefootball/s3-upload-action@0d261a6f15b3b2e209dfebdecace4b100c04f95b # master
+              name: Upload To S3
+              id: S3
               with:
-                  files: |
-                      apps/browser/dist/firefox/web-ext-artifacts/*.xpi
-                      firefox-extension.zip
-                  body: |
-                      Firefox Extension Release ${{ steps.version.outputs.version }}
+                  aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws_bucket: 'releases.eurora-labs.com'
+                  source_dir: 'release-s3/'
+                  destination_dir: 'extensions/${{ needs.build-firefox.outputs.channel }}/firefox/${{ env.version }}-${{ github.run_number }}'
 
-                      This release has been automatically built and submitted to the Firefox Add-ons store.
-                  draft: false
-                  prerelease: false
+    create-git-tag:
+        needs: [publish-firefox, build-firefox]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write # Required for creating and pushing git tags
+        steps:
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: true
+
+            - name: Download artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: '${{ needs.build-firefox.outputs.channel }}-firefox-${{ github.run_number }}'
+                  path: release
+
+            - name: Extract version
+              shell: bash
+              run: |
+                  VERSION="$(cat release/version)"
+                  echo "version=$VERSION" >> $GITHUB_ENV
+
+            - name: Create git tag
+              shell: bash
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Notify on success
-              if: success()
+                  OUTPUT_CHANNEL: ${{ needs.build-firefox.outputs.channel }}
+                  VERSION: ${{ env.version }}
               run: |
-                  echo "✅ Firefox extension ${{ steps.version.outputs.version }} successfully built and deployed!"
+                  TAG_NAME="firefox/${OUTPUT_CHANNEL}/${VERSION}"
+                  function tag_exists() {
+                    git tag --list | grep -q "^$1$"
+                  }
+                  function fetch_tag() {
+                    git fetch origin "refs/tags/$1:refs/tags/$1"
+                  }
+                  function delete_tag() {
+                    git push --delete origin "$1"
+                  }
+                  function create_tag() {
+                    git tag --force "$1"
+                    git push --tags
+                  }
 
-            - name: Notify on failure
-              if: failure()
-              run: |
-                  echo "❌ Firefox extension deployment failed. Check the logs for details."
+                  fetch_tag "$TAG_NAME" || true
+                  if tag_exists "$TAG_NAME"; then
+                    delete_tag "$TAG_NAME"
+                  fi
+                  create_tag "$TAG_NAME"

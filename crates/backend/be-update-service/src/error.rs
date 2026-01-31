@@ -24,6 +24,9 @@ pub enum UpdateServiceError {
     InvalidVersion(String),
     InvalidTargetArch(String),
     InvalidChannel(String),
+    InvalidBrowserType(String),
+    InvalidExtensionChannel(String),
+    ExtensionNotFound { browser: String, channel: String },
     S3Error(String),
     SignatureNotFound(String),
     DownloadFileNotFound(String),
@@ -39,6 +42,19 @@ impl std::fmt::Display for UpdateServiceError {
                 write!(f, "Invalid target architecture: {}", t)
             }
             UpdateServiceError::InvalidChannel(c) => write!(f, "Invalid channel: {}", c),
+            UpdateServiceError::InvalidBrowserType(b) => {
+                write!(f, "Invalid browser type: {}", b)
+            }
+            UpdateServiceError::InvalidExtensionChannel(c) => {
+                write!(f, "Invalid extension channel: {}", c)
+            }
+            UpdateServiceError::ExtensionNotFound { browser, channel } => {
+                write!(
+                    f,
+                    "Extension not found for browser '{}' channel '{}'",
+                    browser, channel
+                )
+            }
             UpdateServiceError::S3Error(e) => write!(f, "S3 operation failed: {}", e),
             UpdateServiceError::SignatureNotFound(k) => {
                 write!(f, "Signature file not found: {}", k)
@@ -130,6 +146,51 @@ pub fn error_to_http_response(e: &anyhow::Error) -> (StatusCode, Json<ErrorRespo
                     error: "url_generation_failed".to_string(),
                     message: "Failed to generate download URL".to_string(),
                     details: None,
+                }),
+            )
+        }
+        Some(UpdateServiceError::InvalidBrowserType(browser)) => {
+            error!("Invalid browser type: {}", browser);
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: "invalid_browser_type".to_string(),
+                    message: "Invalid browser type".to_string(),
+                    details: Some(format!(
+                        "Browser '{}' is not supported. Use 'firefox', 'chrome', or 'safari'",
+                        browser
+                    )),
+                }),
+            )
+        }
+        Some(UpdateServiceError::InvalidExtensionChannel(channel)) => {
+            error!("Invalid extension channel: {}", channel);
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: "invalid_extension_channel".to_string(),
+                    message: "Invalid extension channel".to_string(),
+                    details: Some(format!(
+                        "Channel '{}' is not supported. Use 'release' or 'nightly'",
+                        channel
+                    )),
+                }),
+            )
+        }
+        Some(UpdateServiceError::ExtensionNotFound { browser, channel }) => {
+            error!(
+                "Extension not found for browser '{}' channel '{}'",
+                browser, channel
+            );
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponse {
+                    error: "extension_not_found".to_string(),
+                    message: "Extension version not found".to_string(),
+                    details: Some(format!(
+                        "No extension found for browser '{}' in channel '{}'",
+                        browser, channel
+                    )),
                 }),
             )
         }
