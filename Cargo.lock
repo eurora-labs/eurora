@@ -10937,11 +10937,12 @@ dependencies = [
 [[package]]
 name = "taurpc"
 version = "0.6.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fimproved-compatibility#1539787f504caf476741838ded43539a77703be3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5b5960e74001bd829049feded3903affa4826d34ec3608d142677c2bc877f21"
 dependencies = [
  "anyhow",
- "heck 0.5.0",
- "itertools 0.14.0",
+ "heck 0.4.1",
+ "itertools 0.12.1",
  "serde",
  "serde_json",
  "specta",
@@ -10956,7 +10957,8 @@ dependencies = [
 [[package]]
 name = "taurpc-macros"
 version = "0.6.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=feature%2Fimproved-compatibility#1539787f504caf476741838ded43539a77703be3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a19a378067085cc3581ae01a36582bf18f18109055efb4eae1763e3f418e27c2"
 dependencies = [
  "proc-macro2",
  "quote",
