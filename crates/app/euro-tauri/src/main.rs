@@ -4,7 +4,6 @@
 )]
 
 use dotenv::dotenv;
-use euro_native_messaging::create_browser_bridge_client;
 use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::TimelineAppEvent;
 use euro_tauri::shared_types::SharedUserController;
@@ -306,29 +305,6 @@ fn main() {
                         // app_handle_user.manage(user_controller);
                     });
 
-
-
-                    // Initialize conversation storage
-                    // let db_app_handle = app_handle.clone();
-                    // tauri::async_runtime::spawn(async move {
-                    //     let db = create_shared_database_manager(&db_app_handle).await;
-                    //     db_app_handle.manage(db);
-                    // });
-                    // Initialize conversation storage
-
-
-
-                    // Initialize IPC client
-                    let ipc_handle = app_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        match create_browser_bridge_client().await {
-                            Ok(ipc_client) => {
-                                ipc_handle.manage(ipc_client.clone());
-                                debug!("gRPC IPC client initialized");
-                            }
-                            Err(e) => error!("Failed to initialize gRPC IPC client: {}", e),
-                        }
-                    });
 
                     Ok(())
                 })

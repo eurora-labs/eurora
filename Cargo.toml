@@ -52,6 +52,7 @@ dotenv = "0.15.0"
 enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
+euro-browser = { path = "crates/app/euro-browser" }
 euro-conversation = { path = "crates/app/euro-conversation" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-fs = { path = "crates/app/euro-fs" }

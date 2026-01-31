@@ -2,48 +2,54 @@ syntax = "proto3";
 package browser_bridge;
 
 service BrowserBridge {
-    rpc Open(stream Frame) returns (stream Frame);
+  rpc Open(stream Frame) returns (stream Frame);
 }
 
 message Frame {
-    oneof kind {
-        RequestFrame request = 1;
-        ResponseFrame response = 2;
-        EventFrame event = 3;
-        ErrorFrame error = 4;
-        CancelFrame cancel = 5;
-    }
+  oneof kind {
+    RequestFrame request = 1;
+    ResponseFrame response = 2;
+    EventFrame event = 3;
+    ErrorFrame error = 4;
+    CancelFrame cancel = 5;
+    RegisterFrame register = 6;
+  }
 }
 
 message RequestFrame {
-    uint32 id = 1;
-    string action = 2;
-    // JSON string
-    optional string payload = 3;
+  uint32 id = 1;
+  string action = 2;
+  // JSON string
+  optional string payload = 3;
 }
 
 message ResponseFrame {
-    uint32 id = 1;
-    string action = 2;
-    // JSON string
-    optional string payload = 3;
+  uint32 id = 1;
+  string action = 2;
+  // JSON string
+  optional string payload = 3;
 }
 
 // Event doesn't have an id because it doesn't expect a response
 message EventFrame {
-    string action = 1;
-    // JSON string
-    optional string payload = 2;
+  string action = 1;
+  // JSON string
+  optional string payload = 2;
 }
 
 message ErrorFrame {
-    uint32 id = 1;
-    uint32 code = 2;
-    string message = 3;
-    // JSON string
-    optional string details = 4;
+  uint32 id = 1;
+  uint32 code = 2;
+  string message = 3;
+  // JSON string
+  optional string details = 4;
 }
 
 message CancelFrame {
-    uint32 id = 1;
+  uint32 id = 1;
+}
+
+message RegisterFrame {
+  uint32 host_pid = 1;
+  uint32 browser_pid = 2;
 }

@@ -15,14 +15,15 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 cfg-if = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-dashmap = "6.1.0"
 enum_dispatch = { workspace = true }
 euro-auth = { workspace = true }
+euro-browser = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
 focus-tracker = { workspace = true, features = ["async"] }
 humantime-serde = { workspace = true }
 image = { workspace = true }
+prost = { workspace = true }
 prost-types = { workspace = true }
 proto-gen = { workspace = true }
 regex = { workspace = true }
@@ -30,8 +31,7 @@ resvg = { version = "0.45" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
-# taurpc = { version = "0.5.2" }
-taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "feature/improved-compatibility" }
+taurpc = { version = "0.6.0" }
 thiserror = { workspace = true }
 tiny-skia = "0.11"
 tokio = { workspace = true, features = [
@@ -39,15 +39,14 @@ tokio = { workspace = true, features = [
   "macros",
   "rt-multi-thread",
 ] }
-tokio-stream = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
 usvg = { version = "0.45" }
 uuid = { workspace = true }
 
-[dev-dependencies]
-tracing-subscriber = { workspace = true }
+[build-dependencies]
+tonic-prost-build = { workspace = true }
 
 [features]
 default = []
