@@ -11,7 +11,10 @@ use tracing::{debug, error, instrument};
 
 use crate::{
     error::UpdateServiceError,
-    types::{PlatformInfo, ReleaseInfoResponse, UpdateResponse},
+    types::{
+        BrowserExtensionInfo, BrowserType, ExtensionChannel, ExtensionReleaseResponse,
+        PlatformInfo, ReleaseInfoResponse, UpdateResponse,
+    },
     utils::parse_target_arch,
 };
 
@@ -689,5 +692,263 @@ impl AppState {
                 .unwrap_or(version_str)
                 .to_string()
         }
+    }
+
+    // ========================================================================
+    // Browser Extension Version Methods
+    // ========================================================================
+
+    /// Validate extension channel parameter
+    fn validate_extension_channel(&self, channel: &str) -> Result<ExtensionChannel> {
+        channel.parse().map_err(|_| {
+            anyhow::Error::from(UpdateServiceError::InvalidExtensionChannel(
+                channel.to_string(),
+            ))
+        })
+    }
+
+    /// Get the latest extension versions for all browsers in a specific channel
+    ///
+    /// Returns a response similar to ReleaseInfoResponse but for browser extensions.
+    /// Each browser (firefox, chrome, safari) that has an extension in this channel
+    /// will be included in the response.
+    ///
+    /// S3 structure expected:
+    /// extensions/{channel}/{browser}/{version}/
+    ///   - extension.{xpi|crx|zip} (the extension file)
+    ///   - notes.txt (optional release notes)
+    #[instrument(skip(self), fields(bucket = %self.bucket_name, channel = %channel))]
+    pub async fn get_extension_release(
+        &self,
+        channel: &str,
+    ) -> Result<Option<ExtensionReleaseResponse>> {
+        debug!("Getting extension release for channel '{}'", channel);
+
+        // Validate channel
+        let extension_channel = self.validate_extension_channel(channel)?;
+
+        let mut browsers: BTreeMap<String, BrowserExtensionInfo> = BTreeMap::new();
+        let mut max_last_modified: Option<DateTime<Utc>> = None;
+
+        // For each browser, find the latest version
+        for browser in [
+            BrowserType::Firefox,
+            BrowserType::Chrome,
+            BrowserType::Safari,
+        ] {
+            match self
+                .get_latest_browser_extension_for_channel(browser, extension_channel)
+                .await
+            {
+                Ok(Some((info, last_modified))) => {
+                    // Track max last_modified
+                    match &max_last_modified {
+                        None => max_last_modified = Some(last_modified),
+                        Some(current_max) if last_modified > *current_max => {
+                            max_last_modified = Some(last_modified);
+                        }
+                        _ => {}
+                    }
+                    browsers.insert(browser.to_string(), info);
+                }
+                Ok(None) => {
+                    debug!(
+                        "No extension found for browser '{}' in channel '{}'",
+                        browser.as_str(),
+                        channel
+                    );
+                }
+                Err(e) => {
+                    debug!(
+                        "Error getting extension for browser '{}' channel '{}': {}",
+                        browser.as_str(),
+                        channel,
+                        e
+                    );
+                }
+            }
+        }
+
+        if browsers.is_empty() {
+            debug!("No extensions found for channel '{}'", channel);
+            return Ok(None);
+        }
+
+        let pub_date = max_last_modified.unwrap_or_else(Utc::now);
+
+        Ok(Some(ExtensionReleaseResponse {
+            channel: extension_channel.to_string(),
+            pub_date: pub_date.to_rfc3339(),
+            browsers,
+        }))
+    }
+
+    /// Get the latest extension for a specific browser in a channel
+    /// Returns the BrowserExtensionInfo and the last_modified timestamp
+    #[instrument(skip(self), fields(bucket = %self.bucket_name, browser = %browser, channel = %channel))]
+    async fn get_latest_browser_extension_for_channel(
+        &self,
+        browser: BrowserType,
+        channel: ExtensionChannel,
+    ) -> Result<Option<(BrowserExtensionInfo, DateTime<Utc>)>> {
+        // List all version directories for this channel/browser
+        let prefix = format!("extensions/{}/{}/", channel.as_str(), browser.as_str());
+        debug!(
+            "Listing extension versions with prefix: {} and delimiter: /",
+            prefix
+        );
+
+        let mut all_versions: Vec<(Version, String)> = Vec::new();
+
+        let mut paginator = self
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(&prefix)
+            .delimiter("/")
+            .into_paginator()
+            .send();
+
+        while let Some(resp) = paginator.next().await {
+            let resp = resp.context("Failed to list S3 extension objects")?;
+
+            for common_prefix in resp.common_prefixes() {
+                if let Some(prefix_str) = common_prefix.prefix() {
+                    let version_str = prefix_str
+                        .strip_prefix(&prefix)
+                        .and_then(|s| s.strip_suffix('/'))
+                        .unwrap_or("");
+
+                    if let Ok(version) = Version::parse(version_str) {
+                        debug!("Found extension version: {}", version_str);
+                        all_versions.push((version, version_str.to_string()));
+                    }
+                }
+            }
+        }
+
+        if all_versions.is_empty() {
+            return Ok(None);
+        }
+
+        // Sort versions in descending order (newest first)
+        all_versions.sort_by(|a, b| b.0.cmp(&a.0));
+
+        // Get the latest version
+        let (_, latest_version_str) = &all_versions[0];
+        debug!(
+            "Latest extension version for {}/{}: {}",
+            channel.as_str(),
+            browser.as_str(),
+            latest_version_str
+        );
+
+        // Build the browser extension info
+        let version_prefix = format!(
+            "extensions/{}/{}/{}/",
+            channel.as_str(),
+            browser.as_str(),
+            latest_version_str
+        );
+
+        let (url, last_modified) = self
+            .find_extension_file_and_url(&version_prefix, browser)
+            .await?;
+
+        Ok(Some((
+            BrowserExtensionInfo {
+                version: Self::strip_build_metadata(latest_version_str),
+                url,
+            },
+            last_modified,
+        )))
+    }
+
+    /// Find the extension file in the S3 directory and generate a presigned URL
+    #[instrument(skip(self), fields(bucket = %self.bucket_name, directory_prefix, browser = %browser))]
+    async fn find_extension_file_and_url(
+        &self,
+        directory_prefix: &str,
+        browser: BrowserType,
+    ) -> Result<(String, DateTime<Utc>)> {
+        debug!(
+            "Searching for extension file in directory: {}",
+            directory_prefix
+        );
+
+        let resp = self
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(directory_prefix)
+            .send()
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to list files in extension directory: {}",
+                    directory_prefix
+                )
+            })?;
+
+        // Define expected file extensions based on browser type
+        let expected_extensions = match browser {
+            BrowserType::Firefox => vec![".xpi", ".zip"],
+            BrowserType::Chrome => vec![".crx", ".zip"],
+            BrowserType::Safari => vec![".zip", ".safariextz"],
+        };
+        debug!(
+            "Expected extensions for {:?}: {:?}",
+            browser, expected_extensions
+        );
+
+        // Find the first file that matches expected extensions
+        for object in resp.contents() {
+            if let Some(key) = object.key() {
+                let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
+                debug!("Examining file: {}", filename);
+
+                // Skip metadata files
+                if filename.ends_with(".sig")
+                    || filename == "notes.txt"
+                    || filename == "manifest.json"
+                {
+                    debug!("Skipping metadata file: {}", filename);
+                    continue;
+                }
+
+                // Check if file matches expected extensions
+                for ext in &expected_extensions {
+                    if filename.ends_with(ext) {
+                        debug!(
+                            "Found matching extension file: {} (extension: {})",
+                            filename, ext
+                        );
+                        let last_modified = self.extract_last_modified(object)?;
+                        let url = self.generate_presigned_url(key).await?;
+                        return Ok((url, last_modified));
+                    }
+                }
+            }
+        }
+
+        // If no specific file found, return the first non-metadata file
+        for object in resp.contents() {
+            if let Some(key) = object.key() {
+                let filename = key.strip_prefix(directory_prefix).unwrap_or(key);
+                if !filename.ends_with(".sig")
+                    && filename != "notes.txt"
+                    && filename != "manifest.json"
+                    && !filename.is_empty()
+                {
+                    let last_modified = self.extract_last_modified(object)?;
+                    let url = self.generate_presigned_url(key).await?;
+                    return Ok((url, last_modified));
+                }
+            }
+        }
+
+        Err(anyhow::Error::from(
+            UpdateServiceError::DownloadFileNotFound(directory_prefix.to_string()),
+        ))
     }
 }

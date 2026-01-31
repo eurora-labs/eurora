@@ -1,38 +1,44 @@
-name: Deploy Chrome Extension
-
+name: 'Publish Chrome Extension'
+env:
+    RUSTUP_TOOLCHAIN: stable
+permissions:
+    contents: read # Required for checkout
+    actions: read # Required for downloading artifacts
 on:
-    # Manual trigger
     workflow_dispatch:
         inputs:
             channel:
                 type: choice
                 required: true
-                description: Release channel
-                default: production
+                description: channel
+                default: nightly
                 options:
-                    - production
-                    - beta
-            version:
-                type: string
+                    - release
+                    - nightly
+            bump:
+                type: choice
                 required: true
-                description: Extension version (e.g., 0.1.0)
-
-    # Trigger on tags matching extension release pattern
-    push:
-        tags:
-            - 'chrome/v*.*.*'
+                description: update type
+                default: patch
+                options:
+                    - undefined
+                    - patch
+                    - minor
+                    - major
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
 jobs:
-    build-and-deploy:
+    build-chrome:
         runs-on: ubuntu-latest
-        permissions:
-            contents: write
         environment:
-            name: chrome-web-store
+            name: chrome-addons
+
+        outputs:
+            version: ${{ env.version }}
+            channel: ${{ env.channel }}
 
         steps:
             - name: Checkout code
@@ -41,6 +47,29 @@ jobs:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
                   lfs: true
+
+            - name: Consume input variables
+              shell: bash
+              env:
+                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
+              run: |
+                  echo "channel=$INPUT_CHANNEL" >> $GITHUB_ENV
+                  echo "bump=$INPUT_BUMP" >> $GITHUB_ENV
+
+            - name: Calculate next version
+              shell: bash
+              env:
+                  CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  BUMP: ${{ github.event.inputs.bump || 'patch' }}
+              run: |
+                  # Fetch current version from API
+                  # CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/extensions/${CHANNEL}" | jq -r '.browsers.chrome.version // "0.5.0"')"
+                  CURRENT_VERSION="0.5.0"
+                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP}")
+                  echo "version=$NEXT_VERSION" >> $GITHUB_ENV
+                  mkdir -p release && echo "$NEXT_VERSION" > release/version
+                  echo "Chrome extension version: $NEXT_VERSION (previous: $CURRENT_VERSION)"
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
@@ -53,52 +82,56 @@ jobs:
             - name: Compile Protobuf
               run: pnpm proto:typescript
 
-            - name: Extract version from input or tag
-              id: version
-              shell: bash
-              env:
-                  EVENT_NAME: ${{ github.event_name }}
-                  GITHUB_REF: ${{ github.ref }}
-                  INPUT_VERSION: ${{ github.event.inputs.version }}
-              run: |
-                  if [ "$EVENT_NAME" == "push" ]; then
-                    # Extract version from tag (e.g., chrome/v0.1.0 -> 0.1.0)
-                    VERSION="${GITHUB_REF#refs/tags/chrome/v}"
-                  else
-                    VERSION="$INPUT_VERSION"
-                  fi
-                  if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}([-\+][0-9A-Za-z\.-]+)?$ ]]; then
-                    echo "Invalid version: $VERSION" >&2
-                    exit 1
-                  fi
-                  printf "version=%s\n" "$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "Chrome extension version: $VERSION"
-
             - name: Build Chrome extension
-              working-directory: apps/browser
               run: pnpm run build:chrome
               env:
                   NODE_ENV: production
-                  VERSION: ${{ steps.version.outputs.version }}
+                  VERSION: ${{ env.version }}
 
             - name: Create Chrome extension zip
               shell: bash
               run: |
                   cd apps/browser/dist/chrome
-                  zip -r ../../../../chrome-extension.zip . -x "*.git*" -x "*.zip"
+                  zip -r ../../../../release/chrome-extension.zip . -x "*.git*" -x "*.zip"
                   cd ../../../..
-                  echo "Created chrome-extension.zip"
-                  ls -lh chrome-extension.zip
+                  echo "Created release/chrome-extension.zip"
+                  ls -lh release/chrome-extension.zip
 
-            - name: Upload artifact
+            - name: Upload Artifacts
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
-                  name: chrome-extension-${{ steps.version.outputs.version }}
-                  path: chrome-extension.zip
-                  retention-days: 30
+                  name: '${{ env.channel }}-chrome-${{ github.run_number }}'
+                  path: release/
+                  if-no-files-found: error
 
-            - name: Upload to Chrome Web Store
-              if: github.event.inputs.channel == 'production' || github.event_name == 'push'
+    publish-chrome:
+        needs: [build-chrome]
+        runs-on: ubuntu-latest
+        environment:
+            name: chrome-addons
+        permissions:
+            contents: write # Required for creating and pushing git tags
+
+        steps:
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: true
+
+            - name: Download artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: '${{ needs.build-chrome.outputs.channel }}-chrome-${{ github.run_number }}'
+                  path: release
+
+            - name: Extract version
+              shell: bash
+              run: |
+                  VERSION="$(cat release/version)"
+                  echo "version=$VERSION" >> $GITHUB_ENV
+
+            - name: Upload to Chrome Web Store (Release)
+              if: needs.build-chrome.outputs.channel == 'release'
               shell: bash
               env:
                   CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
@@ -107,14 +140,20 @@ jobs:
                   CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
               run: |
                   # Get access token using refresh token
-                  ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
-                    -d "client_id=$CHROME_CLIENT_ID" \
-                    -d "client_secret=$CHROME_CLIENT_SECRET" \
-                    -d "refresh_token=$CHROME_REFRESH_TOKEN" \
-                    -d "grant_type=refresh_token" | jq -r '.access_token')
+                  TOKEN_RESPONSE=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+                    -H "Content-Type: application/x-www-form-urlencoded" \
+                    --data-urlencode "client_id=$CHROME_CLIENT_ID" \
+                    --data-urlencode "client_secret=$CHROME_CLIENT_SECRET" \
+                    --data-urlencode "refresh_token=$CHROME_REFRESH_TOKEN" \
+                    --data-urlencode "grant_type=refresh_token")
+
+                  ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
 
                   if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
                     echo "Failed to get access token"
+                    echo "Token response: $TOKEN_RESPONSE"
+                    echo "Error: $(echo "$TOKEN_RESPONSE" | jq -r '.error // empty')"
+                    echo "Error description: $(echo "$TOKEN_RESPONSE" | jq -r '.error_description // empty')"
                     exit 1
                   fi
 
@@ -123,7 +162,7 @@ jobs:
                     "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID" \
                     -H "Authorization: Bearer $ACCESS_TOKEN" \
                     -H "x-goog-api-version: 2" \
-                    -F "file=@chrome-extension.zip")
+                    -F "file=@release/chrome-extension.zip")
 
                   echo "Upload response: $UPLOAD_RESPONSE"
 
@@ -153,8 +192,8 @@ jobs:
 
                   echo "Extension published successfully (status: $PUBLISH_STATUS)"
 
-            - name: Upload to Chrome Web Store (Beta/Trusted Testers)
-              if: github.event.inputs.channel == 'beta'
+            - name: Upload to Chrome Web Store (Nightly/Trusted Testers)
+              if: needs.build-chrome.outputs.channel == 'nightly'
               shell: bash
               env:
                   CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
@@ -163,14 +202,20 @@ jobs:
                   CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
               run: |
                   # Get access token using refresh token
-                  ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
-                    -d "client_id=$CHROME_CLIENT_ID" \
-                    -d "client_secret=$CHROME_CLIENT_SECRET" \
-                    -d "refresh_token=$CHROME_REFRESH_TOKEN" \
-                    -d "grant_type=refresh_token" | jq -r '.access_token')
+                  TOKEN_RESPONSE=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+                    -H "Content-Type: application/x-www-form-urlencoded" \
+                    --data-urlencode "client_id=$CHROME_CLIENT_ID" \
+                    --data-urlencode "client_secret=$CHROME_CLIENT_SECRET" \
+                    --data-urlencode "refresh_token=$CHROME_REFRESH_TOKEN" \
+                    --data-urlencode "grant_type=refresh_token")
+
+                  ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
 
                   if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
                     echo "Failed to get access token"
+                    echo "Token response: $TOKEN_RESPONSE"
+                    echo "Error: $(echo "$TOKEN_RESPONSE" | jq -r '.error // empty')"
+                    echo "Error description: $(echo "$TOKEN_RESPONSE" | jq -r '.error_description // empty')"
                     exit 1
                   fi
 
@@ -179,7 +224,7 @@ jobs:
                     "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID" \
                     -H "Authorization: Bearer $ACCESS_TOKEN" \
                     -H "x-goog-api-version: 2" \
-                    -F "file=@chrome-extension.zip")
+                    -F "file=@release/chrome-extension.zip")
 
                   echo "Upload response: $UPLOAD_RESPONSE"
 
@@ -209,27 +254,69 @@ jobs:
 
                   echo "Extension published to trusted testers (status: $PUBLISH_STATUS)"
 
-            - name: Create GitHub Release
-              if: github.event_name == 'push'
-              uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+            - name: Prepare S3 payload
+              shell: bash
+              run: |
+                  rm -rf release-s3
+                  mkdir -p release-s3
+                  cp release/chrome-extension.zip release-s3/
+
+            - uses: shallwefootball/s3-upload-action@0d261a6f15b3b2e209dfebdecace4b100c04f95b # master
+              name: Upload To S3
+              id: S3
               with:
-                  files: |
-                      chrome-extension.zip
-                  body: |
-                      Chrome Extension Release ${{ steps.version.outputs.version }}
+                  aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws_bucket: 'releases.eurora-labs.com'
+                  source_dir: 'release-s3/'
+                  destination_dir: 'extensions/${{ needs.build-chrome.outputs.channel }}/chrome/${{ env.version }}-${{ github.run_number }}'
 
-                      This release has been automatically built and submitted to the Chrome Web Store.
-                  draft: false
-                  prerelease: false
+    create-git-tag:
+        needs: [publish-chrome, build-chrome]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write # Required for creating and pushing git tags
+        steps:
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: true
+
+            - name: Download artifacts
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+              with:
+                  name: '${{ needs.build-chrome.outputs.channel }}-chrome-${{ github.run_number }}'
+                  path: release
+
+            - name: Extract version
+              shell: bash
+              run: |
+                  VERSION="$(cat release/version)"
+                  echo "version=$VERSION" >> $GITHUB_ENV
+
+            - name: Create git tag
+              shell: bash
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Notify on success
-              if: success()
+                  OUTPUT_CHANNEL: ${{ needs.build-chrome.outputs.channel }}
+                  VERSION: ${{ env.version }}
               run: |
-                  echo "✅ Chrome extension ${{ steps.version.outputs.version }} successfully built and deployed!"
+                  TAG_NAME="chrome/${OUTPUT_CHANNEL}/${VERSION}"
+                  function tag_exists() {
+                    git tag --list | grep -q "^$1$"
+                  }
+                  function fetch_tag() {
+                    git fetch origin "refs/tags/$1:refs/tags/$1"
+                  }
+                  function delete_tag() {
+                    git push --delete origin "$1"
+                  }
+                  function create_tag() {
+                    git tag --force "$1"
+                    git push --tags
+                  }
 
-            - name: Notify on failure
-              if: failure()
-              run: |
-                  echo "❌ Chrome extension deployment failed. Check the logs for details."
+                  fetch_tag "$TAG_NAME" || true
+                  if tag_exists "$TAG_NAME"; then
+                    delete_tag "$TAG_NAME"
+                  fi
+                  create_tag "$TAG_NAME"
