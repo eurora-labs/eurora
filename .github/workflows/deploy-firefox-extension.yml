@@ -64,7 +64,8 @@ jobs:
                   BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
                   # Fetch current version from API
-                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/extensions/${CHANNEL}" | jq -r '.browsers.firefox.version // "0.5.0"')"
+                  # CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/extensions/${CHANNEL}" | jq -r '.browsers.firefox.version // "0.5.0"')"
+                  CURRENT_VERSION="0.5.0"
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP}")
                   echo "version=$NEXT_VERSION" >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
