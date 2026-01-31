@@ -23,14 +23,14 @@ use euro_native_messaging::NativeMessage;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use url::Url;
 
 // Re-export the singleton service and types from euro_browser crate
 pub use euro_browser::{
-    BrowserBridgeServer, BrowserBridgeService, Frame, FrameKind, RequestFrame, ResponseFrame,
+    BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
+    ResponseFrame,
 };
 
 /// Browser strategy for collecting web browser activity data
@@ -41,8 +41,6 @@ pub use euro_browser::{
 #[derive(Clone, Serialize, Deserialize, Default)]
 pub struct BrowserStrategy {
     #[serde(skip)]
-    tracking_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
-    #[serde(skip)]
     sender: Option<mpsc::UnboundedSender<ActivityReport>>,
 
     /// Reference to the global singleton bridge service
@@ -51,7 +49,7 @@ pub struct BrowserStrategy {
     bridge_service: Option<&'static BrowserBridgeService>,
 
     #[serde(skip)]
-    activity_event_tx: Option<broadcast::Sender<Frame>>,
+    event_subscription_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 
     #[serde(skip)]
     snapshot_collection_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
@@ -73,10 +71,7 @@ impl BrowserStrategy {
         // Get the global singleton service instance (server is started by TimelineManager)
         let service = BrowserBridgeService::get_or_init().await;
 
-        let activity_event_tx: broadcast::Sender<Frame> = broadcast::channel(100).0;
-
         self.bridge_service = Some(service);
-        self.activity_event_tx = Some(activity_event_tx);
 
         Ok(())
     }
@@ -122,7 +117,14 @@ impl BrowserStrategy {
                 "Sender not initialized".to_string(),
             ));
         };
-        let mut activity_receiver = self.activity_event_tx.clone().unwrap().subscribe();
+
+        let service = self
+            .bridge_service
+            .as_ref()
+            .ok_or_else(|| ActivityError::Strategy("Bridge service not initialized".to_string()))?;
+
+        // Subscribe to event frames from the bridge service
+        let mut events_rx = service.subscribe_to_events();
         let _default_icon = focus_window.icon.clone();
         let mut strategy = self.clone();
         let last_url: Arc<tokio::sync::Mutex<Option<Url>>> =
@@ -131,20 +133,17 @@ impl BrowserStrategy {
         let handle = tokio::spawn(async move {
             let last_url = Arc::clone(&last_url);
 
-            while let Ok(frame) = activity_receiver.recv().await {
-                let kind = match frame.kind {
-                    Some(k) => k,
-                    None => continue,
-                };
-                let payload = match kind {
-                    FrameKind::Response(frame) => frame.payload,
-                    FrameKind::Event(frame) => frame.payload,
-                    _ => None,
-                };
-                let Some(payload_str) = payload else {
+            while let Ok((browser_pid, event_frame)) = events_rx.recv().await {
+                debug!(
+                    "Received event from browser PID {}: action={}",
+                    browser_pid, event_frame.action
+                );
+
+                let Some(payload_str) = event_frame.payload else {
                     continue;
                 };
-                let native_asset = match serde_json::from_str::<NativeMessage>(&payload_str) {
+
+                let native_message = match serde_json::from_str::<NativeMessage>(&payload_str) {
                     Ok(msg) => msg,
                     Err(e) => {
                         warn!("Failed to parse native message: {}", e);
@@ -152,18 +151,22 @@ impl BrowserStrategy {
                     }
                 };
 
-                let event = match native_asset {
+                // Only handle NativeMetadata events to create new activities
+                let metadata = match native_message {
                     NativeMessage::NativeMetadata(data) => StrategyMetadata::from(data),
                     _ => {
-                        warn!("Unexpected native asset type");
+                        debug!("Ignoring non-metadata event");
                         continue;
                     }
                 };
+
                 let mut prev = last_url.lock().await;
-                let url = match Url::parse(&event.url.clone().unwrap_or_default()) {
+                let url = match Url::parse(&metadata.url.clone().unwrap_or_default()) {
                     Ok(u) => u,
                     Err(_) => continue,
                 };
+
+                // Skip if URL domain hasn't changed
                 if let Some(prev_url) = prev.take()
                     && prev_url.domain() == url.domain()
                 {
@@ -171,19 +174,22 @@ impl BrowserStrategy {
                     continue;
                 }
                 *prev = Some(url);
-                let icon = event.icon;
+
+                let icon = metadata.icon.clone();
+                let url_str = metadata.url.clone().unwrap_or_default();
 
                 let assets = strategy.retrieve_assets().await.map_err(|e| {
                     warn!("Failed to retrieve assets: {}", e);
                     e
                 });
-                let activity = Activity::new(
-                    event.url.unwrap_or_default(),
-                    icon,
-                    "".to_string(),
-                    assets.unwrap_or_default(),
-                );
 
+                let activity =
+                    Activity::new(url_str, icon, "".to_string(), assets.unwrap_or_default());
+
+                info!(
+                    "Creating new activity from event: browser_pid={}, name={}",
+                    browser_pid, activity.name
+                );
                 if sender
                     .send(ActivityReport::NewActivity(activity.clone()))
                     .is_err()
@@ -192,9 +198,11 @@ impl BrowserStrategy {
                     break;
                 }
             }
+
+            debug!("Event subscription task ended");
         });
 
-        self.tracking_handle = Some(Arc::new(handle));
+        self.event_subscription_handle = Some(Arc::new(handle));
 
         // Start snapshot collection
         self.collect_snapshots();
@@ -291,7 +299,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             );
             if self.active_browser_pid == Some(focus_window.process_id) {
                 info!("Detected the same browser. Ignoring...",);
-                // return Ok(true);
             } else {
                 self.active_browser_pid = Some(focus_window.process_id);
                 self.active_browser = Some(focus_window.process_name.to_string());
@@ -343,7 +350,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         self.active_browser = None;
         self.active_browser_pid = None;
 
-        if let Some(handle) = self.tracking_handle.take() {
+        // Clean up event subscription task
+        if let Some(handle) = self.event_subscription_handle.take() {
             // Try to unwrap Arc, if we're the only owner, abort the task
             if let Ok(handle) = Arc::try_unwrap(handle) {
                 handle.abort();

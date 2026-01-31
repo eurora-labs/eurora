@@ -34,9 +34,6 @@ color-thief = "0.2.2"
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-conversation = { workspace = true }
-euro-encrypt = { workspace = true }
-euro-native-messaging = { workspace = true }
-# euro-personal-db = { workspace = true, features = ["specta"] }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-timeline = { workspace = true }
@@ -58,6 +55,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-http = "2"
 tauri-plugin-log = { version = "2", features = ["colored"] }
+tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 tauri-plugin-shell = "2"
@@ -66,7 +64,6 @@ tauri-plugin-store = "2"
 tauri-plugin-stronghold = "2.3.1"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
-tauri-plugin-opener = "2"
 # taurpc = { version = "0.5.2" }
 taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "feature/improved-compatibility" }
 # The features here optimize for performance.

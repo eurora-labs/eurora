@@ -8,7 +8,7 @@
 //! is alive. When the TimelineManager is stopped, the server will be gracefully shut down.
 
 use super::proto::{
-    Frame, RequestFrame, ResponseFrame, browser_bridge_server::BrowserBridge,
+    EventFrame, Frame, RequestFrame, ResponseFrame, browser_bridge_server::BrowserBridge,
     browser_bridge_server::BrowserBridgeServer, frame::Kind as FrameKind,
 };
 use dashmap::DashMap;
@@ -84,6 +84,8 @@ pub struct BrowserBridgeService {
     pub app_from_tx: broadcast::Sender<Frame>,
     /// Broadcast channel for frames coming from native messengers
     pub frames_from_messengers_tx: broadcast::Sender<(u32, Frame)>,
+    /// Broadcast channel for event frames (browser_pid, EventFrame)
+    events_tx: broadcast::Sender<(u32, EventFrame)>,
     /// Pending requests waiting for responses, keyed by request ID
     pending_requests: Arc<DashMap<u32, PendingRequest>>,
     /// Counter for generating unique request IDs
@@ -97,11 +99,13 @@ impl BrowserBridgeService {
     pub fn new() -> Self {
         let (app_from_tx, _) = broadcast::channel(100);
         let (frames_from_messengers_tx, _) = broadcast::channel(100);
+        let (events_tx, _) = broadcast::channel(100);
 
         Self {
             registry: Arc::new(RwLock::new(HashMap::new())),
             app_from_tx,
             frames_from_messengers_tx,
+            events_tx,
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
             frame_handler_handle: Arc::new(OnceCell::new()),
@@ -116,6 +120,7 @@ impl BrowserBridgeService {
     pub fn start_frame_handler(&self) {
         let pending_requests = Arc::clone(&self.pending_requests);
         let frames_from_messengers_tx = self.frames_from_messengers_tx.clone();
+        let events_tx = self.events_tx.clone();
         let mut frames_rx = frames_from_messengers_tx.subscribe();
 
         let handle = tokio::spawn(async move {
@@ -162,8 +167,17 @@ impl BrowserBridgeService {
                         }
                     }
                     FrameKind::Event(evt_frame) => {
-                        // Event frames are broadcast to subscribers, no special handling needed here
-                        debug!("Received event frame: action={}", evt_frame.action);
+                        debug!(
+                            "Received event frame from browser PID {}: action={}",
+                            browser_pid, evt_frame.action
+                        );
+                        // Broadcast event frame to event subscribers
+                        if let Err(e) = events_tx.send((browser_pid, evt_frame)) {
+                            debug!(
+                                "No event subscribers for event frame from browser PID {}: {}",
+                                browser_pid, e
+                            );
+                        }
                     }
                     FrameKind::Error(err_frame) => {
                         error!(
@@ -289,6 +303,27 @@ impl BrowserBridgeService {
     /// Subscribe to frames coming from native messengers
     pub fn subscribe_to_frames(&self) -> broadcast::Receiver<(u32, Frame)> {
         self.frames_from_messengers_tx.subscribe()
+    }
+
+    /// Subscribe to event frames coming from native messengers
+    ///
+    /// Returns a receiver that will receive tuples of (browser_pid, EventFrame)
+    /// for all event frames from connected native messengers.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let service = BrowserBridgeService::get_or_init().await;
+    /// let mut events_rx = service.subscribe_to_events();
+    ///
+    /// tokio::spawn(async move {
+    ///     while let Ok((browser_pid, event)) = events_rx.recv().await {
+    ///         println!("Event from browser {}: action={}", browser_pid, event.action);
+    ///     }
+    /// });
+    /// ```
+    pub fn subscribe_to_events(&self) -> broadcast::Receiver<(u32, EventFrame)> {
+        self.events_tx.subscribe()
     }
 
     /// Check if a browser PID is registered with a native messenger

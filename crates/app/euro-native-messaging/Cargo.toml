@@ -11,9 +11,7 @@ ignored = ["tonic-prost"]
 anyhow = { workspace = true }
 async-stream = "0.3"
 base64 = { workspace = true }
-ctrlc = "3.5.1"
 enum_dispatch = { workspace = true }
-futures = { workspace = true }
 image = { workspace = true, features = ["default"] }
 prost = { workspace = true }
 prost-types = { workspace = true }
@@ -31,7 +29,6 @@ specta-typescript = { version = "0.0.9" }
 strum_macros = { workspace = true }
 tiny-skia = "0.11"
 tokio = { workspace = true, features = ["full"] }
-tokio-stream = { workspace = true }
 tonic = { workspace = true, features = [
   "channel",
   "router",
