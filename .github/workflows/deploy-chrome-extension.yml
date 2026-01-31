@@ -141,10 +141,11 @@ jobs:
               run: |
                   # Get access token using refresh token
                   TOKEN_RESPONSE=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
-                    -d "client_id=$CHROME_CLIENT_ID" \
-                    -d "client_secret=$CHROME_CLIENT_SECRET" \
-                    -d "refresh_token=$CHROME_REFRESH_TOKEN" \
-                    -d "grant_type=refresh_token")
+                    -H "Content-Type: application/x-www-form-urlencoded" \
+                    --data-urlencode "client_id=$CHROME_CLIENT_ID" \
+                    --data-urlencode "client_secret=$CHROME_CLIENT_SECRET" \
+                    --data-urlencode "refresh_token=$CHROME_REFRESH_TOKEN" \
+                    --data-urlencode "grant_type=refresh_token")
 
                   ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
 
@@ -202,10 +203,11 @@ jobs:
               run: |
                   # Get access token using refresh token
                   TOKEN_RESPONSE=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
-                    -d "client_id=$CHROME_CLIENT_ID" \
-                    -d "client_secret=$CHROME_CLIENT_SECRET" \
-                    -d "refresh_token=$CHROME_REFRESH_TOKEN" \
-                    -d "grant_type=refresh_token")
+                    -H "Content-Type: application/x-www-form-urlencoded" \
+                    --data-urlencode "client_id=$CHROME_CLIENT_ID" \
+                    --data-urlencode "client_secret=$CHROME_CLIENT_SECRET" \
+                    --data-urlencode "refresh_token=$CHROME_REFRESH_TOKEN" \
+                    --data-urlencode "grant_type=refresh_token")
 
                   ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
 
