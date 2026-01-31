@@ -4,6 +4,7 @@
 //! (Eurora) to avoid unnecessary snapshot retrieval calls.
 
 use async_trait::async_trait;
+use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::debug;
@@ -31,9 +32,9 @@ impl StrategySupport for NoStrategy {
 
 #[async_trait]
 impl ActivityStrategyFunctionality for NoStrategy {
-    fn can_handle_process(&self, process_name: &str) -> bool {
+    fn can_handle_process(&self, focus_window: &FocusedWindow) -> bool {
         // Check if the process is in the supported processes list
-        NoStrategy::get_supported_processes().contains(&process_name)
+        NoStrategy::get_supported_processes().contains(&focus_window.process_name.as_str())
     }
 
     async fn start_tracking(
@@ -49,10 +50,16 @@ impl ActivityStrategyFunctionality for NoStrategy {
         Ok(())
     }
 
-    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool> {
-        debug!("NoStrategy: handling process change to: {}", process_name);
+    async fn handle_process_change(
+        &mut self,
+        focus_window: &FocusedWindow,
+    ) -> ActivityResult<bool> {
+        debug!(
+            "NoStrategy: handling process change to: {}",
+            focus_window.process_name
+        );
         // Only continue if the new process is one we can handle (Eurora)
-        Ok(self.can_handle_process(process_name))
+        Ok(self.can_handle_process(focus_window))
     }
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {

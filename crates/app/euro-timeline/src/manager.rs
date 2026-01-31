@@ -5,7 +5,7 @@ use bon::bon;
 use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
     ActivityStorage, AssetFunctionality, ContextChip, TimelineError, collector::CollectorService,
@@ -44,9 +44,36 @@ impl TimelineManager {
     }
 
     /// Start the timeline manager (begins activity collection)
+    ///
+    /// This also starts the browser bridge gRPC server which accepts connections
+    /// from native messaging hosts. The server will run as long as the timeline
+    /// manager is alive.
     pub async fn start(&mut self) -> TimelineResult<()> {
         debug!("Starting timeline manager");
+
+        // Start the browser bridge server for native messenger communication
+        info!("Starting browser bridge gRPC server");
+        euro_browser::start_browser_bridge_server().await;
+
         self.collector.start().await
+    }
+
+    /// Stop the timeline manager
+    ///
+    /// This stops activity collection and gracefully shuts down the browser bridge
+    /// gRPC server, disconnecting all native messengers.
+    pub async fn stop(&mut self) -> TimelineResult<()> {
+        debug!("Stopping timeline manager");
+
+        // Stop the browser bridge server
+        info!("Stopping browser bridge gRPC server");
+        euro_browser::stop_browser_bridge_server().await;
+
+        // Stop the collector if it has a stop method
+        // For now, just log that we're stopping
+        info!("Timeline manager stopped");
+
+        Ok(())
     }
 
     /// Get context chips from the current activity

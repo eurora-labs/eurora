@@ -4,6 +4,7 @@ use crate::utils::convert_svg_to_rgba;
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
+use focus_tracker::FocusedWindow;
 use tokio::sync::mpsc;
 
 pub mod browser;
@@ -65,7 +66,7 @@ impl From<NativeMetadata> for StrategyMetadata {
 
 /// Enum containing all possible activity strategies
 #[enum_dispatch(ActivityStrategyFunctionality)]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum ActivityStrategy {
     BrowserStrategy,
     DefaultStrategy,
@@ -76,7 +77,7 @@ pub enum ActivityStrategy {
 #[enum_dispatch]
 pub trait ActivityStrategyFunctionality {
     /// Check if this strategy can handle the given process name
-    fn can_handle_process(&self, process_name: &str) -> bool;
+    fn can_handle_process(&self, focus_window: &FocusedWindow) -> bool;
 
     /// Start tracking and reporting activities
     /// The strategy should spawn its own tasks and report activities through the sender
@@ -90,7 +91,8 @@ pub trait ActivityStrategyFunctionality {
     /// Returns Ok(true) if the strategy can continue handling the new process
     /// Returns Ok(false) if a strategy switch is needed
     /// Returns Err if there was an error
-    async fn handle_process_change(&mut self, process_name: &str) -> ActivityResult<bool>;
+    async fn handle_process_change(&mut self, focus_window: &FocusedWindow)
+    -> ActivityResult<bool>;
 
     /// Stop tracking gracefully
     async fn stop_tracking(&mut self) -> ActivityResult<()>;
