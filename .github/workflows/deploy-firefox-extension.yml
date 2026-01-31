@@ -50,16 +50,22 @@ jobs:
 
             - name: Consume input variables
               shell: bash
+              env:
+                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
-                  echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
-                  echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
+                  echo "channel=$INPUT_CHANNEL" >> $GITHUB_ENV
+                  echo "bump=$INPUT_BUMP" >> $GITHUB_ENV
 
             - name: Calculate next version
               shell: bash
+              env:
+                  CHANNEL: ${{ env.channel }}
+                  BUMP: ${{ env.bump }}
               run: |
                   # Fetch current version from API
-                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/extensions/${{ env.channel }}" | jq -r '.browsers.firefox.version // "0.5.0"')"
-                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
+                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/extensions/${CHANNEL}" | jq -r '.browsers.firefox.version // "0.5.0"')"
+                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP}")
                   echo "version=$NEXT_VERSION" >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
                   echo "Firefox extension version: $NEXT_VERSION (previous: $CURRENT_VERSION)"
@@ -78,8 +84,10 @@ jobs:
             - name: Determine Firefox extension ID
               id: firefox-id
               shell: bash
+              env:
+                  CHANNEL: ${{ env.channel }}
               run: |
-                  if [ "${{ env.channel }}" == "release" ]; then
+                  if [ "$CHANNEL" == "release" ]; then
                     FIREFOX_ID="{271903fe-1905-4636-b47f-6f0873dc97f8}"
                     echo "Using production Firefox extension ID"
                   else
@@ -223,8 +231,10 @@ jobs:
             - name: Create git tag
               shell: bash
               env:
-                  TAG_NAME: 'firefox/${{ needs.build-firefox.outputs.channel }}/${{ env.version }}'
+                  OUTPUT_CHANNEL: ${{ needs.build-firefox.outputs.channel }}
+                  VERSION: ${{ env.version }}
               run: |
+                  TAG_NAME="firefox/${OUTPUT_CHANNEL}/${VERSION}"
                   function tag_exists() {
                     git tag --list | grep -q "^$1$"
                   }
