@@ -140,11 +140,14 @@ jobs:
                   name: '${{ needs.build-firefox.outputs.channel }}-firefox-${{ github.run_number }}'
                   path: release
 
-            - name: Extract version
+            - name: Extract version and extension
               shell: bash
               run: |
                   VERSION="$(cat release/version)"
                   echo "version=$VERSION" >> $GITHUB_ENV
+                  # Extract the extension zip for signing
+                  mkdir -p extension-source
+                  unzip release/firefox-extension.zip -d extension-source
 
             - name: Install web-ext
               run: npm install -g web-ext@8.10.0
@@ -156,7 +159,7 @@ jobs:
                   WEB_EXT_API_KEY: ${{ secrets.FIREFOX_API_KEY }}
                   WEB_EXT_API_SECRET: ${{ secrets.FIREFOX_API_SECRET }}
               run: |
-                  cd apps/browser/dist/firefox
+                  cd extension-source
 
                   # Sign and submit the Firefox extension
                   web-ext sign \
@@ -174,7 +177,7 @@ jobs:
                   WEB_EXT_API_KEY: ${{ secrets.FIREFOX_API_KEY }}
                   WEB_EXT_API_SECRET: ${{ secrets.FIREFOX_API_SECRET }}
               run: |
-                  cd apps/browser/dist/firefox
+                  cd extension-source
 
                   # Sign and submit to unlisted (nightly) channel
                   web-ext sign \
@@ -191,8 +194,8 @@ jobs:
                   rm -rf release-s3
                   mkdir -p release-s3
                   # Copy the signed XPI if it exists, otherwise use the zip
-                  if ls apps/browser/dist/firefox/web-ext-artifacts/*.xpi 1> /dev/null 2>&1; then
-                    cp apps/browser/dist/firefox/web-ext-artifacts/*.xpi release-s3/eurora.xpi
+                  if ls extension-source/web-ext-artifacts/*.xpi 1> /dev/null 2>&1; then
+                    cp extension-source/web-ext-artifacts/*.xpi release-s3/eurora.xpi
                   fi
                   cp release/firefox-extension.zip release-s3/
 
