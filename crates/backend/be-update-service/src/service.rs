@@ -700,7 +700,7 @@ impl AppState {
 
     /// Validate extension channel parameter
     fn validate_extension_channel(&self, channel: &str) -> Result<ExtensionChannel> {
-        ExtensionChannel::from_str(channel).ok_or_else(|| {
+        channel.parse().map_err(|_| {
             anyhow::Error::from(UpdateServiceError::InvalidExtensionChannel(
                 channel.to_string(),
             ))
