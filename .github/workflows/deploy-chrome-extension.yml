@@ -140,14 +140,19 @@ jobs:
                   CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
               run: |
                   # Get access token using refresh token
-                  ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+                  TOKEN_RESPONSE=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
                     -d "client_id=$CHROME_CLIENT_ID" \
                     -d "client_secret=$CHROME_CLIENT_SECRET" \
                     -d "refresh_token=$CHROME_REFRESH_TOKEN" \
-                    -d "grant_type=refresh_token" | jq -r '.access_token')
+                    -d "grant_type=refresh_token")
+
+                  ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
 
                   if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
                     echo "Failed to get access token"
+                    echo "Token response: $TOKEN_RESPONSE"
+                    echo "Error: $(echo "$TOKEN_RESPONSE" | jq -r '.error // empty')"
+                    echo "Error description: $(echo "$TOKEN_RESPONSE" | jq -r '.error_description // empty')"
                     exit 1
                   fi
 
@@ -196,14 +201,19 @@ jobs:
                   CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
               run: |
                   # Get access token using refresh token
-                  ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+                  TOKEN_RESPONSE=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
                     -d "client_id=$CHROME_CLIENT_ID" \
                     -d "client_secret=$CHROME_CLIENT_SECRET" \
                     -d "refresh_token=$CHROME_REFRESH_TOKEN" \
-                    -d "grant_type=refresh_token" | jq -r '.access_token')
+                    -d "grant_type=refresh_token")
+
+                  ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
 
                   if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
                     echo "Failed to get access token"
+                    echo "Token response: $TOKEN_RESPONSE"
+                    echo "Error: $(echo "$TOKEN_RESPONSE" | jq -r '.error // empty')"
+                    echo "Error description: $(echo "$TOKEN_RESPONSE" | jq -r '.error_description // empty')"
                     exit 1
                   fi
 
