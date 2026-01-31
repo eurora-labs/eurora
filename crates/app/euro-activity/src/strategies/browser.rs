@@ -76,40 +76,6 @@ impl BrowserStrategy {
         Ok(())
     }
 
-    /// Validates that the focused window's process is registered as a native messenger.
-    /// This ensures we're tracking a browser that has the extension installed.
-    #[allow(dead_code)]
-    async fn validate_browser_pid(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
-        let service = self
-            .bridge_service
-            .as_ref()
-            .ok_or_else(|| ActivityError::Strategy("Bridge service not initialized".to_string()))?;
-
-        let focus_pid = focus_window.process_id;
-
-        // Check if this browser PID is registered
-        if service.is_registered(focus_pid).await {
-            info!(
-                "Browser PID {} is registered with native messenger",
-                focus_pid
-            );
-            // Set this as the active browser PID
-            self.active_browser_pid = Some(focus_pid);
-            Ok(())
-        } else {
-            let registered_pids = service.get_registered_pids().await;
-            warn!(
-                "Browser PID {} is not registered. Currently registered PIDs: {:?}",
-                focus_pid, registered_pids
-            );
-            Err(ActivityError::Strategy(format!(
-                "Browser PID {} does not have a registered native messenger. \
-                 Make sure the browser extension is installed and active.",
-                focus_pid
-            )))
-        }
-    }
-
     async fn init_collection(&mut self, focus_window: &FocusedWindow) -> ActivityResult<()> {
         // Initialize tracking logic here
         let Some(sender) = self.sender.clone() else {
@@ -239,9 +205,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         focus_window: &FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
-        // Validate that the focused browser PID has a registered native messenger
-        // self.validate_browser_pid(focus_window).await?;
-
         self.sender = Some(sender.clone());
         let process_name = focus_window.process_name.clone();
         self.active_browser = Some(process_name.clone());

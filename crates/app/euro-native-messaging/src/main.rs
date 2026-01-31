@@ -91,7 +91,7 @@ async fn main() -> Result<()> {
         let mut stdout = io::stdout();
         info!("Chrome writer task started");
         while let Some(frame) = from_server_rx.recv().await {
-            info!("Writing frame to Chrome: {:?}", frame);
+            info!("Writing frame to Chrome: {:?}", frame.kind);
             if let Err(err) = write_framed(&mut stdout, &frame).await {
                 error!("Native host write error: {:?}", err);
                 break;
@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
             loop {
                 match read_framed(&mut stdin).await {
                     Ok(Some(frame)) => {
-                        info!("Read frame from Chrome: {:?}", frame);
+                        info!("Read frame from Chrome: {:?}", frame.kind);
                         // Broadcast to any active server connection
                         // It's okay if there are no receivers (server disconnected)
                         let _ = to_server_tx.send(frame);

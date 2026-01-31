@@ -558,12 +558,23 @@ impl BrowserBridge for BrowserBridgeService {
             }
 
             let mut registry = registry.write().await;
-            registry.remove(&browser_pid);
-            info!(
-                "Unregistered native messenger for browser PID {}. Remaining: {}",
-                browser_pid,
-                registry.len()
-            );
+            if registry
+                .get(&browser_pid)
+                .is_some_and(|m| m.host_pid == host_pid)
+            {
+                registry.remove(&browser_pid);
+                info!(
+                    "Unregistered native messenger for browser PID {} and host PID {}. Remaining: {}",
+                    browser_pid,
+                    host_pid,
+                    registry.len()
+                );
+            } else {
+                warn!(
+                    "Failed to unregister native messenger: browser_pid={} host_pid={} not found or mismatch",
+                    browser_pid, host_pid
+                );
+            }
         });
         let out_stream = ReceiverStream::new(rx_to_client);
         Ok(Response::new(Box::pin(out_stream) as Self::OpenStream))

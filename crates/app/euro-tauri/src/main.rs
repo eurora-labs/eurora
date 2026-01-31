@@ -306,29 +306,6 @@ fn main() {
                     });
 
 
-
-                    // Initialize conversation storage
-                    // let db_app_handle = app_handle.clone();
-                    // tauri::async_runtime::spawn(async move {
-                    //     let db = create_shared_database_manager(&db_app_handle).await;
-                    //     db_app_handle.manage(db);
-                    // });
-                    // Initialize conversation storage
-
-
-
-                    // Initialize IPC client
-                    // let ipc_handle = app_handle.clone();
-                    // tauri::async_runtime::spawn(async move {
-                    //     match create_browser_bridge_client().await {
-                    //         Ok(ipc_client) => {
-                    //             ipc_handle.manage(ipc_client.clone());
-                    //             debug!("gRPC IPC client initialized");
-                    //         }
-                    //         Err(e) => error!("Failed to initialize gRPC IPC client: {}", e),
-                    //     }
-                    // });
-
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
