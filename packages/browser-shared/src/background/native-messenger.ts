@@ -27,7 +27,7 @@ export function startNativeMessenger() {
 
 function onNativePortDisconnect(port: browser.Runtime.Port) {
 	const error = port.error;
-	console.error('Native port disconnected:', error?.message || 'Unknown error');
+	console.error('Native port disconnected:', error || 'Unknown error');
 	nativePort = null;
 
 	// Try to reconnect after a delay
