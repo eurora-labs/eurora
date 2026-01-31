@@ -68,14 +68,17 @@ impl BrowserType {
             BrowserType::Safari => "safari",
         }
     }
+}
 
-    /// Parse from string
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for BrowserType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "firefox" => Some(BrowserType::Firefox),
-            "chrome" | "chromium" => Some(BrowserType::Chrome),
-            "safari" => Some(BrowserType::Safari),
-            _ => None,
+            "firefox" => Ok(BrowserType::Firefox),
+            "chrome" | "chromium" => Ok(BrowserType::Chrome),
+            "safari" => Ok(BrowserType::Safari),
+            _ => Err(format!("Unknown browser type: {}", s)),
         }
     }
 }
@@ -102,13 +105,16 @@ impl ExtensionChannel {
             ExtensionChannel::Nightly => "nightly",
         }
     }
+}
 
-    /// Parse from string
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for ExtensionChannel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "release" | "stable" => Some(ExtensionChannel::Release),
-            "nightly" | "dev" | "development" => Some(ExtensionChannel::Nightly),
-            _ => None,
+            "release" | "stable" => Ok(ExtensionChannel::Release),
+            "nightly" | "dev" | "development" => Ok(ExtensionChannel::Nightly),
+            _ => Err(format!("Unknown extension channel: {}", s)),
         }
     }
 }
