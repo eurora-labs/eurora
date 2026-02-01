@@ -67,7 +67,7 @@ message ChatStreamResponse {
 
 message AddHumanMessageRequest {
   string conversation_id = 1;
-  string content = 2;
+  agent_chain.ProtoHumanMessage message = 2;
 }
 
 message AddHumanMessageResponse {
@@ -94,7 +94,7 @@ message GetConversationResponse {
 
 message AddSystemMessageRequest {
   string conversation_id = 1;
-  string content = 2;
+  agent_chain.ProtoSystemMessage message = 2;
 }
 
 message AddSystemMessageResponse {
