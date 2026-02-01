@@ -478,7 +478,7 @@ impl BaseMessageChunk {
     /// Get the message content.
     pub fn content(&self) -> &str {
         match self {
-            BaseMessageChunk::AI(m) => m.content(),
+            BaseMessageChunk::AI(m) => &m.content,
             BaseMessageChunk::Human(m) => m.content(),
             BaseMessageChunk::System(m) => m.content(),
             BaseMessageChunk::Tool(m) => m.content(),
@@ -490,7 +490,7 @@ impl BaseMessageChunk {
     /// Get the message ID.
     pub fn id(&self) -> Option<String> {
         match self {
-            BaseMessageChunk::AI(m) => m.id(),
+            BaseMessageChunk::AI(m) => m.id.clone(),
             BaseMessageChunk::Human(m) => m.id(),
             BaseMessageChunk::System(m) => m.id(),
             BaseMessageChunk::Tool(m) => m.id(),

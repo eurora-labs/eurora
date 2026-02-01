@@ -97,9 +97,9 @@ fn test_serdes_message() {
 
 #[test]
 fn test_serdes_message_chunk() {
-    let chunk = AIMessageChunk::new_with_tool_call_chunks(
-        "",
-        vec![
+    let chunk = AIMessageChunk::builder()
+        .content("")
+        .tool_call_chunks(vec![
             tool_call_chunk(
                 Some("foo".to_string()),
                 Some(r#"{"bar": 1}"#.to_string()),
@@ -112,8 +112,8 @@ fn test_serdes_message_chunk() {
                 Some("booz".to_string()),
                 Some(1),
             ),
-        ],
-    );
+        ])
+        .build();
 
     // Serialize and check structure
     let serialized = serde_json::to_value(&chunk).unwrap();
@@ -144,9 +144,9 @@ fn test_serdes_message_chunk() {
 
     // Test roundtrip
     let deserialized: AIMessageChunk = serde_json::from_value(serialized).unwrap();
-    assert_eq!(deserialized.tool_call_chunks().len(), 2);
+    assert_eq!(deserialized.tool_call_chunks.len(), 2);
     assert_eq!(
-        deserialized.tool_call_chunks()[0].name,
+        deserialized.tool_call_chunks[0].name,
         Some("foo".to_string())
     );
 }
@@ -298,13 +298,12 @@ fn test_add_ai_message_chunks_usage() {
 
     let chunk2 = AIMessageChunk::builder()
         .content("")
-        .build()
-        .with_usage_metadata(UsageMetadata::new(2, 3));
+        .usage_metadata(UsageMetadata::new(2, 3))
+        .build();
 
     let chunk3 = AIMessageChunk::builder()
         .content("")
-        .build()
-        .with_usage_metadata(UsageMetadata {
+        .usage_metadata(UsageMetadata {
             input_tokens: 2,
             output_tokens: 3,
             total_tokens: 5,
@@ -317,12 +316,13 @@ fn test_add_ai_message_chunks_usage() {
                 audio: Some(1),
                 reasoning: Some(2),
             }),
-        });
+        })
+        .build();
 
     let combined = add_ai_message_chunks(chunk1, vec![chunk2, chunk3]);
 
-    assert!(combined.usage_metadata().is_some());
-    let usage = combined.usage_metadata().unwrap();
+    assert!(combined.usage_metadata.is_some());
+    let usage = combined.usage_metadata.as_ref().unwrap();
     assert_eq!(usage.input_tokens, 4);
     assert_eq!(usage.output_tokens, 6);
     assert_eq!(usage.total_tokens, 10);
@@ -389,47 +389,47 @@ fn test_content_blocks() {
     assert_eq!(message2.tool_calls.len(), 1);
 
     // Test AIMessageChunk with tool_call_chunks
-    let chunk = AIMessageChunk::new_with_tool_call_chunks(
-        "",
-        vec![tool_call_chunk(
+    let chunk = AIMessageChunk::builder()
+        .content("")
+        .tool_call_chunks(vec![tool_call_chunk(
             Some("foo".to_string()),
             Some("".to_string()),
             Some("abc_123".to_string()),
             Some(0),
-        )],
-    );
-    assert_eq!(chunk.tool_call_chunks().len(), 1);
-    assert_eq!(chunk.content(), "");
+        )])
+        .build();
+    assert_eq!(chunk.tool_call_chunks.len(), 1);
+    assert_eq!(chunk.content, "");
 
     // Test merging tool call chunks
-    let chunk_1 = AIMessageChunk::new_with_tool_call_chunks(
-        "",
-        vec![tool_call_chunk(
+    let chunk_1 = AIMessageChunk::builder()
+        .content("")
+        .tool_call_chunks(vec![tool_call_chunk(
             Some("foo".to_string()),
             Some(r#"{"foo": "b"#.to_string()),
             Some("abc_123".to_string()),
             Some(0),
-        )],
-    );
+        )])
+        .build();
 
-    let chunk_2 = AIMessageChunk::new_with_tool_call_chunks(
-        "",
-        vec![tool_call_chunk(
+    let chunk_2 = AIMessageChunk::builder()
+        .content("")
+        .tool_call_chunks(vec![tool_call_chunk(
             Some("".to_string()),
             Some(r#"ar"}"#.to_string()),
             Some("abc_123".to_string()),
             Some(0),
-        )],
-    );
+        )])
+        .build();
 
     let mut chunk_3 = AIMessageChunk::builder().content("").build();
     chunk_3.set_chunk_position(Some(ChunkPosition::Last));
 
     let merged = add_ai_message_chunks(chunk_1, vec![chunk_2, chunk_3]);
-    assert_eq!(merged.content(), "");
+    assert_eq!(merged.content, "");
 
     // With chunk_position=Last, tool_call_chunks should be parsed into tool_calls
-    assert!(!merged.tool_calls().is_empty() || !merged.tool_call_chunks().is_empty());
+    assert!(!merged.tool_calls.is_empty() || !merged.tool_call_chunks.is_empty());
 }
 
 // ============================================================================
@@ -454,11 +454,7 @@ fn test_content_blocks_reasoning_extraction() {
     assert_eq!(message.content(), "The answer is 42.");
     // In Python, content_blocks property extracts reasoning from additional_kwargs
     // For now, we verify the additional_kwargs is set correctly
-    assert!(
-        message
-            .additional_kwargs
-            .contains_key("reasoning_content")
-    );
+    assert!(message.additional_kwargs.contains_key("reasoning_content"));
     assert_eq!(
         message
             .additional_kwargs
@@ -478,11 +474,7 @@ fn test_content_blocks_reasoning_extraction() {
         .additional_kwargs(additional_kwargs2)
         .build();
 
-    assert!(
-        !message2
-            .additional_kwargs
-            .contains_key("reasoning_content")
-    );
+    assert!(!message2.additional_kwargs.contains_key("reasoning_content"));
 }
 
 // ============================================================================
@@ -532,14 +524,17 @@ fn test_ai_message_with_usage_metadata() {
 #[test]
 fn test_ai_message_chunk_basic() {
     let chunk = AIMessageChunk::builder().content("Hello").build();
-    assert_eq!(chunk.content(), "Hello");
-    assert!(chunk.id().is_none());
+    assert_eq!(chunk.content, "Hello");
+    assert!(chunk.id.is_none());
 }
 
 #[test]
 fn test_ai_message_chunk_with_id() {
-    let chunk = AIMessageChunk::with_id("chunk-123", "Hello");
-    assert_eq!(chunk.id(), Some("chunk-123".to_string()));
+    let chunk = AIMessageChunk::builder()
+        .content("Hello")
+        .id("chunk-123".to_string())
+        .build();
+    assert_eq!(chunk.id, Some("chunk-123".to_string()));
 }
 
 #[test]
@@ -547,7 +542,7 @@ fn test_ai_message_chunk_add() {
     let chunk1 = AIMessageChunk::builder().content("Hello ").build();
     let chunk2 = AIMessageChunk::builder().content("world!").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content(), "Hello world!");
+    assert_eq!(result.content, "Hello world!");
 }
 
 #[test]
@@ -558,12 +553,15 @@ fn test_ai_message_chunk_sum() {
         AIMessageChunk::builder().content("world!").build(),
     ];
     let result: AIMessageChunk = chunks.into_iter().sum();
-    assert_eq!(result.content(), "Hello beautiful world!");
+    assert_eq!(result.content, "Hello beautiful world!");
 }
 
 #[test]
 fn test_ai_message_chunk_to_message() {
-    let mut chunk = AIMessageChunk::with_id("chunk-1", "Hello!");
+    let mut chunk = AIMessageChunk::builder()
+        .content("Hello!")
+        .id("chunk-1".to_string())
+        .build();
     chunk.set_usage_metadata(Some(UsageMetadata::new(5, 10)));
 
     let message = chunk.to_message();
@@ -575,63 +573,78 @@ fn test_ai_message_chunk_to_message() {
 #[test]
 fn test_ai_message_chunk_id_priority() {
     // Provider-assigned ID should take priority over lc_* IDs
-    let chunk1 = AIMessageChunk::with_id("lc_auto123", "");
-    let chunk2 = AIMessageChunk::with_id("provider_id_456", "");
-    let chunk3 = AIMessageChunk::with_id("lc_run-789", "");
+    let chunk1 = AIMessageChunk::builder()
+        .content("")
+        .id("lc_auto123".to_string())
+        .build();
+    let chunk2 = AIMessageChunk::builder()
+        .content("")
+        .id("provider_id_456".to_string())
+        .build();
+    let chunk3 = AIMessageChunk::builder()
+        .content("")
+        .id("lc_run-789".to_string())
+        .build();
 
     let result = add_ai_message_chunks(chunk1, vec![chunk2, chunk3]);
-    assert_eq!(result.id(), Some("provider_id_456".to_string()));
+    assert_eq!(result.id, Some("provider_id_456".to_string()));
 }
 
 #[test]
 fn test_ai_message_chunk_lc_run_priority() {
     // lc_run-* should take priority over lc_* (auto-generated)
-    let chunk1 = AIMessageChunk::with_id("lc_auto123", "");
-    let chunk2 = AIMessageChunk::with_id("lc_run-789", "");
+    let chunk1 = AIMessageChunk::builder()
+        .content("")
+        .id("lc_auto123".to_string())
+        .build();
+    let chunk2 = AIMessageChunk::builder()
+        .content("")
+        .id("lc_run-789".to_string())
+        .build();
 
     let result = add_ai_message_chunks(chunk1, vec![chunk2]);
-    assert_eq!(result.id(), Some("lc_run-789".to_string()));
+    assert_eq!(result.id, Some("lc_run-789".to_string()));
 }
 
 #[test]
 fn test_ai_message_chunk_init_tool_calls() {
     // Test that tool_call_chunks are parsed into tool_calls when chunk_position is Last
-    let mut chunk = AIMessageChunk::new_with_tool_call_chunks(
-        "",
-        vec![tool_call_chunk(
+    let mut chunk = AIMessageChunk::builder()
+        .content("")
+        .tool_call_chunks(vec![tool_call_chunk(
             Some("get_weather".to_string()),
             Some(r#"{"city": "London"}"#.to_string()),
             Some("call_123".to_string()),
             Some(0),
-        )],
-    );
+        )])
+        .build();
     chunk.set_chunk_position(Some(ChunkPosition::Last));
     chunk.init_tool_calls();
 
-    assert_eq!(chunk.tool_calls().len(), 1);
-    assert_eq!(chunk.tool_calls()[0].name(), "get_weather");
-    assert_eq!(chunk.tool_calls()[0].id(), Some("call_123".to_string()));
+    assert_eq!(chunk.tool_calls.len(), 1);
+    assert_eq!(chunk.tool_calls[0].name(), "get_weather");
+    assert_eq!(chunk.tool_calls[0].id(), Some("call_123".to_string()));
 }
 
 #[test]
 fn test_ai_message_chunk_init_tool_calls_invalid_json() {
     // Test that invalid JSON in tool_call_chunks creates invalid_tool_calls
-    let mut chunk = AIMessageChunk::new_with_tool_call_chunks(
-        "",
-        vec![tool_call_chunk(
+    let mut chunk = AIMessageChunk::builder()
+        .content("")
+        .tool_call_chunks(vec![tool_call_chunk(
             Some("get_weather".to_string()),
             Some("invalid json {".to_string()),
             Some("call_123".to_string()),
             Some(0),
-        )],
-    );
+        )])
+        .build();
     chunk.set_chunk_position(Some(ChunkPosition::Last));
     chunk.init_tool_calls();
 
-    assert!(chunk.tool_calls().is_empty());
-    assert_eq!(chunk.invalid_tool_calls().len(), 1);
+    assert!(chunk.tool_calls.is_empty());
+    assert_eq!(chunk.invalid_tool_calls.len(), 1);
     assert_eq!(
-        chunk.invalid_tool_calls()[0].name,
+        chunk.invalid_tool_calls[0].name,
         Some("get_weather".to_string())
     );
 }

@@ -321,7 +321,7 @@ impl ProtoConversationService for ConversationService {
                     Ok(chunk) => {
                         // AIMessageChunk has content() method for getting the text content
                         // We determine finality by empty content or chunk_position
-                        let content = chunk.content().to_string();
+                        let content = chunk.content.to_string();
                         full_content.push_str(&content);
                         // TODO: Don't rely on empty string for finality
                         let is_final = content.is_empty();
