@@ -549,7 +549,7 @@ impl From<ProtoHumanMessage> for HumanMessage {
 impl From<HumanMessageChunk> for ProtoHumanMessageChunk {
     fn from(chunk: HumanMessageChunk) -> Self {
         ProtoHumanMessageChunk {
-            content: Some(chunk.content.clone().into()),
+            content: Some(chunk.content.into()),
             id: chunk.id,
             name: chunk.name,
             additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
