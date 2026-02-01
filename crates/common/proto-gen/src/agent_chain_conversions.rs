@@ -565,15 +565,13 @@ impl From<ProtoHumanMessageChunk> for HumanMessageChunk {
             .map(Into::into)
             .unwrap_or(MessageContent::Text(String::new()));
 
-        let text = match &content {
-            MessageContent::Text(t) => t.clone(),
-            MessageContent::Parts(_) => String::new(),
-        };
-
-        match proto.id {
-            Some(id) => HumanMessageChunk::builder().id(id).content(text).build(),
-            None => HumanMessageChunk::builder().content(text).build(),
-        }
+        HumanMessageChunk::builder()
+            .maybe_id(proto.id)
+            .content(content)
+            .maybe_name(proto.name)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
+            .build()
     }
 }
 
@@ -733,6 +731,7 @@ impl From<ProtoAiMessageChunk> for AIMessageChunk {
 
         let chunk = AIMessageChunk::builder()
             .maybe_id(proto.id)
+            .maybe_name(proto.name)
             .tool_call_chunks(tool_call_chunks)
             .content(proto.content)
             .maybe_usage_metadata(proto.usage_metadata.map(Into::into))
@@ -744,6 +743,8 @@ impl From<ProtoAiMessageChunk> for AIMessageChunk {
                     .map(Into::into)
                     .collect(),
             )
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
             .maybe_chunk_position(chunk_position)
             .build();
 
@@ -800,8 +801,8 @@ impl From<ToolMessageChunk> for ProtoToolMessageChunk {
             name: chunk.name.clone(),
             status: i32::from(ProtoToolStatus::from(chunk.status.clone())),
             artifact: chunk.artifact.as_ref().map(|a| value_to_json_string(a)),
-            additional_kwargs: None,
-            response_metadata: None,
+            additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
+            response_metadata: hashmap_to_json_string(&chunk.response_metadata),
         }
     }
 }
@@ -813,6 +814,10 @@ impl From<ProtoToolMessageChunk> for ToolMessageChunk {
             .tool_call_id(proto.tool_call_id)
             .maybe_id(proto.id)
             .maybe_name(proto.name)
+            .status(i32_to_tool_status(proto.status))
+            .maybe_artifact(json_string_to_value(&proto.artifact))
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
             .build()
     }
 }
@@ -871,6 +876,8 @@ impl From<ProtoChatMessageChunk> for ChatMessageChunk {
             .role(proto.role)
             .maybe_id(proto.id)
             .maybe_name(proto.name)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
             .build()
     }
 }
@@ -925,6 +932,8 @@ impl From<ProtoFunctionMessageChunk> for FunctionMessageChunk {
             .content(proto.content)
             .name(proto.name)
             .maybe_id(proto.id)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
             .build()
     }
 }
