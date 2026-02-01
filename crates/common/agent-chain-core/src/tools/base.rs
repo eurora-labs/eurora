@@ -252,7 +252,13 @@ impl From<Value> for ToolInput {
                         obj.get("args"),
                     )
                 {
-                    return ToolInput::ToolCall(ToolCall::with_id(id, name, args.clone()));
+                    return ToolInput::ToolCall(
+                        ToolCall::builder()
+                            .name(name)
+                            .args(args.clone())
+                            .id(id.to_string())
+                            .build(),
+                    );
                 }
                 ToolInput::Dict(obj.into_iter().collect())
             }
@@ -403,24 +409,39 @@ pub trait BaseTool: Send + Sync + Debug {
     /// Invoke the tool with a ToolCall.
     async fn invoke(&self, tool_call: ToolCall) -> BaseMessage {
         let input = ToolInput::ToolCall(tool_call.clone());
-        let tool_call_id = tool_call.id().unwrap_or_default();
+        let tool_call_id = tool_call.id.clone().unwrap_or_default();
         match self.arun(input, None).await {
             Ok(output) => match output {
-                ToolOutput::String(s) => ToolMessage::new(s, &tool_call_id).into(),
+                ToolOutput::String(s) => ToolMessage::builder()
+                    .content(s)
+                    .tool_call_id(&tool_call_id)
+                    .build()
+                    .into(),
                 ToolOutput::Message(m) => m.into(),
-                ToolOutput::ContentAndArtifact { content, artifact } => {
-                    ToolMessage::new_with_artifact(stringify(&content), &tool_call_id, artifact)
-                        .into()
-                }
-                ToolOutput::Json(v) => ToolMessage::new(v.to_string(), &tool_call_id).into(),
+                ToolOutput::ContentAndArtifact { content, artifact } => ToolMessage::builder()
+                    .content(stringify(&content))
+                    .tool_call_id(&tool_call_id)
+                    .artifact(artifact)
+                    .build()
+                    .into(),
+                ToolOutput::Json(v) => ToolMessage::builder()
+                    .content(v.to_string())
+                    .tool_call_id(&tool_call_id)
+                    .build()
+                    .into(),
             },
-            Err(e) => ToolMessage::error(e.to_string(), &tool_call_id).into(),
+            Err(e) => ToolMessage::builder()
+                .content(e.to_string())
+                .tool_call_id(&tool_call_id)
+                .status(crate::messages::ToolStatus::Error)
+                .build()
+                .into(),
         }
     }
 
     /// Invoke the tool directly with arguments.
     async fn invoke_args(&self, args: Value) -> Value {
-        let tool_call = ToolCall::new(self.name(), args);
+        let tool_call = ToolCall::builder().name(self.name()).args(args).build();
         let result = self.invoke(tool_call).await;
         Value::String(result.content().to_string())
     }
@@ -511,14 +532,18 @@ pub fn format_output(
         ToolOutput::ContentAndArtifact { content, .. } => stringify(content),
     };
 
-    let msg =
-        ToolMessage::with_status_constructor(content_str, tool_call_id, status).with_name(name);
-
-    let msg = if let Some(artifact) = artifact {
-        msg.with_artifact(artifact)
-    } else {
-        msg
+    let status_enum = match status {
+        "error" => crate::messages::ToolStatus::Error,
+        _ => crate::messages::ToolStatus::Success,
     };
+
+    let msg = ToolMessage::builder()
+        .content(content_str)
+        .tool_call_id(tool_call_id)
+        .status(status_enum)
+        .name(name.to_string())
+        .maybe_artifact(artifact)
+        .build();
 
     ToolOutput::Message(msg)
 }
@@ -572,9 +597,9 @@ pub fn prep_run_args(
 
     match &value {
         ToolInput::ToolCall(tc) => {
-            let tool_call_id = tc.id();
+            let tool_call_id = tc.id.clone();
             let input = ToolInput::Dict(
-                tc.args()
+                tc.args
                     .as_object()
                     .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                     .unwrap_or_default(),

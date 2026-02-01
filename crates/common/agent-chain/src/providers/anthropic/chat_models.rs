@@ -191,7 +191,7 @@ impl ChatAnthropic {
         for msg in messages {
             match msg {
                 BaseMessage::System(m) => {
-                    system_message = Some(m.content().to_string());
+                    system_message = Some(m.content.as_text().to_string());
                 }
                 BaseMessage::Human(m) => {
                     conversation.push(serde_json::json!({
@@ -212,9 +212,9 @@ impl ChatAnthropic {
                     for tool_call in &m.tool_calls {
                         content.push(serde_json::json!({
                             "type": "tool_use",
-                            "id": tool_call.id(),
-                            "name": tool_call.name(),
-                            "input": tool_call.args()
+                            "id": tool_call.id,
+                            "name": tool_call.name,
+                            "input": tool_call.args
                         }));
                     }
 
@@ -228,21 +228,21 @@ impl ChatAnthropic {
                         "role": "user",
                         "content": [{
                             "type": "tool_result",
-                            "tool_use_id": m.tool_call_id(),
-                            "content": m.content()
+                            "tool_use_id": m.tool_call_id,
+                            "content": m.content
                         }]
                     }));
                 }
                 BaseMessage::Chat(m) => {
                     // Map chat messages based on role
-                    let role = match m.role() {
+                    let role = match m.role.as_str() {
                         "user" | "human" => "user",
                         "assistant" | "ai" => "assistant",
                         _ => "user", // Default to user for unknown roles
                     };
                     conversation.push(serde_json::json!({
                         "role": role,
-                        "content": m.content()
+                        "content": m.content
                     }));
                 }
                 BaseMessage::Function(m) => {
@@ -329,7 +329,13 @@ impl ChatAnthropic {
                     text_content.push_str(&text);
                 }
                 AnthropicContent::ToolUse { id, name, input } => {
-                    tool_calls.push(ToolCall::with_id(id, name, input));
+                    tool_calls.push(
+                        ToolCall::builder()
+                            .name(name)
+                            .args(input)
+                            .id(id)
+                            .build(),
+                    );
                 }
             }
         }

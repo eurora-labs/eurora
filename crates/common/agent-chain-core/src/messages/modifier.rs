@@ -3,6 +3,7 @@
 //! This module contains types for modifying message history,
 //! such as `RemoveMessage`. Mirrors `langchain_core.messages.modifier`.
 
+use bon::bon;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
@@ -11,6 +12,23 @@ use std::collections::HashMap;
 ///
 /// This is used to remove messages from a conversation history by their ID.
 /// This corresponds to `RemoveMessage` in LangChain Python.
+///
+/// # Example
+///
+/// ```
+/// use agent_chain_core::messages::RemoveMessage;
+///
+/// // Simple remove message with just id
+/// let msg = RemoveMessage::builder()
+///     .id("msg-123")
+///     .build();
+///
+/// // Message with name
+/// let msg = RemoveMessage::builder()
+///     .id("msg-123")
+///     .maybe_name(Some("user".to_string()))
+///     .build();
+/// ```
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct RemoveMessage {
@@ -52,29 +70,39 @@ impl Serialize for RemoveMessage {
     }
 }
 
+#[bon]
 impl RemoveMessage {
-    /// Create a new RemoveMessage.
+    /// Create a new RemoveMessage with named parameters using the builder pattern.
     ///
-    /// # Arguments
+    /// # Example
     ///
-    /// * `id` - The ID of the message to remove.
-    pub fn new(id: impl Into<String>) -> Self {
+    /// ```
+    /// use agent_chain_core::messages::RemoveMessage;
+    ///
+    /// // Simple remove message with just id
+    /// let msg = RemoveMessage::builder()
+    ///     .id("msg-123")
+    ///     .build();
+    ///
+    /// // Message with name
+    /// let msg = RemoveMessage::builder()
+    ///     .id("msg-123")
+    ///     .maybe_name(Some("user".to_string()))
+    ///     .build();
+    /// ```
+    #[builder]
+    pub fn new(
+        id: impl Into<String>,
+        name: Option<String>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+        #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
         Self {
             id: id.into(),
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
+            name,
+            additional_kwargs,
+            response_metadata,
         }
-    }
-
-    /// Get the ID of the message to be removed.
-    pub fn id(&self) -> Option<String> {
-        Some(self.id.clone())
-    }
-
-    /// Get the target message ID.
-    pub fn target_id(&self) -> &str {
-        &self.id
     }
 
     /// Set the message ID.
@@ -99,44 +127,5 @@ impl RemoveMessage {
     /// RemoveMessage always returns an empty string.
     pub fn content(&self) -> &'static str {
         ""
-    }
-
-    /// Get the message name.
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
-    }
-
-    /// Set the name for this message (builder pattern).
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    /// Set the additional kwargs for this message (builder pattern).
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
-    }
-
-    /// Set the response metadata for this message (builder pattern).
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
     }
 }

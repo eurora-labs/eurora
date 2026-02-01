@@ -555,7 +555,7 @@ impl ChatOpenAI {
             .filter_map(|msg| match msg {
                 BaseMessage::System(m) => Some(serde_json::json!({
                     "role": "system",
-                    "content": m.content()
+                    "content": m.content.as_text()
                 })),
                 BaseMessage::Human(m) => {
                     let content = match &m.content {
@@ -617,11 +617,11 @@ impl ChatOpenAI {
                             .iter()
                             .map(|tc| {
                                 serde_json::json!({
-                                    "id": tc.id(),
+                                    "id": tc.id,
                                     "type": "function",
                                     "function": {
-                                        "name": tc.name(),
-                                        "arguments": tc.args().to_string()
+                                        "name": tc.name,
+                                        "arguments": tc.args.to_string()
                                     }
                                 })
                             })
@@ -633,16 +633,16 @@ impl ChatOpenAI {
                 }
                 BaseMessage::Tool(m) => Some(serde_json::json!({
                     "role": "tool",
-                    "tool_call_id": m.tool_call_id(),
-                    "content": m.content()
+                    "tool_call_id": m.tool_call_id,
+                    "content": m.content
                 })),
                 BaseMessage::Remove(_) => {
                     // RemoveMessage is used for message management, not sent to API
                     None
                 }
                 BaseMessage::Chat(m) => Some(serde_json::json!({
-                    "role": m.role(),
-                    "content": m.content()
+                    "role": m.role,
+                    "content": m.content
                 })),
                 BaseMessage::Function(m) => Some(serde_json::json!({
                     "role": "function",
@@ -980,7 +980,7 @@ impl ChatOpenAI {
                 BaseMessage::System(m) => {
                     input.push(serde_json::json!({
                         "role": "system",
-                        "content": m.content()
+                        "content": m.content.as_text()
                     }));
                 }
                 BaseMessage::Human(m) => {
@@ -1046,17 +1046,17 @@ impl ChatOpenAI {
                     for tc in &m.tool_calls {
                         input.push(serde_json::json!({
                             "type": "function_call",
-                            "name": tc.name(),
-                            "arguments": tc.args().to_string(),
-                            "call_id": tc.id()
+                            "name": tc.name,
+                            "arguments": tc.args.to_string(),
+                            "call_id": tc.id
                         }));
                     }
                 }
                 BaseMessage::Tool(m) => {
                     input.push(serde_json::json!({
                         "type": "function_call_output",
-                        "call_id": m.tool_call_id(),
-                        "output": m.content()
+                        "call_id": m.tool_call_id,
+                        "output": m.content
                     }));
                 }
                 BaseMessage::Remove(_) => {
@@ -1065,8 +1065,8 @@ impl ChatOpenAI {
                 }
                 BaseMessage::Chat(m) => {
                     input.push(serde_json::json!({
-                        "role": m.role(),
-                        "content": m.content()
+                        "role": m.role,
+                        "content": m.content
                     }));
                 }
                 BaseMessage::Function(m) => {
@@ -1103,7 +1103,11 @@ impl ChatOpenAI {
                     .map(|tc| {
                         let args: serde_json::Value =
                             serde_json::from_str(&tc.function.arguments).unwrap_or_default();
-                        ToolCall::with_id(tc.id, tc.function.name, args)
+                        ToolCall::builder()
+                            .name(tc.function.name)
+                            .args(args)
+                            .id(tc.id)
+                            .build()
                     })
                     .collect();
                 (content, tool_calls)
@@ -1154,7 +1158,13 @@ impl ChatOpenAI {
                 } => {
                     let args: serde_json::Value =
                         serde_json::from_str(arguments).unwrap_or_default();
-                    tool_calls.push(ToolCall::with_id(call_id.clone(), name.clone(), args));
+                    tool_calls.push(
+                        ToolCall::builder()
+                            .name(name.clone())
+                            .args(args)
+                            .id(call_id.clone())
+                            .build(),
+                    );
                 }
                 ResponsesOutput::WebSearchCall { .. } => {
                     // Web search is handled internally by OpenAI
