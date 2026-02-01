@@ -149,7 +149,7 @@ impl BaseMessage {
     pub fn content(&self) -> &str {
         match self {
             BaseMessage::Human(m) => m.content.as_text_ref(),
-            BaseMessage::System(m) => m.content(),
+            BaseMessage::System(m) => m.content.as_text_ref(),
             BaseMessage::AI(m) => &m.content,
             BaseMessage::Tool(m) => m.content(),
             BaseMessage::Chat(m) => m.content(),
@@ -162,7 +162,7 @@ impl BaseMessage {
     pub fn id(&self) -> Option<String> {
         match self {
             BaseMessage::Human(m) => m.id.clone(),
-            BaseMessage::System(m) => m.id(),
+            BaseMessage::System(m) => m.id.clone(),
             BaseMessage::AI(m) => m.id.clone(),
             BaseMessage::Tool(m) => m.id(),
             BaseMessage::Chat(m) => m.id(),
@@ -175,7 +175,7 @@ impl BaseMessage {
     pub fn name(&self) -> Option<String> {
         match self {
             BaseMessage::Human(m) => m.name.clone(),
-            BaseMessage::System(m) => m.name(),
+            BaseMessage::System(m) => m.name.clone(),
             BaseMessage::AI(m) => m.name.clone(),
             BaseMessage::Tool(m) => m.name(),
             BaseMessage::Chat(m) => m.name(),
@@ -204,7 +204,7 @@ impl BaseMessage {
     pub fn text(&self) -> String {
         match self {
             BaseMessage::Human(m) => m.content.as_text(),
-            BaseMessage::System(m) => m.content().to_string(),
+            BaseMessage::System(m) => m.content.as_text(),
             BaseMessage::AI(m) => m.content.to_string(),
             BaseMessage::Tool(m) => m.content().to_string(),
             BaseMessage::Chat(m) => m.content().to_string(),
@@ -238,7 +238,7 @@ impl BaseMessage {
     pub fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
             BaseMessage::Human(m) => Some(&m.additional_kwargs),
-            BaseMessage::System(m) => Some(m.additional_kwargs()),
+            BaseMessage::System(m) => Some(&m.additional_kwargs),
             BaseMessage::AI(m) => Some(&m.additional_kwargs),
             BaseMessage::Tool(m) => Some(m.additional_kwargs()),
             BaseMessage::Chat(m) => Some(m.additional_kwargs()),
@@ -263,7 +263,7 @@ impl BaseMessage {
     pub fn pretty_print(&self) {
         let (role, content) = match self {
             BaseMessage::Human(m) => ("Human", m.content.as_text_ref()),
-            BaseMessage::System(m) => ("System", m.content()),
+            BaseMessage::System(m) => ("System", m.content.as_text_ref()),
             BaseMessage::AI(m) => {
                 let tool_calls = &m.tool_calls;
                 if tool_calls.is_empty() {
@@ -480,7 +480,7 @@ impl BaseMessageChunk {
         match self {
             BaseMessageChunk::AI(m) => &m.content,
             BaseMessageChunk::Human(m) => m.content.as_text_ref(),
-            BaseMessageChunk::System(m) => m.content(),
+            BaseMessageChunk::System(m) => m.content.as_text_ref(),
             BaseMessageChunk::Tool(m) => m.content(),
             BaseMessageChunk::Chat(m) => m.content(),
             BaseMessageChunk::Function(m) => m.content(),
@@ -492,7 +492,7 @@ impl BaseMessageChunk {
         match self {
             BaseMessageChunk::AI(m) => m.id.clone(),
             BaseMessageChunk::Human(m) => m.id.clone(),
-            BaseMessageChunk::System(m) => m.id(),
+            BaseMessageChunk::System(m) => m.id.clone(),
             BaseMessageChunk::Tool(m) => m.id(),
             BaseMessageChunk::Chat(m) => m.id(),
             BaseMessageChunk::Function(m) => m.id(),

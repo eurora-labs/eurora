@@ -182,7 +182,9 @@ fn create_message_from_role(role: &str, content: &str) -> Result<BaseMessage, St
         "ai" | "assistant" => Ok(BaseMessage::AI(
             AIMessage::builder().content(content).build(),
         )),
-        "system" | "developer" => Ok(BaseMessage::System(SystemMessage::new(content))),
+        "system" | "developer" => Ok(BaseMessage::System(
+            SystemMessage::builder().content(content).build(),
+        )),
         "function" => Err("Function messages require a name".to_string()),
         "tool" => Err("Tool messages require a tool_call_id".to_string()),
         _ => Ok(BaseMessage::Chat(ChatMessage::new(role, content))),
@@ -289,7 +291,7 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                     BaseMessage::AI(AIMessage::builder().content(&merged_content).build())
                 }
                 (BaseMessage::System(_), BaseMessage::System(_)) => {
-                    BaseMessage::System(SystemMessage::new(&merged_content))
+                    BaseMessage::System(SystemMessage::builder().content(&merged_content).build())
                 }
                 (BaseMessage::Chat(c), BaseMessage::Chat(_)) => {
                     BaseMessage::Chat(ChatMessage::new(c.role(), &merged_content))
@@ -803,13 +805,12 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        BaseMessage::System(m) => {
-            let mut new_msg = SystemMessage::new(content);
-            if let Some(id) = m.id() {
-                new_msg = SystemMessage::with_id(id, content);
-            }
-            BaseMessage::System(new_msg)
-        }
+        BaseMessage::System(m) => BaseMessage::System(
+            SystemMessage::builder()
+                .content(content)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
         BaseMessage::Tool(m) => {
             let mut new_msg = ToolMessage::new(content, m.tool_call_id());
             if let Some(id) = m.id() {

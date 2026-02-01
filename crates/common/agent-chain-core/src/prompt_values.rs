@@ -334,7 +334,11 @@ mod tests {
     #[test]
     fn test_chat_prompt_value() {
         let messages = vec![
-            BaseMessage::System(SystemMessage::new("You are a helpful assistant.")),
+            BaseMessage::System(
+                SystemMessage::builder()
+                    .content("You are a helpful assistant.")
+                    .build(),
+            ),
             BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
             BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
         ];
