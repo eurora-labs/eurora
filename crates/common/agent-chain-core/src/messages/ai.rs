@@ -272,28 +272,31 @@ impl AIMessage {
             .build()
     }
 
-    /// Create a new AIMessage with both tool calls and invalid tool calls.
-    ///
-    /// This is a convenience method for creating messages with all tool call data.
-    pub fn with_all_tool_calls(
-        content: impl Into<String>,
-        tool_calls: Vec<ToolCall>,
-        invalid_tool_calls: Vec<InvalidToolCall>,
+    /// Set response metadata (builder pattern).
+    pub fn with_response_metadata(
+        mut self,
+        response_metadata: HashMap<String, serde_json::Value>,
     ) -> Self {
-        Self::builder()
-            .content(content)
-            .tool_calls(tool_calls)
-            .invalid_tool_calls(invalid_tool_calls)
-            .build()
+        self.response_metadata = response_metadata;
+        self
     }
 
-    /// Set the message name using a builder pattern.
+    /// Set additional kwargs (builder pattern).
+    pub fn with_additional_kwargs(
+        mut self,
+        additional_kwargs: HashMap<String, serde_json::Value>,
+    ) -> Self {
+        self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set name (builder pattern).
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
-    /// Set the usage metadata using a builder pattern.
+    /// Set usage metadata (builder pattern).
     pub fn with_usage_metadata(mut self, usage_metadata: UsageMetadata) -> Self {
         self.usage_metadata = Some(usage_metadata);
         self
@@ -307,6 +310,21 @@ impl AIMessage {
     /// Get the message content.
     pub fn content(&self) -> &str {
         &self.content
+    }
+
+    /// Get usage metadata if present.
+    pub fn usage_metadata(&self) -> Option<&UsageMetadata> {
+        self.usage_metadata.as_ref()
+    }
+
+    /// Get additional kwargs.
+    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
+        &self.additional_kwargs
+    }
+
+    /// Get response metadata.
+    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
     }
 
     /// Get the raw content as a list of JSON values.
@@ -475,59 +493,6 @@ impl AIMessage {
     /// Get the message name.
     pub fn name(&self) -> Option<String> {
         self.name.clone()
-    }
-
-    /// Get the invalid tool calls.
-    pub fn invalid_tool_calls(&self) -> &[InvalidToolCall] {
-        &self.invalid_tool_calls
-    }
-
-    /// Get usage metadata if present.
-    pub fn usage_metadata(&self) -> Option<&UsageMetadata> {
-        self.usage_metadata.as_ref()
-    }
-
-    /// Add annotations to the message (e.g., citations from web search).
-    /// Annotations are stored in additional_kwargs under the "annotations" key.
-    pub fn with_annotations<T: Serialize>(mut self, annotations: Vec<T>) -> Self {
-        if let Ok(value) = serde_json::to_value(&annotations) {
-            self.additional_kwargs
-                .insert("annotations".to_string(), value);
-        }
-        self
-    }
-
-    /// Get annotations from the message if present.
-    pub fn annotations(&self) -> Option<&serde_json::Value> {
-        self.additional_kwargs.get("annotations")
-    }
-
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
-    }
-
-    /// Set response metadata.
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
-    }
-
-    /// Set additional kwargs.
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
     }
 
     /// Get a pretty representation of the message.

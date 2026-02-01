@@ -165,10 +165,25 @@ fn test_merge_message_runs_response_metadata() {
     // Note: The Rust implementation doesn't yet preserve response_metadata
     // This test demonstrates that the first message's ID is preserved
     let messages = vec![
-        BaseMessage::AI(AIMessage::with_id("1", "foo")),
-        BaseMessage::AI(AIMessage::with_id("2", "bar")),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .id("1".to_string())
+                .content("foo")
+                .build(),
+        ),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .id("2".to_string())
+                .content("bar")
+                .build(),
+        ),
     ];
-    let expected = [BaseMessage::AI(AIMessage::with_id("1", "foo\nbar"))];
+    let expected = [BaseMessage::AI(
+        AIMessage::builder()
+            .id("1".to_string())
+            .content("foo\nbar")
+            .build(),
+    )];
     let actual = merge_message_runs(&messages, "\n");
 
     // Check content is merged
@@ -428,12 +443,19 @@ fn test_trim_messages_first_30() {
     let messages = vec![
         BaseMessage::System(SystemMessage::new("This is a 4 token text.")),
         BaseMessage::Human(HumanMessage::with_id("first", "This is a 4 token text.")),
-        BaseMessage::AI(AIMessage::with_id(
-            "second",
-            "This is the FIRST 4 token block.",
-        )),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .id("second".to_string())
+                .content("This is the FIRST 4 token block.")
+                .build(),
+        ),
         BaseMessage::Human(HumanMessage::with_id("third", "This is a 4 token text.")),
-        BaseMessage::AI(AIMessage::with_id("fourth", "This is a 4 token text.")),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .id("fourth".to_string())
+                .content("This is a 4 token text.")
+                .build(),
+        ),
     ];
     let messages_copy = messages.clone();
 
@@ -441,10 +463,12 @@ fn test_trim_messages_first_30() {
     let expected = [
         BaseMessage::System(SystemMessage::new("This is a 4 token text.")),
         BaseMessage::Human(HumanMessage::with_id("first", "This is a 4 token text.")),
-        BaseMessage::AI(AIMessage::with_id(
-            "second",
-            "This is the FIRST 4 token block.",
-        )),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .id("second".to_string())
+                .content("This is the FIRST 4 token block.")
+                .build(),
+        ),
     ];
 
     let config =
@@ -468,10 +492,12 @@ fn test_trim_messages_first_30_allow_partial() {
     let messages = vec![
         BaseMessage::System(SystemMessage::new("This is a 4 token text.")),
         BaseMessage::Human(HumanMessage::with_id("first", "This is a 4 token text.")),
-        BaseMessage::AI(AIMessage::with_id(
-            "second",
-            "First line\nSecond line\nThird line",
-        )),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .id("second".to_string())
+                .content("First line\nSecond line\nThird line")
+                .build(),
+        ),
         BaseMessage::Human(HumanMessage::with_id("third", "This is a 4 token text.")),
     ];
     let messages_copy = messages.clone();
@@ -495,16 +521,31 @@ fn test_trim_messages_last_30_include_system() {
     let messages = vec![
         BaseMessage::System(SystemMessage::new("This is a 4 token text.")),
         BaseMessage::Human(HumanMessage::with_id("first", "This is a 4 token text.")),
-        BaseMessage::AI(AIMessage::with_id("second", "This is a block.")),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .id("second".to_string())
+                .content("This is a block.")
+                .build(),
+        ),
         BaseMessage::Human(HumanMessage::with_id("third", "This is a 4 token text.")),
-        BaseMessage::AI(AIMessage::with_id("fourth", "This is a 4 token text.")),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .id("fourth".to_string())
+                .content("This is a 4 token text.")
+                .build(),
+        ),
     ];
     let messages_copy = messages.clone();
 
     let expected = [
         BaseMessage::System(SystemMessage::new("This is a 4 token text.")),
         BaseMessage::Human(HumanMessage::with_id("third", "This is a 4 token text.")),
-        BaseMessage::AI(AIMessage::with_id("fourth", "This is a 4 token text.")),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .id("fourth".to_string())
+                .content("This is a 4 token text.")
+                .build(),
+        ),
     ];
 
     let config = TrimMessagesConfig::new(30, dummy_token_counter)
@@ -631,8 +672,8 @@ fn test_count_tokens_approximately_with_names() {
         BaseMessage::AI(
             AIMessage::builder()
                 .content("Hi there")
-                .build()
-                .with_name("assistant"),
+                .name("assistant".to_string())
+                .build(),
         ),
     ];
 

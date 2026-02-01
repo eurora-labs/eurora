@@ -239,7 +239,7 @@ impl BaseMessage {
         match self {
             BaseMessage::Human(m) => Some(m.additional_kwargs()),
             BaseMessage::System(m) => Some(m.additional_kwargs()),
-            BaseMessage::AI(m) => Some(m.additional_kwargs()),
+            BaseMessage::AI(m) => Some(&m.additional_kwargs),
             BaseMessage::Tool(m) => Some(m.additional_kwargs()),
             BaseMessage::Chat(m) => Some(m.additional_kwargs()),
             BaseMessage::Function(m) => Some(m.additional_kwargs()),
@@ -250,7 +250,7 @@ impl BaseMessage {
     /// Get response metadata if present.
     pub fn response_metadata(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
-            BaseMessage::AI(m) => Some(m.response_metadata()),
+            BaseMessage::AI(m) => Some(&m.response_metadata),
             BaseMessage::Chat(m) => Some(m.response_metadata()),
             BaseMessage::Function(m) => Some(m.response_metadata()),
             BaseMessage::Tool(m) => Some(m.response_metadata()),
