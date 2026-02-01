@@ -14,7 +14,7 @@ mod chat_result_tests {
     /// Test creating ChatResult with a single generation.
     #[test]
     fn test_creation_with_single_generation() {
-        let msg = AIMessage::new("Hello");
+        let msg = AIMessage::builder().content("Hello").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let result = ChatResult::new(vec![chat_gen.clone()]);
         assert_eq!(result.generations.len(), 1);
@@ -25,9 +25,9 @@ mod chat_result_tests {
     /// Test creating ChatResult with multiple generations.
     #[test]
     fn test_creation_with_multiple_generations() {
-        let gen1 = ChatGeneration::new(AIMessage::new("Response 1").into());
-        let gen2 = ChatGeneration::new(AIMessage::new("Response 2").into());
-        let gen3 = ChatGeneration::new(AIMessage::new("Response 3").into());
+        let gen1 = ChatGeneration::new(AIMessage::builder().content("Response 1").build().into());
+        let gen2 = ChatGeneration::new(AIMessage::builder().content("Response 2").build().into());
+        let gen3 = ChatGeneration::new(AIMessage::builder().content("Response 3").build().into());
         let result = ChatResult::new(vec![gen1.clone(), gen2.clone(), gen3.clone()]);
         assert_eq!(result.generations.len(), 3);
         assert_eq!(result.generations[0], gen1);
@@ -38,7 +38,7 @@ mod chat_result_tests {
     /// Test creating ChatResult with llm_output.
     #[test]
     fn test_creation_with_llm_output() {
-        let msg = AIMessage::new("Test");
+        let msg = AIMessage::builder().content("Test").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let mut llm_output = HashMap::new();
         llm_output.insert(
@@ -61,7 +61,7 @@ mod chat_result_tests {
     /// Test creating ChatResult with empty llm_output dict.
     #[test]
     fn test_creation_with_empty_llm_output() {
-        let msg = AIMessage::new("Test");
+        let msg = AIMessage::builder().content("Test").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let result = ChatResult::with_llm_output(vec![chat_gen], HashMap::new());
         assert_eq!(result.llm_output, Some(HashMap::new()));
@@ -70,7 +70,7 @@ mod chat_result_tests {
     /// Test that llm_output defaults to None when not provided.
     #[test]
     fn test_llm_output_defaults_to_none() {
-        let msg = AIMessage::new("Test");
+        let msg = AIMessage::builder().content("Test").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let result = ChatResult::new(vec![chat_gen]);
         assert!(result.llm_output.is_none());
@@ -82,12 +82,12 @@ mod chat_result_tests {
         let mut gen_info1 = HashMap::new();
         gen_info1.insert("finish_reason".to_string(), json!("stop"));
         let gen1 =
-            ChatGeneration::with_info(AIMessage::new("Response 1").into(), gen_info1.clone());
+            ChatGeneration::with_info(AIMessage::builder().content("Response 1").build().into(), gen_info1.clone());
 
         let mut gen_info2 = HashMap::new();
         gen_info2.insert("finish_reason".to_string(), json!("length"));
         let gen2 =
-            ChatGeneration::with_info(AIMessage::new("Response 2").into(), gen_info2.clone());
+            ChatGeneration::with_info(AIMessage::builder().content("Response 2").build().into(), gen_info2.clone());
 
         let result = ChatResult::new(vec![gen1, gen2]);
         assert_eq!(
@@ -119,7 +119,7 @@ mod chat_result_tests {
     /// Test that message attributes are preserved in generations.
     #[test]
     fn test_generations_preserve_message_attributes() {
-        let mut msg = AIMessage::new("Test response");
+        let mut msg = AIMessage::builder().content("Test response").build();
         msg.additional_kwargs
             .insert("function_call".to_string(), json!({"name": "test"}));
         let chat_gen = ChatGeneration::new(msg.clone().into());
@@ -139,7 +139,7 @@ mod chat_result_tests {
     /// Test llm_output can contain various data types.
     #[test]
     fn test_llm_output_with_various_types() {
-        let msg = AIMessage::new("Test");
+        let msg = AIMessage::builder().content("Test").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let mut llm_output = HashMap::new();
         llm_output.insert("string_field".to_string(), json!("value"));
@@ -165,9 +165,9 @@ mod chat_result_tests {
     fn test_multiple_candidate_generations() {
         // Simulates n>1 parameter in API calls
         let candidates = vec![
-            ChatGeneration::new(AIMessage::new("Candidate 1").into()),
-            ChatGeneration::new(AIMessage::new("Candidate 2").into()),
-            ChatGeneration::new(AIMessage::new("Candidate 3").into()),
+            ChatGeneration::new(AIMessage::builder().content("Candidate 1").build().into()),
+            ChatGeneration::new(AIMessage::builder().content("Candidate 2").build().into()),
+            ChatGeneration::new(AIMessage::builder().content("Candidate 3").build().into()),
         ];
         let result = ChatResult::new(candidates);
         assert_eq!(result.generations.len(), 3);

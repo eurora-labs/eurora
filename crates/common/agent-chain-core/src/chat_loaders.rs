@@ -34,7 +34,7 @@ use crate::chat_sessions::ChatSession;
 ///     sessions: vec![
 ///         ChatSession::with_messages(vec![
 ///             BaseMessage::Human(HumanMessage::new("Hello")),
-///             BaseMessage::AI(AIMessage::new("Hi there!")),
+///             BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
 ///         ]),
 ///     ],
 /// };
@@ -100,7 +100,7 @@ mod tests {
         let sessions = vec![
             ChatSession::with_messages(vec![
                 BaseMessage::Human(HumanMessage::new("Hello")),
-                BaseMessage::AI(AIMessage::new("Hi")),
+                BaseMessage::AI(AIMessage::builder().content("Hi").build()),
             ]),
             ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::new("Bye"))]),
         ];
@@ -119,7 +119,7 @@ mod tests {
     fn test_load() {
         let sessions = vec![
             ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::new("Hello"))]),
-            ChatSession::with_messages(vec![BaseMessage::AI(AIMessage::new("Hi"))]),
+            ChatSession::with_messages(vec![BaseMessage::AI(AIMessage::builder().content("Hi").build())]),
             ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::new("Bye"))]),
         ];
 

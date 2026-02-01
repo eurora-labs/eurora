@@ -31,12 +31,12 @@ fn test_merge_message_runs_str_human() {
 #[test]
 fn test_merge_message_runs_str_ai() {
     let messages = vec![
-        BaseMessage::AI(AIMessage::new("foo")),
-        BaseMessage::AI(AIMessage::new("bar")),
-        BaseMessage::AI(AIMessage::new("baz")),
+        BaseMessage::AI(AIMessage::builder().content("foo").build()),
+        BaseMessage::AI(AIMessage::builder().content("bar").build()),
+        BaseMessage::AI(AIMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::AI(AIMessage::new("foo\nbar\nbaz"))];
+    let expected = vec![BaseMessage::AI(AIMessage::builder().content("foo\nbar\nbaz").build())];
     let actual = merge_message_runs(&messages, "\n");
     assert_eq!(actual, expected);
     assert_eq!(messages, messages_copy);
@@ -77,12 +77,12 @@ fn test_merge_message_runs_str_with_specified_separator_human() {
 #[test]
 fn test_merge_message_runs_str_with_specified_separator_ai() {
     let messages = vec![
-        BaseMessage::AI(AIMessage::new("foo")),
-        BaseMessage::AI(AIMessage::new("bar")),
-        BaseMessage::AI(AIMessage::new("baz")),
+        BaseMessage::AI(AIMessage::builder().content("foo").build()),
+        BaseMessage::AI(AIMessage::builder().content("bar").build()),
+        BaseMessage::AI(AIMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::AI(AIMessage::new("foo<sep>bar<sep>baz"))];
+    let expected = vec![BaseMessage::AI(AIMessage::builder().content("foo<sep>bar<sep>baz").build())];
     let actual = merge_message_runs(&messages, "<sep>");
     assert_eq!(actual, expected);
     assert_eq!(messages, messages_copy);
@@ -125,12 +125,12 @@ fn test_merge_message_runs_str_without_separator_human() {
 #[test]
 fn test_merge_message_runs_str_without_separator_ai() {
     let messages = vec![
-        BaseMessage::AI(AIMessage::new("foo")),
-        BaseMessage::AI(AIMessage::new("bar")),
-        BaseMessage::AI(AIMessage::new("baz")),
+        BaseMessage::AI(AIMessage::builder().content("foo").build()),
+        BaseMessage::AI(AIMessage::builder().content("bar").build()),
+        BaseMessage::AI(AIMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::AI(AIMessage::new("foobarbaz"))];
+    let expected = vec![BaseMessage::AI(AIMessage::builder().content("foobarbaz").build())];
     let actual = merge_message_runs(&messages, "");
     assert_eq!(actual, expected);
     assert_eq!(messages, messages_copy);
@@ -321,7 +321,7 @@ fn test_convert_to_messages_tuple_human() {
 #[test]
 fn test_convert_to_messages_tuple_ai() {
     let message_like = vec![serde_json::json!(["ai", "response"])];
-    let expected = vec![BaseMessage::AI(AIMessage::new("response"))];
+    let expected = vec![BaseMessage::AI(AIMessage::builder().content("response").build())];
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(expected, actual);
 }
@@ -345,7 +345,7 @@ fn test_convert_to_messages_role_user() {
 #[test]
 fn test_convert_to_messages_role_assistant() {
     let message_like = vec![serde_json::json!({"role": "assistant", "content": "Hi"})];
-    let expected = vec![BaseMessage::AI(AIMessage::new("Hi"))];
+    let expected = vec![BaseMessage::AI(AIMessage::builder().content("Hi").build())];
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(expected, actual);
 }
@@ -375,7 +375,7 @@ fn test_get_buffer_string_custom_human_prefix() {
 
 #[test]
 fn test_get_buffer_string_custom_ai_prefix() {
-    let messages = vec![BaseMessage::AI(AIMessage::new("ai"))];
+    let messages = vec![BaseMessage::AI(AIMessage::builder().content("ai").build())];
     let expected_output = "A: ai";
     assert_eq!(get_buffer_string(&messages, "Human", "A"), expected_output);
 }
@@ -384,7 +384,7 @@ fn test_get_buffer_string_custom_ai_prefix() {
 fn test_get_buffer_string_multiple_msg() {
     let messages = vec![
         BaseMessage::Human(HumanMessage::new("human")),
-        BaseMessage::AI(AIMessage::new("ai")),
+        BaseMessage::AI(AIMessage::builder().content("ai").build()),
         BaseMessage::System(SystemMessage::new("system")),
         // Note: FunctionMessage, ToolMessage, ChatMessage require additional parameters
         BaseMessage::Tool(ToolMessage::new("tool", "tool_id")),
@@ -533,7 +533,7 @@ fn test_convert_to_openai_messages_multiple_messages() {
     let messages = vec![
         BaseMessage::System(SystemMessage::new("System message")),
         BaseMessage::Human(HumanMessage::new("Human message")),
-        BaseMessage::AI(AIMessage::new("AI message")),
+        BaseMessage::AI(AIMessage::builder().content("AI message").build()),
     ];
     let result = convert_to_openai_messages(&messages, TextFormat::String);
 
@@ -606,7 +606,7 @@ fn test_count_tokens_approximately_string_content() {
         // "Hello" = 5 chars + "user" = 4 chars -> ceil(9/4) + 3 = 3 + 3 = 6 tokens
         BaseMessage::Human(HumanMessage::new("Hello")),
         // "Hi there" = 8 chars + "assistant" = 9 chars -> ceil(17/4) + 3 = 5 + 3 = 8 tokens
-        BaseMessage::AI(AIMessage::new("Hi there")),
+        BaseMessage::AI(AIMessage::builder().content("Hi there").build()),
         // "How are you?" = 12 chars + "user" = 4 chars -> ceil(16/4) + 3 = 4 + 3 = 7 tokens
         BaseMessage::Human(HumanMessage::new("How are you?")),
     ];
@@ -620,7 +620,7 @@ fn test_count_tokens_approximately_string_content() {
 fn test_count_tokens_approximately_with_names() {
     let messages = vec![
         BaseMessage::Human(HumanMessage::new("Hello").with_name("user")),
-        BaseMessage::AI(AIMessage::new("Hi there").with_name("assistant")),
+        BaseMessage::AI(AIMessage::builder().content("Hi there").build().with_name("assistant")),
     ];
 
     // With names included (default)
@@ -647,7 +647,7 @@ fn test_count_tokens_approximately_custom_token_length() {
         // "Hello world" + "user" = 11 + 4 = 15 chars
         BaseMessage::Human(HumanMessage::new("Hello world")),
         // "Testing" + "assistant" = 7 + 9 = 16 chars
-        BaseMessage::AI(AIMessage::new("Testing")),
+        BaseMessage::AI(AIMessage::builder().content("Testing").build()),
     ];
 
     // With chars_per_token = 4 (default)

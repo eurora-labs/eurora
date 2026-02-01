@@ -147,7 +147,7 @@ fn test_message_to_dict_with_additional_kwargs() {
         json!({"name": "test", "arguments": "{}"}),
     );
 
-    let msg = AIMessage::new("Hello").with_additional_kwargs(additional_kwargs);
+    let msg = AIMessage::builder().content("Hello").build().with_additional_kwargs(additional_kwargs);
     let result = message_to_dict(&BaseMessage::AI(msg));
     assert_eq!(
         result
@@ -170,7 +170,7 @@ fn test_messages_to_dict_multiple_messages() {
     let messages = vec![
         BaseMessage::System(SystemMessage::new("System")),
         BaseMessage::Human(HumanMessage::new("Hello")),
-        BaseMessage::AI(AIMessage::new("Hi")),
+        BaseMessage::AI(AIMessage::builder().content("Hi").build()),
     ];
     let result = messages_to_dict(&messages);
     assert_eq!(result.len(), 3);
@@ -291,7 +291,7 @@ fn test_init_with_response_metadata() {
     response_metadata.insert("model".to_string(), json!("gpt-4"));
     response_metadata.insert("tokens".to_string(), json!(10));
 
-    let msg = AIMessage::new("Hello").with_response_metadata(response_metadata);
+    let msg = AIMessage::builder().content("Hello").build().with_response_metadata(response_metadata);
     assert_eq!(
         msg.response_metadata().get("model").unwrap(),
         &json!("gpt-4")
@@ -306,7 +306,7 @@ fn test_init_with_response_metadata() {
 #[test]
 fn test_message_types_have_consistent_types() {
     let human_msg = HumanMessage::new("Hello");
-    let ai_msg = AIMessage::new("Hi");
+    let ai_msg = AIMessage::builder().content("Hi").build();
     let system_msg = SystemMessage::new("You are helpful");
 
     assert_eq!(human_msg.message_type(), "human");

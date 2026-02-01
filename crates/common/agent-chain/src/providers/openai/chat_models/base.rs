@@ -611,9 +611,9 @@ impl ChatOpenAI {
                         message["content"] = serde_json::json!(m.content());
                     }
 
-                    if !m.tool_calls().is_empty() {
+                    if !m.tool_calls.is_empty() {
                         let tool_calls: Vec<serde_json::Value> = m
-                            .tool_calls()
+                            .tool_calls
                             .iter()
                             .map(|tc| {
                                 serde_json::json!({
@@ -1030,7 +1030,7 @@ impl ChatOpenAI {
                 }
                 BaseMessage::AI(m) => {
                     // Add message content
-                    if !m.content().is_empty() || m.tool_calls().is_empty() {
+                    if !m.content().is_empty() || m.tool_calls.is_empty() {
                         input.push(serde_json::json!({
                             "type": "message",
                             "role": "assistant",
@@ -1043,7 +1043,7 @@ impl ChatOpenAI {
                     }
 
                     // Add function calls
-                    for tc in m.tool_calls() {
+                    for tc in &m.tool_calls {
                         input.push(serde_json::json!({
                             "type": "function_call",
                             "name": tc.name(),
@@ -1111,19 +1111,16 @@ impl ChatOpenAI {
             None => (String::new(), Vec::new()),
         };
 
-        let mut ai_message = if tool_calls.is_empty() {
-            AIMessage::new(content)
-        } else {
-            AIMessage::with_tool_calls(content, tool_calls)
+        let ai_message = AIMessage::builder().content(content).tool_calls(tool_calls);
+        let ai_message = match response.usage {
+            Some(usage) => ai_message
+                .usage_metadata(UsageMetadata::new(
+                    usage.prompt_tokens as i64,
+                    usage.completion_tokens as i64,
+                ))
+                .build(),
+            None => ai_message.build(),
         };
-
-        // Set usage metadata if available from response
-        if let Some(usage) = response.usage {
-            ai_message = ai_message.with_usage_metadata(UsageMetadata::new(
-                usage.prompt_tokens as i64,
-                usage.completion_tokens as i64,
-            ));
-        }
 
         let generation = ChatGeneration::new(ai_message.into());
         ChatResult::new(vec![generation])
@@ -1167,23 +1164,39 @@ impl ChatOpenAI {
             }
         }
 
-        let mut ai_message = if tool_calls.is_empty() {
-            let mut msg = AIMessage::new(text_content);
-            if !annotations.is_empty() {
-                msg = msg.with_annotations(annotations);
-            }
-            msg
-        } else {
-            AIMessage::with_tool_calls(text_content, tool_calls)
-        };
+        // TODO: ADD THIS BACK
+        // if !annotations.is_empty() {
+        //     msg = msg.with_annotations(annotations);
+        // }
 
-        // Set usage metadata if available from response
-        if let Some(usage) = response.usage {
-            ai_message = ai_message.with_usage_metadata(UsageMetadata::new(
-                usage.input_tokens as i64,
-                usage.output_tokens as i64,
-            ));
-        }
+        // let mut ai_message = if tool_calls.is_empty() {
+        //     let mut msg = AIMessage::builder().content(text_content).build();
+        //     if !annotations.is_empty() {
+        //         msg = msg.with_annotations(annotations);
+        //     }
+        //     msg
+        // } else {
+        //     AIMessage::builder().content(text_content).tool_calls(tool_calls).build()
+        // };
+        // if let Some(usage) = response.usage {
+        //     ai_message.usage_metadata(UsageMetadata::new(
+        //         usage.input_tokens as i64,
+        //         usage.output_tokens as i64,
+        //     ));
+        // }
+
+        let ai_message = AIMessage::builder()
+            .content(text_content)
+            .tool_calls(tool_calls);
+        let ai_message = match response.usage {
+            Some(usage) => ai_message
+                .usage_metadata(UsageMetadata::new(
+                    usage.input_tokens as i64,
+                    usage.output_tokens as i64,
+                ))
+                .build(),
+            None => ai_message.build(),
+        };
 
         let generation = ChatGeneration::new(ai_message.into());
         ChatResult::new(vec![generation])
@@ -1334,7 +1347,7 @@ impl BaseChatModel for ChatOpenAI {
                 match result {
                     Ok(chat_chunk) => {
                         // Convert ChatChunk to ChatGenerationChunk
-                        let message = AIMessage::new(&chat_chunk.content);
+                        let message = AIMessage::builder().content(&chat_chunk.content).build();
                         let generation_chunk = ChatGenerationChunk::new(message.into());
                         yield Ok(generation_chunk);
                     }

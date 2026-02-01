@@ -148,7 +148,7 @@ impl BaseChatModel for FakeMessagesListChatModel {
             .responses
             .get(i)
             .cloned()
-            .unwrap_or_else(|| BaseMessage::AI(AIMessage::new("")));
+            .unwrap_or_else(|| BaseMessage::AI(AIMessage::builder().content("").build()));
 
         // Update index
         let next_i = if i < self.responses.len() - 1 {
@@ -326,7 +326,7 @@ impl BaseChatModel for FakeListChatModel {
         }
 
         let response = self.get_next_response();
-        let message = AIMessage::new(&response);
+        let message = AIMessage::builder().content(&response).build();
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
     }
@@ -366,7 +366,7 @@ impl BaseChatModel for FakeListChatModel {
                     None
                 };
 
-                let mut ai_chunk = AIMessageChunk::new(c.to_string());
+                let mut ai_chunk = AIMessageChunk::builder().content(c.to_string()).build();
                 ai_chunk.set_chunk_position(chunk_position);
 
                 let chunk = ChatGenerationChunk::new(ai_chunk.to_message().into());
@@ -464,7 +464,7 @@ impl BaseChatModel for FakeChatModel {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let message = AIMessage::new("fake response");
+        let message = AIMessage::builder().content("fake response").build();
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
     }
@@ -512,7 +512,7 @@ impl GenericFakeChatModel {
 
     /// Create from a vector of strings (converted to AIMessages).
     pub fn from_strings(messages: Vec<String>) -> Self {
-        Self::new(messages.into_iter().map(|s| AIMessage::new(&s)))
+        Self::new(messages.into_iter().map(|s| AIMessage::builder().content(&s).build()))
     }
 
     /// Set the configuration.
@@ -582,7 +582,7 @@ impl BaseChatModel for GenericFakeChatModel {
     ) -> Result<ChatResult> {
         let message = {
             let mut guard = self.messages.lock().unwrap();
-            guard.next().unwrap_or_else(|| AIMessage::new(""))
+            guard.next().unwrap_or_else(|| AIMessage::builder().content("").build())
         };
 
         let generation = ChatGeneration::new(message.into());
@@ -598,7 +598,7 @@ impl BaseChatModel for GenericFakeChatModel {
         // Get the message via _generate
         let message = {
             let mut guard = self.messages.lock().unwrap();
-            guard.next().unwrap_or_else(|| AIMessage::new(""))
+            guard.next().unwrap_or_else(|| AIMessage::builder().content("").build())
         };
 
         let content = message.content().to_string();
@@ -631,11 +631,11 @@ impl BaseChatModel for GenericFakeChatModel {
                 let num_chunks = all_parts.len();
 
                 for (idx, token) in all_parts.into_iter().enumerate() {
-                    let mut chunk_msg = AIMessageChunk::new(&token);
+                    let mut chunk_msg = AIMessageChunk::builder().content(&token).build();
 
                     // Set message ID if available
                     if let Some(ref id) = message_id {
-                        chunk_msg = AIMessageChunk::with_id(id.clone(), &token);
+                        chunk_msg = AIMessageChunk::builder().id(id.clone()).content(&token).build();
                     }
 
                     // Set chunk_position on the last chunk if no additional_kwargs
@@ -675,9 +675,9 @@ impl BaseChatModel for GenericFakeChatModel {
                                         fc.insert(fkey.clone(), Value::String(chunk_content));
                                         kwargs.insert("function_call".to_string(), Value::Object(fc.into_iter().collect()));
 
-                                        let mut chunk_msg = AIMessageChunk::new("");
+                                        let mut chunk_msg = AIMessageChunk::builder().content("").build();
                                         if let Some(ref id) = message_id {
-                                            chunk_msg = AIMessageChunk::with_id(id.clone(), "");
+                                            chunk_msg = AIMessageChunk::builder().id(id.clone()).content("").build();
                                         }
 
                                         let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
@@ -689,9 +689,9 @@ impl BaseChatModel for GenericFakeChatModel {
                                     fc.insert(fkey.clone(), fvalue.clone());
                                     kwargs.insert("function_call".to_string(), Value::Object(fc.into_iter().collect()));
 
-                                    let mut chunk_msg = AIMessageChunk::new("");
+                                    let mut chunk_msg = AIMessageChunk::builder().content("").build();
                                     if let Some(ref id) = message_id {
-                                        chunk_msg = AIMessageChunk::with_id(id.clone(), "");
+                                        chunk_msg = AIMessageChunk::builder().id(id.clone()).content("").build();
                                     }
 
                                     let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
@@ -703,9 +703,9 @@ impl BaseChatModel for GenericFakeChatModel {
                         let mut kwargs: HashMap<String, Value> = HashMap::new();
                         kwargs.insert(key.clone(), value.clone());
 
-                        let mut chunk_msg = AIMessageChunk::new("");
+                        let mut chunk_msg = AIMessageChunk::builder().content("").build();
                         if let Some(ref id) = message_id {
-                            chunk_msg = AIMessageChunk::with_id(id.clone(), "");
+                            chunk_msg = AIMessageChunk::builder().id(id.clone()).content("").build();
                         }
 
                         let chunk = ChatGenerationChunk::new(chunk_msg.to_message().into());
@@ -803,7 +803,7 @@ impl BaseChatModel for ParrotFakeChatModel {
         let last_message = messages
             .last()
             .cloned()
-            .unwrap_or_else(|| BaseMessage::AI(AIMessage::new("")));
+            .unwrap_or_else(|| BaseMessage::AI(AIMessage::builder().content("").build()));
 
         let generation = ChatGeneration::new(last_message);
         Ok(ChatResult::new(vec![generation]))
@@ -818,8 +818,8 @@ mod tests {
     #[tokio::test]
     async fn test_fake_messages_list_chat_model() {
         let llm = FakeMessagesListChatModel::new(vec![
-            BaseMessage::AI(AIMessage::new("Response 1")),
-            BaseMessage::AI(AIMessage::new("Response 2")),
+            BaseMessage::AI(AIMessage::builder().content("Response 1").build()),
+            BaseMessage::AI(AIMessage::builder().content("Response 2").build()),
         ]);
 
         let result = llm._generate(vec![], None, None).await.unwrap();

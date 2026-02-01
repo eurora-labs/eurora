@@ -104,7 +104,7 @@ impl BaseChatModel for ModelWithGenerateOnly {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let message = AIMessage::new("hello");
+        let message = AIMessage::builder().content("hello").build();
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
     }
@@ -202,8 +202,8 @@ impl BaseChatModel for ModelWithSyncStream {
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         let stream = async_stream::stream! {
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("a").into()));
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("b").into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("a").build().into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("b").build().into()));
         };
         Ok(Box::pin(stream))
     }
@@ -305,8 +305,8 @@ impl BaseChatModel for ModelWithAsyncStream {
         _run_manager: Option<&agent_chain_core::callbacks::AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         let stream = async_stream::stream! {
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("a").into()));
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("b").into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("a").build().into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("b").build().into()));
         };
         Ok(Box::pin(stream))
     }
@@ -419,7 +419,7 @@ impl BaseChatModel for NoStreamingModel {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let message = AIMessage::new("invoke");
+        let message = AIMessage::builder().content("invoke").build();
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
     }
@@ -507,7 +507,7 @@ impl BaseChatModel for StreamingModel {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let message = AIMessage::new("invoke");
+        let message = AIMessage::builder().content("invoke").build();
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
     }
@@ -519,7 +519,7 @@ impl BaseChatModel for StreamingModel {
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         let stream = async_stream::stream! {
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("stream").into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("stream").build().into()));
         };
         Ok(Box::pin(stream))
     }

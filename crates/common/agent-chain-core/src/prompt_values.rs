@@ -331,7 +331,7 @@ mod tests {
         let messages = vec![
             BaseMessage::System(SystemMessage::new("You are a helpful assistant.")),
             BaseMessage::Human(HumanMessage::new("Hello!")),
-            BaseMessage::AI(AIMessage::new("Hi there!")),
+            BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
         ];
         let pv = ChatPromptValue::new(messages.clone());
 
@@ -368,7 +368,7 @@ mod tests {
     fn test_chat_prompt_value_concrete() {
         let messages = vec![
             BaseMessage::Human(HumanMessage::new("Hello!")),
-            BaseMessage::AI(AIMessage::new("Hi!")),
+            BaseMessage::AI(AIMessage::builder().content("Hi!").build()),
         ];
         let pv = ChatPromptValueConcrete::new(messages);
 

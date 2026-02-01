@@ -390,7 +390,7 @@ mod test_language_model_output {
         // Test LanguageModelOutput accepts AIMessage
         // Python equivalent: test_language_model_output_accepts_base_message()
 
-        let message = AIMessage::new("test message");
+        let message = AIMessage::builder().content("test message").build();
         let output: LanguageModelOutput = message.into();
         assert_eq!(output.text(), "test message");
     }
@@ -406,7 +406,7 @@ mod test_language_model_output {
     #[test]
     fn test_language_model_output_message_variant() {
         // Test creating Message variant directly
-        let ai_message = AIMessage::new("direct message");
+        let ai_message = AIMessage::builder().content("direct message").build();
         let output = LanguageModelOutput::message(ai_message);
         assert_eq!(output.text(), "direct message");
     }
@@ -624,7 +624,7 @@ mod test_base_language_model_trait {
 
         let messages = vec![
             BaseMessage::Human(HumanMessage::new("Hi")),
-            BaseMessage::AI(AIMessage::new("Hello")),
+            BaseMessage::AI(AIMessage::builder().content("Hello").build()),
         ];
 
         let result = model.get_num_tokens_from_messages(&messages);

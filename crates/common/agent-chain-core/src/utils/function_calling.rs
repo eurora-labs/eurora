@@ -589,7 +589,7 @@ pub fn tool_example_to_messages<T: Serialize>(
         Value::Array(openai_tool_calls.clone()),
     );
 
-    let ai_msg = AIMessage::new("").with_additional_kwargs(additional_kwargs);
+    let ai_msg = AIMessage::builder().content("").build().with_additional_kwargs(additional_kwargs);
     messages.push(ai_msg.into());
 
     // Add tool messages
@@ -607,7 +607,7 @@ pub fn tool_example_to_messages<T: Serialize>(
 
     // Add final AI response if provided
     if let Some(response) = ai_response {
-        messages.push(AIMessage::new(response).into());
+        messages.push(AIMessage::builder().content(response).build().into());
     }
 
     messages
