@@ -244,62 +244,12 @@ impl AIMessage {
         }
     }
 
-    /// Create a new AIMessage with an ID and content using a builder-like pattern.
-    ///
-    /// This is a convenience method that wraps the builder to set both id and content at once.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self::builder()
-            .content(content)
-            .maybe_id(Some(id.into()))
-            .build()
-    }
-
     /// Create a new AIMessage with a list of content blocks.
     ///
     /// This is a convenience method for creating messages with structured content.
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
         let content = serde_json::to_string(&content_list).unwrap_or_default();
         Self::builder().content(content).build()
-    }
-
-    /// Create a new AIMessage with tool calls.
-    ///
-    /// This is a convenience method for creating messages with tool calls.
-    pub fn with_tool_calls(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
-        Self::builder()
-            .content(content)
-            .tool_calls(tool_calls)
-            .build()
-    }
-
-    /// Set response metadata (builder pattern).
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
-    }
-
-    /// Set additional kwargs (builder pattern).
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
-    }
-
-    /// Set name (builder pattern).
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Set usage metadata (builder pattern).
-    pub fn with_usage_metadata(mut self, usage_metadata: UsageMetadata) -> Self {
-        self.usage_metadata = Some(usage_metadata);
-        self
     }
 
     /// Set the message ID.
@@ -310,21 +260,6 @@ impl AIMessage {
     /// Get the message content.
     pub fn content(&self) -> &str {
         &self.content
-    }
-
-    /// Get usage metadata if present.
-    pub fn usage_metadata(&self) -> Option<&UsageMetadata> {
-        self.usage_metadata.as_ref()
-    }
-
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
     }
 
     /// Get the raw content as a list of JSON values.
@@ -483,16 +418,6 @@ impl AIMessage {
                 })
             })
             .collect()
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// Get the message name.
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
     }
 
     /// Get a pretty representation of the message.

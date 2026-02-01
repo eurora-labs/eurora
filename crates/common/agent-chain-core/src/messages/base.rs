@@ -163,7 +163,7 @@ impl BaseMessage {
         match self {
             BaseMessage::Human(m) => m.id(),
             BaseMessage::System(m) => m.id(),
-            BaseMessage::AI(m) => m.id(),
+            BaseMessage::AI(m) => m.id.clone(),
             BaseMessage::Tool(m) => m.id(),
             BaseMessage::Chat(m) => m.id(),
             BaseMessage::Function(m) => m.id(),
@@ -176,7 +176,7 @@ impl BaseMessage {
         match self {
             BaseMessage::Human(m) => m.name(),
             BaseMessage::System(m) => m.name(),
-            BaseMessage::AI(m) => m.name(),
+            BaseMessage::AI(m) => m.name.clone(),
             BaseMessage::Tool(m) => m.name(),
             BaseMessage::Chat(m) => m.name(),
             BaseMessage::Function(m) => Some(m.name().to_string()),
