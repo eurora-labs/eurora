@@ -20,6 +20,7 @@ use agent_chain_core::messages::{
     FileContentBlock,
     HumanMessage,
     ImageContentBlock,
+    MessageContent,
     NonStandardContentBlock,
     PlainTextContentBlock,
     ReasoningContentBlock,
@@ -139,8 +140,11 @@ fn test_convert_to_v1_from_anthropic() {
     let mut response_metadata = HashMap::new();
     response_metadata.insert("model_provider".to_string(), json!("anthropic"));
 
-    let message =
-        AIMessage::with_content_list(content.clone()).with_response_metadata(response_metadata);
+    let content_str = serde_json::to_string(&content).unwrap_or_default();
+    let message = AIMessage::builder()
+        .content(content_str)
+        .response_metadata(response_metadata)
+        .build();
 
     // Expected v1 content blocks after translation
     let expected_content: Vec<ContentBlock> = vec![
@@ -337,12 +341,15 @@ fn test_convert_to_v1_from_anthropic() {
     let mut response_metadata2 = HashMap::new();
     response_metadata2.insert("model_provider".to_string(), json!("anthropic"));
 
-    let message2 = AIMessage::new("Hello").with_response_metadata(response_metadata2);
+    let message2 = AIMessage::builder()
+        .content("Hello")
+        .response_metadata(response_metadata2)
+        .build();
 
     let expected_content2 = vec![ContentBlock::Text(TextContentBlock::new("Hello"))];
     assert_eq!(message2.content_blocks(), expected_content2);
     // Check no mutation
-    assert_ne!(message2.content(), "");
+    assert_ne!(message2.content, "");
 }
 
 // ============================================================================
@@ -361,68 +368,109 @@ fn test_convert_to_v1_from_anthropic_chunk() {
 
     // Create streaming chunks as they would come from Anthropic
     let chunks = vec![
-        AIMessageChunk::with_content_list(vec![
-            json!({"text": "Looking ", "type": "text", "index": 0}),
-        ])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![
-            json!({"text": "now.", "type": "text", "index": 0}),
-        ])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![json!({
-            "type": "tool_use",
-            "name": "get_weather",
-            "input": {},
-            "id": "toolu_abc123",
-            "index": 1
-        })])
-        .with_tool_call_chunks(vec![tool_call_chunk(
-            Some("get_weather".to_string()),
-            Some("".to_string()),
-            Some("toolu_abc123".to_string()),
-            Some(1),
-        )])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![
-            json!({"type": "input_json_delta", "partial_json": "", "index": 1}),
-        ])
-        .with_tool_call_chunks(vec![tool_call_chunk(
-            None,
-            Some("".to_string()),
-            None,
-            Some(1),
-        )])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![
-            json!({"type": "input_json_delta", "partial_json": r#"{"loca"#, "index": 1}),
-        ])
-        .with_tool_call_chunks(vec![tool_call_chunk(
-            None,
-            Some(r#"{"loca"#.to_string()),
-            None,
-            Some(1),
-        )])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![
-            json!({"type": "input_json_delta", "partial_json": r#"tion": "San "#, "index": 1}),
-        ])
-        .with_tool_call_chunks(vec![tool_call_chunk(
-            None,
-            Some(r#"tion": "San "#.to_string()),
-            None,
-            Some(1),
-        )])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![
-            json!({"type": "input_json_delta", "partial_json": r#"Francisco"}"#, "index": 1}),
-        ])
-        .with_tool_call_chunks(vec![tool_call_chunk(
-            None,
-            Some(r#"Francisco"}"#.to_string()),
-            None,
-            Some(1),
-        )])
-        .with_response_metadata(response_metadata.clone()),
+        {
+            let content = serde_json::to_string(&vec![
+                json!({"text": "Looking ", "type": "text", "index": 0}),
+            ])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content =
+                serde_json::to_string(&vec![json!({"text": "now.", "type": "text", "index": 0})])
+                    .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![json!({
+                "type": "tool_use",
+                "name": "get_weather",
+                "input": {},
+                "id": "toolu_abc123",
+                "index": 1
+            })])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .tool_call_chunks(vec![tool_call_chunk(
+                    Some("get_weather".to_string()),
+                    Some("".to_string()),
+                    Some("toolu_abc123".to_string()),
+                    Some(1),
+                )])
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![
+                json!({"type": "input_json_delta", "partial_json": "", "index": 1}),
+            ])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .tool_call_chunks(vec![tool_call_chunk(
+                    None,
+                    Some("".to_string()),
+                    None,
+                    Some(1),
+                )])
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![
+                json!({"type": "input_json_delta", "partial_json": r#"{"loca"#, "index": 1}),
+            ])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .tool_call_chunks(vec![tool_call_chunk(
+                    None,
+                    Some(r#"{"loca"#.to_string()),
+                    None,
+                    Some(1),
+                )])
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![
+                json!({"type": "input_json_delta", "partial_json": r#"tion": "San "#, "index": 1}),
+            ])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .tool_call_chunks(vec![tool_call_chunk(
+                    None,
+                    Some(r#"tion": "San "#.to_string()),
+                    None,
+                    Some(1),
+                )])
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![
+                json!({"type": "input_json_delta", "partial_json": r#"Francisco"}"#, "index": 1}),
+            ])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .tool_call_chunks(vec![tool_call_chunk(
+                    None,
+                    Some(r#"Francisco"}"#.to_string()),
+                    None,
+                    Some(1),
+                )])
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
     ];
 
     // Expected content_blocks for each chunk
@@ -536,7 +584,7 @@ fn test_convert_to_v1_from_anthropic_chunk() {
     assert_eq!(full.content_blocks(), expected_merged_content_blocks);
 
     // Test parsing partial_json for server tool calls
-    let mut full_server = AIMessageChunk::with_content_list(vec![
+    let content = serde_json::to_string(&vec![
         json!({
             "id": "srvtoolu_abc123",
             "input": {},
@@ -555,8 +603,12 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             "partial_json": r#"{"repoName": "<my repo>", "question": "<my query>"}"#
         }),
     ])
-    .with_response_metadata(response_metadata.clone());
-    full_server.set_chunk_position(Some(ChunkPosition::Last));
+    .unwrap_or_default();
+    let full_server = AIMessageChunk::builder()
+        .content(content)
+        .response_metadata(response_metadata.clone())
+        .chunk_position(ChunkPosition::Last)
+        .build();
 
     let expected_server_content_blocks = vec![
         ContentBlock::ServerToolCall(ServerToolCall {
@@ -668,7 +720,14 @@ fn test_convert_to_v1_from_anthropic_input() {
         }),
     ];
 
-    let message = HumanMessage::with_content_list(content);
+    let message = HumanMessage::builder()
+        .content(MessageContent::Parts(
+            content
+                .iter()
+                .map(|v| serde_json::from_value(v.clone()).unwrap())
+                .collect(),
+        ))
+        .build();
 
     let expected: Vec<ContentBlock> = vec![
         // text -> text

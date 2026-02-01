@@ -26,7 +26,7 @@ mod chat_generation_tests {
     /// Test that text is extracted correctly from string content.
     #[test]
     fn test_msg_with_text() {
-        let msg = AIMessage::new("foo");
+        let msg = AIMessage::builder().content("foo").build();
         let chat_gen = ChatGeneration::new(msg.into());
         assert_eq!(chat_gen.text, "foo");
     }
@@ -34,7 +34,7 @@ mod chat_generation_tests {
     /// Test that empty message returns empty text.
     #[test]
     fn test_msg_no_text() {
-        let msg = AIMessage::new("");
+        let msg = AIMessage::builder().content("").build();
         let chat_gen = ChatGeneration::new(msg.into());
         assert_eq!(chat_gen.text, "");
     }
@@ -42,7 +42,7 @@ mod chat_generation_tests {
     /// Test creating ChatGeneration with string content.
     #[test]
     fn test_creation_with_string_content() {
-        let msg = AIMessage::new("Hello, world!");
+        let msg = AIMessage::builder().content("Hello, world!").build();
         let chat_gen = ChatGeneration::new(msg.clone().into());
         assert_eq!(chat_gen.text, "Hello, world!");
         assert_eq!(chat_gen.message, msg.into());
@@ -52,7 +52,7 @@ mod chat_generation_tests {
     /// Test creating ChatGeneration with generation_info.
     #[test]
     fn test_creation_with_generation_info() {
-        let msg = AIMessage::new("Test");
+        let msg = AIMessage::builder().content("Test").build();
         let mut gen_info = HashMap::new();
         gen_info.insert("finish_reason".to_string(), json!("stop"));
         gen_info.insert("model".to_string(), json!("gpt-4"));
@@ -64,7 +64,7 @@ mod chat_generation_tests {
     /// Test that type field is set correctly.
     #[test]
     fn test_type_field_is_literal() {
-        let msg = AIMessage::new("test");
+        let msg = AIMessage::builder().content("test").build();
         let chat_gen = ChatGeneration::new(msg.into());
         assert_eq!(chat_gen.generation_type, "ChatGeneration");
     }
@@ -80,7 +80,7 @@ mod test_chat_generation_chunk {
     /// Test creating a ChatGenerationChunk.
     #[test]
     fn test_creation() {
-        let msg = AIMessage::new("chunk");
+        let msg = AIMessage::builder().content("chunk").build();
         let chunk = ChatGenerationChunk::new(msg.into());
         assert_eq!(chunk.text, "chunk");
         assert_eq!(chunk.generation_type, "ChatGenerationChunk");
@@ -89,8 +89,8 @@ mod test_chat_generation_chunk {
     /// Test concatenating two ChatGenerationChunks.
     #[test]
     fn test_add_two_chunks() {
-        let msg1 = AIMessage::new("Hello, ");
-        let msg2 = AIMessage::new("world!");
+        let msg1 = AIMessage::builder().content("Hello, ").build();
+        let msg2 = AIMessage::builder().content("world!").build();
         let chunk1 = ChatGenerationChunk::new(msg1.into());
         let chunk2 = ChatGenerationChunk::new(msg2.into());
         let result = chunk1 + chunk2;
@@ -101,8 +101,8 @@ mod test_chat_generation_chunk {
     /// Test concatenating chunks with generation_info.
     #[test]
     fn test_add_chunks_with_generation_info() {
-        let msg1 = AIMessage::new("Hello");
-        let msg2 = AIMessage::new(" world");
+        let msg1 = AIMessage::builder().content("Hello").build();
+        let msg2 = AIMessage::builder().content(" world").build();
         let mut info1 = HashMap::new();
         info1.insert("key1".to_string(), json!("value1"));
         info1.insert("shared".to_string(), json!("first"));
@@ -126,8 +126,8 @@ mod test_chat_generation_chunk {
     /// Test concatenating chunks where one has None generation_info.
     #[test]
     fn test_add_chunk_with_none_generation_info() {
-        let msg1 = AIMessage::new("Hello");
-        let msg2 = AIMessage::new(" world");
+        let msg1 = AIMessage::builder().content("Hello").build();
+        let msg2 = AIMessage::builder().content(" world").build();
         let mut info = HashMap::new();
         info.insert("key".to_string(), json!("value"));
         let chunk1 = ChatGenerationChunk::with_info(msg1.into(), info.clone());
@@ -140,8 +140,8 @@ mod test_chat_generation_chunk {
     /// Test concatenating chunks where both have None generation_info.
     #[test]
     fn test_add_chunks_both_none_generation_info() {
-        let msg1 = AIMessage::new("Hello");
-        let msg2 = AIMessage::new(" world");
+        let msg1 = AIMessage::builder().content("Hello").build();
+        let msg2 = AIMessage::builder().content(" world").build();
         let chunk1 = ChatGenerationChunk::new(msg1.into());
         let chunk2 = ChatGenerationChunk::new(msg2.into());
         let result = chunk1 + chunk2;
@@ -156,7 +156,7 @@ mod test_chat_generation_chunk {
     /// Test concatenating empty list using merge function.
     #[test]
     fn test_merge_single_chunk_via_function() {
-        let msg = AIMessage::new("test");
+        let msg = AIMessage::builder().content("test").build();
         let chunk = ChatGenerationChunk::new(msg.into());
         // In Rust, we use merge_chat_generation_chunks for list merging
         let result = merge_chat_generation_chunks(vec![chunk.clone()]);
@@ -175,7 +175,7 @@ mod test_chat_generation_chunk {
     /// This is the Rust equivalent of Python's inheritance test.
     #[test]
     fn test_conversion_to_chat_generation() {
-        let msg = AIMessage::new("test");
+        let msg = AIMessage::builder().content("test").build();
         let chunk = ChatGenerationChunk::new(msg.into());
         // Convert to ChatGeneration
         let chat_gen: ChatGeneration = chunk.clone().into();
@@ -189,7 +189,7 @@ mod test_chat_generation_chunk {
     /// Test that type field is set correctly.
     #[test]
     fn test_type_field_is_literal() {
-        let msg = AIMessage::new("test");
+        let msg = AIMessage::builder().content("test").build();
         let chunk = ChatGenerationChunk::new(msg.into());
         assert_eq!(chunk.generation_type, "ChatGenerationChunk");
     }
@@ -209,7 +209,7 @@ mod test_merge_chat_generation_chunks {
     /// Test merging a single chunk returns the chunk itself.
     #[test]
     fn test_merge_single_chunk() {
-        let msg = AIMessage::new("single");
+        let msg = AIMessage::builder().content("single").build();
         let chunk = ChatGenerationChunk::new(msg.into());
         let result = merge_chat_generation_chunks(vec![chunk.clone()]);
         assert!(result.is_some());
@@ -221,8 +221,8 @@ mod test_merge_chat_generation_chunks {
     /// Test merging two chunks.
     #[test]
     fn test_merge_two_chunks() {
-        let msg1 = AIMessage::new("Hello ");
-        let msg2 = AIMessage::new("world");
+        let msg1 = AIMessage::builder().content("Hello ").build();
+        let msg2 = AIMessage::builder().content("world").build();
         let chunk1 = ChatGenerationChunk::new(msg1.into());
         let chunk2 = ChatGenerationChunk::new(msg2.into());
         let result = merge_chat_generation_chunks(vec![chunk1, chunk2]);
@@ -234,10 +234,10 @@ mod test_merge_chat_generation_chunks {
     #[test]
     fn test_merge_multiple_chunks() {
         let chunks = vec![
-            ChatGenerationChunk::new(AIMessage::new("A").into()),
-            ChatGenerationChunk::new(AIMessage::new("B").into()),
-            ChatGenerationChunk::new(AIMessage::new("C").into()),
-            ChatGenerationChunk::new(AIMessage::new("D").into()),
+            ChatGenerationChunk::new(AIMessage::builder().content("A").build().into()),
+            ChatGenerationChunk::new(AIMessage::builder().content("B").build().into()),
+            ChatGenerationChunk::new(AIMessage::builder().content("C").build().into()),
+            ChatGenerationChunk::new(AIMessage::builder().content("D").build().into()),
         ];
         let result = merge_chat_generation_chunks(chunks);
         assert!(result.is_some());
@@ -247,8 +247,8 @@ mod test_merge_chat_generation_chunks {
     /// Test merging chunks preserves and merges generation_info.
     #[test]
     fn test_merge_chunks_with_generation_info() {
-        let msg1 = AIMessage::new("A");
-        let msg2 = AIMessage::new("B");
+        let msg1 = AIMessage::builder().content("A").build();
+        let msg2 = AIMessage::builder().content("B").build();
         let mut info1 = HashMap::new();
         info1.insert("key1".to_string(), json!("value1"));
         let mut info2 = HashMap::new();

@@ -3,18 +3,36 @@
 //! This module contains the `HumanMessage` and `HumanMessageChunk` types which represent
 //! messages from the user. Mirrors `langchain_core.messages.human`.
 
+use bon::bon;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::base::merge_content;
-use super::content::{ContentBlock, ContentPart, ImageSource, MessageContent};
+use super::content::{ContentBlock, ContentPart, MessageContent};
 
 /// A human message in the conversation.
 ///
 /// Human messages support both simple text content and multimodal content
-/// with images. Use [`HumanMessage::new`] for simple text messages and
-/// [`HumanMessage::with_content`] for multimodal messages.
+/// with images. Use [`HumanMessage::builder()`] to construct messages.
+///
+/// # Example
+///
+/// ```
+/// use agent_chain_core::messages::HumanMessage;
+///
+/// // Simple text message
+/// let msg = HumanMessage::builder()
+///     .content("Hello!")
+///     .build();
+///
+/// // Message with ID and name
+/// let msg = HumanMessage::builder()
+///     .content("Hello!")
+///     .maybe_id(Some("msg-123".to_string()))
+///     .maybe_name(Some("user".to_string()))
+///     .build();
+/// ```
 ///
 /// This corresponds to `HumanMessage` in LangChain Python.
 
@@ -44,7 +62,6 @@ impl Serialize for HumanMessage {
         if self.name.is_some() {
             field_count += 1;
         }
-        // Add 1 for additional type field
         field_count += 1;
 
         let mut map = serializer.serialize_map(Some(field_count))?;
@@ -61,286 +78,42 @@ impl Serialize for HumanMessage {
     }
 }
 
+#[bon]
 impl HumanMessage {
-    /// Create a new human message with simple text content.
-    pub fn new(content: impl Into<String>) -> Self {
-        Self {
-            content: MessageContent::Text(content.into()),
-            id: None,
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new human message with simple text content and an explicit ID.
-    ///
-    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            content: MessageContent::Text(content.into()),
-            id: Some(id.into()),
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new human message with multipart content.
+    /// Create a new human message with named parameters using the builder pattern.
     ///
     /// # Example
     ///
-    /// ```ignore
-    /// use agent_chain_core::messages::{HumanMessage, ContentPart, ImageSource};
-    ///
-    /// let msg = HumanMessage::with_content(vec![
-    ///     ContentPart::Text { text: "What's in this image?".into() },
-    ///     ContentPart::Image {
-    ///         source: ImageSource::Url {
-    ///             url: "https://example.com/image.jpg".into(),
-    ///         },
-    ///         detail: None,
-    ///     },
-    /// ]);
     /// ```
-    pub fn with_content(parts: Vec<ContentPart>) -> Self {
-        Self {
-            content: MessageContent::Parts(parts),
-            id: None,
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new human message with multipart content and an explicit ID.
+    /// use agent_chain_core::messages::{HumanMessage, MessageContent};
     ///
-    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
-    pub fn with_id_and_content(id: impl Into<String>, parts: Vec<ContentPart>) -> Self {
-        Self {
-            content: MessageContent::Parts(parts),
-            id: Some(id.into()),
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a human message with text and a single image from a URL.
-    pub fn with_image_url(text: impl Into<String>, url: impl Into<String>) -> Self {
-        Self::with_content(vec![
-            ContentPart::Text { text: text.into() },
-            ContentPart::Image {
-                source: ImageSource::Url { url: url.into() },
-                detail: None,
-            },
-        ])
-    }
-
-    /// Create a human message with text and a single base64-encoded image.
-    pub fn with_image_base64(
-        text: impl Into<String>,
-        media_type: impl Into<String>,
-        data: impl Into<String>,
+    /// // Simple message with just content
+    /// let msg = HumanMessage::builder()
+    ///     .content("Hello!")
+    ///     .build();
+    ///
+    /// // Message with ID and name
+    /// let msg = HumanMessage::builder()
+    ///     .content("Hello!")
+    ///     .maybe_id(Some("msg-123".to_string()))
+    ///     .maybe_name(Some("user".to_string()))
+    ///     .build();
+    /// ```
+    #[builder]
+    pub fn new(
+        content: impl Into<MessageContent>,
+        id: Option<String>,
+        name: Option<String>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+        #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
     ) -> Self {
-        Self::with_content(vec![
-            ContentPart::Text { text: text.into() },
-            ContentPart::Image {
-                source: ImageSource::Base64 {
-                    media_type: media_type.into(),
-                    data: data.into(),
-                },
-                detail: None,
-            },
-        ])
-    }
-
-    /// Create a new human message with a list of content blocks.
-    ///
-    /// This is used for multimodal content or provider-specific content blocks.
-    /// The content is stored as `MessageContent::Parts` derived from the JSON blocks.
-    pub fn with_content_list(content: Vec<serde_json::Value>) -> Self {
-        // Convert JSON values to ContentParts
-        let parts: Vec<ContentPart> = content
-            .into_iter()
-            .map(|v| {
-                if let Some(obj) = v.as_object() {
-                    let block_type = obj.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                    match block_type {
-                        "text" => {
-                            let text = obj.get("text").and_then(|t| t.as_str()).unwrap_or("");
-                            ContentPart::Text {
-                                text: text.to_string(),
-                            }
-                        }
-                        "image" => {
-                            // Handle various image source formats
-                            if let Some(url) = obj.get("url").and_then(|u| u.as_str()) {
-                                ContentPart::Image {
-                                    source: ImageSource::Url {
-                                        url: url.to_string(),
-                                    },
-                                    detail: None,
-                                }
-                            } else if let Some(base64) = obj.get("base64").and_then(|b| b.as_str())
-                            {
-                                let mime_type = obj
-                                    .get("mime_type")
-                                    .and_then(|m| m.as_str())
-                                    .unwrap_or("image/png");
-                                ContentPart::Image {
-                                    source: ImageSource::Base64 {
-                                        media_type: mime_type.to_string(),
-                                        data: base64.to_string(),
-                                    },
-                                    detail: None,
-                                }
-                            } else if let Some(source) =
-                                obj.get("source").and_then(|s| s.as_object())
-                            {
-                                let source_type =
-                                    source.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                                match source_type {
-                                    "url" => {
-                                        let url = source
-                                            .get("url")
-                                            .and_then(|u| u.as_str())
-                                            .unwrap_or("");
-                                        ContentPart::Image {
-                                            source: ImageSource::Url {
-                                                url: url.to_string(),
-                                            },
-                                            detail: None,
-                                        }
-                                    }
-                                    "base64" => {
-                                        let data = source
-                                            .get("data")
-                                            .and_then(|d| d.as_str())
-                                            .unwrap_or("");
-                                        let media_type = source
-                                            .get("media_type")
-                                            .and_then(|m| m.as_str())
-                                            .unwrap_or("image/png");
-                                        ContentPart::Image {
-                                            source: ImageSource::Base64 {
-                                                media_type: media_type.to_string(),
-                                                data: data.to_string(),
-                                            },
-                                            detail: None,
-                                        }
-                                    }
-                                    "file" => {
-                                        let file_id = source
-                                            .get("file_id")
-                                            .and_then(|f| f.as_str())
-                                            .unwrap_or("");
-                                        ContentPart::Image {
-                                            source: ImageSource::FileId {
-                                                file_id: file_id.to_string(),
-                                            },
-                                            detail: None,
-                                        }
-                                    }
-                                    _ => ContentPart::Other(v.clone()),
-                                }
-                            } else if let Some(id) = obj.get("id").and_then(|i| i.as_str()) {
-                                ContentPart::Image {
-                                    source: ImageSource::FileId {
-                                        file_id: id.to_string(),
-                                    },
-                                    detail: None,
-                                }
-                            } else {
-                                ContentPart::Other(v.clone())
-                            }
-                        }
-                        _ => ContentPart::Other(v.clone()),
-                    }
-                } else if let Some(s) = v.as_str() {
-                    ContentPart::Text {
-                        text: s.to_string(),
-                    }
-                } else {
-                    ContentPart::Other(v.clone())
-                }
-            })
-            .collect();
-
         Self {
-            content: MessageContent::Parts(parts),
-            id: None,
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
+            content: content.into(),
+            id,
+            name,
+            additional_kwargs,
+            response_metadata,
         }
-    }
-
-    /// Set the name for this message.
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Set the additional kwargs for this message (builder pattern).
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
-    }
-
-    /// Set the response metadata for this message (builder pattern).
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
-    }
-
-    /// Get the message type as a string.
-    pub fn message_type(&self) -> &'static str {
-        "human"
-    }
-
-    /// Get the text content of the message.
-    ///
-    /// This is the same as `content()` for simple text messages.
-    pub fn text(&self) -> &str {
-        self.content()
-    }
-
-    /// Get the message content as text.
-    ///
-    /// For multipart messages, this returns an empty string.
-    /// Use [`message_content()`](Self::message_content) to access the full content.
-    pub fn content(&self) -> &str {
-        match &self.content {
-            MessageContent::Text(s) => s,
-            MessageContent::Parts(_) => "",
-        }
-    }
-
-    /// Get the full message content (text or multipart).
-    pub fn message_content(&self) -> &MessageContent {
-        &self.content
-    }
-
-    /// Check if this message contains images.
-    pub fn has_images(&self) -> bool {
-        self.content.has_images()
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> Option<String> {
-        self.id.clone()
     }
 
     /// Set the message ID.
@@ -348,14 +121,14 @@ impl HumanMessage {
         self.id = Some(id);
     }
 
-    /// Get the message name.
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
+    /// Get the message type as a string.
+    pub fn message_type(&self) -> &'static str {
+        "human"
     }
 
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
+    /// Check if this message contains images.
+    pub fn has_images(&self) -> bool {
+        self.content.has_images()
     }
 
     /// Get the raw content as a list of JSON values.
@@ -394,8 +167,6 @@ impl HumanMessage {
 
         let raw_content = self.content_list();
 
-        // Try to detect if this is OpenAI Chat Completions format
-        // Check if any blocks are image_url, input_audio, or file type
         let is_openai_format = raw_content.iter().any(|block| {
             block
                 .get("type")
@@ -410,13 +181,6 @@ impl HumanMessage {
             anthropic_convert(&raw_content)
         };
 
-        // Deserialize JSON blocks into ContentBlock structs
-        // We can't use direct serde deserialization because the enum has #[serde(tag = "type")]
-        // which expects externally tagged format, but our JSON has type as a field inside.
-        // So we need to manually deserialize based on the type field.
-        //
-        // On deserialization failure, we log a warning and wrap the malformed block
-        // as NonStandardContentBlock with error info, rather than panicking.
         blocks_json
             .into_iter()
             .map(|v| {
@@ -455,7 +219,6 @@ impl HumanMessage {
                     "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
                         .map(ContentBlock::NonStandard),
                     _ => {
-                        // Unknown type, wrap as non_standard
                         tracing::warn!(
                             block_type = %block_type,
                             json = %v,
@@ -473,12 +236,8 @@ impl HumanMessage {
                         json = %v,
                         "Failed to deserialize ContentBlock in content_blocks, wrapping as non_standard"
                     );
-                    // Wrap the malformed block as NonStandardContentBlock with error info
                     let mut error_value = std::collections::HashMap::new();
-                    error_value.insert(
-                        "original_json".to_string(),
-                        v.clone(),
-                    );
+                    error_value.insert("original_json".to_string(), v.clone());
                     error_value.insert(
                         "deserialization_error".to_string(),
                         serde_json::Value::String(e.to_string()),
@@ -491,9 +250,7 @@ impl HumanMessage {
                         block_type: "non_standard".to_string(),
                         id: None,
                         value: error_value,
-                        index: v.get("index").and_then(|i| {
-                            serde_json::from_value(i.clone()).ok()
-                        }),
+                        index: v.get("index").and_then(|i| serde_json::from_value(i.clone()).ok()),
                     })
                 })
             })
@@ -508,18 +265,18 @@ impl HumanMessage {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct HumanMessageChunk {
     /// The message content (may be partial during streaming)
-    content: MessageContent,
+    pub content: MessageContent,
     /// Optional unique identifier
-    id: Option<String>,
+    pub id: Option<String>,
     /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    pub name: Option<String>,
     /// Additional metadata
     #[serde(default)]
-    additional_kwargs: HashMap<String, serde_json::Value>,
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
     /// Response metadata
     #[serde(default)]
-    response_metadata: HashMap<String, serde_json::Value>,
+    pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
 impl Serialize for HumanMessageChunk {
@@ -531,7 +288,6 @@ impl Serialize for HumanMessageChunk {
         if self.name.is_some() {
             field_count += 1;
         }
-        // Add 1 for additional type field
         field_count += 1;
 
         let mut map = serializer.serialize_map(Some(field_count))?;
@@ -548,94 +304,46 @@ impl Serialize for HumanMessageChunk {
     }
 }
 
+#[bon]
 impl HumanMessageChunk {
-    /// Create a new human message chunk with text content.
-    pub fn new(content: impl Into<String>) -> Self {
-        Self {
-            content: MessageContent::Text(content.into()),
-            id: None,
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new human message chunk with an ID.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            content: MessageContent::Text(content.into()),
-            id: Some(id.into()),
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Set the name for this chunk (builder pattern).
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Set the additional kwargs for this chunk (builder pattern).
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
+    /// Create a new human message chunk with named parameters using the builder pattern.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use agent_chain_core::messages::HumanMessageChunk;
+    ///
+    /// // Simple chunk with just content
+    /// let chunk = HumanMessageChunk::builder()
+    ///     .content("Hello")
+    ///     .build();
+    ///
+    /// // Chunk with ID
+    /// let chunk = HumanMessageChunk::builder()
+    ///     .content("Hello")
+    ///     .maybe_id(Some("chunk-123".to_string()))
+    ///     .build();
+    /// ```
+    #[builder]
+    pub fn new(
+        content: impl Into<MessageContent>,
+        id: Option<String>,
+        name: Option<String>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+        #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
     ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
-    }
-
-    /// Set the response metadata for this chunk (builder pattern).
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
+        Self {
+            content: content.into(),
+            id,
+            name,
+            additional_kwargs,
+            response_metadata,
+        }
     }
 
     /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "HumanMessageChunk"
-    }
-
-    /// Get the text content of the chunk.
-    pub fn text(&self) -> &str {
-        self.content()
-    }
-
-    /// Get the message content as text.
-    pub fn content(&self) -> &str {
-        match &self.content {
-            MessageContent::Text(s) => s,
-            MessageContent::Parts(_) => "",
-        }
-    }
-
-    /// Get the full message content.
-    pub fn message_content(&self) -> &MessageContent {
-        &self.content
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// Get the message name.
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
-    }
-
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
     }
 
     /// Concatenate this chunk with another chunk.
@@ -661,13 +369,11 @@ impl HumanMessageChunk {
             }
         };
 
-        // Merge additional_kwargs
         let mut additional_kwargs = self.additional_kwargs.clone();
         for (k, v) in &other.additional_kwargs {
             additional_kwargs.insert(k.clone(), v.clone());
         }
 
-        // Merge response_metadata
         let mut response_metadata = self.response_metadata.clone();
         for (k, v) in &other.response_metadata {
             response_metadata.insert(k.clone(), v.clone());
@@ -705,34 +411,12 @@ impl std::ops::Add for HumanMessageChunk {
 impl std::iter::Sum for HumanMessageChunk {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.reduce(|a, b| a + b)
-            .unwrap_or_else(|| HumanMessageChunk::new(""))
+            .unwrap_or_else(|| HumanMessageChunk::builder().content("").build())
     }
 }
 
 impl From<HumanMessageChunk> for HumanMessage {
     fn from(chunk: HumanMessageChunk) -> Self {
         chunk.to_message()
-    }
-}
-
-impl super::base::BaseMessageTrait for HumanMessage {
-    fn content(&self) -> &str {
-        HumanMessage::content(self)
-    }
-
-    fn id(&self) -> Option<String> {
-        HumanMessage::id(self)
-    }
-
-    fn name(&self) -> Option<String> {
-        HumanMessage::name(self)
-    }
-
-    fn set_id(&mut self, id: String) {
-        HumanMessage::set_id(self, id)
-    }
-
-    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
-        Some(HumanMessage::additional_kwargs(self))
     }
 }

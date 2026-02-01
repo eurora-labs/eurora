@@ -14,7 +14,7 @@ use agent_chain_core::messages::block_translators::openai::{
 };
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, Annotation, AudioContentBlock, BlockIndex, ContentBlock,
-    FileContentBlock, HumanMessage, ImageContentBlock, NonStandardContentBlock,
+    FileContentBlock, HumanMessage, ImageContentBlock, MessageContent, NonStandardContentBlock,
     ReasoningContentBlock, ServerToolCall, ServerToolResult, ServerToolStatus, TextContentBlock,
     ToolCallBlock, tool_call, tool_call_chunk,
 };
@@ -171,9 +171,12 @@ fn test_convert_to_v1_from_responses() {
         ),
     ];
 
-    let mut message =
-        AIMessage::with_content_list(content.clone()).with_response_metadata(response_metadata);
-    message.tool_calls = tool_calls;
+    let content_str = serde_json::to_string(&content).unwrap_or_default();
+    let message = AIMessage::builder()
+        .content(content_str)
+        .response_metadata(response_metadata)
+        .tool_calls(tool_calls)
+        .build();
 
     // Expected v1 content blocks after translation
     let expected_content: Vec<ContentBlock> = vec![
@@ -357,66 +360,114 @@ fn test_convert_to_v1_from_responses_chunk() {
 
     // Create streaming chunks as they would come from OpenAI Responses API
     let chunks = vec![
-        AIMessageChunk::with_content_list(vec![
-            json!({"type": "reasoning", "id": "abc123", "summary": [], "index": 0}),
-        ])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![json!({
-            "type": "reasoning",
-            "id": "abc234",
-            "summary": [
-                {"type": "summary_text", "text": "foo ", "index": 0}
-            ],
-            "index": 1
-        })])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![json!({
-            "type": "reasoning",
-            "id": "abc234",
-            "summary": [
-                {"type": "summary_text", "text": "bar", "index": 0}
-            ],
-            "index": 1
-        })])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![json!({
-            "type": "reasoning",
-            "id": "abc234",
-            "summary": [
-                {"type": "summary_text", "text": "baz", "index": 1}
-            ],
-            "index": 1
-        })])
-        .with_response_metadata(response_metadata.clone()),
+        {
+            let content = serde_json::to_string(&vec![
+                json!({"type": "reasoning", "id": "abc123", "summary": [], "index": 0}),
+            ])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![json!({
+                "type": "reasoning",
+                "id": "abc234",
+                "summary": [
+                    {"type": "summary_text", "text": "foo ", "index": 0}
+                ],
+                "index": 1
+            })])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![json!({
+                "type": "reasoning",
+                "id": "abc234",
+                "summary": [
+                    {"type": "summary_text", "text": "bar", "index": 0}
+                ],
+                "index": 1
+            })])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![json!({
+                "type": "reasoning",
+                "id": "abc234",
+                "summary": [
+                    {"type": "summary_text", "text": "baz", "index": 1}
+                ],
+                "index": 1
+            })])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
     ];
 
     // Expected content_blocks for each chunk
     let expected_chunks = [
-        AIMessageChunk::with_content_list(vec![
-            json!({"type": "reasoning", "id": "abc123", "index": "lc_rs_305f30"}),
-        ])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![json!({
-            "type": "reasoning",
-            "id": "abc234",
-            "reasoning": "foo ",
-            "index": "lc_rs_315f30"
-        })])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![json!({
-            "type": "reasoning",
-            "id": "abc234",
-            "reasoning": "bar",
-            "index": "lc_rs_315f30"
-        })])
-        .with_response_metadata(response_metadata.clone()),
-        AIMessageChunk::with_content_list(vec![json!({
-            "type": "reasoning",
-            "id": "abc234",
-            "reasoning": "baz",
-            "index": "lc_rs_315f31"
-        })])
-        .with_response_metadata(response_metadata.clone()),
+        {
+            let content = serde_json::to_string(&vec![
+                json!({"type": "reasoning", "id": "abc123", "index": "lc_rs_305f30"}),
+            ])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![json!({
+                "type": "reasoning",
+                "id": "abc234",
+                "reasoning": "foo ",
+                "index": "lc_rs_315f30"
+            })])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![json!({
+                "type": "reasoning",
+                "id": "abc234",
+                "reasoning": "bar",
+                "index": "lc_rs_315f30"
+            })])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
+        {
+            let content = serde_json::to_string(&vec![json!({
+                "type": "reasoning",
+                "id": "abc234",
+                "reasoning": "baz",
+                "index": "lc_rs_315f31"
+            })])
+            .unwrap_or_default();
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        },
     ];
 
     // Verify each chunk's content_blocks
@@ -486,7 +537,7 @@ fn test_convert_to_v1_from_responses_chunk() {
 /// (image_url, input_audio, file) are correctly translated to standard v1 content blocks.
 #[test]
 fn test_convert_to_v1_from_openai_input() {
-    let content = vec![
+    let content = [
         json!({"type": "text", "text": "Hello"}),
         json!({
             "type": "image_url",
@@ -516,7 +567,14 @@ fn test_convert_to_v1_from_openai_input() {
         }),
     ];
 
-    let message = HumanMessage::with_content_list(content);
+    let message = HumanMessage::builder()
+        .content(MessageContent::Parts(
+            content
+                .iter()
+                .map(|v| serde_json::from_value(v.clone()).unwrap())
+                .collect(),
+        ))
+        .build();
 
     let expected: Vec<ContentBlock> = vec![
         // text -> text
@@ -642,11 +700,14 @@ fn test_compat_responses_v03() {
         Some("call_abc".to_string()),
     )];
 
-    let mut message = AIMessage::with_content_list(content)
-        .with_additional_kwargs(additional_kwargs)
-        .with_response_metadata(response_metadata);
-    message.tool_calls = tool_calls;
-    message.id = Some("msg_123".to_string());
+    let content_str = serde_json::to_string(&content).unwrap_or_default();
+    let message = AIMessage::builder()
+        .content(content_str)
+        .additional_kwargs(additional_kwargs)
+        .response_metadata(response_metadata)
+        .tool_calls(tool_calls)
+        .id("msg_123".to_string())
+        .build();
 
     // Expected v1 content blocks
     let expected_content: Vec<ContentBlock> = vec![
@@ -742,15 +803,17 @@ fn test_compat_responses_v03() {
     let mut response_metadata_chunk = HashMap::new();
     response_metadata_chunk.insert("model_provider".to_string(), json!("openai"));
 
-    let chunk_1 = AIMessageChunk::with_content_list(vec![])
-        .with_additional_kwargs(additional_kwargs_chunk1)
-        .with_tool_call_chunks(vec![tool_call_chunk(
+    let chunk_1 = AIMessageChunk::builder()
+        .content("[]")
+        .additional_kwargs(additional_kwargs_chunk1)
+        .tool_call_chunks(vec![tool_call_chunk(
             Some("my_tool".to_string()),
             Some("".to_string()),
             Some("call_abc".to_string()),
             Some(0),
         )])
-        .with_response_metadata(response_metadata_chunk.clone());
+        .response_metadata(response_metadata_chunk.clone())
+        .build();
 
     let expected_chunk1_content = vec![ContentBlock::ToolCallChunk(
         agent_chain_core::messages::ToolCallChunkBlock {
@@ -772,14 +835,16 @@ fn test_compat_responses_v03() {
     let mut additional_kwargs_chunk2 = HashMap::new();
     additional_kwargs_chunk2.insert("__openai_function_call_ids__".to_string(), json!({}));
 
-    let chunk_2 = AIMessageChunk::with_content_list(vec![])
-        .with_additional_kwargs(additional_kwargs_chunk2)
-        .with_tool_call_chunks(vec![tool_call_chunk(
+    let chunk_2 = AIMessageChunk::builder()
+        .content("[]")
+        .additional_kwargs(additional_kwargs_chunk2)
+        .tool_call_chunks(vec![tool_call_chunk(
             None,
             Some("{".to_string()),
             None,
             Some(0),
-        )]);
+        )])
+        .build();
 
     let expected_chunk2_content = vec![ContentBlock::ToolCallChunk(
         agent_chain_core::messages::ToolCallChunkBlock {
@@ -818,9 +883,11 @@ fn test_compat_responses_v03() {
         json!({"id": "rs_abc", "summary": [], "type": "reasoning"}),
     );
 
-    let reasoning_chunk_1 = AIMessageChunk::with_content_list(vec![])
-        .with_additional_kwargs(additional_kwargs_reasoning1)
-        .with_response_metadata(response_metadata_chunk.clone());
+    let reasoning_chunk_1 = AIMessageChunk::builder()
+        .content("[]")
+        .additional_kwargs(additional_kwargs_reasoning1)
+        .response_metadata(response_metadata_chunk.clone())
+        .build();
 
     let expected_reasoning1_content = vec![ContentBlock::Reasoning(ReasoningContentBlock {
         block_type: "reasoning".to_string(),
@@ -844,9 +911,11 @@ fn test_compat_responses_v03() {
         }),
     );
 
-    let reasoning_chunk_2 = AIMessageChunk::with_content_list(vec![])
-        .with_additional_kwargs(additional_kwargs_reasoning2)
-        .with_response_metadata(response_metadata_chunk.clone());
+    let reasoning_chunk_2 = AIMessageChunk::builder()
+        .content("[]")
+        .additional_kwargs(additional_kwargs_reasoning2)
+        .response_metadata(response_metadata_chunk.clone())
+        .build();
 
     let expected_reasoning2_content = vec![ContentBlock::Reasoning(ReasoningContentBlock {
         block_type: "reasoning".to_string(),

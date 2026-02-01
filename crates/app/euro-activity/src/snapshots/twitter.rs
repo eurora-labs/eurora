@@ -204,7 +204,7 @@ impl SnapshotFunctionality for TwitterSnapshot {
 
         content.push_str(&tweet_texts.join("\n\n"));
 
-        vec![SystemMessage::new(content).into()]
+        vec![SystemMessage::builder().content(content).build().into()]
     }
 
     fn get_updated_at(&self) -> u64 {

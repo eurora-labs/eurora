@@ -10,16 +10,23 @@ use agent_chain_core::messages::{FunctionMessage, FunctionMessageChunk};
 
 #[test]
 fn test_init_basic() {
-    let msg = FunctionMessage::new("Result: 42", "calculator");
-    assert_eq!(msg.content(), "Result: 42");
-    assert_eq!(msg.name(), "calculator");
+    let msg = FunctionMessage::builder()
+        .content("Result: 42")
+        .name("calculator")
+        .build();
+    assert_eq!(msg.content, "Result: 42");
+    assert_eq!(msg.name, "calculator");
     assert_eq!(msg.message_type(), "function");
 }
 
 #[test]
 fn test_init_with_id() {
-    let msg = FunctionMessage::with_id("func-123", "Result", "func");
-    assert_eq!(msg.id(), Some("func-123".to_string()));
+    let msg = FunctionMessage::builder()
+        .id("func-123".to_string())
+        .content("Result")
+        .name("func")
+        .build();
+    assert_eq!(msg.id, Some("func-123".to_string()));
 }
 
 #[test]
@@ -27,9 +34,13 @@ fn test_init_with_additional_kwargs() {
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert("custom".to_string(), serde_json::json!("value"));
 
-    let msg = FunctionMessage::new("Result", "func").with_additional_kwargs(additional_kwargs);
+    let msg = FunctionMessage::builder()
+        .content("Result")
+        .name("func")
+        .additional_kwargs(additional_kwargs)
+        .build();
     assert_eq!(
-        msg.additional_kwargs().get("custom").unwrap(),
+        msg.additional_kwargs.get("custom").unwrap(),
         &serde_json::json!("value")
     );
 }
@@ -39,16 +50,23 @@ fn test_init_with_response_metadata() {
     let mut response_metadata = std::collections::HashMap::new();
     response_metadata.insert("model".to_string(), serde_json::json!("gpt-4"));
 
-    let msg = FunctionMessage::new("Result", "func").with_response_metadata(response_metadata);
+    let msg = FunctionMessage::builder()
+        .content("Result")
+        .name("func")
+        .response_metadata(response_metadata)
+        .build();
     assert_eq!(
-        msg.response_metadata().get("model").unwrap(),
+        msg.response_metadata.get("model").unwrap(),
         &serde_json::json!("gpt-4")
     );
 }
 
 #[test]
 fn test_type_is_function() {
-    let msg = FunctionMessage::new("Result", "func");
+    let msg = FunctionMessage::builder()
+        .content("Result")
+        .name("func")
+        .build();
     assert_eq!(msg.message_type(), "function");
 }
 
@@ -57,8 +75,12 @@ fn test_serialization_roundtrip() {
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert("status".to_string(), serde_json::json!("success"));
 
-    let msg = FunctionMessage::with_id("func-123", "Result: 42", "calculator")
-        .with_additional_kwargs(additional_kwargs);
+    let msg = FunctionMessage::builder()
+        .id("func-123".to_string())
+        .content("Result: 42")
+        .name("calculator")
+        .additional_kwargs(additional_kwargs)
+        .build();
 
     let serialized = serde_json::to_value(&msg).unwrap();
     assert_eq!(
@@ -67,19 +89,22 @@ fn test_serialization_roundtrip() {
     );
 
     let deserialized: FunctionMessage = serde_json::from_value(serialized).unwrap();
-    assert_eq!(deserialized.content(), "Result: 42");
-    assert_eq!(deserialized.name(), "calculator");
-    assert_eq!(deserialized.id(), Some("func-123".to_string()));
+    assert_eq!(deserialized.content, "Result: 42");
+    assert_eq!(deserialized.name, "calculator");
+    assert_eq!(deserialized.id, Some("func-123".to_string()));
     assert_eq!(
-        deserialized.additional_kwargs().get("status").unwrap(),
+        deserialized.additional_kwargs.get("status").unwrap(),
         &serde_json::json!("success")
     );
 }
 
 #[test]
-fn test_text_property() {
-    let msg = FunctionMessage::new("Hello world", "func");
-    assert_eq!(msg.text(), "Hello world");
+fn test_content_property() {
+    let msg = FunctionMessage::builder()
+        .content("Hello world")
+        .name("func")
+        .build();
+    assert_eq!(msg.content, "Hello world");
 }
 
 // ============================================================================
@@ -88,33 +113,52 @@ fn test_text_property() {
 
 #[test]
 fn test_chunk_init_basic() {
-    let chunk = FunctionMessageChunk::new("Result", "func");
-    assert_eq!(chunk.content(), "Result");
-    assert_eq!(chunk.name(), "func");
+    let chunk = FunctionMessageChunk::builder()
+        .content("Result")
+        .name("func")
+        .build();
+    assert_eq!(chunk.content, "Result");
+    assert_eq!(chunk.name, "func");
     assert_eq!(chunk.message_type(), "FunctionMessageChunk");
 }
 
 #[test]
 fn test_chunk_type_is_function_message_chunk() {
-    let chunk = FunctionMessageChunk::new("Result", "func");
+    let chunk = FunctionMessageChunk::builder()
+        .content("Result")
+        .name("func")
+        .build();
     assert_eq!(chunk.message_type(), "FunctionMessageChunk");
 }
 
 #[test]
 fn test_chunk_add_same_name_chunks() {
-    let chunk1 = FunctionMessageChunk::with_id("1", "Hello", "func");
-    let chunk2 = FunctionMessageChunk::new(" world", "func");
+    let chunk1 = FunctionMessageChunk::builder()
+        .id("1".to_string())
+        .content("Hello")
+        .name("func")
+        .build();
+    let chunk2 = FunctionMessageChunk::builder()
+        .content(" world")
+        .name("func")
+        .build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content(), "Hello world");
-    assert_eq!(result.name(), "func");
-    assert_eq!(result.id(), Some("1".to_string()));
+    assert_eq!(result.content, "Hello world");
+    assert_eq!(result.name, "func");
+    assert_eq!(result.id, Some("1".to_string()));
 }
 
 #[test]
 #[should_panic(expected = "Cannot concatenate")]
 fn test_chunk_add_different_name_chunks_raises_error() {
-    let chunk1 = FunctionMessageChunk::new("Hello", "func1");
-    let chunk2 = FunctionMessageChunk::new(" world", "func2");
+    let chunk1 = FunctionMessageChunk::builder()
+        .content("Hello")
+        .name("func1")
+        .build();
+    let chunk2 = FunctionMessageChunk::builder()
+        .content(" world")
+        .name("func2")
+        .build();
     let _result = chunk1 + chunk2;
 }
 
@@ -126,16 +170,24 @@ fn test_chunk_add_with_additional_kwargs() {
     let mut kwargs2 = std::collections::HashMap::new();
     kwargs2.insert("key2".to_string(), serde_json::json!("value2"));
 
-    let chunk1 = FunctionMessageChunk::new("Hello", "func").with_additional_kwargs(kwargs1);
-    let chunk2 = FunctionMessageChunk::new(" world", "func").with_additional_kwargs(kwargs2);
+    let chunk1 = FunctionMessageChunk::builder()
+        .content("Hello")
+        .name("func")
+        .additional_kwargs(kwargs1)
+        .build();
+    let chunk2 = FunctionMessageChunk::builder()
+        .content(" world")
+        .name("func")
+        .additional_kwargs(kwargs2)
+        .build();
 
     let result = chunk1 + chunk2;
     assert_eq!(
-        result.additional_kwargs().get("key1").unwrap(),
+        result.additional_kwargs.get("key1").unwrap(),
         &serde_json::json!("value1")
     );
     assert_eq!(
-        result.additional_kwargs().get("key2").unwrap(),
+        result.additional_kwargs.get("key2").unwrap(),
         &serde_json::json!("value2")
     );
 }
@@ -148,31 +200,51 @@ fn test_chunk_add_with_response_metadata() {
     let mut meta2 = std::collections::HashMap::new();
     meta2.insert("meta2".to_string(), serde_json::json!("data2"));
 
-    let chunk1 = FunctionMessageChunk::new("Hello", "func").with_response_metadata(meta1);
-    let chunk2 = FunctionMessageChunk::new(" world", "func").with_response_metadata(meta2);
+    let chunk1 = FunctionMessageChunk::builder()
+        .content("Hello")
+        .name("func")
+        .response_metadata(meta1)
+        .build();
+    let chunk2 = FunctionMessageChunk::builder()
+        .content(" world")
+        .name("func")
+        .response_metadata(meta2)
+        .build();
 
     let result = chunk1 + chunk2;
     assert_eq!(
-        result.response_metadata().get("meta1").unwrap(),
+        result.response_metadata.get("meta1").unwrap(),
         &serde_json::json!("data1")
     );
     assert_eq!(
-        result.response_metadata().get("meta2").unwrap(),
+        result.response_metadata.get("meta2").unwrap(),
         &serde_json::json!("data2")
     );
 }
 
 #[test]
 fn test_chunk_add_preserves_id() {
-    let chunk1 = FunctionMessageChunk::with_id("original-id", "Hello", "func");
-    let chunk2 = FunctionMessageChunk::with_id("other-id", " world", "func");
+    let chunk1 = FunctionMessageChunk::builder()
+        .id("original-id".to_string())
+        .content("Hello")
+        .name("func")
+        .build();
+    let chunk2 = FunctionMessageChunk::builder()
+        .id("other-id".to_string())
+        .content(" world")
+        .name("func")
+        .build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.id(), Some("original-id".to_string()));
+    assert_eq!(result.id, Some("original-id".to_string()));
 }
 
 #[test]
 fn test_chunk_serialization_roundtrip() {
-    let chunk = FunctionMessageChunk::with_id("chunk-123", "Result", "calculator");
+    let chunk = FunctionMessageChunk::builder()
+        .id("chunk-123".to_string())
+        .content("Result")
+        .name("calculator")
+        .build();
 
     let serialized = serde_json::to_value(&chunk).unwrap();
     assert_eq!(
@@ -181,33 +253,51 @@ fn test_chunk_serialization_roundtrip() {
     );
 
     let deserialized: FunctionMessageChunk = serde_json::from_value(serialized).unwrap();
-    assert_eq!(deserialized.content(), "Result");
-    assert_eq!(deserialized.name(), "calculator");
-    assert_eq!(deserialized.id(), Some("chunk-123".to_string()));
+    assert_eq!(deserialized.content, "Result");
+    assert_eq!(deserialized.name, "calculator");
+    assert_eq!(deserialized.id, Some("chunk-123".to_string()));
 }
 
 #[test]
 fn test_chunk_multiple_additions() {
-    let chunk1 = FunctionMessageChunk::new("a", "func");
-    let chunk2 = FunctionMessageChunk::new("b", "func");
-    let chunk3 = FunctionMessageChunk::new("c", "func");
+    let chunk1 = FunctionMessageChunk::builder()
+        .content("a")
+        .name("func")
+        .build();
+    let chunk2 = FunctionMessageChunk::builder()
+        .content("b")
+        .name("func")
+        .build();
+    let chunk3 = FunctionMessageChunk::builder()
+        .content("c")
+        .name("func")
+        .build();
     let result = chunk1 + chunk2 + chunk3;
-    assert_eq!(result.content(), "abc");
-    assert_eq!(result.name(), "func");
+    assert_eq!(result.content, "abc");
+    assert_eq!(result.name, "func");
 }
 
 #[test]
 fn test_chunk_empty_content() {
-    let chunk1 = FunctionMessageChunk::new("Hello", "func");
-    let chunk2 = FunctionMessageChunk::new("", "func");
+    let chunk1 = FunctionMessageChunk::builder()
+        .content("Hello")
+        .name("func")
+        .build();
+    let chunk2 = FunctionMessageChunk::builder()
+        .content("")
+        .name("func")
+        .build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content(), "Hello");
+    assert_eq!(result.content, "Hello");
 }
 
 #[test]
-fn test_chunk_text_property() {
-    let chunk = FunctionMessageChunk::new("Hello world", "func");
-    assert_eq!(chunk.text(), "Hello world");
+fn test_chunk_content_property() {
+    let chunk = FunctionMessageChunk::builder()
+        .content("Hello world")
+        .name("func")
+        .build();
+    assert_eq!(chunk.content, "Hello world");
 }
 
 // ============================================================================
@@ -218,20 +308,29 @@ fn test_chunk_text_property() {
 fn test_function_message_vs_tool_message() {
     use agent_chain_core::messages::ToolMessage;
 
-    let func_msg = FunctionMessage::new("Result", "func");
-    let tool_msg = ToolMessage::new("Result", "call-123");
+    let func_msg = FunctionMessage::builder()
+        .content("Result")
+        .name("func")
+        .build();
+    let tool_msg = ToolMessage::builder()
+        .content("Result")
+        .tool_call_id("call-123")
+        .build();
 
     // FunctionMessage has name field
-    assert_eq!(func_msg.name(), "func");
+    assert_eq!(func_msg.name, "func");
     // ToolMessage has tool_call_id field
-    assert_eq!(tool_msg.tool_call_id(), "call-123");
+    assert_eq!(tool_msg.tool_call_id, "call-123");
 }
 
 #[test]
 fn test_function_message_still_serializable() {
-    let msg = FunctionMessage::new("test", "test_func");
+    let msg = FunctionMessage::builder()
+        .content("test")
+        .name("test_func")
+        .build();
     let serialized = serde_json::to_value(&msg).unwrap();
     let deserialized: FunctionMessage = serde_json::from_value(serialized).unwrap();
-    assert_eq!(deserialized.content(), "test");
-    assert_eq!(deserialized.name(), "test_func");
+    assert_eq!(deserialized.content, "test");
+    assert_eq!(deserialized.name, "test_func");
 }

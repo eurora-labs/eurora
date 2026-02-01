@@ -145,6 +145,17 @@ impl MessageContent {
         }
     }
 
+    /// Get the text content as a reference.
+    ///
+    /// For simple text content, returns a reference to the string.
+    /// For multipart content, returns an empty string reference.
+    pub fn as_text_ref(&self) -> &str {
+        match self {
+            MessageContent::Text(s) => s,
+            MessageContent::Parts(_) => "",
+        }
+    }
+
     /// Check if this content has any images.
     pub fn has_images(&self) -> bool {
         match self {
@@ -179,6 +190,12 @@ impl From<String> for MessageContent {
 impl From<&str> for MessageContent {
     fn from(s: &str) -> Self {
         MessageContent::Text(s.to_string())
+    }
+}
+
+impl From<&String> for MessageContent {
+    fn from(s: &String) -> Self {
+        MessageContent::Text(s.clone())
     }
 }
 

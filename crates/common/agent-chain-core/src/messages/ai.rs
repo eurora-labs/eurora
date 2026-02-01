@@ -3,6 +3,7 @@
 //! This module contains the `AIMessage` and `AIMessageChunk` types which represent
 //! messages from an AI model. Mirrors `langchain_core.messages.ai`.
 
+use bon::bon;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
@@ -199,128 +200,61 @@ impl Serialize for AIMessage {
     }
 }
 
+#[bon]
 impl AIMessage {
-    /// Create a new AI message.
-    pub fn new(content: impl Into<String>) -> Self {
+    /// Create a new AI message with named parameters using the builder pattern.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use agent_chain_core::messages::AIMessage;
+    ///
+    /// // Simple message with just content
+    /// let msg = AIMessage::builder()
+    ///     .content("Hello!")
+    ///     .build();
+    ///
+    /// // Message with ID and tool calls
+    /// let msg = AIMessage::builder()
+    ///     .content("Calling tool...")
+    ///     .maybe_id(Some("msg-123".to_string()))
+    ///     .tool_calls(vec![])
+    ///     .build();
+    /// ```
+    #[builder]
+    pub fn new(
+        content: impl Into<String>,
+        id: Option<String>,
+        name: Option<String>,
+        #[builder(default)] tool_calls: Vec<ToolCall>,
+        #[builder(default)] invalid_tool_calls: Vec<InvalidToolCall>,
+        usage_metadata: Option<UsageMetadata>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+        #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
         Self {
             content: content.into(),
-            id: None,
-            name: None,
-            tool_calls: Vec::new(),
-            invalid_tool_calls: Vec::new(),
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
+            id,
+            name,
+            tool_calls,
+            invalid_tool_calls,
+            usage_metadata,
+            additional_kwargs,
+            response_metadata,
         }
     }
 
-    /// Create a new AI message with a list of content blocks.
+    /// Create a new AIMessage with a list of content blocks.
     ///
-    /// This is used for multimodal content or provider-specific content blocks.
-    /// The content is stored as a JSON array string internally.
-    pub fn with_content_list(content: Vec<serde_json::Value>) -> Self {
-        let content_str = serde_json::to_string(&content).unwrap_or_default();
-        Self {
-            content: content_str,
-            id: None,
-            name: None,
-            tool_calls: Vec::new(),
-            invalid_tool_calls: Vec::new(),
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
+    /// This is a convenience method for creating messages with structured content.
+    pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
+        let content = serde_json::to_string(&content_list).unwrap_or_default();
+        Self::builder().content(content).build()
     }
 
     /// Set the message ID.
     pub fn set_id(&mut self, id: String) {
         self.id = Some(id);
-    }
-
-    /// Create a new AI message with an explicit ID.
-    ///
-    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            content: content.into(),
-            id: Some(id.into()),
-            name: None,
-            tool_calls: Vec::new(),
-            invalid_tool_calls: Vec::new(),
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new AI message with tool calls.
-    pub fn with_tool_calls(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
-        Self {
-            content: content.into(),
-            id: None,
-            name: None,
-            tool_calls,
-            invalid_tool_calls: Vec::new(),
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new AI message with tool calls and an explicit ID.
-    ///
-    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
-    pub fn with_id_and_tool_calls(
-        id: impl Into<String>,
-        content: impl Into<String>,
-        tool_calls: Vec<ToolCall>,
-    ) -> Self {
-        Self {
-            content: content.into(),
-            id: Some(id.into()),
-            name: None,
-            tool_calls,
-            invalid_tool_calls: Vec::new(),
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new AI message with both valid and invalid tool calls.
-    pub fn with_all_tool_calls(
-        content: impl Into<String>,
-        tool_calls: Vec<ToolCall>,
-        invalid_tool_calls: Vec<InvalidToolCall>,
-    ) -> Self {
-        Self {
-            content: content.into(),
-            id: None,
-            name: None,
-            tool_calls,
-            invalid_tool_calls,
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Set the name for this message.
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Set invalid tool calls for this message.
-    pub fn with_invalid_tool_calls(mut self, invalid_tool_calls: Vec<InvalidToolCall>) -> Self {
-        self.invalid_tool_calls = invalid_tool_calls;
-        self
-    }
-
-    /// Set usage metadata for this message.
-    pub fn with_usage_metadata(mut self, usage_metadata: UsageMetadata) -> Self {
-        self.usage_metadata = Some(usage_metadata);
-        self
     }
 
     /// Get the message content.
@@ -486,74 +420,6 @@ impl AIMessage {
             .collect()
     }
 
-    /// Get the message ID.
-    pub fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// Get the message name.
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
-    }
-
-    /// Get the tool calls.
-    pub fn tool_calls(&self) -> &[ToolCall] {
-        &self.tool_calls
-    }
-
-    /// Get the invalid tool calls.
-    pub fn invalid_tool_calls(&self) -> &[InvalidToolCall] {
-        &self.invalid_tool_calls
-    }
-
-    /// Get usage metadata if present.
-    pub fn usage_metadata(&self) -> Option<&UsageMetadata> {
-        self.usage_metadata.as_ref()
-    }
-
-    /// Add annotations to the message (e.g., citations from web search).
-    /// Annotations are stored in additional_kwargs under the "annotations" key.
-    pub fn with_annotations<T: Serialize>(mut self, annotations: Vec<T>) -> Self {
-        if let Ok(value) = serde_json::to_value(&annotations) {
-            self.additional_kwargs
-                .insert("annotations".to_string(), value);
-        }
-        self
-    }
-
-    /// Get annotations from the message if present.
-    pub fn annotations(&self) -> Option<&serde_json::Value> {
-        self.additional_kwargs.get("annotations")
-    }
-
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
-    }
-
-    /// Set response metadata.
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
-    }
-
-    /// Set additional kwargs.
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
-    }
-
     /// Get a pretty representation of the message.
     ///
     /// This corresponds to `pretty_repr` in LangChain Python.
@@ -592,15 +458,15 @@ fn format_tool_calls_repr(
     if !tool_calls.is_empty() {
         lines.push("Tool Calls:".to_string());
         for tc in tool_calls {
-            lines.push(format!("  {} ({:?})", tc.name(), tc.id()));
-            lines.push(format!(" Call ID: {:?}", tc.id()));
+            lines.push(format!("  {} ({:?})", tc.name, tc.id));
+            lines.push(format!(" Call ID: {:?}", tc.id));
             lines.push("  Args:".to_string());
-            if let serde_json::Value::Object(args) = tc.args() {
+            if let serde_json::Value::Object(args) = &tc.args {
                 for (arg, value) in args {
                     lines.push(format!("    {}: {}", arg, value));
                 }
             } else {
-                lines.push(format!("    {}", tc.args()));
+                lines.push(format!("    {}", tc.args));
             }
         }
     }
@@ -644,36 +510,36 @@ pub enum ChunkPosition {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct AIMessageChunk {
     /// The message content (may be partial during streaming)
-    content: String,
+    pub content: String,
     /// Optional unique identifier
-    id: Option<String>,
+    pub id: Option<String>,
     /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    pub name: Option<String>,
     /// Tool calls made by the AI
     #[serde(default)]
-    tool_calls: Vec<ToolCall>,
+    pub tool_calls: Vec<ToolCall>,
     /// Tool calls with parsing errors
     #[serde(default)]
-    invalid_tool_calls: Vec<InvalidToolCall>,
+    pub invalid_tool_calls: Vec<InvalidToolCall>,
     /// Tool call chunks (for streaming tool calls)
     #[serde(default)]
-    tool_call_chunks: Vec<ToolCallChunk>,
+    pub tool_call_chunks: Vec<ToolCallChunk>,
     /// If present, usage metadata for a message
     #[serde(skip_serializing_if = "Option::is_none")]
-    usage_metadata: Option<UsageMetadata>,
+    pub usage_metadata: Option<UsageMetadata>,
     /// Additional metadata
     #[serde(default)]
-    additional_kwargs: HashMap<String, serde_json::Value>,
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
     /// Response metadata
     #[serde(default)]
-    response_metadata: HashMap<String, serde_json::Value>,
+    pub response_metadata: HashMap<String, serde_json::Value>,
     /// Optional span represented by an aggregated AIMessageChunk.
     ///
     /// If a chunk with `chunk_position=Some(ChunkPosition::Last)` is aggregated into a stream,
     /// `tool_call_chunks` in message content will be parsed into `tool_calls`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    chunk_position: Option<ChunkPosition>,
+    pub chunk_position: Option<ChunkPosition>,
 }
 
 impl Serialize for AIMessageChunk {
@@ -718,145 +584,60 @@ impl Serialize for AIMessageChunk {
     }
 }
 
+#[bon]
 impl AIMessageChunk {
-    /// Create a new AI message chunk.
-    pub fn new(content: impl Into<String>) -> Self {
-        Self {
-            content: content.into(),
-            id: None,
-            name: None,
-            tool_calls: Vec::new(),
-            invalid_tool_calls: Vec::new(),
-            tool_call_chunks: Vec::new(),
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-            chunk_position: None,
-        }
-    }
-
-    /// Create a new AI message chunk with an ID.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            content: content.into(),
-            id: Some(id.into()),
-            name: None,
-            tool_calls: Vec::new(),
-            invalid_tool_calls: Vec::new(),
-            tool_call_chunks: Vec::new(),
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-            chunk_position: None,
-        }
-    }
-
-    /// Create a new AI message chunk with tool call chunks (associated function).
-    pub fn new_with_tool_call_chunks(
-        content: impl Into<String>,
-        tool_call_chunks: Vec<ToolCallChunk>,
-    ) -> Self {
-        Self {
-            content: content.into(),
-            id: None,
-            name: None,
-            tool_calls: Vec::new(),
-            invalid_tool_calls: Vec::new(),
-            tool_call_chunks,
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-            chunk_position: None,
-        }
-    }
-
-    /// Create a new AI message chunk with a list of content blocks.
+    /// Create a new AI message chunk with named parameters.
     ///
-    /// This is used for multimodal content or provider-specific content blocks.
-    /// The content is stored as a JSON array string internally.
-    pub fn with_content_list(content: Vec<serde_json::Value>) -> Self {
-        let content_str = serde_json::to_string(&content).unwrap_or_default();
+    /// # Example
+    ///
+    /// ```
+    /// use agent_chain_core::messages::AIMessageChunk;
+    ///
+    /// // Simple chunk with just content
+    /// let chunk = AIMessageChunk::builder()
+    ///     .content("Hello")
+    ///     .build();
+    ///
+    /// // Chunk with ID and tool call chunks
+    /// let chunk = AIMessageChunk::builder()
+    ///     .content("")
+    ///     .maybe_id(Some("chunk-123".to_string()))
+    ///     .tool_call_chunks(vec![])
+    ///     .build();
+    /// ```
+    #[builder]
+    pub fn new(
+        content: impl Into<String>,
+        id: Option<String>,
+        name: Option<String>,
+        #[builder(default)] tool_calls: Vec<ToolCall>,
+        #[builder(default)] invalid_tool_calls: Vec<InvalidToolCall>,
+        #[builder(default)] tool_call_chunks: Vec<ToolCallChunk>,
+        usage_metadata: Option<UsageMetadata>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+        #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
+        chunk_position: Option<ChunkPosition>,
+    ) -> Self {
         Self {
-            content: content_str,
-            id: None,
-            name: None,
-            tool_calls: Vec::new(),
-            invalid_tool_calls: Vec::new(),
-            tool_call_chunks: Vec::new(),
-            usage_metadata: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-            chunk_position: None,
+            content: content.into(),
+            id,
+            name,
+            tool_calls,
+            invalid_tool_calls,
+            tool_call_chunks,
+            usage_metadata,
+            additional_kwargs,
+            response_metadata,
+            chunk_position,
         }
     }
 
-    /// Set tool call chunks (builder pattern).
-    pub fn with_tool_call_chunks(mut self, tool_call_chunks: Vec<ToolCallChunk>) -> Self {
-        self.tool_call_chunks = tool_call_chunks;
-        self
-    }
-
-    /// Get the message content.
-    pub fn content(&self) -> &str {
-        &self.content
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// Get the message name.
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
-    }
-
-    /// Get the tool calls.
-    pub fn tool_calls(&self) -> &[ToolCall] {
-        &self.tool_calls
-    }
-
-    /// Get the invalid tool calls.
-    pub fn invalid_tool_calls(&self) -> &[InvalidToolCall] {
-        &self.invalid_tool_calls
-    }
-
-    /// Get the tool call chunks.
-    pub fn tool_call_chunks(&self) -> &[ToolCallChunk] {
-        &self.tool_call_chunks
-    }
-
-    /// Get usage metadata if present.
-    pub fn usage_metadata(&self) -> Option<&UsageMetadata> {
-        self.usage_metadata.as_ref()
-    }
-
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
-    }
-
-    /// Set response metadata (builder pattern).
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
-    }
-
-    /// Set additional kwargs (builder pattern).
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
+    /// Create a new AIMessageChunk with a list of content blocks.
+    ///
+    /// This is a convenience method for creating chunks with structured content.
+    pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
+        let content = serde_json::to_string(&content_list).unwrap_or_default();
+        Self::builder().content(content).build()
     }
 
     /// Get the raw content as a list of JSON values.
@@ -1070,12 +851,6 @@ impl AIMessageChunk {
         self.usage_metadata = usage_metadata;
     }
 
-    /// Set usage metadata (builder pattern).
-    pub fn with_usage_metadata(mut self, usage_metadata: UsageMetadata) -> Self {
-        self.usage_metadata = Some(usage_metadata);
-        self
-    }
-
     /// Set tool calls.
     pub fn set_tool_calls(&mut self, tool_calls: Vec<ToolCall>) {
         self.tool_calls = tool_calls;
@@ -1102,9 +877,9 @@ impl AIMessageChunk {
                     .tool_calls
                     .iter()
                     .map(|tc| ToolCallChunk {
-                        name: Some(tc.name().to_string()),
-                        args: Some(tc.args().to_string()),
-                        id: tc.id(),
+                        name: Some(tc.name.clone()),
+                        args: Some(tc.args.to_string()),
+                        id: tc.id.clone(),
                         index: None,
                     })
                     .collect();
@@ -1495,7 +1270,7 @@ impl std::iter::Sum for AIMessageChunk {
     fn sum<I: Iterator<Item = AIMessageChunk>>(iter: I) -> AIMessageChunk {
         let chunks: Vec<AIMessageChunk> = iter.collect();
         if chunks.is_empty() {
-            AIMessageChunk::new("")
+            AIMessageChunk::builder().content("").build()
         } else {
             let first = chunks[0].clone();
             let rest = chunks[1..].to_vec();
@@ -1687,28 +1462,6 @@ pub fn backwards_compat_tool_calls(
     (tool_calls, invalid_tool_calls, tool_call_chunks)
 }
 
-impl super::base::BaseMessageTrait for AIMessage {
-    fn content(&self) -> &str {
-        AIMessage::content(self)
-    }
-
-    fn id(&self) -> Option<String> {
-        AIMessage::id(self)
-    }
-
-    fn name(&self) -> Option<String> {
-        AIMessage::name(self)
-    }
-
-    fn set_id(&mut self, id: String) {
-        AIMessage::set_id(self, id)
-    }
-
-    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
-        Some(AIMessage::additional_kwargs(self))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1871,7 +1624,7 @@ mod tests {
             backwards_compat_tool_calls(&additional_kwargs, false);
 
         assert_eq!(tool_calls.len(), 1);
-        assert_eq!(tool_calls[0].name(), "get_weather");
+        assert_eq!(tool_calls[0].name, "get_weather");
         assert!(invalid_tool_calls.is_empty());
         assert!(tool_call_chunks.is_empty());
     }
@@ -1942,38 +1695,38 @@ mod tests {
 
     #[test]
     fn test_ai_message_chunk_add() {
-        let chunk1 = AIMessageChunk::new("Hello ");
-        let chunk2 = AIMessageChunk::new("world!");
+        let chunk1 = AIMessageChunk::builder().content("Hello ").build();
+        let chunk2 = AIMessageChunk::builder().content("world!").build();
 
         let result = chunk1 + chunk2;
 
-        assert_eq!(result.content(), "Hello world!");
+        assert_eq!(result.content, "Hello world!");
     }
 
     #[test]
     fn test_ai_message_chunk_sum() {
         let chunks = vec![
-            AIMessageChunk::new("Hello "),
-            AIMessageChunk::new("beautiful "),
-            AIMessageChunk::new("world!"),
+            AIMessageChunk::builder().content("Hello ").build(),
+            AIMessageChunk::builder().content("beautiful ").build(),
+            AIMessageChunk::builder().content("world!").build(),
         ];
 
         let result: AIMessageChunk = chunks.into_iter().sum();
 
-        assert_eq!(result.content(), "Hello beautiful world!");
+        assert_eq!(result.content, "Hello beautiful world!");
     }
 
     #[test]
     fn test_add_ai_message_chunks_with_usage() {
-        let mut chunk1 = AIMessageChunk::new("Hello ");
+        let mut chunk1 = AIMessageChunk::builder().content("Hello ").build();
         chunk1.usage_metadata = Some(UsageMetadata::new(5, 0));
 
-        let mut chunk2 = AIMessageChunk::new("world!");
+        let mut chunk2 = AIMessageChunk::builder().content("world!").build();
         chunk2.usage_metadata = Some(UsageMetadata::new(0, 10));
 
         let result = add_ai_message_chunks(chunk1, vec![chunk2]);
 
-        assert_eq!(result.content(), "Hello world!");
+        assert_eq!(result.content, "Hello world!");
         assert!(result.usage_metadata.is_some());
         let usage = result.usage_metadata.as_ref().unwrap();
         assert_eq!(usage.input_tokens, 5);
@@ -1984,24 +1737,39 @@ mod tests {
     #[test]
     fn test_add_ai_message_chunks_id_priority() {
         // Provider-assigned ID should take priority
-        let chunk1 = AIMessageChunk::with_id("lc_auto123", "");
-        let chunk2 = AIMessageChunk::with_id("provider_id_456", "");
-        let chunk3 = AIMessageChunk::with_id("lc_run-789", "");
+        let chunk1 = AIMessageChunk::builder()
+            .id("lc_auto123".to_string())
+            .content("")
+            .build();
+        let chunk2 = AIMessageChunk::builder()
+            .id("provider_id_456".to_string())
+            .content("")
+            .build();
+        let chunk3 = AIMessageChunk::builder()
+            .id("lc_run".to_string())
+            .content("")
+            .build();
 
         let result = add_ai_message_chunks(chunk1, vec![chunk2, chunk3]);
 
         // Provider ID should be selected (not lc_* or lc_run-*)
-        assert_eq!(result.id(), Some("provider_id_456".to_string()));
+        assert_eq!(result.id, Some("provider_id_456".to_string()));
     }
 
     #[test]
     fn test_add_ai_message_chunks_lc_run_priority() {
         // lc_run-* should take priority over lc_*
-        let chunk1 = AIMessageChunk::with_id("lc_auto123", "");
-        let chunk2 = AIMessageChunk::with_id("lc_run-789", "");
+        let chunk1 = AIMessageChunk::builder()
+            .id("lc_auto123".to_string())
+            .content("")
+            .build();
+        let chunk2 = AIMessageChunk::builder()
+            .id("lc_run-789".to_string())
+            .content("")
+            .build();
 
         let result = add_ai_message_chunks(chunk1, vec![chunk2]);
 
-        assert_eq!(result.id(), Some("lc_run-789".to_string()));
+        assert_eq!(result.id, Some("lc_run-789".to_string()));
     }
 }

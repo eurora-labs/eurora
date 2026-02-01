@@ -225,7 +225,7 @@ impl StructuredTool {
             }
             ToolInput::Dict(d) => Ok(d),
             ToolInput::ToolCall(tc) => {
-                let args = tc.args();
+                let args = &tc.args;
                 if let Some(obj) = args.as_object() {
                     Ok(obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 } else {

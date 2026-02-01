@@ -14,7 +14,7 @@ use serde_json::Value;
 use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
 use crate::callbacks::CallbackManagerForLLMRun;
 use crate::error::Result;
-use crate::messages::BaseMessageTrait;
+
 use crate::outputs::{Generation, GenerationChunk, GenerationType, LLMResult};
 use crate::prompt_values::PromptValue;
 

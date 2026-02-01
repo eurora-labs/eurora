@@ -9,9 +9,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::messages::{
-    AIMessage, BaseMessage, BaseMessageTrait, ChatMessage, HumanMessage, SystemMessage,
-};
+use crate::messages::{AIMessage, BaseMessage, ChatMessage, HumanMessage, SystemMessage};
 use crate::utils::input::get_colored_text;
 use crate::utils::interactive_env::is_interactive_env;
 
@@ -217,7 +215,12 @@ impl BaseMessagePromptTemplate for ChatMessagePromptTemplate {
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::Chat(ChatMessage::new(&self.role, text))])
+        Ok(vec![BaseMessage::Chat(
+            ChatMessage::builder()
+                .content(text)
+                .role(&self.role)
+                .build(),
+        )])
     }
 
     fn pretty_repr(&self, html: bool) -> String {
@@ -238,7 +241,12 @@ impl BaseStringMessagePromptTemplate for ChatMessagePromptTemplate {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::Chat(ChatMessage::new(&self.role, text)))
+        Ok(BaseMessage::Chat(
+            ChatMessage::builder()
+                .content(text)
+                .role(&self.role)
+                .build(),
+        ))
     }
 }
 
@@ -290,7 +298,9 @@ impl BaseMessagePromptTemplate for HumanMessagePromptTemplate {
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::Human(HumanMessage::new(text))])
+        Ok(vec![BaseMessage::Human(
+            HumanMessage::builder().content(text).build(),
+        )])
     }
 
     fn pretty_repr(&self, html: bool) -> String {
@@ -310,7 +320,9 @@ impl BaseStringMessagePromptTemplate for HumanMessagePromptTemplate {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::Human(HumanMessage::new(text)))
+        Ok(BaseMessage::Human(
+            HumanMessage::builder().content(text).build(),
+        ))
     }
 }
 
@@ -362,7 +374,9 @@ impl BaseMessagePromptTemplate for AIMessagePromptTemplate {
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::AI(AIMessage::new(text))])
+        Ok(vec![BaseMessage::AI(
+            AIMessage::builder().content(text).build(),
+        )])
     }
 
     fn pretty_repr(&self, html: bool) -> String {
@@ -382,7 +396,7 @@ impl BaseStringMessagePromptTemplate for AIMessagePromptTemplate {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::AI(AIMessage::new(text)))
+        Ok(BaseMessage::AI(AIMessage::builder().content(text).build()))
     }
 }
 
@@ -434,7 +448,9 @@ impl BaseMessagePromptTemplate for SystemMessagePromptTemplate {
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::System(SystemMessage::new(text))])
+        Ok(vec![BaseMessage::System(
+            SystemMessage::builder().content(text).build(),
+        )])
     }
 
     fn pretty_repr(&self, html: bool) -> String {
@@ -454,7 +470,9 @@ impl BaseStringMessagePromptTemplate for SystemMessagePromptTemplate {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::System(SystemMessage::new(text)))
+        Ok(BaseMessage::System(
+            SystemMessage::builder().content(text).build(),
+        ))
     }
 }
 

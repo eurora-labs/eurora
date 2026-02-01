@@ -21,23 +21,26 @@ pub fn convert_db_message_to_base_message(
         MessageType::Human => {
             let content = parse_message_content(&db_message.content)?;
             let message = match content {
-                MessageContent::Text(text) => HumanMessage::with_id(id, text),
-                MessageContent::Parts(parts) => HumanMessage::with_id_and_content(id, parts),
+                MessageContent::Text(text) => HumanMessage::builder().id(id).content(text).build(),
+                MessageContent::Parts(parts) => {
+                    HumanMessage::builder().id(id).content(parts).build()
+                }
             };
             Ok(BaseMessage::Human(message))
         }
         MessageType::System => {
             let content = parse_message_content(&db_message.content)?;
-            let message = match content {
-                MessageContent::Text(text) => SystemMessage::with_id(id, text),
-                MessageContent::Parts(parts) => SystemMessage::with_id_and_content(id, parts),
-            };
+            let message = SystemMessage::builder().id(id).content(content).build();
             Ok(BaseMessage::System(message))
         }
         MessageType::Ai => {
             let content = parse_ai_content(&db_message.content)?;
             let tool_calls = parse_tool_calls(&db_message.tool_calls)?;
-            let message = AIMessage::with_id_and_tool_calls(id, content, tool_calls);
+            let message = AIMessage::builder()
+                .id(id)
+                .content(content)
+                .tool_calls(tool_calls)
+                .build();
             Ok(BaseMessage::AI(message))
         }
         MessageType::Tool => {
@@ -45,7 +48,11 @@ pub fn convert_db_message_to_base_message(
             let tool_call_id = db_message.tool_call_id.ok_or_else(|| {
                 ConversationServiceError::Internal("Tool message missing tool_call_id".to_string())
             })?;
-            let message = ToolMessage::with_id(id, content, tool_call_id);
+            let message = ToolMessage::builder()
+                .id(id)
+                .content(content)
+                .tool_call_id(tool_call_id)
+                .build();
             Ok(BaseMessage::Tool(message))
         }
     }

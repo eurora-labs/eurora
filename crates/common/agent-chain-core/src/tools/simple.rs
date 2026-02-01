@@ -185,7 +185,7 @@ impl Tool {
                 }
             }
             ToolInput::ToolCall(tc) => {
-                let args = tc.args();
+                let args = &tc.args;
                 if let Some(obj) = args.as_object() {
                     let values: Vec<_> = obj.values().collect();
                     if values.len() != 1 {

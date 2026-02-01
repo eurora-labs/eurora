@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_chat_result_new() {
-        let msg = AIMessage::new("Hello");
+        let msg = AIMessage::builder().content("Hello").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let result = ChatResult::new(vec![chat_gen]);
         assert_eq!(result.generations.len(), 1);
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn test_chat_result_with_llm_output() {
-        let msg = AIMessage::new("Hello");
+        let msg = AIMessage::builder().content("Hello").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let mut output = HashMap::new();
         output.insert("model".to_string(), json!("gpt-4"));
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn test_chat_result_from_generation() {
-        let msg = AIMessage::new("Hello");
+        let msg = AIMessage::builder().content("Hello").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let result = ChatResult::from_generation(chat_gen);
         assert_eq!(result.generations.len(), 1);
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_chat_result_serialization() {
-        let msg = AIMessage::new("test");
+        let msg = AIMessage::builder().content("test").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let result = ChatResult::new(vec![chat_gen]);
         let json = serde_json::to_string(&result).unwrap();
