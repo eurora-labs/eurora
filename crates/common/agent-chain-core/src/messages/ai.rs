@@ -217,7 +217,7 @@ impl AIMessage {
     /// // Message with ID and tool calls
     /// let msg = AIMessage::builder()
     ///     .content("Calling tool...")
-    ///     .id("msg-123")
+    ///     .maybe_id(Some("msg-123".to_string()))
     ///     .tool_calls(vec![])
     ///     .build();
     /// ```
@@ -242,6 +242,61 @@ impl AIMessage {
             additional_kwargs,
             response_metadata,
         }
+    }
+
+    /// Create a new AIMessage with an ID and content using a builder-like pattern.
+    ///
+    /// This is a convenience method that wraps the builder to set both id and content at once.
+    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self::builder()
+            .content(content)
+            .maybe_id(Some(id.into()))
+            .build()
+    }
+
+    /// Create a new AIMessage with a list of content blocks.
+    ///
+    /// This is a convenience method for creating messages with structured content.
+    pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
+        let content = serde_json::to_string(&content_list).unwrap_or_default();
+        Self::builder().content(content).build()
+    }
+
+    /// Create a new AIMessage with tool calls.
+    ///
+    /// This is a convenience method for creating messages with tool calls.
+    pub fn with_tool_calls(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
+        Self::builder()
+            .content(content)
+            .tool_calls(tool_calls)
+            .build()
+    }
+
+    /// Create a new AIMessage with both tool calls and invalid tool calls.
+    ///
+    /// This is a convenience method for creating messages with all tool call data.
+    pub fn with_all_tool_calls(
+        content: impl Into<String>,
+        tool_calls: Vec<ToolCall>,
+        invalid_tool_calls: Vec<InvalidToolCall>,
+    ) -> Self {
+        Self::builder()
+            .content(content)
+            .tool_calls(tool_calls)
+            .invalid_tool_calls(invalid_tool_calls)
+            .build()
+    }
+
+    /// Set the message name using a builder pattern.
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Set the usage metadata using a builder pattern.
+    pub fn with_usage_metadata(mut self, usage_metadata: UsageMetadata) -> Self {
+        self.usage_metadata = Some(usage_metadata);
+        self
     }
 
     /// Set the message ID.
@@ -425,6 +480,11 @@ impl AIMessage {
     /// Get the invalid tool calls.
     pub fn invalid_tool_calls(&self) -> &[InvalidToolCall] {
         &self.invalid_tool_calls
+    }
+
+    /// Get usage metadata if present.
+    pub fn usage_metadata(&self) -> Option<&UsageMetadata> {
+        self.usage_metadata.as_ref()
     }
 
     /// Add annotations to the message (e.g., citations from web search).
@@ -651,7 +711,7 @@ impl AIMessageChunk {
     /// // Chunk with ID and tool call chunks
     /// let chunk = AIMessageChunk::builder()
     ///     .content("")
-    ///     .id("chunk-123")
+    ///     .maybe_id(Some("chunk-123".to_string()))
     ///     .tool_call_chunks(vec![])
     ///     .build();
     /// ```
@@ -680,6 +740,37 @@ impl AIMessageChunk {
             response_metadata,
             chunk_position,
         }
+    }
+
+    /// Create a new AIMessageChunk with an ID and content using a builder-like pattern.
+    ///
+    /// This is a convenience method that wraps the builder to set both id and content at once.
+    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self::builder()
+            .content(content)
+            .maybe_id(Some(id.into()))
+            .build()
+    }
+
+    /// Create a new AIMessageChunk with a list of content blocks.
+    ///
+    /// This is a convenience method for creating chunks with structured content.
+    pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
+        let content = serde_json::to_string(&content_list).unwrap_or_default();
+        Self::builder().content(content).build()
+    }
+
+    /// Create a new AIMessageChunk with tool call chunks.
+    ///
+    /// This is a convenience method for creating chunks with tool call chunks.
+    pub fn new_with_tool_call_chunks(
+        content: impl Into<String>,
+        tool_call_chunks: Vec<ToolCallChunk>,
+    ) -> Self {
+        Self::builder()
+            .content(content)
+            .tool_call_chunks(tool_call_chunks)
+            .build()
     }
 
     /// Get the message content.
@@ -742,6 +833,12 @@ impl AIMessageChunk {
         additional_kwargs: HashMap<String, serde_json::Value>,
     ) -> Self {
         self.additional_kwargs = additional_kwargs;
+        self
+    }
+
+    /// Set tool call chunks (builder pattern).
+    pub fn with_tool_call_chunks(mut self, tool_call_chunks: Vec<ToolCallChunk>) -> Self {
+        self.tool_call_chunks = tool_call_chunks;
         self
     }
 

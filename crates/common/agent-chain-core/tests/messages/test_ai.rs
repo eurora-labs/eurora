@@ -292,22 +292,28 @@ fn test_add_ai_message_chunks_usage() {
     let chunk1 = AIMessageChunk::builder().content("").build();
     // chunk1 has no usage_metadata
 
-    let chunk2 = AIMessageChunk::builder().content("").build().with_usage_metadata(UsageMetadata::new(2, 3));
+    let chunk2 = AIMessageChunk::builder()
+        .content("")
+        .build()
+        .with_usage_metadata(UsageMetadata::new(2, 3));
 
-    let chunk3 = AIMessageChunk::builder().content("").build().with_usage_metadata(UsageMetadata {
-        input_tokens: 2,
-        output_tokens: 3,
-        total_tokens: 5,
-        input_token_details: Some(InputTokenDetails {
-            audio: Some(1),
-            cache_creation: None,
-            cache_read: Some(1),
-        }),
-        output_token_details: Some(OutputTokenDetails {
-            audio: Some(1),
-            reasoning: Some(2),
-        }),
-    });
+    let chunk3 = AIMessageChunk::builder()
+        .content("")
+        .build()
+        .with_usage_metadata(UsageMetadata {
+            input_tokens: 2,
+            output_tokens: 3,
+            total_tokens: 5,
+            input_token_details: Some(InputTokenDetails {
+                audio: Some(1),
+                cache_creation: None,
+                cache_read: Some(1),
+            }),
+            output_token_details: Some(OutputTokenDetails {
+                audio: Some(1),
+                reasoning: Some(2),
+            }),
+        });
 
     let combined = add_ai_message_chunks(chunk1, vec![chunk2, chunk3]);
 
@@ -432,7 +438,10 @@ fn test_content_blocks_reasoning_extraction() {
         json!("Let me think about this problem..."),
     );
 
-    let message = AIMessage::builder().content("The answer is 42.").build().with_additional_kwargs(additional_kwargs);
+    let message = AIMessage::builder()
+        .content("The answer is 42.")
+        .build()
+        .with_additional_kwargs(additional_kwargs);
 
     assert_eq!(message.content(), "The answer is 42.");
     // In Python, content_blocks property extracts reasoning from additional_kwargs
@@ -456,7 +465,10 @@ fn test_content_blocks_reasoning_extraction() {
     let mut additional_kwargs2 = std::collections::HashMap::new();
     additional_kwargs2.insert("other_field".to_string(), json!("some value"));
 
-    let message2 = AIMessage::builder().content("The answer is 42.").build().with_additional_kwargs(additional_kwargs2);
+    let message2 = AIMessage::builder()
+        .content("The answer is 42.")
+        .build()
+        .with_additional_kwargs(additional_kwargs2);
 
     assert!(
         !message2
@@ -488,14 +500,20 @@ fn test_ai_message_with_id() {
 
 #[test]
 fn test_ai_message_with_name() {
-    let msg = AIMessage::builder().content("Hello!").build().with_name("Assistant");
+    let msg = AIMessage::builder()
+        .content("Hello!")
+        .build()
+        .with_name("Assistant");
     assert_eq!(msg.name(), Some("Assistant".to_string()));
 }
 
 #[test]
 fn test_ai_message_with_usage_metadata() {
     let usage = UsageMetadata::new(10, 20);
-    let msg = AIMessage::builder().content("Hello!").build().with_usage_metadata(usage);
+    let msg = AIMessage::builder()
+        .content("Hello!")
+        .build()
+        .with_usage_metadata(usage);
     assert!(msg.usage_metadata().is_some());
     assert_eq!(msg.usage_metadata().unwrap().input_tokens, 10);
 }

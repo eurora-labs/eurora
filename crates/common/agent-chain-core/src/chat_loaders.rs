@@ -119,7 +119,9 @@ mod tests {
     fn test_load() {
         let sessions = vec![
             ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::new("Hello"))]),
-            ChatSession::with_messages(vec![BaseMessage::AI(AIMessage::builder().content("Hi").build())]),
+            ChatSession::with_messages(vec![BaseMessage::AI(
+                AIMessage::builder().content("Hi").build(),
+            )]),
             ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::new("Bye"))]),
         ];
 

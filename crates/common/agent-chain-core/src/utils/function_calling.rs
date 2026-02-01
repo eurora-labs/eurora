@@ -589,7 +589,10 @@ pub fn tool_example_to_messages<T: Serialize>(
         Value::Array(openai_tool_calls.clone()),
     );
 
-    let ai_msg = AIMessage::builder().content("").build().with_additional_kwargs(additional_kwargs);
+    let ai_msg = AIMessage::builder()
+        .content("")
+        .build()
+        .with_additional_kwargs(additional_kwargs);
     messages.push(ai_msg.into());
 
     // Add tool messages

@@ -32,7 +32,8 @@ fn test_all_imports() {
     use uuid::Uuid;
 
     // ChatGeneration
-    let _: outputs::ChatGeneration = outputs::ChatGeneration::new(AIMessage::builder().content("test").build().into());
+    let _: outputs::ChatGeneration =
+        outputs::ChatGeneration::new(AIMessage::builder().content("test").build().into());
 
     // ChatGenerationChunk
     let _: outputs::ChatGenerationChunk =
@@ -100,8 +101,12 @@ fn test_merge_function_export() {
 
     // Verify the function is accessible and works
     let chunks = vec![
-        agent_chain_core::outputs::ChatGenerationChunk::new(AIMessage::builder().content("Hello ").build().into()),
-        agent_chain_core::outputs::ChatGenerationChunk::new(AIMessage::builder().content("world").build().into()),
+        agent_chain_core::outputs::ChatGenerationChunk::new(
+            AIMessage::builder().content("Hello ").build().into(),
+        ),
+        agent_chain_core::outputs::ChatGenerationChunk::new(
+            AIMessage::builder().content("world").build().into(),
+        ),
     ];
 
     let merged = merge_chat_generation_chunks(chunks);

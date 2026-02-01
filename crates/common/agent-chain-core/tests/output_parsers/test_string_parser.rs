@@ -196,7 +196,8 @@ async fn test_str_output_parser_atransform_message_chunks() {
 #[tokio::test]
 async fn test_str_output_parser_with_model_chain() {
     // Test StrOutputParser chained with a model
-    let model = GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("Model output").build()]);
+    let model =
+        GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("Model output").build()]);
     let parser = StrOutputParser::new();
 
     // Simulate chaining: model | parser
@@ -218,7 +219,9 @@ async fn test_str_output_parser_with_model_chain() {
 #[tokio::test]
 async fn test_str_output_parser_with_model_stream() {
     // Test StrOutputParser streaming with a model
-    let model = GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("Streaming output").build()]);
+    let model = GenericFakeChatModel::from_vec(vec![
+        AIMessage::builder().content("Streaming output").build(),
+    ]);
     let parser = StrOutputParser::new();
 
     // Simulate streaming: model.stream() | parser

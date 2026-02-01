@@ -70,18 +70,19 @@ mod tests {
         );
 
         let original = AIMessage::builder()
-            .id("msg_456")
+            .id("msg_456".to_string())
             .content("Let me search for that.")
             .tool_calls(vec![tool_call])
-            .with_usage_metadata(UsageMetadata::new(50, 25));
+            .usage_metadata(UsageMetadata::new(50, 25))
+            .build();
 
         let proto: ProtoAiMessage = original.clone().into();
         let roundtrip: AIMessage = proto.into();
 
         assert_eq!(roundtrip.id(), Some("msg_456".to_string()));
         assert_eq!(roundtrip.content(), "Let me search for that.");
-        assert_eq!(roundtrip.tool_calls().len(), 1);
-        assert_eq!(roundtrip.tool_calls()[0].name(), "search");
+        assert_eq!(roundtrip.tool_calls.len(), 1);
+        assert_eq!(roundtrip.tool_calls[0].name(), "search");
         assert!(roundtrip.usage_metadata().is_some());
         assert_eq!(roundtrip.usage_metadata().unwrap().input_tokens, 50);
     }

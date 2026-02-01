@@ -512,7 +512,11 @@ impl GenericFakeChatModel {
 
     /// Create from a vector of strings (converted to AIMessages).
     pub fn from_strings(messages: Vec<String>) -> Self {
-        Self::new(messages.into_iter().map(|s| AIMessage::builder().content(&s).build()))
+        Self::new(
+            messages
+                .into_iter()
+                .map(|s| AIMessage::builder().content(&s).build()),
+        )
     }
 
     /// Set the configuration.
@@ -582,7 +586,9 @@ impl BaseChatModel for GenericFakeChatModel {
     ) -> Result<ChatResult> {
         let message = {
             let mut guard = self.messages.lock().unwrap();
-            guard.next().unwrap_or_else(|| AIMessage::builder().content("").build())
+            guard
+                .next()
+                .unwrap_or_else(|| AIMessage::builder().content("").build())
         };
 
         let generation = ChatGeneration::new(message.into());
@@ -598,7 +604,9 @@ impl BaseChatModel for GenericFakeChatModel {
         // Get the message via _generate
         let message = {
             let mut guard = self.messages.lock().unwrap();
-            guard.next().unwrap_or_else(|| AIMessage::builder().content("").build())
+            guard
+                .next()
+                .unwrap_or_else(|| AIMessage::builder().content("").build())
         };
 
         let content = message.content().to_string();

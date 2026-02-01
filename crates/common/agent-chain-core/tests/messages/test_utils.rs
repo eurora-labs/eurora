@@ -36,7 +36,9 @@ fn test_merge_message_runs_str_ai() {
         BaseMessage::AI(AIMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::AI(AIMessage::builder().content("foo\nbar\nbaz").build())];
+    let expected = vec![BaseMessage::AI(
+        AIMessage::builder().content("foo\nbar\nbaz").build(),
+    )];
     let actual = merge_message_runs(&messages, "\n");
     assert_eq!(actual, expected);
     assert_eq!(messages, messages_copy);
@@ -82,7 +84,9 @@ fn test_merge_message_runs_str_with_specified_separator_ai() {
         BaseMessage::AI(AIMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::AI(AIMessage::builder().content("foo<sep>bar<sep>baz").build())];
+    let expected = vec![BaseMessage::AI(
+        AIMessage::builder().content("foo<sep>bar<sep>baz").build(),
+    )];
     let actual = merge_message_runs(&messages, "<sep>");
     assert_eq!(actual, expected);
     assert_eq!(messages, messages_copy);
@@ -130,7 +134,9 @@ fn test_merge_message_runs_str_without_separator_ai() {
         BaseMessage::AI(AIMessage::builder().content("baz").build()),
     ];
     let messages_copy = messages.clone();
-    let expected = vec![BaseMessage::AI(AIMessage::builder().content("foobarbaz").build())];
+    let expected = vec![BaseMessage::AI(
+        AIMessage::builder().content("foobarbaz").build(),
+    )];
     let actual = merge_message_runs(&messages, "");
     assert_eq!(actual, expected);
     assert_eq!(messages, messages_copy);
@@ -321,7 +327,9 @@ fn test_convert_to_messages_tuple_human() {
 #[test]
 fn test_convert_to_messages_tuple_ai() {
     let message_like = vec![serde_json::json!(["ai", "response"])];
-    let expected = vec![BaseMessage::AI(AIMessage::builder().content("response").build())];
+    let expected = vec![BaseMessage::AI(
+        AIMessage::builder().content("response").build(),
+    )];
     let actual = convert_to_messages(&message_like).unwrap();
     assert_eq!(expected, actual);
 }
@@ -620,7 +628,12 @@ fn test_count_tokens_approximately_string_content() {
 fn test_count_tokens_approximately_with_names() {
     let messages = vec![
         BaseMessage::Human(HumanMessage::new("Hello").with_name("user")),
-        BaseMessage::AI(AIMessage::builder().content("Hi there").build().with_name("assistant")),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .content("Hi there")
+                .build()
+                .with_name("assistant"),
+        ),
     ];
 
     // With names included (default)

@@ -149,7 +149,9 @@ impl Add for ChatGenerationChunk {
         let merged_text = self.text + &other.text;
 
         // Create a new AI message with the merged content
-        let merged_message = crate::messages::AIMessage::builder().content(&merged_text).build();
+        let merged_message = crate::messages::AIMessage::builder()
+            .content(&merged_text)
+            .build();
 
         ChatGenerationChunk {
             text: merged_text,
