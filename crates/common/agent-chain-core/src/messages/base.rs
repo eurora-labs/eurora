@@ -153,7 +153,7 @@ impl BaseMessage {
             BaseMessage::AI(m) => &m.content,
             BaseMessage::Tool(m) => &m.content,
             BaseMessage::Chat(m) => &m.content,
-            BaseMessage::Function(m) => m.content(),
+            BaseMessage::Function(m) => &m.content,
             BaseMessage::Remove(_) => "",
         }
     }
@@ -166,7 +166,7 @@ impl BaseMessage {
             BaseMessage::AI(m) => m.id.clone(),
             BaseMessage::Tool(m) => m.id.clone(),
             BaseMessage::Chat(m) => m.id.clone(),
-            BaseMessage::Function(m) => m.id(),
+            BaseMessage::Function(m) => m.id.clone(),
             BaseMessage::Remove(m) => Some(m.id.clone()),
         }
     }
@@ -179,7 +179,7 @@ impl BaseMessage {
             BaseMessage::AI(m) => m.name.clone(),
             BaseMessage::Tool(m) => m.name.clone(),
             BaseMessage::Chat(m) => m.name.clone(),
-            BaseMessage::Function(m) => Some(m.name().to_string()),
+            BaseMessage::Function(m) => Some(m.name.clone()),
             BaseMessage::Remove(_) => None,
         }
     }
@@ -208,7 +208,7 @@ impl BaseMessage {
             BaseMessage::AI(m) => m.content.to_string(),
             BaseMessage::Tool(m) => m.content.clone(),
             BaseMessage::Chat(m) => m.content.to_string(),
-            BaseMessage::Function(m) => m.content().to_string(),
+            BaseMessage::Function(m) => m.content.clone(),
             BaseMessage::Remove(_) => String::new(),
         }
     }
@@ -242,7 +242,7 @@ impl BaseMessage {
             BaseMessage::AI(m) => Some(&m.additional_kwargs),
             BaseMessage::Tool(m) => Some(&m.additional_kwargs),
             BaseMessage::Chat(m) => Some(&m.additional_kwargs),
-            BaseMessage::Function(m) => Some(m.additional_kwargs()),
+            BaseMessage::Function(m) => Some(&m.additional_kwargs),
             BaseMessage::Remove(_) => None,
         }
     }
@@ -252,7 +252,7 @@ impl BaseMessage {
         match self {
             BaseMessage::AI(m) => Some(&m.response_metadata),
             BaseMessage::Chat(m) => Some(&m.response_metadata),
-            BaseMessage::Function(m) => Some(m.response_metadata()),
+            BaseMessage::Function(m) => Some(&m.response_metadata),
             BaseMessage::Tool(m) => Some(&m.response_metadata),
             _ => None,
         }
@@ -294,7 +294,7 @@ impl BaseMessage {
                 println!(
                     "=============================== Function Message ==============================="
                 );
-                println!("[{}] {}", m.name(), m.content());
+                println!("[{}] {}", m.name, m.content);
                 return;
             }
             BaseMessage::Remove(m) => {
@@ -481,7 +481,7 @@ impl BaseMessageChunk {
             BaseMessageChunk::System(m) => m.content.as_text_ref(),
             BaseMessageChunk::Tool(m) => &m.content,
             BaseMessageChunk::Chat(m) => &m.content,
-            BaseMessageChunk::Function(m) => m.content(),
+            BaseMessageChunk::Function(m) => &m.content,
         }
     }
 
@@ -493,7 +493,7 @@ impl BaseMessageChunk {
             BaseMessageChunk::System(m) => m.id.clone(),
             BaseMessageChunk::Tool(m) => m.id.clone(),
             BaseMessageChunk::Chat(m) => m.id.clone(),
-            BaseMessageChunk::Function(m) => m.id(),
+            BaseMessageChunk::Function(m) => m.id.clone(),
         }
     }
 

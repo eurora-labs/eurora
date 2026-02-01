@@ -251,8 +251,8 @@ impl ChatAnthropic {
                         "role": "user",
                         "content": [{
                             "type": "tool_result",
-                            "tool_use_id": m.name(), // Use function name as tool_use_id
-                            "content": m.content()
+                            "tool_use_id": m.name, // Use function name as tool_use_id
+                            "content": m.content
                         }]
                     }));
                 }
@@ -329,13 +329,7 @@ impl ChatAnthropic {
                     text_content.push_str(&text);
                 }
                 AnthropicContent::ToolUse { id, name, input } => {
-                    tool_calls.push(
-                        ToolCall::builder()
-                            .name(name)
-                            .args(input)
-                            .id(id)
-                            .build(),
-                    );
+                    tool_calls.push(ToolCall::builder().name(name).args(input).id(id).build());
                 }
             }
         }

@@ -373,8 +373,8 @@ impl ChatOllama {
                 })),
                 BaseMessage::Function(m) => Some(serde_json::json!({
                     "role": "function",
-                    "name": m.name(),
-                    "content": m.content()
+                    "name": m.name,
+                    "content": m.content
                 })),
             })
             .collect()

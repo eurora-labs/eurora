@@ -646,8 +646,8 @@ impl ChatOpenAI {
                 })),
                 BaseMessage::Function(m) => Some(serde_json::json!({
                     "role": "function",
-                    "name": m.name(),
-                    "content": m.content()
+                    "name": m.name,
+                    "content": m.content
                 })),
             })
             .collect()
@@ -1072,8 +1072,8 @@ impl ChatOpenAI {
                 BaseMessage::Function(m) => {
                     input.push(serde_json::json!({
                         "type": "function_call_output",
-                        "name": m.name(),
-                        "output": m.content()
+                        "name": m.name,
+                        "output": m.content
                     }));
                 }
             }
