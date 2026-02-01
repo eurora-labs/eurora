@@ -323,7 +323,9 @@ mod tests {
     #[test]
     fn test_add_message() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_message(BaseMessage::Human(HumanMessage::builder().content("Hello").build()));
+        history.add_message(BaseMessage::Human(
+            HumanMessage::builder().content("Hello").build(),
+        ));
         history.add_message(BaseMessage::AI(AIMessage::builder().content("Hi").build()));
 
         let messages = history.messages();

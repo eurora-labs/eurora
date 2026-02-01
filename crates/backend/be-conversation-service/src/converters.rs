@@ -21,8 +21,10 @@ pub fn convert_db_message_to_base_message(
         MessageType::Human => {
             let content = parse_message_content(&db_message.content)?;
             let message = match content {
-                MessageContent::Text(text) => HumanMessage::with_id(id, text),
-                MessageContent::Parts(parts) => HumanMessage::with_id_and_content(id, parts),
+                MessageContent::Text(text) => HumanMessage::builder().id(id).content(text).build(),
+                MessageContent::Parts(parts) => {
+                    HumanMessage::builder().id(id).content(parts).build()
+                }
             };
             Ok(BaseMessage::Human(message))
         }

@@ -124,7 +124,12 @@ impl SnapshotFunctionality for YoutubeSnapshot {
             });
         }
 
-        vec![HumanMessage::with_content(content_parts).into()]
+        vec![
+            HumanMessage::builder()
+                .content(content_parts)
+                .build()
+                .into(),
+        ]
     }
 
     fn get_updated_at(&self) -> u64 {

@@ -286,7 +286,12 @@ impl ProtoConversationService for ConversationService {
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
-        messages.push(HumanMessage::new(req.content.clone()).into());
+        messages.push(
+            HumanMessage::builder()
+                .content(req.content.clone())
+                .build()
+                .into(),
+        );
 
         self.db
             .create_message(NewMessage {
@@ -456,7 +461,7 @@ impl ProtoConversationService for ConversationService {
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
-        messages.push(HumanMessage::new(req.content).into());
+        messages.push(HumanMessage::builder().content(req.content).build().into());
 
         messages.push(
             SystemMessage::new(

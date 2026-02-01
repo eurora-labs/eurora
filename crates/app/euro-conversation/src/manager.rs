@@ -3,7 +3,7 @@ use crate::{
     error::{Error, Result},
     types::ConversationEvent,
 };
-use agent_chain::{BaseMessage, HumanMessage, SystemMessage};
+use agent_chain::{BaseMessage, HumanMessage, MessageContent, SystemMessage};
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::conversation::{
     AddHumanMessageRequest, AddSystemMessageRequest, ChatStreamRequest, CreateConversationRequest,
@@ -199,10 +199,17 @@ impl ConversationManager {
 impl ConversationManager {
     pub async fn add_human_message(&mut self, message: &HumanMessage) -> Result<()> {
         let mut client = self.conversation_client.clone();
+        let content = match &message.content {
+            MessageContent::Text(text) => text,
+            _ => {
+                todo!("refactor this so that the proto file expects the correct custom type")
+            }
+        };
         client
             .add_human_message(AddHumanMessageRequest {
                 conversation_id: self.current_conversation.id().unwrap().to_string(),
-                content: message.content().to_string(),
+                // content: message.content,
+                content: content.to_string(),
             })
             .await?;
         Ok(())

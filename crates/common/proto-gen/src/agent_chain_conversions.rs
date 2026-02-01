@@ -524,28 +524,17 @@ impl From<HumanMessage> for ProtoHumanMessage {
 
 impl From<ProtoHumanMessage> for HumanMessage {
     fn from(proto: ProtoHumanMessage) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-
-        let mut msg = match content {
-            MessageContent::Text(text) => match proto.id {
-                Some(id) => HumanMessage::with_id(id, text),
-                None => HumanMessage::new(text),
-            },
-            MessageContent::Parts(parts) => match proto.id {
-                Some(id) => HumanMessage::with_id_and_content(id, parts),
-                None => HumanMessage::with_content(parts),
-            },
-        };
-
-        if let Some(name) = proto.name {
-            msg = msg.with_name(name);
-        }
-
-        msg.additional_kwargs = json_string_to_hashmap(&proto.additional_kwargs);
-        msg
+        HumanMessage::builder()
+            .maybe_id(proto.id)
+            .content(
+                proto
+                    .content
+                    .map(Into::into)
+                    .unwrap_or(MessageContent::Text(String::new())),
+            )
+            .maybe_name(proto.name)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .build()
     }
 }
 
@@ -556,11 +545,11 @@ impl From<ProtoHumanMessage> for HumanMessage {
 impl From<HumanMessageChunk> for ProtoHumanMessageChunk {
     fn from(chunk: HumanMessageChunk) -> Self {
         ProtoHumanMessageChunk {
-            content: Some(chunk.message_content().clone().into()),
-            id: chunk.id(),
-            name: chunk.name(),
-            additional_kwargs: hashmap_to_json_string(chunk.additional_kwargs()),
-            response_metadata: hashmap_to_json_string(chunk.response_metadata()),
+            content: Some(chunk.content.clone().into()),
+            id: chunk.id,
+            name: chunk.name,
+            additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
+            response_metadata: hashmap_to_json_string(&chunk.response_metadata),
         }
     }
 }
@@ -578,8 +567,8 @@ impl From<ProtoHumanMessageChunk> for HumanMessageChunk {
         };
 
         match proto.id {
-            Some(id) => HumanMessageChunk::with_id(id, text),
-            None => HumanMessageChunk::new(text),
+            Some(id) => HumanMessageChunk::builder().id(id).content(text).build(),
+            None => HumanMessageChunk::builder().content(text).build(),
         }
     }
 }
@@ -1012,7 +1001,7 @@ impl From<ProtoBaseMessage> for BaseMessage {
             Some(proto_base_message::Message::Chat(m)) => BaseMessage::Chat(m.into()),
             Some(proto_base_message::Message::Function(m)) => BaseMessage::Function(m.into()),
             Some(proto_base_message::Message::Remove(m)) => BaseMessage::Remove(m.into()),
-            None => BaseMessage::Human(HumanMessage::new("")),
+            None => BaseMessage::Human(HumanMessage::builder().content("").build()),
         }
     }
 }

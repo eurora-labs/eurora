@@ -558,7 +558,8 @@ pub fn tool_example_to_messages<T: Serialize>(
     tool_outputs: Option<Vec<String>>,
     ai_response: Option<String>,
 ) -> Vec<BaseMessage> {
-    let mut messages: Vec<BaseMessage> = vec![HumanMessage::builder().content(input).build().into()];
+    let mut messages: Vec<BaseMessage> =
+        vec![HumanMessage::builder().content(input).build().into()];
 
     // Build OpenAI-style tool calls
     let openai_tool_calls: Vec<Value> = tool_calls
