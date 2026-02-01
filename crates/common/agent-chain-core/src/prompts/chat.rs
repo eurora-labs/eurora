@@ -215,7 +215,12 @@ impl BaseMessagePromptTemplate for ChatMessagePromptTemplate {
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::Chat(ChatMessage::new(&self.role, text))])
+        Ok(vec![BaseMessage::Chat(
+            ChatMessage::builder()
+                .content(text)
+                .role(&self.role)
+                .build(),
+        )])
     }
 
     fn pretty_repr(&self, html: bool) -> String {
@@ -236,7 +241,12 @@ impl BaseStringMessagePromptTemplate for ChatMessagePromptTemplate {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::Chat(ChatMessage::new(&self.role, text)))
+        Ok(BaseMessage::Chat(
+            ChatMessage::builder()
+                .content(text)
+                .role(&self.role)
+                .build(),
+        ))
     }
 }
 
