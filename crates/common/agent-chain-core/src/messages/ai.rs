@@ -1687,28 +1687,6 @@ pub fn backwards_compat_tool_calls(
     (tool_calls, invalid_tool_calls, tool_call_chunks)
 }
 
-impl super::base::BaseMessageTrait for AIMessage {
-    fn content(&self) -> &str {
-        AIMessage::content(self)
-    }
-
-    fn id(&self) -> Option<String> {
-        AIMessage::id(self)
-    }
-
-    fn name(&self) -> Option<String> {
-        AIMessage::name(self)
-    }
-
-    fn set_id(&mut self, id: String) {
-        AIMessage::set_id(self, id)
-    }
-
-    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
-        Some(AIMessage::additional_kwargs(self))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

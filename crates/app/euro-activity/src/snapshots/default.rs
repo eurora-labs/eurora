@@ -60,7 +60,6 @@ impl SnapshotFunctionality for DefaultSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_chain_core::messages::BaseMessageTrait;
 
     #[test]
     fn test_default_snapshot_creation() {

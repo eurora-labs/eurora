@@ -10,9 +10,7 @@ use agent_chain_core::language_models::{
     FakeListChatModel, GenericFakeChatModel, LangSmithParams, LanguageModelConfig,
     LanguageModelInput, ModelProfile,
 };
-use agent_chain_core::messages::{
-    AIMessage, BaseMessage, BaseMessageTrait, HumanMessage, SystemMessage,
-};
+use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
 use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult};
 use async_trait::async_trait;
 use futures::StreamExt;

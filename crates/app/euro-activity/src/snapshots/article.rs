@@ -107,7 +107,6 @@ impl From<NativeArticleSnapshot> for ArticleSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_chain_core::messages::BaseMessageTrait;
 
     #[test]
     fn test_article_snapshot_creation() {

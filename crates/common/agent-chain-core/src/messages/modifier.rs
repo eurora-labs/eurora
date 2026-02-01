@@ -140,25 +140,3 @@ impl RemoveMessage {
         self
     }
 }
-
-impl super::base::BaseMessageTrait for RemoveMessage {
-    fn content(&self) -> &str {
-        RemoveMessage::content(self)
-    }
-
-    fn id(&self) -> Option<String> {
-        RemoveMessage::id(self)
-    }
-
-    fn name(&self) -> Option<String> {
-        RemoveMessage::name(self)
-    }
-
-    fn set_id(&mut self, id: String) {
-        RemoveMessage::set_id(self, id)
-    }
-
-    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
-        Some(&self.additional_kwargs)
-    }
-}

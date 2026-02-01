@@ -786,25 +786,3 @@ pub fn default_tool_chunk_parser(raw_tool_calls: &[serde_json::Value]) -> Vec<To
 
     chunks
 }
-
-impl super::base::BaseMessageTrait for ToolMessage {
-    fn content(&self) -> &str {
-        ToolMessage::content(self)
-    }
-
-    fn id(&self) -> Option<String> {
-        ToolMessage::id(self)
-    }
-
-    fn name(&self) -> Option<String> {
-        ToolMessage::name(self)
-    }
-
-    fn set_id(&mut self, id: String) {
-        ToolMessage::set_id(self, id)
-    }
-
-    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
-        Some(ToolMessage::additional_kwargs(self))
-    }
-}

@@ -2,9 +2,7 @@
 //!
 //! Converted from `langchain/libs/core/tests/unit_tests/messages/test_modifier.py`
 
-use agent_chain_core::messages::{
-    AIMessage, BaseMessage, BaseMessageTrait, HumanMessage, RemoveMessage,
-};
+use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, RemoveMessage};
 
 // ============================================================================
 // TestRemoveMessage

@@ -108,8 +108,6 @@ fn test_base_message_variants() {
 #[test]
 #[allow(unused_imports)]
 fn test_trait_imports() {
-    use agent_chain_core::messages::BaseMessageTrait;
-
     // Verify trait is accessible and provides expected methods
     let msg = agent_chain_core::messages::HumanMessage::new("test");
     let _ = msg.content();

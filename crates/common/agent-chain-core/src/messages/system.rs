@@ -491,25 +491,3 @@ impl std::ops::Add for SystemMessageChunk {
         self.concat(&other)
     }
 }
-
-impl super::base::BaseMessageTrait for SystemMessage {
-    fn content(&self) -> &str {
-        SystemMessage::content(self)
-    }
-
-    fn id(&self) -> Option<String> {
-        SystemMessage::id(self)
-    }
-
-    fn name(&self) -> Option<String> {
-        SystemMessage::name(self)
-    }
-
-    fn set_id(&mut self, id: String) {
-        SystemMessage::set_id(self, id)
-    }
-
-    fn additional_kwargs(&self) -> Option<&std::collections::HashMap<String, serde_json::Value>> {
-        Some(SystemMessage::additional_kwargs(self))
-    }
-}

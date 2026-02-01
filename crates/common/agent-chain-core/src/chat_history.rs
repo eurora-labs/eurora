@@ -257,7 +257,6 @@ impl BaseChatMessageHistory for InMemoryChatMessageHistory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messages::BaseMessageTrait;
 
     #[test]
     fn test_in_memory_chat_history_new() {
