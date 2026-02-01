@@ -362,25 +362,3 @@ impl std::ops::Add for ChatMessageChunk {
         self.concat(&other)
     }
 }
-
-impl super::base::BaseMessageTrait for ChatMessage {
-    fn content(&self) -> &str {
-        ChatMessage::content(self)
-    }
-
-    fn id(&self) -> Option<String> {
-        ChatMessage::id(self)
-    }
-
-    fn name(&self) -> Option<String> {
-        ChatMessage::name(self)
-    }
-
-    fn set_id(&mut self, id: String) {
-        ChatMessage::set_id(self, id)
-    }
-
-    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
-        Some(ChatMessage::additional_kwargs(self))
-    }
-}

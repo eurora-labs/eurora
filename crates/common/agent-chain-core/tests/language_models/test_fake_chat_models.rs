@@ -11,7 +11,7 @@ mod test_fake_messages_list_chat_model {
 
     use agent_chain_core::FakeMessagesListChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{AIMessage, BaseMessage, BaseMessageTrait, HumanMessage};
+    use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
 
     #[test]
     fn test_initialization() {
@@ -174,7 +174,7 @@ mod test_fake_list_chat_model {
 
     use agent_chain_core::FakeListChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{BaseMessage, BaseMessageTrait};
+    use agent_chain_core::messages::BaseMessage;
     use futures::StreamExt;
 
     #[test]
@@ -408,7 +408,6 @@ mod test_fake_chat_model {
 
     use agent_chain_core::FakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::BaseMessageTrait;
 
     #[test]
     fn test_initialization() {
@@ -488,7 +487,7 @@ mod test_generic_fake_chat_model {
 
     use agent_chain_core::GenericFakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{AIMessage, BaseMessageTrait};
+    use agent_chain_core::messages::AIMessage;
     use futures::StreamExt;
 
     #[test]
@@ -662,7 +661,7 @@ mod test_parrot_fake_chat_model {
 
     use agent_chain_core::ParrotFakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{BaseMessage, BaseMessageTrait, HumanMessage, SystemMessage};
+    use agent_chain_core::messages::{BaseMessage, HumanMessage, SystemMessage};
 
     #[test]
     fn test_initialization() {

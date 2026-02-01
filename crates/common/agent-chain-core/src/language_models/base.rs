@@ -15,7 +15,7 @@ use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
 use crate::globals::get_verbose;
-use crate::messages::{AIMessage, BaseMessage, BaseMessageTrait};
+use crate::messages::{AIMessage, BaseMessage};
 use crate::outputs::LLMResult;
 
 /// Parameters for LangSmith tracing.

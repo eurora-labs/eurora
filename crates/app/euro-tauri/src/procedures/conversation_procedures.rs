@@ -1,5 +1,5 @@
 use crate::shared_types::SharedConversationManager;
-use agent_chain_core::{BaseMessage, BaseMessageTrait};
+use agent_chain_core::BaseMessage;
 use euro_conversation::{Conversation, ListConversationsRequest};
 use tauri::{Manager, Runtime};
 

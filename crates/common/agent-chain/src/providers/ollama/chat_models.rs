@@ -39,7 +39,7 @@ use crate::chat_models::{
 };
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
-use crate::messages::{AIMessage, BaseMessage, BaseMessageTrait, ToolCall};
+use crate::messages::{AIMessage, BaseMessage, ToolCall};
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
 use crate::tools::{BaseTool, ToolDefinition};
 
@@ -960,7 +960,7 @@ impl MessageWithAny for BaseMessage {
     }
 
     fn content(&self) -> &str {
-        BaseMessageTrait::content(self)
+        BaseMessage::content(self)
     }
 }
 

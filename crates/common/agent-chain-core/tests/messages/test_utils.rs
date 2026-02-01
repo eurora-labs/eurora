@@ -3,10 +3,10 @@
 //! Converted from `langchain/libs/core/tests/unit_tests/messages/test_utils.py`
 
 use agent_chain_core::messages::{
-    AIMessage, BaseMessage, BaseMessageTrait, CountTokensConfig, HumanMessage, SystemMessage,
-    TextFormat, ToolMessage, TrimMessagesConfig, TrimStrategy, convert_to_messages,
-    convert_to_openai_messages, count_tokens_approximately, filter_messages, get_buffer_string,
-    merge_message_runs, trim_messages,
+    AIMessage, BaseMessage, CountTokensConfig, HumanMessage, SystemMessage, TextFormat,
+    ToolMessage, TrimMessagesConfig, TrimStrategy, convert_to_messages, convert_to_openai_messages,
+    count_tokens_approximately, filter_messages, get_buffer_string, merge_message_runs,
+    trim_messages,
 };
 
 // ============================================================================
