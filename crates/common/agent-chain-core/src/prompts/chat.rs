@@ -438,7 +438,9 @@ impl BaseMessagePromptTemplate for SystemMessagePromptTemplate {
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::System(SystemMessage::new(text))])
+        Ok(vec![BaseMessage::System(
+            SystemMessage::builder().content(text).build(),
+        )])
     }
 
     fn pretty_repr(&self, html: bool) -> String {
@@ -458,7 +460,9 @@ impl BaseStringMessagePromptTemplate for SystemMessagePromptTemplate {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::System(SystemMessage::new(text)))
+        Ok(BaseMessage::System(
+            SystemMessage::builder().content(text).build(),
+        ))
     }
 }
 
