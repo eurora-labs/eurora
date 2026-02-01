@@ -13,7 +13,7 @@
 //! use agent_chain_core::messages::{HumanMessage, ContentPart, ImageSource};
 //!
 //! // Simple text message
-//! let msg = HumanMessage::new("Hello!");
+//! let msg = HumanMessage::builder().content("Hello!").build();
 //!
 //! // Message with image from URL
 //! let msg = HumanMessage::with_content(vec![
@@ -60,7 +60,7 @@ pub use ai::{
 
 // Re-export from base
 pub use base::{
-    BaseMessage, BaseMessageChunk, BaseMessageTrait, HasId, MergeableContent,
+    BaseMessage, BaseMessageChunk, HasId, MergeableContent,
     extract_reasoning_from_additional_kwargs, get_bolded_text, get_msg_title_repr,
     is_interactive_env, merge_content, merge_content_complex, merge_content_vec,
     message_to_dict as base_message_to_dict, messages_to_dict as base_messages_to_dict,

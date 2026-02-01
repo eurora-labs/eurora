@@ -39,7 +39,7 @@ use crate::chat_models::{
 };
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
-use crate::messages::{AIMessage, BaseMessage, BaseMessageTrait, ToolCall};
+use crate::messages::{AIMessage, BaseMessage, ToolCall};
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
 use crate::tools::{BaseTool, ToolDefinition};
 
@@ -60,7 +60,7 @@ const DEFAULT_API_BASE: &str = "http://localhost:11434";
 ///     .temperature(0.7)
 ///     .num_ctx(4096);
 ///
-/// let messages = vec![HumanMessage::new("Hello!").into()];
+/// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
 /// let response = model.generate(messages, None).await?;
 /// ```
 #[derive(Debug, Clone)]
@@ -323,11 +323,11 @@ impl ChatOllama {
             .filter_map(|msg| match msg {
                 BaseMessage::System(m) => Some(serde_json::json!({
                     "role": "system",
-                    "content": m.content()
+                    "content": m.content.as_text()
                 })),
                 BaseMessage::Human(m) => Some(serde_json::json!({
                     "role": "user",
-                    "content": m.content()
+                    "content": m.content.as_text()
                 })),
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
@@ -338,17 +338,17 @@ impl ChatOllama {
                         message["content"] = serde_json::json!(m.content());
                     }
 
-                    if !m.tool_calls().is_empty() {
+                    if !m.tool_calls.is_empty() {
                         let tool_calls: Vec<serde_json::Value> = m
-                            .tool_calls()
+                            .tool_calls
                             .iter()
                             .map(|tc| {
                                 serde_json::json!({
                                     "type": "function",
-                                    "id": tc.id(),
+                                    "id": tc.id,
                                     "function": {
-                                        "name": tc.name(),
-                                        "arguments": tc.args()
+                                        "name": tc.name,
+                                        "arguments": tc.args
                                     }
                                 })
                             })
@@ -360,21 +360,21 @@ impl ChatOllama {
                 }
                 BaseMessage::Tool(m) => Some(serde_json::json!({
                     "role": "tool",
-                    "tool_call_id": m.tool_call_id(),
-                    "content": m.content()
+                    "tool_call_id": m.tool_call_id,
+                    "content": m.content
                 })),
                 BaseMessage::Remove(_) => {
                     // RemoveMessage is used for message management, not sent to API
                     None
                 }
                 BaseMessage::Chat(m) => Some(serde_json::json!({
-                    "role": m.role(),
-                    "content": m.content()
+                    "role": m.role,
+                    "content": m.content
                 })),
                 BaseMessage::Function(m) => Some(serde_json::json!({
                     "role": "function",
-                    "name": m.name(),
-                    "content": m.content()
+                    "name": m.name,
+                    "content": m.content
                 })),
             })
             .collect()
@@ -514,29 +514,27 @@ impl ChatOllama {
                             } else {
                                 serde_json::json!({})
                             };
-                            ToolCall::new(&f.name, args)
+                            ToolCall::builder().name(&f.name).args(args).build()
                         })
                     })
                     .collect()
             })
             .unwrap_or_default();
 
-        let ai_message = if tool_calls.is_empty() {
-            AIMessage::new(content)
-        } else {
-            AIMessage::with_tool_calls(content, tool_calls)
-        };
+        let ai_message = AIMessage::builder().content(content).tool_calls(tool_calls);
 
         // Add usage metadata if available
         if let (Some(prompt_eval_count), Some(eval_count)) =
             (response.prompt_eval_count, response.eval_count)
         {
-            ai_message.with_usage_metadata(UsageMetadata::new(
-                prompt_eval_count as i64,
-                eval_count as i64,
-            ))
-        } else {
             ai_message
+                .usage_metadata(UsageMetadata::new(
+                    prompt_eval_count as i64,
+                    eval_count as i64,
+                ))
+                .build()
+        } else {
+            ai_message.build()
         }
     }
 }
@@ -621,7 +619,7 @@ impl BaseChatModel for ChatOllama {
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(chat_chunk) => {
-                        let message = AIMessage::new(&chat_chunk.content);
+                        let message = AIMessage::builder().content(&chat_chunk.content).build();
                         let generation_chunk = ChatGenerationChunk::new(message.into());
                         yield Ok(generation_chunk);
                     }
@@ -894,7 +892,12 @@ impl BoundChatOllama {
     /// For better performance in async contexts, use `invoke_async` instead.
     pub fn invoke(&self, prompt: impl Into<String>) -> Box<dyn MessageWithAny> {
         let prompt = prompt.into();
-        let messages = vec![crate::messages::HumanMessage::new(prompt).into()];
+        let messages = vec![
+            crate::messages::HumanMessage::builder()
+                .content(prompt)
+                .build()
+                .into(),
+        ];
 
         // Try to use existing runtime, or create a new one
         match tokio::runtime::Handle::try_current() {
@@ -927,7 +930,11 @@ impl BoundChatOllama {
             .await
         {
             Ok(ai_message) => Box::new(ai_message),
-            Err(e) => Box::new(AIMessage::new(format!("Error: {}", e))),
+            Err(e) => Box::new(
+                AIMessage::builder()
+                    .content(format!("Error: {}", e))
+                    .build(),
+            ),
         }
     }
 }
@@ -960,7 +967,7 @@ impl MessageWithAny for BaseMessage {
     }
 
     fn content(&self) -> &str {
-        BaseMessageTrait::content(self)
+        BaseMessage::content(self)
     }
 }
 

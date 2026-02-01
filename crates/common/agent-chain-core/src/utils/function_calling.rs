@@ -558,7 +558,8 @@ pub fn tool_example_to_messages<T: Serialize>(
     tool_outputs: Option<Vec<String>>,
     ai_response: Option<String>,
 ) -> Vec<BaseMessage> {
-    let mut messages: Vec<BaseMessage> = vec![HumanMessage::new(input).into()];
+    let mut messages: Vec<BaseMessage> =
+        vec![HumanMessage::builder().content(input).build().into()];
 
     // Build OpenAI-style tool calls
     let openai_tool_calls: Vec<Value> = tool_calls
@@ -589,7 +590,10 @@ pub fn tool_example_to_messages<T: Serialize>(
         Value::Array(openai_tool_calls.clone()),
     );
 
-    let ai_msg = AIMessage::new("").with_additional_kwargs(additional_kwargs);
+    let ai_msg = AIMessage::builder()
+        .content("")
+        .additional_kwargs(additional_kwargs)
+        .build();
     messages.push(ai_msg.into());
 
     // Add tool messages
@@ -602,12 +606,18 @@ pub fn tool_example_to_messages<T: Serialize>(
             .get("id")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        messages.push(ToolMessage::new(output.clone(), tool_call_id).into());
+        messages.push(
+            ToolMessage::builder()
+                .content(output.clone())
+                .tool_call_id(tool_call_id)
+                .build()
+                .into(),
+        );
     }
 
     // Add final AI response if provided
     if let Some(response) = ai_response {
-        messages.push(AIMessage::new(response).into());
+        messages.push(AIMessage::builder().content(response).build().into());
     }
 
     messages

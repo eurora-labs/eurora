@@ -45,7 +45,7 @@ const DEFAULT_MAX_TOKENS: u32 = 4096;
 ///     .temperature(0.7)
 ///     .max_tokens(1024);
 ///
-/// let messages = vec![HumanMessage::new("Hello!").into()];
+/// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
 /// let response = model.generate(messages, None).await?;
 /// ```
 #[derive(Debug, Clone)]
@@ -191,12 +191,12 @@ impl ChatAnthropic {
         for msg in messages {
             match msg {
                 BaseMessage::System(m) => {
-                    system_message = Some(m.content().to_string());
+                    system_message = Some(m.content.as_text().to_string());
                 }
                 BaseMessage::Human(m) => {
                     conversation.push(serde_json::json!({
                         "role": "user",
-                        "content": m.content()
+                        "content": m.content.as_text()
                     }));
                 }
                 BaseMessage::AI(m) => {
@@ -209,12 +209,12 @@ impl ChatAnthropic {
                         }));
                     }
 
-                    for tool_call in m.tool_calls() {
+                    for tool_call in &m.tool_calls {
                         content.push(serde_json::json!({
                             "type": "tool_use",
-                            "id": tool_call.id(),
-                            "name": tool_call.name(),
-                            "input": tool_call.args()
+                            "id": tool_call.id,
+                            "name": tool_call.name,
+                            "input": tool_call.args
                         }));
                     }
 
@@ -228,21 +228,21 @@ impl ChatAnthropic {
                         "role": "user",
                         "content": [{
                             "type": "tool_result",
-                            "tool_use_id": m.tool_call_id(),
-                            "content": m.content()
+                            "tool_use_id": m.tool_call_id,
+                            "content": m.content
                         }]
                     }));
                 }
                 BaseMessage::Chat(m) => {
                     // Map chat messages based on role
-                    let role = match m.role() {
+                    let role = match m.role.as_str() {
                         "user" | "human" => "user",
                         "assistant" | "ai" => "assistant",
                         _ => "user", // Default to user for unknown roles
                     };
                     conversation.push(serde_json::json!({
                         "role": role,
-                        "content": m.content()
+                        "content": m.content
                     }));
                 }
                 BaseMessage::Function(m) => {
@@ -251,8 +251,8 @@ impl ChatAnthropic {
                         "role": "user",
                         "content": [{
                             "type": "tool_result",
-                            "tool_use_id": m.name(), // Use function name as tool_use_id
-                            "content": m.content()
+                            "tool_use_id": m.name, // Use function name as tool_use_id
+                            "content": m.content
                         }]
                     }));
                 }
@@ -329,18 +329,17 @@ impl ChatAnthropic {
                     text_content.push_str(&text);
                 }
                 AnthropicContent::ToolUse { id, name, input } => {
-                    tool_calls.push(ToolCall::with_id(id, name, input));
+                    tool_calls.push(ToolCall::builder().name(name).args(input).id(id).build());
                 }
             }
         }
 
-        let message: BaseMessage = if tool_calls.is_empty() {
-            AIMessage::new(text_content).into()
-        } else {
-            AIMessage::with_tool_calls(text_content, tool_calls).into()
-        };
+        let message = AIMessage::builder()
+            .content(text_content)
+            .tool_calls(tool_calls)
+            .build();
 
-        let generation = ChatGeneration::new(message);
+        let generation = ChatGeneration::new(message.into());
         ChatResult::new(vec![generation])
     }
 

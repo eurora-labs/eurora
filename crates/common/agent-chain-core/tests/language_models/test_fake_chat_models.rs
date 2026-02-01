@@ -11,7 +11,7 @@ mod test_fake_messages_list_chat_model {
 
     use agent_chain_core::FakeMessagesListChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{AIMessage, BaseMessage, BaseMessageTrait, HumanMessage};
+    use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
 
     #[test]
     fn test_initialization() {
@@ -19,8 +19,8 @@ mod test_fake_messages_list_chat_model {
         // Python equivalent: test_initialization()
 
         let responses = vec![
-            BaseMessage::AI(AIMessage::new("response1")),
-            BaseMessage::AI(AIMessage::new("response2")),
+            BaseMessage::AI(AIMessage::builder().content("response1").build()),
+            BaseMessage::AI(AIMessage::builder().content("response2").build()),
         ];
         let model = FakeMessagesListChatModel::new(responses);
         assert_eq!(model.current_index(), 0);
@@ -32,8 +32,10 @@ mod test_fake_messages_list_chat_model {
         // Test FakeMessagesListChatModel with sleep parameter
         // Python equivalent: test_initialization_with_sleep()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::new("test"))])
-            .with_sleep(Duration::from_millis(100));
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("test").build(),
+        )])
+        .with_sleep(Duration::from_millis(100));
         // Sleep is set (tested by timing in test_invoke_with_sleep)
         assert_eq!(model.current_index(), 0);
     }
@@ -43,7 +45,9 @@ mod test_fake_messages_list_chat_model {
         // Test _llm_type property
         // Python equivalent: test_llm_type()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::new("test"))]);
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("test").build(),
+        )]);
         assert_eq!(model.llm_type(), "fake-messages-list-chat-model");
     }
 
@@ -52,7 +56,7 @@ mod test_fake_messages_list_chat_model {
         // Test invoke returns the message from responses
         // Python equivalent: test_invoke_returns_message()
 
-        let response = BaseMessage::AI(AIMessage::new("hello"));
+        let response = BaseMessage::AI(AIMessage::builder().content("hello").build());
         let model = FakeMessagesListChatModel::new(vec![response]);
         let result = model._generate(vec![], None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "hello");
@@ -64,9 +68,9 @@ mod test_fake_messages_list_chat_model {
         // Python equivalent: test_invoke_cycles_through_responses()
 
         let responses = vec![
-            BaseMessage::AI(AIMessage::new("first")),
-            BaseMessage::AI(AIMessage::new("second")),
-            BaseMessage::AI(AIMessage::new("third")),
+            BaseMessage::AI(AIMessage::builder().content("first").build()),
+            BaseMessage::AI(AIMessage::builder().content("second").build()),
+            BaseMessage::AI(AIMessage::builder().content("third").build()),
         ];
         let model = FakeMessagesListChatModel::new(responses);
 
@@ -89,7 +93,9 @@ mod test_fake_messages_list_chat_model {
         // Test invoke with single response stays at same
         // Python equivalent: test_invoke_with_single_response()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::new("only"))]);
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("only").build(),
+        )]);
 
         let result = model._generate(vec![], None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "only");
@@ -105,8 +111,10 @@ mod test_fake_messages_list_chat_model {
         // Test invoke with sleep parameter
         // Python equivalent: test_invoke_with_sleep()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::new("test"))])
-            .with_sleep(Duration::from_millis(50));
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("test").build(),
+        )])
+        .with_sleep(Duration::from_millis(50));
 
         let start = Instant::now();
         let _ = model._generate(vec![], None, None).await.unwrap();
@@ -124,10 +132,14 @@ mod test_fake_messages_list_chat_model {
         // Test _generate returns ChatResult
         // Python equivalent: test_generate_returns_chat_result()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::new("test"))]);
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("test").build(),
+        )]);
         let result = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("hi"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("hi").build(),
+                )],
                 None,
                 None,
             )
@@ -174,7 +186,7 @@ mod test_fake_list_chat_model {
 
     use agent_chain_core::FakeListChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{BaseMessage, BaseMessageTrait};
+    use agent_chain_core::messages::BaseMessage;
     use futures::StreamExt;
 
     #[test]
@@ -408,7 +420,6 @@ mod test_fake_chat_model {
 
     use agent_chain_core::FakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::BaseMessageTrait;
 
     #[test]
     fn test_initialization() {
@@ -439,7 +450,9 @@ mod test_fake_chat_model {
         let model = FakeChatModel::new();
         let result1 = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("hello"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("hello").build(),
+                )],
                 None,
                 None,
             )
@@ -447,7 +460,9 @@ mod test_fake_chat_model {
             .unwrap();
         let result2 = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("goodbye"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("goodbye").build(),
+                )],
                 None,
                 None,
             )
@@ -488,7 +503,7 @@ mod test_generic_fake_chat_model {
 
     use agent_chain_core::GenericFakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{AIMessage, BaseMessageTrait};
+    use agent_chain_core::messages::AIMessage;
     use futures::StreamExt;
 
     #[test]
@@ -496,7 +511,7 @@ mod test_generic_fake_chat_model {
         // Test GenericFakeChatModel initialization
         // Python equivalent: test_initialization()
 
-        let messages = vec![AIMessage::new("test")];
+        let messages = vec![AIMessage::builder().content("test").build()];
         let model = GenericFakeChatModel::from_vec(messages);
         assert_eq!(model.llm_type(), "generic-fake-chat-model");
     }
@@ -506,7 +521,7 @@ mod test_generic_fake_chat_model {
         // Test invoke returns message from iterator
         // Python equivalent: test_invoke_returns_message_from_iterator()
 
-        let messages = vec![AIMessage::new("hello")];
+        let messages = vec![AIMessage::builder().content("hello").build()];
         let model = GenericFakeChatModel::from_vec(messages);
         let result = model._generate(vec![], None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "hello");
@@ -533,7 +548,7 @@ mod test_generic_fake_chat_model {
         // Python equivalent: test_invoke_exhausts_iterator()
         // Note: In Rust, when iterator is exhausted, it returns empty AIMessage
 
-        let messages = vec![AIMessage::new("only")];
+        let messages = vec![AIMessage::builder().content("only").build()];
         let model = GenericFakeChatModel::from_vec(messages);
 
         let result1 = model._generate(vec![], None, None).await.unwrap();
@@ -549,7 +564,7 @@ mod test_generic_fake_chat_model {
         // Test stream splits content on whitespace
         // Python equivalent: test_stream_splits_on_whitespace()
 
-        let messages = vec![AIMessage::new("hello world")];
+        let messages = vec![AIMessage::builder().content("hello world").build()];
         let model = GenericFakeChatModel::from_vec(messages);
         let mut stream = model._stream(vec![], None, None).unwrap();
 
@@ -587,7 +602,10 @@ mod test_generic_fake_chat_model {
             Value::Object(function_call.into_iter().collect()),
         );
 
-        let ai_msg = AIMessage::new("").with_additional_kwargs(additional_kwargs);
+        let ai_msg = AIMessage::builder()
+            .content("")
+            .additional_kwargs(additional_kwargs)
+            .build();
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
         let mut stream = model._stream(vec![], None, None).unwrap();
@@ -617,7 +635,10 @@ mod test_generic_fake_chat_model {
             Value::String("custom_value".to_string()),
         );
 
-        let ai_msg = AIMessage::new("").with_additional_kwargs(additional_kwargs);
+        let ai_msg = AIMessage::builder()
+            .content("")
+            .additional_kwargs(additional_kwargs)
+            .build();
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
         let mut stream = model._stream(vec![], None, None).unwrap();
@@ -639,7 +660,7 @@ mod test_generic_fake_chat_model {
         // Python equivalent: test_stream_empty_content_raises_error()
         // Note: In Rust implementation, empty content with no kwargs yields no chunks
 
-        let ai_msg = AIMessage::new("");
+        let ai_msg = AIMessage::builder().content("").build();
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
         let mut stream = model._stream(vec![], None, None).unwrap();
 
@@ -662,7 +683,7 @@ mod test_parrot_fake_chat_model {
 
     use agent_chain_core::ParrotFakeChatModel;
     use agent_chain_core::language_models::{BaseChatModel, BaseLanguageModel};
-    use agent_chain_core::messages::{BaseMessage, BaseMessageTrait, HumanMessage, SystemMessage};
+    use agent_chain_core::messages::{BaseMessage, HumanMessage, SystemMessage};
 
     #[test]
     fn test_initialization() {
@@ -680,8 +701,8 @@ mod test_parrot_fake_chat_model {
 
         let model = ParrotFakeChatModel::new();
         let messages = vec![
-            BaseMessage::System(SystemMessage::new("You are helpful")),
-            BaseMessage::Human(HumanMessage::new("Hello!")),
+            BaseMessage::System(SystemMessage::builder().content("You are helpful").build()),
+            BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
         ];
         let result = model._generate(messages, None, None).await.unwrap();
         // Should return the last message (HumanMessage)
@@ -696,7 +717,9 @@ mod test_parrot_fake_chat_model {
         let model = ParrotFakeChatModel::new();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("Single"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("Single").build(),
+                )],
                 None,
                 None,
             )
@@ -726,7 +749,9 @@ mod test_parrot_fake_chat_model {
         // Python equivalent: test_invoke_preserves_message_type()
 
         let model = ParrotFakeChatModel::new();
-        let messages = vec![BaseMessage::Human(HumanMessage::new("test"))];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder().content("test").build(),
+        )];
         let result = model._generate(messages, None, None).await.unwrap();
         // The generation should contain the original message
         assert_eq!(result.generations[0].message.content(), "test");
@@ -739,8 +764,8 @@ mod test_parrot_fake_chat_model {
 
         let model = ParrotFakeChatModel::new();
         let messages = vec![
-            BaseMessage::Human(HumanMessage::new("First")),
-            BaseMessage::Human(HumanMessage::new("Last")),
+            BaseMessage::Human(HumanMessage::builder().content("First").build()),
+            BaseMessage::Human(HumanMessage::builder().content("Last").build()),
         ];
         let result = model._generate(messages, None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "Last");
@@ -754,7 +779,9 @@ mod test_parrot_fake_chat_model {
         let model = ParrotFakeChatModel::new();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("test"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("test").build(),
+                )],
                 None,
                 None,
             )
@@ -773,7 +800,9 @@ mod test_parrot_fake_chat_model {
 
         let result1 = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("batch1"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("batch1").build(),
+                )],
                 None,
                 None,
             )
@@ -781,7 +810,9 @@ mod test_parrot_fake_chat_model {
             .unwrap();
         let result2 = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("batch2"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("batch2").build(),
+                )],
                 None,
                 None,
             )
@@ -797,20 +828,22 @@ mod test_parrot_fake_chat_model {
         // Test with complex content blocks
         // Python equivalent: test_with_complex_content()
 
-        use agent_chain_core::messages::{ContentPart, ImageSource};
+        use agent_chain_core::messages::{ContentPart, ImageSource, MessageContent};
 
         let model = ParrotFakeChatModel::new();
-        let message = HumanMessage::with_content(vec![
-            ContentPart::Text {
-                text: "Hello".to_string(),
-            },
-            ContentPart::Image {
-                source: ImageSource::Url {
-                    url: "https://example.com/img.png".to_string(),
+        let message = HumanMessage::builder()
+            .content(MessageContent::Parts(vec![
+                ContentPart::Text {
+                    text: "Hello".to_string(),
                 },
-                detail: None,
-            },
-        ]);
+                ContentPart::Image {
+                    source: ImageSource::Url {
+                        url: "https://example.com/img.png".to_string(),
+                    },
+                    detail: None,
+                },
+            ]))
+            .build();
 
         let result = model
             ._generate(vec![BaseMessage::Human(message.clone())], None, None)

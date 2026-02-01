@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_llm_result_with_chat_generation() {
-        let msg = AIMessage::new("Hello");
+        let msg = AIMessage::builder().content("Hello").build();
         let chat_gen = ChatGeneration::new(msg.into());
         let result = LLMResult::new(vec![vec![chat_gen.into()]]);
         assert_eq!(result.generations.len(), 1);

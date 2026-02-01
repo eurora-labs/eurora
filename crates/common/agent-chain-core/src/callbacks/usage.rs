@@ -93,7 +93,7 @@ impl LLMManagerMixin for UsageMetadataCallbackHandler {
             Some(generation) => {
                 // Try to get usage from the AIMessage
                 let usage = match &generation.message {
-                    BaseMessage::AI(ai_msg) => ai_msg.usage_metadata().cloned(),
+                    BaseMessage::AI(ai_msg) => ai_msg.usage_metadata.clone(),
                     _ => None,
                 };
 
@@ -258,11 +258,13 @@ mod tests {
         input_tokens: u32,
         output_tokens: u32,
     ) -> ChatResult {
-        let mut ai_msg = AIMessage::new(content);
-        ai_msg = ai_msg.with_usage_metadata(UsageMetadata::new(
-            input_tokens as i64,
-            output_tokens as i64,
-        ));
+        let ai_msg = AIMessage::builder()
+            .content(content)
+            .usage_metadata(UsageMetadata::new(
+                input_tokens as i64,
+                output_tokens as i64,
+            ))
+            .build();
 
         let generation = ChatGeneration::new(ai_msg.into());
 

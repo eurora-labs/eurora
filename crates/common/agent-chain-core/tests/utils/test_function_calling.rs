@@ -715,13 +715,13 @@ fn test_valid_example_conversion() {
     assert!(matches!(&messages[1], BaseMessage::AI(_)));
 
     if let BaseMessage::Human(human_msg) = &messages[0] {
-        assert_eq!(human_msg.content(), "This is a valid example");
+        assert_eq!(human_msg.content.as_text(), "This is a valid example");
     }
 
     if let BaseMessage::AI(ai_msg) = &messages[1] {
-        assert_eq!(ai_msg.content(), "");
+        assert_eq!(ai_msg.content, "");
         let tool_calls = ai_msg
-            .additional_kwargs()
+            .additional_kwargs
             .get("tool_calls")
             .and_then(|tc| tc.as_array());
         assert!(tool_calls.map(|tc| tc.is_empty()).unwrap_or(true));
@@ -755,7 +755,7 @@ fn test_multiple_tool_calls() {
     // Verify AI message has correct tool_calls structure
     if let BaseMessage::AI(ai_msg) = &messages[1] {
         let tool_calls = ai_msg
-            .additional_kwargs()
+            .additional_kwargs
             .get("tool_calls")
             .and_then(|tc| tc.as_array())
             .expect("tool_calls should be an array");
@@ -791,7 +791,7 @@ fn test_tool_outputs() {
     assert!(matches!(&messages[2], BaseMessage::Tool(_)));
 
     if let BaseMessage::Tool(tool_msg) = &messages[2] {
-        assert_eq!(tool_msg.content(), "Output1");
+        assert_eq!(tool_msg.content, "Output1");
     }
 }
 
@@ -818,10 +818,10 @@ fn test_tool_outputs_with_ai_response() {
     assert!(matches!(&messages[3], BaseMessage::AI(_)));
 
     if let BaseMessage::AI(response) = &messages[3] {
-        assert_eq!(response.content(), "The output is Output1");
+        assert_eq!(response.content, "The output is Output1");
         // Final AI response should not have tool calls
         let tool_calls = response
-            .additional_kwargs()
+            .additional_kwargs
             .get("tool_calls")
             .and_then(|tc| tc.as_array());
         assert!(tool_calls.is_none() || tool_calls.unwrap().is_empty());

@@ -4,7 +4,7 @@
 //! for working with messages. Mirrors `langchain_core.messages.utils`.
 
 use super::ai::AIMessage;
-use super::base::{BaseMessage, BaseMessageChunk, BaseMessageTrait};
+use super::base::{BaseMessage, BaseMessageChunk};
 use super::chat::ChatMessage;
 use super::function::FunctionMessage;
 use super::human::HumanMessage;
@@ -43,7 +43,7 @@ pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix
                 BaseMessage::System(_) => "System",
                 BaseMessage::AI(_) => ai_prefix,
                 BaseMessage::Tool(_) => "Tool",
-                BaseMessage::Chat(c) => c.role(),
+                BaseMessage::Chat(c) => &c.role,
                 BaseMessage::Function(_) => "Function",
                 BaseMessage::Remove(_) => "Remove",
             };
@@ -154,7 +154,9 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
         create_message_from_role(role, content)
     } else if let Some(s) = message.as_str() {
         // Plain string -> HumanMessage
-        Ok(BaseMessage::Human(HumanMessage::new(s)))
+        Ok(BaseMessage::Human(
+            HumanMessage::builder().content(s).build(),
+        ))
     } else if let Some(arr) = message.as_array() {
         // 2-tuple: [role, content]
         if arr.len() == 2 {
@@ -174,12 +176,20 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
 /// Create a message from a role string and content.
 fn create_message_from_role(role: &str, content: &str) -> Result<BaseMessage, String> {
     match role {
-        "human" | "user" => Ok(BaseMessage::Human(HumanMessage::new(content))),
-        "ai" | "assistant" => Ok(BaseMessage::AI(AIMessage::new(content))),
-        "system" | "developer" => Ok(BaseMessage::System(SystemMessage::new(content))),
+        "human" | "user" => Ok(BaseMessage::Human(
+            HumanMessage::builder().content(content).build(),
+        )),
+        "ai" | "assistant" => Ok(BaseMessage::AI(
+            AIMessage::builder().content(content).build(),
+        )),
+        "system" | "developer" => Ok(BaseMessage::System(
+            SystemMessage::builder().content(content).build(),
+        )),
         "function" => Err("Function messages require a name".to_string()),
         "tool" => Err("Tool messages require a tool_call_id".to_string()),
-        _ => Ok(BaseMessage::Chat(ChatMessage::new(role, content))),
+        _ => Ok(BaseMessage::Chat(
+            ChatMessage::builder().content(content).role(role).build(),
+        )),
     }
 }
 
@@ -277,20 +287,26 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
 
             let new_msg = match (last, msg) {
                 (BaseMessage::Human(_), BaseMessage::Human(_)) => {
-                    BaseMessage::Human(HumanMessage::new(&merged_content))
+                    BaseMessage::Human(HumanMessage::builder().content(&merged_content).build())
                 }
                 (BaseMessage::AI(_), BaseMessage::AI(_)) => {
-                    BaseMessage::AI(AIMessage::new(&merged_content))
+                    BaseMessage::AI(AIMessage::builder().content(&merged_content).build())
                 }
                 (BaseMessage::System(_), BaseMessage::System(_)) => {
-                    BaseMessage::System(SystemMessage::new(&merged_content))
+                    BaseMessage::System(SystemMessage::builder().content(&merged_content).build())
                 }
-                (BaseMessage::Chat(c), BaseMessage::Chat(_)) => {
-                    BaseMessage::Chat(ChatMessage::new(c.role(), &merged_content))
-                }
-                (BaseMessage::Function(f), BaseMessage::Function(_)) => {
-                    BaseMessage::Function(FunctionMessage::new(f.name(), &merged_content))
-                }
+                (BaseMessage::Chat(c), BaseMessage::Chat(_)) => BaseMessage::Chat(
+                    ChatMessage::builder()
+                        .content(&merged_content)
+                        .role(&c.role)
+                        .build(),
+                ),
+                (BaseMessage::Function(f), BaseMessage::Function(_)) => BaseMessage::Function(
+                    FunctionMessage::builder()
+                        .name(&f.name)
+                        .content(&merged_content)
+                        .build(),
+                ),
                 _ => {
                     // Shouldn't happen due to discriminant check, but handle gracefully
                     merged.push(msg.clone());
@@ -365,15 +381,15 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
 
         // For AI messages, also count tool calls if present
         if let BaseMessage::AI(ai_msg) = message
-            && !ai_msg.tool_calls().is_empty()
+            && !ai_msg.tool_calls.is_empty()
         {
-            let tool_calls_str = format!("{:?}", ai_msg.tool_calls());
+            let tool_calls_str = format!("{:?}", ai_msg.tool_calls);
             message_chars += tool_calls_str.len();
         }
 
         // For tool messages, also count the tool call ID
         if let BaseMessage::Tool(tool_msg) = message {
-            message_chars += tool_msg.tool_call_id().len();
+            message_chars += tool_msg.tool_call_id.len();
         }
 
         // Add role characters
@@ -409,7 +425,7 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
         BaseMessage::Function(_) => "function",
         BaseMessage::Chat(c) => {
             // Return static strings for common roles, otherwise return a generic one
-            match c.role() {
+            match c.role.as_str() {
                 "user" => "user",
                 "assistant" => "assistant",
                 "system" => "system",
@@ -476,23 +492,23 @@ fn convert_single_to_openai_message(
 
     // Add tool_call_id for tool messages
     if let BaseMessage::Tool(tool_msg) = message {
-        oai_msg["tool_call_id"] = serde_json::json!(tool_msg.tool_call_id());
+        oai_msg["tool_call_id"] = serde_json::json!(tool_msg.tool_call_id);
     }
 
     // Add tool_calls for AI messages
     if let BaseMessage::AI(ai_msg) = message
-        && !ai_msg.tool_calls().is_empty()
+        && !ai_msg.tool_calls.is_empty()
     {
         let tool_calls: Vec<serde_json::Value> = ai_msg
-            .tool_calls()
+            .tool_calls
             .iter()
             .map(|tc| {
                 serde_json::json!({
                     "type": "function",
-                    "id": tc.id(),
+                    "id": tc.id,
                     "function": {
-                        "name": tc.name(),
-                        "arguments": serde_json::to_string(&tc.args()).unwrap_or_default(),
+                        "name": tc.name,
+                        "arguments": serde_json::to_string(&tc.args).unwrap_or_default(),
                     }
                 })
             })
@@ -785,51 +801,49 @@ where
 /// Create a message of the same type with different content.
 fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMessage {
     match original {
-        BaseMessage::Human(m) => {
-            let mut new_msg = HumanMessage::new(content);
-            if let Some(id) = m.id() {
-                new_msg = HumanMessage::with_id(id, content);
-            }
-            BaseMessage::Human(new_msg)
-        }
-        BaseMessage::AI(m) => {
-            let mut new_msg = AIMessage::new(content);
-            if let Some(id) = m.id() {
-                new_msg = AIMessage::with_id(id, content);
-            }
-            BaseMessage::AI(new_msg)
-        }
-        BaseMessage::System(m) => {
-            let mut new_msg = SystemMessage::new(content);
-            if let Some(id) = m.id() {
-                new_msg = SystemMessage::with_id(id, content);
-            }
-            BaseMessage::System(new_msg)
-        }
+        BaseMessage::Human(m) => BaseMessage::Human(
+            HumanMessage::builder()
+                .content(content)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
+        BaseMessage::AI(m) => BaseMessage::AI(
+            AIMessage::builder()
+                .content(content)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
+        BaseMessage::System(m) => BaseMessage::System(
+            SystemMessage::builder()
+                .content(content)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
         BaseMessage::Tool(m) => {
-            let mut new_msg = ToolMessage::new(content, m.tool_call_id());
-            if let Some(id) = m.id() {
-                new_msg = ToolMessage::with_id(id, content, m.tool_call_id());
-            }
+            let new_msg = ToolMessage::builder()
+                .content(content)
+                .tool_call_id(&m.tool_call_id)
+                .maybe_id(m.id.clone())
+                .build();
             BaseMessage::Tool(new_msg)
         }
-        BaseMessage::Chat(m) => {
-            let mut new_msg = ChatMessage::new(m.role(), content);
-            if let Some(id) = m.id() {
-                new_msg = ChatMessage::with_id(id, m.role(), content);
-            }
-            BaseMessage::Chat(new_msg)
-        }
-        BaseMessage::Function(m) => {
-            let mut new_msg = FunctionMessage::new(m.name(), content);
-            if let Some(id) = m.id() {
-                new_msg = FunctionMessage::with_id(id, m.name(), content);
-            }
-            BaseMessage::Function(new_msg)
-        }
+        BaseMessage::Chat(m) => BaseMessage::Chat(
+            ChatMessage::builder()
+                .content(content)
+                .role(&m.role)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
+        BaseMessage::Function(m) => BaseMessage::Function(
+            FunctionMessage::builder()
+                .name(&m.name)
+                .content(content)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
         BaseMessage::Remove(m) => {
             // RemoveMessage preserves the same id (which is the target id to remove)
-            BaseMessage::Remove(RemoveMessage::new(m.target_id()))
+            BaseMessage::Remove(RemoveMessage::builder().id(&m.id).build())
         }
     }
 }

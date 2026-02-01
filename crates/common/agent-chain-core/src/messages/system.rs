@@ -3,6 +3,7 @@
 //! This module contains the `SystemMessage` and `SystemMessageChunk` types which represent
 //! system instructions for priming AI behavior. Mirrors `langchain_core.messages.system`.
 
+use bon::bon;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
@@ -14,6 +15,24 @@ use super::content::{ContentBlock, ContentPart, MessageContent};
 ///
 /// The system message is usually passed in as the first of a sequence
 /// of input messages. It's used to prime AI behavior with instructions.
+///
+/// # Example
+///
+/// ```
+/// use agent_chain_core::messages::SystemMessage;
+///
+/// // Simple text message
+/// let msg = SystemMessage::builder()
+///     .content("You are a helpful assistant.")
+///     .build();
+///
+/// // Message with ID and name
+/// let msg = SystemMessage::builder()
+///     .content("You are a helpful assistant.")
+///     .maybe_id(Some("msg-123".to_string()))
+///     .maybe_name(Some("system".to_string()))
+///     .build();
+/// ```
 ///
 /// This corresponds to `SystemMessage` in LangChain Python.
 
@@ -60,15 +79,41 @@ impl Serialize for SystemMessage {
     }
 }
 
+#[bon]
 impl SystemMessage {
-    /// Create a new system message with simple text content.
-    pub fn new(content: impl Into<String>) -> Self {
+    /// Create a new system message with named parameters using the builder pattern.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use agent_chain_core::messages::{SystemMessage, MessageContent};
+    ///
+    /// // Simple message with just content
+    /// let msg = SystemMessage::builder()
+    ///     .content("You are a helpful assistant.")
+    ///     .build();
+    ///
+    /// // Message with ID and name
+    /// let msg = SystemMessage::builder()
+    ///     .content("You are a helpful assistant.")
+    ///     .maybe_id(Some("msg-123".to_string()))
+    ///     .maybe_name(Some("system".to_string()))
+    ///     .build();
+    /// ```
+    #[builder]
+    pub fn new(
+        content: impl Into<MessageContent>,
+        id: Option<String>,
+        name: Option<String>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+        #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
+    ) -> Self {
         Self {
-            content: MessageContent::Text(content.into()),
-            id: None,
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
+            content: content.into(),
+            id,
+            name,
+            additional_kwargs,
+            response_metadata,
         }
     }
 
@@ -77,113 +122,9 @@ impl SystemMessage {
         self.id = Some(id);
     }
 
-    /// Create a new system message with simple text content and an explicit ID.
-    ///
-    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            content: MessageContent::Text(content.into()),
-            id: Some(id.into()),
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new system message with multipart content.
-    pub fn with_content(parts: Vec<ContentPart>) -> Self {
-        Self {
-            content: MessageContent::Parts(parts),
-            id: None,
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new system message with multipart content and an explicit ID.
-    ///
-    /// Use this when deserializing or reconstructing messages where the ID must be preserved.
-    pub fn with_id_and_content(id: impl Into<String>, parts: Vec<ContentPart>) -> Self {
-        Self {
-            content: MessageContent::Parts(parts),
-            id: Some(id.into()),
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Set the name for this message.
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Set the additional kwargs for this message (builder pattern).
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
-    }
-
-    /// Set the response metadata for this message (builder pattern).
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
-    }
-
     /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "system"
-    }
-
-    /// Get the text content of the message.
-    ///
-    /// This is the same as `content()` for simple text messages.
-    pub fn text(&self) -> &str {
-        self.content()
-    }
-
-    /// Get the message content as text.
-    ///
-    /// For multipart messages, this returns an empty string.
-    /// Use [`message_content()`](Self::message_content) to access the full content.
-    pub fn content(&self) -> &str {
-        match &self.content {
-            MessageContent::Text(s) => s,
-            MessageContent::Parts(_) => "",
-        }
-    }
-
-    /// Get the full message content (text or multipart).
-    pub fn message_content(&self) -> &MessageContent {
-        &self.content
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// Get the message name.
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
-    }
-
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
     }
 
     /// Get the raw content as a list of JSON values.
@@ -298,18 +239,18 @@ impl SystemMessage {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct SystemMessageChunk {
     /// The message content (may be partial during streaming)
-    content: MessageContent,
+    pub content: MessageContent,
     /// Optional unique identifier
-    id: Option<String>,
+    pub id: Option<String>,
     /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    pub name: Option<String>,
     /// Additional metadata
     #[serde(default)]
-    additional_kwargs: HashMap<String, serde_json::Value>,
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
     /// Response metadata
     #[serde(default)]
-    response_metadata: HashMap<String, serde_json::Value>,
+    pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
 impl Serialize for SystemMessageChunk {
@@ -338,94 +279,46 @@ impl Serialize for SystemMessageChunk {
     }
 }
 
+#[bon]
 impl SystemMessageChunk {
-    /// Create a new system message chunk with text content.
-    pub fn new(content: impl Into<String>) -> Self {
-        Self {
-            content: MessageContent::Text(content.into()),
-            id: None,
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Create a new system message chunk with an ID.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            content: MessageContent::Text(content.into()),
-            id: Some(id.into()),
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
-    /// Set the name for this chunk (builder pattern).
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
-    }
-
-    /// Set the additional kwargs for this chunk (builder pattern).
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
+    /// Create a new system message chunk with named parameters using the builder pattern.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use agent_chain_core::messages::SystemMessageChunk;
+    ///
+    /// // Simple chunk with just content
+    /// let chunk = SystemMessageChunk::builder()
+    ///     .content("You are")
+    ///     .build();
+    ///
+    /// // Chunk with ID
+    /// let chunk = SystemMessageChunk::builder()
+    ///     .content("You are")
+    ///     .maybe_id(Some("chunk-123".to_string()))
+    ///     .build();
+    /// ```
+    #[builder]
+    pub fn new(
+        content: impl Into<MessageContent>,
+        id: Option<String>,
+        name: Option<String>,
+        #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
+        #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
     ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
-    }
-
-    /// Set the response metadata for this chunk (builder pattern).
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
+        Self {
+            content: content.into(),
+            id,
+            name,
+            additional_kwargs,
+            response_metadata,
+        }
     }
 
     /// Get the message type as a string.
     pub fn message_type(&self) -> &'static str {
         "SystemMessageChunk"
-    }
-
-    /// Get the text content of the chunk.
-    pub fn text(&self) -> &str {
-        self.content()
-    }
-
-    /// Get the message content as text.
-    pub fn content(&self) -> &str {
-        match &self.content {
-            MessageContent::Text(s) => s,
-            MessageContent::Parts(_) => "",
-        }
-    }
-
-    /// Get the full message content.
-    pub fn message_content(&self) -> &MessageContent {
-        &self.content
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// Get the message name.
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
-    }
-
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
     }
 
     /// Concatenate this chunk with another chunk.
@@ -492,24 +385,15 @@ impl std::ops::Add for SystemMessageChunk {
     }
 }
 
-impl super::base::BaseMessageTrait for SystemMessage {
-    fn content(&self) -> &str {
-        SystemMessage::content(self)
+impl std::iter::Sum for SystemMessageChunk {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|a, b| a + b)
+            .unwrap_or_else(|| SystemMessageChunk::builder().content("").build())
     }
+}
 
-    fn id(&self) -> Option<String> {
-        SystemMessage::id(self)
-    }
-
-    fn name(&self) -> Option<String> {
-        SystemMessage::name(self)
-    }
-
-    fn set_id(&mut self, id: String) {
-        SystemMessage::set_id(self, id)
-    }
-
-    fn additional_kwargs(&self) -> Option<&std::collections::HashMap<String, serde_json::Value>> {
-        Some(SystemMessage::additional_kwargs(self))
+impl From<SystemMessageChunk> for SystemMessage {
+    fn from(chunk: SystemMessageChunk) -> Self {
+        chunk.to_message()
     }
 }

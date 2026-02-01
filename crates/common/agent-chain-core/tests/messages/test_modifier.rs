@@ -2,9 +2,7 @@
 //!
 //! Converted from `langchain/libs/core/tests/unit_tests/messages/test_modifier.py`
 
-use agent_chain_core::messages::{
-    AIMessage, BaseMessage, BaseMessageTrait, HumanMessage, RemoveMessage,
-};
+use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, RemoveMessage};
 
 // ============================================================================
 // TestRemoveMessage
@@ -12,41 +10,44 @@ use agent_chain_core::messages::{
 
 #[test]
 fn test_init_basic() {
-    let msg = RemoveMessage::new("msg-to-remove");
-    assert_eq!(msg.id(), Some("msg-to-remove".to_string()));
+    let msg = RemoveMessage::builder().id("msg-to-remove").build();
+    assert_eq!(msg.id, "msg-to-remove");
     assert_eq!(msg.message_type(), "remove");
     assert_eq!(msg.content(), "");
 }
 
 #[test]
 fn test_type_is_remove() {
-    let msg = RemoveMessage::new("msg-123");
+    let msg = RemoveMessage::builder().id("msg-123").build();
     assert_eq!(msg.message_type(), "remove");
 }
 
 #[test]
 fn test_content_is_empty_string() {
-    let msg = RemoveMessage::new("msg-123");
+    let msg = RemoveMessage::builder().id("msg-123").build();
     assert_eq!(msg.content(), "");
 }
 
 #[test]
 fn test_serialization_roundtrip() {
-    let msg = RemoveMessage::new("msg-to-remove");
+    let msg = RemoveMessage::builder().id("msg-to-remove").build();
 
     let serialized = serde_json::to_value(&msg).unwrap();
     assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "remove");
 
     let deserialized: RemoveMessage = serde_json::from_value(serialized).unwrap();
-    assert_eq!(deserialized.id(), Some("msg-to-remove".to_string()));
+    assert_eq!(deserialized.id, "msg-to-remove");
     assert_eq!(deserialized.content(), "");
 }
 
 #[test]
 fn test_with_name() {
-    let msg = RemoveMessage::new("msg-123").with_name("delete-marker");
-    assert_eq!(msg.name(), Some("delete-marker".to_string()));
-    assert_eq!(msg.id(), Some("msg-123".to_string()));
+    let msg = RemoveMessage::builder()
+        .id("msg-123")
+        .name("delete-marker".to_string())
+        .build();
+    assert_eq!(msg.name, Some("delete-marker".to_string()));
+    assert_eq!(msg.id, "msg-123");
 }
 
 #[test]
@@ -54,9 +55,12 @@ fn test_with_additional_kwargs() {
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert("reason".to_string(), serde_json::json!("outdated"));
 
-    let msg = RemoveMessage::new("msg-123").with_additional_kwargs(additional_kwargs);
+    let msg = RemoveMessage::builder()
+        .id("msg-123")
+        .additional_kwargs(additional_kwargs)
+        .build();
     assert_eq!(
-        msg.additional_kwargs().get("reason").unwrap(),
+        msg.additional_kwargs.get("reason").unwrap(),
         &serde_json::json!("outdated")
     );
 }
@@ -66,28 +70,31 @@ fn test_with_response_metadata() {
     let mut response_metadata = std::collections::HashMap::new();
     response_metadata.insert("deleted_at".to_string(), serde_json::json!("2024-01-01"));
 
-    let msg = RemoveMessage::new("msg-123").with_response_metadata(response_metadata);
+    let msg = RemoveMessage::builder()
+        .id("msg-123")
+        .response_metadata(response_metadata)
+        .build();
     assert_eq!(
-        msg.response_metadata().get("deleted_at").unwrap(),
+        msg.response_metadata.get("deleted_at").unwrap(),
         &serde_json::json!("2024-01-01")
     );
 }
 
 #[test]
-fn test_text_property_is_empty() {
-    let msg = RemoveMessage::new("msg-123");
-    assert_eq!(msg.text(), "");
+fn test_content_property_is_empty() {
+    let msg = RemoveMessage::builder().id("msg-123").build();
+    assert_eq!(msg.content(), "");
 }
 
 #[test]
 fn test_multiple_remove_messages() {
-    let msg1 = RemoveMessage::new("msg-1");
-    let msg2 = RemoveMessage::new("msg-2");
-    let msg3 = RemoveMessage::new("msg-3");
+    let msg1 = RemoveMessage::builder().id("msg-1").build();
+    let msg2 = RemoveMessage::builder().id("msg-2").build();
+    let msg3 = RemoveMessage::builder().id("msg-3").build();
 
-    assert_eq!(msg1.id(), Some("msg-1".to_string()));
-    assert_eq!(msg2.id(), Some("msg-2".to_string()));
-    assert_eq!(msg3.id(), Some("msg-3".to_string()));
+    assert_eq!(msg1.id, "msg-1");
+    assert_eq!(msg2.id, "msg-2");
+    assert_eq!(msg3.id, "msg-3");
 
     // All should have empty content
     assert_eq!(msg1.content(), "");
@@ -102,9 +109,19 @@ fn test_multiple_remove_messages() {
 #[test]
 fn test_remove_message_in_list() {
     let messages = [
-        BaseMessage::Human(HumanMessage::with_id("human-1", "Hello")),
-        BaseMessage::AI(AIMessage::with_id("ai-1", "Hi there!")),
-        BaseMessage::Remove(RemoveMessage::new("human-1")),
+        BaseMessage::Human(
+            HumanMessage::builder()
+                .id("human-1".to_string())
+                .content("Hello")
+                .build(),
+        ),
+        BaseMessage::AI(
+            AIMessage::builder()
+                .content("Hi there!")
+                .id("ai-1".to_string())
+                .build(),
+        ),
+        BaseMessage::Remove(RemoveMessage::builder().id("human-1").build()),
     ];
 
     assert_eq!(messages.len(), 3);
@@ -115,8 +132,13 @@ fn test_remove_message_in_list() {
 #[test]
 fn test_remove_message_serialization_in_list() {
     let messages = [
-        BaseMessage::Human(HumanMessage::with_id("human-1", "Hello")),
-        BaseMessage::Remove(RemoveMessage::new("human-1")),
+        BaseMessage::Human(
+            HumanMessage::builder()
+                .id("human-1".to_string())
+                .content("Hello")
+                .build(),
+        ),
+        BaseMessage::Remove(RemoveMessage::builder().id("human-1").build()),
     ];
 
     // Serialize both messages
@@ -148,7 +170,7 @@ fn test_remove_message_serialization_in_list() {
 
 #[test]
 fn test_remove_message_does_not_modify_content() {
-    let msg = RemoveMessage::new("msg-123");
+    let msg = RemoveMessage::builder().id("msg-123").build();
 
     // Content should always be empty string
     assert_eq!(msg.content(), "");
