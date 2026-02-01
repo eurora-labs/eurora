@@ -81,13 +81,17 @@ mod chat_result_tests {
     fn test_generations_with_generation_info() {
         let mut gen_info1 = HashMap::new();
         gen_info1.insert("finish_reason".to_string(), json!("stop"));
-        let gen1 =
-            ChatGeneration::with_info(AIMessage::builder().content("Response 1").build().into(), gen_info1.clone());
+        let gen1 = ChatGeneration::with_info(
+            AIMessage::builder().content("Response 1").build().into(),
+            gen_info1.clone(),
+        );
 
         let mut gen_info2 = HashMap::new();
         gen_info2.insert("finish_reason".to_string(), json!("length"));
-        let gen2 =
-            ChatGeneration::with_info(AIMessage::builder().content("Response 2").build().into(), gen_info2.clone());
+        let gen2 = ChatGeneration::with_info(
+            AIMessage::builder().content("Response 2").build().into(),
+            gen_info2.clone(),
+        );
 
         let result = ChatResult::new(vec![gen1, gen2]);
         assert_eq!(

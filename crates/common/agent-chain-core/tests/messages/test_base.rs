@@ -147,7 +147,10 @@ fn test_message_to_dict_with_additional_kwargs() {
         json!({"name": "test", "arguments": "{}"}),
     );
 
-    let msg = AIMessage::builder().content("Hello").build().with_additional_kwargs(additional_kwargs);
+    let msg = AIMessage::builder()
+        .content("Hello")
+        .build()
+        .with_additional_kwargs(additional_kwargs);
     let result = message_to_dict(&BaseMessage::AI(msg));
     assert_eq!(
         result
@@ -291,7 +294,10 @@ fn test_init_with_response_metadata() {
     response_metadata.insert("model".to_string(), json!("gpt-4"));
     response_metadata.insert("tokens".to_string(), json!(10));
 
-    let msg = AIMessage::builder().content("Hello").build().with_response_metadata(response_metadata);
+    let msg = AIMessage::builder()
+        .content("Hello")
+        .build()
+        .with_response_metadata(response_metadata);
     assert_eq!(
         msg.response_metadata().get("model").unwrap(),
         &json!("gpt-4")

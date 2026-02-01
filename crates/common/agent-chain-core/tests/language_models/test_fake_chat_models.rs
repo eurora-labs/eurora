@@ -32,8 +32,10 @@ mod test_fake_messages_list_chat_model {
         // Test FakeMessagesListChatModel with sleep parameter
         // Python equivalent: test_initialization_with_sleep()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::builder().content("test").build())])
-            .with_sleep(Duration::from_millis(100));
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("test").build(),
+        )])
+        .with_sleep(Duration::from_millis(100));
         // Sleep is set (tested by timing in test_invoke_with_sleep)
         assert_eq!(model.current_index(), 0);
     }
@@ -43,7 +45,9 @@ mod test_fake_messages_list_chat_model {
         // Test _llm_type property
         // Python equivalent: test_llm_type()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::builder().content("test").build())]);
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("test").build(),
+        )]);
         assert_eq!(model.llm_type(), "fake-messages-list-chat-model");
     }
 
@@ -89,7 +93,9 @@ mod test_fake_messages_list_chat_model {
         // Test invoke with single response stays at same
         // Python equivalent: test_invoke_with_single_response()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::builder().content("only").build())]);
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("only").build(),
+        )]);
 
         let result = model._generate(vec![], None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "only");
@@ -105,8 +111,10 @@ mod test_fake_messages_list_chat_model {
         // Test invoke with sleep parameter
         // Python equivalent: test_invoke_with_sleep()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::builder().content("test").build())])
-            .with_sleep(Duration::from_millis(50));
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("test").build(),
+        )])
+        .with_sleep(Duration::from_millis(50));
 
         let start = Instant::now();
         let _ = model._generate(vec![], None, None).await.unwrap();
@@ -124,7 +132,9 @@ mod test_fake_messages_list_chat_model {
         // Test _generate returns ChatResult
         // Python equivalent: test_generate_returns_chat_result()
 
-        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(AIMessage::builder().content("test").build())]);
+        let model = FakeMessagesListChatModel::new(vec![BaseMessage::AI(
+            AIMessage::builder().content("test").build(),
+        )]);
         let result = model
             ._generate(
                 vec![BaseMessage::Human(HumanMessage::new("hi"))],
@@ -586,7 +596,10 @@ mod test_generic_fake_chat_model {
             Value::Object(function_call.into_iter().collect()),
         );
 
-        let ai_msg = AIMessage::builder().content("").build().with_additional_kwargs(additional_kwargs);
+        let ai_msg = AIMessage::builder()
+            .content("")
+            .build()
+            .with_additional_kwargs(additional_kwargs);
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
         let mut stream = model._stream(vec![], None, None).unwrap();
@@ -616,7 +629,10 @@ mod test_generic_fake_chat_model {
             Value::String("custom_value".to_string()),
         );
 
-        let ai_msg = AIMessage::builder().content("").build().with_additional_kwargs(additional_kwargs);
+        let ai_msg = AIMessage::builder()
+            .content("")
+            .build()
+            .with_additional_kwargs(additional_kwargs);
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
         let mut stream = model._stream(vec![], None, None).unwrap();

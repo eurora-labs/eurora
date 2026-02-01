@@ -360,7 +360,9 @@ impl BaseMessagePromptTemplate for AIMessagePromptTemplate {
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::AI(AIMessage::builder().content(text).build())])
+        Ok(vec![BaseMessage::AI(
+            AIMessage::builder().content(text).build(),
+        )])
     }
 
     fn pretty_repr(&self, html: bool) -> String {

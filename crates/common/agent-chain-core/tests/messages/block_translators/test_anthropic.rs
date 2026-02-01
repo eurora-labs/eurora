@@ -337,7 +337,10 @@ fn test_convert_to_v1_from_anthropic() {
     let mut response_metadata2 = HashMap::new();
     response_metadata2.insert("model_provider".to_string(), json!("anthropic"));
 
-    let message2 = AIMessage::builder().content("Hello").build().with_response_metadata(response_metadata2);
+    let message2 = AIMessage::builder()
+        .content("Hello")
+        .build()
+        .with_response_metadata(response_metadata2);
 
     let expected_content2 = vec![ContentBlock::Text(TextContentBlock::new("Hello"))];
     assert_eq!(message2.content_blocks(), expected_content2);

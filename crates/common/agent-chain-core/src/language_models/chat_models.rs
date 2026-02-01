@@ -1545,8 +1545,12 @@ mod tests {
     #[tokio::test]
     async fn test_agenerate_from_stream() {
         let chunks = vec![
-            Ok(ChatGenerationChunk::new(AIMessage::builder().content("Hello, ").build().into())),
-            Ok(ChatGenerationChunk::new(AIMessage::builder().content("world!").build().into())),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("Hello, ").build().into(),
+            )),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("world!").build().into(),
+            )),
         ];
 
         let stream = futures::stream::iter(chunks);
@@ -1558,9 +1562,15 @@ mod tests {
     #[tokio::test]
     async fn test_collect_and_merge_stream() {
         let chunks = vec![
-            Ok(ChatGenerationChunk::new(AIMessage::builder().content("a").build().into())),
-            Ok(ChatGenerationChunk::new(AIMessage::builder().content("b").build().into())),
-            Ok(ChatGenerationChunk::new(AIMessage::builder().content("c").build().into())),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("a").build().into(),
+            )),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("b").build().into(),
+            )),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("c").build().into(),
+            )),
         ];
 
         let stream = futures::stream::iter(chunks);

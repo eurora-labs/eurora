@@ -74,8 +74,18 @@ mod llm_result_tests {
     /// Test creating LLMResult with ChatGeneration objects.
     #[test]
     fn test_creation_with_chat_generations() {
-        let gen1 = ChatGeneration::new(AIMessage::builder().content("Chat response 1").build().into());
-        let gen2 = ChatGeneration::new(AIMessage::builder().content("Chat response 2").build().into());
+        let gen1 = ChatGeneration::new(
+            AIMessage::builder()
+                .content("Chat response 1")
+                .build()
+                .into(),
+        );
+        let gen2 = ChatGeneration::new(
+            AIMessage::builder()
+                .content("Chat response 2")
+                .build()
+                .into(),
+        );
         let result = LLMResult::new(vec![vec![gen1.into()], vec![gen2.into()]]);
         assert_eq!(result.generations.len(), 2);
         if let GenerationType::ChatGeneration(cg) = &result.generations[0][0] {
@@ -87,7 +97,8 @@ mod llm_result_tests {
     #[test]
     fn test_creation_with_generation_chunks() {
         let chunk1 = GenerationChunk::new("Chunk 1");
-        let chunk2 = ChatGenerationChunk::new(AIMessage::builder().content("Chunk 2").build().into());
+        let chunk2 =
+            ChatGenerationChunk::new(AIMessage::builder().content("Chunk 2").build().into());
         let result = LLMResult::new(vec![vec![chunk1.into()], vec![chunk2.into()]]);
         assert_eq!(result.generations.len(), 2);
         if let GenerationType::GenerationChunk(gc) = &result.generations[0][0] {
