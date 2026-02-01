@@ -97,7 +97,7 @@ pub trait BaseChatMessageHistory: Send + Sync {
     fn add_ai_message(&mut self, message: AIMessageInput) {
         let ai_message = match message {
             AIMessageInput::Message(m) => *m,
-            AIMessageInput::Text(text) => AIMessage::new(&text),
+            AIMessageInput::Text(text) => AIMessage::builder().content(&text).build(),
         };
         self.add_message(BaseMessage::AI(ai_message));
     }
@@ -268,7 +268,7 @@ mod tests {
     fn test_in_memory_chat_history_with_messages() {
         let messages = vec![
             BaseMessage::Human(HumanMessage::new("Hello")),
-            BaseMessage::AI(AIMessage::new("Hi there!")),
+            BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
         ];
         let history = InMemoryChatMessageHistory::with_messages(messages.clone());
         assert_eq!(history.messages().len(), 2);
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn test_add_ai_message_ai_message() {
         let mut history = InMemoryChatMessageHistory::new();
-        let ai_msg = AIMessage::new("Hi there!");
+        let ai_msg = AIMessage::builder().content("Hi there!").build();
         history.add_ai_message(ai_msg.into());
 
         let messages = history.messages();
@@ -324,7 +324,7 @@ mod tests {
     fn test_add_message() {
         let mut history = InMemoryChatMessageHistory::new();
         history.add_message(BaseMessage::Human(HumanMessage::new("Hello")));
-        history.add_message(BaseMessage::AI(AIMessage::new("Hi")));
+        history.add_message(BaseMessage::AI(AIMessage::builder().content("Hi").build()));
 
         let messages = history.messages();
         assert_eq!(messages.len(), 2);
@@ -335,7 +335,7 @@ mod tests {
         let mut history = InMemoryChatMessageHistory::new();
         let new_messages = vec![
             BaseMessage::Human(HumanMessage::new("Hello")),
-            BaseMessage::AI(AIMessage::new("Hi")),
+            BaseMessage::AI(AIMessage::builder().content("Hi").build()),
             BaseMessage::Human(HumanMessage::new("How are you?")),
         ];
         history.add_messages(&new_messages);
@@ -392,7 +392,7 @@ mod tests {
         let mut history = InMemoryChatMessageHistory::new();
         let new_messages = vec![
             BaseMessage::Human(HumanMessage::new("Hello")),
-            BaseMessage::AI(AIMessage::new("Hi")),
+            BaseMessage::AI(AIMessage::builder().content("Hi").build()),
         ];
         history.add_messages_async(new_messages).await;
 

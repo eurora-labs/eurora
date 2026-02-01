@@ -689,31 +689,19 @@ impl From<ProtoAiMessage> for AIMessage {
             .map(Into::into)
             .collect();
 
-        let mut msg = if tool_calls.is_empty() && invalid_tool_calls.is_empty() {
-            match proto.id {
-                Some(id) => AIMessage::with_id(id, proto.content),
-                None => AIMessage::new(proto.content),
-            }
-        } else {
-            match proto.id {
-                Some(id) => AIMessage::with_id_and_tool_calls(id, proto.content, tool_calls)
-                    .with_invalid_tool_calls(invalid_tool_calls),
-                None => {
-                    AIMessage::with_all_tool_calls(proto.content, tool_calls, invalid_tool_calls)
-                }
-            }
-        };
+        let usage_metadata = proto.usage_metadata.map(Into::into);
 
-        if let Some(name) = proto.name {
-            msg = msg.with_name(name);
-        }
+        let msg = AIMessage::builder()
+            .maybe_id(proto.id)
+            .content(proto.content)
+            .maybe_name(proto.name)
+            .maybe_usage_metadata(usage_metadata)
+            .tool_calls(tool_calls)
+            .invalid_tool_calls(invalid_tool_calls)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
+            .build();
 
-        if let Some(usage) = proto.usage_metadata {
-            msg = msg.with_usage_metadata(usage.into());
-        }
-
-        msg.additional_kwargs = json_string_to_hashmap(&proto.additional_kwargs);
-        msg.response_metadata = json_string_to_hashmap(&proto.response_metadata);
         msg
     }
 }
@@ -758,11 +746,17 @@ impl From<ProtoAiMessageChunk> for AIMessageChunk {
 
         let mut chunk = if tool_call_chunks.is_empty() {
             match proto.id {
-                Some(id) => AIMessageChunk::with_id(id, proto.content),
-                None => AIMessageChunk::new(proto.content),
+                Some(id) => AIMessageChunk::builder()
+                    .id(id)
+                    .content(proto.content)
+                    .build(),
+                None => AIMessageChunk::builder().content(proto.content).build(),
             }
         } else {
-            AIMessageChunk::new_with_tool_call_chunks(proto.content, tool_call_chunks)
+            AIMessageChunk::builder()
+                .tool_call_chunks(tool_call_chunks)
+                .content(proto.content)
+                .build()
         };
 
         if let Some(usage) = proto.usage_metadata {
@@ -1075,7 +1069,7 @@ impl From<ProtoBaseMessageChunk> for BaseMessageChunk {
             Some(proto_base_message_chunk::Chunk::Function(c)) => {
                 BaseMessageChunk::Function(c.into())
             }
-            None => BaseMessageChunk::AI(AIMessageChunk::new("")),
+            None => BaseMessageChunk::AI(AIMessageChunk::builder().content("").build()),
         }
     }
 }

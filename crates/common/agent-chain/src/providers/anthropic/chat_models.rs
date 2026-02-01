@@ -209,7 +209,7 @@ impl ChatAnthropic {
                         }));
                     }
 
-                    for tool_call in m.tool_calls() {
+                    for tool_call in &m.tool_calls {
                         content.push(serde_json::json!({
                             "type": "tool_use",
                             "id": tool_call.id(),
@@ -334,13 +334,12 @@ impl ChatAnthropic {
             }
         }
 
-        let message: BaseMessage = if tool_calls.is_empty() {
-            AIMessage::new(text_content).into()
-        } else {
-            AIMessage::with_tool_calls(text_content, tool_calls).into()
-        };
+        let message = AIMessage::builder()
+            .content(text_content)
+            .tool_calls(tool_calls)
+            .build();
 
-        let generation = ChatGeneration::new(message);
+        let generation = ChatGeneration::new(message.into());
         ChatResult::new(vec![generation])
     }
 

@@ -278,7 +278,7 @@ fn test_token_costs_are_zeroed_out() {
     // Expected behavior:
     // let local_cache = InMemoryCache::new();
     // let messages = vec![
-    //     AIMessage::new("Hello, how are you?")
+    //     AIMessage::builder().content("Hello, how are you?").build()
     //         .with_usage_metadata(UsageMetadata {
     //             input_tokens: 5,
     //             output_tokens: 10,

@@ -338,9 +338,9 @@ impl ChatOllama {
                         message["content"] = serde_json::json!(m.content());
                     }
 
-                    if !m.tool_calls().is_empty() {
+                    if !m.tool_calls.is_empty() {
                         let tool_calls: Vec<serde_json::Value> = m
-                            .tool_calls()
+                            .tool_calls
                             .iter()
                             .map(|tc| {
                                 serde_json::json!({
@@ -521,22 +521,20 @@ impl ChatOllama {
             })
             .unwrap_or_default();
 
-        let ai_message = if tool_calls.is_empty() {
-            AIMessage::new(content)
-        } else {
-            AIMessage::with_tool_calls(content, tool_calls)
-        };
+        let ai_message = AIMessage::builder().content(content).tool_calls(tool_calls);
 
         // Add usage metadata if available
         if let (Some(prompt_eval_count), Some(eval_count)) =
             (response.prompt_eval_count, response.eval_count)
         {
-            ai_message.with_usage_metadata(UsageMetadata::new(
-                prompt_eval_count as i64,
-                eval_count as i64,
-            ))
-        } else {
             ai_message
+                .usage_metadata(UsageMetadata::new(
+                    prompt_eval_count as i64,
+                    eval_count as i64,
+                ))
+                .build()
+        } else {
+            ai_message.build()
         }
     }
 }
@@ -621,7 +619,7 @@ impl BaseChatModel for ChatOllama {
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(chat_chunk) => {
-                        let message = AIMessage::new(&chat_chunk.content);
+                        let message = AIMessage::builder().content(&chat_chunk.content).build();
                         let generation_chunk = ChatGenerationChunk::new(message.into());
                         yield Ok(generation_chunk);
                     }
@@ -927,7 +925,11 @@ impl BoundChatOllama {
             .await
         {
             Ok(ai_message) => Box::new(ai_message),
-            Err(e) => Box::new(AIMessage::new(format!("Error: {}", e))),
+            Err(e) => Box::new(
+                AIMessage::builder()
+                    .content(format!("Error: {}", e))
+                    .build(),
+            ),
         }
     }
 }

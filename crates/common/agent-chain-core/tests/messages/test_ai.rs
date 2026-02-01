@@ -289,12 +289,12 @@ fn test_subtract_usage_with_negative_result() {
 
 #[test]
 fn test_add_ai_message_chunks_usage() {
-    let chunk1 = AIMessageChunk::new("");
+    let chunk1 = AIMessageChunk::builder().content("").build();
     // chunk1 has no usage_metadata
 
-    let chunk2 = AIMessageChunk::new("").with_usage_metadata(UsageMetadata::new(2, 3));
+    let chunk2 = AIMessageChunk::builder().content("").build().with_usage_metadata(UsageMetadata::new(2, 3));
 
-    let chunk3 = AIMessageChunk::new("").with_usage_metadata(UsageMetadata {
+    let chunk3 = AIMessageChunk::builder().content("").build().with_usage_metadata(UsageMetadata {
         input_tokens: 2,
         output_tokens: 3,
         total_tokens: 5,
@@ -408,7 +408,7 @@ fn test_content_blocks() {
         )],
     );
 
-    let mut chunk_3 = AIMessageChunk::new("");
+    let mut chunk_3 = AIMessageChunk::builder().content("").build();
     chunk_3.set_chunk_position(Some(ChunkPosition::Last));
 
     let merged = add_ai_message_chunks(chunk_1, vec![chunk_2, chunk_3]);
@@ -432,7 +432,7 @@ fn test_content_blocks_reasoning_extraction() {
         json!("Let me think about this problem..."),
     );
 
-    let message = AIMessage::new("The answer is 42.").with_additional_kwargs(additional_kwargs);
+    let message = AIMessage::builder().content("The answer is 42.").build().with_additional_kwargs(additional_kwargs);
 
     assert_eq!(message.content(), "The answer is 42.");
     // In Python, content_blocks property extracts reasoning from additional_kwargs
@@ -456,7 +456,7 @@ fn test_content_blocks_reasoning_extraction() {
     let mut additional_kwargs2 = std::collections::HashMap::new();
     additional_kwargs2.insert("other_field".to_string(), json!("some value"));
 
-    let message2 = AIMessage::new("The answer is 42.").with_additional_kwargs(additional_kwargs2);
+    let message2 = AIMessage::builder().content("The answer is 42.").build().with_additional_kwargs(additional_kwargs2);
 
     assert!(
         !message2
@@ -471,7 +471,7 @@ fn test_content_blocks_reasoning_extraction() {
 
 #[test]
 fn test_ai_message_basic() {
-    let msg = AIMessage::new("Hello, world!");
+    let msg = AIMessage::builder().content("Hello, world!").build();
     assert_eq!(msg.content(), "Hello, world!");
     assert!(msg.id().is_none());
     assert!(msg.name().is_none());
@@ -488,21 +488,21 @@ fn test_ai_message_with_id() {
 
 #[test]
 fn test_ai_message_with_name() {
-    let msg = AIMessage::new("Hello!").with_name("Assistant");
+    let msg = AIMessage::builder().content("Hello!").build().with_name("Assistant");
     assert_eq!(msg.name(), Some("Assistant".to_string()));
 }
 
 #[test]
 fn test_ai_message_with_usage_metadata() {
     let usage = UsageMetadata::new(10, 20);
-    let msg = AIMessage::new("Hello!").with_usage_metadata(usage);
+    let msg = AIMessage::builder().content("Hello!").build().with_usage_metadata(usage);
     assert!(msg.usage_metadata().is_some());
     assert_eq!(msg.usage_metadata().unwrap().input_tokens, 10);
 }
 
 #[test]
 fn test_ai_message_chunk_basic() {
-    let chunk = AIMessageChunk::new("Hello");
+    let chunk = AIMessageChunk::builder().content("Hello").build();
     assert_eq!(chunk.content(), "Hello");
     assert!(chunk.id().is_none());
 }
@@ -515,8 +515,8 @@ fn test_ai_message_chunk_with_id() {
 
 #[test]
 fn test_ai_message_chunk_add() {
-    let chunk1 = AIMessageChunk::new("Hello ");
-    let chunk2 = AIMessageChunk::new("world!");
+    let chunk1 = AIMessageChunk::builder().content("Hello ").build();
+    let chunk2 = AIMessageChunk::builder().content("world!").build();
     let result = chunk1 + chunk2;
     assert_eq!(result.content(), "Hello world!");
 }
@@ -524,9 +524,9 @@ fn test_ai_message_chunk_add() {
 #[test]
 fn test_ai_message_chunk_sum() {
     let chunks = vec![
-        AIMessageChunk::new("Hello "),
-        AIMessageChunk::new("beautiful "),
-        AIMessageChunk::new("world!"),
+        AIMessageChunk::builder().content("Hello ").build(),
+        AIMessageChunk::builder().content("beautiful ").build(),
+        AIMessageChunk::builder().content("world!").build(),
     ];
     let result: AIMessageChunk = chunks.into_iter().sum();
     assert_eq!(result.content(), "Hello beautiful world!");

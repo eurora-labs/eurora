@@ -22,7 +22,7 @@ use crate::messages::BaseMessage;
 /// let session = ChatSession {
 ///     messages: Some(vec![
 ///         BaseMessage::Human(HumanMessage::new("Hello!")),
-///         BaseMessage::AI(AIMessage::new("Hi there!")),
+///         BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
 ///     ]),
 ///     functions: None,
 /// };
@@ -102,7 +102,7 @@ mod tests {
     fn test_chat_session_with_messages() {
         let messages = vec![
             BaseMessage::Human(HumanMessage::new("Hello")),
-            BaseMessage::AI(AIMessage::new("Hi")),
+            BaseMessage::AI(AIMessage::builder().content("Hi").build()),
         ];
         let session = ChatSession::with_messages(messages);
 

@@ -37,7 +37,11 @@ pub fn convert_db_message_to_base_message(
         MessageType::Ai => {
             let content = parse_ai_content(&db_message.content)?;
             let tool_calls = parse_tool_calls(&db_message.tool_calls)?;
-            let message = AIMessage::with_id_and_tool_calls(id, content, tool_calls);
+            let message = AIMessage::builder()
+                .id(id)
+                .content(content)
+                .tool_calls(tool_calls)
+                .build();
             Ok(BaseMessage::AI(message))
         }
         MessageType::Tool => {

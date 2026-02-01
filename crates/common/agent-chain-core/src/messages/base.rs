@@ -216,7 +216,7 @@ impl BaseMessage {
     /// Get tool calls if this is an AI message.
     pub fn tool_calls(&self) -> &[ToolCall] {
         match self {
-            BaseMessage::AI(m) => m.tool_calls(),
+            BaseMessage::AI(m) => &m.tool_calls,
             _ => &[],
         }
     }
@@ -265,7 +265,7 @@ impl BaseMessage {
             BaseMessage::Human(m) => ("Human", m.content()),
             BaseMessage::System(m) => ("System", m.content()),
             BaseMessage::AI(m) => {
-                let tool_calls = m.tool_calls();
+                let tool_calls = &m.tool_calls;
                 if tool_calls.is_empty() {
                     ("AI", m.content())
                 } else {

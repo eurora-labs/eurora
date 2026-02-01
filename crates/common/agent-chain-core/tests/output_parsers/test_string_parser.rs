@@ -56,7 +56,7 @@ fn test_str_output_parser_parse_unicode() {
 fn test_str_output_parser_invoke_with_message() {
     // Test StrOutputParser.invoke() with AIMessage input
     let parser = StrOutputParser::new();
-    let message = AIMessage::new("Hello from AI");
+    let message = AIMessage::builder().content("Hello from AI").build();
     let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
     assert_eq!(result, "Hello from AI");
 }
@@ -74,7 +74,7 @@ fn test_str_output_parser_invoke_with_human_message() {
 async fn test_str_output_parser_ainvoke_with_message() {
     // Test StrOutputParser.ainvoke() with AIMessage input
     let parser = StrOutputParser::new();
-    let message = AIMessage::new("Async hello from AI");
+    let message = AIMessage::builder().content("Async hello from AI").build();
     let result = parser
         .ainvoke(BaseMessage::AI(message), None)
         .await
@@ -95,7 +95,7 @@ fn test_str_output_parser_parse_result_with_generation() {
 fn test_str_output_parser_parse_result_with_chat_generation() {
     // Test StrOutputParser.parse_result() with ChatGeneration
     let parser = StrOutputParser::new();
-    let message = AIMessage::new("Chat generated text");
+    let message = AIMessage::builder().content("Chat generated text").build();
     let chat_generation = ChatGeneration::new(BaseMessage::AI(message));
     // ChatGeneration has a `text` field that holds the content
     let generation = Generation::new(&chat_generation.text);
@@ -129,9 +129,9 @@ async fn test_str_output_parser_transform_message_chunks() {
     // Test StrOutputParser.transform() with message chunks
     let parser = StrOutputParser::new();
     let chunks = vec![
-        BaseMessageChunk::AI(AIMessageChunk::new("Hello")),
-        BaseMessageChunk::AI(AIMessageChunk::new(" ")),
-        BaseMessageChunk::AI(AIMessageChunk::new("world")),
+        BaseMessageChunk::AI(AIMessageChunk::builder().content("Hello").build()),
+        BaseMessageChunk::AI(AIMessageChunk::builder().content(" ").build()),
+        BaseMessageChunk::AI(AIMessageChunk::builder().content("world").build()),
     ];
 
     let input_stream = futures::stream::iter(
@@ -174,9 +174,9 @@ async fn test_str_output_parser_atransform_message_chunks() {
     // Test StrOutputParser.atransform() with message chunks
     let parser = StrOutputParser::new();
     let chunks = vec![
-        BaseMessageChunk::AI(AIMessageChunk::new("Async")),
-        BaseMessageChunk::AI(AIMessageChunk::new(" ")),
-        BaseMessageChunk::AI(AIMessageChunk::new("messages")),
+        BaseMessageChunk::AI(AIMessageChunk::builder().content("Async").build()),
+        BaseMessageChunk::AI(AIMessageChunk::builder().content(" ").build()),
+        BaseMessageChunk::AI(AIMessageChunk::builder().content("messages").build()),
     ];
 
     let input_stream = futures::stream::iter(
@@ -196,7 +196,7 @@ async fn test_str_output_parser_atransform_message_chunks() {
 #[tokio::test]
 async fn test_str_output_parser_with_model_chain() {
     // Test StrOutputParser chained with a model
-    let model = GenericFakeChatModel::from_vec(vec![AIMessage::new("Model output")]);
+    let model = GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("Model output").build()]);
     let parser = StrOutputParser::new();
 
     // Simulate chaining: model | parser
@@ -218,7 +218,7 @@ async fn test_str_output_parser_with_model_chain() {
 #[tokio::test]
 async fn test_str_output_parser_with_model_stream() {
     // Test StrOutputParser streaming with a model
-    let model = GenericFakeChatModel::from_vec(vec![AIMessage::new("Streaming output")]);
+    let model = GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("Streaming output").build()]);
     let parser = StrOutputParser::new();
 
     // Simulate streaming: model.stream() | parser
@@ -247,7 +247,7 @@ async fn test_str_output_parser_with_model_stream() {
 fn test_str_output_parser_with_empty_content() {
     // Test StrOutputParser with message containing empty content
     let parser = StrOutputParser::new();
-    let message = AIMessage::new("");
+    let message = AIMessage::builder().content("").build();
     let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
     assert_eq!(result, "");
 }

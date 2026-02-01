@@ -175,7 +175,9 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
 fn create_message_from_role(role: &str, content: &str) -> Result<BaseMessage, String> {
     match role {
         "human" | "user" => Ok(BaseMessage::Human(HumanMessage::new(content))),
-        "ai" | "assistant" => Ok(BaseMessage::AI(AIMessage::new(content))),
+        "ai" | "assistant" => Ok(BaseMessage::AI(
+            AIMessage::builder().content(content).build(),
+        )),
         "system" | "developer" => Ok(BaseMessage::System(SystemMessage::new(content))),
         "function" => Err("Function messages require a name".to_string()),
         "tool" => Err("Tool messages require a tool_call_id".to_string()),
@@ -280,7 +282,7 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                     BaseMessage::Human(HumanMessage::new(&merged_content))
                 }
                 (BaseMessage::AI(_), BaseMessage::AI(_)) => {
-                    BaseMessage::AI(AIMessage::new(&merged_content))
+                    BaseMessage::AI(AIMessage::builder().content(&merged_content).build())
                 }
                 (BaseMessage::System(_), BaseMessage::System(_)) => {
                     BaseMessage::System(SystemMessage::new(&merged_content))
@@ -365,9 +367,9 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
 
         // For AI messages, also count tool calls if present
         if let BaseMessage::AI(ai_msg) = message
-            && !ai_msg.tool_calls().is_empty()
+            && !ai_msg.tool_calls.is_empty()
         {
-            let tool_calls_str = format!("{:?}", ai_msg.tool_calls());
+            let tool_calls_str = format!("{:?}", ai_msg.tool_calls);
             message_chars += tool_calls_str.len();
         }
 
@@ -481,10 +483,10 @@ fn convert_single_to_openai_message(
 
     // Add tool_calls for AI messages
     if let BaseMessage::AI(ai_msg) = message
-        && !ai_msg.tool_calls().is_empty()
+        && !ai_msg.tool_calls.is_empty()
     {
         let tool_calls: Vec<serde_json::Value> = ai_msg
-            .tool_calls()
+            .tool_calls
             .iter()
             .map(|tc| {
                 serde_json::json!({
@@ -793,9 +795,9 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
             BaseMessage::Human(new_msg)
         }
         BaseMessage::AI(m) => {
-            let mut new_msg = AIMessage::new(content);
+            let mut new_msg = AIMessage::builder().content(content).build();
             if let Some(id) = m.id() {
-                new_msg = AIMessage::with_id(id, content);
+                new_msg = AIMessage::builder().id(id).content(content).build();
             }
             BaseMessage::AI(new_msg)
         }

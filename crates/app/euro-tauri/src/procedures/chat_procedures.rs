@@ -191,7 +191,10 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
-        let _ai_message: BaseMessage = AIMessage::new(complete_response.clone()).into();
+        let _ai_message: BaseMessage = AIMessage::builder()
+            .content(complete_response.clone())
+            .build()
+            .into();
         Ok(complete_response)
     }
 }

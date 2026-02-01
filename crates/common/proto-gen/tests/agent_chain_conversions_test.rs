@@ -69,12 +69,11 @@ mod tests {
             serde_json::json!({"query": "rust programming"}),
         );
 
-        let original = AIMessage::with_id_and_tool_calls(
-            "msg_456",
-            "Let me search for that.",
-            vec![tool_call],
-        )
-        .with_usage_metadata(UsageMetadata::new(50, 25));
+        let original = AIMessage::builder()
+            .id("msg_456")
+            .content("Let me search for that.")
+            .tool_calls(vec![tool_call])
+            .with_usage_metadata(UsageMetadata::new(50, 25));
 
         let proto: ProtoAiMessage = original.clone().into();
         let roundtrip: AIMessage = proto.into();

@@ -55,7 +55,7 @@ fn test_all_imports() {
     use agent_chain_core::messages::KNOWN_BLOCK_TYPES;
 
     // Verify they're not just imported but usable
-    let _ = AIMessage::new("test");
+    let _ = AIMessage::builder().content("test").build();
     let _ = HumanMessage::new("test");
     let _ = SystemMessage::new("test");
     let _ = ChatMessage::new("test", "user");
@@ -63,7 +63,7 @@ fn test_all_imports() {
     let _ = ToolMessage::new("test", "call-123");
     let _ = RemoveMessage::new("msg-123");
 
-    let _ = AIMessageChunk::new("test");
+    let _ = AIMessageChunk::builder().content("test").build();
     let _ = HumanMessageChunk::new("test");
     let _ = SystemMessageChunk::new("test");
     let _ = ChatMessageChunk::new("test", "user");
@@ -97,7 +97,7 @@ fn test_base_message_variants() {
 
     // Test that all BaseMessage variants are accessible
     let _human = BaseMessage::Human(HumanMessage::new("test"));
-    let _ai = BaseMessage::AI(AIMessage::new("test"));
+    let _ai = BaseMessage::AI(AIMessage::builder().content("test").build());
     let _system = BaseMessage::System(SystemMessage::new("test"));
     let _chat = BaseMessage::Chat(ChatMessage::new("test", "user"));
     let _function = BaseMessage::Function(FunctionMessage::new("test", "func"));
