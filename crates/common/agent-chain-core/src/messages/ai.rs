@@ -458,15 +458,15 @@ fn format_tool_calls_repr(
     if !tool_calls.is_empty() {
         lines.push("Tool Calls:".to_string());
         for tc in tool_calls {
-            lines.push(format!("  {} ({:?})", tc.name(), tc.id()));
-            lines.push(format!(" Call ID: {:?}", tc.id()));
+            lines.push(format!("  {} ({:?})", tc.name, tc.id));
+            lines.push(format!(" Call ID: {:?}", tc.id));
             lines.push("  Args:".to_string());
-            if let serde_json::Value::Object(args) = tc.args() {
+            if let serde_json::Value::Object(args) = &tc.args {
                 for (arg, value) in args {
                     lines.push(format!("    {}: {}", arg, value));
                 }
             } else {
-                lines.push(format!("    {}", tc.args()));
+                lines.push(format!("    {}", tc.args));
             }
         }
     }
@@ -877,9 +877,9 @@ impl AIMessageChunk {
                     .tool_calls
                     .iter()
                     .map(|tc| ToolCallChunk {
-                        name: Some(tc.name().to_string()),
-                        args: Some(tc.args().to_string()),
-                        id: tc.id(),
+                        name: Some(tc.name.clone()),
+                        args: Some(tc.args.to_string()),
+                        id: tc.id.clone(),
                         index: None,
                     })
                     .collect();
@@ -1624,7 +1624,7 @@ mod tests {
             backwards_compat_tool_calls(&additional_kwargs, false);
 
         assert_eq!(tool_calls.len(), 1);
-        assert_eq!(tool_calls[0].name(), "get_weather");
+        assert_eq!(tool_calls[0].name, "get_weather");
         assert!(invalid_tool_calls.is_empty());
         assert!(tool_call_chunks.is_empty());
     }

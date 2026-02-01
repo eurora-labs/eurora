@@ -606,7 +606,13 @@ pub fn tool_example_to_messages<T: Serialize>(
             .get("id")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        messages.push(ToolMessage::new(output.clone(), tool_call_id).into());
+        messages.push(
+            ToolMessage::builder()
+                .content(output.clone())
+                .tool_call_id(tool_call_id)
+                .build()
+                .into(),
+        );
     }
 
     // Add final AI response if provided

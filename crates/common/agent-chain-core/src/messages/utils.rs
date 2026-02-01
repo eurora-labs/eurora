@@ -386,7 +386,7 @@ pub fn count_tokens_approximately(messages: &[BaseMessage], config: &CountTokens
 
         // For tool messages, also count the tool call ID
         if let BaseMessage::Tool(tool_msg) = message {
-            message_chars += tool_msg.tool_call_id().len();
+            message_chars += tool_msg.tool_call_id.len();
         }
 
         // Add role characters
@@ -489,7 +489,7 @@ fn convert_single_to_openai_message(
 
     // Add tool_call_id for tool messages
     if let BaseMessage::Tool(tool_msg) = message {
-        oai_msg["tool_call_id"] = serde_json::json!(tool_msg.tool_call_id());
+        oai_msg["tool_call_id"] = serde_json::json!(tool_msg.tool_call_id);
     }
 
     // Add tool_calls for AI messages
@@ -502,10 +502,10 @@ fn convert_single_to_openai_message(
             .map(|tc| {
                 serde_json::json!({
                     "type": "function",
-                    "id": tc.id(),
+                    "id": tc.id,
                     "function": {
-                        "name": tc.name(),
-                        "arguments": serde_json::to_string(&tc.args()).unwrap_or_default(),
+                        "name": tc.name,
+                        "arguments": serde_json::to_string(&tc.args).unwrap_or_default(),
                     }
                 })
             })
@@ -817,10 +817,11 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
                 .build(),
         ),
         BaseMessage::Tool(m) => {
-            let mut new_msg = ToolMessage::new(content, m.tool_call_id());
-            if let Some(id) = m.id() {
-                new_msg = ToolMessage::with_id(id, content, m.tool_call_id());
-            }
+            let new_msg = ToolMessage::builder()
+                .content(content)
+                .tool_call_id(&m.tool_call_id)
+                .maybe_id(m.id.clone())
+                .build();
             BaseMessage::Tool(new_msg)
         }
         BaseMessage::Chat(m) => BaseMessage::Chat(
@@ -839,7 +840,7 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
         }
         BaseMessage::Remove(m) => {
             // RemoveMessage preserves the same id (which is the target id to remove)
-            BaseMessage::Remove(RemoveMessage::new(m.target_id()))
+            BaseMessage::Remove(RemoveMessage::builder().id(&m.id).build())
         }
     }
 }

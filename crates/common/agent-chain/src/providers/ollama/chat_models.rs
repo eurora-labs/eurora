@@ -323,7 +323,7 @@ impl ChatOllama {
             .filter_map(|msg| match msg {
                 BaseMessage::System(m) => Some(serde_json::json!({
                     "role": "system",
-                    "content": m.content()
+                    "content": m.content.as_text()
                 })),
                 BaseMessage::Human(m) => Some(serde_json::json!({
                     "role": "user",
@@ -345,10 +345,10 @@ impl ChatOllama {
                             .map(|tc| {
                                 serde_json::json!({
                                     "type": "function",
-                                    "id": tc.id(),
+                                    "id": tc.id,
                                     "function": {
-                                        "name": tc.name(),
-                                        "arguments": tc.args()
+                                        "name": tc.name,
+                                        "arguments": tc.args
                                     }
                                 })
                             })
@@ -360,16 +360,16 @@ impl ChatOllama {
                 }
                 BaseMessage::Tool(m) => Some(serde_json::json!({
                     "role": "tool",
-                    "tool_call_id": m.tool_call_id(),
-                    "content": m.content()
+                    "tool_call_id": m.tool_call_id,
+                    "content": m.content
                 })),
                 BaseMessage::Remove(_) => {
                     // RemoveMessage is used for message management, not sent to API
                     None
                 }
                 BaseMessage::Chat(m) => Some(serde_json::json!({
-                    "role": m.role(),
-                    "content": m.content()
+                    "role": m.role,
+                    "content": m.content
                 })),
                 BaseMessage::Function(m) => Some(serde_json::json!({
                     "role": "function",
@@ -514,7 +514,7 @@ impl ChatOllama {
                             } else {
                                 serde_json::json!({})
                             };
-                            ToolCall::new(&f.name, args)
+                            ToolCall::builder().name(&f.name).args(args).build()
                         })
                     })
                     .collect()
