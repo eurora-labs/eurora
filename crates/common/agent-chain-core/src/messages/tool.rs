@@ -447,7 +447,11 @@ impl std::ops::Add for ToolMessageChunk {
 ///
 /// This corresponds to the `tool_call` function in LangChain Python.
 pub fn tool_call(name: impl Into<String>, args: serde_json::Value, id: Option<String>) -> ToolCall {
-    ToolCall::builder().name(name).args(args).maybe_id(id).build()
+    ToolCall::builder()
+        .name(name)
+        .args(args)
+        .maybe_id(id)
+        .build()
 }
 
 /// Factory function to create a tool call chunk.

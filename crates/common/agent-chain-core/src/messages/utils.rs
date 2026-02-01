@@ -301,9 +301,12 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                         .role(&c.role)
                         .build(),
                 ),
-                (BaseMessage::Function(f), BaseMessage::Function(_)) => {
-                    BaseMessage::Function(FunctionMessage::new(f.name(), &merged_content))
-                }
+                (BaseMessage::Function(f), BaseMessage::Function(_)) => BaseMessage::Function(
+                    FunctionMessage::builder()
+                        .name(&f.name)
+                        .content(&merged_content)
+                        .build(),
+                ),
                 _ => {
                     // Shouldn't happen due to discriminant check, but handle gracefully
                     merged.push(msg.clone());
@@ -831,13 +834,13 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        BaseMessage::Function(m) => {
-            let mut new_msg = FunctionMessage::new(m.name(), content);
-            if let Some(id) = m.id() {
-                new_msg = FunctionMessage::with_id(id, m.name(), content);
-            }
-            BaseMessage::Function(new_msg)
-        }
+        BaseMessage::Function(m) => BaseMessage::Function(
+            FunctionMessage::builder()
+                .name(&m.name)
+                .content(content)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
         BaseMessage::Remove(m) => {
             // RemoveMessage preserves the same id (which is the target id to remove)
             BaseMessage::Remove(RemoveMessage::builder().id(&m.id).build())
