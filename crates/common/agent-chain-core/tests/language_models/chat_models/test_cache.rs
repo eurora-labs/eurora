@@ -72,9 +72,9 @@ fn test_local_cache_sync() {
     // let chat_model = FakeListChatModel::new(vec!["hello", "goodbye"])
     //     .with_cache(local_cache.clone());
     //
-    // assert_eq!(chat_model.invoke("How are you?").content(), "hello");
+    // assert_eq!(chat_model.invoke("How are you?").content, "hello");
     // // Cache hit - should get same response
-    // assert_eq!(chat_model.invoke("How are you?").content(), "hello");
+    // assert_eq!(chat_model.invoke("How are you?").content, "hello");
     //
     // // Global cache should be empty
     // assert_eq!(global_cache.len(), 0);
@@ -82,7 +82,7 @@ fn test_local_cache_sync() {
     // assert_eq!(local_cache.len(), 1);
     //
     // // Different prompt triggers new call
-    // assert_eq!(chat_model.invoke("meow?").content(), "goodbye");
+    // assert_eq!(chat_model.invoke("meow?").content, "goodbye");
     // assert_eq!(local_cache.len(), 2);
 }
 
@@ -107,9 +107,9 @@ fn test_global_cache_sync() {
     // let chat_model = FakeListChatModel::new(vec!["hello", "goodbye", "meow", "woof"])
     //     .with_cache(true);
     //
-    // assert_eq!(chat_model.invoke("How are you?").content(), "hello");
+    // assert_eq!(chat_model.invoke("How are you?").content, "hello");
     // // Cache hit
-    // assert_eq!(chat_model.invoke("How are you?").content(), "hello");
+    // assert_eq!(chat_model.invoke("How are you?").content, "hello");
     // // Global cache should be populated
     // assert_eq!(global_cache.len(), 1);
 }
@@ -135,9 +135,9 @@ fn test_no_cache_sync() {
     // let chat_model = FakeListChatModel::new(vec!["hello", "goodbye"])
     //     .with_cache(false);
     //
-    // assert_eq!(chat_model.invoke("How are you?").content(), "hello");
+    // assert_eq!(chat_model.invoke("How are you?").content, "hello");
     // // No cache - should get different response
-    // assert_eq!(chat_model.invoke("How are you?").content(), "goodbye");
+    // assert_eq!(chat_model.invoke("How are you?").content, "goodbye");
     // // Global cache should remain empty
     // assert_eq!(global_cache.len(), 0);
 }
@@ -202,7 +202,7 @@ async fn test_can_swap_caches() {
     //     .with_cache(cache1.clone());
     //
     // let result = model.ainvoke("foo").await;
-    // assert_eq!(result.content(), "hello");
+    // assert_eq!(result.content, "hello");
     //
     // // Copy cache to new instance
     // let cache2 = InMemoryCache::new();
@@ -214,7 +214,7 @@ async fn test_can_swap_caches() {
     //
     // // Should get cache hit with original response
     // let result2 = model2.ainvoke("foo").await;
-    // assert_eq!(result2.content(), "hello");
+    // assert_eq!(result2.content, "hello");
 }
 
 #[test]

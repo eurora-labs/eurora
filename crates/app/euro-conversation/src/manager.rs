@@ -220,7 +220,7 @@ impl ConversationManager {
         client
             .add_system_message(AddSystemMessageRequest {
                 conversation_id: self.current_conversation.id().unwrap().to_string(),
-                content: message.content().to_string(),
+                content: message.content.as_text().to_string(),
             })
             .await?;
         Ok(())

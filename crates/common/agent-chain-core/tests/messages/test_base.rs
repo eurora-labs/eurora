@@ -131,7 +131,9 @@ fn test_message_to_dict_ai_message() {
 
 #[test]
 fn test_message_to_dict_system_message() {
-    let msg = SystemMessage::new("You are a helpful assistant");
+    let msg = SystemMessage::builder()
+        .content("You are a helpful assistant")
+        .build();
     let result = message_to_dict(&BaseMessage::System(msg));
     assert_eq!(result.get("type").unwrap().as_str().unwrap(), "system");
     assert_eq!(
@@ -178,7 +180,7 @@ fn test_message_to_dict_with_additional_kwargs() {
 #[test]
 fn test_messages_to_dict_multiple_messages() {
     let messages = vec![
-        BaseMessage::System(SystemMessage::new("System")),
+        BaseMessage::System(SystemMessage::builder().content("System").build()),
         BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
         BaseMessage::AI(AIMessage::builder().content("Hi").build()),
     ];
@@ -214,10 +216,10 @@ fn test_add_human_message_chunks() {
 
 #[test]
 fn test_add_system_message_chunks() {
-    let chunk1 = SystemMessageChunk::new("You are");
-    let chunk2 = SystemMessageChunk::new(" helpful");
+    let chunk1 = SystemMessageChunk::builder().content("You are").build();
+    let chunk2 = SystemMessageChunk::builder().content(" helpful").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content(), "You are helpful");
+    assert_eq!(result.content.as_text(), "You are helpful");
 }
 
 #[test]
@@ -341,7 +343,7 @@ fn test_init_with_response_metadata() {
 fn test_message_types_have_consistent_types() {
     let human_msg = HumanMessage::builder().content("Hello").build();
     let ai_msg = AIMessage::builder().content("Hi").build();
-    let system_msg = SystemMessage::new("You are helpful");
+    let system_msg = SystemMessage::builder().content("You are helpful").build();
 
     assert_eq!(human_msg.message_type(), "human");
     assert_eq!(ai_msg.message_type(), "ai");

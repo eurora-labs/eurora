@@ -128,9 +128,9 @@ impl From<ProtoUsageMetadata> for UsageMetadata {
 impl From<ToolCall> for ProtoToolCall {
     fn from(tc: ToolCall) -> Self {
         ProtoToolCall {
-            id: tc.id().unwrap_or_default(),
-            name: tc.name().to_string(),
-            args: value_to_json_string(tc.args()),
+            id: tc.id.clone().unwrap_or_default(),
+            name: tc.name.clone(),
+            args: value_to_json_string(&tc.args),
         }
     }
 }
@@ -140,9 +140,13 @@ impl From<ProtoToolCall> for ToolCall {
         let args: serde_json::Value = serde_json::from_str(&proto.args)
             .unwrap_or(serde_json::Value::Object(Default::default()));
         if proto.id.is_empty() {
-            ToolCall::new(proto.name, args)
+            ToolCall::builder().name(proto.name).args(args).build()
         } else {
-            ToolCall::with_id(proto.id, proto.name, args)
+            ToolCall::builder()
+                .name(proto.name)
+                .args(args)
+                .id(proto.id)
+                .build()
         }
     }
 }
@@ -595,23 +599,12 @@ impl From<ProtoSystemMessage> for SystemMessage {
             .map(Into::into)
             .unwrap_or(MessageContent::Text(String::new()));
 
-        let mut msg = match content {
-            MessageContent::Text(text) => match proto.id {
-                Some(id) => SystemMessage::with_id(id, text),
-                None => SystemMessage::new(text),
-            },
-            MessageContent::Parts(parts) => match proto.id {
-                Some(id) => SystemMessage::with_id_and_content(id, parts),
-                None => SystemMessage::with_content(parts),
-            },
-        };
-
-        if let Some(name) = proto.name {
-            msg = msg.with_name(name);
-        }
-
-        msg.additional_kwargs = json_string_to_hashmap(&proto.additional_kwargs);
-        msg
+        SystemMessage::builder()
+            .content(content)
+            .maybe_id(proto.id)
+            .maybe_name(proto.name)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .build()
     }
 }
 
@@ -622,11 +615,11 @@ impl From<ProtoSystemMessage> for SystemMessage {
 impl From<SystemMessageChunk> for ProtoSystemMessageChunk {
     fn from(chunk: SystemMessageChunk) -> Self {
         ProtoSystemMessageChunk {
-            content: Some(chunk.message_content().clone().into()),
-            id: chunk.id(),
-            name: chunk.name(),
-            additional_kwargs: hashmap_to_json_string(chunk.additional_kwargs()),
-            response_metadata: hashmap_to_json_string(chunk.response_metadata()),
+            content: Some(chunk.content.clone().into()),
+            id: chunk.id.clone(),
+            name: chunk.name.clone(),
+            additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
+            response_metadata: hashmap_to_json_string(&chunk.response_metadata),
         }
     }
 }
@@ -638,15 +631,13 @@ impl From<ProtoSystemMessageChunk> for SystemMessageChunk {
             .map(Into::into)
             .unwrap_or(MessageContent::Text(String::new()));
 
-        let text = match &content {
-            MessageContent::Text(t) => t.clone(),
-            MessageContent::Parts(_) => String::new(),
-        };
-
-        match proto.id {
-            Some(id) => SystemMessageChunk::with_id(id, text),
-            None => SystemMessageChunk::new(text),
-        }
+        SystemMessageChunk::builder()
+            .content(content)
+            .maybe_id(proto.id)
+            .maybe_name(proto.name)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
+            .build()
     }
 }
 
@@ -783,24 +774,16 @@ impl From<ProtoToolMessage> for ToolMessage {
     fn from(proto: ProtoToolMessage) -> Self {
         let status: ToolStatus = i32_to_tool_status(proto.status);
 
-        let mut msg = match proto.id {
-            Some(id) => ToolMessage::with_id(id, proto.content, proto.tool_call_id),
-            None => ToolMessage::new(proto.content, proto.tool_call_id),
-        };
-
-        if let Some(name) = proto.name {
-            msg = msg.with_name(name);
-        }
-
-        if let Some(artifact) = json_string_to_value(&proto.artifact) {
-            msg = msg.with_artifact_value(artifact);
-        }
-
-        let status_string: String = status.into();
-        msg = msg.with_status(status_string.as_str());
-        msg.additional_kwargs = json_string_to_hashmap(&proto.additional_kwargs);
-        msg.response_metadata = json_string_to_hashmap(&proto.response_metadata);
-        msg
+        ToolMessage::builder()
+            .content(proto.content)
+            .tool_call_id(proto.tool_call_id)
+            .maybe_id(proto.id)
+            .maybe_name(proto.name)
+            .maybe_artifact(json_string_to_value(&proto.artifact))
+            .status(status)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
+            .build()
     }
 }
 
@@ -811,12 +794,12 @@ impl From<ProtoToolMessage> for ToolMessage {
 impl From<ToolMessageChunk> for ProtoToolMessageChunk {
     fn from(chunk: ToolMessageChunk) -> Self {
         ProtoToolMessageChunk {
-            content: chunk.content().to_string(),
-            tool_call_id: chunk.tool_call_id().to_string(),
-            id: chunk.id(),
-            name: chunk.name().map(|s| s.to_string()),
-            status: i32::from(ProtoToolStatus::from(chunk.status().clone())),
-            artifact: chunk.artifact().map(|a| value_to_json_string(a)),
+            content: chunk.content.clone(),
+            tool_call_id: chunk.tool_call_id.clone(),
+            id: chunk.id.clone(),
+            name: chunk.name.clone(),
+            status: i32::from(ProtoToolStatus::from(chunk.status.clone())),
+            artifact: chunk.artifact.as_ref().map(|a| value_to_json_string(a)),
             additional_kwargs: None,
             response_metadata: None,
         }
@@ -825,7 +808,12 @@ impl From<ToolMessageChunk> for ProtoToolMessageChunk {
 
 impl From<ProtoToolMessageChunk> for ToolMessageChunk {
     fn from(proto: ProtoToolMessageChunk) -> Self {
-        ToolMessageChunk::new(proto.content, proto.tool_call_id)
+        ToolMessageChunk::builder()
+            .content(proto.content)
+            .tool_call_id(proto.tool_call_id)
+            .maybe_id(proto.id)
+            .maybe_name(proto.name)
+            .build()
     }
 }
 
@@ -848,18 +836,14 @@ impl From<ChatMessage> for ProtoChatMessage {
 
 impl From<ProtoChatMessage> for ChatMessage {
     fn from(proto: ProtoChatMessage) -> Self {
-        let mut msg = match proto.id {
-            Some(id) => ChatMessage::with_id(id, proto.role, proto.content),
-            None => ChatMessage::new(proto.role, proto.content),
-        };
-
-        if let Some(name) = proto.name {
-            msg = msg.with_name(name);
-        }
-
-        msg.additional_kwargs = json_string_to_hashmap(&proto.additional_kwargs);
-        msg.response_metadata = json_string_to_hashmap(&proto.response_metadata);
-        msg
+        ChatMessage::builder()
+            .content(proto.content)
+            .role(proto.role)
+            .maybe_id(proto.id)
+            .maybe_name(proto.name)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
+            .build()
     }
 }
 
@@ -870,22 +854,24 @@ impl From<ProtoChatMessage> for ChatMessage {
 impl From<ChatMessageChunk> for ProtoChatMessageChunk {
     fn from(chunk: ChatMessageChunk) -> Self {
         ProtoChatMessageChunk {
-            content: chunk.content().to_string(),
-            role: chunk.role().to_string(),
-            id: chunk.id(),
-            name: chunk.name(),
-            additional_kwargs: hashmap_to_json_string(chunk.additional_kwargs()),
-            response_metadata: hashmap_to_json_string(chunk.response_metadata()),
+            content: chunk.content.clone(),
+            role: chunk.role.clone(),
+            id: chunk.id.clone(),
+            name: chunk.name.clone(),
+            additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
+            response_metadata: hashmap_to_json_string(&chunk.response_metadata),
         }
     }
 }
 
 impl From<ProtoChatMessageChunk> for ChatMessageChunk {
     fn from(proto: ProtoChatMessageChunk) -> Self {
-        match proto.id {
-            Some(id) => ChatMessageChunk::with_id(id, proto.role, proto.content),
-            None => ChatMessageChunk::new(proto.role, proto.content),
-        }
+        ChatMessageChunk::builder()
+            .content(proto.content)
+            .role(proto.role)
+            .maybe_id(proto.id)
+            .maybe_name(proto.name)
+            .build()
     }
 }
 
@@ -907,14 +893,13 @@ impl From<FunctionMessage> for ProtoFunctionMessage {
 
 impl From<ProtoFunctionMessage> for FunctionMessage {
     fn from(proto: ProtoFunctionMessage) -> Self {
-        let mut msg = match proto.id {
-            Some(id) => FunctionMessage::with_id(id, proto.name, proto.content),
-            None => FunctionMessage::new(proto.name, proto.content),
-        };
-
-        msg.additional_kwargs = json_string_to_hashmap(&proto.additional_kwargs);
-        msg.response_metadata = json_string_to_hashmap(&proto.response_metadata);
-        msg
+        FunctionMessage::builder()
+            .content(proto.content)
+            .name(proto.name)
+            .maybe_id(proto.id)
+            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
+            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
+            .build()
     }
 }
 
@@ -925,21 +910,22 @@ impl From<ProtoFunctionMessage> for FunctionMessage {
 impl From<FunctionMessageChunk> for ProtoFunctionMessageChunk {
     fn from(chunk: FunctionMessageChunk) -> Self {
         ProtoFunctionMessageChunk {
-            content: chunk.content().to_string(),
-            name: chunk.name().to_string(),
-            id: chunk.id(),
-            additional_kwargs: hashmap_to_json_string(chunk.additional_kwargs()),
-            response_metadata: hashmap_to_json_string(chunk.response_metadata()),
+            content: chunk.content.clone(),
+            name: chunk.name.clone(),
+            id: chunk.id.clone(),
+            additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
+            response_metadata: hashmap_to_json_string(&chunk.response_metadata),
         }
     }
 }
 
 impl From<ProtoFunctionMessageChunk> for FunctionMessageChunk {
     fn from(proto: ProtoFunctionMessageChunk) -> Self {
-        match proto.id {
-            Some(id) => FunctionMessageChunk::with_id(id, proto.name, proto.content),
-            None => FunctionMessageChunk::new(proto.name, proto.content),
-        }
+        FunctionMessageChunk::builder()
+            .content(proto.content)
+            .name(proto.name)
+            .maybe_id(proto.id)
+            .build()
     }
 }
 
@@ -955,7 +941,7 @@ impl From<RemoveMessage> for ProtoRemoveMessage {
 
 impl From<ProtoRemoveMessage> for RemoveMessage {
     fn from(proto: ProtoRemoveMessage) -> Self {
-        RemoveMessage::new(proto.id)
+        RemoveMessage::builder().id(proto.id).build()
     }
 }
 

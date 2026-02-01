@@ -70,7 +70,7 @@ impl AssetFunctionality for ArticleAsset {
             self.content
         ));
 
-        vec![SystemMessage::new(content).into()]
+        vec![SystemMessage::builder().content(content).build().into()]
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {

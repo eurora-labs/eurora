@@ -41,7 +41,7 @@ impl SnapshotFunctionality for DefaultSnapshot {
             }
         }
 
-        vec![SystemMessage::new(content).into()]
+        vec![SystemMessage::builder().content(content).build().into()]
     }
 
     fn get_updated_at(&self) -> u64 {

@@ -39,35 +39,43 @@ mod tests {
             "units": "celsius"
         });
 
-        let original = ToolCall::with_id("call_123", "get_weather", args.clone());
+        let original = ToolCall::builder()
+            .id("call_123".to_string())
+            .name("get_weather")
+            .args(args.clone())
+            .build();
 
         let proto: ProtoToolCall = original.clone().into();
         let roundtrip: ToolCall = proto.into();
 
-        assert_eq!(roundtrip.id(), Some("call_123".to_string()));
-        assert_eq!(roundtrip.name(), "get_weather");
-        assert_eq!(roundtrip.args(), &args);
+        assert_eq!(roundtrip.id, Some("call_123".to_string()));
+        assert_eq!(roundtrip.name, "get_weather");
+        assert_eq!(roundtrip.args, args);
     }
 
     #[test]
     fn test_human_message_roundtrip() {
-        let original = HumanMessage::with_id("msg_123", "Hello, world!").with_name("User");
+        let original = HumanMessage::builder()
+            .id("msg_123".to_string())
+            .content("Hello, world!")
+            .name("User".to_string())
+            .build();
 
         let proto: ProtoHumanMessage = original.clone().into();
         let roundtrip: HumanMessage = proto.into();
 
-        assert_eq!(roundtrip.id(), Some("msg_123".to_string()));
-        assert_eq!(roundtrip.content(), "Hello, world!");
-        assert_eq!(roundtrip.name(), Some("User".to_string()));
+        assert_eq!(roundtrip.id, Some("msg_123".to_string()));
+        assert_eq!(roundtrip.content.as_text(), "Hello, world!");
+        assert_eq!(roundtrip.name, Some("User".to_string()));
     }
 
     #[test]
     fn test_ai_message_roundtrip() {
-        let tool_call = ToolCall::with_id(
-            "call_456",
-            "search",
-            serde_json::json!({"query": "rust programming"}),
-        );
+        let tool_call = ToolCall::builder()
+            .id("call_456".to_string())
+            .name("search")
+            .args(serde_json::json!({"query": "rust programming"}))
+            .build();
 
         let original = AIMessage::builder()
             .id("msg_456".to_string())
@@ -82,40 +90,47 @@ mod tests {
         assert_eq!(roundtrip.id, Some("msg_456".to_string()));
         assert_eq!(roundtrip.content, "Let me search for that.");
         assert_eq!(roundtrip.tool_calls.len(), 1);
-        assert_eq!(roundtrip.tool_calls[0].name(), "search");
+        assert_eq!(roundtrip.tool_calls[0].name, "search");
         assert!(roundtrip.usage_metadata.is_some());
         assert_eq!(roundtrip.usage_metadata.unwrap().input_tokens, 50);
     }
 
     #[test]
     fn test_system_message_roundtrip() {
-        let original = SystemMessage::with_id("msg_789", "You are a helpful assistant.");
+        let original = SystemMessage::builder()
+            .id("msg_789".to_string())
+            .content("You are a helpful assistant.")
+            .build();
 
         let proto: ProtoSystemMessage = original.clone().into();
         let roundtrip: SystemMessage = proto.into();
 
-        assert_eq!(roundtrip.id(), Some("msg_789".to_string()));
-        assert_eq!(roundtrip.content(), "You are a helpful assistant.");
+        assert_eq!(roundtrip.id, Some("msg_789".to_string()));
+        assert_eq!(roundtrip.content.as_text(), "You are a helpful assistant.");
     }
 
     #[test]
     fn test_tool_message_roundtrip() {
-        let original = ToolMessage::with_id("msg_999", "Search results: ...", "call_456")
-            .with_name("search")
-            .with_status("success");
+        let original = ToolMessage::builder()
+            .id("msg_999".to_string())
+            .content("Search results: ...")
+            .tool_call_id("call_456")
+            .name("search".to_string())
+            .status(ToolStatus::Success)
+            .build();
 
         let proto: ProtoToolMessage = original.clone().into();
         let roundtrip: ToolMessage = proto.into();
 
-        assert_eq!(roundtrip.id(), Some("msg_999".to_string()));
-        assert_eq!(roundtrip.content(), "Search results: ...");
-        assert_eq!(roundtrip.tool_call_id(), "call_456");
-        assert_eq!(roundtrip.status(), &ToolStatus::Success);
+        assert_eq!(roundtrip.id, Some("msg_999".to_string()));
+        assert_eq!(roundtrip.content, "Search results: ...");
+        assert_eq!(roundtrip.tool_call_id, "call_456");
+        assert_eq!(roundtrip.status, ToolStatus::Success);
     }
 
     #[test]
     fn test_base_message_roundtrip() {
-        let human = HumanMessage::new("Hello!");
+        let human = HumanMessage::builder().content("Hello!").build();
         let original = BaseMessage::Human(human);
 
         let proto: ProtoBaseMessage = original.clone().into();
@@ -123,7 +138,7 @@ mod tests {
 
         match roundtrip {
             BaseMessage::Human(msg) => {
-                assert_eq!(msg.content(), "Hello!");
+                assert_eq!(msg.content.as_text(), "Hello!");
             }
             _ => panic!("Expected Human message"),
         }
@@ -170,12 +185,14 @@ mod tests {
             },
         ];
 
-        let original = HumanMessage::with_content(parts);
+        let original = HumanMessage::builder()
+            .content(MessageContent::Parts(parts))
+            .build();
 
         let proto: ProtoHumanMessage = original.clone().into();
         let roundtrip: HumanMessage = proto.into();
 
-        match roundtrip.message_content() {
+        match &roundtrip.content {
             MessageContent::Parts(parts) => {
                 assert_eq!(parts.len(), 2);
                 match &parts[0] {

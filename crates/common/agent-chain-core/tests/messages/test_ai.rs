@@ -83,7 +83,7 @@ fn test_serdes_message() {
     // Test roundtrip
     let deserialized: AIMessage = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.tool_calls.len(), 1);
-    assert_eq!(deserialized.tool_calls[0].name(), "foo");
+    assert_eq!(deserialized.tool_calls[0].name, "foo");
     assert_eq!(deserialized.invalid_tool_calls.len(), 1);
     assert_eq!(
         deserialized.invalid_tool_calls[0].name,
@@ -355,7 +355,7 @@ fn test_init_tool_calls() {
         .build();
     assert_eq!(msg.tool_calls.len(), 1);
     // In Rust, tool_call helper creates a ToolCall struct which has consistent type
-    assert_eq!(msg.tool_calls[0].name(), "foo");
+    assert_eq!(msg.tool_calls[0].name, "foo");
 }
 
 // ============================================================================
@@ -374,7 +374,7 @@ fn test_content_blocks() {
         )])
         .build();
     assert_eq!(message.tool_calls.len(), 1);
-    assert_eq!(message.content(), "");
+    assert_eq!(message.content, "");
 
     // Test AIMessage with content and tool_calls
     let message2 = AIMessage::builder()
@@ -385,7 +385,7 @@ fn test_content_blocks() {
             Some("abc_123".to_string()),
         )])
         .build();
-    assert_eq!(message2.content(), "foo");
+    assert_eq!(message2.content, "foo");
     assert_eq!(message2.tool_calls.len(), 1);
 
     // Test AIMessageChunk with tool_call_chunks
@@ -451,7 +451,7 @@ fn test_content_blocks_reasoning_extraction() {
         .additional_kwargs(additional_kwargs)
         .build();
 
-    assert_eq!(message.content(), "The answer is 42.");
+    assert_eq!(message.content, "The answer is 42.");
     // In Python, content_blocks property extracts reasoning from additional_kwargs
     // For now, we verify the additional_kwargs is set correctly
     assert!(message.additional_kwargs.contains_key("reasoning_content"));
@@ -484,7 +484,7 @@ fn test_content_blocks_reasoning_extraction() {
 #[test]
 fn test_ai_message_basic() {
     let msg = AIMessage::builder().content("Hello, world!").build();
-    assert_eq!(msg.content(), "Hello, world!");
+    assert_eq!(msg.content, "Hello, world!");
     assert!(msg.id.is_none());
     assert!(msg.name.is_none());
     assert!(msg.tool_calls.is_empty());
@@ -498,7 +498,7 @@ fn test_ai_message_with_id() {
         .id("msg-123".to_string())
         .build();
     assert_eq!(msg.id, Some("msg-123".to_string()));
-    assert_eq!(msg.content(), "Hello!");
+    assert_eq!(msg.content, "Hello!");
 }
 
 #[test]
@@ -565,7 +565,7 @@ fn test_ai_message_chunk_to_message() {
     chunk.set_usage_metadata(Some(UsageMetadata::new(5, 10)));
 
     let message = chunk.to_message();
-    assert_eq!(message.content(), "Hello!");
+    assert_eq!(message.content, "Hello!");
     assert_eq!(message.id, Some("chunk-1".to_string()));
     assert!(message.usage_metadata.is_some());
 }
@@ -622,8 +622,8 @@ fn test_ai_message_chunk_init_tool_calls() {
     chunk.init_tool_calls();
 
     assert_eq!(chunk.tool_calls.len(), 1);
-    assert_eq!(chunk.tool_calls[0].name(), "get_weather");
-    assert_eq!(chunk.tool_calls[0].id(), Some("call_123".to_string()));
+    assert_eq!(chunk.tool_calls[0].name, "get_weather");
+    assert_eq!(chunk.tool_calls[0].id, Some("call_123".to_string()));
 }
 
 #[test]

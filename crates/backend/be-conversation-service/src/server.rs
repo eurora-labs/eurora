@@ -464,8 +464,9 @@ impl ProtoConversationService for ConversationService {
         messages.push(HumanMessage::builder().content(req.content).build().into());
 
         messages.push(
-            SystemMessage::new(
-                "Generate a title for the past conversation. Your task is:
+            SystemMessage::builder()
+                .content(
+                    "Generate a title for the past conversation. Your task is:
                 - Return a concise title, max 6 words.
                 - No quotation marks.
                 - Use sentence case.
@@ -473,9 +474,10 @@ impl ProtoConversationService for ConversationService {
                 - If the topic is unclear, use a generic title.
                 Output only the title text.
                 "
-                .to_string(),
-            )
-            .into(),
+                    .to_string(),
+                )
+                .build()
+                .into(),
         );
 
         let title = match self.title_provider.invoke(messages.into()).await {
