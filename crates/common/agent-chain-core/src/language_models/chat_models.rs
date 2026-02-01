@@ -22,9 +22,7 @@ use crate::callbacks::{
     AsyncCallbackManagerForLLMRun, BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks,
 };
 use crate::error::{Error, Result};
-use crate::messages::{
-    AIMessage, AIMessageChunk, BaseMessage, BaseMessageTrait, ChunkPosition, UsageMetadata,
-};
+use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition, UsageMetadata};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, Generation, LLMResult};
 use crate::rate_limiters::BaseRateLimiter;
 use crate::tools::{BaseTool, ToolDefinition};
@@ -380,7 +378,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
         match result.generations[0].message.clone() {
             BaseMessage::AI(message) => Ok(message),
-            other => Ok(AIMessage::new(other.content())),
+            other => Ok(AIMessage::builder().content(other.content()).build()),
         }
     }
 
@@ -408,7 +406,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             .into_iter()
             .map(|cached_gen| {
                 // Convert Generation to ChatGeneration by creating AIMessage from text
-                let message = AIMessage::new(&cached_gen.text);
+                let message = AIMessage::builder().content(&cached_gen.text).build();
                 match cached_gen.generation_info {
                     Some(info) => ChatGeneration::with_info(message.into(), info),
                     None => ChatGeneration::new(message.into()),
@@ -1094,7 +1092,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             // fall back to invoke and yield the result as a single chunk
             let result = self._generate(messages, stop, None).await?;
             let message = self.get_first_message(&result)?;
-            let chunk = AIMessageChunk::new(message.content());
+            let chunk = AIMessageChunk::builder().content(message.content()).build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -1118,8 +1116,8 @@ pub trait BaseChatModel: BaseLanguageModel {
                     Ok(generation_chunk) => {
                         // Extract AIMessageChunk from the generation chunk
                         let ai_chunk = match generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::new(ai_msg.content()),
-                            other => AIMessageChunk::new(other.content()),
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content()).build(),
+                            other => AIMessageChunk::builder().content(other.content()).build(),
                         };
                         yielded = true;
                         yield Ok(ai_chunk);
@@ -1133,7 +1131,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
             // Yield a final empty chunk with chunk_position="last" if we yielded anything
             if yielded {
-                let mut final_chunk = AIMessageChunk::new("");
+                let mut final_chunk = AIMessageChunk::builder().content("").build();
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
                 yield Ok(final_chunk);
             }
@@ -1168,7 +1166,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             // No async or sync stream is implemented, fall back to ainvoke
             let result = self._agenerate(messages, stop, None).await?;
             let message = self.get_first_message(&result)?;
-            let chunk = AIMessageChunk::new(message.content());
+            let chunk = AIMessageChunk::builder().content(message.content()).build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -1192,8 +1190,8 @@ pub trait BaseChatModel: BaseLanguageModel {
                     Ok(generation_chunk) => {
                         // Extract AIMessageChunk from the generation chunk
                         let ai_chunk = match generation_chunk.message {
-                            BaseMessage::AI(ai_msg) => AIMessageChunk::new(ai_msg.content()),
-                            other => AIMessageChunk::new(other.content()),
+                            BaseMessage::AI(ai_msg) => AIMessageChunk::builder().content(ai_msg.content()).build(),
+                            other => AIMessageChunk::builder().content(other.content()).build(),
                         };
                         yielded = true;
                         yield Ok(ai_chunk);
@@ -1207,7 +1205,7 @@ pub trait BaseChatModel: BaseLanguageModel {
 
             // Yield a final empty chunk with chunk_position="last" if we yielded anything
             if yielded {
-                let mut final_chunk = AIMessageChunk::new("");
+                let mut final_chunk = AIMessageChunk::builder().content("").build();
                 final_chunk.set_chunk_position(Some(ChunkPosition::Last));
                 yield Ok(final_chunk);
             }
@@ -1345,7 +1343,7 @@ impl<T: SimpleChatModel> BaseChatModel for T {
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         let output_str = self._call(messages, stop, run_manager).await?;
-        let message = AIMessage::new(output_str);
+        let message = AIMessage::builder().content(output_str).build();
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
     }
@@ -1528,8 +1526,8 @@ mod tests {
     #[test]
     fn test_generate_from_stream() {
         let chunks = vec![
-            ChatGenerationChunk::new(AIMessage::new("Hello, ").into()),
-            ChatGenerationChunk::new(AIMessage::new("world!").into()),
+            ChatGenerationChunk::new(AIMessage::builder().content("Hello, ").build().into()),
+            ChatGenerationChunk::new(AIMessage::builder().content("world!").build().into()),
         ];
 
         let result = generate_from_stream(chunks.into_iter()).unwrap();
@@ -1547,8 +1545,12 @@ mod tests {
     #[tokio::test]
     async fn test_agenerate_from_stream() {
         let chunks = vec![
-            Ok(ChatGenerationChunk::new(AIMessage::new("Hello, ").into())),
-            Ok(ChatGenerationChunk::new(AIMessage::new("world!").into())),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("Hello, ").build().into(),
+            )),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("world!").build().into(),
+            )),
         ];
 
         let stream = futures::stream::iter(chunks);
@@ -1560,9 +1562,15 @@ mod tests {
     #[tokio::test]
     async fn test_collect_and_merge_stream() {
         let chunks = vec![
-            Ok(ChatGenerationChunk::new(AIMessage::new("a").into())),
-            Ok(ChatGenerationChunk::new(AIMessage::new("b").into())),
-            Ok(ChatGenerationChunk::new(AIMessage::new("c").into())),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("a").build().into(),
+            )),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("b").build().into(),
+            )),
+            Ok(ChatGenerationChunk::new(
+                AIMessage::builder().content("c").build().into(),
+            )),
         ];
 
         let stream = futures::stream::iter(chunks);

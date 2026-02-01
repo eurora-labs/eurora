@@ -81,7 +81,7 @@ impl SnapshotFunctionality for ArticleSnapshot {
             content.push_str(&format!(" (from: {})", url));
         }
 
-        vec![SystemMessage::new(content).into()]
+        vec![SystemMessage::builder().content(content).build().into()]
     }
 
     fn get_updated_at(&self) -> u64 {
@@ -107,7 +107,6 @@ impl From<NativeArticleSnapshot> for ArticleSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_chain_core::messages::BaseMessageTrait;
 
     #[test]
     fn test_article_snapshot_creation() {

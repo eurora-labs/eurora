@@ -10,23 +10,31 @@ use agent_chain_core::messages::{ChatMessage, ChatMessageChunk};
 
 #[test]
 fn test_init_basic() {
-    let msg = ChatMessage::new("Hello", "user");
-    assert_eq!(msg.content(), "Hello");
-    assert_eq!(msg.role(), "user");
+    let msg = ChatMessage::builder().content("Hello").role("user").build();
+    assert_eq!(msg.content, "Hello");
+    assert_eq!(msg.role, "user");
     assert_eq!(msg.message_type(), "chat");
 }
 
 #[test]
 fn test_init_with_name() {
-    let msg = ChatMessage::new("Hello", "assistant").with_name("bot");
-    assert_eq!(msg.name(), Some("bot".to_string()));
-    assert_eq!(msg.role(), "assistant");
+    let msg = ChatMessage::builder()
+        .content("Hello")
+        .role("assistant")
+        .name("bot".to_string())
+        .build();
+    assert_eq!(msg.name, Some("bot".to_string()));
+    assert_eq!(msg.role, "assistant");
 }
 
 #[test]
 fn test_init_with_id() {
-    let msg = ChatMessage::with_id("msg-123", "Hello", "user");
-    assert_eq!(msg.id(), Some("msg-123".to_string()));
+    let msg = ChatMessage::builder()
+        .id("msg-123".to_string())
+        .content("Hello")
+        .role("user")
+        .build();
+    assert_eq!(msg.id, Some("msg-123".to_string()));
 }
 
 #[test]
@@ -34,9 +42,13 @@ fn test_init_with_additional_kwargs() {
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert("custom".to_string(), serde_json::json!("value"));
 
-    let msg = ChatMessage::new("Hello", "user").with_additional_kwargs(additional_kwargs);
+    let msg = ChatMessage::builder()
+        .content("Hello")
+        .role("user")
+        .additional_kwargs(additional_kwargs)
+        .build();
     assert_eq!(
-        msg.additional_kwargs().get("custom").unwrap(),
+        msg.additional_kwargs.get("custom").unwrap(),
         &serde_json::json!("value")
     );
 }
@@ -46,9 +58,13 @@ fn test_init_with_response_metadata() {
     let mut response_metadata = std::collections::HashMap::new();
     response_metadata.insert("model".to_string(), serde_json::json!("custom"));
 
-    let msg = ChatMessage::new("Hello", "system").with_response_metadata(response_metadata);
+    let msg = ChatMessage::builder()
+        .content("Hello")
+        .role("system")
+        .response_metadata(response_metadata)
+        .build();
     assert_eq!(
-        msg.response_metadata().get("model").unwrap(),
+        msg.response_metadata.get("model").unwrap(),
         &serde_json::json!("custom")
     );
 }
@@ -57,14 +73,14 @@ fn test_init_with_response_metadata() {
 fn test_different_roles() {
     let roles = vec!["user", "assistant", "system", "admin", "custom_role"];
     for role in roles {
-        let msg = ChatMessage::new("Test", role);
-        assert_eq!(msg.role(), role);
+        let msg = ChatMessage::builder().content("Test").role(role).build();
+        assert_eq!(msg.role, role);
     }
 }
 
 #[test]
 fn test_type_is_chat() {
-    let msg = ChatMessage::new("Test", "user");
+    let msg = ChatMessage::builder().content("Test").role("user").build();
     assert_eq!(msg.message_type(), "chat");
 }
 
@@ -73,28 +89,35 @@ fn test_serialization_roundtrip() {
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert("priority".to_string(), serde_json::json!("high"));
 
-    let msg = ChatMessage::with_id("chat-123", "Hello", "moderator")
-        .with_name("mod1")
-        .with_additional_kwargs(additional_kwargs);
+    let msg = ChatMessage::builder()
+        .id("chat-123".to_string())
+        .content("Hello")
+        .role("moderator")
+        .name("mod1".to_string())
+        .additional_kwargs(additional_kwargs)
+        .build();
 
     let serialized = serde_json::to_value(&msg).unwrap();
     assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "chat");
 
     let deserialized: ChatMessage = serde_json::from_value(serialized).unwrap();
-    assert_eq!(deserialized.content(), "Hello");
-    assert_eq!(deserialized.role(), "moderator");
-    assert_eq!(deserialized.name(), Some("mod1".to_string()));
-    assert_eq!(deserialized.id(), Some("chat-123".to_string()));
+    assert_eq!(deserialized.content, "Hello");
+    assert_eq!(deserialized.role, "moderator");
+    assert_eq!(deserialized.name, Some("mod1".to_string()));
+    assert_eq!(deserialized.id, Some("chat-123".to_string()));
     assert_eq!(
-        deserialized.additional_kwargs().get("priority").unwrap(),
+        deserialized.additional_kwargs.get("priority").unwrap(),
         &serde_json::json!("high")
     );
 }
 
 #[test]
-fn test_text_property() {
-    let msg = ChatMessage::new("Hello world", "user");
-    assert_eq!(msg.text(), "Hello world");
+fn test_content_property() {
+    let msg = ChatMessage::builder()
+        .content("Hello world")
+        .role("user")
+        .build();
+    assert_eq!(msg.content, "Hello world");
 }
 
 // ============================================================================
@@ -103,33 +126,52 @@ fn test_text_property() {
 
 #[test]
 fn test_chunk_init_basic() {
-    let chunk = ChatMessageChunk::new("Hello", "user");
-    assert_eq!(chunk.content(), "Hello");
-    assert_eq!(chunk.role(), "user");
+    let chunk = ChatMessageChunk::builder()
+        .content("Hello")
+        .role("user")
+        .build();
+    assert_eq!(chunk.content, "Hello");
+    assert_eq!(chunk.role, "user");
     assert_eq!(chunk.message_type(), "ChatMessageChunk");
 }
 
 #[test]
 fn test_chunk_type_is_chat_message_chunk() {
-    let chunk = ChatMessageChunk::new("Test", "user");
+    let chunk = ChatMessageChunk::builder()
+        .content("Test")
+        .role("user")
+        .build();
     assert_eq!(chunk.message_type(), "ChatMessageChunk");
 }
 
 #[test]
 fn test_chunk_add_same_role_chunks() {
-    let chunk1 = ChatMessageChunk::with_id("1", "Hello", "user");
-    let chunk2 = ChatMessageChunk::new(" world", "user");
+    let chunk1 = ChatMessageChunk::builder()
+        .id("1".to_string())
+        .content("Hello")
+        .role("user")
+        .build();
+    let chunk2 = ChatMessageChunk::builder()
+        .content(" world")
+        .role("user")
+        .build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content(), "Hello world");
-    assert_eq!(result.role(), "user");
-    assert_eq!(result.id(), Some("1".to_string()));
+    assert_eq!(result.content, "Hello world");
+    assert_eq!(result.role, "user");
+    assert_eq!(result.id, Some("1".to_string()));
 }
 
 #[test]
 #[should_panic(expected = "Cannot concatenate")]
 fn test_chunk_add_different_role_chunks_raises_error() {
-    let chunk1 = ChatMessageChunk::new("Hello", "user");
-    let chunk2 = ChatMessageChunk::new(" world", "assistant");
+    let chunk1 = ChatMessageChunk::builder()
+        .content("Hello")
+        .role("user")
+        .build();
+    let chunk2 = ChatMessageChunk::builder()
+        .content(" world")
+        .role("assistant")
+        .build();
     let _result = chunk1 + chunk2;
 }
 
@@ -141,16 +183,24 @@ fn test_chunk_add_with_additional_kwargs() {
     let mut kwargs2 = std::collections::HashMap::new();
     kwargs2.insert("key2".to_string(), serde_json::json!("value2"));
 
-    let chunk1 = ChatMessageChunk::new("Hello", "user").with_additional_kwargs(kwargs1);
-    let chunk2 = ChatMessageChunk::new(" world", "user").with_additional_kwargs(kwargs2);
+    let chunk1 = ChatMessageChunk::builder()
+        .content("Hello")
+        .role("user")
+        .additional_kwargs(kwargs1)
+        .build();
+    let chunk2 = ChatMessageChunk::builder()
+        .content(" world")
+        .role("user")
+        .additional_kwargs(kwargs2)
+        .build();
 
     let result = chunk1 + chunk2;
     assert_eq!(
-        result.additional_kwargs().get("key1").unwrap(),
+        result.additional_kwargs.get("key1").unwrap(),
         &serde_json::json!("value1")
     );
     assert_eq!(
-        result.additional_kwargs().get("key2").unwrap(),
+        result.additional_kwargs.get("key2").unwrap(),
         &serde_json::json!("value2")
     );
 }
@@ -163,31 +213,51 @@ fn test_chunk_add_with_response_metadata() {
     let mut meta2 = std::collections::HashMap::new();
     meta2.insert("meta2".to_string(), serde_json::json!("data2"));
 
-    let chunk1 = ChatMessageChunk::new("Hello", "user").with_response_metadata(meta1);
-    let chunk2 = ChatMessageChunk::new(" world", "user").with_response_metadata(meta2);
+    let chunk1 = ChatMessageChunk::builder()
+        .content("Hello")
+        .role("user")
+        .response_metadata(meta1)
+        .build();
+    let chunk2 = ChatMessageChunk::builder()
+        .content(" world")
+        .role("user")
+        .response_metadata(meta2)
+        .build();
 
     let result = chunk1 + chunk2;
     assert_eq!(
-        result.response_metadata().get("meta1").unwrap(),
+        result.response_metadata.get("meta1").unwrap(),
         &serde_json::json!("data1")
     );
     assert_eq!(
-        result.response_metadata().get("meta2").unwrap(),
+        result.response_metadata.get("meta2").unwrap(),
         &serde_json::json!("data2")
     );
 }
 
 #[test]
 fn test_chunk_add_preserves_id() {
-    let chunk1 = ChatMessageChunk::with_id("original-id", "Hello", "user");
-    let chunk2 = ChatMessageChunk::with_id("other-id", " world", "user");
+    let chunk1 = ChatMessageChunk::builder()
+        .id("original-id".to_string())
+        .content("Hello")
+        .role("user")
+        .build();
+    let chunk2 = ChatMessageChunk::builder()
+        .id("other-id".to_string())
+        .content(" world")
+        .role("user")
+        .build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.id(), Some("original-id".to_string()));
+    assert_eq!(result.id, Some("original-id".to_string()));
 }
 
 #[test]
 fn test_chunk_serialization_roundtrip() {
-    let chunk = ChatMessageChunk::with_id("chunk-123", "Hello", "moderator");
+    let chunk = ChatMessageChunk::builder()
+        .id("chunk-123".to_string())
+        .content("Hello")
+        .role("moderator")
+        .build();
 
     let serialized = serde_json::to_value(&chunk).unwrap();
     assert_eq!(
@@ -196,31 +266,46 @@ fn test_chunk_serialization_roundtrip() {
     );
 
     let deserialized: ChatMessageChunk = serde_json::from_value(serialized).unwrap();
-    assert_eq!(deserialized.content(), "Hello");
-    assert_eq!(deserialized.role(), "moderator");
-    assert_eq!(deserialized.id(), Some("chunk-123".to_string()));
+    assert_eq!(deserialized.content, "Hello");
+    assert_eq!(deserialized.role, "moderator");
+    assert_eq!(deserialized.id, Some("chunk-123".to_string()));
 }
 
 #[test]
 fn test_chunk_multiple_additions() {
-    let chunk1 = ChatMessageChunk::new("a", "user");
-    let chunk2 = ChatMessageChunk::new("b", "user");
-    let chunk3 = ChatMessageChunk::new("c", "user");
+    let chunk1 = ChatMessageChunk::builder()
+        .content("a")
+        .role("user")
+        .build();
+    let chunk2 = ChatMessageChunk::builder()
+        .content("b")
+        .role("user")
+        .build();
+    let chunk3 = ChatMessageChunk::builder()
+        .content("c")
+        .role("user")
+        .build();
     let result = chunk1 + chunk2 + chunk3;
-    assert_eq!(result.content(), "abc");
-    assert_eq!(result.role(), "user");
+    assert_eq!(result.content, "abc");
+    assert_eq!(result.role, "user");
 }
 
 #[test]
 fn test_chunk_empty_content() {
-    let chunk1 = ChatMessageChunk::new("Hello", "user");
-    let chunk2 = ChatMessageChunk::new("", "user");
+    let chunk1 = ChatMessageChunk::builder()
+        .content("Hello")
+        .role("user")
+        .build();
+    let chunk2 = ChatMessageChunk::builder().content("").role("user").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content(), "Hello");
+    assert_eq!(result.content, "Hello");
 }
 
 #[test]
-fn test_chunk_text_property() {
-    let chunk = ChatMessageChunk::new("Hello world", "user");
-    assert_eq!(chunk.text(), "Hello world");
+fn test_chunk_content_property() {
+    let chunk = ChatMessageChunk::builder()
+        .content("Hello world")
+        .role("user")
+        .build();
+    assert_eq!(chunk.content, "Hello world");
 }

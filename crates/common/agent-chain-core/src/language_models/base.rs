@@ -15,7 +15,7 @@ use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
 use crate::globals::get_verbose;
-use crate::messages::{AIMessage, BaseMessage, BaseMessageTrait};
+use crate::messages::{AIMessage, BaseMessage};
 use crate::outputs::LLMResult;
 
 /// Parameters for LangSmith tracing.
@@ -160,7 +160,11 @@ impl LanguageModelInput {
         use crate::prompt_values::PromptValue;
         match self {
             LanguageModelInput::Text(s) => {
-                vec![BaseMessage::Human(crate::messages::HumanMessage::new(s))]
+                vec![BaseMessage::Human(
+                    crate::messages::HumanMessage::builder()
+                        .content(s.as_str())
+                        .build(),
+                )]
             }
             LanguageModelInput::StringPrompt(p) => p.to_messages(),
             LanguageModelInput::ChatPrompt(p) => p.to_messages(),

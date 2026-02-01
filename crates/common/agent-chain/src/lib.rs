@@ -27,7 +27,7 @@
 //! let model = init_chat_model("my-custom-model", Some("openai"))?;
 //!
 //! // Use the model
-//! let messages = vec![HumanMessage::new("Hello!").into()];
+//! let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
 //! let response = model.generate(messages, None).await?;
 //! ```
 //!

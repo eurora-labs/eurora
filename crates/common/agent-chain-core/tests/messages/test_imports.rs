@@ -55,20 +55,35 @@ fn test_all_imports() {
     use agent_chain_core::messages::KNOWN_BLOCK_TYPES;
 
     // Verify they're not just imported but usable
-    let _ = AIMessage::new("test");
-    let _ = HumanMessage::new("test");
-    let _ = SystemMessage::new("test");
-    let _ = ChatMessage::new("test", "user");
-    let _ = FunctionMessage::new("test", "func");
-    let _ = ToolMessage::new("test", "call-123");
-    let _ = RemoveMessage::new("msg-123");
+    let _ = AIMessage::builder().content("test").build();
+    let _ = HumanMessage::builder().content("test").build();
+    let _ = SystemMessage::builder().content("test").build();
+    let _ = ChatMessage::builder().content("test").role("user").build();
+    let _ = FunctionMessage::builder()
+        .content("test")
+        .name("func")
+        .build();
+    let _ = ToolMessage::builder()
+        .content("test")
+        .tool_call_id("call-123")
+        .build();
+    let _ = RemoveMessage::builder().id("msg-123").build();
 
-    let _ = AIMessageChunk::new("test");
-    let _ = HumanMessageChunk::new("test");
-    let _ = SystemMessageChunk::new("test");
-    let _ = ChatMessageChunk::new("test", "user");
-    let _ = FunctionMessageChunk::new("test", "func");
-    let _ = ToolMessageChunk::new("test", "call-123");
+    let _ = AIMessageChunk::builder().content("test").build();
+    let _ = HumanMessageChunk::builder().content("test").build();
+    let _ = SystemMessageChunk::builder().content("test").build();
+    let _ = ChatMessageChunk::builder()
+        .content("test")
+        .role("user")
+        .build();
+    let _ = FunctionMessageChunk::builder()
+        .content("test")
+        .name("func")
+        .build();
+    let _ = ToolMessageChunk::builder()
+        .content("test")
+        .tool_call_id("call-123")
+        .build();
 
     let _ = tool_call("test", serde_json::json!({}), None);
     let _ = tool_call_chunk(None, None, None, None);
@@ -96,23 +111,33 @@ fn test_base_message_variants() {
     };
 
     // Test that all BaseMessage variants are accessible
-    let _human = BaseMessage::Human(HumanMessage::new("test"));
-    let _ai = BaseMessage::AI(AIMessage::new("test"));
-    let _system = BaseMessage::System(SystemMessage::new("test"));
-    let _chat = BaseMessage::Chat(ChatMessage::new("test", "user"));
-    let _function = BaseMessage::Function(FunctionMessage::new("test", "func"));
-    let _tool = BaseMessage::Tool(ToolMessage::new("test", "call-123"));
-    let _remove = BaseMessage::Remove(RemoveMessage::new("msg-123"));
+    let _human = BaseMessage::Human(HumanMessage::builder().content("test").build());
+    let _ai = BaseMessage::AI(AIMessage::builder().content("test").build());
+    let _system = BaseMessage::System(SystemMessage::builder().content("test").build());
+    let _chat = BaseMessage::Chat(ChatMessage::builder().content("test").role("user").build());
+    let _function = BaseMessage::Function(
+        FunctionMessage::builder()
+            .content("test")
+            .name("func")
+            .build(),
+    );
+    let _tool = BaseMessage::Tool(
+        ToolMessage::builder()
+            .content("test")
+            .tool_call_id("call-123")
+            .build(),
+    );
+    let _remove = BaseMessage::Remove(RemoveMessage::builder().id("msg-123").build());
 }
 
 #[test]
 #[allow(unused_imports)]
 fn test_trait_imports() {
-    use agent_chain_core::messages::BaseMessageTrait;
-
     // Verify trait is accessible and provides expected methods
-    let msg = agent_chain_core::messages::HumanMessage::new("test");
-    let _ = msg.content();
+    let msg = agent_chain_core::messages::HumanMessage::builder()
+        .content("test")
+        .build();
+    let _ = msg.content;
     let _ = msg.message_type();
-    let _ = msg.text();
+    let _ = msg.content.as_text();
 }
