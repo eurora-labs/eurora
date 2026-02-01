@@ -598,8 +598,8 @@ mod test_generic_fake_chat_model {
 
         let ai_msg = AIMessage::builder()
             .content("")
-            .build()
-            .with_additional_kwargs(additional_kwargs);
+            .additional_kwargs(additional_kwargs)
+            .build();
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
         let mut stream = model._stream(vec![], None, None).unwrap();
@@ -631,8 +631,8 @@ mod test_generic_fake_chat_model {
 
         let ai_msg = AIMessage::builder()
             .content("")
-            .build()
-            .with_additional_kwargs(additional_kwargs);
+            .additional_kwargs(additional_kwargs)
+            .build();
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
         let mut stream = model._stream(vec![], None, None).unwrap();

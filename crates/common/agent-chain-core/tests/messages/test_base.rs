@@ -97,7 +97,10 @@ fn test_message_to_dict_human_message() {
 
 #[test]
 fn test_message_to_dict_ai_message() {
-    let msg = AIMessage::with_id("ai1", "Hi there");
+    let msg = AIMessage::builder()
+        .content("Hi there")
+        .id("ai1".to_string())
+        .build();
     let result = message_to_dict(&BaseMessage::AI(msg));
     assert_eq!(result.get("type").unwrap().as_str().unwrap(), "ai");
     assert_eq!(
@@ -149,8 +152,8 @@ fn test_message_to_dict_with_additional_kwargs() {
 
     let msg = AIMessage::builder()
         .content("Hello")
-        .build()
-        .with_additional_kwargs(additional_kwargs);
+        .additional_kwargs(additional_kwargs)
+        .build();
     let result = message_to_dict(&BaseMessage::AI(msg));
     assert_eq!(
         result
@@ -296,13 +299,13 @@ fn test_init_with_response_metadata() {
 
     let msg = AIMessage::builder()
         .content("Hello")
-        .build()
-        .with_response_metadata(response_metadata);
+        .response_metadata(response_metadata)
+        .build();
     assert_eq!(
-        msg.response_metadata().get("model").unwrap(),
+        msg.response_metadata.get("model").unwrap(),
         &json!("gpt-4")
     );
-    assert_eq!(msg.response_metadata().get("tokens").unwrap(), &json!(10));
+    assert_eq!(msg.response_metadata.get("tokens").unwrap(), &json!(10));
 }
 
 // ============================================================================

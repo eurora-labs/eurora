@@ -101,7 +101,7 @@ fn test_multiple_remove_messages() {
 fn test_remove_message_in_list() {
     let messages = [
         BaseMessage::Human(HumanMessage::with_id("human-1", "Hello")),
-        BaseMessage::AI(AIMessage::with_id("ai-1", "Hi there!")),
+        BaseMessage::AI(AIMessage::builder().content("Hi there!").id("ai-1".to_string()).build()),
         BaseMessage::Remove(RemoveMessage::new("human-1")),
     ];
 

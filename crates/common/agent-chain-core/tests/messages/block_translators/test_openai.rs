@@ -171,9 +171,12 @@ fn test_convert_to_v1_from_responses() {
         ),
     ];
 
-    let mut message =
-        AIMessage::with_content_list(content.clone()).with_response_metadata(response_metadata);
-    message.tool_calls = tool_calls;
+    let content_str = serde_json::to_string(&content).unwrap_or_default();
+    let message = AIMessage::builder()
+        .content(content_str)
+        .response_metadata(response_metadata)
+        .tool_calls(tool_calls)
+        .build();
 
     // Expected v1 content blocks after translation
     let expected_content: Vec<ContentBlock> = vec![
@@ -642,11 +645,14 @@ fn test_compat_responses_v03() {
         Some("call_abc".to_string()),
     )];
 
-    let mut message = AIMessage::with_content_list(content)
-        .with_additional_kwargs(additional_kwargs)
-        .with_response_metadata(response_metadata);
-    message.tool_calls = tool_calls;
-    message.id = Some("msg_123".to_string());
+    let content_str = serde_json::to_string(&content).unwrap_or_default();
+    let message = AIMessage::builder()
+        .content(content_str)
+        .additional_kwargs(additional_kwargs)
+        .response_metadata(response_metadata)
+        .tool_calls(tool_calls)
+        .id("msg_123".to_string())
+        .build();
 
     // Expected v1 content blocks
     let expected_content: Vec<ContentBlock> = vec![
