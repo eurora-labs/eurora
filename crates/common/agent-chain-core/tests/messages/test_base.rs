@@ -301,10 +301,7 @@ fn test_init_with_response_metadata() {
         .content("Hello")
         .response_metadata(response_metadata)
         .build();
-    assert_eq!(
-        msg.response_metadata.get("model").unwrap(),
-        &json!("gpt-4")
-    );
+    assert_eq!(msg.response_metadata.get("model").unwrap(), &json!("gpt-4"));
     assert_eq!(msg.response_metadata.get("tokens").unwrap(), &json!(10));
 }
 

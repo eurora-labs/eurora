@@ -510,36 +510,36 @@ pub enum ChunkPosition {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct AIMessageChunk {
     /// The message content (may be partial during streaming)
-    content: String,
+    pub content: String,
     /// Optional unique identifier
-    id: Option<String>,
+    pub id: Option<String>,
     /// Optional name for the message
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    pub name: Option<String>,
     /// Tool calls made by the AI
     #[serde(default)]
-    tool_calls: Vec<ToolCall>,
+    pub tool_calls: Vec<ToolCall>,
     /// Tool calls with parsing errors
     #[serde(default)]
-    invalid_tool_calls: Vec<InvalidToolCall>,
+    pub invalid_tool_calls: Vec<InvalidToolCall>,
     /// Tool call chunks (for streaming tool calls)
     #[serde(default)]
-    tool_call_chunks: Vec<ToolCallChunk>,
+    pub tool_call_chunks: Vec<ToolCallChunk>,
     /// If present, usage metadata for a message
     #[serde(skip_serializing_if = "Option::is_none")]
-    usage_metadata: Option<UsageMetadata>,
+    pub usage_metadata: Option<UsageMetadata>,
     /// Additional metadata
     #[serde(default)]
-    additional_kwargs: HashMap<String, serde_json::Value>,
+    pub additional_kwargs: HashMap<String, serde_json::Value>,
     /// Response metadata
     #[serde(default)]
-    response_metadata: HashMap<String, serde_json::Value>,
+    pub response_metadata: HashMap<String, serde_json::Value>,
     /// Optional span represented by an aggregated AIMessageChunk.
     ///
     /// If a chunk with `chunk_position=Some(ChunkPosition::Last)` is aggregated into a stream,
     /// `tool_call_chunks` in message content will be parsed into `tool_calls`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    chunk_position: Option<ChunkPosition>,
+    pub chunk_position: Option<ChunkPosition>,
 }
 
 impl Serialize for AIMessageChunk {
@@ -632,104 +632,12 @@ impl AIMessageChunk {
         }
     }
 
-    /// Create a new AIMessageChunk with an ID and content using a builder-like pattern.
-    ///
-    /// This is a convenience method that wraps the builder to set both id and content at once.
-    pub fn with_id(id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self::builder()
-            .content(content)
-            .maybe_id(Some(id.into()))
-            .build()
-    }
-
     /// Create a new AIMessageChunk with a list of content blocks.
     ///
     /// This is a convenience method for creating chunks with structured content.
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
         let content = serde_json::to_string(&content_list).unwrap_or_default();
         Self::builder().content(content).build()
-    }
-
-    /// Create a new AIMessageChunk with tool call chunks.
-    ///
-    /// This is a convenience method for creating chunks with tool call chunks.
-    pub fn new_with_tool_call_chunks(
-        content: impl Into<String>,
-        tool_call_chunks: Vec<ToolCallChunk>,
-    ) -> Self {
-        Self::builder()
-            .content(content)
-            .tool_call_chunks(tool_call_chunks)
-            .build()
-    }
-
-    /// Get the message content.
-    pub fn content(&self) -> &str {
-        &self.content
-    }
-
-    /// Get the message ID.
-    pub fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// Get the message name.
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
-    }
-
-    /// Get the tool calls.
-    pub fn tool_calls(&self) -> &[ToolCall] {
-        &self.tool_calls
-    }
-
-    /// Get the invalid tool calls.
-    pub fn invalid_tool_calls(&self) -> &[InvalidToolCall] {
-        &self.invalid_tool_calls
-    }
-
-    /// Get the tool call chunks.
-    pub fn tool_call_chunks(&self) -> &[ToolCallChunk] {
-        &self.tool_call_chunks
-    }
-
-    /// Get usage metadata if present.
-    pub fn usage_metadata(&self) -> Option<&UsageMetadata> {
-        self.usage_metadata.as_ref()
-    }
-
-    /// Get additional kwargs.
-    pub fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
-        &self.additional_kwargs
-    }
-
-    /// Get response metadata.
-    pub fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
-        &self.response_metadata
-    }
-
-    /// Set response metadata (builder pattern).
-    pub fn with_response_metadata(
-        mut self,
-        response_metadata: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.response_metadata = response_metadata;
-        self
-    }
-
-    /// Set additional kwargs (builder pattern).
-    pub fn with_additional_kwargs(
-        mut self,
-        additional_kwargs: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        self.additional_kwargs = additional_kwargs;
-        self
-    }
-
-    /// Set tool call chunks (builder pattern).
-    pub fn with_tool_call_chunks(mut self, tool_call_chunks: Vec<ToolCallChunk>) -> Self {
-        self.tool_call_chunks = tool_call_chunks;
-        self
     }
 
     /// Get the raw content as a list of JSON values.
@@ -941,12 +849,6 @@ impl AIMessageChunk {
     /// Set usage metadata.
     pub fn set_usage_metadata(&mut self, usage_metadata: Option<UsageMetadata>) {
         self.usage_metadata = usage_metadata;
-    }
-
-    /// Set usage metadata (builder pattern).
-    pub fn with_usage_metadata(mut self, usage_metadata: UsageMetadata) -> Self {
-        self.usage_metadata = Some(usage_metadata);
-        self
     }
 
     /// Set tool calls.
@@ -1798,7 +1700,7 @@ mod tests {
 
         let result = chunk1 + chunk2;
 
-        assert_eq!(result.content(), "Hello world!");
+        assert_eq!(result.content, "Hello world!");
     }
 
     #[test]
@@ -1811,7 +1713,7 @@ mod tests {
 
         let result: AIMessageChunk = chunks.into_iter().sum();
 
-        assert_eq!(result.content(), "Hello beautiful world!");
+        assert_eq!(result.content, "Hello beautiful world!");
     }
 
     #[test]
@@ -1824,7 +1726,7 @@ mod tests {
 
         let result = add_ai_message_chunks(chunk1, vec![chunk2]);
 
-        assert_eq!(result.content(), "Hello world!");
+        assert_eq!(result.content, "Hello world!");
         assert!(result.usage_metadata.is_some());
         let usage = result.usage_metadata.as_ref().unwrap();
         assert_eq!(usage.input_tokens, 5);
@@ -1851,7 +1753,7 @@ mod tests {
         let result = add_ai_message_chunks(chunk1, vec![chunk2, chunk3]);
 
         // Provider ID should be selected (not lc_* or lc_run-*)
-        assert_eq!(result.id(), Some("provider_id_456".to_string()));
+        assert_eq!(result.id, Some("provider_id_456".to_string()));
     }
 
     #[test]
@@ -1868,6 +1770,6 @@ mod tests {
 
         let result = add_ai_message_chunks(chunk1, vec![chunk2]);
 
-        assert_eq!(result.id(), Some("lc_run-789".to_string()));
+        assert_eq!(result.id, Some("lc_run-789".to_string()));
     }
 }

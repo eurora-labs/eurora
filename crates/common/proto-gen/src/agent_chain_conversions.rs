@@ -713,25 +713,25 @@ impl From<ProtoAiMessage> for AIMessage {
 impl From<AIMessageChunk> for ProtoAiMessageChunk {
     fn from(chunk: AIMessageChunk) -> Self {
         ProtoAiMessageChunk {
-            content: chunk.content().to_string(),
-            id: chunk.id(),
-            name: chunk.name(),
-            tool_calls: chunk.tool_calls().iter().cloned().map(Into::into).collect(),
+            content: chunk.content.to_string(),
+            id: chunk.id.clone(),
+            name: chunk.name.clone(),
+            tool_calls: chunk.tool_calls.iter().cloned().map(Into::into).collect(),
             invalid_tool_calls: chunk
-                .invalid_tool_calls()
+                .invalid_tool_calls
                 .iter()
                 .cloned()
                 .map(Into::into)
                 .collect(),
             tool_call_chunks: chunk
-                .tool_call_chunks()
+                .tool_call_chunks
                 .iter()
                 .cloned()
                 .map(Into::into)
                 .collect(),
-            usage_metadata: chunk.usage_metadata().cloned().map(Into::into),
-            additional_kwargs: hashmap_to_json_string(chunk.additional_kwargs()),
-            response_metadata: hashmap_to_json_string(chunk.response_metadata()),
+            usage_metadata: chunk.usage_metadata.clone().map(Into::into),
+            additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
+            response_metadata: hashmap_to_json_string(&chunk.response_metadata),
             chunk_position: chunk
                 .chunk_position()
                 .map(|p| i32::from(ProtoChunkPosition::from(p.clone()))),
@@ -744,40 +744,28 @@ impl From<ProtoAiMessageChunk> for AIMessageChunk {
         let tool_call_chunks: Vec<ToolCallChunk> =
             proto.tool_call_chunks.into_iter().map(Into::into).collect();
 
-        let mut chunk = if tool_call_chunks.is_empty() {
-            match proto.id {
-                Some(id) => AIMessageChunk::builder()
-                    .id(id)
-                    .content(proto.content)
-                    .build(),
-                None => AIMessageChunk::builder().content(proto.content).build(),
-            }
-        } else {
-            AIMessageChunk::builder()
-                .tool_call_chunks(tool_call_chunks)
-                .content(proto.content)
-                .build()
+        let chunk_position: Option<ChunkPosition> = match proto.chunk_position {
+            Some(pos) => ProtoChunkPosition::try_from(pos)
+                .unwrap_or(ProtoChunkPosition::ChunkPositionUnspecified)
+                .into(),
+            None => None,
         };
 
-        if let Some(usage) = proto.usage_metadata {
-            chunk = chunk.with_usage_metadata(usage.into());
-        }
-
-        chunk.set_tool_calls(proto.tool_calls.into_iter().map(Into::into).collect());
-        chunk.set_invalid_tool_calls(
-            proto
-                .invalid_tool_calls
-                .into_iter()
-                .map(Into::into)
-                .collect(),
-        );
-
-        if let Some(pos) = proto.chunk_position {
-            let position: Option<ChunkPosition> = ProtoChunkPosition::try_from(pos)
-                .unwrap_or(ProtoChunkPosition::ChunkPositionUnspecified)
-                .into();
-            chunk.set_chunk_position(position);
-        }
+        let chunk = AIMessageChunk::builder()
+            .maybe_id(proto.id)
+            .tool_call_chunks(tool_call_chunks)
+            .content(proto.content)
+            .maybe_usage_metadata(proto.usage_metadata.map(Into::into))
+            .tool_calls(proto.tool_calls.into_iter().map(Into::into).collect())
+            .invalid_tool_calls(
+                proto
+                    .invalid_tool_calls
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
+            )
+            .maybe_chunk_position(chunk_position)
+            .build();
 
         chunk
     }

@@ -79,12 +79,12 @@ mod tests {
         let proto: ProtoAiMessage = original.clone().into();
         let roundtrip: AIMessage = proto.into();
 
-        assert_eq!(roundtrip.id(), Some("msg_456".to_string()));
-        assert_eq!(roundtrip.content(), "Let me search for that.");
+        assert_eq!(roundtrip.id, Some("msg_456".to_string()));
+        assert_eq!(roundtrip.content, "Let me search for that.");
         assert_eq!(roundtrip.tool_calls.len(), 1);
         assert_eq!(roundtrip.tool_calls[0].name(), "search");
-        assert!(roundtrip.usage_metadata().is_some());
-        assert_eq!(roundtrip.usage_metadata().unwrap().input_tokens, 50);
+        assert!(roundtrip.usage_metadata.is_some());
+        assert_eq!(roundtrip.usage_metadata.unwrap().input_tokens, 50);
     }
 
     #[test]
@@ -138,19 +138,22 @@ mod tests {
             index: Some(0),
         };
 
-        let original = AIMessageChunk::new_with_tool_call_chunks("Searching...", vec![tool_chunk])
-            .with_usage_metadata(UsageMetadata::new(10, 5));
+        let original = AIMessageChunk::builder()
+            .content("Searching...")
+            .tool_call_chunks(vec![tool_chunk])
+            .usage_metadata(UsageMetadata::new(10, 5))
+            .build();
 
         let proto: ProtoAiMessageChunk = original.clone().into();
         let roundtrip: AIMessageChunk = proto.into();
 
-        assert_eq!(roundtrip.content(), "Searching...");
-        assert_eq!(roundtrip.tool_call_chunks().len(), 1);
+        assert_eq!(roundtrip.content, "Searching...");
+        assert_eq!(roundtrip.tool_call_chunks.len(), 1);
         assert_eq!(
-            roundtrip.tool_call_chunks()[0].name,
+            roundtrip.tool_call_chunks[0].name,
             Some("search".to_string())
         );
-        assert!(roundtrip.usage_metadata().is_some());
+        assert!(roundtrip.usage_metadata.is_some());
     }
 
     #[test]
