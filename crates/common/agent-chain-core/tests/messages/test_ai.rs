@@ -365,26 +365,26 @@ fn test_init_tool_calls() {
 #[test]
 fn test_content_blocks() {
     // Test AIMessage with tool_calls
-    let message = AIMessage::with_tool_calls(
-        "",
-        vec![tool_call(
+    let message = AIMessage::builder()
+        .content("")
+        .tool_calls(vec![tool_call(
             "foo",
             json!({"a": "b"}),
             Some("abc_123".to_string()),
-        )],
-    );
+        )])
+        .build();
     assert_eq!(message.tool_calls.len(), 1);
     assert_eq!(message.content(), "");
 
     // Test AIMessage with content and tool_calls
-    let message2 = AIMessage::with_tool_calls(
-        "foo",
-        vec![tool_call(
+    let message2 = AIMessage::builder()
+        .content("foo")
+        .tool_calls(vec![tool_call(
             "foo",
             json!({"a": "b"}),
             Some("abc_123".to_string()),
-        )],
-    );
+        )])
+        .build();
     assert_eq!(message2.content(), "foo");
     assert_eq!(message2.tool_calls.len(), 1);
 
@@ -448,20 +448,20 @@ fn test_content_blocks_reasoning_extraction() {
 
     let message = AIMessage::builder()
         .content("The answer is 42.")
-        .build()
-        .with_additional_kwargs(additional_kwargs);
+        .additional_kwargs(additional_kwargs)
+        .build();
 
     assert_eq!(message.content(), "The answer is 42.");
     // In Python, content_blocks property extracts reasoning from additional_kwargs
     // For now, we verify the additional_kwargs is set correctly
     assert!(
         message
-            .additional_kwargs()
+            .additional_kwargs
             .contains_key("reasoning_content")
     );
     assert_eq!(
         message
-            .additional_kwargs()
+            .additional_kwargs
             .get("reasoning_content")
             .unwrap()
             .as_str()
@@ -475,12 +475,12 @@ fn test_content_blocks_reasoning_extraction() {
 
     let message2 = AIMessage::builder()
         .content("The answer is 42.")
-        .build()
-        .with_additional_kwargs(additional_kwargs2);
+        .additional_kwargs(additional_kwargs2)
+        .build();
 
     assert!(
         !message2
-            .additional_kwargs()
+            .additional_kwargs
             .contains_key("reasoning_content")
     );
 }
@@ -493,16 +493,19 @@ fn test_content_blocks_reasoning_extraction() {
 fn test_ai_message_basic() {
     let msg = AIMessage::builder().content("Hello, world!").build();
     assert_eq!(msg.content(), "Hello, world!");
-    assert!(msg.id().is_none());
-    assert!(msg.name().is_none());
+    assert!(msg.id.is_none());
+    assert!(msg.name.is_none());
     assert!(msg.tool_calls.is_empty());
     assert!(msg.invalid_tool_calls.is_empty());
 }
 
 #[test]
 fn test_ai_message_with_id() {
-    let msg = AIMessage::with_id("msg-123", "Hello!");
-    assert_eq!(msg.id(), Some("msg-123".to_string()));
+    let msg = AIMessage::builder()
+        .content("Hello!")
+        .id("msg-123".to_string())
+        .build();
+    assert_eq!(msg.id, Some("msg-123".to_string()));
     assert_eq!(msg.content(), "Hello!");
 }
 
@@ -510,9 +513,9 @@ fn test_ai_message_with_id() {
 fn test_ai_message_with_name() {
     let msg = AIMessage::builder()
         .content("Hello!")
-        .build()
-        .with_name("Assistant");
-    assert_eq!(msg.name(), Some("Assistant".to_string()));
+        .name("Assistant".to_string())
+        .build();
+    assert_eq!(msg.name, Some("Assistant".to_string()));
 }
 
 #[test]
@@ -520,10 +523,10 @@ fn test_ai_message_with_usage_metadata() {
     let usage = UsageMetadata::new(10, 20);
     let msg = AIMessage::builder()
         .content("Hello!")
-        .build()
-        .with_usage_metadata(usage);
-    assert!(msg.usage_metadata().is_some());
-    assert_eq!(msg.usage_metadata().unwrap().input_tokens, 10);
+        .usage_metadata(usage)
+        .build();
+    assert!(msg.usage_metadata.is_some());
+    assert_eq!(msg.usage_metadata.as_ref().unwrap().input_tokens, 10);
 }
 
 #[test]
@@ -565,8 +568,8 @@ fn test_ai_message_chunk_to_message() {
 
     let message = chunk.to_message();
     assert_eq!(message.content(), "Hello!");
-    assert_eq!(message.id(), Some("chunk-1".to_string()));
-    assert!(message.usage_metadata().is_some());
+    assert_eq!(message.id, Some("chunk-1".to_string()));
+    assert!(message.usage_metadata.is_some());
 }
 
 #[test]

@@ -139,8 +139,11 @@ fn test_convert_to_v1_from_anthropic() {
     let mut response_metadata = HashMap::new();
     response_metadata.insert("model_provider".to_string(), json!("anthropic"));
 
-    let message =
-        AIMessage::with_content_list(content.clone()).with_response_metadata(response_metadata);
+    let content_str = serde_json::to_string(&content).unwrap_or_default();
+    let message = AIMessage::builder()
+        .content(content_str)
+        .response_metadata(response_metadata)
+        .build();
 
     // Expected v1 content blocks after translation
     let expected_content: Vec<ContentBlock> = vec![
@@ -339,8 +342,8 @@ fn test_convert_to_v1_from_anthropic() {
 
     let message2 = AIMessage::builder()
         .content("Hello")
-        .build()
-        .with_response_metadata(response_metadata2);
+        .response_metadata(response_metadata2)
+        .build();
 
     let expected_content2 = vec![ContentBlock::Text(TextContentBlock::new("Hello"))];
     assert_eq!(message2.content_blocks(), expected_content2);
