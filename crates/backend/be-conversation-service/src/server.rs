@@ -178,6 +178,22 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
+        // Extract the HumanMessage from the proto message
+        let proto_message = req
+            .message
+            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
+
+        // Convert proto message to agent_chain HumanMessage for content serialization
+        let human_message: HumanMessage = proto_message.into();
+
+        // Serialize content for database storage
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ConversationServiceError::Internal(format!(
+                "Failed to serialize message content: {}",
+                e
+            ))
+        })?;
+
         // Save the human message to the database
         let message = self
             .db
@@ -186,7 +202,7 @@ impl ProtoConversationService for ConversationService {
                 conversation_id,
                 user_id,
                 message_type: MessageType::Human,
-                content: serde_json::json!(req.content),
+                content,
                 tool_call_id: None,
                 tool_calls: None,
                 additional_kwargs: None,
@@ -221,6 +237,22 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
+        // Extract the SystemMessage from the proto message
+        let proto_message = req
+            .message
+            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
+
+        // Convert proto message to agent_chain SystemMessage for content serialization
+        let system_message: SystemMessage = proto_message.into();
+
+        // Serialize content for database storage
+        let content = serde_json::to_value(&system_message.content).map_err(|e| {
+            ConversationServiceError::Internal(format!(
+                "Failed to serialize message content: {}",
+                e
+            ))
+        })?;
+
         // Save the system message to the database
         let message = self
             .db
@@ -229,7 +261,7 @@ impl ProtoConversationService for ConversationService {
                 conversation_id,
                 user_id,
                 message_type: MessageType::System,
-                content: serde_json::json!(req.content),
+                content,
                 tool_call_id: None,
                 tool_calls: None,
                 additional_kwargs: None,

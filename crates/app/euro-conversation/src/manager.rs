@@ -3,8 +3,9 @@ use crate::{
     error::{Error, Result},
     types::ConversationEvent,
 };
-use agent_chain::{BaseMessage, HumanMessage, MessageContent, SystemMessage};
+use agent_chain::{BaseMessage, HumanMessage, SystemMessage};
 use euro_auth::{AuthedChannel, get_authed_channel};
+use proto_gen::agent_chain::{ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::conversation::{
     AddHumanMessageRequest, AddSystemMessageRequest, ChatStreamRequest, CreateConversationRequest,
     GenerateConversationTitleRequest, GetConversationRequest, GetMessagesRequest,
@@ -199,17 +200,12 @@ impl ConversationManager {
 impl ConversationManager {
     pub async fn add_human_message(&mut self, message: &HumanMessage) -> Result<()> {
         let mut client = self.conversation_client.clone();
-        let content = match &message.content {
-            MessageContent::Text(text) => text,
-            _ => {
-                todo!("refactor this so that the proto file expects the correct custom type")
-            }
-        };
+        // Convert HumanMessage to ProtoHumanMessage using the From trait implementation
+        let proto_message: ProtoHumanMessage = message.clone().into();
         client
             .add_human_message(AddHumanMessageRequest {
                 conversation_id: self.current_conversation.id().unwrap().to_string(),
-                // content: message.content,
-                content: content.to_string(),
+                message: Some(proto_message),
             })
             .await?;
         Ok(())
@@ -217,10 +213,12 @@ impl ConversationManager {
 
     pub async fn add_system_message(&mut self, message: &SystemMessage) -> Result<()> {
         let mut client = self.conversation_client.clone();
+        // Convert SystemMessage to ProtoSystemMessage using the From trait implementation
+        let proto_message: ProtoSystemMessage = message.clone().into();
         client
             .add_system_message(AddSystemMessageRequest {
                 conversation_id: self.current_conversation.id().unwrap().to_string(),
-                content: message.content.as_text().to_string(),
+                message: Some(proto_message),
             })
             .await?;
         Ok(())
