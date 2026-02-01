@@ -45,7 +45,7 @@ const DEFAULT_MAX_TOKENS: u32 = 4096;
 ///     .temperature(0.7)
 ///     .max_tokens(1024);
 ///
-/// let messages = vec![HumanMessage::new("Hello!").into()];
+/// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
 /// let response = model.generate(messages, None).await?;
 /// ```
 #[derive(Debug, Clone)]
@@ -196,7 +196,7 @@ impl ChatAnthropic {
                 BaseMessage::Human(m) => {
                     conversation.push(serde_json::json!({
                         "role": "user",
-                        "content": m.content()
+                        "content": m.content.as_text()
                     }));
                 }
                 BaseMessage::AI(m) => {

@@ -160,7 +160,9 @@ impl LanguageModelInput {
         use crate::prompt_values::PromptValue;
         match self {
             LanguageModelInput::Text(s) => {
-                vec![BaseMessage::Human(crate::messages::HumanMessage::new(s))]
+                vec![BaseMessage::Human(
+                    crate::messages::HumanMessage::builder().content(s.as_str()).build(),
+                )]
             }
             LanguageModelInput::StringPrompt(p) => p.to_messages(),
             LanguageModelInput::ChatPrompt(p) => p.to_messages(),

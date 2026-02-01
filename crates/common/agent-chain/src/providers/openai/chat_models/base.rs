@@ -16,7 +16,7 @@
 //!     .with_responses_api(true)
 //!     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 //!
-//! let messages = vec![HumanMessage::new("What is the latest news?").into()];
+//! let messages = vec![HumanMessage::builder().content("What is the latest news?").build().into()];
 //! let response = model.generate(messages, None).await?;
 //! ```
 //!
@@ -32,7 +32,7 @@
 //! let model = ChatOpenAI::new("gpt-4o")
 //!     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 //!
-//! let messages = vec![HumanMessage::new("What is the latest news?").into()];
+//! let messages = vec![HumanMessage::builder().content("What is the latest news?").build().into()];
 //! let mut stream = model.stream(messages, None).await?;
 //!
 //! while let Some(chunk) = stream.next().await {
@@ -158,7 +158,7 @@ pub enum ContentBlock {
 ///     .temperature(0.7)
 ///     .max_tokens(1024);
 ///
-/// let messages = vec![HumanMessage::new("Hello!").into()];
+/// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
 /// let response = model.generate(messages, None).await?;
 /// ```
 ///
@@ -172,7 +172,7 @@ pub enum ContentBlock {
 ///     .with_responses_api(true)
 ///     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 ///
-/// let messages = vec![HumanMessage::new("What happened today?").into()];
+/// let messages = vec![HumanMessage::builder().content("What happened today?").build().into()];
 /// let response = model.generate(messages, None).await?;
 /// // Response will include web search results with citations
 /// ```
@@ -558,7 +558,7 @@ impl ChatOpenAI {
                     "content": m.content()
                 })),
                 BaseMessage::Human(m) => {
-                    let content = match m.message_content() {
+                    let content = match &m.content {
                         MessageContent::Text(text) => serde_json::json!(text),
                         MessageContent::Parts(parts) => {
                             let content_parts: Vec<serde_json::Value> = parts
@@ -984,7 +984,7 @@ impl ChatOpenAI {
                     }));
                 }
                 BaseMessage::Human(m) => {
-                    let content = match m.message_content() {
+                    let content = match &m.content {
                         MessageContent::Text(text) => serde_json::json!(text),
                         MessageContent::Parts(parts) => {
                             let content_parts: Vec<serde_json::Value> = parts

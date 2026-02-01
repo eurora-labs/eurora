@@ -33,7 +33,7 @@ use crate::chat_sessions::ChatSession;
 /// let loader = MyLoader {
 ///     sessions: vec![
 ///         ChatSession::with_messages(vec![
-///             BaseMessage::Human(HumanMessage::new("Hello")),
+///             BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
 ///             BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
 ///         ]),
 ///     ],
@@ -99,10 +99,10 @@ mod tests {
     fn test_lazy_load() {
         let sessions = vec![
             ChatSession::with_messages(vec![
-                BaseMessage::Human(HumanMessage::new("Hello")),
+                BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
                 BaseMessage::AI(AIMessage::builder().content("Hi").build()),
             ]),
-            ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::new("Bye"))]),
+            ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::builder().content("Bye").build())]),
         ];
 
         let loader = InMemoryChatLoader::new(sessions);
@@ -118,11 +118,11 @@ mod tests {
     #[test]
     fn test_load() {
         let sessions = vec![
-            ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::new("Hello"))]),
+            ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::builder().content("Hello").build())]),
             ChatSession::with_messages(vec![BaseMessage::AI(
                 AIMessage::builder().content("Hi").build(),
             )]),
-            ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::new("Bye"))]),
+            ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::builder().content("Bye").build())]),
         ];
 
         let loader = InMemoryChatLoader::new(sessions);

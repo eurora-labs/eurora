@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::load::Serializable;
 use crate::messages::{
-    AnyMessage, BaseMessage, ContentPart, HumanMessage, ImageDetail, ImageSource, get_buffer_string,
+    AnyMessage, BaseMessage, ContentPart, HumanMessage, ImageDetail, ImageSource, MessageContent, get_buffer_string,
 };
 
 /// Base trait for inputs to any language model.
@@ -105,7 +105,7 @@ impl PromptValue for StringPromptValue {
     }
 
     fn to_messages(&self) -> Vec<BaseMessage> {
-        vec![BaseMessage::Human(HumanMessage::new(&self.text))]
+        vec![BaseMessage::Human(HumanMessage::builder().content(&self.text).build())]
     }
 }
 
@@ -236,9 +236,11 @@ impl PromptValue for ImagePromptValue {
             detail,
         };
 
-        vec![BaseMessage::Human(HumanMessage::with_content(vec![
-            content_part,
-        ]))]
+        vec![BaseMessage::Human(
+            HumanMessage::builder()
+                .content(MessageContent::Parts(vec![content_part]))
+                .build()
+        )]
     }
 }
 
@@ -330,7 +332,7 @@ mod tests {
     fn test_chat_prompt_value() {
         let messages = vec![
             BaseMessage::System(SystemMessage::new("You are a helpful assistant.")),
-            BaseMessage::Human(HumanMessage::new("Hello!")),
+            BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
             BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
         ];
         let pv = ChatPromptValue::new(messages.clone());
@@ -367,7 +369,7 @@ mod tests {
     #[test]
     fn test_chat_prompt_value_concrete() {
         let messages = vec![
-            BaseMessage::Human(HumanMessage::new("Hello!")),
+            BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
             BaseMessage::AI(AIMessage::builder().content("Hi!").build()),
         ];
         let pv = ChatPromptValueConcrete::new(messages);
