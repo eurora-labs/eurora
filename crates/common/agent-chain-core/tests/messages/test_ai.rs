@@ -15,16 +15,20 @@ use serde_json::json;
 
 #[test]
 fn test_serdes_message() {
-    let msg = AIMessage::with_all_tool_calls(
-        "",
-        vec![tool_call("foo", json!({"bar": 1}), Some("baz".to_string()))],
-        vec![invalid_tool_call(
+    let msg = AIMessage::builder()
+        .content("")
+        .tool_calls(vec![tool_call(
+            "foo",
+            json!({"bar": 1}),
+            Some("baz".to_string()),
+        )])
+        .invalid_tool_calls(vec![invalid_tool_call(
             Some("foobad".to_string()),
             Some("blah".to_string()),
             Some("booz".to_string()),
             Some("bad".to_string()),
-        )],
-    );
+        )])
+        .build();
 
     // For now, test that we can serialize/deserialize using serde_json
     // Python test expects:
@@ -341,10 +345,14 @@ fn test_add_ai_message_chunks_usage() {
 #[test]
 fn test_init_tool_calls() {
     // Test we can create AIMessage with tool_calls (Python test adds "type" key on init)
-    let msg = AIMessage::with_tool_calls(
-        "",
-        vec![tool_call("foo", json!({"a": "b"}), Some("abc".to_string()))],
-    );
+    let msg = AIMessage::builder()
+        .content("")
+        .tool_calls(vec![tool_call(
+            "foo",
+            json!({"a": "b"}),
+            Some("abc".to_string()),
+        )])
+        .build();
     assert_eq!(msg.tool_calls.len(), 1);
     // In Rust, tool_call helper creates a ToolCall struct which has consistent type
     assert_eq!(msg.tool_calls[0].name(), "foo");

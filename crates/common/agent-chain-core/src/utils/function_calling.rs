@@ -591,8 +591,8 @@ pub fn tool_example_to_messages<T: Serialize>(
 
     let ai_msg = AIMessage::builder()
         .content("")
-        .build()
-        .with_additional_kwargs(additional_kwargs);
+        .additional_kwargs(additional_kwargs)
+        .build();
     messages.push(ai_msg.into());
 
     // Add tool messages

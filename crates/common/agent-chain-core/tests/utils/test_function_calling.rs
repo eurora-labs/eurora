@@ -721,7 +721,7 @@ fn test_valid_example_conversion() {
     if let BaseMessage::AI(ai_msg) = &messages[1] {
         assert_eq!(ai_msg.content(), "");
         let tool_calls = ai_msg
-            .additional_kwargs()
+            .additional_kwargs
             .get("tool_calls")
             .and_then(|tc| tc.as_array());
         assert!(tool_calls.map(|tc| tc.is_empty()).unwrap_or(true));
@@ -755,7 +755,7 @@ fn test_multiple_tool_calls() {
     // Verify AI message has correct tool_calls structure
     if let BaseMessage::AI(ai_msg) = &messages[1] {
         let tool_calls = ai_msg
-            .additional_kwargs()
+            .additional_kwargs
             .get("tool_calls")
             .and_then(|tc| tc.as_array())
             .expect("tool_calls should be an array");
@@ -821,7 +821,7 @@ fn test_tool_outputs_with_ai_response() {
         assert_eq!(response.content(), "The output is Output1");
         // Final AI response should not have tool calls
         let tool_calls = response
-            .additional_kwargs()
+            .additional_kwargs
             .get("tool_calls")
             .and_then(|tc| tc.as_array());
         assert!(tool_calls.is_none() || tool_calls.unwrap().is_empty());
