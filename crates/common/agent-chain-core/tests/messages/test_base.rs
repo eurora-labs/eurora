@@ -14,14 +14,14 @@ use serde_json::json;
 
 #[test]
 fn test_text_property_string_content() {
-    let msg = HumanMessage::new("Hello, world!");
-    assert_eq!(msg.text(), "Hello, world!");
+    let msg = HumanMessage::builder().content("Hello, world!").build();
+    assert_eq!(msg.content.as_text(), "Hello, world!");
 }
 
 #[test]
 fn test_text_property_empty_content() {
-    let msg = HumanMessage::new("");
-    assert_eq!(msg.text(), "");
+    let msg = HumanMessage::builder().content("").build();
+    assert_eq!(msg.content.as_text(), "");
 }
 
 // ============================================================================
@@ -60,7 +60,11 @@ fn test_merge_empty_string_second() {
 
 #[test]
 fn test_message_to_dict_human_message() {
-    let msg = HumanMessage::with_id("msg1", "Hello").with_name("user1");
+    let msg = HumanMessage::builder()
+        .content("Hello")
+        .id("msg1".to_string())
+        .name("user1".to_string())
+        .build();
     let result = message_to_dict(&BaseMessage::Human(msg));
     assert_eq!(result.get("type").unwrap().as_str().unwrap(), "human");
     assert_eq!(
@@ -175,7 +179,7 @@ fn test_message_to_dict_with_additional_kwargs() {
 fn test_messages_to_dict_multiple_messages() {
     let messages = vec![
         BaseMessage::System(SystemMessage::new("System")),
-        BaseMessage::Human(HumanMessage::new("Hello")),
+        BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
         BaseMessage::AI(AIMessage::builder().content("Hi").build()),
     ];
     let result = messages_to_dict(&messages);
@@ -198,11 +202,14 @@ fn test_messages_to_dict_empty_list() {
 
 #[test]
 fn test_add_human_message_chunks() {
-    let chunk1 = HumanMessageChunk::with_id("1", "Hello");
-    let chunk2 = HumanMessageChunk::new(" world");
+    let chunk1 = HumanMessageChunk::builder()
+        .content("Hello")
+        .id("1".to_string())
+        .build();
+    let chunk2 = HumanMessageChunk::builder().content(" world").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content(), "Hello world");
-    assert_eq!(result.id(), Some("1".to_string()));
+    assert_eq!(result.content.as_text(), "Hello world");
+    assert_eq!(result.id, Some("1".to_string()));
 }
 
 #[test]
@@ -221,16 +228,22 @@ fn test_add_chunks_with_additional_kwargs() {
     let mut kwargs2 = std::collections::HashMap::new();
     kwargs2.insert("key2".to_string(), json!("value2"));
 
-    let chunk1 = HumanMessageChunk::new("Hello").with_additional_kwargs(kwargs1);
-    let chunk2 = HumanMessageChunk::new(" world").with_additional_kwargs(kwargs2);
+    let chunk1 = HumanMessageChunk::builder()
+        .content("Hello")
+        .additional_kwargs(kwargs1)
+        .build();
+    let chunk2 = HumanMessageChunk::builder()
+        .content(" world")
+        .additional_kwargs(kwargs2)
+        .build();
 
     let result = chunk1 + chunk2;
     assert_eq!(
-        result.additional_kwargs().get("key1").unwrap(),
+        result.additional_kwargs.get("key1").unwrap(),
         &json!("value1")
     );
     assert_eq!(
-        result.additional_kwargs().get("key2").unwrap(),
+        result.additional_kwargs.get("key2").unwrap(),
         &json!("value2")
     );
 }
@@ -243,16 +256,22 @@ fn test_add_chunks_with_response_metadata() {
     let mut meta2 = std::collections::HashMap::new();
     meta2.insert("meta2".to_string(), json!("data2"));
 
-    let chunk1 = HumanMessageChunk::new("Hello").with_response_metadata(meta1);
-    let chunk2 = HumanMessageChunk::new(" world").with_response_metadata(meta2);
+    let chunk1 = HumanMessageChunk::builder()
+        .content("Hello")
+        .response_metadata(meta1)
+        .build();
+    let chunk2 = HumanMessageChunk::builder()
+        .content(" world")
+        .response_metadata(meta2)
+        .build();
 
     let result = chunk1 + chunk2;
     assert_eq!(
-        result.response_metadata().get("meta1").unwrap(),
+        result.response_metadata.get("meta1").unwrap(),
         &json!("data1")
     );
     assert_eq!(
-        result.response_metadata().get("meta2").unwrap(),
+        result.response_metadata.get("meta2").unwrap(),
         &json!("data2")
     );
 }
@@ -263,20 +282,26 @@ fn test_add_chunks_with_response_metadata() {
 
 #[test]
 fn test_init_with_string_content() {
-    let msg = HumanMessage::new("Hello world");
-    assert_eq!(msg.content(), "Hello world");
+    let msg = HumanMessage::builder().content("Hello world").build();
+    assert_eq!(msg.content.as_text(), "Hello world");
 }
 
 #[test]
 fn test_init_with_id() {
-    let msg = HumanMessage::with_id("msg-123", "Hello");
-    assert_eq!(msg.id(), Some("msg-123".to_string()));
+    let msg = HumanMessage::builder()
+        .content("Hello")
+        .id("msg-123".to_string())
+        .build();
+    assert_eq!(msg.id, Some("msg-123".to_string()));
 }
 
 #[test]
 fn test_init_with_name() {
-    let msg = HumanMessage::new("Hello").with_name("user1");
-    assert_eq!(msg.name(), Some("user1".to_string()));
+    let msg = HumanMessage::builder()
+        .content("Hello")
+        .name("user1".to_string())
+        .build();
+    assert_eq!(msg.name, Some("user1".to_string()));
 }
 
 #[test]
@@ -284,9 +309,12 @@ fn test_init_with_additional_kwargs() {
     let mut additional_kwargs = std::collections::HashMap::new();
     additional_kwargs.insert("custom_key".to_string(), json!("custom_value"));
 
-    let msg = HumanMessage::new("Hello").with_additional_kwargs(additional_kwargs);
+    let msg = HumanMessage::builder()
+        .content("Hello")
+        .additional_kwargs(additional_kwargs)
+        .build();
     assert_eq!(
-        msg.additional_kwargs().get("custom_key").unwrap(),
+        msg.additional_kwargs.get("custom_key").unwrap(),
         &json!("custom_value")
     );
 }
@@ -311,7 +339,7 @@ fn test_init_with_response_metadata() {
 
 #[test]
 fn test_message_types_have_consistent_types() {
-    let human_msg = HumanMessage::new("Hello");
+    let human_msg = HumanMessage::builder().content("Hello").build();
     let ai_msg = AIMessage::builder().content("Hi").build();
     let system_msg = SystemMessage::new("You are helpful");
 

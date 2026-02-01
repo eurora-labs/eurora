@@ -21,7 +21,7 @@ use crate::messages::BaseMessage;
 ///
 /// let session = ChatSession {
 ///     messages: Some(vec![
-///         BaseMessage::Human(HumanMessage::new("Hello!")),
+///         BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
 ///         BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
 ///     ]),
 ///     functions: None,
@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn test_chat_session_with_messages() {
         let messages = vec![
-            BaseMessage::Human(HumanMessage::new("Hello")),
+            BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
             BaseMessage::AI(AIMessage::builder().content("Hi").build()),
         ];
         let session = ChatSession::with_messages(messages);
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_chat_session_with_messages_and_functions() {
-        let messages = vec![BaseMessage::Human(HumanMessage::new("Hello"))];
+        let messages = vec![BaseMessage::Human(HumanMessage::builder().content("Hello").build())];
         let functions = vec![serde_json::json!({
             "name": "get_weather",
             "parameters": {}
@@ -133,7 +133,7 @@ mod tests {
         assert!(session.messages().is_empty());
 
         let session_with_messages =
-            ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::new("Hello"))]);
+            ChatSession::with_messages(vec![BaseMessage::Human(HumanMessage::builder().content("Hello").build())]);
         assert_eq!(session_with_messages.messages().len(), 1);
     }
 
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_chat_session_serialization() {
-        let messages = vec![BaseMessage::Human(HumanMessage::new("Hello"))];
+        let messages = vec![BaseMessage::Human(HumanMessage::builder().content("Hello").build())];
         let session = ChatSession::with_messages(messages);
 
         let serialized = serde_json::to_string(&session).expect("serialization should work");

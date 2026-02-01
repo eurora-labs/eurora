@@ -60,7 +60,7 @@ const DEFAULT_API_BASE: &str = "http://localhost:11434";
 ///     .temperature(0.7)
 ///     .num_ctx(4096);
 ///
-/// let messages = vec![HumanMessage::new("Hello!").into()];
+/// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
 /// let response = model.generate(messages, None).await?;
 /// ```
 #[derive(Debug, Clone)]
@@ -327,7 +327,7 @@ impl ChatOllama {
                 })),
                 BaseMessage::Human(m) => Some(serde_json::json!({
                     "role": "user",
-                    "content": m.content()
+                    "content": m.content.as_text()
                 })),
                 BaseMessage::AI(m) => {
                     let mut message = serde_json::json!({
@@ -892,7 +892,7 @@ impl BoundChatOllama {
     /// For better performance in async contexts, use `invoke_async` instead.
     pub fn invoke(&self, prompt: impl Into<String>) -> Box<dyn MessageWithAny> {
         let prompt = prompt.into();
-        let messages = vec![crate::messages::HumanMessage::new(prompt).into()];
+        let messages = vec![crate::messages::HumanMessage::builder().content(prompt).build().into()];
 
         // Try to use existing runtime, or create a new one
         match tokio::runtime::Handle::try_current() {

@@ -148,9 +148,9 @@ impl BaseMessage {
     /// or an empty string.
     pub fn content(&self) -> &str {
         match self {
-            BaseMessage::Human(m) => m.content(),
+            BaseMessage::Human(m) => m.content.as_text_ref(),
             BaseMessage::System(m) => m.content(),
-            BaseMessage::AI(m) => m.content(),
+            BaseMessage::AI(m) => &m.content,
             BaseMessage::Tool(m) => m.content(),
             BaseMessage::Chat(m) => m.content(),
             BaseMessage::Function(m) => m.content(),
@@ -161,7 +161,7 @@ impl BaseMessage {
     /// Get the message ID.
     pub fn id(&self) -> Option<String> {
         match self {
-            BaseMessage::Human(m) => m.id(),
+            BaseMessage::Human(m) => m.id.clone(),
             BaseMessage::System(m) => m.id(),
             BaseMessage::AI(m) => m.id.clone(),
             BaseMessage::Tool(m) => m.id(),
@@ -174,7 +174,7 @@ impl BaseMessage {
     /// Get the message name if present.
     pub fn name(&self) -> Option<String> {
         match self {
-            BaseMessage::Human(m) => m.name(),
+            BaseMessage::Human(m) => m.name.clone(),
             BaseMessage::System(m) => m.name(),
             BaseMessage::AI(m) => m.name.clone(),
             BaseMessage::Tool(m) => m.name(),
@@ -203,9 +203,9 @@ impl BaseMessage {
     /// (filtering for text blocks). Corresponds to the `text` property in Python.
     pub fn text(&self) -> String {
         match self {
-            BaseMessage::Human(m) => m.message_content().as_text(),
+            BaseMessage::Human(m) => m.content.as_text(),
             BaseMessage::System(m) => m.content().to_string(),
-            BaseMessage::AI(m) => m.content().to_string(),
+            BaseMessage::AI(m) => m.content.to_string(),
             BaseMessage::Tool(m) => m.content().to_string(),
             BaseMessage::Chat(m) => m.content().to_string(),
             BaseMessage::Function(m) => m.content().to_string(),
@@ -237,7 +237,7 @@ impl BaseMessage {
     /// Get additional kwargs if present.
     pub fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
-            BaseMessage::Human(m) => Some(m.additional_kwargs()),
+            BaseMessage::Human(m) => Some(&m.additional_kwargs),
             BaseMessage::System(m) => Some(m.additional_kwargs()),
             BaseMessage::AI(m) => Some(&m.additional_kwargs),
             BaseMessage::Tool(m) => Some(m.additional_kwargs()),
@@ -262,7 +262,7 @@ impl BaseMessage {
     /// This mimics LangChain's pretty_print() method for messages.
     pub fn pretty_print(&self) {
         let (role, content) = match self {
-            BaseMessage::Human(m) => ("Human", m.content()),
+            BaseMessage::Human(m) => ("Human", m.content.as_text_ref()),
             BaseMessage::System(m) => ("System", m.content()),
             BaseMessage::AI(m) => {
                 let tool_calls = &m.tool_calls;
@@ -479,7 +479,7 @@ impl BaseMessageChunk {
     pub fn content(&self) -> &str {
         match self {
             BaseMessageChunk::AI(m) => &m.content,
-            BaseMessageChunk::Human(m) => m.content(),
+            BaseMessageChunk::Human(m) => m.content.as_text_ref(),
             BaseMessageChunk::System(m) => m.content(),
             BaseMessageChunk::Tool(m) => m.content(),
             BaseMessageChunk::Chat(m) => m.content(),
@@ -491,7 +491,7 @@ impl BaseMessageChunk {
     pub fn id(&self) -> Option<String> {
         match self {
             BaseMessageChunk::AI(m) => m.id.clone(),
-            BaseMessageChunk::Human(m) => m.id(),
+            BaseMessageChunk::Human(m) => m.id.clone(),
             BaseMessageChunk::System(m) => m.id(),
             BaseMessageChunk::Tool(m) => m.id(),
             BaseMessageChunk::Chat(m) => m.id(),

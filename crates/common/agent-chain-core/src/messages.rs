@@ -13,7 +13,7 @@
 //! use agent_chain_core::messages::{HumanMessage, ContentPart, ImageSource};
 //!
 //! // Simple text message
-//! let msg = HumanMessage::new("Hello!");
+//! let msg = HumanMessage::builder().content("Hello!").build();
 //!
 //! // Message with image from URL
 //! let msg = HumanMessage::with_content(vec![
