@@ -65,7 +65,7 @@ fn test_str_output_parser_invoke_with_message() {
 fn test_str_output_parser_invoke_with_human_message() {
     // Test StrOutputParser.invoke() with HumanMessage input
     let parser = StrOutputParser::new();
-    let message = HumanMessage::new("Hello from human");
+    let message = HumanMessage::builder().content("Hello from human").build();
     let result = parser.invoke(BaseMessage::Human(message), None).unwrap();
     assert_eq!(result, "Hello from human");
 }
@@ -203,7 +203,9 @@ async fn test_str_output_parser_with_model_chain() {
     // Simulate chaining: model | parser
     let model_output = model
         ._generate(
-            vec![BaseMessage::Human(HumanMessage::new("input"))],
+            vec![BaseMessage::Human(
+                HumanMessage::builder().content("input").build(),
+            )],
             None,
             None,
         )
@@ -227,7 +229,9 @@ async fn test_str_output_parser_with_model_stream() {
     // Simulate streaming: model.stream() | parser
     let stream = model
         ._stream(
-            vec![BaseMessage::Human(HumanMessage::new("input"))],
+            vec![BaseMessage::Human(
+                HumanMessage::builder().content("input").build(),
+            )],
             None,
             None,
         )

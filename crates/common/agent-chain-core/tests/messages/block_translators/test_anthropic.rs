@@ -20,6 +20,7 @@ use agent_chain_core::messages::{
     FileContentBlock,
     HumanMessage,
     ImageContentBlock,
+    MessageContent,
     NonStandardContentBlock,
     PlainTextContentBlock,
     ReasoningContentBlock,
@@ -348,7 +349,7 @@ fn test_convert_to_v1_from_anthropic() {
     let expected_content2 = vec![ContentBlock::Text(TextContentBlock::new("Hello"))];
     assert_eq!(message2.content_blocks(), expected_content2);
     // Check no mutation
-    assert_ne!(message2.content(), "");
+    assert_ne!(message2.content, "");
 }
 
 // ============================================================================
@@ -719,7 +720,14 @@ fn test_convert_to_v1_from_anthropic_input() {
         }),
     ];
 
-    let message = HumanMessage::with_content_list(content);
+    let message = HumanMessage::builder()
+        .content(MessageContent::Parts(
+            content
+                .iter()
+                .map(|v| serde_json::from_value(v.clone()).unwrap())
+                .collect(),
+        ))
+        .build();
 
     let expected: Vec<ContentBlock> = vec![
         // text -> text

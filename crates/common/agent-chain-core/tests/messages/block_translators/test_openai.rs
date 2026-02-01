@@ -14,7 +14,7 @@ use agent_chain_core::messages::block_translators::openai::{
 };
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, Annotation, AudioContentBlock, BlockIndex, ContentBlock,
-    FileContentBlock, HumanMessage, ImageContentBlock, NonStandardContentBlock,
+    FileContentBlock, HumanMessage, ImageContentBlock, MessageContent, NonStandardContentBlock,
     ReasoningContentBlock, ServerToolCall, ServerToolResult, ServerToolStatus, TextContentBlock,
     ToolCallBlock, tool_call, tool_call_chunk,
 };
@@ -537,7 +537,7 @@ fn test_convert_to_v1_from_responses_chunk() {
 /// (image_url, input_audio, file) are correctly translated to standard v1 content blocks.
 #[test]
 fn test_convert_to_v1_from_openai_input() {
-    let content = vec![
+    let content = [
         json!({"type": "text", "text": "Hello"}),
         json!({
             "type": "image_url",
@@ -567,7 +567,14 @@ fn test_convert_to_v1_from_openai_input() {
         }),
     ];
 
-    let message = HumanMessage::with_content_list(content);
+    let message = HumanMessage::builder()
+        .content(MessageContent::Parts(
+            content
+                .iter()
+                .map(|v| serde_json::from_value(v.clone()).unwrap())
+                .collect(),
+        ))
+        .build();
 
     let expected: Vec<ContentBlock> = vec![
         // text -> text

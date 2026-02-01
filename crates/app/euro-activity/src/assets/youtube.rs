@@ -86,7 +86,7 @@ impl AssetFunctionality for YoutubeAsset {
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        vec![SystemMessage::new(content).into()]
+        vec![SystemMessage::builder().content(content).build().into()]
     }
 
     /// Get context chip for UI integration

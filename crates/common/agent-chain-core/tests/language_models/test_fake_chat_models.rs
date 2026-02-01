@@ -137,7 +137,9 @@ mod test_fake_messages_list_chat_model {
         )]);
         let result = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("hi"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("hi").build(),
+                )],
                 None,
                 None,
             )
@@ -448,7 +450,9 @@ mod test_fake_chat_model {
         let model = FakeChatModel::new();
         let result1 = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("hello"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("hello").build(),
+                )],
                 None,
                 None,
             )
@@ -456,7 +460,9 @@ mod test_fake_chat_model {
             .unwrap();
         let result2 = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("goodbye"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("goodbye").build(),
+                )],
                 None,
                 None,
             )
@@ -695,8 +701,8 @@ mod test_parrot_fake_chat_model {
 
         let model = ParrotFakeChatModel::new();
         let messages = vec![
-            BaseMessage::System(SystemMessage::new("You are helpful")),
-            BaseMessage::Human(HumanMessage::new("Hello!")),
+            BaseMessage::System(SystemMessage::builder().content("You are helpful").build()),
+            BaseMessage::Human(HumanMessage::builder().content("Hello!").build()),
         ];
         let result = model._generate(messages, None, None).await.unwrap();
         // Should return the last message (HumanMessage)
@@ -711,7 +717,9 @@ mod test_parrot_fake_chat_model {
         let model = ParrotFakeChatModel::new();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("Single"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("Single").build(),
+                )],
                 None,
                 None,
             )
@@ -741,7 +749,9 @@ mod test_parrot_fake_chat_model {
         // Python equivalent: test_invoke_preserves_message_type()
 
         let model = ParrotFakeChatModel::new();
-        let messages = vec![BaseMessage::Human(HumanMessage::new("test"))];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder().content("test").build(),
+        )];
         let result = model._generate(messages, None, None).await.unwrap();
         // The generation should contain the original message
         assert_eq!(result.generations[0].message.content(), "test");
@@ -754,8 +764,8 @@ mod test_parrot_fake_chat_model {
 
         let model = ParrotFakeChatModel::new();
         let messages = vec![
-            BaseMessage::Human(HumanMessage::new("First")),
-            BaseMessage::Human(HumanMessage::new("Last")),
+            BaseMessage::Human(HumanMessage::builder().content("First").build()),
+            BaseMessage::Human(HumanMessage::builder().content("Last").build()),
         ];
         let result = model._generate(messages, None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "Last");
@@ -769,7 +779,9 @@ mod test_parrot_fake_chat_model {
         let model = ParrotFakeChatModel::new();
         let result = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("test"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("test").build(),
+                )],
                 None,
                 None,
             )
@@ -788,7 +800,9 @@ mod test_parrot_fake_chat_model {
 
         let result1 = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("batch1"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("batch1").build(),
+                )],
                 None,
                 None,
             )
@@ -796,7 +810,9 @@ mod test_parrot_fake_chat_model {
             .unwrap();
         let result2 = model
             ._generate(
-                vec![BaseMessage::Human(HumanMessage::new("batch2"))],
+                vec![BaseMessage::Human(
+                    HumanMessage::builder().content("batch2").build(),
+                )],
                 None,
                 None,
             )
@@ -812,20 +828,22 @@ mod test_parrot_fake_chat_model {
         // Test with complex content blocks
         // Python equivalent: test_with_complex_content()
 
-        use agent_chain_core::messages::{ContentPart, ImageSource};
+        use agent_chain_core::messages::{ContentPart, ImageSource, MessageContent};
 
         let model = ParrotFakeChatModel::new();
-        let message = HumanMessage::with_content(vec![
-            ContentPart::Text {
-                text: "Hello".to_string(),
-            },
-            ContentPart::Image {
-                source: ImageSource::Url {
-                    url: "https://example.com/img.png".to_string(),
+        let message = HumanMessage::builder()
+            .content(MessageContent::Parts(vec![
+                ContentPart::Text {
+                    text: "Hello".to_string(),
                 },
-                detail: None,
-            },
-        ]);
+                ContentPart::Image {
+                    source: ImageSource::Url {
+                        url: "https://example.com/img.png".to_string(),
+                    },
+                    detail: None,
+                },
+            ]))
+            .build();
 
         let result = model
             ._generate(vec![BaseMessage::Human(message.clone())], None, None)

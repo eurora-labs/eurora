@@ -337,7 +337,9 @@ mod test_language_model_input {
         // Test LanguageModelInput accepts message sequence
         // Python equivalent: test_language_model_input_accepts_message_sequence()
 
-        let messages = vec![BaseMessage::Human(HumanMessage::new("Hello"))];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder().content("Hello").build(),
+        )];
         let input: LanguageModelInput = messages.into();
 
         match input {
@@ -357,7 +359,7 @@ mod test_language_model_input {
         assert_eq!(messages.len(), 1);
         match &messages[0] {
             BaseMessage::Human(m) => {
-                assert_eq!(m.content(), "hello");
+                assert_eq!(m.content.as_text(), "hello");
             }
             _ => panic!("Expected Human message"),
         }
@@ -623,7 +625,7 @@ mod test_base_language_model_trait {
         let model = FakeListLLM::new(vec!["response".to_string()]);
 
         let messages = vec![
-            BaseMessage::Human(HumanMessage::new("Hi")),
+            BaseMessage::Human(HumanMessage::builder().content("Hi").build()),
             BaseMessage::AI(AIMessage::builder().content("Hello").build()),
         ];
 
