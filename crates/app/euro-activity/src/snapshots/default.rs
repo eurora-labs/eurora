@@ -41,7 +41,7 @@ impl SnapshotFunctionality for DefaultSnapshot {
             }
         }
 
-        vec![SystemMessage::new(content).into()]
+        vec![SystemMessage::builder().content(content).build().into()]
     }
 
     fn get_updated_at(&self) -> u64 {
@@ -60,7 +60,6 @@ impl SnapshotFunctionality for DefaultSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agent_chain_core::messages::BaseMessageTrait;
 
     #[test]
     fn test_default_snapshot_creation() {

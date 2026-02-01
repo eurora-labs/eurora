@@ -32,14 +32,15 @@ fn test_all_imports() {
     use uuid::Uuid;
 
     // ChatGeneration
-    let _: outputs::ChatGeneration = outputs::ChatGeneration::new(AIMessage::new("test").into());
+    let _: outputs::ChatGeneration =
+        outputs::ChatGeneration::new(AIMessage::builder().content("test").build().into());
 
     // ChatGenerationChunk
     let _: outputs::ChatGenerationChunk =
-        outputs::ChatGenerationChunk::new(AIMessage::new("test").into());
+        outputs::ChatGenerationChunk::new(AIMessage::builder().content("test").build().into());
 
     // ChatResult
-    let cg = outputs::ChatGeneration::new(AIMessage::new("test").into());
+    let cg = outputs::ChatGeneration::new(AIMessage::builder().content("test").build().into());
     let _: outputs::ChatResult = outputs::ChatResult::new(vec![cg]);
 
     // Generation
@@ -82,11 +83,11 @@ fn test_imports_from_crate_root() {
     // Verify each type is usable
     let _ = Generation::new("test");
     let _ = GenerationChunk::new("test");
-    let _ = ChatGeneration::new(AIMessage::new("test").into());
-    let _ = ChatGenerationChunk::new(AIMessage::new("test").into());
+    let _ = ChatGeneration::new(AIMessage::builder().content("test").build().into());
+    let _ = ChatGenerationChunk::new(AIMessage::builder().content("test").build().into());
     let generation = Generation::new("test");
     let _ = LLMResult::new(vec![vec![generation.into()]]);
-    let cg = ChatGeneration::new(AIMessage::new("test").into());
+    let cg = ChatGeneration::new(AIMessage::builder().content("test").build().into());
     let _ = ChatResult::new(vec![cg]);
     let _ = RunInfo::new(Uuid::new_v4());
 }
@@ -100,8 +101,12 @@ fn test_merge_function_export() {
 
     // Verify the function is accessible and works
     let chunks = vec![
-        agent_chain_core::outputs::ChatGenerationChunk::new(AIMessage::new("Hello ").into()),
-        agent_chain_core::outputs::ChatGenerationChunk::new(AIMessage::new("world").into()),
+        agent_chain_core::outputs::ChatGenerationChunk::new(
+            AIMessage::builder().content("Hello ").build().into(),
+        ),
+        agent_chain_core::outputs::ChatGenerationChunk::new(
+            AIMessage::builder().content("world").build().into(),
+        ),
     ];
 
     let merged = merge_chat_generation_chunks(chunks);

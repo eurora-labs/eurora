@@ -120,7 +120,7 @@ impl AssetFunctionality for TwitterAsset {
             ));
         }
 
-        vec![SystemMessage::new(text).into()]
+        vec![SystemMessage::builder().content(text).build().into()]
     }
 
     /// Get context chip for UI integration

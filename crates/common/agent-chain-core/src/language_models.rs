@@ -33,7 +33,7 @@
 //!
 //! async fn chat_with_model<M: BaseChatModel>(model: &M) -> Result<ChatResult, agent_chain_core::error::Error> {
 //!     let messages = vec![
-//!         BaseMessage::Human(HumanMessage::new("Hello, how are you?")),
+//!         BaseMessage::Human(HumanMessage::builder().content("Hello, how are you?").build()),
 //!     ];
 //!     model.generate(messages, None, None).await
 //! }

@@ -10,9 +10,7 @@ use agent_chain_core::language_models::{
     FakeListChatModel, GenericFakeChatModel, LangSmithParams, LanguageModelConfig,
     LanguageModelInput, ModelProfile,
 };
-use agent_chain_core::messages::{
-    AIMessage, BaseMessage, BaseMessageTrait, HumanMessage, SystemMessage,
-};
+use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
 use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult};
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -20,16 +18,32 @@ use futures::StreamExt;
 /// Helper function to create messages fixture
 fn create_messages() -> Vec<BaseMessage> {
     vec![
-        BaseMessage::System(SystemMessage::new("You are a test user.")),
-        BaseMessage::Human(HumanMessage::new("Hello, I am a test user.")),
+        BaseMessage::System(
+            SystemMessage::builder()
+                .content("You are a test user.")
+                .build(),
+        ),
+        BaseMessage::Human(
+            HumanMessage::builder()
+                .content("Hello, I am a test user.")
+                .build(),
+        ),
     ]
 }
 
 /// Helper function to create a second set of messages fixture
 fn create_messages_2() -> Vec<BaseMessage> {
     vec![
-        BaseMessage::System(SystemMessage::new("You are a test user.")),
-        BaseMessage::Human(HumanMessage::new("Hello, I not a test user.")),
+        BaseMessage::System(
+            SystemMessage::builder()
+                .content("You are a test user.")
+                .build(),
+        ),
+        BaseMessage::Human(
+            HumanMessage::builder()
+                .content("Hello, I not a test user.")
+                .build(),
+        ),
     ]
 }
 
@@ -106,7 +120,7 @@ impl BaseChatModel for ModelWithGenerateOnly {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let message = AIMessage::new("hello");
+        let message = AIMessage::builder().content("hello").build();
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
     }
@@ -204,8 +218,8 @@ impl BaseChatModel for ModelWithSyncStream {
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         let stream = async_stream::stream! {
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("a").into()));
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("b").into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("a").build().into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("b").build().into()));
         };
         Ok(Box::pin(stream))
     }
@@ -307,8 +321,8 @@ impl BaseChatModel for ModelWithAsyncStream {
         _run_manager: Option<&agent_chain_core::callbacks::AsyncCallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         let stream = async_stream::stream! {
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("a").into()));
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("b").into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("a").build().into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("b").build().into()));
         };
         Ok(Box::pin(stream))
     }
@@ -421,7 +435,7 @@ impl BaseChatModel for NoStreamingModel {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let message = AIMessage::new("invoke");
+        let message = AIMessage::builder().content("invoke").build();
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
     }
@@ -509,7 +523,7 @@ impl BaseChatModel for StreamingModel {
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
-        let message = AIMessage::new("invoke");
+        let message = AIMessage::builder().content("invoke").build();
         let generation = ChatGeneration::new(message.into());
         Ok(ChatResult::new(vec![generation]))
     }
@@ -521,7 +535,7 @@ impl BaseChatModel for StreamingModel {
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         let stream = async_stream::stream! {
-            yield Ok(ChatGenerationChunk::new(AIMessage::new("stream").into()));
+            yield Ok(ChatGenerationChunk::new(AIMessage::builder().content("stream").build().into()));
         };
         Ok(Box::pin(stream))
     }
@@ -586,7 +600,7 @@ async fn test_disable_streaming_async() {
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
     let result = model.invoke(LanguageModelInput::Messages(vec![])).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().content(), "invoke");
+    assert_eq!(result.unwrap().content, "invoke");
 
     // Test Bool(false) - streaming works
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
@@ -606,7 +620,7 @@ async fn test_disable_streaming_no_streaming_model() {
     let model = NoStreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
     let result = model.invoke(LanguageModelInput::Messages(vec![])).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().content(), "invoke");
+    assert_eq!(result.unwrap().content, "invoke");
 
     // Even with Bool(false), _should_stream returns false because no stream impl
     let model = NoStreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
@@ -626,7 +640,7 @@ async fn test_disable_streaming_no_streaming_model_async() {
         let model = NoStreamingModel::new().with_disable_streaming(disable);
         let result = model.ainvoke(LanguageModelInput::Messages(vec![])).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().content(), "invoke");
+        assert_eq!(result.unwrap().content, "invoke");
     }
 }
 
@@ -1005,7 +1019,7 @@ async fn test_invoke_basic() {
         .await;
 
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().content(), "hello world");
+    assert_eq!(result.unwrap().content, "hello world");
 }
 
 #[tokio::test]
@@ -1018,7 +1032,7 @@ async fn test_ainvoke_basic() {
         .await;
 
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().content(), "async hello");
+    assert_eq!(result.unwrap().content, "async hello");
 }
 
 #[tokio::test]
@@ -1048,8 +1062,12 @@ async fn test_generate_basic() {
     // Test basic generate functionality.
 
     let model = FakeListChatModel::new(vec!["gen1".to_string(), "gen2".to_string()]);
-    let messages1 = vec![BaseMessage::Human(HumanMessage::new("test1"))];
-    let messages2 = vec![BaseMessage::Human(HumanMessage::new("test2"))];
+    let messages1 = vec![BaseMessage::Human(
+        HumanMessage::builder().content("test1").build(),
+    )];
+    let messages2 = vec![BaseMessage::Human(
+        HumanMessage::builder().content("test2").build(),
+    )];
 
     let result = model
         .generate(

@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::ops::Add;
 
-use crate::messages::{BaseMessage, BaseMessageTrait};
+use crate::messages::BaseMessage;
 use crate::utils::merge::merge_dicts;
 
 /// A single chat generation output.
@@ -149,7 +149,9 @@ impl Add for ChatGenerationChunk {
         let merged_text = self.text + &other.text;
 
         // Create a new AI message with the merged content
-        let merged_message = crate::messages::AIMessage::new(&merged_text);
+        let merged_message = crate::messages::AIMessage::builder()
+            .content(&merged_text)
+            .build();
 
         ChatGenerationChunk {
             text: merged_text,
@@ -237,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_chat_generation_new() {
-        let msg = AIMessage::new("Hello, world!");
+        let msg = AIMessage::builder().content("Hello, world!").build();
         let chat_gen = ChatGeneration::new(msg.into());
         assert_eq!(chat_gen.text, "Hello, world!");
         assert!(chat_gen.generation_info.is_none());
@@ -246,7 +248,7 @@ mod tests {
 
     #[test]
     fn test_chat_generation_with_info() {
-        let msg = AIMessage::new("Hello");
+        let msg = AIMessage::builder().content("Hello").build();
         let mut info = HashMap::new();
         info.insert("finish_reason".to_string(), json!("stop"));
         let chat_gen = ChatGeneration::with_info(msg.into(), info.clone());
@@ -256,8 +258,8 @@ mod tests {
 
     #[test]
     fn test_chat_generation_chunk_add() {
-        let msg1 = AIMessage::new("Hello, ");
-        let msg2 = AIMessage::new("world!");
+        let msg1 = AIMessage::builder().content("Hello, ").build();
+        let msg2 = AIMessage::builder().content("world!").build();
         let chunk1 = ChatGenerationChunk::new(msg1.into());
         let chunk2 = ChatGenerationChunk::new(msg2.into());
         let result = chunk1 + chunk2;
@@ -272,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_merge_chat_generation_chunks_single() {
-        let msg = AIMessage::new("Hello");
+        let msg = AIMessage::builder().content("Hello").build();
         let chunk = ChatGenerationChunk::new(msg.into());
         let result = merge_chat_generation_chunks(vec![chunk.clone()]);
         assert!(result.is_some());
@@ -281,9 +283,9 @@ mod tests {
 
     #[test]
     fn test_merge_chat_generation_chunks_multiple() {
-        let msg1 = AIMessage::new("Hello, ");
-        let msg2 = AIMessage::new("world");
-        let msg3 = AIMessage::new("!");
+        let msg1 = AIMessage::builder().content("Hello, ").build();
+        let msg2 = AIMessage::builder().content("world").build();
+        let msg3 = AIMessage::builder().content("!").build();
         let chunks = vec![
             ChatGenerationChunk::new(msg1.into()),
             ChatGenerationChunk::new(msg2.into()),

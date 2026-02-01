@@ -16,7 +16,7 @@
 //!     .with_responses_api(true)
 //!     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 //!
-//! let messages = vec![HumanMessage::new("What is the latest news?").into()];
+//! let messages = vec![HumanMessage::builder().content("What is the latest news?").build().into()];
 //! let response = model.generate(messages, None).await?;
 //! ```
 //!
@@ -32,7 +32,7 @@
 //! let model = ChatOpenAI::new("gpt-4o")
 //!     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 //!
-//! let messages = vec![HumanMessage::new("What is the latest news?").into()];
+//! let messages = vec![HumanMessage::builder().content("What is the latest news?").build().into()];
 //! let mut stream = model.stream(messages, None).await?;
 //!
 //! while let Some(chunk) = stream.next().await {
@@ -158,7 +158,7 @@ pub enum ContentBlock {
 ///     .temperature(0.7)
 ///     .max_tokens(1024);
 ///
-/// let messages = vec![HumanMessage::new("Hello!").into()];
+/// let messages = vec![HumanMessage::builder().content("Hello!").build().into()];
 /// let response = model.generate(messages, None).await?;
 /// ```
 ///
@@ -172,7 +172,7 @@ pub enum ContentBlock {
 ///     .with_responses_api(true)
 ///     .with_builtin_tools(vec![BuiltinTool::WebSearch]);
 ///
-/// let messages = vec![HumanMessage::new("What happened today?").into()];
+/// let messages = vec![HumanMessage::builder().content("What happened today?").build().into()];
 /// let response = model.generate(messages, None).await?;
 /// // Response will include web search results with citations
 /// ```
@@ -555,10 +555,10 @@ impl ChatOpenAI {
             .filter_map(|msg| match msg {
                 BaseMessage::System(m) => Some(serde_json::json!({
                     "role": "system",
-                    "content": m.content()
+                    "content": m.content.as_text()
                 })),
                 BaseMessage::Human(m) => {
-                    let content = match m.message_content() {
+                    let content = match &m.content {
                         MessageContent::Text(text) => serde_json::json!(text),
                         MessageContent::Parts(parts) => {
                             let content_parts: Vec<serde_json::Value> = parts
@@ -611,17 +611,17 @@ impl ChatOpenAI {
                         message["content"] = serde_json::json!(m.content());
                     }
 
-                    if !m.tool_calls().is_empty() {
+                    if !m.tool_calls.is_empty() {
                         let tool_calls: Vec<serde_json::Value> = m
-                            .tool_calls()
+                            .tool_calls
                             .iter()
                             .map(|tc| {
                                 serde_json::json!({
-                                    "id": tc.id(),
+                                    "id": tc.id,
                                     "type": "function",
                                     "function": {
-                                        "name": tc.name(),
-                                        "arguments": tc.args().to_string()
+                                        "name": tc.name,
+                                        "arguments": tc.args.to_string()
                                     }
                                 })
                             })
@@ -633,21 +633,21 @@ impl ChatOpenAI {
                 }
                 BaseMessage::Tool(m) => Some(serde_json::json!({
                     "role": "tool",
-                    "tool_call_id": m.tool_call_id(),
-                    "content": m.content()
+                    "tool_call_id": m.tool_call_id,
+                    "content": m.content
                 })),
                 BaseMessage::Remove(_) => {
                     // RemoveMessage is used for message management, not sent to API
                     None
                 }
                 BaseMessage::Chat(m) => Some(serde_json::json!({
-                    "role": m.role(),
-                    "content": m.content()
+                    "role": m.role,
+                    "content": m.content
                 })),
                 BaseMessage::Function(m) => Some(serde_json::json!({
                     "role": "function",
-                    "name": m.name(),
-                    "content": m.content()
+                    "name": m.name,
+                    "content": m.content
                 })),
             })
             .collect()
@@ -980,11 +980,11 @@ impl ChatOpenAI {
                 BaseMessage::System(m) => {
                     input.push(serde_json::json!({
                         "role": "system",
-                        "content": m.content()
+                        "content": m.content.as_text()
                     }));
                 }
                 BaseMessage::Human(m) => {
-                    let content = match m.message_content() {
+                    let content = match &m.content {
                         MessageContent::Text(text) => serde_json::json!(text),
                         MessageContent::Parts(parts) => {
                             let content_parts: Vec<serde_json::Value> = parts
@@ -1030,7 +1030,7 @@ impl ChatOpenAI {
                 }
                 BaseMessage::AI(m) => {
                     // Add message content
-                    if !m.content().is_empty() || m.tool_calls().is_empty() {
+                    if !m.content().is_empty() || m.tool_calls.is_empty() {
                         input.push(serde_json::json!({
                             "type": "message",
                             "role": "assistant",
@@ -1043,20 +1043,20 @@ impl ChatOpenAI {
                     }
 
                     // Add function calls
-                    for tc in m.tool_calls() {
+                    for tc in &m.tool_calls {
                         input.push(serde_json::json!({
                             "type": "function_call",
-                            "name": tc.name(),
-                            "arguments": tc.args().to_string(),
-                            "call_id": tc.id()
+                            "name": tc.name,
+                            "arguments": tc.args.to_string(),
+                            "call_id": tc.id
                         }));
                     }
                 }
                 BaseMessage::Tool(m) => {
                     input.push(serde_json::json!({
                         "type": "function_call_output",
-                        "call_id": m.tool_call_id(),
-                        "output": m.content()
+                        "call_id": m.tool_call_id,
+                        "output": m.content
                     }));
                 }
                 BaseMessage::Remove(_) => {
@@ -1065,15 +1065,15 @@ impl ChatOpenAI {
                 }
                 BaseMessage::Chat(m) => {
                     input.push(serde_json::json!({
-                        "role": m.role(),
-                        "content": m.content()
+                        "role": m.role,
+                        "content": m.content
                     }));
                 }
                 BaseMessage::Function(m) => {
                     input.push(serde_json::json!({
                         "type": "function_call_output",
-                        "name": m.name(),
-                        "output": m.content()
+                        "name": m.name,
+                        "output": m.content
                     }));
                 }
             }
@@ -1103,7 +1103,11 @@ impl ChatOpenAI {
                     .map(|tc| {
                         let args: serde_json::Value =
                             serde_json::from_str(&tc.function.arguments).unwrap_or_default();
-                        ToolCall::with_id(tc.id, tc.function.name, args)
+                        ToolCall::builder()
+                            .name(tc.function.name)
+                            .args(args)
+                            .id(tc.id)
+                            .build()
                     })
                     .collect();
                 (content, tool_calls)
@@ -1111,19 +1115,16 @@ impl ChatOpenAI {
             None => (String::new(), Vec::new()),
         };
 
-        let mut ai_message = if tool_calls.is_empty() {
-            AIMessage::new(content)
-        } else {
-            AIMessage::with_tool_calls(content, tool_calls)
+        let ai_message = AIMessage::builder().content(content).tool_calls(tool_calls);
+        let ai_message = match response.usage {
+            Some(usage) => ai_message
+                .usage_metadata(UsageMetadata::new(
+                    usage.prompt_tokens as i64,
+                    usage.completion_tokens as i64,
+                ))
+                .build(),
+            None => ai_message.build(),
         };
-
-        // Set usage metadata if available from response
-        if let Some(usage) = response.usage {
-            ai_message = ai_message.with_usage_metadata(UsageMetadata::new(
-                usage.prompt_tokens as i64,
-                usage.completion_tokens as i64,
-            ));
-        }
 
         let generation = ChatGeneration::new(ai_message.into());
         ChatResult::new(vec![generation])
@@ -1157,7 +1158,13 @@ impl ChatOpenAI {
                 } => {
                     let args: serde_json::Value =
                         serde_json::from_str(arguments).unwrap_or_default();
-                    tool_calls.push(ToolCall::with_id(call_id.clone(), name.clone(), args));
+                    tool_calls.push(
+                        ToolCall::builder()
+                            .name(name.clone())
+                            .args(args)
+                            .id(call_id.clone())
+                            .build(),
+                    );
                 }
                 ResponsesOutput::WebSearchCall { .. } => {
                     // Web search is handled internally by OpenAI
@@ -1167,23 +1174,18 @@ impl ChatOpenAI {
             }
         }
 
-        let mut ai_message = if tool_calls.is_empty() {
-            let mut msg = AIMessage::new(text_content);
-            if !annotations.is_empty() {
-                msg = msg.with_annotations(annotations);
-            }
-            msg
-        } else {
-            AIMessage::with_tool_calls(text_content, tool_calls)
+        let ai_message = AIMessage::builder()
+            .content(text_content)
+            .tool_calls(tool_calls);
+        let ai_message = match response.usage {
+            Some(usage) => ai_message
+                .usage_metadata(UsageMetadata::new(
+                    usage.input_tokens as i64,
+                    usage.output_tokens as i64,
+                ))
+                .build(),
+            None => ai_message.build(),
         };
-
-        // Set usage metadata if available from response
-        if let Some(usage) = response.usage {
-            ai_message = ai_message.with_usage_metadata(UsageMetadata::new(
-                usage.input_tokens as i64,
-                usage.output_tokens as i64,
-            ));
-        }
 
         let generation = ChatGeneration::new(ai_message.into());
         ChatResult::new(vec![generation])
@@ -1334,7 +1336,7 @@ impl BaseChatModel for ChatOpenAI {
                 match result {
                     Ok(chat_chunk) => {
                         // Convert ChatChunk to ChatGenerationChunk
-                        let message = AIMessage::new(&chat_chunk.content);
+                        let message = AIMessage::builder().content(&chat_chunk.content).build();
                         let generation_chunk = ChatGenerationChunk::new(message.into());
                         yield Ok(generation_chunk);
                     }

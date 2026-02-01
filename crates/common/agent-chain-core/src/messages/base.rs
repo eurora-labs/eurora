@@ -3,7 +3,6 @@
 //! This module contains the core `BaseMessage` enum and related traits,
 //! mirroring `langchain_core.messages.base`.
 
-use enum_dispatch::enum_dispatch;
 use serde::de::{self, MapAccess, Visitor};
 use serde::ser::Serializer;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -21,41 +20,9 @@ use super::system::{SystemMessage, SystemMessageChunk};
 use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
 use crate::utils::merge::merge_lists;
 
-/// Core trait for message-like types, enabling enum_dispatch for BaseMessage.
-///
-/// This trait defines the common interface that all message types must implement
-/// to be used with BaseMessage. It enables efficient static dispatch through
-/// enum_dispatch instead of dynamic dispatch.
-///
-/// Each message type implements this trait in its own module file.
-#[enum_dispatch(BaseMessage)]
-pub trait BaseMessageTrait {
-    /// Get the message content as a string reference.
-    ///
-    /// For messages with multimodal content, this returns the first text content
-    /// or an empty string.
-    fn content(&self) -> &str;
-
-    /// Get the message ID.
-    fn id(&self) -> Option<String>;
-
-    /// Get the message name if present.
-    fn name(&self) -> Option<String>;
-
-    /// Set id of the message
-    fn set_id(&mut self, id: String);
-
-    /// Get additional kwargs if present.
-    fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>>;
-}
-
 /// A unified message type that can represent any message role.
 ///
 /// This corresponds to `BaseMessage` in LangChain Python.
-///
-/// This enum uses `enum_dispatch` for efficient static dispatch of common
-/// message operations through the `MessageLike` trait.
-#[enum_dispatch]
 #[derive(Debug, Clone, PartialEq)]
 pub enum BaseMessage {
     /// A human message
@@ -175,18 +142,73 @@ impl<'de> Deserialize<'de> for BaseMessage {
 }
 
 impl BaseMessage {
+    /// Get the message content as a string reference.
+    ///
+    /// For messages with multimodal content, this returns the first text content
+    /// or an empty string.
+    pub fn content(&self) -> &str {
+        match self {
+            BaseMessage::Human(m) => m.content.as_text_ref(),
+            BaseMessage::System(m) => m.content.as_text_ref(),
+            BaseMessage::AI(m) => &m.content,
+            BaseMessage::Tool(m) => &m.content,
+            BaseMessage::Chat(m) => &m.content,
+            BaseMessage::Function(m) => &m.content,
+            BaseMessage::Remove(_) => "",
+        }
+    }
+
+    /// Get the message ID.
+    pub fn id(&self) -> Option<String> {
+        match self {
+            BaseMessage::Human(m) => m.id.clone(),
+            BaseMessage::System(m) => m.id.clone(),
+            BaseMessage::AI(m) => m.id.clone(),
+            BaseMessage::Tool(m) => m.id.clone(),
+            BaseMessage::Chat(m) => m.id.clone(),
+            BaseMessage::Function(m) => m.id.clone(),
+            BaseMessage::Remove(m) => Some(m.id.clone()),
+        }
+    }
+
+    /// Get the message name if present.
+    pub fn name(&self) -> Option<String> {
+        match self {
+            BaseMessage::Human(m) => m.name.clone(),
+            BaseMessage::System(m) => m.name.clone(),
+            BaseMessage::AI(m) => m.name.clone(),
+            BaseMessage::Tool(m) => m.name.clone(),
+            BaseMessage::Chat(m) => m.name.clone(),
+            BaseMessage::Function(m) => Some(m.name.clone()),
+            BaseMessage::Remove(_) => None,
+        }
+    }
+
+    /// Set id of the message.
+    pub fn set_id(&mut self, id: String) {
+        match self {
+            BaseMessage::Human(m) => m.set_id(id),
+            BaseMessage::System(m) => m.set_id(id),
+            BaseMessage::AI(m) => m.set_id(id),
+            BaseMessage::Tool(m) => m.set_id(id),
+            BaseMessage::Chat(m) => m.set_id(id),
+            BaseMessage::Function(m) => m.set_id(id),
+            BaseMessage::Remove(m) => m.set_id(id),
+        }
+    }
+
     /// Get the text content of the message as a string.
     ///
     /// This extracts text from both simple string content and list content
     /// (filtering for text blocks). Corresponds to the `text` property in Python.
     pub fn text(&self) -> String {
         match self {
-            BaseMessage::Human(m) => m.message_content().as_text(),
-            BaseMessage::System(m) => m.content().to_string(),
-            BaseMessage::AI(m) => m.content().to_string(),
-            BaseMessage::Tool(m) => m.content().to_string(),
-            BaseMessage::Chat(m) => m.content().to_string(),
-            BaseMessage::Function(m) => m.content().to_string(),
+            BaseMessage::Human(m) => m.content.as_text(),
+            BaseMessage::System(m) => m.content.as_text(),
+            BaseMessage::AI(m) => m.content.to_string(),
+            BaseMessage::Tool(m) => m.content.clone(),
+            BaseMessage::Chat(m) => m.content.to_string(),
+            BaseMessage::Function(m) => m.content.clone(),
             BaseMessage::Remove(_) => String::new(),
         }
     }
@@ -194,7 +216,7 @@ impl BaseMessage {
     /// Get tool calls if this is an AI message.
     pub fn tool_calls(&self) -> &[ToolCall] {
         match self {
-            BaseMessage::AI(m) => m.tool_calls(),
+            BaseMessage::AI(m) => &m.tool_calls,
             _ => &[],
         }
     }
@@ -215,12 +237,12 @@ impl BaseMessage {
     /// Get additional kwargs if present.
     pub fn additional_kwargs(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
-            BaseMessage::Human(m) => Some(m.additional_kwargs()),
-            BaseMessage::System(m) => Some(m.additional_kwargs()),
-            BaseMessage::AI(m) => Some(m.additional_kwargs()),
-            BaseMessage::Tool(m) => Some(m.additional_kwargs()),
-            BaseMessage::Chat(m) => Some(m.additional_kwargs()),
-            BaseMessage::Function(m) => Some(m.additional_kwargs()),
+            BaseMessage::Human(m) => Some(&m.additional_kwargs),
+            BaseMessage::System(m) => Some(&m.additional_kwargs),
+            BaseMessage::AI(m) => Some(&m.additional_kwargs),
+            BaseMessage::Tool(m) => Some(&m.additional_kwargs),
+            BaseMessage::Chat(m) => Some(&m.additional_kwargs),
+            BaseMessage::Function(m) => Some(&m.additional_kwargs),
             BaseMessage::Remove(_) => None,
         }
     }
@@ -228,10 +250,10 @@ impl BaseMessage {
     /// Get response metadata if present.
     pub fn response_metadata(&self) -> Option<&HashMap<String, serde_json::Value>> {
         match self {
-            BaseMessage::AI(m) => Some(m.response_metadata()),
-            BaseMessage::Chat(m) => Some(m.response_metadata()),
-            BaseMessage::Function(m) => Some(m.response_metadata()),
-            BaseMessage::Tool(m) => Some(m.response_metadata()),
+            BaseMessage::AI(m) => Some(&m.response_metadata),
+            BaseMessage::Chat(m) => Some(&m.response_metadata),
+            BaseMessage::Function(m) => Some(&m.response_metadata),
+            BaseMessage::Tool(m) => Some(&m.response_metadata),
             _ => None,
         }
     }
@@ -240,10 +262,10 @@ impl BaseMessage {
     /// This mimics LangChain's pretty_print() method for messages.
     pub fn pretty_print(&self) {
         let (role, content) = match self {
-            BaseMessage::Human(m) => ("Human", m.content()),
-            BaseMessage::System(m) => ("System", m.content()),
+            BaseMessage::Human(m) => ("Human", m.content.as_text_ref()),
+            BaseMessage::System(m) => ("System", m.content.as_text_ref()),
             BaseMessage::AI(m) => {
-                let tool_calls = m.tool_calls();
+                let tool_calls = &m.tool_calls;
                 if tool_calls.is_empty() {
                     ("AI", m.content())
                 } else {
@@ -254,8 +276,8 @@ impl BaseMessage {
                         println!("{}", m.content());
                     }
                     for tc in tool_calls {
-                        println!("Tool Call: {} ({:?})", tc.name(), tc.id());
-                        println!("  Args: {}", tc.args());
+                        println!("Tool Call: {} ({:?})", tc.name, tc.id);
+                        println!("  Args: {}", tc.args);
                     }
                     return;
                 }
@@ -264,24 +286,22 @@ impl BaseMessage {
                 println!(
                     "================================= Tool Message ================================="
                 );
-                println!("[{}] {}", m.tool_call_id(), m.content());
+                println!("[{}] {}", m.tool_call_id, m.content);
                 return;
             }
-            BaseMessage::Chat(m) => (m.role(), m.content()),
+            BaseMessage::Chat(m) => (m.role.as_str(), m.content.as_str()),
             BaseMessage::Function(m) => {
                 println!(
                     "=============================== Function Message ==============================="
                 );
-                println!("[{}] {}", m.name(), m.content());
+                println!("[{}] {}", m.name, m.content);
                 return;
             }
             BaseMessage::Remove(m) => {
                 println!(
                     "================================ Remove Message ================================"
                 );
-                if let Some(id) = m.id() {
-                    println!("Remove message with id: {}", id);
-                }
+                println!("Remove message with id: {}", m.id);
                 return;
             }
         };
@@ -456,24 +476,24 @@ impl BaseMessageChunk {
     /// Get the message content.
     pub fn content(&self) -> &str {
         match self {
-            BaseMessageChunk::AI(m) => m.content(),
-            BaseMessageChunk::Human(m) => m.content(),
-            BaseMessageChunk::System(m) => m.content(),
-            BaseMessageChunk::Tool(m) => m.content(),
-            BaseMessageChunk::Chat(m) => m.content(),
-            BaseMessageChunk::Function(m) => m.content(),
+            BaseMessageChunk::AI(m) => &m.content,
+            BaseMessageChunk::Human(m) => m.content.as_text_ref(),
+            BaseMessageChunk::System(m) => m.content.as_text_ref(),
+            BaseMessageChunk::Tool(m) => &m.content,
+            BaseMessageChunk::Chat(m) => &m.content,
+            BaseMessageChunk::Function(m) => &m.content,
         }
     }
 
     /// Get the message ID.
     pub fn id(&self) -> Option<String> {
         match self {
-            BaseMessageChunk::AI(m) => m.id(),
-            BaseMessageChunk::Human(m) => m.id(),
-            BaseMessageChunk::System(m) => m.id(),
-            BaseMessageChunk::Tool(m) => m.id(),
-            BaseMessageChunk::Chat(m) => m.id(),
-            BaseMessageChunk::Function(m) => m.id(),
+            BaseMessageChunk::AI(m) => m.id.clone(),
+            BaseMessageChunk::Human(m) => m.id.clone(),
+            BaseMessageChunk::System(m) => m.id.clone(),
+            BaseMessageChunk::Tool(m) => m.id.clone(),
+            BaseMessageChunk::Chat(m) => m.id.clone(),
+            BaseMessageChunk::Function(m) => m.id.clone(),
         }
     }
 
@@ -535,6 +555,48 @@ impl From<ChatMessageChunk> for BaseMessageChunk {
 impl From<FunctionMessageChunk> for BaseMessageChunk {
     fn from(chunk: FunctionMessageChunk) -> Self {
         BaseMessageChunk::Function(chunk)
+    }
+}
+
+impl From<AIMessage> for BaseMessage {
+    fn from(message: AIMessage) -> Self {
+        BaseMessage::AI(message)
+    }
+}
+
+impl From<HumanMessage> for BaseMessage {
+    fn from(message: HumanMessage) -> Self {
+        BaseMessage::Human(message)
+    }
+}
+
+impl From<SystemMessage> for BaseMessage {
+    fn from(message: SystemMessage) -> Self {
+        BaseMessage::System(message)
+    }
+}
+
+impl From<ToolMessage> for BaseMessage {
+    fn from(message: ToolMessage) -> Self {
+        BaseMessage::Tool(message)
+    }
+}
+
+impl From<ChatMessage> for BaseMessage {
+    fn from(message: ChatMessage) -> Self {
+        BaseMessage::Chat(message)
+    }
+}
+
+impl From<FunctionMessage> for BaseMessage {
+    fn from(message: FunctionMessage) -> Self {
+        BaseMessage::Function(message)
+    }
+}
+
+impl From<RemoveMessage> for BaseMessage {
+    fn from(message: RemoveMessage) -> Self {
+        BaseMessage::Remove(message)
     }
 }
 

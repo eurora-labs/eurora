@@ -178,6 +178,22 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
+        // Extract the HumanMessage from the proto message
+        let proto_message = req
+            .message
+            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
+
+        // Convert proto message to agent_chain HumanMessage for content serialization
+        let human_message: HumanMessage = proto_message.into();
+
+        // Serialize content for database storage
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ConversationServiceError::Internal(format!(
+                "Failed to serialize message content: {}",
+                e
+            ))
+        })?;
+
         // Save the human message to the database
         let message = self
             .db
@@ -186,7 +202,7 @@ impl ProtoConversationService for ConversationService {
                 conversation_id,
                 user_id,
                 message_type: MessageType::Human,
-                content: serde_json::json!(req.content),
+                content,
                 tool_call_id: None,
                 tool_calls: None,
                 additional_kwargs: None,
@@ -221,6 +237,22 @@ impl ProtoConversationService for ConversationService {
             }
         })?;
 
+        // Extract the SystemMessage from the proto message
+        let proto_message = req
+            .message
+            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
+
+        // Convert proto message to agent_chain SystemMessage for content serialization
+        let system_message: SystemMessage = proto_message.into();
+
+        // Serialize content for database storage
+        let content = serde_json::to_value(&system_message.content).map_err(|e| {
+            ConversationServiceError::Internal(format!(
+                "Failed to serialize message content: {}",
+                e
+            ))
+        })?;
+
         // Save the system message to the database
         let message = self
             .db
@@ -229,7 +261,7 @@ impl ProtoConversationService for ConversationService {
                 conversation_id,
                 user_id,
                 message_type: MessageType::System,
-                content: serde_json::json!(req.content),
+                content,
                 tool_call_id: None,
                 tool_calls: None,
                 additional_kwargs: None,
@@ -286,7 +318,12 @@ impl ProtoConversationService for ConversationService {
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
-        messages.push(HumanMessage::new(req.content.clone()).into());
+        messages.push(
+            HumanMessage::builder()
+                .content(req.content.clone())
+                .build()
+                .into(),
+        );
 
         self.db
             .create_message(NewMessage {
@@ -319,9 +356,9 @@ impl ProtoConversationService for ConversationService {
             while let Some(result) = openai_stream.next().await {
                 match result {
                     Ok(chunk) => {
-                        // AIMessageChunk has content() method for getting the text content
+                        // AIMessageChunk has content for getting the text content
                         // We determine finality by empty content or chunk_position
-                        let content = chunk.content().to_string();
+                        let content = chunk.content.to_string();
                         full_content.push_str(&content);
                         // TODO: Don't rely on empty string for finality
                         let is_final = content.is_empty();
@@ -456,11 +493,12 @@ impl ProtoConversationService for ConversationService {
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
-        messages.push(HumanMessage::new(req.content).into());
+        messages.push(HumanMessage::builder().content(req.content).build().into());
 
         messages.push(
-            SystemMessage::new(
-                "Generate a title for the past conversation. Your task is:
+            SystemMessage::builder()
+                .content(
+                    "Generate a title for the past conversation. Your task is:
                 - Return a concise title, max 6 words.
                 - No quotation marks.
                 - Use sentence case.
@@ -468,9 +506,10 @@ impl ProtoConversationService for ConversationService {
                 - If the topic is unclear, use a generic title.
                 Output only the title text.
                 "
-                .to_string(),
-            )
-            .into(),
+                    .to_string(),
+                )
+                .build()
+                .into(),
         );
 
         let title = match self.title_provider.invoke(messages.into()).await {
