@@ -1174,27 +1174,6 @@ impl ChatOpenAI {
             }
         }
 
-        // TODO: ADD THIS BACK
-        // if !annotations.is_empty() {
-        //     msg = msg.with_annotations(annotations);
-        // }
-
-        // let mut ai_message = if tool_calls.is_empty() {
-        //     let mut msg = AIMessage::builder().content(text_content).build();
-        //     if !annotations.is_empty() {
-        //         msg = msg.with_annotations(annotations);
-        //     }
-        //     msg
-        // } else {
-        //     AIMessage::builder().content(text_content).tool_calls(tool_calls).build()
-        // };
-        // if let Some(usage) = response.usage {
-        //     ai_message.usage_metadata(UsageMetadata::new(
-        //         usage.input_tokens as i64,
-        //         usage.output_tokens as i64,
-        //     ));
-        // }
-
         let ai_message = AIMessage::builder()
             .content(text_content)
             .tool_calls(tool_calls);
