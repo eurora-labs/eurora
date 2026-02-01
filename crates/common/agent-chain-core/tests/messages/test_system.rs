@@ -136,7 +136,9 @@ fn test_developer_role_via_additional_kwargs() {
 
 #[test]
 fn test_chunk_init_basic() {
-    let chunk = SystemMessageChunk::builder().content("Instructions").build();
+    let chunk = SystemMessageChunk::builder()
+        .content("Instructions")
+        .build();
     assert!(matches!(&chunk.content, MessageContent::Text(s) if s == "Instructions"));
     assert_eq!(chunk.message_type(), "SystemMessageChunk");
 }
@@ -322,7 +324,10 @@ fn test_developer_role_preserved_in_serialization() {
     let deserialized: SystemMessage = serde_json::from_value(serialized).unwrap();
 
     assert_eq!(
-        deserialized.additional_kwargs.get("__openai_role__").unwrap(),
+        deserialized
+            .additional_kwargs
+            .get("__openai_role__")
+            .unwrap(),
         &serde_json::json!("developer")
     );
 }
@@ -345,7 +350,10 @@ fn test_multiple_system_messages_with_different_roles() {
 
     assert!(!system_msg.additional_kwargs.contains_key("__openai_role__"));
     assert_eq!(
-        developer_msg.additional_kwargs.get("__openai_role__").unwrap(),
+        developer_msg
+            .additional_kwargs
+            .get("__openai_role__")
+            .unwrap(),
         &serde_json::json!("developer")
     );
 }

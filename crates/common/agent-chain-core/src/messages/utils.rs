@@ -43,7 +43,7 @@ pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix
                 BaseMessage::System(_) => "System",
                 BaseMessage::AI(_) => ai_prefix,
                 BaseMessage::Tool(_) => "Tool",
-                BaseMessage::Chat(c) => c.role(),
+                BaseMessage::Chat(c) => &c.role,
                 BaseMessage::Function(_) => "Function",
                 BaseMessage::Remove(_) => "Remove",
             };
@@ -187,7 +187,9 @@ fn create_message_from_role(role: &str, content: &str) -> Result<BaseMessage, St
         )),
         "function" => Err("Function messages require a name".to_string()),
         "tool" => Err("Tool messages require a tool_call_id".to_string()),
-        _ => Ok(BaseMessage::Chat(ChatMessage::new(role, content))),
+        _ => Ok(BaseMessage::Chat(
+            ChatMessage::builder().content(content).role(role).build(),
+        )),
     }
 }
 
@@ -293,9 +295,12 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
                 (BaseMessage::System(_), BaseMessage::System(_)) => {
                     BaseMessage::System(SystemMessage::builder().content(&merged_content).build())
                 }
-                (BaseMessage::Chat(c), BaseMessage::Chat(_)) => {
-                    BaseMessage::Chat(ChatMessage::new(c.role(), &merged_content))
-                }
+                (BaseMessage::Chat(c), BaseMessage::Chat(_)) => BaseMessage::Chat(
+                    ChatMessage::builder()
+                        .content(&merged_content)
+                        .role(&c.role)
+                        .build(),
+                ),
                 (BaseMessage::Function(f), BaseMessage::Function(_)) => {
                     BaseMessage::Function(FunctionMessage::new(f.name(), &merged_content))
                 }
@@ -417,7 +422,7 @@ fn get_message_openai_role(message: &BaseMessage) -> &'static str {
         BaseMessage::Function(_) => "function",
         BaseMessage::Chat(c) => {
             // Return static strings for common roles, otherwise return a generic one
-            match c.role() {
+            match c.role.as_str() {
                 "user" => "user",
                 "assistant" => "assistant",
                 "system" => "system",
@@ -818,13 +823,13 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
             }
             BaseMessage::Tool(new_msg)
         }
-        BaseMessage::Chat(m) => {
-            let mut new_msg = ChatMessage::new(m.role(), content);
-            if let Some(id) = m.id() {
-                new_msg = ChatMessage::with_id(id, m.role(), content);
-            }
-            BaseMessage::Chat(new_msg)
-        }
+        BaseMessage::Chat(m) => BaseMessage::Chat(
+            ChatMessage::builder()
+                .content(content)
+                .role(&m.role)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
         BaseMessage::Function(m) => {
             let mut new_msg = FunctionMessage::new(m.name(), content);
             if let Some(id) = m.id() {
