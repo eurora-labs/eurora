@@ -356,7 +356,7 @@ impl ProtoConversationService for ConversationService {
             while let Some(result) = openai_stream.next().await {
                 match result {
                     Ok(chunk) => {
-                        // AIMessageChunk has content() method for getting the text content
+                        // AIMessageChunk has content for getting the text content
                         // We determine finality by empty content or chunk_position
                         let content = chunk.content.to_string();
                         full_content.push_str(&content);
