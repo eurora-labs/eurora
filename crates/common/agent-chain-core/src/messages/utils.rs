@@ -794,13 +794,12 @@ fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMes
             }
             BaseMessage::Human(new_msg)
         }
-        BaseMessage::AI(m) => {
-            let mut new_msg = AIMessage::builder().content(content).build();
-            if let Some(id) = m.id() {
-                new_msg = AIMessage::builder().id(id).content(content).build();
-            }
-            BaseMessage::AI(new_msg)
-        }
+        BaseMessage::AI(m) => BaseMessage::AI(
+            AIMessage::builder()
+                .content(content)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
         BaseMessage::System(m) => {
             let mut new_msg = SystemMessage::new(content);
             if let Some(id) = m.id() {
