@@ -892,7 +892,12 @@ impl BoundChatOllama {
     /// For better performance in async contexts, use `invoke_async` instead.
     pub fn invoke(&self, prompt: impl Into<String>) -> Box<dyn MessageWithAny> {
         let prompt = prompt.into();
-        let messages = vec![crate::messages::HumanMessage::builder().content(prompt).build().into()];
+        let messages = vec![
+            crate::messages::HumanMessage::builder()
+                .content(prompt)
+                .build()
+                .into(),
+        ];
 
         // Try to use existing runtime, or create a new one
         match tokio::runtime::Handle::try_current() {

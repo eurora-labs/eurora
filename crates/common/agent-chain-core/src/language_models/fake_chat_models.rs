@@ -895,7 +895,9 @@ mod tests {
     async fn test_parrot_fake_chat_model() {
         let llm = ParrotFakeChatModel::new();
 
-        let messages = vec![BaseMessage::Human(HumanMessage::builder().content("Hello, parrot!").build())];
+        let messages = vec![BaseMessage::Human(
+            HumanMessage::builder().content("Hello, parrot!").build(),
+        )];
 
         let result = llm._generate(messages, None, None).await.unwrap();
         // ParrotFakeChatModel should return the last message as-is

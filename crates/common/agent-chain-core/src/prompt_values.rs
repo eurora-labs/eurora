@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::load::Serializable;
 use crate::messages::{
-    AnyMessage, BaseMessage, ContentPart, HumanMessage, ImageDetail, ImageSource, MessageContent, get_buffer_string,
+    AnyMessage, BaseMessage, ContentPart, HumanMessage, ImageDetail, ImageSource, MessageContent,
+    get_buffer_string,
 };
 
 /// Base trait for inputs to any language model.
@@ -105,7 +106,9 @@ impl PromptValue for StringPromptValue {
     }
 
     fn to_messages(&self) -> Vec<BaseMessage> {
-        vec![BaseMessage::Human(HumanMessage::builder().content(&self.text).build())]
+        vec![BaseMessage::Human(
+            HumanMessage::builder().content(&self.text).build(),
+        )]
     }
 }
 
@@ -239,7 +242,7 @@ impl PromptValue for ImagePromptValue {
         vec![BaseMessage::Human(
             HumanMessage::builder()
                 .content(MessageContent::Parts(vec![content_part]))
-                .build()
+                .build(),
         )]
     }
 }

@@ -154,7 +154,9 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
         create_message_from_role(role, content)
     } else if let Some(s) = message.as_str() {
         // Plain string -> HumanMessage
-        Ok(BaseMessage::Human(HumanMessage::builder().content(s).build()))
+        Ok(BaseMessage::Human(
+            HumanMessage::builder().content(s).build(),
+        ))
     } else if let Some(arr) = message.as_array() {
         // 2-tuple: [role, content]
         if arr.len() == 2 {
@@ -174,7 +176,9 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, St
 /// Create a message from a role string and content.
 fn create_message_from_role(role: &str, content: &str) -> Result<BaseMessage, String> {
     match role {
-        "human" | "user" => Ok(BaseMessage::Human(HumanMessage::builder().content(content).build())),
+        "human" | "user" => Ok(BaseMessage::Human(
+            HumanMessage::builder().content(content).build(),
+        )),
         "ai" | "assistant" => Ok(BaseMessage::AI(
             AIMessage::builder().content(content).build(),
         )),
@@ -278,12 +282,12 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
             let merged_content = format!("{}{}{}", last.content(), chunk_separator, msg.content());
 
             let new_msg = match (last, msg) {
-            (BaseMessage::Human(_), BaseMessage::Human(_)) => {
-                BaseMessage::Human(HumanMessage::builder().content(&merged_content).build())
-            }
-            (BaseMessage::AI(_), BaseMessage::AI(_)) => {
-                BaseMessage::AI(AIMessage::builder().content(&merged_content).build())
-            }
+                (BaseMessage::Human(_), BaseMessage::Human(_)) => {
+                    BaseMessage::Human(HumanMessage::builder().content(&merged_content).build())
+                }
+                (BaseMessage::AI(_), BaseMessage::AI(_)) => {
+                    BaseMessage::AI(AIMessage::builder().content(&merged_content).build())
+                }
                 (BaseMessage::System(_), BaseMessage::System(_)) => {
                     BaseMessage::System(SystemMessage::new(&merged_content))
                 }
@@ -787,14 +791,12 @@ where
 /// Create a message of the same type with different content.
 fn create_message_with_content(original: &BaseMessage, content: &str) -> BaseMessage {
     match original {
-        BaseMessage::Human(m) => {
-            BaseMessage::Human(
-                HumanMessage::builder()
-                    .content(content)
-                    .maybe_id(m.id.clone())
-                    .build()
-            )
-        }
+        BaseMessage::Human(m) => BaseMessage::Human(
+            HumanMessage::builder()
+                .content(content)
+                .maybe_id(m.id.clone())
+                .build(),
+        ),
         BaseMessage::AI(m) => BaseMessage::AI(
             AIMessage::builder()
                 .content(content)

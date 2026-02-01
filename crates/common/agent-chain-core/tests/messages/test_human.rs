@@ -10,7 +10,9 @@ use agent_chain_core::messages::{HumanMessage, HumanMessageChunk};
 
 #[test]
 fn test_init_basic() {
-    let msg = HumanMessage::builder().content("Hello, how are you?").build();
+    let msg = HumanMessage::builder()
+        .content("Hello, how are you?")
+        .build();
     assert_eq!(msg.content.as_text(), "Hello, how are you?");
     assert_eq!(msg.message_type(), "human");
 }
