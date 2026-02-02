@@ -36,14 +36,14 @@
 	});
 </script>
 
-<div class="flex flex-col {className}">
+<div class="flex flex-col {className} overflow-hidden">
 	<div class="flex flex-row mb-4 h-8">
-		<div class="flex w-1/2 items-center justify-end">
-			<div class="flex flex-row w-max gap-2">
+		<div class="flex w-1/2 min-w-0 items-center justify-end overflow-hidden">
+			<div class="flex flex-row gap-2">
 				{@render children?.()}
 			</div>
 		</div>
-		<div class="flex w-fit justify-center pl-2 ml-4 border-l-2 items-center">
+		<div class="flex w-fit shrink-0 justify-center pl-2 ml-4 border-l-2 items-center">
 			{label}
 		</div>
 	</div>
