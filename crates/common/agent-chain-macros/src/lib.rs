@@ -143,7 +143,7 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
 
                 async fn invoke(&self, tool_call: ::agent_chain::_core::messages::ToolCall) -> ::agent_chain::_core::messages::BaseMessage {
-                    let args = tool_call.args();
+                    let args = &tool_call.args;
 
                     #(
                         let #param_names: #param_types = serde_json::from_value(
@@ -155,7 +155,11 @@ pub fn tool(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     let result_str = serde_json::to_string(&result).unwrap_or_else(|_| format!("{:?}", result));
 
-                    ::agent_chain::_core::messages::ToolMessage::new(result_str, tool_call.id().unwrap_or_default()).into()
+                    ::agent_chain::_core::messages::ToolMessage::builder()
+                        .content(result_str)
+                        .tool_call_id(tool_call.id.unwrap_or_default())
+                        .build()
+                        .into()
                 }
             }
 
