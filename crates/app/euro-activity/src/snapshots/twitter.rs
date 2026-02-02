@@ -1,6 +1,6 @@
 //! Twitter snapshot implementation
 
-use agent_chain_core::{BaseMessage, SystemMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use euro_native_messaging::types::NativeTwitterSnapshot;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -204,7 +204,7 @@ impl SnapshotFunctionality for TwitterSnapshot {
 
         content.push_str(&tweet_texts.join("\n\n"));
 
-        vec![SystemMessage::builder().content(content).build().into()]
+        vec![HumanMessage::builder().content(content).build().into()]
     }
 
     fn get_updated_at(&self) -> u64 {
