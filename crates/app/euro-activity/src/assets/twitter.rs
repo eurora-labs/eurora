@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use agent_chain_core::{BaseMessage, SystemMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
 use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet};
 use serde::{Deserialize, Serialize};
@@ -120,7 +120,7 @@ impl AssetFunctionality for TwitterAsset {
             ));
         }
 
-        vec![SystemMessage::builder().content(text).build().into()]
+        vec![HumanMessage::builder().content(text).build().into()]
     }
 
     /// Get context chip for UI integration

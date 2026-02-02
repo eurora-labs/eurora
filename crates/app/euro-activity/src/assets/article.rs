@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use agent_chain_core::{BaseMessage, SystemMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
 use euro_native_messaging::NativeArticleAsset;
 use serde::{Deserialize, Serialize};
@@ -61,16 +61,16 @@ impl AssetFunctionality for ArticleAsset {
     /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
         let mut content = format!(
-            "The user is reading an article titled '{}' and has a question about it.",
+            "The user is on a website titled '{}' and has a question about it.",
             self.title
         );
 
         content.push_str(&format!(
-            " Here's the text content of the article: \n {}",
+            " Here's the text content of the website: \n {}",
             self.content
         ));
 
-        vec![SystemMessage::builder().content(content).build().into()]
+        vec![HumanMessage::builder().content(content).build().into()]
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
