@@ -357,19 +357,24 @@ impl ProtoConversationService for ConversationService {
             .params(PaginationParams::new(0, 5, "DESC".to_string()))
             .call()
             .await
-            .unwrap();
+            .map_err(ConversationServiceError::from)?;
 
         let mut messages: Vec<BaseMessage> = db_messages
             .into_iter()
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
-        messages.push(
-            HumanMessage::builder()
-                .content(req.content.clone())
-                .build()
-                .into(),
-        );
+        let human_message = HumanMessage::builder().content(req.content.clone()).build();
+
+        messages.push(human_message.clone().into());
+
+        // Serialize content for database storage using the same MessageContent shape
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ConversationServiceError::Internal(format!(
+                "Failed to serialize message content: {}",
+                e
+            ))
+        })?;
 
         let _message = self
             .db
@@ -377,7 +382,7 @@ impl ProtoConversationService for ConversationService {
             .conversation_id(conversation_id)
             .user_id(user_id)
             .message_type(MessageType::Human)
-            .content(serde_json::json!(req.content))
+            .content(content)
             .call()
             .await
             .map_err(ConversationServiceError::from)?;
@@ -525,7 +530,7 @@ impl ProtoConversationService for ConversationService {
             .params(PaginationParams::new(0, 5, "ASC".to_string()))
             .call()
             .await
-            .unwrap();
+            .map_err(ConversationServiceError::from)?;
 
         let mut messages: Vec<BaseMessage> = db_messages
             .into_iter()
@@ -566,7 +571,7 @@ impl ProtoConversationService for ConversationService {
             .title(title.clone())
             .call()
             .await
-            .unwrap();
+            .map_err(ConversationServiceError::from)?;
 
         Ok(Response::new(GenerateConversationTitleResponse {
             conversation: Some(Self::db_conversation_to_proto(conversation)),

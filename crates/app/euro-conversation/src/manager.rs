@@ -203,9 +203,14 @@ impl ConversationManager {
         let mut client = self.conversation_client.clone();
         // Convert HumanMessage to ProtoHumanMessage using the From trait implementation
         let proto_message: ProtoHumanMessage = message.clone().into();
+        let conversation_id = self
+            .current_conversation
+            .id()
+            .ok_or(Error::InvalidConversationId)?;
+
         client
             .add_human_message(AddHumanMessageRequest {
-                conversation_id: self.current_conversation.id().unwrap().to_string(),
+                conversation_id: conversation_id.to_string(),
                 message: Some(proto_message),
             })
             .await?;
