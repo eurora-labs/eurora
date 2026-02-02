@@ -80,16 +80,12 @@ impl ChatApi for ChatApiImpl {
 
                 if has_assets {
                     let mut messages = Vec::new();
-                    let asset_messages = timeline
-                        .construct_asset_messages_by_ids(&query.assets)
-                        .await;
+                    let asset_messages = timeline.construct_messages_from_last_asset().await;
                     if let Some(last_asset_message) = asset_messages.last() {
                         messages.push(last_asset_message);
                     }
 
-                    let snapshot_messages = timeline
-                        .construct_snapshot_messages_by_ids(&query.assets)
-                        .await;
+                    let snapshot_messages = timeline.construct_messages_from_last_snapshot().await;
 
                     if let Some(last_snapshot_message) = snapshot_messages.last() {
                         messages.push(last_snapshot_message);
