@@ -1,6 +1,6 @@
 //! Default asset implementation for unsupported activity types
 
-use agent_chain_core::{BaseMessage, SystemMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -78,7 +78,7 @@ impl AssetFunctionality for DefaultAsset {
 
         content.push_str(" and has a question about it.");
 
-        vec![SystemMessage::builder().content(content).build().into()]
+        vec![HumanMessage::builder().content(content).build().into()]
     }
 
     /// Get context chip for UI integration (returns None for default assets)
@@ -160,7 +160,7 @@ mod tests {
         let messages = AssetFunctionality::construct_messages(&asset);
         let msg = messages[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, BaseMessage::System(_)));
+        assert!(matches!(msg, BaseMessage::Human(_)));
         assert!(chip.is_none());
     }
 }

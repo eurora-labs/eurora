@@ -8,15 +8,15 @@ export function createArticleAsset(document: Document): NativeResponse {
 		const article = new Readability(clone).parse();
 
 		const reportData: NativeArticleAsset = {
+			title: article?.title || document.title,
+			url: window.location.href,
 			content: article?.content || '',
 			text_content: article?.textContent || '',
-			title: article?.title || document.title,
 			site_name: article?.siteName || '',
+			selected_text: window.getSelection()?.toString() || '',
 			language: article?.lang || '',
 			excerpt: article?.excerpt || '',
 			length: article?.length || 0,
-			selected_text: window.getSelection()?.toString() || '',
-			url: window.location.href,
 		};
 
 		return { kind: 'NativeArticleAsset', data: reportData };
