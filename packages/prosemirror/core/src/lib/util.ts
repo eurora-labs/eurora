@@ -63,3 +63,47 @@ export async function clearQuery(editorRef: Editor) {
 		dispatch?.(tr);
 	});
 }
+
+/**
+ * Checks if a node type name looks like a UUID (registered extension node)
+ * @param typeName - The node type name to check
+ * @returns true if it looks like a UUID extension node
+ */
+function isExtensionNodeType(typeName: string): boolean {
+	// Extension nodes use UUIDs as their type names
+	// They contain hyphens and are longer than 10 characters
+	return typeName !== 'doc' && typeName !== 'paragraph' && typeName !== 'text' &&
+		(typeName.includes('-') || typeName.length > 10);
+}
+
+/**
+ * Clears only the extension nodes (assets) from the editor while preserving text content
+ * @param editorRef - The ProseMirror editor instance
+ * @throws Error if editor view is not available
+ */
+export async function clearExtensionNodes(editorRef: Editor) {
+	editorRef.cmd((state, dispatch) => {
+		const tr = state.tr;
+		const nodesToDelete: { from: number; to: number }[] = [];
+
+		// Walk through the document and find all extension nodes
+		state.doc.descendants((node, pos) => {
+			if (isExtensionNodeType(node.type.name)) {
+				nodesToDelete.push({
+					from: pos,
+					to: pos + node.nodeSize,
+				});
+			}
+			return true; // Continue traversing
+		});
+
+		// Delete nodes in reverse order to maintain position accuracy
+		nodesToDelete.reverse().forEach(({ from, to }) => {
+			tr.delete(from, to);
+		});
+
+		if (nodesToDelete.length > 0) {
+			dispatch?.(tr);
+		}
+	});
+}

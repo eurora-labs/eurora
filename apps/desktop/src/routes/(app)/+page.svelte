@@ -14,7 +14,7 @@
 		Editor as ProsemirrorEditor,
 		type SveltePMExtension,
 	} from '@eurora/prosemirror-core/index';
-	import { processQuery, clearQuery, type QueryAssets } from '@eurora/prosemirror-core/util';
+	import { processQuery, clearQuery, clearExtensionNodes, type QueryAssets } from '@eurora/prosemirror-core/util';
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { inject } from '@eurora/shared/context';
@@ -34,13 +34,17 @@
 	registerCoreExtensions();
 	let searchQuery = $state({
 		text: '',
-		extensions: [
+		extensions: getExtensions(),
+	});
+
+	function getExtensions(): SveltePMExtension[] {
+		return [
 			extensionFactory.getExtension('59b26f84-d10a-11f0-a0a4-17b6bfaafdde'),
 			extensionFactory.getExtension('7c7b59bb-d44d-431a-9f4d-64240172e092'),
 			extensionFactory.getExtension('309f0906-d48c-4439-9751-7bcf915cdfc5'),
 			extensionFactory.getExtension('2c434895-d32c-485f-8525-c4394863b83a'),
-		] as SveltePMExtension[],
-	});
+		];
+	}
 
 	onMount(() => {
 		document.addEventListener('keydown', handleEscapeKey);
@@ -67,7 +71,7 @@
 
 		taurpc.timeline.new_assets_event.on((assets) => {
 			if (!editorRef) return false;
-			clearQuery(editorRef);
+			clearExtensionNodes(editorRef);
 			assets.forEach((command) => {
 				executeCommand(editorRef!, command);
 			});
