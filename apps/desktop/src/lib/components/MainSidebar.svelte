@@ -35,7 +35,10 @@
 				});
 
 				taurpc.conversation.new_conversation_added.on((conversation) => {
-					conversations = [conversation, ...conversations];
+					// Avoid duplicate conversations by checking if already exists
+					if (!conversations.some((c) => c.id === conversation.id)) {
+						conversations = [conversation, ...conversations];
+					}
 				});
 
 				taurpc.conversation.conversation_title_changed.on((conversation) => {

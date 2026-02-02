@@ -13,7 +13,7 @@
 <div
 	bind:this={ref}
 	data-slot="message-content"
-	class={cn('px-4 inline-flex', className)}
+	class={cn('px-4 w-full break-words whitespace-pre-wrap', className)}
 	{...restProps}
 >
 	{@render children?.()}

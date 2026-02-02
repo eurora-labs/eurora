@@ -14,7 +14,12 @@
 		Editor as ProsemirrorEditor,
 		type SveltePMExtension,
 	} from '@eurora/prosemirror-core/index';
-	import { processQuery, clearQuery, clearExtensionNodes, type QueryAssets } from '@eurora/prosemirror-core/util';
+	import {
+		processQuery,
+		clearQuery,
+		clearExtensionNodes,
+		type QueryAssets,
+	} from '@eurora/prosemirror-core/util';
 	import { extensionFactory, registerCoreExtensions } from '@eurora/prosemirror-factory/index';
 	import * as Launcher from '@eurora/prosemirror-view/launcher';
 	import { inject } from '@eurora/shared/context';
@@ -59,6 +64,8 @@
 				// goto('/onboarding');
 			});
 
+		// TODO: This also needs to properly react to new conversations being added
+		// since new conversations are always the current conversations
 		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
 

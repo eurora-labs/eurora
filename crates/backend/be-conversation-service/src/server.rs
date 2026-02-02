@@ -308,7 +308,7 @@ impl ProtoConversationService for ConversationService {
                     conversation_id,
                     user_id,
                 },
-                PaginationParams::new(0, 5, "DESC".to_string()),
+                PaginationParams::new(0, 5, "ASC".to_string()),
             )
             .await
             .unwrap();
@@ -483,7 +483,7 @@ impl ProtoConversationService for ConversationService {
                     conversation_id,
                     user_id,
                 },
-                PaginationParams::new(0, 5, "DESC".to_string()),
+                PaginationParams::new(0, 5, "ASC".to_string()),
             )
             .await
             .unwrap();
