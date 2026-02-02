@@ -7,9 +7,10 @@ use agent_chain::{BaseMessage, HumanMessage, SystemMessage};
 use euro_auth::{AuthedChannel, get_authed_channel};
 use proto_gen::agent_chain::{ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::conversation::{
-    AddHumanMessageRequest, AddSystemMessageRequest, ChatStreamRequest, CreateConversationRequest,
-    GenerateConversationTitleRequest, GetConversationRequest, GetMessagesRequest,
-    ListConversationsRequest, proto_conversation_service_client::ProtoConversationServiceClient,
+    AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
+    ChatStreamRequest, CreateConversationRequest, GenerateConversationTitleRequest,
+    GetConversationRequest, GetMessagesRequest, ListConversationsRequest,
+    proto_conversation_service_client::ProtoConversationServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::broadcast;
@@ -202,8 +203,26 @@ impl ConversationManager {
         let mut client = self.conversation_client.clone();
         // Convert HumanMessage to ProtoHumanMessage using the From trait implementation
         let proto_message: ProtoHumanMessage = message.clone().into();
+        let conversation_id = self
+            .current_conversation
+            .id()
+            .ok_or(Error::InvalidConversationId)?;
+
         client
             .add_human_message(AddHumanMessageRequest {
+                conversation_id: conversation_id.to_string(),
+                message: Some(proto_message),
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn add_hidden_human_message(&mut self, message: &HumanMessage) -> Result<()> {
+        let mut client = self.conversation_client.clone();
+        // Convert HumanMessage to ProtoHumanMessage using the From trait implementation
+        let proto_message: ProtoHumanMessage = message.clone().into();
+        client
+            .add_hidden_human_message(AddHiddenHumanMessageRequest {
                 conversation_id: self.current_conversation.id().unwrap().to_string(),
                 message: Some(proto_message),
             })
