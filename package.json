@@ -74,7 +74,7 @@
 		"svelte-eslint-parser": "^1.4.1",
 		"tailwindcss": "catalog:",
 		"ts-proto": "^2.11.1",
-		"turbo": "^2.8.0",
+		"turbo": "^2.8.1",
 		"typescript-eslint": "^8.54.0",
 		"web-ext": "^8.10.0"
 	},

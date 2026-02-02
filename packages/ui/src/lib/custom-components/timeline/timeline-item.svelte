@@ -18,13 +18,12 @@
 	});
 </script>
 
-<div class="relative w-full min-w-25 flex items-center justify-center rounded-2xl">
+<div class="relative min-w-25 shrink flex items-center justify-center rounded-2xl">
 	<div
 		class="absolute w-full h-2 rounded-2xl top-1/2 -translate-y-1/2 border-solid border"
 		style="background-color: {color}; border-color: {borderColor};"
 	></div>
 	<div class="relative z-10 flex items-center justify-center w-fit text-sm text-center p-0 m-0">
 		{@render children?.()}
-		<!-- {#if icon}<img src={icon} alt={name} class="w-4 h-4" />{:else}{name}{/if} -->
 	</div>
 </div>
