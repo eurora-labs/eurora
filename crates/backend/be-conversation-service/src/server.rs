@@ -5,8 +5,8 @@ use agent_chain::openai::BuiltinTool;
 use agent_chain::{BaseChatModel, BaseMessage, HumanMessage, openai::ChatOpenAI};
 use be_auth_grpc::{extract_claims, parse_user_id};
 use be_remote_db::{
-    DatabaseManager, GetConversation, ListConversations, ListMessages, MessageType,
-    NewConversation, NewMessage, PaginationParams,
+    DatabaseManager, GetConversation, ListConversations, MessageType, NewConversation,
+    PaginationParams,
 };
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -20,11 +20,11 @@ use crate::error::ConversationServiceError;
 use crate::{ConversationServiceResult, converters::convert_db_message_to_base_message};
 
 use proto_gen::conversation::{
-    AddHumanMessageRequest, AddHumanMessageResponse, AddSystemMessageRequest,
-    AddSystemMessageResponse, ChatStreamRequest, ChatStreamResponse, Conversation,
-    CreateConversationRequest, CreateConversationResponse, GenerateConversationTitleRequest,
-    GenerateConversationTitleResponse, GetConversationResponse, GetMessagesRequest,
-    GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
+    AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
+    AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
+    ChatStreamResponse, Conversation, CreateConversationRequest, CreateConversationResponse,
+    GenerateConversationTitleRequest, GenerateConversationTitleResponse, GetConversationResponse,
+    GetMessagesRequest, GetMessagesResponse, ListConversationsRequest, ListConversationsResponse,
 };
 
 pub use proto_gen::conversation::proto_conversation_service_server::{
@@ -197,16 +197,12 @@ impl ProtoConversationService for ConversationService {
         // Save the human message to the database
         let message = self
             .db
-            .create_message(NewMessage {
-                id: None,
-                conversation_id,
-                user_id,
-                message_type: MessageType::Human,
-                content,
-                tool_call_id: None,
-                tool_calls: None,
-                additional_kwargs: None,
-            })
+            .create_message()
+            .conversation_id(conversation_id)
+            .user_id(user_id)
+            .message_type(MessageType::Human)
+            .content(content)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -216,6 +212,62 @@ impl ProtoConversationService for ConversationService {
         );
 
         Ok(Response::new(AddHumanMessageResponse {
+            message: Some(message.into()),
+        }))
+    }
+
+    async fn add_hidden_human_message(
+        &self,
+        request: Request<AddHiddenHumanMessageRequest>,
+    ) -> Result<Response<AddHiddenHumanMessageResponse>, Status> {
+        info!("AddHiddenHumanMessage request received");
+
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let conversation_id = Uuid::parse_str(&req.conversation_id).map_err(|e| {
+            ConversationServiceError::InvalidUuid {
+                field: "conversation_id",
+                source: e,
+            }
+        })?;
+
+        // Extract the HumanMessage from the proto message
+        let proto_message = req
+            .message
+            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
+
+        // Convert proto message to agent_chain HumanMessage for content serialization
+        let human_message: HumanMessage = proto_message.into();
+
+        // Serialize content for database storage
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ConversationServiceError::Internal(format!(
+                "Failed to serialize message content: {}",
+                e
+            ))
+        })?;
+
+        // Save the human message to the database with hidden_from_ui set to true
+        let message = self
+            .db
+            .create_message()
+            .conversation_id(conversation_id)
+            .user_id(user_id)
+            .message_type(MessageType::Human)
+            .content(content)
+            .hidden_from_ui(true)
+            .call()
+            .await
+            .map_err(ConversationServiceError::from)?;
+
+        info!(
+            "Added hidden human message to conversation {} for user {}",
+            conversation_id, user_id
+        );
+
+        Ok(Response::new(AddHiddenHumanMessageResponse {
             message: Some(message.into()),
         }))
     }
@@ -256,16 +308,12 @@ impl ProtoConversationService for ConversationService {
         // Save the system message to the database
         let message = self
             .db
-            .create_message(NewMessage {
-                id: None,
-                conversation_id,
-                user_id,
-                message_type: MessageType::System,
-                content,
-                tool_call_id: None,
-                tool_calls: None,
-                additional_kwargs: None,
-            })
+            .create_message()
+            .conversation_id(conversation_id)
+            .user_id(user_id)
+            .message_type(MessageType::System)
+            .content(content)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -303,39 +351,39 @@ impl ProtoConversationService for ConversationService {
 
         let db_messages = self
             .db
-            .list_messages(
-                ListMessages {
-                    conversation_id,
-                    user_id,
-                },
-                PaginationParams::new(0, 5, "DESC".to_string()),
-            )
+            .list_messages()
+            .conversation_id(conversation_id)
+            .user_id(user_id)
+            .params(PaginationParams::new(0, 5, "DESC".to_string()))
+            .call()
             .await
-            .unwrap();
+            .map_err(ConversationServiceError::from)?;
 
         let mut messages: Vec<BaseMessage> = db_messages
             .into_iter()
             .map(|msg| convert_db_message_to_base_message(msg).unwrap())
             .collect();
 
-        messages.push(
-            HumanMessage::builder()
-                .content(req.content.clone())
-                .build()
-                .into(),
-        );
+        let human_message = HumanMessage::builder().content(req.content.clone()).build();
 
-        self.db
-            .create_message(NewMessage {
-                id: None,
-                conversation_id,
-                user_id,
-                message_type: MessageType::Human,
-                content: serde_json::json!(req.content),
-                tool_call_id: None,
-                tool_calls: None,
-                additional_kwargs: None,
-            })
+        messages.push(human_message.clone().into());
+
+        // Serialize content for database storage using the same MessageContent shape
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ConversationServiceError::Internal(format!(
+                "Failed to serialize message content: {}",
+                e
+            ))
+        })?;
+
+        let _message = self
+            .db
+            .create_message()
+            .conversation_id(conversation_id)
+            .user_id(user_id)
+            .message_type(MessageType::Human)
+            .content(content)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -376,16 +424,11 @@ impl ProtoConversationService for ConversationService {
 
             // Save the AI message to the database after stream completes
             if !full_content.is_empty() && let Err(e) = db
-                    .create_message(NewMessage {
-                        id: None,
-                        conversation_id,
-                        user_id,
-                        message_type: MessageType::Ai,
-                        content: serde_json::json!(full_content),
-                        tool_call_id: None,
-                        tool_calls: None,
-                        additional_kwargs: None,
-                    })
+                    .create_message().conversation_id(conversation_id)
+                    .user_id(user_id)
+                    .message_type(MessageType::Ai)
+                    .content(serde_json::json!(full_content))
+                    .call()
                     .await
                 {
                     error!("Failed to save AI message to database: {}", e);
@@ -415,13 +458,16 @@ impl ProtoConversationService for ConversationService {
 
         let messages = self
             .db
-            .list_messages(
-                ListMessages {
-                    conversation_id,
-                    user_id,
-                },
-                PaginationParams::new(req.offset, req.limit, "ASC".to_string()),
-            )
+            .list_messages()
+            .conversation_id(conversation_id)
+            .user_id(user_id)
+            .params(PaginationParams::new(
+                req.offset,
+                req.limit,
+                "DESC".to_string(),
+            ))
+            .only_visible(true)
+            .call()
             .await
             .map_err(ConversationServiceError::from)?;
 
@@ -478,15 +524,13 @@ impl ProtoConversationService for ConversationService {
 
         let db_messages = self
             .db
-            .list_messages(
-                ListMessages {
-                    conversation_id,
-                    user_id,
-                },
-                PaginationParams::new(0, 5, "DESC".to_string()),
-            )
+            .list_messages()
+            .conversation_id(conversation_id)
+            .user_id(user_id)
+            .params(PaginationParams::new(0, 5, "ASC".to_string()))
+            .call()
             .await
-            .unwrap();
+            .map_err(ConversationServiceError::from)?;
 
         let mut messages: Vec<BaseMessage> = db_messages
             .into_iter()
@@ -527,7 +571,7 @@ impl ProtoConversationService for ConversationService {
             .title(title.clone())
             .call()
             .await
-            .unwrap();
+            .map_err(ConversationServiceError::from)?;
 
         Ok(Response::new(GenerateConversationTitleResponse {
             conversation: Some(Self::db_conversation_to_proto(conversation)),

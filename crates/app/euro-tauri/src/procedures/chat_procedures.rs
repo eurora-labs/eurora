@@ -43,10 +43,6 @@ impl ChatApi for ChatApiImpl {
         channel: Channel<ResponseChunk>,
         query: Query,
     ) -> Result<String, String> {
-        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
-        let timeline = timeline_state.lock().await;
-        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
-        let mut conversation_manager = conversation_state.lock().await;
         let mut conversation_id = conversation_id;
 
         let event = posthog_rs::Event::new_anon("send_query");
@@ -56,60 +52,72 @@ impl ChatApi for ChatApiImpl {
             });
         });
 
-        if conversation_id.is_none() {
-            let conversation = conversation_manager
-                .ensure_remote_conversation()
-                .await
-                .expect("Failed to ensure remote conversation");
-            conversation_id = Some(conversation.id().unwrap().to_string());
-            TauRpcConversationApiEventTrigger::new(app_handle.clone())
-                .new_conversation_added(conversation.into())
-                .expect("Failed to trigger new conversation added event");
-        }
+        // Scope for timeline and conversation_manager locks
+        // These locks are released before stream processing to avoid blocking
+        {
+            let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle.state();
+            let timeline = timeline_state.lock().await;
+            let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+            let mut conversation_manager = conversation_state.lock().await;
 
-        if timeline.save_current_activity_to_service().await.is_ok() {
-            if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
-                info!("Infos: {:?}", infos);
+            if conversation_id.is_none() {
+                let conversation = conversation_manager
+                    .ensure_remote_conversation()
+                    .await
+                    .expect("Failed to ensure remote conversation");
+                conversation_id = Some(conversation.id().unwrap().to_string());
+                TauRpcConversationApiEventTrigger::new(app_handle.clone())
+                    .new_conversation_added(conversation.into())
+                    .expect("Failed to trigger new conversation added event");
             }
 
-            let has_assets = !query.assets.is_empty();
-
-            if has_assets {
-                let mut messages = Vec::new();
-                let asset_messages = timeline
-                    .construct_asset_messages_by_ids(&query.assets)
-                    .await;
-                if let Some(last_asset_message) = asset_messages.last() {
-                    messages.push(last_asset_message);
+            if timeline.save_current_activity_to_service().await.is_ok() {
+                if let Ok(infos) = timeline.save_assets_to_service_by_ids(&query.assets).await {
+                    info!("Infos: {:?}", infos);
                 }
 
-                let snapshot_messages = timeline
-                    .construct_snapshot_messages_by_ids(&query.assets)
-                    .await;
+                let has_assets = !query.assets.is_empty();
 
-                if let Some(last_snapshot_message) = snapshot_messages.last() {
-                    messages.push(last_snapshot_message);
-                }
+                if has_assets {
+                    let mut messages = Vec::new();
+                    let asset_messages = timeline
+                        .construct_asset_messages_by_ids(&query.assets)
+                        .await;
+                    if let Some(last_asset_message) = asset_messages.last() {
+                        messages.push(last_asset_message);
+                    }
 
-                // Make a for loop
-                for message in messages {
-                    match &message {
-                        BaseMessage::System(m) => {
-                            let _ = conversation_manager.add_system_message(m).await;
+                    let snapshot_messages = timeline
+                        .construct_snapshot_messages_by_ids(&query.assets)
+                        .await;
+
+                    if let Some(last_snapshot_message) = snapshot_messages.last() {
+                        messages.push(last_snapshot_message);
+                    }
+
+                    // Make a for loop
+                    for message in messages {
+                        match &message {
+                            BaseMessage::System(m) => {
+                                let _ = conversation_manager.add_system_message(m).await;
+                            }
+                            BaseMessage::Human(m) => {
+                                let _ = conversation_manager.add_hidden_human_message(m).await;
+                            }
+                            _ => todo!(),
                         }
-                        BaseMessage::Human(m) => {
-                            let _ = conversation_manager.add_human_message(m).await;
-                        }
-                        _ => todo!(),
                     }
                 }
             }
+            // timeline and conversation_manager locks are released here
         }
 
         // Create new thread to handle conversation title generation
+        // This runs in a separate task so it doesn't block the main flow
         let title_app_handle = app_handle.clone();
         let content = query.text.clone();
-        if let Some(id) = conversation_id {
+        let conversation_id_for_title = conversation_id.clone();
+        if let Some(id) = conversation_id_for_title {
             tokio::spawn(async move {
                 let app_handle = title_app_handle.clone();
                 let conversation_state: tauri::State<SharedConversationManager> =
@@ -137,10 +145,13 @@ impl ChatApi for ChatApiImpl {
             .map_err(|e| format!("Failed to send initial response: {e}"))?;
 
         debug!("Sending chat stream");
-        let stream_result = conversation_manager.chat_stream(query.text.clone()).await;
-        // Drop the MutexGuard to free the lock before consuming the stream,
-        // so other chat operations are not blocked during stream iteration
-        drop(conversation_manager);
+        // Acquire the lock just for creating the stream, then release it
+        let stream_result = {
+            let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+            let mut conversation_manager = conversation_state.lock().await;
+            conversation_manager.chat_stream(query.text.clone()).await
+            // conversation_manager lock is released here at end of scope
+        };
 
         match stream_result {
             Ok(mut stream) => {

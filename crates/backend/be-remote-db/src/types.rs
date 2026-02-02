@@ -25,6 +25,12 @@ pub struct PaginationParams {
     order: SortOrder,
 }
 
+impl Default for PaginationParams {
+    fn default() -> Self {
+        Self::new(0, 5, "DESC".to_string())
+    }
+}
+
 impl PaginationParams {
     pub const MAX_LIMIT: u32 = 100;
 
@@ -468,19 +474,6 @@ pub struct Message {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Request for creating a new message
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewMessage {
-    pub id: Option<Uuid>,
-    pub conversation_id: Uuid,
-    pub user_id: Uuid,
-    pub message_type: MessageType,
-    pub content: serde_json::Value,
-    pub tool_call_id: Option<String>,
-    pub tool_calls: Option<serde_json::Value>,
-    pub additional_kwargs: Option<serde_json::Value>,
-}
-
 /// Request for updating an existing message
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UpdateMessage {
@@ -488,13 +481,6 @@ pub struct UpdateMessage {
     pub tool_call_id: Option<String>,
     pub tool_calls: Option<serde_json::Value>,
     pub additional_kwargs: Option<serde_json::Value>,
-}
-
-/// Request for listing messages with pagination
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListMessages {
-    pub conversation_id: Uuid,
-    pub user_id: Uuid,
 }
 
 // =============================================================================
