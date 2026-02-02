@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use agent_chain_core::{BaseMessage, SystemMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use async_trait::async_trait;
 use euro_native_messaging::NativePdfAsset;
 use serde::{Deserialize, Serialize};
@@ -70,7 +70,7 @@ impl AssetFunctionality for PdfAsset {
             self.content
         ));
 
-        vec![SystemMessage::builder().content(content).build().into()]
+        vec![HumanMessage::builder().content(content).build().into()]
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
