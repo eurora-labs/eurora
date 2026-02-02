@@ -72,8 +72,12 @@ export async function clearQuery(editorRef: Editor) {
 function isExtensionNodeType(typeName: string): boolean {
 	// Extension nodes use UUIDs as their type names
 	// They contain hyphens and are longer than 10 characters
-	return typeName !== 'doc' && typeName !== 'paragraph' && typeName !== 'text' &&
-		(typeName.includes('-') || typeName.length > 10);
+	return (
+		typeName !== 'doc' &&
+		typeName !== 'paragraph' &&
+		typeName !== 'text' &&
+		(typeName.includes('-') || typeName.length > 10)
+	);
 }
 
 /**

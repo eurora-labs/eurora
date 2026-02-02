@@ -128,6 +128,32 @@ impl TimelineManager {
         }
     }
 
+    pub async fn construct_messages_from_last_snapshot(&self) -> Vec<BaseMessage> {
+        let storage = self.storage.lock().await;
+        if let Some(activity) = storage.get_current_activity() {
+            if let Some(snapshot) = activity.snapshots.last() {
+                snapshot.construct_messages()
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        }
+    }
+
+    pub async fn construct_messages_from_last_asset(&self) -> Vec<BaseMessage> {
+        let storage = self.storage.lock().await;
+        if let Some(activity) = storage.get_current_activity() {
+            if let Some(asset) = activity.assets.last() {
+                asset.construct_messages()
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        }
+    }
+
     /// Construct messages from current activity by ids
     pub async fn construct_asset_messages_by_ids(&self, ids: &[String]) -> Vec<BaseMessage> {
         let storage = self.storage.lock().await;

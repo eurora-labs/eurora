@@ -1,6 +1,6 @@
 //! Default snapshot implementation for unsupported activity types
 
-use agent_chain_core::{BaseMessage, SystemMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use serde::{Deserialize, Serialize};
 
 use crate::types::SnapshotFunctionality;
@@ -41,7 +41,7 @@ impl SnapshotFunctionality for DefaultSnapshot {
             }
         }
 
-        vec![SystemMessage::builder().content(content).build().into()]
+        vec![HumanMessage::builder().content(content).build().into()]
     }
 
     fn get_updated_at(&self) -> u64 {
