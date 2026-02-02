@@ -38,9 +38,9 @@
 <Sidebar.Provider open={true}>
 	<MainSidebar />
 	<Sidebar.Inset>
-		<div class="flex flex-col h-screen overflow-hidden">
-			<div class="flex-1 overflow-auto">{@render children?.()}</div>
-			<div class="flex flex-col w-full overflow-hidden">
+		<div class="flex flex-col h-screen">
+			<div class="flex-1">{@render children?.()}</div>
+			<div class="flex flex-col w-full">
 				<Timeline.Root class="w-full" bind:open={timelineOpen} defaultOpen={false}>
 					{#each timelineItems as item}
 						<Timeline.Item color={item.color}>
