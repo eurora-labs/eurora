@@ -171,7 +171,7 @@ impl BrowserStrategy {
         self.event_subscription_handle = Some(Arc::new(handle));
 
         // Start snapshot collection
-        self.collect_snapshots();
+        self.collect_assets_and_snapshots();
         Ok(())
     }
 
@@ -267,33 +267,50 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 self.active_browser = Some(focus_window.process_name.to_string());
             }
 
-            if let Some(sender) = self.sender.clone() {
-                match self.get_metadata().await {
-                    Ok(metadata) => {
-                        let activity = Activity::new(
-                            metadata.url.unwrap_or_default(),
-                            metadata.icon,
-                            focus_window.process_name.to_string(),
-                            vec![],
-                        );
-                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                            warn!("Failed to send new activity report - receiver dropped");
-                        }
-                    }
-                    Err(err) => {
-                        let activity = Activity::new(
-                            focus_window.process_name.clone(),
-                            focus_window.icon.clone(),
-                            focus_window.process_name.clone(),
-                            vec![],
-                        );
-                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                            warn!("Failed to send new activity report - receiver dropped");
-                        }
+            // Only send activity report if the browser does NOT have a registered gRPC client.
+            // When a client is registered, the browser extension will send metadata events
+            // through the gRPC channel which are handled by the event subscription in init_collection.
+            // This prevents duplicate activity events.
+            let has_registered_client = if let Some(service) = self.bridge_service.as_ref() {
+                service.is_registered(focus_window.process_id).await
+            } else {
+                false
+            };
 
-                        warn!("Failed to get metadata: {}", err);
+            if !has_registered_client {
+                if let Some(sender) = self.sender.clone() {
+                    match self.get_metadata().await {
+                        Ok(metadata) => {
+                            let activity = Activity::new(
+                                metadata.url.unwrap_or_default(),
+                                metadata.icon,
+                                focus_window.process_name.to_string(),
+                                vec![],
+                            );
+                            if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                                warn!("Failed to send new activity report - receiver dropped");
+                            }
+                        }
+                        Err(err) => {
+                            let activity = Activity::new(
+                                focus_window.process_name.clone(),
+                                focus_window.icon.clone(),
+                                focus_window.process_name.clone(),
+                                vec![],
+                            );
+                            if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                                warn!("Failed to send new activity report - receiver dropped");
+                            }
+
+                            warn!("Failed to get metadata: {}", err);
+                        }
                     }
                 }
+            } else {
+                debug!(
+                    "Browser PID {} has registered gRPC client, skipping activity report (will be handled by event subscription)",
+                    focus_window.process_id
+                );
             }
 
             Ok(true)
@@ -442,7 +459,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 }
 
 impl BrowserStrategy {
-    fn collect_snapshots(&mut self) {
+    fn collect_assets_and_snapshots(&mut self) {
+        info!("Starting active collection task");
         let sender = match self.sender.clone() {
             Some(sender) => sender,
             None => {
@@ -460,6 +478,27 @@ impl BrowserStrategy {
             loop {
                 interval.tick().await;
 
+                // Collect assets
+                // TODO: This shouldn't happen every tick
+                // ideally this would be driven by the browser's extension itself
+                // so the watchers need to be rewritten
+                match strategy_clone.retrieve_assets().await {
+                    Ok(assets) if !assets.is_empty() => {
+                        debug!("Collected {} asset(s)", assets.len());
+                        if sender.send(ActivityReport::Assets(assets)).is_err() {
+                            warn!("Failed to send assets - receiver dropped");
+                            break;
+                        }
+                    }
+                    Ok(_) => {
+                        debug!("No assets collected");
+                    }
+                    Err(e) => {
+                        warn!("Failed to retrieve assets: {}", e);
+                    }
+                }
+
+                // Collect snapshots
                 match strategy_clone.retrieve_snapshots().await {
                     Ok(snapshots) if !snapshots.is_empty() => {
                         debug!("Collected {} snapshot(s)", snapshots.len());

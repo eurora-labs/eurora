@@ -1,6 +1,6 @@
 //! Article snapshot implementation
 
-use agent_chain_core::{BaseMessage, SystemMessage};
+use agent_chain_core::{BaseMessage, HumanMessage};
 use euro_native_messaging::types::NativeArticleSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -57,6 +57,11 @@ impl ArticleSnapshot {
 impl SnapshotFunctionality for ArticleSnapshot {
     /// Construct a message for LLM interaction
     fn construct_messages(&self) -> Vec<BaseMessage> {
+        if let Some(highlight) = &self.highlight
+            && highlight.is_empty()
+        {
+            return vec![];
+        }
         let mut content = String::new();
 
         if let Some(title) = &self.page_title {
@@ -81,7 +86,7 @@ impl SnapshotFunctionality for ArticleSnapshot {
             content.push_str(&format!(" (from: {})", url));
         }
 
-        vec![SystemMessage::builder().content(content).build().into()]
+        vec![HumanMessage::builder().content(content).build().into()]
     }
 
     fn get_updated_at(&self) -> u64 {
