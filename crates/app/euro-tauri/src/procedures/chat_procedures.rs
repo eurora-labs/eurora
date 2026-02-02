@@ -102,7 +102,7 @@ impl ChatApi for ChatApiImpl {
                                 let _ = conversation_manager.add_system_message(m).await;
                             }
                             BaseMessage::Human(m) => {
-                                let _ = conversation_manager.add_human_message(m).await;
+                                let _ = conversation_manager.add_hidden_human_message(m).await;
                             }
                             _ => todo!(),
                         }

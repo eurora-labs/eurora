@@ -1,13 +1,12 @@
 use crate::{
-    GetConversation, PaginationParams,
+    GetConversation, MessageType, PaginationParams,
     error::DbResult,
     types::{
         Activity, ActivityAsset, Asset, AssetStatus, Conversation, CreateLoginToken,
         CreateOAuthCredentials, CreateOAuthState, CreateRefreshToken, GetActivitiesByTimeRange,
-        ListActivities, ListConversations, ListMessages, LoginToken, Message, NewActivity,
-        NewAsset, NewConversation, NewMessage, NewUser, OAuthCredentials, OAuthProvider,
-        OAuthState, PasswordCredentials, RefreshToken, UpdateActivity, UpdateActivityEndTime,
-        UpdateOAuthCredentials, User,
+        ListActivities, ListConversations, LoginToken, Message, NewActivity, NewAsset,
+        NewConversation, NewUser, OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials,
+        RefreshToken, UpdateActivity, UpdateActivityEndTime, UpdateOAuthCredentials, User,
     },
 };
 use bon::bon;
@@ -857,12 +856,23 @@ impl DatabaseManager {
     // =========================================================================
 
     /// Create a new message
-    pub async fn create_message(&self, request: NewMessage) -> DbResult<Message> {
-        let id = request.id.unwrap_or_else(Uuid::now_v7);
+    #[builder]
+    pub async fn create_message(
+        &self,
+        id: Option<Uuid>,
+        conversation_id: Uuid,
+        user_id: Uuid,
+        message_type: MessageType,
+        content: serde_json::Value,
+        tool_call_id: Option<String>,
+        tool_calls: Option<serde_json::Value>,
+        additional_kwargs: Option<serde_json::Value>,
+        hidden_from_ui: Option<bool>,
+    ) -> DbResult<Message> {
+        let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
-        let additional_kwargs = request
-            .additional_kwargs
-            .unwrap_or_else(|| serde_json::json!({}));
+        let additional_kwargs = additional_kwargs.unwrap_or_else(|| serde_json::json!({}));
+        let hidden_from_ui = hidden_from_ui.unwrap_or(false);
 
         let message = sqlx::query_as::<_, Message>(
             r#"
@@ -877,22 +887,23 @@ impl DatabaseManager {
                 RETURNING id
             ),
             inserted_message AS (
-                INSERT INTO messages (id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at)
-                SELECT $1, vc.id, $3, $4, $5, $6, $7, $8, $9, $10
+                INSERT INTO messages (id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, created_at, updated_at)
+                SELECT $1, vc.id, $3, $4, $5, $6, $7, $8, $9, $10, $11
                 FROM verified_conversation vc
-                RETURNING id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
+                RETURNING id, conversation_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, created_at, updated_at
             )
             SELECT * FROM inserted_message
             "#,
         )
         .bind(id)
-        .bind(request.conversation_id)
-        .bind(request.user_id)
-        .bind(request.message_type)
-        .bind(&request.content)
-        .bind(&request.tool_call_id)
-        .bind(&request.tool_calls)
+        .bind(conversation_id)
+        .bind(user_id)
+        .bind(message_type)
+        .bind(&content)
+        .bind(&tool_call_id)
+        .bind(&tool_calls)
         .bind(&additional_kwargs)
+        .bind(hidden_from_ui)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -901,30 +912,63 @@ impl DatabaseManager {
         Ok(message)
     }
 
+    #[builder]
     /// List messages for a conversation with pagination
+    ///
+    /// By default, retrieves all messages regardless of `hidden_from_ui` status.
+    /// If `only_visible` is `Some(true)`, only retrieves messages where `hidden_from_ui = false` (visible messages).
+    /// If `only_visible` is `Some(false)`, only retrieves messages where `hidden_from_ui = true` (hidden messages).
     pub async fn list_messages(
         &self,
-        request: ListMessages,
-        params: PaginationParams,
+        conversation_id: Uuid,
+        user_id: Uuid,
+        params: Option<PaginationParams>,
+        only_visible: Option<bool>,
     ) -> DbResult<Vec<Message>> {
-        let query = format!(
-            r#"
-            SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.created_at, m.updated_at
-            FROM messages m
-            WHERE m.conversation_id = $1 AND m.user_id = $2
-            ORDER BY m.id {}
-            LIMIT $3 OFFSET $4
-            "#,
-            params.order()
-        );
+        let params = params.unwrap_or_default();
 
-        let messages = sqlx::query_as::<_, Message>(&query)
-            .bind(request.conversation_id)
-            .bind(request.user_id)
-            .bind(params.limit())
-            .bind(params.offset())
-            .fetch_all(&self.pool)
-            .await?;
+        let messages = match only_visible {
+            Some(visible) => {
+                let hidden_from_ui = !visible;
+                let query = format!(
+                    r#"
+                    SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
+                    FROM messages m
+                    WHERE m.conversation_id = $1 AND m.user_id = $2 AND m.hidden_from_ui = $3
+                    ORDER BY m.id {}
+                    LIMIT $4 OFFSET $5
+                    "#,
+                    params.order()
+                );
+                sqlx::query_as::<_, Message>(&query)
+                    .bind(conversation_id)
+                    .bind(user_id)
+                    .bind(hidden_from_ui)
+                    .bind(params.limit())
+                    .bind(params.offset())
+                    .fetch_all(&self.pool)
+                    .await?
+            }
+            None => {
+                let query = format!(
+                    r#"
+                    SELECT m.id, m.conversation_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
+                    FROM messages m
+                    WHERE m.conversation_id = $1 AND m.user_id = $2
+                    ORDER BY m.id {}
+                    LIMIT $3 OFFSET $4
+                    "#,
+                    params.order()
+                );
+                sqlx::query_as::<_, Message>(&query)
+                    .bind(conversation_id)
+                    .bind(user_id)
+                    .bind(params.limit())
+                    .bind(params.offset())
+                    .fetch_all(&self.pool)
+                    .await?
+            }
+        };
 
         Ok(messages)
     }
