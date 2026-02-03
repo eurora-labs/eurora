@@ -55,7 +55,17 @@
 	});
 
 	async function createChat() {
-		// await taurpc.personal_db.conversation.create();
+		await taurpc.conversation.create_empty_conversation().catch((error) => {
+			console.error('Failed to create conversation:', error);
+			toast.error(`The app encountered the following error: ${error}`, {
+				description: 'Please try again later.',
+				duration: 5000,
+				cancel: {
+					label: 'Ok',
+					onClick: () => {},
+				},
+			});
+		});
 	}
 
 	async function switchConversation(id: string) {
