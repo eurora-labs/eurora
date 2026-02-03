@@ -41,7 +41,7 @@ function os() {
 	os="$(uname -s)"
 	case "$os" in
 	Darwin)
-		echo "macos"
+		echo "darwin"
 		;;
 	Linux)
 		echo "linux"
@@ -139,7 +139,7 @@ if [ "$CHANNEL" != "release" ] && [ "$CHANNEL" != "nightly" ]; then
 fi
 
 if [ "$DO_SIGN" = "true" ]; then
-	if [ "$OS" = "macos" ]; then
+	if [ "$OS" = "darwin" ]; then
 		[ -z "${APPLE_CERTIFICATE-}" ] && error "$APPLE_CERTIFICATE is not set"
 		[ -z "${APPLE_CERTIFICATE_PASSWORD-}" ] && error "$APPLE_CERTIFICATE_PASSWORD is not set"
 		[ -z "${APPLE_ID-}" ] && error "$APPLE_ID is not set"
@@ -184,6 +184,8 @@ else
 	FEATURES=""
 fi
 
+# Note: OS values are: darwin, linux, windows
+
 # update the version in the tauri release config
 jq '.version="'"$VERSION"'"' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
 
@@ -226,7 +228,7 @@ fi
 RELEASE_DIR="$DIST/$OS/$ARCH"
 mkdir -p "$RELEASE_DIR"
 
-if [ "$OS" = "macos" ]; then
+if [ "$OS" = "darwin" ]; then
 	MACOS_DMG="$(find "$BUNDLE_DIR/dmg" -depth 1 -type f -name "*.dmg")"
 	MACOS_UPDATER="$(find "$BUNDLE_DIR/macos" -depth 1 -type f -name "*.tar.gz")"
 	MACOS_UPDATER_SIG="$(find "$BUNDLE_DIR/macos" -depth 1 -type f -name "*.tar.gz.sig")"
@@ -290,8 +292,8 @@ function install_native_messaging_host() {
 	cp "$PWD/../apps/browser/src/native-messaging-host.chromium.json" "$PWD/../apps/browser/src/native-messaging-host.json"
 	local TEMPLATE_PATH="$PWD/../apps/browser/src/native-messaging-host.json"
 
-	if [ "$OS" = "macos" ]; then
-		# For macOS, the binary is inside the .app bundle
+	if [ "$OS" = "darwin" ]; then
+		# For macOS (darwin), the binary is inside the .app bundle
 		NATIVE_MESSAGING_HOST_BINARY="/Applications/Eurora.app/Contents/MacOS/euro-native-messaging"
 		MANIFEST_DIR="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
 
@@ -324,8 +326,8 @@ function install_native_messaging_host() {
 	# Create the manifest content with the correct binary path
 	MANIFEST_CONTENT=$(cat "$TEMPLATE_PATH" | sed "s|\"path\": \".*\"|\"path\": \"$NATIVE_MESSAGING_HOST_BINARY\"|")
 
-	if [ "$OS" = "macos" ] || [ "$OS" = "linux" ]; then
-		# For macOS and Linux, write the manifest to the filesystem
+	if [ "$OS" = "darwin" ] || [ "$OS" = "linux" ]; then
+		# For darwin (macOS) and Linux, write the manifest to the filesystem
 		for browser_dir in "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts" \
                             "$HOME/Library/Application Support/Chromium/NativeMessagingHosts" \
                             "$HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts" \
