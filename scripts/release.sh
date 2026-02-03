@@ -194,14 +194,30 @@ cat "$TMP_DIR/tauri.conf.json"
 export VERSION
 export CHANNEL
 
-# Build native messaging
-cargo build --package euro-native-messaging --release
-
 # Build the app with release config
 if [ -n "$TARGET" ]; then
 	# Export TARGET for cargo to use
 	export CARGO_BUILD_TARGET="$TARGET"
 
+	# Build native messaging with the same target
+	info "Building native messaging for target: $TARGET"
+	cargo build --package euro-native-messaging --release --target "$TARGET"
+
+	# Determine the path to the native messaging binary for the targeted build
+	NATIVE_MESSAGING_BINARY_PATH="../../../target/$TARGET/release/euro-native-messaging"
+
+	# Update the macOS.files or linux.files config with the correct path for the target
+	if [ "$OS" = "macos" ]; then
+		jq --arg binpath "$NATIVE_MESSAGING_BINARY_PATH" \
+			'.bundle.macOS.files = {($binpath): "MacOS/euro-native-messaging"}' \
+			"$TMP_DIR/tauri.conf.json" > "$TMP_DIR/tauri.conf.json.tmp" && \
+			mv "$TMP_DIR/tauri.conf.json.tmp" "$TMP_DIR/tauri.conf.json"
+	elif [ "$OS" = "linux" ]; then
+		jq --arg binpath "$NATIVE_MESSAGING_BINARY_PATH" \
+			'.bundle.linux.files = {($binpath): "/usr/bin/euro-native-messaging"}' \
+			"$TMP_DIR/tauri.conf.json" > "$TMP_DIR/tauri.conf.json.tmp" && \
+			mv "$TMP_DIR/tauri.conf.json.tmp" "$TMP_DIR/tauri.conf.json"
+	fi
 
 	# Build with specified target
 	# Note: passing --target is necessary to let tauri find the binaries,
@@ -212,8 +228,12 @@ if [ -n "$TARGET" ]; then
 		--config "$TMP_DIR/tauri.conf.json" \
 		--target "$TARGET"
 
-  BUNDLE_DIR=$(readlink -f "$PWD/../target/$TARGET/release/bundle")
+	BUNDLE_DIR=$(readlink -f "$PWD/../target/$TARGET/release/bundle")
 else
+	# Build native messaging without target (default)
+	info "Building native messaging for default target"
+	cargo build --package euro-native-messaging --release
+
 	# Build with default target
 	tauri build \
 		--verbose \
