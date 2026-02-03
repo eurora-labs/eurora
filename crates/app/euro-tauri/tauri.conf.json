@@ -29,12 +29,12 @@
 		],
 		"windows": {
 			"certificateThumbprint": null,
-            "wix": {
-                "fragmentPaths": [
-                    "fragment.wxs"
-                ],
-                "componentRefs": ["ChromeRegistryEntries", "FirefoxRegistryEntries", "FirefoxNativeMessagingHostJson", "FirefoxNativeMessaging", "ChromeNativeMessagingHostJson", "ChromeNativeMessaging"]
-            }
+	           "wix": {
+	               "fragmentPaths": [
+	                   "fragment.wxs"
+	               ],
+	               "componentRefs": ["ChromeRegistryEntries", "FirefoxRegistryEntries", "FirefoxNativeMessagingHostJson", "FirefoxNativeMessaging", "ChromeNativeMessagingHostJson", "ChromeNativeMessaging"]
+	           }
 		},
 		"linux": {
 			"rpm": {
