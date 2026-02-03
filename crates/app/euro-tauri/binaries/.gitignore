@@ -1,0 +1,5 @@
+# Ignore all binary files (these are generated during build)
+*
+
+# But keep this .gitignore file
+!.gitignore
