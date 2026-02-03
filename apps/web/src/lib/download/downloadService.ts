@@ -46,7 +46,7 @@ export class DownloadService {
 
 	constructor(channel: string = 'release') {
 		const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:50051';
-		this.baseUrl = `${apiBaseUrl}/updates`;
+		this.baseUrl = `${apiBaseUrl}`;
 		this.channel = channel;
 	}
 
