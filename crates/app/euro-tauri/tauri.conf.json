@@ -27,24 +27,16 @@
 			"icons/dev/icon.icns",
 			"icons/dev/icon.ico"
 		],
-		"macOS": {
-			"files": {
-				"../../../target/release/euro-native-messaging": "MacOS/euro-native-messaging"
-			}
-		},
 		"windows": {
 			"certificateThumbprint": null,
-            "wix": {
-                "fragmentPaths": [
-                    "fragment.wxs"
-                ],
-                "componentRefs": ["ChromeRegistryEntries", "FirefoxRegistryEntries", "FirefoxNativeMessagingHostJson", "FirefoxNativeMessaging", "ChromeNativeMessagingHostJson", "ChromeNativeMessaging"]
-            }
+	           "wix": {
+	               "fragmentPaths": [
+	                   "fragment.wxs"
+	               ],
+	               "componentRefs": ["ChromeRegistryEntries", "FirefoxRegistryEntries", "FirefoxNativeMessagingHostJson", "FirefoxNativeMessaging", "ChromeNativeMessagingHostJson", "ChromeNativeMessaging"]
+	           }
 		},
 		"linux": {
-			"files": {
-				"../../../target/release/euro-native-messaging": "/usr/bin/euro-native-messaging"
-			},
 			"rpm": {
 				"depends": [
 					"webkit2gtk4.1"

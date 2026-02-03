@@ -6,6 +6,9 @@
 	},
 	"bundle": {
 		"active": true,
+		"externalBin": [
+			"binaries/euro-native-messaging"
+		],
 		"icon": [
 			"icons/nightly/32x32.png",
 			"icons/nightly/128x128.png",
