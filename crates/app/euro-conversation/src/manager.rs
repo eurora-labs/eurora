@@ -36,13 +36,12 @@ impl ConversationManager {
     }
 
     pub async fn create_empty_conversation(&mut self) -> Result<&Conversation> {
-        let conversation = Conversation::default();
-        self.current_conversation = conversation.clone();
-        self.conversation_event_tx
-            .send(ConversationEvent::NewConversation {
-                id: conversation.id(),
-                title: conversation.title().to_string(),
-            })?;
+        self.current_conversation = Conversation::default();
+        // self.conversation_event_tx
+        //     .send(ConversationEvent::NewConversation {
+        //         id: None,
+        //         title: self.current_conversation.title().to_string(),
+        //     })?;
 
         Ok(&self.current_conversation)
     }

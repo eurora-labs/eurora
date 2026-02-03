@@ -64,12 +64,13 @@
 				// goto('/onboarding');
 			});
 
-		// TODO: This also needs to properly react to new conversations being added
-		// since new conversations are always the current conversations
 		taurpc.conversation.current_conversation_changed.on((new_conv) => {
 			conversation = new_conv;
 
-			if (!new_conv.id) return;
+			if (!new_conv.id) {
+				messages.splice(0, messages.length);
+				return;
+			}
 
 			taurpc.conversation.get_messages(new_conv.id, 50, 0).then((response) => {
 				messages = response;

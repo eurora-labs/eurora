@@ -2,6 +2,7 @@ use crate::shared_types::SharedConversationManager;
 use agent_chain_core::BaseMessage;
 use euro_conversation::{Conversation, ListConversationsRequest};
 use tauri::{Manager, Runtime};
+use tracing::error;
 
 #[taurpc::ipc_type]
 pub struct ConversationView {
@@ -83,6 +84,7 @@ impl ConversationApi for ConversationApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<ConversationView, String> {
+        let event_handler = app_handle.clone();
         let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
         let mut conversation_manager = conversation_state.lock().await;
 
@@ -90,7 +92,17 @@ impl ConversationApi for ConversationApiImpl {
             .create_empty_conversation()
             .await
             .map_err(|e| e.to_string())?;
-        Ok(conversation.into())
+
+        let view: ConversationView = conversation.into();
+
+        TauRpcConversationApiEventTrigger::new(event_handler)
+            .current_conversation_changed(view.clone())
+            .map_err(|e| {
+                error!("Failed to trigger new conversation added event: {}", e);
+                e.to_string()
+            })?;
+
+        Ok(view)
     }
 
     async fn create<R: Runtime>(
