@@ -35,6 +35,17 @@ impl ConversationManager {
         }
     }
 
+    pub async fn create_empty_conversation(&mut self) -> Result<&Conversation> {
+        self.current_conversation = Conversation::default();
+        // self.conversation_event_tx
+        //     .send(ConversationEvent::NewConversation {
+        //         id: None,
+        //         title: self.current_conversation.title().to_string(),
+        //     })?;
+
+        Ok(&self.current_conversation)
+    }
+
     pub async fn switch_conversation(&mut self, conversation_id: String) -> Result<&Conversation> {
         let mut client = self.conversation_client.clone();
         let conversation = client
