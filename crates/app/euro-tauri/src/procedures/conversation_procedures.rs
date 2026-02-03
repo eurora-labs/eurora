@@ -95,14 +95,18 @@ impl ConversationApi for ConversationApiImpl {
 
         let view: ConversationView = conversation.into();
 
-        TauRpcConversationApiEventTrigger::new(event_handler)
+        match TauRpcConversationApiEventTrigger::new(event_handler)
             .current_conversation_changed(view.clone())
-            .map_err(|e| {
-                error!("Failed to trigger new conversation added event: {}", e);
-                e.to_string()
-            })?;
-
-        Ok(view)
+        {
+            Ok(_) => Ok(view),
+            Err(e) => {
+                error!(
+                    "Failed to trigger current conversation changed event: {}",
+                    e
+                );
+                Err(e.to_string())
+            }
+        }
     }
 
     async fn create<R: Runtime>(
