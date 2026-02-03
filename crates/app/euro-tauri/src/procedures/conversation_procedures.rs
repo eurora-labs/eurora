@@ -2,6 +2,7 @@ use crate::shared_types::SharedConversationManager;
 use agent_chain_core::BaseMessage;
 use euro_conversation::{Conversation, ListConversationsRequest};
 use tauri::{Manager, Runtime};
+use tracing::error;
 
 #[taurpc::ipc_type]
 pub struct ConversationView {
@@ -38,6 +39,10 @@ pub trait ConversationApi {
         offset: u32,
     ) -> Result<Vec<ConversationView>, String>;
 
+    async fn create_empty_conversation<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<ConversationView, String>;
+
     async fn create<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<ConversationView, String>;
@@ -73,6 +78,35 @@ impl ConversationApi for ConversationApiImpl {
             .into_iter()
             .map(|conversation| conversation.into())
             .collect())
+    }
+
+    async fn create_empty_conversation<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<ConversationView, String> {
+        let event_handler = app_handle.clone();
+        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        let mut conversation_manager = conversation_state.lock().await;
+
+        let conversation = conversation_manager
+            .create_empty_conversation()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let view: ConversationView = conversation.into();
+
+        match TauRpcConversationApiEventTrigger::new(event_handler)
+            .current_conversation_changed(view.clone())
+        {
+            Ok(_) => Ok(view),
+            Err(e) => {
+                error!(
+                    "Failed to trigger current conversation changed event: {}",
+                    e
+                );
+                Err(e.to_string())
+            }
+        }
     }
 
     async fn create<R: Runtime>(
