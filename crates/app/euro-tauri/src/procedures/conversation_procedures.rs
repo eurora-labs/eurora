@@ -38,6 +38,10 @@ pub trait ConversationApi {
         offset: u32,
     ) -> Result<Vec<ConversationView>, String>;
 
+    async fn create_empty_conversation<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<ConversationView, String>;
+
     async fn create<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<ConversationView, String>;
@@ -73,6 +77,20 @@ impl ConversationApi for ConversationApiImpl {
             .into_iter()
             .map(|conversation| conversation.into())
             .collect())
+    }
+
+    async fn create_empty_conversation<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<ConversationView, String> {
+        let conversation_state: tauri::State<SharedConversationManager> = app_handle.state();
+        let mut conversation_manager = conversation_state.lock().await;
+
+        let conversation = conversation_manager
+            .create_empty_conversation()
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(conversation.into())
     }
 
     async fn create<R: Runtime>(
