@@ -25,7 +25,7 @@
 	async function handleDownload() {
 		if (os === 'unknown') {
 			// Redirect to download page for manual selection
-			// window.location.href = '/download';
+			window.location.href = '/download';
 			return;
 		}
 
@@ -38,7 +38,7 @@
 				error = 'Download not available for your platform';
 				// Redirect to download page after a delay
 				setTimeout(() => {
-					// window.location.href = '/download';
+					window.location.href = '/download';
 				}, 2000);
 			}
 		} catch (e) {
@@ -52,7 +52,7 @@
 
 <Button
 	size="lg"
-	class="md:w-auto p-8 shadow-lg gap-4 {className}"
+	class="md:w-auto p-4 shadow-lg {className}"
 	onclick={handleDownload}
 	disabled={isLoading}
 >
@@ -60,8 +60,8 @@
 		<LoaderIcon size={32} class="animate-spin" />
 		Starting download...
 	{:else}
-		<DownloadIcon size={32} />
 		Download for {getOSDisplayName(os)}
+		<DownloadIcon size={32} />
 	{/if}
 </Button>
 
