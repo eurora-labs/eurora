@@ -1,6 +1,7 @@
 <script lang="ts">
 	import StaticLauncher from '$components/marketing/static-launcher.svelte';
 	import VideoSection from '$components/marketing/video-section.svelte';
+	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { type Icon as IconType } from '@lucide/svelte';
@@ -49,18 +50,7 @@
 			style="background-image: url('/images/promo.webp'); background-size: cover; background-position: center; background-repeat: no-repeat;"
 		>
 			<div class="flex justify-center align-start px-4 gap-4 my-8 download-button-container">
-				<!-- {#snippet downloadButtonSnippet()}
-					{@const downloadButton = downloads[System.OSName.toLowerCase()]}
-
-					<Button size="lg" class="w-full md:w-auto p-8 shadow-lg gap-4">
-						{#if downloadButton.icon}
-							{@const Icon = downloadButton.icon}
-							<Icon size={48} />
-						{/if}
-						Download for {downloadButton.name}
-					</Button>
-				{/snippet} -->
-				<!-- {@render downloadButtonSnippet()} -->
+				<DownloadButton />
 				<Button size="lg" class=" md:w-auto p-8 shadow-lg" variant="secondary"
 					>Learn More</Button
 				>
