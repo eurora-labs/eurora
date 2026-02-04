@@ -52,15 +52,15 @@ async fn main() -> Result<()> {
     // This records the PID of the browser process that started this native messaging host.
     parent_pid::capture_parent_pid();
 
-    let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
-        .parse_lossy("euro_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+    // let filter = EnvFilter::builder()
+    //     .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
+    //     .parse_lossy("euro_=trace,hyper=off,tokio=off"); // keep yours, silence deps
 
-    // Write only to file
-    fmt()
-        .with_env_filter(filter.clone())
-        .with_writer(File::create("euro-native-messaging.log")?)
-        .init();
+    // // Write only to file
+    // fmt()
+    //     .with_env_filter(filter.clone())
+    //     .with_writer(File::create("euro-native-messaging.log")?)
+    //     .init();
 
     // Check for command line arguments
     let args: Vec<String> = env::args().collect();

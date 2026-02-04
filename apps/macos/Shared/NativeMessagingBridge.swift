@@ -10,6 +10,7 @@
 
 import Foundation
 import os.log
+import AppKit
 
 /// Singleton bridge that manages communication with euro-native-messaging
 @available(macOS 11.0, *)
@@ -44,8 +45,8 @@ class NativeMessagingBridge {
         }
     }
 
-    /// Send a message to the native messaging host and wait for response
-    func sendMessage(_ message: [String: Any], completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    /// Send a message to the native messaging host and wait for response with timeout
+    func sendMessage(_ message: [String: Any], timeout: TimeInterval = 10.0, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         queue.async { [weak self] in
             guard let self = self else {
                 completion(.failure(BridgeError.bridgeDeallocated))
@@ -56,9 +57,14 @@ class NativeMessagingBridge {
                 self.logger.error("Native messaging host not running, attempting restart...")
                 self.startProcess()
 
-                // Retry after short delay
+                // Retry after short delay (only once)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    self.sendMessage(message, completion: completion)
+                    // Check again after restart attempt
+                    if self.process?.isRunning == true {
+                        self.sendMessage(message, timeout: timeout, completion: completion)
+                    } else {
+                        completion(.failure(BridgeError.processNotRunning))
+                    }
                 }
                 return
             }
@@ -66,10 +72,23 @@ class NativeMessagingBridge {
             do {
                 // Serialize to JSON - pass through as-is, no wrapping
                 let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
+                
+                // Create a unique callback ID for timeout tracking
+                let callbackId = UUID()
+                var callbackFired = false
+                let callbackLock = NSLock()
 
                 // Register callback for response
                 self.responseLock.lock()
                 self.pendingCallbacks.append { responseData in
+                    callbackLock.lock()
+                    guard !callbackFired else {
+                        callbackLock.unlock()
+                        return
+                    }
+                    callbackFired = true
+                    callbackLock.unlock()
+                    
                     do {
                         if let response = try JSONSerialization.jsonObject(with: responseData, options: []) as? [String: Any] {
                             completion(.success(response))
@@ -81,6 +100,20 @@ class NativeMessagingBridge {
                     }
                 }
                 self.responseLock.unlock()
+                
+                // Set up timeout
+                DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
+                    callbackLock.lock()
+                    guard !callbackFired else {
+                        callbackLock.unlock()
+                        return
+                    }
+                    callbackFired = true
+                    callbackLock.unlock()
+                    
+                    self.logger.warning("Request timed out after \(timeout) seconds")
+                    completion(.failure(BridgeError.timeout))
+                }
 
                 // Write length prefix (4 bytes, little-endian)
                 var length = UInt32(jsonData.count).littleEndian
@@ -91,7 +124,7 @@ class NativeMessagingBridge {
                 fileHandle.write(lengthData)
                 fileHandle.write(jsonData)
 
-                self.logger.debug("Sent message to native host: \(jsonData.count) bytes")
+                self.logger.debug("Sent message to native host: \(jsonData.count) bytes (callbackId: \(callbackId))")
 
             } catch {
                 self.logger.error("Failed to send message: \(error.localizedDescription)")
@@ -137,23 +170,39 @@ class NativeMessagingBridge {
 
         // Find the euro-native-messaging binary
         // Check common installation paths in order of preference
+        // Development paths are checked first for convenience during development
+        
+        // Get project root from source file location (works during development)
+        // #file gives path like: /path/to/eurora/apps/macos/Shared/NativeMessagingBridge.swift
+        let sourceFileURL = URL(fileURLWithPath: #file)
+        let projectRoot = sourceFileURL
+            .deletingLastPathComponent()  // Remove NativeMessagingBridge.swift
+            .deletingLastPathComponent()  // Remove Shared
+            .deletingLastPathComponent()  // Remove macos
+            .deletingLastPathComponent()  // Remove apps
+            .path
+        
+        logger.info("Source file: \(#file)")
+        logger.info("Project root: \(projectRoot)")
+        
         let possiblePaths = [
+            // Development paths - relative to project root (derived from source file)
+            "\(projectRoot)/target/debug/euro-native-messaging",
+            "\(projectRoot)/target/release/euro-native-messaging",
             // Installed Eurora desktop app location
             "/Applications/Eurora.app/Contents/MacOS/euro-native-messaging",
-            // Fallback paths for development
+            // Other fallback paths
             "/usr/local/bin/euro-native-messaging",
             "/opt/homebrew/bin/euro-native-messaging",
-            NSHomeDirectory() + "/.local/bin/euro-native-messaging",
-            // Development paths - relative to the project
-            Bundle.main.bundlePath + "/../../../../../target/release/euro-native-messaging",
-            Bundle.main.bundlePath + "/../../../../../target/debug/euro-native-messaging"
+            NSHomeDirectory() + "/.local/bin/euro-native-messaging"
         ]
 
         var foundPath: String?
         for path in possiblePaths {
-            if FileManager.default.isExecutableFile(atPath: path) {
+            let exists = FileManager.default.isExecutableFile(atPath: path)
+            logger.debug("Checking path: \(path) - exists: \(exists)")
+            if exists && foundPath == nil {
                 foundPath = path
-                break
             }
         }
 
@@ -164,6 +213,18 @@ class NativeMessagingBridge {
 
         process.executableURL = URL(fileURLWithPath: executablePath)
         logger.info("Using euro-native-messaging at: \(executablePath)")
+        
+        // Find Safari's PID and pass it via environment variable
+        // euro-native-messaging uses parent_id() which would return this Swift app's PID
+        // We need to provide the actual Safari PID for proper browser tracking
+        var environment = ProcessInfo.processInfo.environment
+        if let safariPid = findSafariPid() {
+            environment["EURORA_BROWSER_PID"] = String(safariPid)
+            logger.info("Found Safari PID: \(safariPid)")
+        } else {
+            logger.warning("Could not find Safari PID")
+        }
+        process.environment = environment
 
         // Set up stdout reading
         stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -223,34 +284,163 @@ class NativeMessagingBridge {
 
     private var readBuffer = Data()
 
+    /// Find Safari's PID by looking for running Safari processes
+    private func findSafariPid() -> pid_t? {
+        // Use NSRunningApplication to find Safari
+        let workspace = NSWorkspace.shared
+        let runningApps = workspace.runningApplications
+        
+        // Look for Safari by bundle identifier
+        for app in runningApps {
+            if app.bundleIdentifier == "com.apple.Safari" {
+                return app.processIdentifier
+            }
+        }
+        
+        // Fallback: look for Safari Technology Preview
+        for app in runningApps {
+            if app.bundleIdentifier == "com.apple.SafariTechnologyPreview" {
+                return app.processIdentifier
+            }
+        }
+        
+        return nil
+    }
+    
     private func handleStdoutData(_ handle: FileHandle) {
+        // Read data on the callback thread
         let data = handle.availableData
-        guard !data.isEmpty else { return }
-
-        readBuffer.append(data)
-
+        
+        // Process on our queue for thread safety
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            guard !data.isEmpty else { return }
+            
+            self.readBuffer.append(data)
+            self.processReadBuffer()
+        }
+    }
+    
+    private func processReadBuffer() {
+        // Must be called on self.queue
+        
         // Try to parse complete frames from buffer
         while readBuffer.count >= 4 {
+            // Convert to Array for safe indexing (Data indices can be non-zero after removeFirst)
+            let headerBytes = [UInt8](readBuffer.prefix(4))
+            
             // Read length prefix (4 bytes, little-endian)
-            let lengthData = readBuffer.prefix(4)
-            let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
-
+            let length = UInt32(headerBytes[0]) |
+                        (UInt32(headerBytes[1]) << 8) |
+                        (UInt32(headerBytes[2]) << 16) |
+                        (UInt32(headerBytes[3]) << 24)
+            
+            // Sanity check: max 8MB frame size
+            let maxFrameSize: UInt32 = 8 * 1024 * 1024
+            guard length > 0 && length <= maxFrameSize else {
+                logger.error("Invalid frame length: \(length), clearing buffer")
+                readBuffer.removeAll()
+                return
+            }
+            
             let totalLength = 4 + Int(length)
             guard readBuffer.count >= totalLength else {
                 // Not enough data yet
                 break
             }
-
-            // Extract the JSON payload
-            let jsonData = readBuffer.subdata(in: 4..<totalLength)
-            readBuffer.removeFirst(totalLength)
-
-            // Call the next pending callback
+            
+            // Extract the JSON payload - copy to new Data to avoid index issues
+            let jsonBytes = [UInt8](readBuffer.prefix(totalLength).dropFirst(4))
+            let jsonData = Data(jsonBytes)
+            
+            // Remove processed data from buffer - reset to clean Data to fix indices
+            let remaining = [UInt8](readBuffer.dropFirst(totalLength))
+            readBuffer = Data(remaining)
+            
+            logger.debug("Received frame: \(jsonData.count) bytes")
+            
+            // Handle the received frame
+            handleReceivedFrame(jsonData)
+        }
+    }
+    
+    private func handleReceivedFrame(_ jsonData: Data) {
+        // Parse the frame to check if it's a Request or Response
+        guard let json = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any],
+              let kind = json["kind"] as? [String: Any] else {
+            logger.error("Failed to parse frame JSON")
+            return
+        }
+        
+        if let request = kind["Request"] as? [String: Any] {
+            // This is a Request from the native host - handle it
+            handleIncomingRequest(request, fullFrame: json)
+        } else if kind["Response"] != nil || kind["Event"] != nil || kind["Error"] != nil {
+            // This is a Response/Event/Error - pass to pending callback
             responseLock.lock()
             let callback = pendingCallbacks.isEmpty ? nil : pendingCallbacks.removeFirst()
             responseLock.unlock()
-
-            callback?(jsonData)
+            
+            if let callback = callback {
+                DispatchQueue.main.async {
+                    callback(jsonData)
+                }
+            } else {
+                if let jsonString = String(data: jsonData, encoding: .utf8) {
+                    logger.debug("Received response with no pending callback: \(jsonString.prefix(200))")
+                }
+            }
+        } else {
+            logger.warning("Unknown frame kind: \(kind.keys)")
+        }
+    }
+    
+    private func handleIncomingRequest(_ request: [String: Any], fullFrame: [String: Any]) {
+        // Handle requests from the native messaging host
+        guard let action = request["action"] as? String,
+              let requestId = request["id"] else {
+            logger.error("Invalid request format")
+            return
+        }
+        
+        logger.debug("Handling request: action=\(action), id=\(requestId as! NSObject)")
+        
+        // For now, just send an empty response - the Safari extension doesn't need to handle these
+        // These are typically metadata requests that Chrome/Firefox extensions handle
+        let response: [String: Any] = [
+            "kind": [
+                "Response": [
+                    "id": requestId,
+                    "action": action,
+                    "payload": NSNull()
+                ]
+            ]
+        ]
+        
+        // Send response back to native host
+        sendRawFrame(response)
+    }
+    
+    private func sendRawFrame(_ frame: [String: Any]) {
+        guard let stdinPipe = self.stdinPipe, self.process?.isRunning == true else {
+            logger.error("Cannot send frame - process not running")
+            return
+        }
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: frame, options: [])
+            
+            // Write length prefix (4 bytes, little-endian)
+            var length = UInt32(jsonData.count).littleEndian
+            let lengthData = Data(bytes: &length, count: 4)
+            
+            let fileHandle = stdinPipe.fileHandleForWriting
+            fileHandle.write(lengthData)
+            fileHandle.write(jsonData)
+            
+            logger.debug("Sent raw frame: \(jsonData.count) bytes")
+        } catch {
+            logger.error("Failed to send raw frame: \(error.localizedDescription)")
         }
     }
 }
