@@ -51,6 +51,15 @@ impl ProcessFunctionality for Chrome {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Safari;
+
+impl ProcessFunctionality for Safari {
+    fn get_name(&self) -> &str {
+        os_pick("safari.exe", "safari", "Safari")
+    }
+}
+
 // Implement a test
 #[cfg(test)]
 mod tests {

@@ -3,9 +3,9 @@
 use agent_chain_core::BaseMessage;
 use bon::bon;
 use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
+use log::{debug, info};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, info};
 
 use crate::{
     ActivityStorage, AssetFunctionality, ContextChip, TimelineError, collector::CollectorService,
