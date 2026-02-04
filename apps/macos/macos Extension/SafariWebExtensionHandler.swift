@@ -2,14 +2,18 @@
 //  SafariWebExtensionHandler.swift
 //  macos Extension
 //
-//  Created by Andre Roelofs on 04/02/2026.
+//  Handles messages from the Safari web extension and forwards them
+//  to the euro-native-messaging bridge.
 //
 
 import SafariServices
 import os.log
 
+@available(macOS 11.0, *)
 class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
 
+    private let logger = Logger(subsystem: "com.eurora.macos.extension", category: "SafariWebExtensionHandler")
+    
     func beginRequest(with context: NSExtensionContext) {
         let request = context.inputItems.first as? NSExtensionItem
 
@@ -27,16 +31,55 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             message = request?.userInfo?["message"]
         }
 
-        os_log(.default, "Received message from browser.runtime.sendNativeMessage: %@ (profile: %@)", String(describing: message), profile?.uuidString ?? "none")
+        logger.debug("Received message from browser.runtime.sendNativeMessage: \(String(describing: message)) (profile: \(profile?.uuidString ?? "none"))")
 
-        let response = NSExtensionItem()
-        if #available(iOS 15.0, macOS 11.0, *) {
-            response.userInfo = [ SFExtensionMessageKey: [ "echo": message ] ]
-        } else {
-            response.userInfo = [ "message": [ "echo": message ] ]
+        // Forward message to native messaging bridge
+        guard let messageDict = message as? [String: Any] else {
+            logger.error("Invalid message format - expected dictionary")
+            completeWithError(context: context, error: "Invalid message format")
+            return
         }
-
-        context.completeRequest(returningItems: [ response ], completionHandler: nil)
+        
+        // Send to bridge and wait for response
+        NativeMessagingBridge.shared.sendMessage(messageDict) { [weak self] (result: Result<[String: Any], Error>) in
+            switch result {
+            case .success(let responseDict):
+                self?.completeWithResponse(context: context, response: responseDict)
+            case .failure(let error):
+                self?.logger.error("Bridge error: \(error.localizedDescription)")
+                self?.completeWithError(context: context, error: error.localizedDescription)
+            }
+        }
     }
-
+    
+    private func completeWithResponse(context: NSExtensionContext, response: [String: Any]) {
+        let responseItem = NSExtensionItem()
+        
+        if #available(iOS 15.0, macOS 11.0, *) {
+            responseItem.userInfo = [SFExtensionMessageKey: response]
+        } else {
+            responseItem.userInfo = ["message": response]
+        }
+        
+        context.completeRequest(returningItems: [responseItem], completionHandler: nil)
+    }
+    
+    private func completeWithError(context: NSExtensionContext, error: String) {
+        let responseItem = NSExtensionItem()
+        let errorResponse: [String: Any] = [
+            "kind": [
+                "Error": [
+                    "message": error
+                ]
+            ]
+        ]
+        
+        if #available(iOS 15.0, macOS 11.0, *) {
+            responseItem.userInfo = [SFExtensionMessageKey: errorResponse]
+        } else {
+            responseItem.userInfo = ["message": errorResponse]
+        }
+        
+        context.completeRequest(returningItems: [responseItem], completionHandler: nil)
+    }
 }
