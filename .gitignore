@@ -295,3 +295,68 @@ vitest.config.*.timestamp*
 # PDF.js viewer cache (downloaded during build)
 apps/browser/.pdfjs-viewer/
 apps/browser/.pdfjs-temp/
+
+############################
+# Xcode / Safari Extension
+############################
+
+# Xcode user data
+*.xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+*.xcscmblueprint
+*.xcuserdatad
+
+# Xcode build artifacts
+build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Playground
+timeline.xctimeline
+playground.xcworkspace
+
+# Workspace annoyances
+xcshareddata/
+project.xcworkspace/xcuserdata/
+
+# Safari Web Extension converter output
+*.xcodeproj/
+*.xcworkspace/
+ExtensionApp/Build/
+ExtensionApp/DerivedData/
+*.entitlements
+
+# If converter added symlinked copies of your web assets, ignore duplicates
+ExtensionApp/Shared\ (Extension)/**/node_modules/
+ExtensionApp/**/dist/
+ExtensionApp/**/.svelte-kit/
+ExtensionApp/**/.vite/
+
+
+############################
+# macOS / OS
+############################
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in mounted volumes
+.Spotlight-V100
+.Trashes
+
+# General
+ehthumbs.db
+Thumbs.db
