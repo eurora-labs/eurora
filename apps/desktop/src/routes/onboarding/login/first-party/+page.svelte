@@ -18,7 +18,8 @@
 			if (!isLoginSuccess) {
 				return;
 			}
-			goto('/onboarding/login/first-party/browser-extension');
+			// goto('/onboarding/login/first-party/browser-extension');
+			goto('/');
 			clearInterval(interval);
 		}, 5000);
 	}
