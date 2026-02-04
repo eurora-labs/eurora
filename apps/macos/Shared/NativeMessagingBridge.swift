@@ -11,6 +11,7 @@
 import Foundation
 import os.log
 import AppKit
+import CoreGraphics
 
 /// Singleton bridge that manages communication with euro-native-messaging
 @available(macOS 11.0, *)
@@ -29,7 +30,29 @@ class NativeMessagingBridge {
 
     private let logger = Logger(subsystem: "com.eurora.macos", category: "NativeMessagingBridge")
 
+    // Store the current tab metadata from extension messages
+    private var currentTabURL: String?
+    private var currentTabTitle: String?
+    private var currentTabIconBase64: String?
+    private let metadataLock = NSLock()
+    
     private init() {}
+    
+    /// Update the current tab metadata (called when extension sends a message with URL/icon info)
+    func updateCurrentTab(url: String?, title: String?, iconBase64: String?) {
+        metadataLock.lock()
+        if let url = url {
+            currentTabURL = url
+        }
+        if let title = title {
+            currentTabTitle = title
+        }
+        if let iconBase64 = iconBase64 {
+            currentTabIconBase64 = iconBase64
+        }
+        metadataLock.unlock()
+        logger.debug("Updated current tab - URL: \(url ?? "nil"), Title: \(title ?? "nil"), hasIcon: \(iconBase64 != nil)")
+    }
 
     /// Start the native messaging host process
     func start() {
@@ -405,20 +428,242 @@ class NativeMessagingBridge {
         
         logger.debug("Handling request: action=\(action), id=\(requestId as! NSObject)")
         
-        // For now, just send an empty response - the Safari extension doesn't need to handle these
-        // These are typically metadata requests that Chrome/Firefox extensions handle
-        let response: [String: Any] = [
-            "kind": [
-                "Response": [
-                    "id": requestId,
-                    "action": action,
-                    "payload": NSNull()
+        switch action {
+        case "GET_METADATA":
+            handleGetMetadata(requestId: requestId, action: action)
+        default:
+            // Send empty response for unknown actions
+            let response: [String: Any] = [
+                "kind": [
+                    "Response": [
+                        "id": requestId,
+                        "action": action,
+                        "payload": NSNull()
+                    ]
                 ]
             ]
+            sendRawFrame(response)
+        }
+    }
+    
+    private func handleGetMetadata(requestId: Any, action: String) {
+        // Get the current tab metadata
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            // Get URL and icon from stored metadata (set by extension messages)
+            self.metadataLock.lock()
+            let url = self.currentTabURL
+            let storedIcon = self.currentTabIconBase64
+            self.metadataLock.unlock()
+            
+            self.logger.info("GET_METADATA: stored URL=\(url ?? "nil"), hasStoredIcon=\(storedIcon != nil)")
+            
+            // Priority order:
+            // 1. Stored icon from extension (website favicon)
+            // 2. Fetched favicon from URL (using Google's service)
+            // 3. Safari app icon (last resort fallback)
+            var finalIcon = storedIcon
+            
+            if finalIcon == nil {
+                self.logger.debug("No stored icon, attempting to fetch favicon...")
+                
+                // Try to fetch favicon from URL
+                if let url = url {
+                    finalIcon = self.fetchFavicon(for: url)
+                    if finalIcon != nil {
+                        self.logger.info("Successfully fetched favicon for URL")
+                    } else {
+                        self.logger.warning("Failed to fetch favicon for URL: \(url)")
+                    }
+                } else {
+                    self.logger.warning("No URL available to fetch favicon")
+                }
+                
+                // Last resort: Safari app icon
+                if finalIcon == nil {
+                    self.logger.info("Using Safari app icon as fallback")
+                    finalIcon = self.getSafariIconBase64()
+                }
+            } else {
+                self.logger.debug("Using stored icon from extension")
+            }
+            
+            // Build the metadata response
+            let metadata: [String: Any] = [
+                "kind": "NativeMetadata",
+                "data": [
+                    "url": url as Any,
+                    "icon_base64": finalIcon as Any
+                ]
+            ]
+            
+            let payloadData = try? JSONSerialization.data(withJSONObject: metadata, options: [])
+            let payloadString = payloadData.flatMap { String(data: $0, encoding: .utf8) }
+            
+            let response: [String: Any] = [
+                "kind": [
+                    "Response": [
+                        "id": requestId,
+                        "action": action,
+                        "payload": payloadString as Any
+                    ]
+                ]
+            ]
+            
+            self.queue.async {
+                self.sendRawFrame(response)
+            }
+        }
+    }
+    
+    /// Get Safari's application icon using native macOS APIs
+    private func getSafariIconBase64() -> String? {
+        // Find Safari's bundle path
+        let workspace = NSWorkspace.shared
+        
+        // Try to find Safari by bundle identifier
+        guard let safariURL = workspace.urlForApplication(withBundleIdentifier: "com.apple.Safari") else {
+            logger.warning("Could not find Safari bundle URL")
+            return nil
+        }
+        
+        // Get the icon for Safari's bundle
+        let icon = workspace.icon(forFile: safariURL.path)
+        
+        // Convert NSImage to PNG data
+        guard let pngData = nsImageToPNGData(icon, size: 64) else {
+            logger.warning("Could not convert Safari icon to PNG")
+            return nil
+        }
+        
+        let base64 = pngData.base64EncodedString()
+        return "data:image/png;base64,\(base64)"
+    }
+    
+    /// Convert NSImage to PNG data at specified size
+    private func nsImageToPNGData(_ image: NSImage, size: Int) -> Data? {
+        let targetSize = NSSize(width: size, height: size)
+        
+        // Create a bitmap representation at the target size
+        guard let bitmapRep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: size,
+            pixelsHigh: size,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .calibratedRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else {
+            return nil
+        }
+        
+        bitmapRep.size = targetSize
+        
+        // Draw the image into the bitmap
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmapRep)
+        
+        image.draw(
+            in: NSRect(origin: .zero, size: targetSize),
+            from: .zero,
+            operation: .copy,
+            fraction: 1.0
+        )
+        
+        NSGraphicsContext.restoreGraphicsState()
+        
+        // Convert to PNG data
+        return bitmapRep.representation(using: .png, properties: [:])
+    }
+    
+    private func fetchFavicon(for urlString: String) -> String? {
+        guard let url = URL(string: urlString),
+              let host = url.host else {
+            logger.warning("fetchFavicon: Invalid URL or no host: \(urlString)")
+            return nil
+        }
+        
+        logger.debug("fetchFavicon: Attempting to fetch favicon for host: \(host)")
+        
+        // Try Google's favicon service first (most reliable)
+        // Then try common favicon locations
+        let faviconURLs = [
+            "https://www.google.com/s2/favicons?domain=\(host)&sz=64",
+            "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=\(urlString)&size=64",
+            "https://\(host)/favicon.ico",
+            "https://\(host)/favicon.png",
+            "https://\(host)/apple-touch-icon.png"
         ]
         
-        // Send response back to native host
-        sendRawFrame(response)
+        for faviconURLString in faviconURLs {
+            guard let faviconURL = URL(string: faviconURLString) else {
+                continue
+            }
+            
+            logger.debug("fetchFavicon: Trying \(faviconURLString)")
+            
+            do {
+                // Use URLSession with timeout for better reliability
+                let semaphore = DispatchSemaphore(value: 0)
+                var resultData: Data?
+                var resultError: Error?
+                
+                let task = URLSession.shared.dataTask(with: faviconURL) { data, response, error in
+                    if let httpResponse = response as? HTTPURLResponse {
+                        self.logger.debug("fetchFavicon: Got HTTP \(httpResponse.statusCode) from \(faviconURLString)")
+                    }
+                    resultData = data
+                    resultError = error
+                    semaphore.signal()
+                }
+                task.resume()
+                
+                // Wait up to 5 seconds
+                let waitResult = semaphore.wait(timeout: .now() + 5.0)
+                if waitResult == .timedOut {
+                    task.cancel()
+                    logger.warning("fetchFavicon: Timeout fetching \(faviconURLString)")
+                    continue
+                }
+                
+                if let error = resultError {
+                    logger.debug("fetchFavicon: Error fetching \(faviconURLString): \(error.localizedDescription)")
+                    continue
+                }
+                
+                guard let data = resultData, !data.isEmpty else {
+                    logger.debug("fetchFavicon: Empty data from \(faviconURLString)")
+                    continue
+                }
+                
+                // Google's service returns 16x16 default icon which is ~726 bytes
+                // Real favicons are typically larger
+                if data.count > 100 {
+                    // Determine MIME type
+                    let mimeType: String
+                    if faviconURLString.contains("google.com") || faviconURLString.contains("gstatic.com") || faviconURLString.hasSuffix(".png") {
+                        mimeType = "image/png"
+                    } else {
+                        mimeType = "image/x-icon"
+                    }
+                    let base64 = data.base64EncodedString()
+                    logger.info("fetchFavicon: Success from \(faviconURLString) (\(data.count) bytes)")
+                    return "data:\(mimeType);base64,\(base64)"
+                } else {
+                    logger.debug("fetchFavicon: Data too small from \(faviconURLString) (\(data.count) bytes)")
+                }
+            } catch {
+                logger.debug("fetchFavicon: Exception for \(faviconURLString): \(error.localizedDescription)")
+                continue
+            }
+        }
+        
+        logger.warning("fetchFavicon: All sources failed for host: \(host)")
+        return nil
     }
     
     private func sendRawFrame(_ frame: [String: Any]) {

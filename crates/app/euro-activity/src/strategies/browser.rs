@@ -434,6 +434,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             .await
             .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
 
+        info!("Received metadata response: {:?}", response_frame);
+
         let Some(payload) = response_frame.payload else {
             warn!("No payload in metadata response");
             return Ok(StrategyMetadata::default());
