@@ -39,7 +39,7 @@
 	<MainSidebar />
 	<Sidebar.Inset>
 		<div class="flex flex-col h-screen">
-			<div class="flex-1">{@render children?.()}</div>
+			<div class="flex-1 bg-background">{@render children?.()}</div>
 			<div class="flex flex-col w-full">
 				<Timeline.Root class="w-full" bind:open={timelineOpen} defaultOpen={false}>
 					{#each timelineItems as item}
