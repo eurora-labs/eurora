@@ -48,7 +48,7 @@ impl ConversationService {
             error!("OPENAI_API_KEY environment variable is not set");
             String::new()
         });
-        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o".to_string());
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-5.1".to_string());
 
         let chat_provider = ChatOpenAI::new(&model)
             .with_builtin_tools(vec![BuiltinTool::WebSearch])
@@ -464,7 +464,7 @@ impl ProtoConversationService for ConversationService {
             .params(PaginationParams::new(
                 req.offset,
                 req.limit,
-                "DESC".to_string(),
+                "ASC".to_string(),
             ))
             .only_visible(true)
             .call()
