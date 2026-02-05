@@ -20,6 +20,7 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 		response: (response?: WatcherResponse) => void,
 	): boolean {
 		const { type } = obj;
+		console.debug(`ArticleWatcher.listen(${type})`);
 
 		let promise: Promise<WatcherResponse>;
 
@@ -74,7 +75,10 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 }
 
 export function main() {
+	console.log('started article watcher');
 	const watcher = new ArticleWatcher({});
 
 	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
 }
+
+console.log('started article watcher 2');

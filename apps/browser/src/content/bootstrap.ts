@@ -27,6 +27,19 @@ async function listener(msg: any, sender: any, sendResponse: (response?: any) =>
 			console.error('Error loading default script:', error);
 		}
 	}
+	async function runCommon() {
+		try {
+			if (msg.commonChunk) {
+				const common = await imp(msg.commonChunk);
+				common?.main?.();
+			}
+		} catch (error) {
+			console.error('Error loading common script:', error);
+		}
+	}
+
+	// Always run common script first
+	await runCommon();
 
 	try {
 		const mod = await imp(msg.chunk);

@@ -2,6 +2,7 @@ export const base = {
 	manifest_version: 3,
 	name: 'Eurora',
 	version: '0.0.0',
+	description: 'Helper extension for Eurora',
 	minimum_chrome_version: '102.0',
 	action: { default_popup: 'popup.html' },
 	content_security_policy: {

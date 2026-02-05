@@ -3,7 +3,8 @@
 //  macos
 //
 //  Container app for the Eurora Safari extension.
-//  Manages the native messaging bridge lifecycle.
+//  This app is mainly for installation and configuration.
+//  The native messaging bridge is managed by the Safari extension itself.
 //
 
 import Cocoa
@@ -12,13 +13,13 @@ import Cocoa
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Start the native messaging bridge
-        NativeMessagingBridge.shared.start()
+        // NOTE: The NativeMessagingBridge is NOT started here.
+        // It runs in the Safari extension process, not the container app.
+        // The extension handler (SafariWebExtensionHandler) manages its own bridge instance.
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Stop the native messaging bridge
-        NativeMessagingBridge.shared.stop()
+        // Nothing to clean up - bridge is managed by the extension
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

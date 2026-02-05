@@ -1,16 +1,33 @@
 import { onUpdated, onActivated } from './focus-tracker.js';
 import { handleMessage } from './messaging.js';
 import { getCurrentTabIcon } from './tabs.js';
-import browser from 'webextension-polyfill';
 import { isSafari } from './util.js';
+import browser from 'webextension-polyfill';
 import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings.js';
 
-const host = 'com.eurora.app';
+// Native messaging host identifier
+// For Chrome/Firefox: matches native-messaging-host.json ('com.eurora.app')
+// For Safari: must match the containing app's bundle identifier ('com.eurora.macos')
+function getHost(): string {
+	return isSafari() ? 'com.eurora.macos' : 'com.eurora.app';
+}
 const connectTimeout = 5000;
+const safariPollInterval = 100; // Poll every 100ms for Safari
 let nativePort: browser.Runtime.Port | null = null;
+let safariPollTimer: ReturnType<typeof setInterval> | null = null;
 
 export function startNativeMessenger() {
+	const host = getHost();
+	console.log(
+		'[NativeMessenger] Starting native messenger, isSafari:',
+		isSafari(),
+		'host:',
+		host,
+	);
+
 	nativePort = browser.runtime.connectNative(host);
+	console.log('[NativeMessenger] connectNative returned port:', !!nativePort);
+
 	nativePort.onDisconnect.addListener(onNativePortDisconnect);
 	nativePort?.onMessage.addListener(onNativePortMessage);
 	browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
@@ -24,12 +41,89 @@ export function startNativeMessenger() {
 
 		await onActivated(activeInfo.tabId, nativePort);
 	});
+
+	// Safari doesn't support true bidirectional native messaging
+	// We need to poll for pending requests from the native host
+	if (isSafari()) {
+		console.log('[NativeMessenger] Safari detected, starting polling');
+		startSafariPolling();
+	}
+}
+
+function startSafariPolling() {
+	if (safariPollTimer) {
+		console.log('[NativeMessenger] Safari polling already running');
+		return;
+	}
+
+	console.log('[NativeMessenger] Starting Safari polling with interval:', safariPollInterval);
+
+	safariPollTimer = setInterval(async () => {
+		// For Safari, we poll even if nativePort is null since sendNativeMessage works independently
+		try {
+			// Send a poll request to check for pending native requests
+			const host = getHost();
+			console.log('[NativeMessenger] Polling for pending requests...');
+			const response = (await browser.runtime.sendNativeMessage(host, {
+				type: 'pollNativeRequests',
+			})) as { pendingRequests?: Frame[]; type?: string } | null;
+
+			console.log('[NativeMessenger] Poll response:', JSON.stringify(response));
+
+			if (response && response.pendingRequests && Array.isArray(response.pendingRequests)) {
+				console.log(
+					'[NativeMessenger] Found',
+					response.pendingRequests.length,
+					'pending requests',
+				);
+				for (const request of response.pendingRequests) {
+					await processPendingNativeRequest(request);
+				}
+			}
+		} catch (error) {
+			// Log polling errors for debugging
+			console.error('[NativeMessenger] Safari poll error:', error);
+		}
+	}, safariPollInterval);
+}
+
+function stopSafariPolling() {
+	if (safariPollTimer) {
+		clearInterval(safariPollTimer);
+		safariPollTimer = null;
+	}
+}
+
+async function processPendingNativeRequest(frame: Frame) {
+	const kind = frame.kind;
+	if (!kind || !('Request' in kind)) {
+		console.warn('Invalid pending native request:', frame);
+		return;
+	}
+
+	const response = await onRequestFrame(kind.Request);
+
+	// Send response back to native host
+	try {
+		const host = getHost();
+		await browser.runtime.sendNativeMessage(host, {
+			type: 'nativeResponse',
+			response: response,
+		});
+	} catch (error) {
+		console.error('Failed to send native response:', error);
+	}
 }
 
 function onNativePortDisconnect(port: browser.Runtime.Port) {
 	const error = port.error;
 	console.error('Native port disconnected:', error || 'Unknown error');
 	nativePort = null;
+
+	// Stop Safari polling on disconnect
+	if (isSafari()) {
+		stopSafariPolling();
+	}
 
 	// Try to reconnect after a delay
 	setTimeout(() => {
@@ -38,15 +132,29 @@ function onNativePortDisconnect(port: browser.Runtime.Port) {
 }
 
 function connect() {
+	const host = getHost();
 	nativePort = browser.runtime.connectNative(host);
 	nativePort.onDisconnect.addListener(onNativePortDisconnect);
 	nativePort?.onMessage.addListener(onNativePortMessage);
+
+	// Restart Safari polling
+	if (isSafari()) {
+		startSafariPolling();
+	}
 }
 
 async function onNativePortMessage(message: unknown, sender: browser.Runtime.Port) {
 	// Assert type here
-	const frame = message as Frame;
+	const frame = message as Frame & { _pendingNativeRequests?: Frame[] };
 	const kind = frame.kind;
+
+	// Handle piggybacked pending native requests (Safari)
+	if (frame._pendingNativeRequests && Array.isArray(frame._pendingNativeRequests)) {
+		for (const request of frame._pendingNativeRequests) {
+			await processPendingNativeRequest(request);
+		}
+	}
+
 	if (!kind) {
 		console.error('Invalid frame kind');
 		throw new Error('Invalid frame kind');
@@ -70,6 +178,7 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 	switch (frame.action) {
 		case 'GET_METADATA':
+			console.log('GET_METADATA');
 			if (isSafari()) {
 				return await onActionMetadataFromContentScript(frame);
 			}

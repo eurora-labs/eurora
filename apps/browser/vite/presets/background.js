@@ -2,8 +2,9 @@ import path from 'node:path';
 
 export function backgroundConfig({ browser, outDir, emptyOutDir }) {
 	const rootDir = path.resolve(import.meta.dirname, '../..');
+	// Safari and Firefox use simpler entry without pdfjs
 	const input =
-		browser === 'firefox'
+		browser === 'firefox' || browser === 'safari'
 			? 'src/background/entry.firefox.ts'
 			: 'src/background/entry.chrome.ts';
 	return {
