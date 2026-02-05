@@ -212,13 +212,18 @@
 			>
 				{#each messages as message}
 					{@const content = getMessageContent(message)}
-					{#if content.length > 0}
+					{@const isUser = isUserMessage(message)}
+					{#if content.length > 0 || !isUser}
 						<Chat.Message
-							variant={isUserMessage(message) ? 'default' : 'assistant'}
+							variant={isUser ? 'default' : 'assistant'}
 							finishRendering={() => {}}
 						>
 							<Chat.MessageContent>
-								<Katex math={content} finishRendering={() => {}} />
+								{#if content.length > 0}
+									<Katex math={content} finishRendering={() => {}} />
+								{:else}
+									<span class="text-primary/60 italic">Thinking...</span>
+								{/if}
 							</Chat.MessageContent>
 						</Chat.Message>
 					{/if}
