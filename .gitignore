@@ -360,3 +360,11 @@ ExtensionApp/**/.vite/
 # General
 ehthumbs.db
 Thumbs.db
+
+############################
+# Generated Proto Files
+############################
+
+# Swift generated protobuf files
+apps/macos/Shared/Generated/
+!apps/macos/Shared/Generated/.gitkeep

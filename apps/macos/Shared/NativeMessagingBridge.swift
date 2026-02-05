@@ -2,59 +2,55 @@
 //  NativeMessagingBridge.swift
 //  Eurora
 //
-//  Bridge between Safari extension and euro-native-messaging binary.
-//  Manages the subprocess lifecycle and handles the native messaging protocol.
+//  Bridge between Safari extension and the container app.
+//  Connects to the local bridge server running in the container app,
+//  which in turn forwards messages to the euro-activity gRPC server.
 //
 //  This file is shared between the container app and the Safari extension.
 //
 
 import Foundation
+import Network
 import os.log
-import AppKit
-import SafariServices
 
-/// Singleton bridge that manages communication with euro-native-messaging
+/// Port for connecting to the local bridge server in the container app
+private let kBridgeConnectionPort: UInt16 = 14310
+
+/// Singleton bridge that manages communication with the container app
 @available(macOS 11.0, *)
 class NativeMessagingBridge {
 
     static let shared = NativeMessagingBridge()
-    
-    /// Bundle identifier for the Safari extension - must match the extension's bundle ID
-    private let extensionBundleIdentifier = "com.eurora.macos.Extension"
-
-    private var process: Process?
-    private var stdinPipe: Pipe?
-    private var stdoutPipe: Pipe?
-    private var stderrPipe: Pipe?
-
-    private let queue = DispatchQueue(label: "com.eurora.native-messaging-bridge", qos: .userInitiated)
-    private let responseLock = NSLock()
-    private var pendingCallbacks: [(Data) -> Void] = []
-    
-    /// Pending requests from euro-native-messaging that are waiting for JavaScript responses
-    /// Key: request ID (as String), Value: the original request for tracking
-    private var pendingNativeRequests: [String: [String: Any]] = [:]
-    private let pendingNativeRequestsLock = NSLock()
 
     private let logger = Logger(subsystem: "com.eurora.macos", category: "NativeMessagingBridge")
+    private let queue = DispatchQueue(label: "com.eurora.native-messaging-bridge", qos: .userInitiated)
+    
+    private var connection: NWConnection?
+    private var isConnected = false
+    private var shouldReconnect = true
+    
+    private let responseLock = NSLock()
+    private var pendingCallbacks: [String: (Data) -> Void] = [:]
+    private var readBuffer = Data()
     
     private init() {}
 
-    /// Start the native messaging host process
+    /// Start the connection to the local bridge server
     func start() {
         queue.async { [weak self] in
-            self?.startProcess()
+            self?.connectToServer()
         }
     }
 
-    /// Stop the native messaging host process
+    /// Stop the connection
     func stop() {
+        shouldReconnect = false
         queue.async { [weak self] in
-            self?.stopProcess()
+            self?.disconnect()
         }
     }
 
-    /// Send a message to the native messaging host and wait for response with timeout
+    /// Send a message to the bridge and wait for response with timeout
     func sendMessage(_ message: [String: Any], timeout: TimeInterval = 10.0, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         queue.async { [weak self] in
             guard let self = self else {
@@ -62,14 +58,13 @@ class NativeMessagingBridge {
                 return
             }
 
-            guard let stdinPipe = self.stdinPipe, self.process?.isRunning == true else {
-                self.logger.error("Native messaging host not running, attempting restart...")
-                self.startProcess()
+            guard self.isConnected, let connection = self.connection else {
+                self.logger.error("Not connected to local bridge server, attempting reconnect...")
+                self.connectToServer()
 
                 // Retry after short delay (only once)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // Check again after restart attempt
-                    if self.process?.isRunning == true {
+                    if self.isConnected {
                         self.sendMessage(message, timeout: timeout, completion: completion)
                     } else {
                         completion(.failure(BridgeError.processNotRunning))
@@ -79,17 +74,25 @@ class NativeMessagingBridge {
             }
 
             do {
-                // Serialize to JSON - pass through as-is, no wrapping
+                // Serialize to JSON
                 let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
                 
-                // Create a unique callback ID for timeout tracking
-                let callbackId = UUID()
+                // Generate or extract request ID for tracking response
+                var requestId: String?
+                if let kind = message["kind"] as? [String: Any],
+                   let request = kind["Request"] as? [String: Any],
+                   let id = request["id"] {
+                    requestId = "\(id)"
+                }
+                
+                // Create a unique callback ID if no request ID
+                let callbackId = requestId ?? UUID().uuidString
                 var callbackFired = false
                 let callbackLock = NSLock()
 
                 // Register callback for response
                 self.responseLock.lock()
-                self.pendingCallbacks.append { responseData in
+                self.pendingCallbacks[callbackId] = { responseData in
                     callbackLock.lock()
                     guard !callbackFired else {
                         callbackLock.unlock()
@@ -120,20 +123,25 @@ class NativeMessagingBridge {
                     callbackFired = true
                     callbackLock.unlock()
                     
+                    self.responseLock.lock()
+                    self.pendingCallbacks.removeValue(forKey: callbackId)
+                    self.responseLock.unlock()
+                    
                     self.logger.warning("Request timed out after \(timeout) seconds")
                     completion(.failure(BridgeError.timeout))
                 }
 
-                // Write length prefix (4 bytes, little-endian)
-                var length = UInt32(jsonData.count).littleEndian
-                let lengthData = Data(bytes: &length, count: 4)
-
-                // Write to stdin
-                let fileHandle = stdinPipe.fileHandleForWriting
-                fileHandle.write(lengthData)
-                fileHandle.write(jsonData)
-
-                self.logger.debug("Sent message to native host: \(jsonData.count) bytes (callbackId: \(callbackId))")
+                // Frame the message with length prefix
+                let framedData = self.frameMessage(jsonData)
+                
+                // Send to server
+                connection.send(content: framedData, completion: .contentProcessed { [weak self] error in
+                    if let error = error {
+                        self?.logger.error("Failed to send message: \(error.localizedDescription)")
+                    } else {
+                        self?.logger.debug("Sent message to local bridge server: \(jsonData.count) bytes")
+                    }
+                })
 
             } catch {
                 self.logger.error("Failed to send message: \(error.localizedDescription)")
@@ -147,7 +155,7 @@ class NativeMessagingBridge {
         let semaphore = DispatchSemaphore(value: 0)
         var result: Result<[String: Any], Error> = .failure(BridgeError.timeout)
 
-        sendMessage(message) { response in
+        sendMessage(message, timeout: timeout) { response in
             result = response
             semaphore.signal()
         }
@@ -162,395 +170,230 @@ class NativeMessagingBridge {
 
     // MARK: - Private Methods
 
-    private func startProcess() {
-        guard process == nil || process?.isRunning == false else {
-            logger.debug("Process already running")
+    private func connectToServer() {
+        guard connection == nil || !isConnected else {
+            logger.debug("Already connected")
             return
         }
-
-        let process = Process()
-        let stdinPipe = Pipe()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-
-        process.standardInput = stdinPipe
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        // Find the euro-native-messaging binary
-        // Check common installation paths in order of preference
-        // Development paths are checked first for convenience during development
         
-        // Get project root from source file location (works during development)
-        // #file gives path like: /path/to/eurora/apps/macos/Shared/NativeMessagingBridge.swift
-        let sourceFileURL = URL(fileURLWithPath: #file)
-        let projectRoot = sourceFileURL
-            .deletingLastPathComponent()  // Remove NativeMessagingBridge.swift
-            .deletingLastPathComponent()  // Remove Shared
-            .deletingLastPathComponent()  // Remove macos
-            .deletingLastPathComponent()  // Remove apps
-            .path
+        logger.info("Connecting to local bridge server on port \(kBridgeConnectionPort)")
         
-        logger.info("Source file: \(#file)")
-        logger.info("Project root: \(projectRoot)")
+        // Create TCP connection to localhost
+        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: kBridgeConnectionPort)!)
+        let connection = NWConnection(to: endpoint, using: .tcp)
         
-        let possiblePaths = [
-            // Development paths - relative to project root (derived from source file)
-            "\(projectRoot)/target/debug/euro-native-messaging",
-            "\(projectRoot)/target/release/euro-native-messaging",
-            // Installed Eurora desktop app location
-            "/Applications/Eurora.app/Contents/MacOS/euro-native-messaging",
-            // Other fallback paths
-            "/usr/local/bin/euro-native-messaging",
-            "/opt/homebrew/bin/euro-native-messaging",
-            NSHomeDirectory() + "/.local/bin/euro-native-messaging"
-        ]
-
-        var foundPath: String?
-        for path in possiblePaths {
-            let exists = FileManager.default.isExecutableFile(atPath: path)
-            logger.debug("Checking path: \(path) - exists: \(exists)")
-            if exists && foundPath == nil {
-                foundPath = path
-            }
+        connection.stateUpdateHandler = { [weak self] state in
+            self?.handleConnectionStateChange(state)
         }
-
-        guard let executablePath = foundPath else {
-            logger.error("euro-native-messaging binary not found. Please ensure Eurora desktop app is installed.")
-            return
-        }
-
-        process.executableURL = URL(fileURLWithPath: executablePath)
-        logger.info("Using euro-native-messaging at: \(executablePath)")
         
-        // Find Safari's PID and pass it via environment variable
-        // euro-native-messaging uses parent_id() which would return this Swift app's PID
-        // We need to provide the actual Safari PID for proper browser tracking
-        var environment = ProcessInfo.processInfo.environment
-        if let safariPid = findSafariPid() {
-            environment["EURORA_BROWSER_PID"] = String(safariPid)
-            logger.info("Found Safari PID: \(safariPid)")
-        } else {
-            logger.warning("Could not find Safari PID")
-        }
-        process.environment = environment
-
-        // Set up stdout reading
-        stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            self?.handleStdoutData(handle)
-        }
-
-        // Set up stderr reading for logging
-        stderrPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            if !data.isEmpty, let str = String(data: data, encoding: .utf8) {
-                self?.logger.warning("Native host stderr: \(str)")
-            }
-        }
-
-        // Handle process termination
-        process.terminationHandler = { [weak self] proc in
-            self?.logger.info("Native messaging host terminated with code: \(proc.terminationStatus)")
-            self?.queue.asyncAfter(deadline: .now() + 2.0) {
-                self?.startProcess() // Auto-restart
-            }
-        }
-
-        do {
-            try process.run()
-            logger.info("Started euro-native-messaging process (PID: \(process.processIdentifier))")
-
-            self.process = process
-            self.stdinPipe = stdinPipe
-            self.stdoutPipe = stdoutPipe
-            self.stderrPipe = stderrPipe
-
-        } catch {
-            logger.error("Failed to start native messaging host: \(error.localizedDescription)")
-        }
+        self.connection = connection
+        connection.start(queue: queue)
     }
 
-    private func stopProcess() {
-        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
-        stderrPipe?.fileHandleForReading.readabilityHandler = nil
-
-        if process?.isRunning == true {
-            process?.terminate()
-        }
-
-        process = nil
-        stdinPipe = nil
-        stdoutPipe = nil
-        stderrPipe = nil
+    private func disconnect() {
+        isConnected = false
+        connection?.cancel()
+        connection = nil
+        readBuffer.removeAll()
 
         // Cancel all pending requests
         responseLock.lock()
         pendingCallbacks.removeAll()
         responseLock.unlock()
 
-        logger.info("Native messaging host stopped")
-    }
-
-    private var readBuffer = Data()
-
-    /// Find Safari's PID by looking for running Safari processes
-    private func findSafariPid() -> pid_t? {
-        // Use NSRunningApplication to find Safari
-        let workspace = NSWorkspace.shared
-        let runningApps = workspace.runningApplications
-        
-        // Look for Safari by bundle identifier
-        for app in runningApps {
-            if app.bundleIdentifier == "com.apple.Safari" {
-                return app.processIdentifier
-            }
-        }
-        
-        // Fallback: look for Safari Technology Preview
-        for app in runningApps {
-            if app.bundleIdentifier == "com.apple.SafariTechnologyPreview" {
-                return app.processIdentifier
-            }
-        }
-        
-        return nil
+        logger.info("Disconnected from local bridge server")
     }
     
-    private func handleStdoutData(_ handle: FileHandle) {
-        // Read data on the callback thread
-        let data = handle.availableData
+    private func handleConnectionStateChange(_ state: NWConnection.State) {
+        switch state {
+        case .ready:
+            logger.info("Connected to local bridge server")
+            isConnected = true
+            startReceiving()
+            
+        case .failed(let error):
+            logger.error("Connection failed: \(error.localizedDescription)")
+            isConnected = false
+            scheduleReconnect()
+            
+        case .cancelled:
+            logger.debug("Connection cancelled")
+            isConnected = false
+            
+        case .waiting(let error):
+            logger.warning("Connection waiting: \(error.localizedDescription)")
+            
+        default:
+            break
+        }
+    }
+    
+    private func scheduleReconnect() {
+        guard shouldReconnect else { return }
         
-        // Process on our queue for thread safety
-        queue.async { [weak self] in
+        logger.info("Scheduling reconnect in 2 seconds")
+        queue.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.disconnect()
+            self?.connectToServer()
+        }
+    }
+    
+    private func startReceiving() {
+        receiveNextMessage()
+    }
+    
+    private func receiveNextMessage() {
+        guard let connection = connection, isConnected else { return }
+        
+        // First read the 4-byte length prefix
+        connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
             guard let self = self else { return }
-            guard !data.isEmpty else { return }
             
-            self.readBuffer.append(data)
-            self.processReadBuffer()
-        }
-    }
-    
-    private func processReadBuffer() {
-        // Must be called on self.queue
-        
-        // Try to parse complete frames from buffer
-        while readBuffer.count >= 4 {
-            // Convert to Array for safe indexing (Data indices can be non-zero after removeFirst)
-            let headerBytes = [UInt8](readBuffer.prefix(4))
-            
-            // Read length prefix (4 bytes, little-endian)
-            let length = UInt32(headerBytes[0]) |
-                        (UInt32(headerBytes[1]) << 8) |
-                        (UInt32(headerBytes[2]) << 16) |
-                        (UInt32(headerBytes[3]) << 24)
-            
-            // Sanity check: max 8MB frame size
-            let maxFrameSize: UInt32 = 8 * 1024 * 1024
-            guard length > 0 && length <= maxFrameSize else {
-                logger.error("Invalid frame length: \(length), clearing buffer")
-                readBuffer.removeAll()
+            if let error = error {
+                self.logger.error("Receive error: \(error.localizedDescription)")
                 return
             }
             
-            let totalLength = 4 + Int(length)
-            guard readBuffer.count >= totalLength else {
-                // Not enough data yet
-                break
+            if isComplete {
+                self.logger.debug("Connection closed by server")
+                self.isConnected = false
+                self.scheduleReconnect()
+                return
             }
             
-            // Extract the JSON payload - copy to new Data to avoid index issues
-            let jsonBytes = [UInt8](readBuffer.prefix(totalLength).dropFirst(4))
-            let jsonData = Data(jsonBytes)
-            
-            // Remove processed data from buffer - reset to clean Data to fix indices
-            let remaining = [UInt8](readBuffer.dropFirst(totalLength))
-            readBuffer = Data(remaining)
-            
-            logger.debug("Received frame: \(jsonData.count) bytes")
-            
-            // Handle the received frame
-            handleReceivedFrame(jsonData)
-        }
-    }
-    
-    private func handleReceivedFrame(_ jsonData: Data) {
-        // Parse the frame to check if it's a Request or Response
-        guard let json = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any],
-              let kind = json["kind"] as? [String: Any] else {
-            logger.error("Failed to parse frame JSON")
-            return
-        }
-        
-        if let request = kind["Request"] as? [String: Any] {
-            // This is a Request from the native host - forward to JavaScript extension
-            handleIncomingRequest(request, fullFrame: json)
-        } else if kind["Response"] != nil || kind["Event"] != nil || kind["Error"] != nil {
-            // This is a Response/Event/Error - pass to pending callback
-            responseLock.lock()
-            let callback = pendingCallbacks.isEmpty ? nil : pendingCallbacks.removeFirst()
-            responseLock.unlock()
-            
-            if let callback = callback {
-                DispatchQueue.main.async {
-                    callback(jsonData)
-                }
-            } else {
-                if let jsonString = String(data: jsonData, encoding: .utf8) {
-                    logger.debug("Received response with no pending callback: \(jsonString.prefix(200))")
-                }
+            guard let lengthData = data, lengthData.count == 4 else {
+                self.logger.error("Invalid length prefix")
+                self.receiveNextMessage()
+                return
             }
-        } else {
-            logger.warning("Unknown frame kind: \(kind.keys)")
+            
+            // Parse length (little-endian)
+            let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
+            
+            guard length > 0 && length < 8 * 1024 * 1024 else {
+                self.logger.error("Invalid message length: \(length)")
+                self.receiveNextMessage()
+                return
+            }
+            
+            // Read the message body
+            self.receiveMessageBody(length: Int(length))
         }
     }
     
-    private func handleIncomingRequest(_ request: [String: Any], fullFrame: [String: Any]) {
-        // Handle requests from the native messaging host by forwarding to JavaScript
-        guard let action = request["action"] as? String,
-              let requestId = request["id"] else {
-            logger.error("Invalid request format")
-            return
+    private func receiveMessageBody(length: Int) {
+        guard let connection = connection else { return }
+        
+        connection.receive(minimumIncompleteLength: length, maximumLength: length) { [weak self] data, _, isComplete, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                self.logger.error("Receive body error: \(error.localizedDescription)")
+                return
+            }
+            
+            if isComplete && data == nil {
+                self.logger.debug("Connection closed")
+                self.isConnected = false
+                self.scheduleReconnect()
+                return
+            }
+            
+            guard let messageData = data, messageData.count == length else {
+                self.logger.error("Incomplete message body")
+                self.receiveNextMessage()
+                return
+            }
+            
+            // Handle the received message
+            self.handleReceivedMessage(messageData)
+            
+            // Continue receiving
+            self.receiveNextMessage()
         }
-        
-        // Convert requestId to String for dictionary key
-        let requestIdString = "\(requestId)"
-        
-        logger.debug("Handling request from native host: action=\(action), id=\(requestIdString)")
-        
-        // Store the pending request so we can match the response later
-        pendingNativeRequestsLock.lock()
-        pendingNativeRequests[requestIdString] = request
-        pendingNativeRequestsLock.unlock()
-        
-        // Forward the request to the JavaScript extension via SFSafariApplication.dispatchMessage
-        dispatchToExtension(frame: fullFrame, action: action, requestId: requestIdString)
     }
     
-    /// Dispatch a message to the Safari extension's JavaScript
-    private func dispatchToExtension(frame: [String: Any], action: String, requestId: String) {
-        // Convert the frame to a format suitable for dispatch
-        // The message will be received by port.onMessage.addListener in JavaScript
+    private func handleReceivedMessage(_ data: Data) {
+        logger.debug("Received message: \(data.count) bytes")
         
+        // Try to extract response ID
         do {
-            let jsonData = try JSONSerialization.data(withJSONObject: frame, options: [])
-            guard let jsonString = String(data: jsonData, encoding: .utf8) else {
-                logger.error("Failed to convert frame to JSON string")
-                return
-            }
-            
-            // SFSafariApplication.dispatchMessage sends to the extension's background script
-            // The userInfo dictionary is passed as the message content
-            let userInfo: [String: Any] = [
-                "frame": frame,
-                "frameJson": jsonString,
-                "action": action,
-                "requestId": requestId
-            ]
-            
-            logger.info("Dispatching message to extension: action=\(action), requestId=\(requestId)")
-            
-            SFSafariApplication.dispatchMessage(
-                withName: "NativeRequest",
-                toExtensionWithIdentifier: extensionBundleIdentifier,
-                userInfo: userInfo
-            ) { [weak self] error in
-                if let error = error {
-                    self?.logger.error("Failed to dispatch message to extension: \(error.localizedDescription)")
-                    // Send error response back to native host
-                    self?.sendErrorResponseToNativeHost(requestId: requestId, action: action, error: error.localizedDescription)
-                } else {
-                    self?.logger.debug("Successfully dispatched message to extension")
+            if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+               let kind = json["kind"] as? [String: Any] {
+                
+                var responseId: String?
+                
+                if let response = kind["Response"] as? [String: Any],
+                   let id = response["id"] {
+                    responseId = "\(id)"
+                } else if let error = kind["Error"] as? [String: Any],
+                          let id = error["id"] {
+                    responseId = "\(id)"
+                }
+                
+                if let responseId = responseId {
+                    responseLock.lock()
+                    let callback = pendingCallbacks.removeValue(forKey: responseId)
+                    responseLock.unlock()
+                    
+                    if let callback = callback {
+                        DispatchQueue.main.async {
+                            callback(data)
+                        }
+                        return
+                    }
                 }
             }
         } catch {
-            logger.error("Failed to serialize frame for dispatch: \(error.localizedDescription)")
-            sendErrorResponseToNativeHost(requestId: requestId, action: action, error: error.localizedDescription)
+            logger.error("Failed to parse received message: \(error.localizedDescription)")
         }
+        
+        // If no matching callback, just log it
+        logger.debug("Received message with no pending callback")
     }
     
-    /// Send an error response back to the native host when extension dispatch fails
-    private func sendErrorResponseToNativeHost(requestId: String, action: String, error: String) {
-        // Remove from pending requests
-        pendingNativeRequestsLock.lock()
-        pendingNativeRequests.removeValue(forKey: requestId)
-        pendingNativeRequestsLock.unlock()
-        
-        // Parse requestId back to appropriate type (try Int first, then use String)
-        let idValue: Any = Int(requestId) ?? requestId
-        
-        let response: [String: Any] = [
-            "kind": [
-                "Response": [
-                    "id": idValue,
-                    "action": action,
-                    "payload": "{\"kind\":\"Error\",\"data\":\"\(error)\"}"
-                ]
-            ]
-        ]
-        
-        queue.async { [weak self] in
-            self?.sendRawFrame(response)
-        }
+    private func frameMessage(_ data: Data) -> Data {
+        var length = UInt32(data.count).littleEndian
+        var framedData = Data(bytes: &length, count: 4)
+        framedData.append(data)
+        return framedData
     }
     
-    /// Called by SafariWebExtensionHandler when JavaScript sends a response
-    /// Returns true if this was a response to a pending native request
+    /// Called by SafariWebExtensionHandler when JavaScript sends a response to a server request
+    /// Returns true if this was handled as a response to a pending server request
     func handleResponseFromExtension(_ response: [String: Any]) -> Bool {
+        // Forward the response to the local bridge server
+        // which will forward it to the container app's gRPC client
+        
         guard let kind = response["kind"] as? [String: Any],
-              let responseData = kind["Response"] as? [String: Any],
-              let responseId = responseData["id"] else {
+              kind["Response"] != nil else {
             return false
         }
         
-        let responseIdString = "\(responseId)"
-        
-        // Check if this is a response to a pending native request
-        pendingNativeRequestsLock.lock()
-        let pendingRequest = pendingNativeRequests.removeValue(forKey: responseIdString)
-        pendingNativeRequestsLock.unlock()
-        
-        if pendingRequest != nil {
-            // This is a response to a request from euro-native-messaging
-            // Forward it back to the native host
-            logger.info("Forwarding JavaScript response to native host: id=\(responseIdString)")
-            queue.async { [weak self] in
-                self?.sendRawFrame(response)
+        // Send it to the server (fire-and-forget, no completion needed)
+        queue.async { [weak self] in
+            guard let self = self, let connection = self.connection, self.isConnected else {
+                self?.logger.error("Cannot forward response - not connected")
+                return
             }
-            return true
+            
+            do {
+                let jsonData = try JSONSerialization.data(withJSONObject: response, options: [])
+                let framedData = self.frameMessage(jsonData)
+                
+                connection.send(content: framedData, completion: .contentProcessed { [weak self] error in
+                    if let error = error {
+                        self?.logger.error("Failed to forward response: \(error.localizedDescription)")
+                    } else {
+                        self?.logger.debug("Forwarded extension response to local bridge server")
+                    }
+                })
+            } catch {
+                self.logger.error("Failed to serialize response: \(error.localizedDescription)")
+            }
         }
         
-        return false
-    }
-    
-    /// Check if a request ID is pending (waiting for JavaScript response)
-    func isPendingNativeRequest(requestId: String) -> Bool {
-        pendingNativeRequestsLock.lock()
-        let isPending = pendingNativeRequests[requestId] != nil
-        pendingNativeRequestsLock.unlock()
-        return isPending
-    }
-    
-    private func sendRawFrame(_ frame: [String: Any]) {
-        guard let stdinPipe = self.stdinPipe, self.process?.isRunning == true else {
-            logger.error("Cannot send frame - process not running")
-            return
-        }
-        
-        do {
-            let jsonData = try JSONSerialization.data(withJSONObject: frame, options: [])
-            
-            // Write length prefix (4 bytes, little-endian)
-            var length = UInt32(jsonData.count).littleEndian
-            let lengthData = Data(bytes: &length, count: 4)
-            
-            let fileHandle = stdinPipe.fileHandleForWriting
-            fileHandle.write(lengthData)
-            fileHandle.write(jsonData)
-            
-            logger.debug("Sent raw frame: \(jsonData.count) bytes")
-        } catch {
-            logger.error("Failed to send raw frame: \(error.localizedDescription)")
-        }
+        return true
     }
 }
 
@@ -568,13 +411,13 @@ enum BridgeError: Error, LocalizedError {
         case .bridgeDeallocated:
             return "Native messaging bridge was deallocated"
         case .processNotRunning:
-            return "Native messaging host is not running"
+            return "Container app is not running"
         case .processStopped:
-            return "Native messaging host was stopped"
+            return "Container app connection was stopped"
         case .timeout:
             return "Request timed out"
         case .invalidResponse:
-            return "Invalid response from native messaging host"
+            return "Invalid response from container app"
         }
     }
 }

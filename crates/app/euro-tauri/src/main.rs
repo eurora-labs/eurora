@@ -32,7 +32,7 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-use tauri_plugin_log::{Target, TargetKind, fern::colors::ColoredLevelConfig};
+use tauri_plugin_log::fern::colors::ColoredLevelConfig;
 use taurpc::Router;
 use tokio::sync::Mutex;
 
@@ -329,7 +329,7 @@ fn main() {
                                 is_euro_crate || is_common_crate || is_webview || is_warning_or_above
                             })
                             .level(log::LevelFilter::Trace)
-                            .target(Target::new(TargetKind::Stdout))
+                            // .target(Target::new(TargetKind::Stdout))
                             .with_colors(ColoredLevelConfig::default())
                             .build()
                 )
