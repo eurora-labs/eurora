@@ -36,7 +36,7 @@ jobs:
               uses: ./.github/actions/init-env-node
 
             - id: get_playwright_version
-              uses: eviden-actions/get-playwright-version@5f9f0c1c02aa67d01d1bd3f46108ad3c1424190d # v1
+              uses: eviden-actions/get-playwright-version@4ab3bd9361d018d7931275b5106f2290fa54cfb6 # v1
             - name: Cache playwright binaries
               uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
               id: playwright-cache
