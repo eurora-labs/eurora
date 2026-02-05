@@ -44,8 +44,24 @@ function connect() {
 }
 
 async function onNativePortMessage(message: unknown, sender: browser.Runtime.Port) {
-	// Assert type here
-	const frame = message as Frame;
+	// Handle Safari-specific dispatch message format
+	// SFSafariApplication.dispatchMessage sends: { name: string, userInfo: { frame, frameJson, action, requestId } }
+	const safariMessage = message as {
+		name?: string;
+		userInfo?: { frame?: Frame; frameJson?: string; action?: string; requestId?: string };
+	};
+
+	let frame: Frame;
+
+	if (safariMessage.name === 'NativeRequest' && safariMessage.userInfo?.frame) {
+		// Safari dispatch message format - extract the frame from userInfo
+		console.log('Received Safari dispatch message:', safariMessage.name);
+		frame = safariMessage.userInfo.frame;
+	} else {
+		// Standard native messaging format (Chrome/Firefox or Safari sendNativeMessage)
+		frame = message as Frame;
+	}
+
 	const kind = frame.kind;
 	if (!kind) {
 		console.error('Invalid frame kind');
@@ -53,7 +69,20 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 	}
 
 	if ('Request' in kind) {
-		sender.postMessage(await onRequestFrame(kind.Request));
+		const response = await onRequestFrame(kind.Request);
+		// For Safari dispatch messages, we need to send the response back via sendNativeMessage
+		// because the port.postMessage might not reach the container app correctly
+		if (isSafari() && safariMessage.name === 'NativeRequest') {
+			try {
+				await browser.runtime.sendNativeMessage('com.eurora.app', response);
+			} catch (error) {
+				console.error('Failed to send response via sendNativeMessage:', error);
+				// Fallback to port.postMessage
+				sender.postMessage(response);
+			}
+		} else {
+			sender.postMessage(response);
+		}
 	} else if ('Response' in kind) {
 		console.warn('Unexpected response frame: ', kind.Response);
 	} else if ('Event' in kind) {

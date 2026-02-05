@@ -11,13 +11,16 @@
 import Foundation
 import os.log
 import AppKit
-import CoreGraphics
+import SafariServices
 
 /// Singleton bridge that manages communication with euro-native-messaging
 @available(macOS 11.0, *)
 class NativeMessagingBridge {
 
     static let shared = NativeMessagingBridge()
+    
+    /// Bundle identifier for the Safari extension - must match the extension's bundle ID
+    private let extensionBundleIdentifier = "com.eurora.macos.Extension"
 
     private var process: Process?
     private var stdinPipe: Pipe?
@@ -27,32 +30,15 @@ class NativeMessagingBridge {
     private let queue = DispatchQueue(label: "com.eurora.native-messaging-bridge", qos: .userInitiated)
     private let responseLock = NSLock()
     private var pendingCallbacks: [(Data) -> Void] = []
+    
+    /// Pending requests from euro-native-messaging that are waiting for JavaScript responses
+    /// Key: request ID (as String), Value: the original request for tracking
+    private var pendingNativeRequests: [String: [String: Any]] = [:]
+    private let pendingNativeRequestsLock = NSLock()
 
     private let logger = Logger(subsystem: "com.eurora.macos", category: "NativeMessagingBridge")
-
-    // Store the current tab metadata from extension messages
-    private var currentTabURL: String?
-    private var currentTabTitle: String?
-    private var currentTabIconBase64: String?
-    private let metadataLock = NSLock()
     
     private init() {}
-    
-    /// Update the current tab metadata (called when extension sends a message with URL/icon info)
-    func updateCurrentTab(url: String?, title: String?, iconBase64: String?) {
-        metadataLock.lock()
-        if let url = url {
-            currentTabURL = url
-        }
-        if let title = title {
-            currentTabTitle = title
-        }
-        if let iconBase64 = iconBase64 {
-            currentTabIconBase64 = iconBase64
-        }
-        metadataLock.unlock()
-        logger.debug("Updated current tab - URL: \(url ?? "nil"), Title: \(title ?? "nil"), hasIcon: \(iconBase64 != nil)")
-    }
 
     /// Start the native messaging host process
     func start() {
@@ -396,7 +382,7 @@ class NativeMessagingBridge {
         }
         
         if let request = kind["Request"] as? [String: Any] {
-            // This is a Request from the native host - handle it
+            // This is a Request from the native host - forward to JavaScript extension
             handleIncomingRequest(request, fullFrame: json)
         } else if kind["Response"] != nil || kind["Event"] != nil || kind["Error"] != nil {
             // This is a Response/Event/Error - pass to pending callback
@@ -419,251 +405,129 @@ class NativeMessagingBridge {
     }
     
     private func handleIncomingRequest(_ request: [String: Any], fullFrame: [String: Any]) {
-        // Handle requests from the native messaging host
+        // Handle requests from the native messaging host by forwarding to JavaScript
         guard let action = request["action"] as? String,
               let requestId = request["id"] else {
             logger.error("Invalid request format")
             return
         }
         
-        logger.debug("Handling request: action=\(action), id=\(requestId as! NSObject)")
+        // Convert requestId to String for dictionary key
+        let requestIdString = "\(requestId)"
         
-        switch action {
-        case "GET_METADATA":
-            handleGetMetadata(requestId: requestId, action: action)
-        default:
-            // Send empty response for unknown actions
-            let response: [String: Any] = [
-                "kind": [
-                    "Response": [
-                        "id": requestId,
-                        "action": action,
-                        "payload": NSNull()
-                    ]
-                ]
-            ]
-            sendRawFrame(response)
-        }
+        logger.debug("Handling request from native host: action=\(action), id=\(requestIdString)")
+        
+        // Store the pending request so we can match the response later
+        pendingNativeRequestsLock.lock()
+        pendingNativeRequests[requestIdString] = request
+        pendingNativeRequestsLock.unlock()
+        
+        // Forward the request to the JavaScript extension via SFSafariApplication.dispatchMessage
+        dispatchToExtension(frame: fullFrame, action: action, requestId: requestIdString)
     }
     
-    private func handleGetMetadata(requestId: Any, action: String) {
-        // Get the current tab metadata
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
+    /// Dispatch a message to the Safari extension's JavaScript
+    private func dispatchToExtension(frame: [String: Any], action: String, requestId: String) {
+        // Convert the frame to a format suitable for dispatch
+        // The message will be received by port.onMessage.addListener in JavaScript
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: frame, options: [])
+            guard let jsonString = String(data: jsonData, encoding: .utf8) else {
+                logger.error("Failed to convert frame to JSON string")
+                return
+            }
             
-            // Get URL and icon from stored metadata (set by extension messages)
-            self.metadataLock.lock()
-            let url = self.currentTabURL
-            let storedIcon = self.currentTabIconBase64
-            self.metadataLock.unlock()
+            // SFSafariApplication.dispatchMessage sends to the extension's background script
+            // The userInfo dictionary is passed as the message content
+            let userInfo: [String: Any] = [
+                "frame": frame,
+                "frameJson": jsonString,
+                "action": action,
+                "requestId": requestId
+            ]
             
-            self.logger.info("GET_METADATA: stored URL=\(url ?? "nil"), hasStoredIcon=\(storedIcon != nil)")
+            logger.info("Dispatching message to extension: action=\(action), requestId=\(requestId)")
             
-            // Priority order:
-            // 1. Stored icon from extension (website favicon)
-            // 2. Fetched favicon from URL (using Google's service)
-            // 3. Safari app icon (last resort fallback)
-            var finalIcon = storedIcon
-            
-            if finalIcon == nil {
-                self.logger.debug("No stored icon, attempting to fetch favicon...")
-                
-                // Try to fetch favicon from URL
-                if let url = url {
-                    finalIcon = self.fetchFavicon(for: url)
-                    if finalIcon != nil {
-                        self.logger.info("Successfully fetched favicon for URL")
-                    } else {
-                        self.logger.warning("Failed to fetch favicon for URL: \(url)")
-                    }
+            SFSafariApplication.dispatchMessage(
+                withName: "NativeRequest",
+                toExtensionWithIdentifier: extensionBundleIdentifier,
+                userInfo: userInfo
+            ) { [weak self] error in
+                if let error = error {
+                    self?.logger.error("Failed to dispatch message to extension: \(error.localizedDescription)")
+                    // Send error response back to native host
+                    self?.sendErrorResponseToNativeHost(requestId: requestId, action: action, error: error.localizedDescription)
                 } else {
-                    self.logger.warning("No URL available to fetch favicon")
+                    self?.logger.debug("Successfully dispatched message to extension")
                 }
-                
-                // Last resort: Safari app icon
-                if finalIcon == nil {
-                    self.logger.info("Using Safari app icon as fallback")
-                    finalIcon = self.getSafariIconBase64()
-                }
-            } else {
-                self.logger.debug("Using stored icon from extension")
             }
-            
-            // Build the metadata response
-            let metadata: [String: Any] = [
-                "kind": "NativeMetadata",
-                "data": [
-                    "url": url as Any,
-                    "icon_base64": finalIcon as Any
+        } catch {
+            logger.error("Failed to serialize frame for dispatch: \(error.localizedDescription)")
+            sendErrorResponseToNativeHost(requestId: requestId, action: action, error: error.localizedDescription)
+        }
+    }
+    
+    /// Send an error response back to the native host when extension dispatch fails
+    private func sendErrorResponseToNativeHost(requestId: String, action: String, error: String) {
+        // Remove from pending requests
+        pendingNativeRequestsLock.lock()
+        pendingNativeRequests.removeValue(forKey: requestId)
+        pendingNativeRequestsLock.unlock()
+        
+        // Parse requestId back to appropriate type (try Int first, then use String)
+        let idValue: Any = Int(requestId) ?? requestId
+        
+        let response: [String: Any] = [
+            "kind": [
+                "Response": [
+                    "id": idValue,
+                    "action": action,
+                    "payload": "{\"kind\":\"Error\",\"data\":\"\(error)\"}"
                 ]
             ]
-            
-            let payloadData = try? JSONSerialization.data(withJSONObject: metadata, options: [])
-            let payloadString = payloadData.flatMap { String(data: $0, encoding: .utf8) }
-            
-            let response: [String: Any] = [
-                "kind": [
-                    "Response": [
-                        "id": requestId,
-                        "action": action,
-                        "payload": payloadString as Any
-                    ]
-                ]
-            ]
-            
-            self.queue.async {
-                self.sendRawFrame(response)
-            }
-        }
-    }
-    
-    /// Get Safari's application icon using native macOS APIs
-    private func getSafariIconBase64() -> String? {
-        // Find Safari's bundle path
-        let workspace = NSWorkspace.shared
-        
-        // Try to find Safari by bundle identifier
-        guard let safariURL = workspace.urlForApplication(withBundleIdentifier: "com.apple.Safari") else {
-            logger.warning("Could not find Safari bundle URL")
-            return nil
-        }
-        
-        // Get the icon for Safari's bundle
-        let icon = workspace.icon(forFile: safariURL.path)
-        
-        // Convert NSImage to PNG data
-        guard let pngData = nsImageToPNGData(icon, size: 64) else {
-            logger.warning("Could not convert Safari icon to PNG")
-            return nil
-        }
-        
-        let base64 = pngData.base64EncodedString()
-        return "data:image/png;base64,\(base64)"
-    }
-    
-    /// Convert NSImage to PNG data at specified size
-    private func nsImageToPNGData(_ image: NSImage, size: Int) -> Data? {
-        let targetSize = NSSize(width: size, height: size)
-        
-        // Create a bitmap representation at the target size
-        guard let bitmapRep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: size,
-            pixelsHigh: size,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .calibratedRGB,
-            bytesPerRow: 0,
-            bitsPerPixel: 0
-        ) else {
-            return nil
-        }
-        
-        bitmapRep.size = targetSize
-        
-        // Draw the image into the bitmap
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmapRep)
-        
-        image.draw(
-            in: NSRect(origin: .zero, size: targetSize),
-            from: .zero,
-            operation: .copy,
-            fraction: 1.0
-        )
-        
-        NSGraphicsContext.restoreGraphicsState()
-        
-        // Convert to PNG data
-        return bitmapRep.representation(using: .png, properties: [:])
-    }
-    
-    private func fetchFavicon(for urlString: String) -> String? {
-        guard let url = URL(string: urlString),
-              let host = url.host else {
-            logger.warning("fetchFavicon: Invalid URL or no host: \(urlString)")
-            return nil
-        }
-        
-        logger.debug("fetchFavicon: Attempting to fetch favicon for host: \(host)")
-        
-        // Try Google's favicon service first (most reliable)
-        // Then try common favicon locations
-        let faviconURLs = [
-            "https://www.google.com/s2/favicons?domain=\(host)&sz=64",
-            "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=\(urlString)&size=64",
-            "https://\(host)/favicon.ico",
-            "https://\(host)/favicon.png",
-            "https://\(host)/apple-touch-icon.png"
         ]
         
-        for faviconURLString in faviconURLs {
-            guard let faviconURL = URL(string: faviconURLString) else {
-                continue
-            }
-            
-            logger.debug("fetchFavicon: Trying \(faviconURLString)")
-            
-            do {
-                // Use URLSession with timeout for better reliability
-                let semaphore = DispatchSemaphore(value: 0)
-                var resultData: Data?
-                var resultError: Error?
-                
-                let task = URLSession.shared.dataTask(with: faviconURL) { data, response, error in
-                    if let httpResponse = response as? HTTPURLResponse {
-                        self.logger.debug("fetchFavicon: Got HTTP \(httpResponse.statusCode) from \(faviconURLString)")
-                    }
-                    resultData = data
-                    resultError = error
-                    semaphore.signal()
-                }
-                task.resume()
-                
-                // Wait up to 5 seconds
-                let waitResult = semaphore.wait(timeout: .now() + 5.0)
-                if waitResult == .timedOut {
-                    task.cancel()
-                    logger.warning("fetchFavicon: Timeout fetching \(faviconURLString)")
-                    continue
-                }
-                
-                if let error = resultError {
-                    logger.debug("fetchFavicon: Error fetching \(faviconURLString): \(error.localizedDescription)")
-                    continue
-                }
-                
-                guard let data = resultData, !data.isEmpty else {
-                    logger.debug("fetchFavicon: Empty data from \(faviconURLString)")
-                    continue
-                }
-                
-                // Google's service returns 16x16 default icon which is ~726 bytes
-                // Real favicons are typically larger
-                if data.count > 100 {
-                    // Determine MIME type
-                    let mimeType: String
-                    if faviconURLString.contains("google.com") || faviconURLString.contains("gstatic.com") || faviconURLString.hasSuffix(".png") {
-                        mimeType = "image/png"
-                    } else {
-                        mimeType = "image/x-icon"
-                    }
-                    let base64 = data.base64EncodedString()
-                    logger.info("fetchFavicon: Success from \(faviconURLString) (\(data.count) bytes)")
-                    return "data:\(mimeType);base64,\(base64)"
-                } else {
-                    logger.debug("fetchFavicon: Data too small from \(faviconURLString) (\(data.count) bytes)")
-                }
-            } catch {
-                logger.debug("fetchFavicon: Exception for \(faviconURLString): \(error.localizedDescription)")
-                continue
-            }
+        queue.async { [weak self] in
+            self?.sendRawFrame(response)
+        }
+    }
+    
+    /// Called by SafariWebExtensionHandler when JavaScript sends a response
+    /// Returns true if this was a response to a pending native request
+    func handleResponseFromExtension(_ response: [String: Any]) -> Bool {
+        guard let kind = response["kind"] as? [String: Any],
+              let responseData = kind["Response"] as? [String: Any],
+              let responseId = responseData["id"] else {
+            return false
         }
         
-        logger.warning("fetchFavicon: All sources failed for host: \(host)")
-        return nil
+        let responseIdString = "\(responseId)"
+        
+        // Check if this is a response to a pending native request
+        pendingNativeRequestsLock.lock()
+        let pendingRequest = pendingNativeRequests.removeValue(forKey: responseIdString)
+        pendingNativeRequestsLock.unlock()
+        
+        if pendingRequest != nil {
+            // This is a response to a request from euro-native-messaging
+            // Forward it back to the native host
+            logger.info("Forwarding JavaScript response to native host: id=\(responseIdString)")
+            queue.async { [weak self] in
+                self?.sendRawFrame(response)
+            }
+            return true
+        }
+        
+        return false
+    }
+    
+    /// Check if a request ID is pending (waiting for JavaScript response)
+    func isPendingNativeRequest(requestId: String) -> Bool {
+        pendingNativeRequestsLock.lock()
+        let isPending = pendingNativeRequests[requestId] != nil
+        pendingNativeRequestsLock.unlock()
+        return isPending
     }
     
     private func sendRawFrame(_ frame: [String: Any]) {
