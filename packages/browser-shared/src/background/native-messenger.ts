@@ -2,6 +2,7 @@ import { onUpdated, onActivated } from './focus-tracker.js';
 import { handleMessage } from './messaging.js';
 import { getCurrentTabIcon } from './tabs.js';
 import browser from 'webextension-polyfill';
+import { isSafari } from './util.js';
 import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings.js';
 
 const host = 'com.eurora.app';
@@ -69,6 +70,9 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 	switch (frame.action) {
 		case 'GET_METADATA':
+			if (isSafari()) {
+				return await onActionMetadataFromContentScript(frame);
+			}
 			return await onActionMetadata(frame);
 		default: {
 			const response = await handleMessage(frame.action);
@@ -107,4 +111,57 @@ async function onActionMetadata(frame: RequestFrame): Promise<Frame> {
 			Response: response,
 		},
 	} as Frame;
+}
+
+async function onActionMetadataFromContentScript(frame: RequestFrame): Promise<Frame> {
+	const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+
+	if (!activeTab.id) {
+		const response: ResponseFrame = {
+			id: frame.id,
+			action: frame.action,
+			payload: JSON.stringify({
+				kind: 'Error',
+				data: 'No active tab found',
+			}),
+		};
+		return {
+			kind: {
+				Response: response,
+			},
+		} as Frame;
+	}
+
+	try {
+		const contentResponse = await browser.tabs.sendMessage(activeTab.id, {
+			type: 'GET_METADATA',
+		});
+
+		const response: ResponseFrame = {
+			id: frame.id,
+			action: frame.action,
+			payload: JSON.stringify(contentResponse),
+		};
+
+		return {
+			kind: {
+				Response: response,
+			},
+		} as Frame;
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		const response: ResponseFrame = {
+			id: frame.id,
+			action: frame.action,
+			payload: JSON.stringify({
+				kind: 'Error',
+				data: `Failed to get metadata from content script: ${errorMessage}`,
+			}),
+		};
+		return {
+			kind: {
+				Response: response,
+			},
+		} as Frame;
+	}
 }
