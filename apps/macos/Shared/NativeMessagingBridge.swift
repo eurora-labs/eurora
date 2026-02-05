@@ -5,13 +5,10 @@
 //  Bridge between Safari extension and euro-native-messaging binary.
 //  Manages the subprocess lifecycle and handles the native messaging protocol.
 //
-//  This file is shared between the container app and the Safari extension.
-//
 
 import Foundation
 import os.log
 import AppKit
-import SafariServices
 
 /// Singleton bridge that manages communication with euro-native-messaging
 @available(macOS 11.0, *)
@@ -27,10 +24,6 @@ class NativeMessagingBridge {
     private let queue = DispatchQueue(label: "com.eurora.native-messaging-bridge", qos: .userInitiated)
     private let responseLock = NSLock()
     private var pendingCallbacks: [(Data) -> Void] = []
-    
-    // Queue of pending requests from euro-native-messaging waiting to be polled by JS
-    private let pendingRequestsLock = NSLock()
-    private var pendingNativeRequests: [[String: Any]] = []
 
     private let logger = Logger(subsystem: "com.eurora.macos", category: "NativeMessagingBridge")
 
@@ -159,9 +152,8 @@ class NativeMessagingBridge {
     // MARK: - Private Methods
 
     private func startProcess() {
-        logger.info(">>> startProcess called")
         guard process == nil || process?.isRunning == false else {
-            logger.info(">>> Process already running")
+            logger.debug("Process already running")
             return
         }
 
@@ -255,7 +247,7 @@ class NativeMessagingBridge {
 
         do {
             try process.run()
-            logger.info(">>> Started euro-native-messaging process (PID: \(process.processIdentifier))")
+            logger.info("Started euro-native-messaging process (PID: \(process.processIdentifier))")
 
             self.process = process
             self.stdinPipe = stdinPipe
@@ -263,7 +255,7 @@ class NativeMessagingBridge {
             self.stderrPipe = stderrPipe
 
         } catch {
-            logger.error(">>> Failed to start native messaging host: \(error.localizedDescription)")
+            logger.error("Failed to start native messaging host: \(error.localizedDescription)")
         }
     }
 
@@ -371,95 +363,20 @@ class NativeMessagingBridge {
     }
     
     private func handleReceivedFrame(_ jsonData: Data) {
-        // Parse the frame to check if it's a Request or Response
-        guard let json = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any],
-              let kind = json["kind"] as? [String: Any] else {
-            logger.error("Failed to parse frame JSON")
-            return
-        }
+        // All frames from euro-native-messaging are passed to pending callbacks
+        // This handles both responses to our requests and unsolicited requests from the host
+        responseLock.lock()
+        let callback = pendingCallbacks.isEmpty ? nil : pendingCallbacks.removeFirst()
+        responseLock.unlock()
         
-        if let request = kind["Request"] as? [String: Any] {
-            // This is a Request from the native host - handle it
-            handleIncomingRequest(request, fullFrame: json)
-        } else if kind["Response"] != nil || kind["Event"] != nil || kind["Error"] != nil {
-            // This is a Response/Event/Error - pass to pending callback
-            responseLock.lock()
-            let callback = pendingCallbacks.isEmpty ? nil : pendingCallbacks.removeFirst()
-            responseLock.unlock()
-            
-            if let callback = callback {
-                DispatchQueue.main.async {
-                    callback(jsonData)
-                }
-            } else {
-                if let jsonString = String(data: jsonData, encoding: .utf8) {
-                    logger.debug("Received response with no pending callback: \(jsonString.prefix(200))")
-                }
+        if let callback = callback {
+            DispatchQueue.main.async {
+                callback(jsonData)
             }
         } else {
-            logger.warning("Unknown frame kind: \(kind.keys)")
-        }
-    }
-    
-    private func handleIncomingRequest(_ request: [String: Any], fullFrame: [String: Any]) {
-        // Handle requests from the native messaging host
-        // Queue the request for JavaScript to poll (Safari doesn't support push to JS)
-        guard let action = request["action"] as? String,
-              let requestId = request["id"] else {
-            logger.error("Invalid request format")
-            return
-        }
-        
-        logger.debug("Queueing native request for JS polling: action=\(action), id=\(requestId as! NSObject)")
-        
-        // Add to pending requests queue - JS will poll for these
-        self.pendingRequestsLock.lock()
-        self.pendingNativeRequests.append(fullFrame)
-        self.pendingRequestsLock.unlock()
-        
-        logger.debug("Request queued. Pending count: \(self.pendingNativeRequests.count)")
-    }
-    
-    /// Get pending requests from euro-native-messaging (called by JS via poll)
-    func getPendingRequests() -> [[String: Any]] {
-        pendingRequestsLock.lock()
-        let requests = pendingNativeRequests
-        pendingNativeRequests.removeAll()
-        pendingRequestsLock.unlock()
-        
-        if !requests.isEmpty {
-            logger.debug("Returning \(requests.count) pending requests to JS")
-        }
-        return requests
-    }
-    
-    /// Send a response from Safari back to euro-native-messaging
-    func sendNativeResponse(_ response: [String: Any]) {
-        queue.async { [weak self] in
-            self?.sendRawFrame(response)
-        }
-    }
-    
-    private func sendRawFrame(_ frame: [String: Any]) {
-        guard let stdinPipe = self.stdinPipe, self.process?.isRunning == true else {
-            logger.error("Cannot send frame - process not running")
-            return
-        }
-        
-        do {
-            let jsonData = try JSONSerialization.data(withJSONObject: frame, options: [])
-            
-            // Write length prefix (4 bytes, little-endian)
-            var length = UInt32(jsonData.count).littleEndian
-            let lengthData = Data(bytes: &length, count: 4)
-            
-            let fileHandle = stdinPipe.fileHandleForWriting
-            fileHandle.write(lengthData)
-            fileHandle.write(jsonData)
-            
-            logger.debug("Sent raw frame: \(jsonData.count) bytes")
-        } catch {
-            logger.error("Failed to send raw frame: \(error.localizedDescription)")
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                logger.debug("Received frame with no pending callback: \(jsonString.prefix(200))")
+            }
         }
     }
 }
