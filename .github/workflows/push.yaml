@@ -27,7 +27,7 @@ jobs:
             node: ${{ steps.filter.outputs.node }}
             rust: ${{ steps.filter.outputs.rust }}
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
 
@@ -70,7 +70,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'false' &&  needs.changes.outputs.docs == 'true'}}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -81,7 +81,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -92,7 +92,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -109,7 +109,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -130,7 +130,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
                   lfs: true
@@ -159,7 +159,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
                   lfs: true
@@ -199,7 +199,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
                   lfs: true
@@ -222,7 +222,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
                   lfs: true

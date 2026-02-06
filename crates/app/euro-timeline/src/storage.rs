@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 
 use chrono::Utc;
-use tracing::debug;
+use log::debug;
 
 use crate::{Activity, config::StorageConfig};
 

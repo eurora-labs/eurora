@@ -1,6 +1,4 @@
-use std::{env, fs::File, time::Duration};
-use tokio::io::{self};
-
+// use std::fs::File;
 use anyhow::Result;
 use euro_native_messaging::PORT;
 use euro_native_messaging::{
@@ -8,16 +6,18 @@ use euro_native_messaging::{
     server::{BrowserBridgeClient, Frame, FrameKind, RegisterFrame},
     utils::{generate_typescript_definitions, read_framed, write_framed},
 };
+use std::{env, time::Duration};
+use tokio::io::{self};
 use tokio::sync::{broadcast, mpsc};
 use tonic::transport::Channel;
 use tracing::{error, info, warn};
 // Need this import to succeed in prod builds
 #[allow(unused_imports)]
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::{
-    filter::{EnvFilter, LevelFilter},
-    fmt,
-};
+// use tracing_subscriber::{
+//     filter::{EnvFilter, LevelFilter},
+//     fmt,
+// };
 
 /// Retry interval for connecting to the server
 const RETRY_INTERVAL_SECS: u64 = 2;
@@ -52,15 +52,15 @@ async fn main() -> Result<()> {
     // This records the PID of the browser process that started this native messaging host.
     parent_pid::capture_parent_pid();
 
-    let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
-        .parse_lossy("euro_=trace,hyper=off,tokio=off"); // keep yours, silence deps
+    // let filter = EnvFilter::builder()
+    //     .with_default_directive(LevelFilter::WARN.into()) // anything not listed → WARN
+    //     .parse_lossy("euro_=trace,hyper=off,tokio=off"); // keep yours, silence deps
 
-    // Write only to file
-    fmt()
-        .with_env_filter(filter.clone())
-        .with_writer(File::create("euro-native-messaging.log")?)
-        .init();
+    // // Write only to file
+    // fmt()
+    //     .with_env_filter(filter.clone())
+    //     .with_writer(File::create("euro-native-messaging.log")?)
+    //     .init();
 
     // Check for command line arguments
     let args: Vec<String> = env::args().collect();
