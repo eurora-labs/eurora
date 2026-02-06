@@ -5,7 +5,15 @@
 //  gRPC client for connecting to the euro-activity browser bridge service.
 //  Implements bidirectional streaming for Frame messages using grpc-swift 2.x.
 //
-//  This file belongs to the container app, NOT the extension.
+//  This is the Swift equivalent of crates/app/euro-native-messaging/src/main.rs.
+//  It connects to the gRPC server, sends a registration frame, and then
+//  forwards Frame messages bidirectionally.
+//
+//  Architecture (matching the Rust code):
+//    - connect_with_retry → connectLoop() with retry
+//    - async_stream::stream! { yield reg; loop { recv → yield } } → AsyncStream + producer closure
+//    - client.open(outbound_stream) → bridgeClient.open(request:onResponse:)
+//    - inbound_stream.message() loop → for try await frame in response.messages
 //
 
 import Foundation
@@ -14,401 +22,263 @@ import GRPCNIOTransportHTTP2
 import os.log
 
 /// Port for the browser bridge gRPC server (running in euro-activity)
+/// Matches euro-native-messaging PORT constant and BROWSER_BRIDGE_PORT in server.rs
 private let kBrowserBridgePort: Int = 1431
 
 /// Retry interval for connecting to the server (in seconds)
+/// Matches RETRY_INTERVAL_SECS in the Rust code
 private let kRetryIntervalSecs: TimeInterval = 2.0
 
-/// Protocol for receiving frames from the server
+/// Protocol for receiving events from the gRPC client
+@available(macOS 15.0, *)
 protocol BrowserBridgeClientDelegate: AnyObject {
-    /// Called when a frame is received from the server
-    func browserBridgeClient(_ client: BrowserBridgeClient, didReceiveFrame frame: [String: Any])
-    
-    /// Called when the connection is established
+    /// Called when the gRPC connection is established and stream is open
     func browserBridgeClientDidConnect(_ client: BrowserBridgeClient)
-    
-    /// Called when the connection is lost
+
+    /// Called when the gRPC connection is lost
     func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?)
+
+    /// Called when a frame is received from the gRPC server
+    func browserBridgeClient(_ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame)
 }
 
-/// gRPC client for the BrowserBridge service using grpc-swift 2.x
+/// gRPC client for the BrowserBridge service.
+///
+/// Mirrors the architecture of `euro-native-messaging/src/main.rs`:
+/// - Connects to gRPC server with retry
+/// - Opens a bidirectional `Open` stream
+/// - Sends a `RegisterFrame` first
+/// - Forwards frames in both directions via delegate + `send(frame:)`
+///
+/// Uses `AsyncStream` for the outbound producer, matching the Rust code's
+/// `async_stream::stream!` pattern. Uses `withGRPCClient` for correct
+/// gRPC client lifecycle management.
 @available(macOS 15.0, *)
-class BrowserBridgeClient {
-    
+final class BrowserBridgeClient: @unchecked Sendable {
+
     // MARK: - Properties
-    
+
     weak var delegate: BrowserBridgeClientDelegate?
-    
+
     private let logger = Logger(subsystem: "com.eurora.macos", category: "BrowserBridgeClient")
-    
-    private var transport: HTTP2ClientTransport.Posix?
-    private var grpcClient: GRPCClient<HTTP2ClientTransport.Posix>?
-    private var bridgeClient: BrowserBridge_BrowserBridge.Client<HTTP2ClientTransport.Posix>?
-    
-    private var connectionTask: Task<Void, Never>?
-    private var streamTask: Task<Void, Error>?
-    
-    private var isConnected = false
-    private var shouldReconnect = true
-    
+
     private let hostPid: UInt32
     private let browserPid: UInt32
-    
-    /// Continuation for sending frames to the server
+
+    /// Task running the connect-with-retry loop
+    private var connectionTask: Task<Void, Never>?
+
+    /// Whether reconnection should continue after disconnection
+    private var shouldReconnect = true
+
+    /// Lock protecting mutable state
+    private let lock = NSLock()
+
+    /// The continuation for the outbound AsyncStream.
+    /// Yielding a frame to this continuation sends it through the gRPC stream.
+    /// This is the Swift equivalent of the Rust `broadcast::Sender<Frame>`.
     private var outboundContinuation: AsyncStream<BrowserBridge_Frame>.Continuation?
-    private let continuationLock = NSLock()
-    
+
+    /// Whether the client currently has an active gRPC stream
+    var isConnected: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return outboundContinuation != nil
+    }
+
     // MARK: - Initialization
-    
+
     init(hostPid: UInt32, browserPid: UInt32) {
         self.hostPid = hostPid
         self.browserPid = browserPid
     }
-    
+
     deinit {
         disconnect()
     }
-    
-    // MARK: - Connection Management
-    
-    /// Start the client and connect to the server
+
+    // MARK: - Public API
+
+    /// Start the client and begin connecting to the gRPC server.
+    /// Mirrors the `server_connection_handle` task in the Rust code.
     func connect() {
-        connectionTask = Task {
-            await connectWithRetry()
+        shouldReconnect = true
+        connectionTask = Task { [weak self] in
+            await self?.connectLoop()
         }
     }
-    
-    /// Disconnect from the server
+
+    /// Disconnect from the server and stop reconnecting.
     func disconnect() {
         shouldReconnect = false
-        
-        continuationLock.lock()
-        outboundContinuation?.finish()
+
+        lock.lock()
+        let continuation = outboundContinuation
         outboundContinuation = nil
-        continuationLock.unlock()
-        
-        streamTask?.cancel()
-        streamTask = nil
+        lock.unlock()
+
+        // Finish the outbound stream, which causes the producer to return,
+        // which closes the request stream (sends END_STREAM).
+        continuation?.finish()
+
         connectionTask?.cancel()
         connectionTask = nil
-        
-        grpcClient?.beginGracefulShutdown()
-        grpcClient = nil
-        bridgeClient = nil
-        transport = nil
-        
-        isConnected = false
-        logger.info("Disconnected from browser bridge server")
     }
-    
-    /// Send a frame to the server
-    func send(frame: [String: Any]) {
-        guard let grpcFrame = Self.frameFromDictionary(frame) else {
-            logger.error("Failed to convert dictionary to Frame")
-            return
-        }
-        
-        continuationLock.lock()
+
+    /// Send a frame to the gRPC server.
+    /// Equivalent to `to_server_tx.send(frame)` in the Rust code.
+    func send(frame: BrowserBridge_Frame) {
+        lock.lock()
         let continuation = outboundContinuation
-        continuationLock.unlock()
-        
-        guard let continuation = continuation else {
-            logger.warning("Cannot send frame - not connected")
+        lock.unlock()
+
+        guard let continuation else {
+            logger.warning("Cannot send frame — not connected")
             return
         }
-        
-        continuation.yield(grpcFrame)
-        logger.debug("Frame queued for sending")
+
+        continuation.yield(frame)
     }
-    
-    // MARK: - Private Methods
-    
-    private func connectWithRetry() async {
+
+    // MARK: - Connection Loop
+
+    /// Main connection loop with retry logic.
+    /// Mirrors the outer `loop { ... }` in the Rust `server_connection_handle` task.
+    private func connectLoop() async {
         while shouldReconnect && !Task.isCancelled {
-            logger.info("Attempting to connect to browser bridge server at [::1]:\(kBrowserBridgePort)")
-            
+            logger.info("Attempting to connect to gRPC server at [::1]:\(kBrowserBridgePort)")
+
             do {
-                try await initializeClient()
-                try await runStream()
+                try await runOneConnection()
+            } catch is CancellationError {
+                logger.info("Connection cancelled")
             } catch {
-                logger.error("Connection failed: \(error.localizedDescription)")
+                if !Task.isCancelled {
+                    logger.error("gRPC connection error: \(error.localizedDescription)")
+                }
             }
-            
-            // Clean up after disconnect
-            cleanup()
-            
-            if shouldReconnect && !Task.isCancelled {
-                logger.info("Reconnecting in \(kRetryIntervalSecs) seconds...")
-                try? await Task.sleep(for: .seconds(kRetryIntervalSecs))
+
+            // Clean up outbound continuation after stream ends
+            lock.lock()
+            let continuation = outboundContinuation
+            outboundContinuation = nil
+            lock.unlock()
+            continuation?.finish()
+
+            if !Task.isCancelled {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.delegate?.browserBridgeClientDidDisconnect(self, error: nil)
+                }
             }
+
+            // Wait before reconnecting (like Rust's RETRY_INTERVAL_SECS)
+            guard shouldReconnect && !Task.isCancelled else { break }
+
+            logger.info("Reconnecting in \(kRetryIntervalSecs) seconds...")
+            try? await Task.sleep(for: .seconds(kRetryIntervalSecs))
         }
     }
-    
-    private func initializeClient() async throws {
-        // Create transport
-        let security: HTTP2ClientTransport.Posix.TransportSecurity = .plaintext
+
+    /// Run a single gRPC connection using the canonical `withGRPCClient` pattern.
+    /// Returns when the connection is lost.
+    ///
+    /// This uses `withGRPCClient` which internally uses `withThrowingDiscardingTaskGroup`
+    /// to manage the gRPC client lifecycle correctly. The `runConnections()` method runs
+    /// as a background task in the discarding group, and our RPC runs in the main body.
+    /// Unlike a regular task group with `group.next()`, a discarding task group does NOT
+    /// cancel other tasks when one completes normally — only when one throws.
+    private func runOneConnection() async throws {
+        // Create transport — this is the HTTP/2 connection to the server
         let transport = try HTTP2ClientTransport.Posix(
             target: .ipv6(host: "::1", port: kBrowserBridgePort),
-            transportSecurity: security
+            transportSecurity: .plaintext
         )
-        self.transport = transport
-        
-        // Create gRPC client
-        let grpcClient = GRPCClient(transport: transport)
-        self.grpcClient = grpcClient
-        
-        // Create service client
-        self.bridgeClient = BrowserBridge_BrowserBridge.Client(wrapping: grpcClient)
-        
-        logger.info("gRPC client initialized, starting run loop")
-    }
-    
-    private func runStream() async throws {
-        guard let transport = self.transport else {
-            throw BridgeClientError.notConnected
-        }
-        
-        // Create async stream for outbound messages
-        let (outboundStream, continuation) = AsyncStream<BrowserBridge_Frame>.makeStream()
-        
-        continuationLock.lock()
-        self.outboundContinuation = continuation
-        continuationLock.unlock()
-        
-        // Send registration frame first
-        logger.info("Sending registration frame: host_pid=\(self.hostPid), browser_pid=\(self.browserPid)")
-        
-        var registerFrame = BrowserBridge_RegisterFrame()
-        registerFrame.hostPid = self.hostPid
-        registerFrame.browserPid = self.browserPid
-        
-        var frame = BrowserBridge_Frame()
-        frame.register = registerFrame
-        
-        continuation.yield(frame)
-        
-        // In grpc-swift 2.x, withGRPCClient manages the client lifecycle
-        // It runs the client and ensures proper cleanup
+
+        // Use the canonical withGRPCClient pattern.
+        // This starts runConnections() in a background task and provides the client.
+        // When the handleClient closure returns, beginGracefulShutdown() is called automatically.
         try await withGRPCClient(transport: transport) { grpcClient in
-            // Store the client reference
-            self.grpcClient = grpcClient
-            
-            // Create service client
             let bridgeClient = BrowserBridge_BrowserBridge.Client(wrapping: grpcClient)
-            self.bridgeClient = bridgeClient
-            
-            // Mark as connected once we start the stream
-            self.isConnected = true
-            
-            await MainActor.run { [weak self] in
-                guard let self = self else { return }
-                self.delegate?.browserBridgeClientDidConnect(self)
-            }
-            
-            self.logger.info("Connected to browser bridge server")
-            
-            // Make the bidirectional streaming call
-            try await bridgeClient.open(
+
+            // Build the registration frame (sent as the first message, like in the Rust code)
+            var registerFrame = BrowserBridge_RegisterFrame()
+            registerFrame.hostPid = self.hostPid
+            registerFrame.browserPid = self.browserPid
+
+            var regFrame = BrowserBridge_Frame()
+            regFrame.register = registerFrame
+
+            self.logger.info("Sending registration frame: host_pid=\(self.hostPid), browser_pid=\(self.browserPid)")
+
+            // Create an AsyncStream for outbound frames.
+            // This is the Swift equivalent of Rust's async_stream::stream! { yield reg; loop { recv → yield } }
+            let (outboundStream, outboundContinuation) = AsyncStream.makeStream(of: BrowserBridge_Frame.self)
+
+            // Store the continuation so send(frame:) can yield frames to the stream.
+            // This is the Swift equivalent of storing the broadcast::Sender.
+            self.lock.lock()
+            self.outboundContinuation = outboundContinuation
+            self.lock.unlock()
+
+            // Yield the registration frame as the first message.
+            // Equivalent to: yield register_frame; in the Rust stream.
+            outboundContinuation.yield(regFrame)
+
+            // Build the streaming request with a producer that reads from the AsyncStream.
+            // The producer blocks on `for await` until the stream is finished (via continuation.finish()).
+            // This keeps the request stream open (no END_STREAM / half-close) until we explicitly close it.
+            let request = StreamingClientRequest<BrowserBridge_Frame>(
                 metadata: [:],
-                options: .defaults,
-                requestProducer: { writer in
-                    // Forward messages from our async stream to the gRPC stream
-                    for await message in outboundStream {
-                        try await writer.write(message)
-                    }
-                },
-                onResponse: { [self] (response: GRPCCore.StreamingClientResponse<BrowserBridge_Frame>) -> Void in
-                    // Process the response stream
+                producer: { writer in
+                    self.logger.debug("Producer started, forwarding outbound frames...")
                     do {
-                        for try await receivedFrame in response.messages {
-                            self.handleReceivedFrame(receivedFrame)
+                        for await frame in outboundStream {
+                            self.logger.debug("Producer writing frame to gRPC stream...")
+                            try await writer.write(frame)
+                            self.logger.debug("Producer wrote frame successfully")
                         }
+                        self.logger.debug("Producer: for-await loop exited normally (stream ended)")
+                    } catch is CancellationError {
+                        self.logger.debug("Producer cancelled")
                     } catch {
-                        self.logger.error("Error receiving messages: \(error)")
+                        self.logger.error("Producer error: \(error.localizedDescription)")
                     }
+                    self.logger.debug("Producer finished — returning from closure")
                 }
             )
-        }
-    }
-    
-    private func cleanup() {
-        continuationLock.lock()
-        outboundContinuation?.finish()
-        outboundContinuation = nil
-        continuationLock.unlock()
-        
-        isConnected = false
-        
-        grpcClient?.beginGracefulShutdown()
-        grpcClient = nil
-        bridgeClient = nil
-        transport = nil
-        
-        Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            self.delegate?.browserBridgeClientDidDisconnect(self, error: nil)
-        }
-    }
-    
-    private func handleReceivedFrame(_ frame: BrowserBridge_Frame) {
-        guard let dict = Self.dictionaryFromFrame(frame) else {
-            logger.warning("Failed to convert received frame to dictionary")
-            return
-        }
-        
-        logger.debug("Received frame from server")
-        
-        Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            self.delegate?.browserBridgeClient(self, didReceiveFrame: dict)
-        }
-    }
-}
 
-// MARK: - Error Types
+            // Open the bidirectional stream and process inbound frames.
+            // This is the Swift equivalent of:
+            //   let response = client.open(outbound_stream).await?;
+            //   let mut inbound_stream = response.into_inner();
+            //   loop { match inbound_stream.message().await { ... } }
+            try await bridgeClient.open(request: request) { [self] response in
+                self.logger.info("Bidirectional stream opened successfully")
 
-enum BridgeClientError: Error {
-    case notConnected
-}
+                // Notify delegate of connection
+                await MainActor.run {
+                    self.delegate?.browserBridgeClientDidConnect(self)
+                }
 
-// MARK: - Frame Conversion Helpers
+                // Process inbound frames from the server.
+                // Mirrors the Rust code's loop { inbound_stream.message().await }
+                do {
+                    var frameCount = 0
+                    for try await receivedFrame in response.messages {
+                        frameCount += 1
+                        self.logger.debug("Received frame #\(frameCount) from server")
+                        await MainActor.run {
+                            self.delegate?.browserBridgeClient(self, didReceiveFrame: receivedFrame)
+                        }
+                    }
+                    self.logger.info("Server stream ended after \(frameCount) frames")
+                } catch {
+                    self.logger.error("Error receiving from server: \(error)")
+                }
+            }
 
-@available(macOS 15.0, *)
-extension BrowserBridgeClient {
-    
-    /// Convert a dictionary message to a Frame for sending to the server
-    static func frameFromDictionary(_ dict: [String: Any]) -> BrowserBridge_Frame? {
-        guard let kind = dict["kind"] as? [String: Any] else {
-            return nil
+            self.logger.info("RPC completed, connection will be retried")
         }
-        
-        var frame = BrowserBridge_Frame()
-        
-        if let request = kind["Request"] as? [String: Any] {
-            var requestFrame = BrowserBridge_RequestFrame()
-            if let id = request["id"] as? Int {
-                requestFrame.id = UInt32(id)
-            }
-            if let action = request["action"] as? String {
-                requestFrame.action = action
-            }
-            if let payload = request["payload"] as? String {
-                requestFrame.payload = payload
-            }
-            frame.request = requestFrame
-        } else if let response = kind["Response"] as? [String: Any] {
-            var responseFrame = BrowserBridge_ResponseFrame()
-            if let id = response["id"] as? Int {
-                responseFrame.id = UInt32(id)
-            }
-            if let action = response["action"] as? String {
-                responseFrame.action = action
-            }
-            if let payload = response["payload"] as? String {
-                responseFrame.payload = payload
-            }
-            frame.response = responseFrame
-        } else if let event = kind["Event"] as? [String: Any] {
-            var eventFrame = BrowserBridge_EventFrame()
-            if let action = event["action"] as? String {
-                eventFrame.action = action
-            }
-            if let payload = event["payload"] as? String {
-                eventFrame.payload = payload
-            }
-            frame.event = eventFrame
-        } else if let error = kind["Error"] as? [String: Any] {
-            var errorFrame = BrowserBridge_ErrorFrame()
-            if let id = error["id"] as? Int {
-                errorFrame.id = UInt32(id)
-            }
-            if let code = error["code"] as? Int {
-                errorFrame.code = UInt32(code)
-            }
-            if let message = error["message"] as? String {
-                errorFrame.message = message
-            }
-            if let details = error["details"] as? String {
-                errorFrame.details = details
-            }
-            frame.error = errorFrame
-        } else if let cancel = kind["Cancel"] as? [String: Any] {
-            var cancelFrame = BrowserBridge_CancelFrame()
-            if let id = cancel["id"] as? Int {
-                cancelFrame.id = UInt32(id)
-            }
-            frame.cancel = cancelFrame
-        } else if let register = kind["Register"] as? [String: Any] {
-            var registerFrame = BrowserBridge_RegisterFrame()
-            if let hostPid = register["host_pid"] as? Int {
-                registerFrame.hostPid = UInt32(hostPid)
-            }
-            if let browserPid = register["browser_pid"] as? Int {
-                registerFrame.browserPid = UInt32(browserPid)
-            }
-            frame.register = registerFrame
-        } else {
-            return nil
-        }
-        
-        return frame
-    }
-    
-    /// Convert a Frame from the server to a dictionary
-    static func dictionaryFromFrame(_ frame: BrowserBridge_Frame) -> [String: Any]? {
-        var kind: [String: Any] = [:]
-        
-        guard let frameKind = frame.kind else { return nil }
-        
-        switch frameKind {
-        case .request(let request):
-            var requestDict: [String: Any] = [
-                "id": Int(request.id),
-                "action": request.action
-            ]
-            if request.hasPayload {
-                requestDict["payload"] = request.payload
-            }
-            kind["Request"] = requestDict
-            
-        case .response(let response):
-            var responseDict: [String: Any] = [
-                "id": Int(response.id),
-                "action": response.action
-            ]
-            if response.hasPayload {
-                responseDict["payload"] = response.payload
-            }
-            kind["Response"] = responseDict
-            
-        case .event(let event):
-            var eventDict: [String: Any] = [
-                "action": event.action
-            ]
-            if event.hasPayload {
-                eventDict["payload"] = event.payload
-            }
-            kind["Event"] = eventDict
-            
-        case .error(let error):
-            var errorDict: [String: Any] = [
-                "id": Int(error.id),
-                "code": Int(error.code),
-                "message": error.message
-            ]
-            if error.hasDetails {
-                errorDict["details"] = error.details
-            }
-            kind["Error"] = errorDict
-            
-        case .cancel(let cancel):
-            kind["Cancel"] = ["id": Int(cancel.id)]
-            
-        case .register:
-            // Registration frames are only sent, not received
-            return nil
-        }
-        
-        return ["kind": kind]
     }
 }
