@@ -2,7 +2,6 @@ import { extensionFactory } from '$lib/factory.js';
 
 // Import extensions
 import { articleExtension, articleExtensionID } from '@eurora/prosemirror-extensions/article/index';
-import { pdfExtension, pdfExtensionID } from '@eurora/prosemirror-extensions/pdf/index';
 import { twitterExtension, twitterExtensionID } from '@eurora/prosemirror-extensions/twitter/index';
 import {
 	youtubeVideoExtension,
@@ -18,7 +17,6 @@ export function registerCoreExtensions(): void {
 	extensionFactory.register(articleExtensionID, articleExtension);
 	extensionFactory.register(youtubeVideoExtensionID, youtubeVideoExtension);
 	extensionFactory.register(twitterExtensionID, twitterExtension);
-	extensionFactory.register(pdfExtensionID, pdfExtension);
 }
 
 // Option 1: Auto-register extensions when this module is imported
