@@ -244,9 +244,8 @@ jobs:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   persist-credentials: false
+            - name: Install SwiftLint
+              run: brew install swiftlint
             - name: SwiftLint
-              uses: norio-nomura/action-swiftlint@9f4dcd7fd46b4e75d7935cf2f4df406d5cae3684 # 3.2.1
-              with:
-                  args: --strict
-              env:
-                  WORKING_DIRECTORY: apps/macos
+              run: swiftlint lint --strict
+              working-directory: apps/macos
