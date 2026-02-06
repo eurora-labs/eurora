@@ -45,7 +45,9 @@ jobs:
             - name: Trigger Sentry Cron - In Progress
               if: ${{ github.event_name == 'schedule' }}
               shell: bash
-              run: curl "${{ secrets.SENTRY_CRONS }}?status=in_progress"
+              env:
+                  SENTRY_CRONS_URL: ${{ secrets.SENTRY_CRONS }}
+              run: curl "${SENTRY_CRONS_URL}?status=in_progress"
 
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
@@ -56,21 +58,27 @@ jobs:
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
+              env:
+                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
                   VITEMODE=nightly
-                  if [[ "${{ github.event.inputs.channel }}" == "release" ]]; then
+                  if [[ "$INPUT_CHANNEL" == "release" ]]; then
                     VITEMODE=production
                   fi
 
                   echo "vitemode=$VITEMODE" >> $GITHUB_ENV
-                  echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
-                  echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
+                  echo "channel=$INPUT_CHANNEL" >> $GITHUB_ENV
+                  echo "bump=$INPUT_BUMP" >> $GITHUB_ENV
 
             - name: Calculate next version
               shell: bash
+              env:
+                  RELEASE_CHANNEL: ${{ env.channel }}
+                  BUMP_TYPE: ${{ env.bump }}
               run: |
-                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${{ env.channel }}" | jq -r '.version')"
-                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
+                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version')"
+                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP_TYPE}")
                   echo "version=$NEXT_VERSION" >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
 
@@ -86,9 +94,10 @@ jobs:
               run: pnpm proto:typescript
 
             - name: Build SvelteKit
-              run: pnpm build:desktop -- --mode ${{ env.vitemode }}
               env:
                   SENTRY_RELEASE: ${{ env.version }}
+                  VITE_MODE: ${{ env.vitemode }}
+              run: pnpm build:desktop -- --mode "$VITE_MODE"
 
             - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               name: Upload pnpm-store contents
@@ -159,15 +168,17 @@ jobs:
                   persist-credentials: false
                   lfs: true
 
-            - name: Set Cargo build target to ${{ matrix.target }}
+            - name: Set Cargo build target
               shell: bash
               if: matrix.target != ''
+              env:
+                  BUILD_TARGET: ${{ matrix.target }}
               run: |
-                  echo "CARGO_BUILD_TARGET=${{ matrix.target }}" >> $GITHUB_ENV
-                  rustup target add ${{ matrix.target }}
+                  echo "CARGO_BUILD_TARGET=$BUILD_TARGET" >> $GITHUB_ENV
+                  rustup target add "$BUILD_TARGET"
 
             # The cache doesn't pick up the environment variable set above, so we have to set it ourselves.
-            - name: Rust Cache ${{ matrix.target }}
+            - name: Rust Cache
               uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
               with:
                   shared-key: app-release-build-${{ github.event.inputs.channel || 'nightly' }}${{ matrix.target }}
@@ -189,15 +200,21 @@ jobs:
             - name: Consume input variables
               shell: bash
               if: ${{ !github.event.workflow_run }}
+              env:
+                  INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+                  INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
-                  echo "channel=${{ github.event.inputs.channel || 'nightly' }}" >> $GITHUB_ENV
-                  echo "bump=${{ github.event.inputs.bump || 'patch' }}" >> $GITHUB_ENV
+                  echo "channel=$INPUT_CHANNEL" >> $GITHUB_ENV
+                  echo "bump=$INPUT_BUMP" >> $GITHUB_ENV
 
             - name: Calculate next version
               shell: bash
+              env:
+                  RELEASE_CHANNEL: ${{ env.channel }}
+                  BUMP_TYPE: ${{ env.bump }}
               run: |
-                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${{ env.channel }}" | jq -r '.version')"
-                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${{ env.bump }}")
+                  CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version')"
+                  NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP_TYPE}")
                   echo "version=$NEXT_VERSION" >> $GITHUB_ENV
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
 
@@ -258,12 +275,9 @@ jobs:
 
             - name: Build binary
               shell: bash
-              run: |
-                  ./scripts/release.sh \
-                    --channel                    "${{ env.channel }}" \
-                    --dist                       "./release" \
-                    --version                    "${{ env.version }}"
               env:
+                  RELEASE_CHANNEL: ${{ env.channel }}
+                  RELEASE_VERSION: ${{ env.version }}
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
                   APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -274,12 +288,19 @@ jobs:
                   APPIMAGE_KEY_ID: ${{ secrets.APPIMAGE_KEY_ID }}
                   APPIMAGE_KEY_PASSPHRASE: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
                   POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+              run: |
+                  ./scripts/release.sh \
+                    --channel                    "$RELEASE_CHANNEL" \
+                    --dist                       "./release" \
+                    --version                    "$RELEASE_VERSION"
 
             - name: Set artifact name suffix
               shell: bash
+              env:
+                  BUILD_TARGET: ${{ matrix.target }}
               run: |
                   # Only add suffix for macOS x86_64 to distinguish from ARM64
-                  if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
+                  if [ "$BUILD_TARGET" = "x86_64-apple-darwin" ]; then
                     echo "artifact_suffix=-x86_64" >> $GITHUB_ENV
                   else
                     echo "artifact_suffix=" >> $GITHUB_ENV
@@ -320,9 +341,11 @@ jobs:
                   lfs: true
             - name: Set artifact name suffix
               shell: bash
+              env:
+                  BUILD_TARGET: ${{ matrix.target }}
               run: |
                   # Only add suffix for macOS x86_64 to distinguish from ARM64
-                  if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
+                  if [ "$BUILD_TARGET" = "x86_64-apple-darwin" ]; then
                     echo "artifact_suffix=-x86_64" >> $GITHUB_ENV
                   else
                     echo "artifact_suffix=" >> $GITHUB_ENV
@@ -404,4 +427,6 @@ jobs:
             - name: Trigger Sentry Cron - Complete
               if: ${{ github.event_name == 'schedule' }}
               shell: bash
-              run: curl "${{ secrets.SENTRY_CRONS }}?status=ok"
+              env:
+                  SENTRY_CRONS_URL: ${{ secrets.SENTRY_CRONS }}
+              run: curl "${SENTRY_CRONS_URL}?status=ok"
