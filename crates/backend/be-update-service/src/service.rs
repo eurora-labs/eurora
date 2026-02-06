@@ -618,7 +618,11 @@ impl AppState {
                                 // Generate presigned URL
                                 match self.generate_presigned_url(&file_key).await {
                                     Ok(url) => {
-                                        let platform_key = format!("{}-{}", target, arch);
+                                        // Normalize platform names: macos -> darwin
+                                        let normalized_target =
+                                            if target == "macos" { "darwin" } else { &target };
+                                        let platform_key =
+                                            format!("{}-{}", normalized_target, arch);
                                         debug!(
                                             "Adding platform {} with URL length {}",
                                             platform_key,
