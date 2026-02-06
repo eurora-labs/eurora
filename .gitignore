@@ -381,3 +381,9 @@ DerivedData/
 xcuserdata/
 
 *.moved-aside
+
+.build/
+.lock
+
+apps/macos/Shared/Generated/
+!apps/macos/Shared/Generated/.gitkeep
