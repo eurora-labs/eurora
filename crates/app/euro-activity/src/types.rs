@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    assets::{ArticleAsset, DefaultAsset, PdfAsset, TwitterAsset, YoutubeAsset},
+    assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset},
     error::ActivityResult,
     snapshots::*,
     storage::SaveableAsset,
@@ -51,7 +51,6 @@ pub enum ActivityAsset {
     ArticleAsset,
     TwitterAsset,
     DefaultAsset,
-    PdfAsset,
 }
 
 impl TryFrom<NativeMessage> for ActivityAsset {
@@ -68,10 +67,6 @@ impl TryFrom<NativeMessage> for ActivityAsset {
             NativeMessage::NativeTwitterAsset(asset) => {
                 Ok(ActivityAsset::TwitterAsset(TwitterAsset::from(asset)))
             }
-            NativeMessage::NativePdfAsset(asset) => {
-                Ok(ActivityAsset::PdfAsset(PdfAsset::from(asset)))
-            }
-
             _ => Err(anyhow::anyhow!("Invalid asset type")),
         }
     }
