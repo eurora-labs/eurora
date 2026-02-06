@@ -129,7 +129,8 @@ class NativeMessagingBridge {
 
         logger.info("Connecting to local bridge server on port \(kBridgeConnectionPort)")
 
-        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: kBridgeConnectionPort)!)
+        guard let port = NWEndpoint.Port(rawValue: kBridgeConnectionPort) else { return }
+        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: port)
         let conn = NWConnection(to: endpoint, using: .tcp)
 
         conn.stateUpdateHandler = { [weak self] state in
@@ -186,6 +187,37 @@ class NativeMessagingBridge {
 
     // MARK: - Private: Sending
 
+    private func extractRequestId(from message: [String: Any]) -> String? {
+        guard let kind = message["kind"] as? [String: Any],
+              let request = kind["Request"] as? [String: Any],
+              let id = request["id"] else { return nil }
+        return "\(id)"
+    }
+
+    private func makeCallback(
+        completion: @escaping (Result<[String: Any], Error>) -> Void,
+        callbackLock: NSLock,
+        callbackFired: UnsafeMutablePointer<Bool>
+    ) -> (Result<Data, Error>) -> Void {
+        return { result in
+            callbackLock.lock()
+            guard !callbackFired.pointee else { callbackLock.unlock(); return }
+            callbackFired.pointee = true
+            callbackLock.unlock()
+
+            switch result {
+            case .success(let data):
+                do {
+                    if let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        completion(.success(dict))
+                    } else { completion(.failure(BridgeError.invalidResponse)) }
+                } catch { completion(.failure(error)) }
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+
     private func doSendMessage(
         _ message: [String: Any],
         timeout: TimeInterval,
@@ -198,187 +230,121 @@ class NativeMessagingBridge {
 
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
-
-            // Extract request ID for matching response
-            var requestId: String?
-            if let kind = message["kind"] as? [String: Any],
-               let request = kind["Request"] as? [String: Any],
-               let id = request["id"] {
-                requestId = "\(id)"
-            }
-
-            let callbackId = requestId ?? UUID().uuidString
-            var callbackFired = false
+            let callbackId = extractRequestId(from: message) ?? UUID().uuidString
             let callbackLock = NSLock()
+            let callbackFired = UnsafeMutablePointer<Bool>.allocate(capacity: 1)
+            callbackFired.initialize(to: false)
 
-            // Register callback
             responseLock.lock()
-            pendingCallbacks[callbackId] = { result in
-                callbackLock.lock()
-                guard !callbackFired else {
-                    callbackLock.unlock()
-                    return
-                }
-                callbackFired = true
-                callbackLock.unlock()
-
-                switch result {
-                case .success(let data):
-                    do {
-                        if let dict = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
-                            completion(.success(dict))
-                        } else {
-                            completion(.failure(BridgeError.invalidResponse))
-                        }
-                    } catch {
-                        completion(.failure(error))
-                    }
-                case .failure(let error):
-                    completion(.failure(error))
-                }
-            }
+            pendingCallbacks[callbackId] = makeCallback(
+                completion: completion, callbackLock: callbackLock, callbackFired: callbackFired
+            )
             responseLock.unlock()
 
-            // Set up timeout
-            DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
-                callbackLock.lock()
-                guard !callbackFired else {
-                    callbackLock.unlock()
-                    return
-                }
-                callbackFired = true
-                callbackLock.unlock()
+            setupTimeout(callbackId: callbackId, timeout: timeout, callbackLock: callbackLock,
+                         callbackFired: callbackFired, completion: completion)
+            sendFramedMessage(jsonData, via: connection)
+        } catch { completion(.failure(error)) }
+    }
 
-                self?.responseLock.lock()
-                self?.pendingCallbacks.removeValue(forKey: callbackId)
-                self?.responseLock.unlock()
+    private func setupTimeout(
+        callbackId: String, timeout: TimeInterval, callbackLock: NSLock,
+        callbackFired: UnsafeMutablePointer<Bool>,
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+            callbackLock.lock()
+            guard !callbackFired.pointee else { callbackLock.unlock(); return }
+            callbackFired.pointee = true
+            callbackLock.unlock()
 
-                completion(.failure(BridgeError.timeout))
-            }
-
-            // Send framed message
-            let framedData = Self.frameMessage(jsonData)
-
-            connection.send(content: framedData, completion: .contentProcessed { [weak self] error in
-                if let error {
-                    self?.logger.error("Send error: \(error.localizedDescription)")
-                }
-            })
-        } catch {
-            completion(.failure(error))
+            self?.responseLock.lock()
+            self?.pendingCallbacks.removeValue(forKey: callbackId)
+            self?.responseLock.unlock()
+            completion(.failure(BridgeError.timeout))
         }
     }
 
-    // MARK: - Private: Receiving
-
-    private func startReceiving() {
-        receiveNextMessage()
-    }
-
-    private func receiveNextMessage() {
-        guard let connection, isConnected else { return }
-
-        // Read 4-byte length prefix
-        connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
-            guard let self else { return }
-
-            if let error {
-                self.logger.error("Receive error: \(error.localizedDescription)")
-                self.isConnected = false
-                return
-            }
-
-            if isComplete {
-                self.logger.debug("Connection closed by server")
-                self.isConnected = false
-                return
-            }
-
-            guard let lengthData = data, lengthData.count == 4 else {
-                self.receiveNextMessage()
-                return
-            }
-
-            let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
-
-            guard length > 0 && length < 8 * 1024 * 1024 else {
-                self.logger.error("Invalid message length: \(length)")
-                self.receiveNextMessage()
-                return
-            }
-
-            self.receiveMessageBody(length: Int(length))
-        }
-    }
-
-    private func receiveMessageBody(length: Int) {
-        guard let connection else { return }
-
-        connection.receive(minimumIncompleteLength: length, maximumLength: length) { [weak self] data, _, isComplete, error in
-            guard let self else { return }
-
-            if let error {
-                self.logger.error("Receive body error: \(error.localizedDescription)")
-                self.isConnected = false
-                return
-            }
-
-            if isComplete && data == nil {
-                self.isConnected = false
-                return
-            }
-
-            guard let messageData = data, messageData.count == length else {
-                self.receiveNextMessage()
-                return
-            }
-
-            self.handleReceivedMessage(messageData)
-            self.receiveNextMessage()
-        }
-    }
-
-    private func handleReceivedMessage(_ data: Data) {
-        // Try to match response to a pending callback
-        do {
-            if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-               let kind = json["kind"] as? [String: Any] {
-
-                var responseId: String?
-
-                if let response = kind["Response"] as? [String: Any],
-                   let id = response["id"] {
-                    responseId = "\(id)"
-                } else if let error = kind["Error"] as? [String: Any],
-                          let id = error["id"] {
-                    responseId = "\(id)"
-                }
-
-                if let responseId {
-                    responseLock.lock()
-                    let callback = pendingCallbacks.removeValue(forKey: responseId)
-                    responseLock.unlock()
-
-                    if let callback {
-                        callback(.success(data))
-                        return
-                    }
-                }
-            }
-        } catch {
-            logger.error("Failed to parse received message: \(error.localizedDescription)")
-        }
-
-        logger.debug("Received message with no pending callback")
+    private func sendFramedMessage(_ jsonData: Data, via connection: NWConnection) {
+        let framedData = Self.frameMessage(jsonData)
+        connection.send(content: framedData, completion: .contentProcessed { [weak self] error in
+            if let error { self?.logger.error("Send error: \(error.localizedDescription)") }
+        })
     }
 
     // MARK: - Static Helpers
-
     static func frameMessage(_ data: Data) -> Data {
         var length = UInt32(data.count).littleEndian
         var framedData = Data(bytes: &length, count: 4)
         framedData.append(data)
         return framedData
+    }
+}
+
+// MARK: - Receiving (extension to reduce type body length)
+@available(macOS 15.0, *)
+extension NativeMessagingBridge {
+    func startReceiving() { receiveNextMessage() }
+
+    func receiveNextMessage() {
+        guard let connection, isConnected else { return }
+        connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
+            self?.handleLengthReceive(data: data, isComplete: isComplete, error: error)
+        }
+    }
+
+    private func handleLengthReceive(data: Data?, isComplete: Bool, error: NWError?) {
+        if let error { logger.error("Receive error: \(error.localizedDescription)"); isConnected = false; return }
+        if isComplete { logger.debug("Connection closed by server"); isConnected = false; return }
+        guard let lengthData = data, lengthData.count == 4 else { receiveNextMessage(); return }
+        let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
+        guard length > 0 && length < 8 * 1024 * 1024 else {
+            logger.error("Invalid message length: \(length)"); receiveNextMessage(); return
+        }
+        receiveMessageBody(length: Int(length))
+    }
+
+    private func receiveMessageBody(length: Int) {
+        guard let connection else { return }
+        let len = length
+        connection.receive(minimumIncompleteLength: len, maximumLength: len) { [weak self] data, _, isComplete, error in
+            self?.handleBodyReceive(data: data, length: length, isComplete: isComplete, error: error)
+        }
+    }
+
+    private func handleBodyReceive(data: Data?, length: Int, isComplete: Bool, error: NWError?) {
+        if let error {
+            logger.error("Receive body error: \(error.localizedDescription)")
+            isConnected = false
+            return
+        }
+        if isComplete && data == nil { isConnected = false; return }
+        guard let messageData = data, messageData.count == length else { receiveNextMessage(); return }
+        handleReceivedMessage(messageData)
+        receiveNextMessage()
+    }
+
+    private func handleReceivedMessage(_ data: Data) {
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let kind = json["kind"] as? [String: Any] else { return }
+            let responseId = extractResponseId(from: kind)
+            if let responseId {
+                responseLock.lock()
+                let callback = pendingCallbacks.removeValue(forKey: responseId)
+                responseLock.unlock()
+                if let callback { callback(.success(data)); return }
+            }
+        } catch {
+            logger.error("Failed to parse received message: \(error.localizedDescription)")
+        }
+        logger.debug("Received message with no pending callback")
+    }
+
+    private func extractResponseId(from kind: [String: Any]) -> String? {
+        if let resp = kind["Response"] as? [String: Any], let id = resp["id"] { return "\(id)" }
+        if let err = kind["Error"] as? [String: Any], let id = err["id"] { return "\(id)" }
+        return nil
     }
 }
 

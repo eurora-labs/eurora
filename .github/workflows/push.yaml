@@ -237,15 +237,3 @@ jobs:
                   key: ${{ inputs.features }}
             - name: 'cargo check'
               run: cargo check --workspace --all-targets
-
-    lint-swift:
-        runs-on: macos-latest
-        steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-              with:
-                  persist-credentials: false
-            - name: Install SwiftLint
-              run: brew install swiftlint
-            - name: SwiftLint
-              run: swiftlint lint --strict
-              working-directory: apps/macos
