@@ -6,16 +6,14 @@ updates:
       schedule:
           interval: 'weekly'
       cooldown:
-          period: 3
-          random-delay: true
+          minimum-release-age: 3
 
     - package-ecosystem: 'npm'
       directory: '/'
       schedule:
           interval: 'weekly'
       cooldown:
-          period: 3
-          random-delay: true
+          minimum-release-age: 3
       ignore:
           - dependency-name: '*'
             update-types: ['version-update:semver-major']
@@ -28,8 +26,7 @@ updates:
       schedule:
           interval: 'monthly'
       cooldown:
-          period: 7
-          random-delay: true
+          minimum-release-age: 7
       ignore:
           - dependency-name: '*'
             update-types: ['version-update:semver-major']
