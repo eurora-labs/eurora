@@ -30,7 +30,7 @@
 		6557CFF52F351EF000ACCFF3 /* GRPCCodeGen in Frameworks */ = {isa = PBXBuildFile; productRef = 6557CFF42F351EF000ACCFF3 /* GRPCCodeGen */; };
 		6557CFF92F3522A300ACCFF3 /* browser_bridge.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6557CFF82F3522A300ACCFF3 /* browser_bridge.grpc.swift */; };
 		6557CFFB2F3522BA00ACCFF3 /* browser_bridge.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6557CFFA2F3522BA00ACCFF3 /* browser_bridge.pb.swift */; };
-		6557CFFD2F35253D00ACCFF3 /* script-1t2026g.js in Resources */ = {isa = PBXBuildFile; fileRef = 6557CFFC2F35253D00ACCFF3 /* script-1t2026g.js */; };
+		659A98322F35FA4C0086B5D5 /* script.js in Resources */ = {isa = PBXBuildFile; fileRef = 659A98312F35FA4C0086B5D5 /* script.js */; };
 		65C9D4C92F3494AF00FAED22 /* icon-128x128.png in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4BE2F3494AF00FAED22 /* icon-128x128.png */; };
 		65C9D4CA2F3494AF00FAED22 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4BF2F3494AF00FAED22 /* assets */; };
 		65C9D4CC2F3494AF00FAED22 /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C12F3494AF00FAED22 /* manifest.json */; };
@@ -87,7 +87,7 @@
 		6557CFCA2F35151300ACCFF3 /* LocalBridgeServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalBridgeServer.swift; sourceTree = "<group>"; };
 		6557CFF82F3522A300ACCFF3 /* browser_bridge.grpc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = browser_bridge.grpc.swift; path = Shared/Generated/browser_bridge.grpc.swift; sourceTree = SOURCE_ROOT; };
 		6557CFFA2F3522BA00ACCFF3 /* browser_bridge.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = browser_bridge.pb.swift; path = Shared/Generated/browser_bridge.pb.swift; sourceTree = SOURCE_ROOT; };
-		6557CFFC2F35253D00ACCFF3 /* script-1t2026g.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = "script-1t2026g.js"; path = "../../browser/dist/safari/script-1t2026g.js"; sourceTree = "<group>"; };
+		659A98312F35FA4C0086B5D5 /* script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = script.js; path = ../../browser/dist/safari/script.js; sourceTree = "<group>"; };
 		65C9D4BE2F3494AF00FAED22 /* icon-128x128.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-128x128.png"; path = "../../browser/dist/safari/icon-128x128.png"; sourceTree = "<group>"; };
 		65C9D4BF2F3494AF00FAED22 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../browser/dist/safari/assets; sourceTree = "<group>"; };
 		65C9D4C12F3494AF00FAED22 /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../browser/dist/safari/manifest.json; sourceTree = "<group>"; };
@@ -187,7 +187,7 @@
 		654B720E2F332FE600A08DFD /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				6557CFFC2F35253D00ACCFF3 /* script-1t2026g.js */,
+				659A98312F35FA4C0086B5D5 /* script.js */,
 				65C9D4C62F3494AF00FAED22 /* app */,
 				65C9D4BF2F3494AF00FAED22 /* assets */,
 				65C9D4C52F3494AF00FAED22 /* icon-16x16.png */,
@@ -322,7 +322,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6557CFFD2F35253D00ACCFF3 /* script-1t2026g.js in Resources */,
+				659A98322F35FA4C0086B5D5 /* script.js in Resources */,
 				65C9D4C92F3494AF00FAED22 /* icon-128x128.png in Resources */,
 				65C9D4CA2F3494AF00FAED22 /* assets in Resources */,
 				65C9D4CC2F3494AF00FAED22 /* manifest.json in Resources */,
