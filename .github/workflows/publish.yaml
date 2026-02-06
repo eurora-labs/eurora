@@ -67,9 +67,21 @@ jobs:
                     VITEMODE=production
                   fi
 
-                  echo "vitemode=$VITEMODE" >> $GITHUB_ENV
-                  echo "channel=$INPUT_CHANNEL" >> $GITHUB_ENV
-                  echo "bump=$INPUT_BUMP" >> $GITHUB_ENV
+                  {
+                    echo 'vitemode<<EOF'
+                    echo "$VITEMODE"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  {
+                    echo 'channel<<EOF'
+                    echo "$INPUT_CHANNEL"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  {
+                    echo 'bump<<EOF'
+                    echo "$INPUT_BUMP"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
 
             - name: Calculate next version
               shell: bash
@@ -79,7 +91,11 @@ jobs:
               run: |
                   CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version')"
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP_TYPE}")
-                  echo "version=$NEXT_VERSION" >> $GITHUB_ENV
+                  {
+                    echo 'version<<EOF'
+                    echo "$NEXT_VERSION"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
 
             - name: Init Node Environment
@@ -159,8 +175,13 @@ jobs:
             - name: Set Perl environment variables
               if: runner.os == 'Windows'
               run: |
-                  echo "PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-                  echo "OPENSSL_SRC_PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+                  $perlPath = (where.exe perl)[0]
+                  "PERL<<EOF" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+                  $perlPath | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+                  "EOF" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+                  "OPENSSL_SRC_PERL<<EOF" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+                  $perlPath | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+                  "EOF" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
@@ -174,7 +195,11 @@ jobs:
               env:
                   BUILD_TARGET: ${{ matrix.target }}
               run: |
-                  echo "CARGO_BUILD_TARGET=$BUILD_TARGET" >> $GITHUB_ENV
+                  {
+                    echo 'CARGO_BUILD_TARGET<<EOF'
+                    echo "$BUILD_TARGET"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
                   rustup target add "$BUILD_TARGET"
 
             # The cache doesn't pick up the environment variable set above, so we have to set it ourselves.
@@ -204,8 +229,16 @@ jobs:
                   INPUT_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
                   INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
               run: |
-                  echo "channel=$INPUT_CHANNEL" >> $GITHUB_ENV
-                  echo "bump=$INPUT_BUMP" >> $GITHUB_ENV
+                  {
+                    echo 'channel<<EOF'
+                    echo "$INPUT_CHANNEL"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  {
+                    echo 'bump<<EOF'
+                    echo "$INPUT_BUMP"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
 
             - name: Calculate next version
               shell: bash
@@ -215,7 +248,11 @@ jobs:
               run: |
                   CURRENT_VERSION="$(curl --silent "https://api.eurora-labs.com/releases/${RELEASE_CHANNEL}" | jq -r '.version')"
                   NEXT_VERSION=$(./scripts/next.sh "${CURRENT_VERSION}" "${BUMP_TYPE}")
-                  echo "version=$NEXT_VERSION" >> $GITHUB_ENV
+                  {
+                    echo 'version<<EOF'
+                    echo "$NEXT_VERSION"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
                   mkdir -p release && echo "$NEXT_VERSION" > release/version
 
             # - name: Import GPG key
@@ -269,9 +306,21 @@ jobs:
               shell: bash
               if: github.event.inputs.channel == 'release'
               run: |
-                  echo "CARGO_PROFILE_RELEASE_LTO=fat" >> $GITHUB_ENV
-                  echo "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1" >> $GITHUB_ENV
-                  echo "CARGO_PROFILE_RELEASE_OPT_LEVEL=s" >> $GITHUB_ENV
+                  {
+                    echo 'CARGO_PROFILE_RELEASE_LTO<<EOF'
+                    echo "fat"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  {
+                    echo 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS<<EOF'
+                    echo "1"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  {
+                    echo 'CARGO_PROFILE_RELEASE_OPT_LEVEL<<EOF'
+                    echo "s"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
 
             - name: Build binary
               shell: bash
@@ -301,9 +350,17 @@ jobs:
               run: |
                   # Only add suffix for macOS x86_64 to distinguish from ARM64
                   if [ "$BUILD_TARGET" = "x86_64-apple-darwin" ]; then
-                    echo "artifact_suffix=-x86_64" >> $GITHUB_ENV
+                    {
+                      echo 'artifact_suffix<<EOF'
+                      echo "-x86_64"
+                      echo 'EOF'
+                    } >> "$GITHUB_ENV"
                   else
-                    echo "artifact_suffix=" >> $GITHUB_ENV
+                    {
+                      echo 'artifact_suffix<<EOF'
+                      echo ""
+                      echo 'EOF'
+                    } >> "$GITHUB_ENV"
                   fi
 
             - name: Upload Artifacts
@@ -346,9 +403,17 @@ jobs:
               run: |
                   # Only add suffix for macOS x86_64 to distinguish from ARM64
                   if [ "$BUILD_TARGET" = "x86_64-apple-darwin" ]; then
-                    echo "artifact_suffix=-x86_64" >> $GITHUB_ENV
+                    {
+                      echo 'artifact_suffix<<EOF'
+                      echo "-x86_64"
+                      echo 'EOF'
+                    } >> "$GITHUB_ENV"
                   else
-                    echo "artifact_suffix=" >> $GITHUB_ENV
+                    {
+                      echo 'artifact_suffix<<EOF'
+                      echo ""
+                      echo 'EOF'
+                    } >> "$GITHUB_ENV"
                   fi
             - name: Download artifacts
               uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
@@ -359,7 +424,11 @@ jobs:
               shell: bash
               run: |
                   VERSION="$(cat release/version)"
-                  echo "version=$VERSION" >> $GITHUB_ENV
+                  {
+                    echo 'version<<EOF'
+                    echo "$VERSION"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
             - name: Prepare S3 payload
               shell: bash
               run: |
