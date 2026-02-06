@@ -34,12 +34,12 @@ export type Kind =
 	| { Register: RegisterFrame };
 
 export type NativeArticleAsset = {
+	title: string;
 	url: string;
 	content: string;
 	text_content: string;
-	selected_text: string | null;
-	title: string;
 	site_name: string;
+	selected_text: string | null;
 	language: string;
 	excerpt: string;
 	length: number;
@@ -50,10 +50,6 @@ export type NativeArticleSnapshot = { highlighted_text: string | null };
 export type NativeIcon = { base64: string | null };
 
 export type NativeMetadata = { url: string | null; icon_base64: string | null };
-
-export type NativePdfAsset = { url: string; title: string; content: string };
-
-export type NativePdfSnapshot = { selected_text: string | null };
 
 export type NativeTwitterAsset = {
 	url: string;
