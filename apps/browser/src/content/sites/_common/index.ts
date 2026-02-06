@@ -105,7 +105,6 @@ export class CommonWatcher {
 						return;
 					}
 					const base64 = dataUrl.split(',')[1] || '';
-					console.log('Found favicon: ', base64);
 					resolve(base64);
 				};
 				reader.onerror = () => resolve('');

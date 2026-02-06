@@ -30,7 +30,7 @@ class NativeMessagingBridge {
     private var shouldReconnect = true
     
     private let responseLock = NSLock()
-    private var pendingCallbacks: [String: (Data) -> Void] = [:]
+    private var pendingCallbacks: [String: (Result<Data, Error>) -> Void] = [:]
     private var readBuffer = Data()
     
     private init() {}
@@ -92,7 +92,7 @@ class NativeMessagingBridge {
 
                 // Register callback for response
                 self.responseLock.lock()
-                self.pendingCallbacks[callbackId] = { responseData in
+                self.pendingCallbacks[callbackId] = { result in
                     callbackLock.lock()
                     guard !callbackFired else {
                         callbackLock.unlock()
@@ -101,13 +101,18 @@ class NativeMessagingBridge {
                     callbackFired = true
                     callbackLock.unlock()
                     
-                    do {
-                        if let response = try JSONSerialization.jsonObject(with: responseData, options: []) as? [String: Any] {
-                            completion(.success(response))
-                        } else {
-                            completion(.failure(BridgeError.invalidResponse))
+                    switch result {
+                    case .success(let responseData):
+                        do {
+                            if let response = try JSONSerialization.jsonObject(with: responseData, options: []) as? [String: Any] {
+                                completion(.success(response))
+                            } else {
+                                completion(.failure(BridgeError.invalidResponse))
+                            }
+                        } catch {
+                            completion(.failure(error))
                         }
-                    } catch {
+                    case .failure(let error):
                         completion(.failure(error))
                     }
                 }
@@ -196,10 +201,19 @@ class NativeMessagingBridge {
         connection = nil
         readBuffer.removeAll()
 
-        // Cancel all pending requests
+        // Copy and clear pending callbacks under the lock
         responseLock.lock()
+        let callbacksToCancel = pendingCallbacks
         pendingCallbacks.removeAll()
         responseLock.unlock()
+
+        // Notify all pending callers outside the lock so sync waiters are unblocked
+        if !callbacksToCancel.isEmpty {
+            logger.info("Cancelling \(callbacksToCancel.count) pending request(s)")
+            for (_, callback) in callbacksToCancel {
+                callback(.failure(BridgeError.processStopped))
+            }
+        }
 
         logger.info("Disconnected from local bridge server")
     }
@@ -338,7 +352,7 @@ class NativeMessagingBridge {
                     
                     if let callback = callback {
                         DispatchQueue.main.async {
-                            callback(data)
+                            callback(.success(data))
                         }
                         return
                     }

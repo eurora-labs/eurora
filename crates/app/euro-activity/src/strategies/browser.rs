@@ -451,6 +451,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     && !url.starts_with("http")
                     // TODO: Add the actual extension ID after we're accepted to chrome
                     && !url.starts_with("chrome-extension:")
+                    && !url.starts_with("safari-web-extension:")
+                    && !url.starts_with("safari-extension:")
                 {
                     return Err(ActivityError::invalid_data(format!(
                         "Invalid metadata URL: must start with 'http', got: {}",

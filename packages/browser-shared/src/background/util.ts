@@ -1,4 +1,9 @@
+let cachedIsSafari: boolean | null = null;
+
 export function isSafari() {
+	if (cachedIsSafari !== null) {
+		return cachedIsSafari;
+	}
 	// navigator is available in both background pages and service workers
 	const ua = navigator.userAgent || '';
 	const vendor = navigator.vendor || '';
@@ -15,5 +20,6 @@ export function isSafari() {
 		!ua.includes('OPR') && // Opera
 		!ua.includes('FxiOS'); // Firefox on iOS
 
-	return isAppleVendor && hasSafari && isNotChromeLike;
+	cachedIsSafari = isAppleVendor && hasSafari && isNotChromeLike;
+	return cachedIsSafari;
 }

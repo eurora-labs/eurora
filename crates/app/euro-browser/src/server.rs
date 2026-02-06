@@ -476,7 +476,7 @@ impl BrowserBridge for BrowserBridgeService {
         &self,
         request: Request<tonic::Streaming<Frame>>,
     ) -> Result<Response<Self::OpenStream>, Status> {
-        eprintln!("Received first browser open request");
+        info!("Received first browser open request");
         let mut inbound = request.into_inner();
 
         let first_frame = inbound.message().await.map_err(|e| {

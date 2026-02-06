@@ -48,8 +48,12 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 // Successfully forwarded to native host, complete with success
                 logger.debug("Forwarded response to native host")
                 completeWithResponse(context: context, response: ["status": "forwarded"])
-                return
+            } else {
+                // No pending request matched this response — treat as error
+                logger.warning("Received Response frame with no matching pending request: \(String(describing: messageDict))")
+                completeWithResponse(context: context, response: ["status": "error", "error": "unmatched_response"])
             }
+            return
         }
         
         // Send to bridge and wait for response
