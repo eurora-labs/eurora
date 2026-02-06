@@ -33,8 +33,6 @@ export const base = {
 		{
 			resources: [
 				'assets/*',
-				'content/web/viewer.html',
-				'pdfjs/viewer/*',
 				'http:/*',
 				'https:/*',
 				'file:/*',

@@ -21,12 +21,10 @@ pub enum NativeMessage {
     NativeYoutubeAsset,
     NativeArticleAsset,
     NativeTwitterAsset,
-    NativePdfAsset,
 
     NativeYoutubeSnapshot,
     NativeArticleSnapshot,
     NativeTwitterSnapshot,
-    NativePdfSnapshot,
 
     NativeMetadata,
     NativeIcon,
