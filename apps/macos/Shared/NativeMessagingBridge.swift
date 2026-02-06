@@ -31,7 +31,6 @@ class NativeMessagingBridge {
     
     private let responseLock = NSLock()
     private var pendingCallbacks: [String: (Result<Data, Error>) -> Void] = [:]
-    private var readBuffer = Data()
     
     private init() {}
 
@@ -155,24 +154,6 @@ class NativeMessagingBridge {
         }
     }
 
-    /// Send a message synchronously (blocks until response)
-    func sendMessageSync(_ message: [String: Any], timeout: TimeInterval = 30.0) -> Result<[String: Any], Error> {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<[String: Any], Error> = .failure(BridgeError.timeout)
-
-        sendMessage(message, timeout: timeout) { response in
-            result = response
-            semaphore.signal()
-        }
-
-        let waitResult = semaphore.wait(timeout: .now() + timeout)
-        if waitResult == .timedOut {
-            return .failure(BridgeError.timeout)
-        }
-
-        return result
-    }
-
     // MARK: - Private Methods
 
     private func connectToServer() {
@@ -199,7 +180,6 @@ class NativeMessagingBridge {
         isConnected = false
         connection?.cancel()
         connection = nil
-        readBuffer.removeAll()
 
         // Copy and clear pending callbacks under the lock
         responseLock.lock()

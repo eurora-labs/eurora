@@ -10,11 +10,10 @@
 import Cocoa
 import SafariServices
 import os.log
-import AppKit
 
 
 @main
-@available(macOS 13.0, *)
+@available(macOS 15.0, *)
 class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate, LocalBridgeServerDelegate {
     
     private let logger = Logger(subsystem: "com.eurora.macos", category: "AppDelegate")
@@ -302,12 +301,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         
         let idValue: Any = Int(requestId) ?? requestId
         
+        let payloadDict: [String: Any] = ["kind": "Error", "data": error]
+        let payload: String
+        do {
+            let payloadData = try JSONSerialization.data(withJSONObject: payloadDict, options: [])
+            guard let payloadString = String(data: payloadData, encoding: .utf8) else {
+                logger.error("Failed to encode error payload as UTF-8 string")
+                return
+            }
+            payload = payloadString
+        } catch {
+            logger.error("Failed to serialize error payload: \(error.localizedDescription)")
+            return
+        }
+        
         let response: [String: Any] = [
             "kind": [
                 "Response": [
                     "id": idValue,
                     "action": action,
-                    "payload": "{\"kind\":\"Error\",\"data\":\"\(error)\"}"
+                    "payload": payload
                 ]
             ]
         ]

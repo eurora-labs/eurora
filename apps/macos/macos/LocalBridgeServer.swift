@@ -22,7 +22,7 @@ protocol LocalBridgeServerDelegate: AnyObject {
 }
 
 /// Local TCP server for communication with the Safari extension
-@available(macOS 13.0, *)
+@available(macOS 15.0, *)
 class LocalBridgeServer {
     
     // MARK: - Properties
