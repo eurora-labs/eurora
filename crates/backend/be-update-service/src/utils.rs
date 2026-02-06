@@ -8,6 +8,8 @@ use crate::error::UpdateServiceError;
 
 /// Parse target_arch into target and arch components
 /// e.g., "linux-x86_64" -> ("linux", "x86_64")
+/// Note: Tauri uses "darwin" for macOS, but our S3 structure uses "macos",
+/// so we normalize darwin -> macos here.
 #[instrument(fields(target_arch))]
 pub fn parse_target_arch(target_arch: &str) -> Result<(String, String)> {
     debug!("Parsing target architecture: {}", target_arch);
@@ -20,6 +22,14 @@ pub fn parse_target_arch(target_arch: &str) -> Result<(String, String)> {
 
     let target = parts[0].to_string();
     let arch = parts[1..].join("-"); // Handle cases like "aarch64" or multi-part arch
+
+    // Normalize darwin -> macos to match our S3 directory structure
+    // Tauri uses "darwin" but our release script stores files under "macos"
+    let target = if target == "darwin" {
+        "macos".to_string()
+    } else {
+        target
+    };
 
     Ok((target, arch))
 }
@@ -86,9 +96,15 @@ mod tests {
             ("linux".to_string(), "x86_64".to_string())
         );
 
+        // darwin should be normalized to macos to match S3 directory structure
         assert_eq!(
             parse_target_arch("darwin-aarch64").unwrap(),
-            ("darwin".to_string(), "aarch64".to_string())
+            ("macos".to_string(), "aarch64".to_string())
+        );
+
+        assert_eq!(
+            parse_target_arch("darwin-x86_64").unwrap(),
+            ("macos".to_string(), "x86_64".to_string())
         );
 
         assert_eq!(
