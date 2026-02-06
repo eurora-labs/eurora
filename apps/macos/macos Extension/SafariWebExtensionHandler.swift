@@ -34,7 +34,9 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             message = request?.userInfo?["message"]
         }
 
-        logger.debug("Received message from browser.runtime.sendNativeMessage: \(String(describing: message)) (profile: \(profile?.uuidString ?? "none"))")
+        let profileStr = profile?.uuidString ?? "none"
+        let msgDesc = String(describing: message)
+        logger.debug("Received native message: \(msgDesc) (profile: \(profileStr))")
 
         guard let messageDict = message as? [String: Any] else {
             logger.error("Invalid message format — expected dictionary")

@@ -180,104 +180,79 @@ final class BrowserBridgeClient: @unchecked Sendable {
         }
     }
 
+    /// Build the registration frame to send on connect
+    private func buildRegistrationFrame() -> BrowserBridge_Frame {
+        var registerFrame = BrowserBridge_RegisterFrame()
+        registerFrame.hostPid = self.hostPid
+        registerFrame.browserPid = self.browserPid
+        var frame = BrowserBridge_Frame()
+        frame.register = registerFrame
+        return frame
+    }
+
+    /// Create the outbound producer for streaming
+    private func makeOutboundProducer(
+        _ outboundStream: AsyncStream<BrowserBridge_Frame>
+    ) -> @Sendable (RPCWriter<BrowserBridge_Frame>) async throws -> Void {
+        return { writer in
+            self.logger.debug("Producer started, forwarding outbound frames...")
+            do {
+                for await frame in outboundStream {
+                    try await writer.write(frame)
+                }
+                self.logger.debug("Producer: stream ended normally")
+            } catch is CancellationError {
+                self.logger.debug("Producer cancelled")
+            } catch {
+                self.logger.error("Producer error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Process inbound frames from the server
+    private func processInboundFrames(
+        _ response: StreamingClientResponse<BrowserBridge_Frame>
+    ) async {
+        await MainActor.run { self.delegate?.browserBridgeClientDidConnect(self) }
+        do {
+            var frameCount = 0
+            for try await receivedFrame in response.messages {
+                frameCount += 1
+                self.logger.debug("Received frame #\(frameCount) from server")
+                await MainActor.run {
+                    self.delegate?.browserBridgeClient(self, didReceiveFrame: receivedFrame)
+                }
+            }
+            self.logger.info("Server stream ended after \(frameCount) frames")
+        } catch { self.logger.error("Error receiving from server: \(error)") }
+    }
+
     /// Run a single gRPC connection using the canonical `withGRPCClient` pattern.
-    /// Returns when the connection is lost.
-    ///
-    /// This uses `withGRPCClient` which internally uses `withThrowingDiscardingTaskGroup`
-    /// to manage the gRPC client lifecycle correctly. The `runConnections()` method runs
-    /// as a background task in the discarding group, and our RPC runs in the main body.
-    /// Unlike a regular task group with `group.next()`, a discarding task group does NOT
-    /// cancel other tasks when one completes normally — only when one throws.
     private func runOneConnection() async throws {
-        // Create transport — this is the HTTP/2 connection to the server
         let transport = try HTTP2ClientTransport.Posix(
-            target: .ipv6(host: "::1", port: kBrowserBridgePort),
+            target: .ipv6(address: "::1", port: kBrowserBridgePort),
             transportSecurity: .plaintext
         )
 
-        // Use the canonical withGRPCClient pattern.
-        // This starts runConnections() in a background task and provides the client.
-        // When the handleClient closure returns, beginGracefulShutdown() is called automatically.
         try await withGRPCClient(transport: transport) { grpcClient in
             let bridgeClient = BrowserBridge_BrowserBridge.Client(wrapping: grpcClient)
+            let regFrame = self.buildRegistrationFrame()
+            self.logger.info("Sending registration: host=\(self.hostPid), browser=\(self.browserPid)")
 
-            // Build the registration frame (sent as the first message, like in the Rust code)
-            var registerFrame = BrowserBridge_RegisterFrame()
-            registerFrame.hostPid = self.hostPid
-            registerFrame.browserPid = self.browserPid
-
-            var regFrame = BrowserBridge_Frame()
-            regFrame.register = registerFrame
-
-            self.logger.info("Sending registration frame: host_pid=\(self.hostPid), browser_pid=\(self.browserPid)")
-
-            // Create an AsyncStream for outbound frames.
-            // This is the Swift equivalent of Rust's async_stream::stream! { yield reg; loop { recv → yield } }
-            let (outboundStream, outboundContinuation) = AsyncStream.makeStream(of: BrowserBridge_Frame.self)
-
-            // Store the continuation so send(frame:) can yield frames to the stream.
-            // This is the Swift equivalent of storing the broadcast::Sender.
+            let (outboundStream, continuation) = AsyncStream.makeStream(of: BrowserBridge_Frame.self)
             self.lock.lock()
-            self.outboundContinuation = outboundContinuation
+            self.outboundContinuation = continuation
             self.lock.unlock()
+            continuation.yield(regFrame)
 
-            // Yield the registration frame as the first message.
-            // Equivalent to: yield register_frame; in the Rust stream.
-            outboundContinuation.yield(regFrame)
-
-            // Build the streaming request with a producer that reads from the AsyncStream.
-            // The producer blocks on `for await` until the stream is finished (via continuation.finish()).
-            // This keeps the request stream open (no END_STREAM / half-close) until we explicitly close it.
             let request = StreamingClientRequest<BrowserBridge_Frame>(
-                metadata: [:],
-                producer: { writer in
-                    self.logger.debug("Producer started, forwarding outbound frames...")
-                    do {
-                        for await frame in outboundStream {
-                            self.logger.debug("Producer writing frame to gRPC stream...")
-                            try await writer.write(frame)
-                            self.logger.debug("Producer wrote frame successfully")
-                        }
-                        self.logger.debug("Producer: for-await loop exited normally (stream ended)")
-                    } catch is CancellationError {
-                        self.logger.debug("Producer cancelled")
-                    } catch {
-                        self.logger.error("Producer error: \(error.localizedDescription)")
-                    }
-                    self.logger.debug("Producer finished — returning from closure")
-                }
+                metadata: [:], producer: self.makeOutboundProducer(outboundStream)
             )
 
-            // Open the bidirectional stream and process inbound frames.
-            // This is the Swift equivalent of:
-            //   let response = client.open(outbound_stream).await?;
-            //   let mut inbound_stream = response.into_inner();
-            //   loop { match inbound_stream.message().await { ... } }
             try await bridgeClient.open(request: request) { [self] response in
                 self.logger.info("Bidirectional stream opened successfully")
-
-                // Notify delegate of connection
-                await MainActor.run {
-                    self.delegate?.browserBridgeClientDidConnect(self)
-                }
-
-                // Process inbound frames from the server.
-                // Mirrors the Rust code's loop { inbound_stream.message().await }
-                do {
-                    var frameCount = 0
-                    for try await receivedFrame in response.messages {
-                        frameCount += 1
-                        self.logger.debug("Received frame #\(frameCount) from server")
-                        await MainActor.run {
-                            self.delegate?.browserBridgeClient(self, didReceiveFrame: receivedFrame)
-                        }
-                    }
-                    self.logger.info("Server stream ended after \(frameCount) frames")
-                } catch {
-                    self.logger.error("Error receiving from server: \(error)")
-                }
+                await self.processInboundFrames(response)
             }
-
             self.logger.info("RPC completed, connection will be retried")
         }
     }

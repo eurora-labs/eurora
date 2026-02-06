@@ -248,7 +248,8 @@ class LocalBridgeServer {
     }
 
     private func receiveMessageBody(from connection: NWConnection, connId: ObjectIdentifier, length: Int) {
-        connection.receive(minimumIncompleteLength: length, maximumLength: length) { [weak self] data, _, isComplete, error in
+        let len = length
+        connection.receive(minimumIncompleteLength: len, maximumLength: len) { [weak self] data, _, isComplete, error in
             guard let self else { return }
 
             if let error {
