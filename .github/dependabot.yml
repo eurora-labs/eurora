@@ -5,11 +5,17 @@ updates:
       directory: '/'
       schedule:
           interval: 'weekly'
+      cooldown:
+          period: 3
+          random-delay: true
 
     - package-ecosystem: 'npm'
       directory: '/'
       schedule:
           interval: 'weekly'
+      cooldown:
+          period: 3
+          random-delay: true
       ignore:
           - dependency-name: '*'
             update-types: ['version-update:semver-major']
@@ -21,6 +27,9 @@ updates:
       directory: '/'
       schedule:
           interval: 'monthly'
+      cooldown:
+          period: 7
+          random-delay: true
       ignore:
           - dependency-name: '*'
             update-types: ['version-update:semver-major']
