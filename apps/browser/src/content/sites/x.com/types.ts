@@ -1,5 +1,5 @@
-import { NativeTwitterTweet } from '@eurora/browser-shared/content/bindings';
-import {
+import type { NativeTwitterTweet } from '@eurora/browser-shared/content/bindings';
+import type {
 	MessageType,
 	BrowserObj,
 } from '@eurora/browser-shared/content/extensions/watchers/watcher';
