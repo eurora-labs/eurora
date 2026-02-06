@@ -17,6 +17,7 @@ export async function webNavigationListener(tabId: number, url: string, frameId:
 		});
 
 		const defaultChunk = 'scripts/content/sites/_default/index.js';
+		const commonChunk = 'scripts/content/sites/_common/index.js';
 		if (!site) {
 			await browser.tabs
 				.sendMessage(tabId, {
@@ -24,6 +25,7 @@ export async function webNavigationListener(tabId: number, url: string, frameId:
 					siteId: 'default',
 					chunk: defaultChunk,
 					defaultChunk,
+					commonChunk,
 				})
 				.catch((error) => {
 					console.error('Failed to send SITE_LOAD message:', error);
@@ -41,6 +43,7 @@ export async function webNavigationListener(tabId: number, url: string, frameId:
 				// chunk paths are already content-side relative inside dist
 				chunk: `scripts/content/${site.chunk}`,
 				defaultChunk,
+				commonChunk,
 			})
 			.catch((error) => {
 				console.error('Failed to send SITE_LOAD message:', error);

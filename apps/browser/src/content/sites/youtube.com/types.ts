@@ -1,4 +1,4 @@
-import {
+import type {
 	MessageType,
 	BrowserObj,
 } from '@eurora/browser-shared/content/extensions/watchers/watcher';

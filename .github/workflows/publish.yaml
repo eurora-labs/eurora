@@ -47,7 +47,7 @@ jobs:
               shell: bash
               run: curl "${{ secrets.SENTRY_CRONS }}?status=in_progress"
 
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -153,7 +153,7 @@ jobs:
                   echo "PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
                   echo "OPENSSL_SRC_PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -313,7 +313,7 @@ jobs:
                     - platform: windows-latest # [windows, x64]
                       target: ''
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -373,7 +373,7 @@ jobs:
         permissions:
             contents: write # Required for creating and pushing git tags
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: true
