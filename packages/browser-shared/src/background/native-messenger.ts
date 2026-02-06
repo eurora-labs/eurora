@@ -145,7 +145,7 @@ async function onActionMetadata(frame: RequestFrame): Promise<Frame> {
 async function onActionMetadataFromContentScript(frame: RequestFrame): Promise<Frame> {
 	const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
 
-	if (!activeTab.id) {
+	if (!activeTab || !activeTab.id) {
 		const response: ResponseFrame = {
 			id: frame.id,
 			action: frame.action,

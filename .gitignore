@@ -318,7 +318,6 @@ DerivedData/
 # Swift Package Manager
 .build/
 .swiftpm/
-Package.resolved
 
 # Playground
 timeline.xctimeline
