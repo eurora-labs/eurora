@@ -531,8 +531,8 @@ impl BrowserBridge for BrowserBridgeService {
                 match inbound.message().await {
                     Ok(Some(frame)) => {
                         info!(
-                            "Received frame from native messenger (browser_pid={}): {:?}",
-                            browser_pid, frame
+                            "Received frame from native messenger browser_pid={}",
+                            browser_pid
                         );
                         if let Err(e) = frames_tx.send((browser_pid, frame)) {
                             warn!(

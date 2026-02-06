@@ -8,15 +8,7 @@ export const base = {
 	content_security_policy: {
 		extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
 	},
-	permissions: [
-		'nativeMessaging',
-		'tabs',
-		'storage',
-		'scripting',
-		'declarativeNetRequestWithHostAccess',
-		'webRequest',
-		'webNavigation',
-	],
+	permissions: ['nativeMessaging', 'tabs', 'storage', 'scripting', 'webRequest', 'webNavigation'],
 	icons: {
 		16: 'icon-16x16.png',
 		32: 'icon-32x32.png',
@@ -24,9 +16,6 @@ export const base = {
 		128: 'icon-128x128.png',
 	},
 	host_permissions: ['<all_urls>'],
-	storage: {
-		managed_schema: 'preferences_schema.json',
-	},
 	// Content scripts are managed programmatically by the background script
 	// using browser.scripting.executeScript, not declared here
 	web_accessible_resources: [

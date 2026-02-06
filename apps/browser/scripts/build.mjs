@@ -60,13 +60,6 @@ async function main() {
 	await build(backgroundConfig({ browser, outDir, emptyOutDir: false }));
 
 	await writeManifest({ browser, outDir });
-
-	// Copy preferences schema to dist folder (next to manifest.json)
-	const preferencesSchemaPath = path.join('src', 'preferences_schema.json');
-	if (fs.existsSync(preferencesSchemaPath)) {
-		fs.copyFileSync(preferencesSchemaPath, path.join(outDir, 'preferences_schema.json'));
-		console.log('Copied preferences_schema.json to', outDir);
-	}
 }
 
 function copyDir(src, dest) {
