@@ -41,6 +41,24 @@ async function main() {
 		if (fs.existsSync(indexHtml)) {
 			fs.renameSync(indexHtml, popupHtml);
 		}
+
+		// For Safari: rename script-{hash}.js to script.js and update references
+		if (browser === 'safari') {
+			const scriptFiles = fs
+				.readdirSync(outDir)
+				.filter((f) => /^script-[a-z0-9]+\.js$/.test(f));
+			for (const scriptFile of scriptFiles) {
+				const newName = 'script.js';
+				fs.renameSync(path.join(outDir, scriptFile), path.join(outDir, newName));
+				console.log(`Renamed ${scriptFile} -> ${newName}`);
+				// Update reference in popup.html
+				if (fs.existsSync(popupHtml)) {
+					let html = fs.readFileSync(popupHtml, 'utf-8');
+					html = html.replace(`/${scriptFile}`, `/${newName}`);
+					fs.writeFileSync(popupHtml, html);
+				}
+			}
+		}
 	}
 
 	// Build content and background scripts

@@ -31,7 +31,7 @@ function targetPatch(browser) {
 	}
 	if (browser === 'safari') {
 		return {
-			// keep it WebExtensions-compatible; Safari packaging is done after build
+			background: { scripts: ['assets/background.js'] },
 		};
 	}
 	return {

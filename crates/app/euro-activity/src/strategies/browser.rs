@@ -21,10 +21,10 @@ use crate::{
 use async_trait::async_trait;
 use euro_native_messaging::NativeMessage;
 use focus_tracker::FocusedWindow;
+use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
 use url::Url;
 
 // Re-export the singleton service and types from euro_browser crate
@@ -190,7 +190,12 @@ impl BrowserStrategy {
 #[async_trait]
 impl StrategySupport for BrowserStrategy {
     fn get_supported_processes() -> Vec<&'static str> {
-        vec![Librewolf.get_name(), Firefox.get_name(), Chrome.get_name()]
+        vec![
+            Librewolf.get_name(),
+            Firefox.get_name(),
+            Chrome.get_name(),
+            Safari.get_name(),
+        ]
     }
 }
 
@@ -444,6 +449,8 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     && !url.starts_with("http")
                     // TODO: Add the actual extension ID after we're accepted to chrome
                     && !url.starts_with("chrome-extension:")
+                    && !url.starts_with("safari-web-extension:")
+                    && !url.starts_with("safari-extension:")
                 {
                     return Err(ActivityError::invalid_data(format!(
                         "Invalid metadata URL: must start with 'http', got: {}",

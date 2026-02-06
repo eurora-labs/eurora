@@ -2,6 +2,7 @@
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use euro_auth::AuthedChannel;
+use log::{debug, error};
 use prost_types::Timestamp;
 use proto_gen::activity::{
     ActivityResponse, InsertActivityRequest,
@@ -11,7 +12,6 @@ use proto_gen::asset::{CreateAssetRequest, proto_asset_service_client::ProtoAsse
 use serde::{Deserialize, Serialize};
 use std::{io::Cursor, path::PathBuf};
 use tonic::Status;
-use tracing::{debug, error};
 
 use crate::{Activity, ActivityAsset, ActivityError, error::ActivityResult};
 
