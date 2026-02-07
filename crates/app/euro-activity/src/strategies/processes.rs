@@ -20,7 +20,12 @@ pub struct Eurora;
 
 impl ProcessFunctionality for Eurora {
     fn get_name(&self) -> &str {
-        os_pick("euro-tauri.exe", "euro-tauri", "euro-tauri")
+        // This process is used to ignore the application.
+        // So different names are used for debug and release builds.
+        match cfg!(debug_assertions) {
+            true => os_pick("euro-tauri.exe", "euro-tauri", "euro-tauri"),
+            false => os_pick("euro-tauri.exe", "euro-tauri", "Eurora"),
+        }
     }
 }
 
