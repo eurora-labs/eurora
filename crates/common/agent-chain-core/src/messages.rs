@@ -114,6 +114,7 @@ pub use content::{
     create_tool_call,
     create_video_block,
     // Helper functions
+    get_data_content_block_types,
     is_data_content_block,
 };
 
