@@ -43,6 +43,7 @@ mod base;
 mod format_instructions;
 mod json;
 mod list;
+mod openai_functions;
 mod string;
 mod transform;
 mod xml;
@@ -76,6 +77,11 @@ pub use list::{
 
 // Re-export XML parser
 pub use xml::{XMLOutputParser, nested_element};
+
+// Re-export OpenAI functions parsers
+pub use openai_functions::{
+    JsonOutputFunctionsParser, OutputFunctionsParser, PydanticOutputFunctionsParser, PydanticSchema,
+};
 
 #[cfg(test)]
 mod tests {
