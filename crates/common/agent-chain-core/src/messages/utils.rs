@@ -1089,9 +1089,10 @@ pub enum TrimStrategy {
 
 /// Configuration for trimming messages.
 #[derive(Debug, Clone)]
-pub struct TrimMessagesConfig<F>
+pub struct TrimMessagesConfig<F, S = fn(&str) -> Vec<String>>
 where
     F: Fn(&[BaseMessage]) -> usize,
+    S: Fn(&str) -> Vec<String>,
 {
     /// Maximum token count of trimmed messages.
     pub max_tokens: usize,
@@ -1112,6 +1113,10 @@ where
     /// strategy="last". If specified, every message before the first occurrence
     /// of this type is ignored (after trimming to max_tokens).
     pub start_on: Option<Vec<String>>,
+    /// Custom text splitter function for partial message splitting.
+    /// When `allow_partial` is true, this function is used to split text content
+    /// into chunks. Defaults to splitting on newlines.
+    pub text_splitter: Option<S>,
 }
 
 impl<F> TrimMessagesConfig<F>
@@ -1128,6 +1133,7 @@ where
             include_system: false,
             end_on: None,
             start_on: None,
+            text_splitter: None,
         }
     }
 
@@ -1160,6 +1166,23 @@ where
         self.start_on = Some(start_on);
         self
     }
+
+    /// Set a custom text splitter function for partial message splitting.
+    pub fn with_text_splitter<S2: Fn(&str) -> Vec<String>>(
+        self,
+        text_splitter: S2,
+    ) -> TrimMessagesConfig<F, S2> {
+        TrimMessagesConfig {
+            max_tokens: self.max_tokens,
+            token_counter: self.token_counter,
+            strategy: self.strategy,
+            allow_partial: self.allow_partial,
+            include_system: self.include_system,
+            end_on: self.end_on,
+            start_on: self.start_on,
+            text_splitter: Some(text_splitter),
+        }
+    }
 }
 
 /// Trim messages to be below a token count.
@@ -1174,12 +1197,13 @@ where
 /// List of trimmed messages.
 ///
 /// This corresponds to `trim_messages` in LangChain Python.
-pub fn trim_messages<F>(
+pub fn trim_messages<F, S>(
     messages: &[BaseMessage],
-    config: &TrimMessagesConfig<F>,
+    config: &TrimMessagesConfig<F, S>,
 ) -> Vec<BaseMessage>
 where
     F: Fn(&[BaseMessage]) -> usize,
+    S: Fn(&str) -> Vec<String>,
 {
     if messages.is_empty() {
         return Vec::new();
@@ -1194,18 +1218,24 @@ where
     }
 
     match config.strategy {
-        TrimStrategy::First => trim_messages_first(messages, config),
+        TrimStrategy::First => trim_messages_first(messages, config, false),
         TrimStrategy::Last => trim_messages_last(messages, config),
     }
 }
 
 /// Trim messages from the beginning (strategy="first").
-fn trim_messages_first<F>(
+///
+/// When `reverse_partial` is true, partial content is taken from the end
+/// of the content (used when the overall strategy is "last" and messages
+/// have been reversed).
+fn trim_messages_first<F, S>(
     messages: &[BaseMessage],
-    config: &TrimMessagesConfig<F>,
+    config: &TrimMessagesConfig<F, S>,
+    reverse_partial: bool,
 ) -> Vec<BaseMessage>
 where
     F: Fn(&[BaseMessage]) -> usize,
+    S: Fn(&str) -> Vec<String>,
 {
     let mut messages: Vec<BaseMessage> = messages.to_vec();
 
@@ -1245,22 +1275,30 @@ where
 
         // First try list content (multimodal blocks)
         let excluded_content = messages[idx].content();
-        if let Ok(content_blocks) = serde_json::from_str::<Vec<serde_json::Value>>(excluded_content)
-            && content_blocks.len() > 1
+        if let Ok(mut content_blocks) =
+            serde_json::from_str::<Vec<serde_json::Value>>(excluded_content)
         {
-            // Try removing blocks from the end
-            let num_blocks = content_blocks.len();
-            for remove_count in 1..num_blocks {
-                let partial_blocks = &content_blocks[..num_blocks - remove_count];
-                let partial_content = serde_json::to_string(partial_blocks).unwrap_or_default();
-                let partial_msg = create_message_with_content(&messages[idx], &partial_content);
-                let mut test = messages[..idx].to_vec();
-                test.push(partial_msg);
-                if (config.token_counter)(&test) <= config.max_tokens {
-                    messages = test;
-                    idx += 1;
-                    included_partial = true;
-                    break;
+            if content_blocks.len() > 1 {
+                if reverse_partial {
+                    content_blocks.reverse();
+                }
+                let num_blocks = content_blocks.len();
+                for remove_count in 1..num_blocks {
+                    let mut partial_blocks = content_blocks[..num_blocks - remove_count].to_vec();
+                    if reverse_partial {
+                        partial_blocks.reverse();
+                    }
+                    let partial_content =
+                        serde_json::to_string(&partial_blocks).unwrap_or_default();
+                    let partial_msg = create_message_with_content(&messages[idx], &partial_content);
+                    let mut test = messages[..idx].to_vec();
+                    test.push(partial_msg);
+                    if (config.token_counter)(&test) <= config.max_tokens {
+                        messages = test;
+                        idx += 1;
+                        included_partial = true;
+                        break;
+                    }
                 }
             }
         }
@@ -1269,8 +1307,15 @@ where
         if !included_partial {
             let content = messages[idx].content();
             if !content.is_empty() {
-                let split_texts = default_text_splitter(content);
+                let mut split_texts = if let Some(ref splitter) = config.text_splitter {
+                    splitter(content)
+                } else {
+                    default_text_splitter(content)
+                };
                 if split_texts.len() > 1 {
+                    if reverse_partial {
+                        split_texts.reverse();
+                    }
                     // Binary search for max splits
                     let mut s_left = 0;
                     let mut s_right = split_texts.len();
@@ -1288,7 +1333,11 @@ where
                         }
                     }
                     if s_left > 0 {
-                        let partial_content: String = split_texts[..s_left].concat();
+                        let mut content_splits = split_texts[..s_left].to_vec();
+                        if reverse_partial {
+                            content_splits.reverse();
+                        }
+                        let partial_content: String = content_splits.concat();
                         let partial_msg =
                             create_message_with_content(&messages[idx], &partial_content);
                         let end = idx;
@@ -1312,12 +1361,13 @@ where
 }
 
 /// Trim messages from the end (strategy="last").
-fn trim_messages_last<F>(
+fn trim_messages_last<F, S>(
     messages: &[BaseMessage],
-    config: &TrimMessagesConfig<F>,
+    config: &TrimMessagesConfig<F, S>,
 ) -> Vec<BaseMessage>
 where
     F: Fn(&[BaseMessage]) -> usize,
+    S: Fn(&str) -> Vec<String>,
 {
     let mut messages: Vec<BaseMessage> = messages.to_vec();
 
@@ -1355,6 +1405,11 @@ where
 
     // Build a temporary config for first-strategy on reversed messages
     // Pass start_on as end_on (since we reversed)
+    // Wrap the text_splitter reference in a closure so it fits the generic param
+    let splitter_wrapper: Option<Box<dyn Fn(&str) -> Vec<String> + '_>> = config
+        .text_splitter
+        .as_ref()
+        .map(|s| Box::new(move |text: &str| s(text)) as Box<dyn Fn(&str) -> Vec<String>>);
     let reverse_config = TrimMessagesConfig {
         max_tokens: remaining_tokens,
         token_counter: &config.token_counter,
@@ -1363,9 +1418,10 @@ where
         include_system: false,
         end_on: config.start_on.clone(),
         start_on: None,
+        text_splitter: splitter_wrapper,
     };
 
-    let mut result = trim_messages_first(&messages, &reverse_config);
+    let mut result = trim_messages_first(&messages, &reverse_config, true);
 
     // Reverse back
     result.reverse();
