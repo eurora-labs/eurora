@@ -99,10 +99,8 @@ impl BaseOutputParser for JsonOutputParser {
                 Ok(value) => Ok(value),
                 Err(_) => {
                     // For partial parsing, try to parse what we have
-                    match parse_partial_json(text, false) {
-                        Ok(value) => Ok(value),
-                        Err(_) => Ok(Value::Null),
-                    }
+                    parse_partial_json(text, false)
+                        .map_err(|e| Error::Other(format!("Partial parse failed: {}", e)))
                 }
             }
         } else {
@@ -150,11 +148,12 @@ impl BaseCumulativeTransformOutputParser for JsonOutputParser {
 
     fn compute_diff(&self, prev: Option<&Value>, next: Value) -> Value {
         match prev {
-            Some(prev_value) => {
-                // Compute JSON patch diff
-                compute_json_diff(prev_value, &next)
-            }
-            None => next,
+            Some(prev_value) => compute_json_diff(prev_value, &next),
+            None => Value::Array(vec![serde_json::json!({
+                "op": "replace",
+                "path": "",
+                "value": next,
+            })]),
         }
     }
 }
@@ -163,38 +162,37 @@ impl BaseCumulativeTransformOutputParser for JsonOutputParser {
 ///
 /// Returns a JSON patch-like representation of the differences.
 fn compute_json_diff(prev: &Value, next: &Value) -> Value {
-    if prev == next {
-        return Value::Array(vec![]);
-    }
-
     let mut patches = Vec::new();
+    compute_json_diff_recursive(prev, next, "", &mut patches);
+    Value::Array(patches)
+}
+
+fn compute_json_diff_recursive(prev: &Value, next: &Value, path: &str, patches: &mut Vec<Value>) {
+    if prev == next {
+        return;
+    }
 
     match (prev, next) {
         (Value::Object(prev_obj), Value::Object(next_obj)) => {
-            // Find removed keys
             for key in prev_obj.keys() {
                 if !next_obj.contains_key(key) {
                     patches.push(serde_json::json!({
                         "op": "remove",
-                        "path": format!("/{}", key),
+                        "path": format!("{}/{}", path, key),
                     }));
                 }
             }
 
-            // Find added or changed keys
             for (key, next_val) in next_obj {
+                let child_path = format!("{}/{}", path, key);
                 match prev_obj.get(key) {
                     Some(prev_val) if prev_val != next_val => {
-                        patches.push(serde_json::json!({
-                            "op": "replace",
-                            "path": format!("/{}", key),
-                            "value": next_val,
-                        }));
+                        compute_json_diff_recursive(prev_val, next_val, &child_path, patches);
                     }
                     None => {
                         patches.push(serde_json::json!({
                             "op": "add",
-                            "path": format!("/{}", key),
+                            "path": child_path,
                             "value": next_val,
                         }));
                     }
@@ -202,17 +200,34 @@ fn compute_json_diff(prev: &Value, next: &Value) -> Value {
                 }
             }
         }
+        (Value::Array(prev_arr), Value::Array(next_arr)) => {
+            let common_len = prev_arr.len().min(next_arr.len());
+            for i in 0..common_len {
+                let child_path = format!("{}/{}", path, i);
+                compute_json_diff_recursive(&prev_arr[i], &next_arr[i], &child_path, patches);
+            }
+            for i in common_len..next_arr.len() {
+                patches.push(serde_json::json!({
+                    "op": "add",
+                    "path": format!("{}/{}", path, i),
+                    "value": next_arr[i],
+                }));
+            }
+            for i in common_len..prev_arr.len() {
+                patches.push(serde_json::json!({
+                    "op": "remove",
+                    "path": format!("{}/{}", path, i),
+                }));
+            }
+        }
         _ => {
-            // For non-object types, just replace
             patches.push(serde_json::json!({
                 "op": "replace",
-                "path": "",
+                "path": path,
                 "value": next,
             }));
         }
     }
-
-    Value::Array(patches)
 }
 
 /// Type alias for backwards compatibility.
