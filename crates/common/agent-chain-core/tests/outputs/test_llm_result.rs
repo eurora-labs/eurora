@@ -300,8 +300,18 @@ mod llm_result_tests {
         assert_ne!(result1, result2);
     }
 
-    // Note: test_equality_ignores_run_info - In Rust, the PartialEq derive includes all fields.
-    // This is a deliberate API difference from Python. Run info is part of equality in Rust.
+    /// Test that equality ignores run info.
+    #[test]
+    fn test_equality_ignores_run_info() {
+        let generation = Generation::new("Response");
+        let run_id1 = Uuid::new_v4();
+        let run_id2 = Uuid::new_v4();
+        let mut result1 = LLMResult::new(vec![vec![generation.clone().into()]]);
+        result1.run = Some(vec![RunInfo::new(run_id1)]);
+        let mut result2 = LLMResult::new(vec![vec![generation.into()]]);
+        result2.run = Some(vec![RunInfo::new(run_id2)]);
+        assert_eq!(result1, result2);
+    }
 
     /// Test equality when llm_output is None.
     #[test]
@@ -311,9 +321,6 @@ mod llm_result_tests {
         let result2 = LLMResult::new(vec![vec![generation.into()]]);
         assert_eq!(result1, result2);
     }
-
-    // Note: test_hash_is_none - In Rust, hash is not implemented by default,
-    // and HashMap doesn't require hashable keys for LLMResult usage.
 
     /// Test that type field is set correctly.
     #[test]
@@ -382,5 +389,278 @@ mod llm_result_tests {
                 .get("temperature"),
             Some(&json!(0.7))
         );
+    }
+}
+
+/// Test suite for LLMResult.flatten() edge cases.
+mod llm_result_flatten_tests {
+    use super::*;
+
+    /// Test that flatten drops run info from flattened results.
+    #[test]
+    fn test_flatten_does_not_include_run_info() {
+        let gen1 = Generation::new("R1");
+        let gen2 = Generation::new("R2");
+        let run_info = vec![RunInfo::new(Uuid::new_v4()), RunInfo::new(Uuid::new_v4())];
+        let mut result = LLMResult::new(vec![vec![gen1.into()], vec![gen2.into()]]);
+        result.run = Some(run_info);
+        let flattened = result.flatten();
+        for flat in &flattened {
+            assert!(flat.run.is_none());
+        }
+    }
+
+    /// Test that flatten clones llm_output so mutations are isolated.
+    #[test]
+    fn test_flatten_clones_llm_output_for_subsequent() {
+        let gen1 = Generation::new("R1");
+        let gen2 = Generation::new("R2");
+        let mut llm_output = HashMap::new();
+        llm_output.insert("token_usage".to_string(), json!({"total": 100}));
+        llm_output.insert("model".to_string(), json!("gpt-4"));
+        let result =
+            LLMResult::with_llm_output(vec![vec![gen1.into()], vec![gen2.into()]], llm_output);
+        let mut flattened = result.flatten();
+        // Mutate the second flattened result's llm_output
+        flattened[1]
+            .llm_output
+            .as_mut()
+            .unwrap()
+            .insert("model".to_string(), json!("modified"));
+        // Original should not be affected
+        assert_eq!(
+            result.llm_output.as_ref().unwrap().get("model"),
+            Some(&json!("gpt-4"))
+        );
+        // First flattened result should not be affected
+        assert_eq!(
+            flattened[0].llm_output.as_ref().unwrap().get("model"),
+            Some(&json!("gpt-4"))
+        );
+    }
+
+    /// Test flatten keeps all candidates within each generation list.
+    #[test]
+    fn test_flatten_preserves_all_candidates_in_gen_list() {
+        let gen1a = Generation::new("1A");
+        let gen1b = Generation::new("1B");
+        let gen2a = Generation::new("2A");
+        let result = LLMResult::new(vec![vec![gen1a.into(), gen1b.into()], vec![gen2a.into()]]);
+        let flattened = result.flatten();
+        assert_eq!(flattened.len(), 2);
+        assert_eq!(flattened[0].generations[0].len(), 2);
+        if let GenerationType::Generation(g) = &flattened[0].generations[0][0] {
+            assert_eq!(g.text, "1A");
+        }
+        if let GenerationType::Generation(g) = &flattened[0].generations[0][1] {
+            assert_eq!(g.text, "1B");
+        }
+        assert_eq!(flattened[1].generations[0].len(), 1);
+        if let GenerationType::Generation(g) = &flattened[1].generations[0][0] {
+            assert_eq!(g.text, "2A");
+        }
+    }
+
+    /// Test flatten works with ChatGeneration objects.
+    #[test]
+    fn test_flatten_with_chat_generations() {
+        let gen1 = ChatGeneration::new(AIMessage::builder().content("Chat 1").build().into());
+        let gen2 = ChatGeneration::new(AIMessage::builder().content("Chat 2").build().into());
+        let mut llm_output = HashMap::new();
+        llm_output.insert("token_usage".to_string(), json!({"total": 50}));
+        let result =
+            LLMResult::with_llm_output(vec![vec![gen1.into()], vec![gen2.into()]], llm_output);
+        let flattened = result.flatten();
+        assert_eq!(flattened.len(), 2);
+        assert!(matches!(
+            flattened[0].generations[0][0],
+            GenerationType::ChatGeneration(_)
+        ));
+        if let GenerationType::ChatGeneration(cg) = &flattened[0].generations[0][0] {
+            assert_eq!(cg.text, "Chat 1");
+        }
+        assert_eq!(
+            flattened[0]
+                .llm_output
+                .as_ref()
+                .unwrap()
+                .get("token_usage")
+                .unwrap()
+                .get("total"),
+            Some(&json!(50))
+        );
+        assert_eq!(
+            flattened[1].llm_output.as_ref().unwrap().get("token_usage"),
+            Some(&json!({}))
+        );
+    }
+
+    /// Test flatten with single generation preserves llm_output fully.
+    #[test]
+    fn test_flatten_single_generation_preserves_llm_output() {
+        let generation = Generation::new("Only");
+        let mut llm_output = HashMap::new();
+        llm_output.insert("token_usage".to_string(), json!({"total": 10}));
+        llm_output.insert("model".to_string(), json!("test"));
+        let result = LLMResult::with_llm_output(vec![vec![generation.into()]], llm_output.clone());
+        let flattened = result.flatten();
+        assert_eq!(flattened.len(), 1);
+        assert_eq!(flattened[0].llm_output, Some(llm_output));
+    }
+
+    /// Test flatten clears token_usage for all prompts after the first.
+    #[test]
+    fn test_flatten_many_prompts_token_usage_cleared() {
+        let generations: Vec<Vec<GenerationType>> = (0..5)
+            .map(|i| vec![Generation::new(format!("R{i}")).into()])
+            .collect();
+        let mut llm_output = HashMap::new();
+        llm_output.insert("token_usage".to_string(), json!({"total": 200}));
+        llm_output.insert("model".to_string(), json!("gpt-4"));
+        let result = LLMResult::with_llm_output(generations, llm_output);
+        let flattened = result.flatten();
+        assert_eq!(flattened.len(), 5);
+        assert_eq!(
+            flattened[0]
+                .llm_output
+                .as_ref()
+                .unwrap()
+                .get("token_usage")
+                .unwrap()
+                .get("total"),
+            Some(&json!(200))
+        );
+        for flat in &flattened[1..] {
+            assert_eq!(
+                flat.llm_output.as_ref().unwrap().get("token_usage"),
+                Some(&json!({}))
+            );
+            assert_eq!(
+                flat.llm_output.as_ref().unwrap().get("model"),
+                Some(&json!("gpt-4"))
+            );
+        }
+    }
+
+    /// Test flatten with empty generations list.
+    #[test]
+    fn test_flatten_empty_generations() {
+        let result = LLMResult::new(vec![]);
+        let flattened = result.flatten();
+        assert!(flattened.is_empty());
+    }
+
+    /// Test flatten with empty dict llm_output.
+    #[test]
+    fn test_flatten_with_empty_llm_output_dict() {
+        let gen1 = Generation::new("R1");
+        let gen2 = Generation::new("R2");
+        let result =
+            LLMResult::with_llm_output(vec![vec![gen1.into()], vec![gen2.into()]], HashMap::new());
+        let flattened = result.flatten();
+        assert_eq!(flattened[0].llm_output, Some(HashMap::new()));
+        assert!(flattened[1].llm_output.is_some());
+        assert_eq!(
+            flattened[1].llm_output.as_ref().unwrap().get("token_usage"),
+            Some(&json!({}))
+        );
+    }
+}
+
+/// Test suite for LLMResult equality edge cases.
+mod llm_result_equality_tests {
+    use super::*;
+
+    /// Test equality with empty generations.
+    #[test]
+    fn test_equality_empty_generations() {
+        let result1 = LLMResult::new(vec![]);
+        let result2 = LLMResult::new(vec![]);
+        assert_eq!(result1, result2);
+    }
+
+    /// Test equality ignores run with different values.
+    #[test]
+    fn test_equality_same_generations_different_run() {
+        let generation = Generation::new("test");
+        let mut result1 = LLMResult::new(vec![vec![generation.clone().into()]]);
+        result1.run = Some(vec![RunInfo::new(Uuid::new_v4())]);
+        let result2 = LLMResult::new(vec![vec![generation.into()]]);
+        assert_eq!(result1, result2);
+    }
+
+    /// Test inequality between None and dict llm_output.
+    #[test]
+    fn test_inequality_none_vs_dict_llm_output() {
+        let generation = Generation::new("Response");
+        let result1 = LLMResult::new(vec![vec![generation.clone().into()]]);
+        let result2 = LLMResult::with_llm_output(vec![vec![generation.into()]], HashMap::new());
+        assert_ne!(result1, result2);
+    }
+}
+
+/// Test suite for LLMResult serialization.
+mod llm_result_serialization_tests {
+    use super::*;
+
+    /// Test serialization for LLMResult.
+    #[test]
+    fn test_serialize_basic() {
+        let generation = Generation::new("Response");
+        let mut llm_output = HashMap::new();
+        llm_output.insert("model".to_string(), json!("test"));
+        let result = LLMResult::with_llm_output(vec![vec![generation.into()]], llm_output.clone());
+        let data: serde_json::Value = serde_json::to_value(&result).unwrap();
+        assert!(data.get("generations").is_some());
+        assert_eq!(data["llm_output"]["model"], json!("test"));
+        assert_eq!(data["type"], json!("LLMResult"));
+        assert!(data.get("run").is_none() || data["run"].is_null());
+    }
+
+    /// Test serialization includes run info.
+    #[test]
+    fn test_serialize_with_run_info() {
+        let generation = Generation::new("Response");
+        let run_id = Uuid::new_v4();
+        let mut result = LLMResult::new(vec![vec![generation.into()]]);
+        result.run = Some(vec![RunInfo::new(run_id)]);
+        let data: serde_json::Value = serde_json::to_value(&result).unwrap();
+        assert!(data["run"].is_array());
+        assert_eq!(data["run"].as_array().unwrap().len(), 1);
+        assert_eq!(data["run"][0]["run_id"], json!(run_id.to_string()));
+    }
+
+    /// Test JSON serialization roundtrip.
+    #[test]
+    fn test_json_roundtrip() {
+        let mut generation_info = HashMap::new();
+        generation_info.insert("reason".to_string(), json!("stop"));
+        let generation = Generation::with_info("test", generation_info);
+        let mut llm_output = HashMap::new();
+        llm_output.insert("model".to_string(), json!("gpt-4"));
+        let result = LLMResult::with_llm_output(vec![vec![generation.into()]], llm_output.clone());
+        let json_str = serde_json::to_string(&result).unwrap();
+        let restored: LLMResult = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(restored.generations.len(), 1);
+        if let GenerationType::Generation(g) = &restored.generations[0][0] {
+            assert_eq!(g.text, "test");
+        } else {
+            panic!("Expected Generation variant");
+        }
+        assert_eq!(restored.llm_output, Some(llm_output));
+        assert_eq!(restored.result_type, "LLMResult");
+    }
+
+    /// Test deserialization from serialized value.
+    #[test]
+    fn test_deserialize_from_value() {
+        let generation = Generation::new("test");
+        let mut llm_output = HashMap::new();
+        llm_output.insert("key".to_string(), json!("val"));
+        let result = LLMResult::with_llm_output(vec![vec![generation.into()]], llm_output.clone());
+        let data = serde_json::to_value(&result).unwrap();
+        let restored: LLMResult = serde_json::from_value(data).unwrap();
+        assert_eq!(restored.llm_output, result.llm_output);
+        assert_eq!(restored.generations.len(), result.generations.len());
     }
 }
