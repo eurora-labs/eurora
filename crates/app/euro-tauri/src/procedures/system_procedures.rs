@@ -32,6 +32,10 @@ pub trait SystemApi {
     async fn install_update<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
 
     async fn quit<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
+
+    async fn check_accessibility_permission() -> Result<bool, String>;
+
+    async fn request_accessibility_permission() -> Result<(), String>;
 }
 
 #[derive(Clone)]
@@ -159,5 +163,65 @@ impl SystemApi for SystemApiImpl {
     async fn quit<R: Runtime>(self, app_handle: tauri::AppHandle<R>) -> Result<(), String> {
         app_handle.exit(0);
         Ok(())
+    }
+
+    async fn check_accessibility_permission(self) -> Result<bool, String> {
+        #[cfg(target_os = "macos")]
+        {
+            use core_foundation::base::TCFType;
+            use core_foundation::boolean::CFBoolean;
+            use core_foundation::dictionary::CFDictionary;
+            use core_foundation::string::CFString;
+
+            unsafe extern "C" {
+                fn AXIsProcessTrustedWithOptions(
+                    options: core_foundation::dictionary::CFDictionaryRef,
+                ) -> bool;
+            }
+
+            // Check without prompting
+            let key = CFString::new("AXTrustedCheckOptionPrompt");
+            let value = CFBoolean::false_value();
+            let options = CFDictionary::from_CFType_pairs(&[(key, value)]);
+
+            let trusted = unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) };
+
+            Ok(trusted)
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            Ok(true)
+        }
+    }
+
+    async fn request_accessibility_permission(self) -> Result<(), String> {
+        #[cfg(target_os = "macos")]
+        {
+            use core_foundation::base::TCFType;
+            use core_foundation::boolean::CFBoolean;
+            use core_foundation::dictionary::CFDictionary;
+            use core_foundation::string::CFString;
+
+            unsafe extern "C" {
+                fn AXIsProcessTrustedWithOptions(
+                    options: core_foundation::dictionary::CFDictionaryRef,
+                ) -> bool;
+            }
+
+            // Call with prompt option to trigger the system dialog
+            let key = CFString::new("AXTrustedCheckOptionPrompt");
+            let value = CFBoolean::true_value();
+            let options = CFDictionary::from_CFType_pairs(&[(key, value)]);
+
+            let _ = unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) };
+
+            Ok(())
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            Ok(())
+        }
     }
 }

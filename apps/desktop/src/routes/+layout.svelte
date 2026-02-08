@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '$styles/styles.css';
 	import { initDependencies } from '$lib/bootstrap/deps.js';
+	import AccessibilityPermission from '$lib/components/AccessibilityPermission.svelte';
 	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { openUrl } from '@tauri-apps/plugin-opener';
@@ -51,5 +52,6 @@
 	{@render children?.()}
 </main>
 
+<AccessibilityPermission />
 <UpdateChecker />
 <Toaster />
