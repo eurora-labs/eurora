@@ -8,7 +8,6 @@ use agent_chain_core::language_models::BaseChatModel;
 use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
 use agent_chain_core::output_parsers::{
     BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, BaseTransformOutputParser,
-    StringOrMessage,
 };
 use agent_chain_core::outputs::Generation;
 use futures::StreamExt;
@@ -122,12 +121,7 @@ async fn test_base_transform_output_parser() {
         )
         .unwrap();
 
-    // Convert model chunks into StringOrMessage for the transform parser
-    let input_stream = stream.filter_map(|chunk| async {
-        chunk
-            .ok()
-            .map(|c| StringOrMessage::Message(Box::new(c.message)))
-    });
+    let input_stream = stream.filter_map(|chunk| async { chunk.ok().map(|c| c.message) });
 
     let parser = TransformStrInvertCase;
     let chunks: Vec<String> = parser

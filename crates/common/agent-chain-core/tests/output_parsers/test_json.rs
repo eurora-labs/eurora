@@ -2,8 +2,9 @@
 //!
 //! Ported from langchain/libs/core/tests/unit_tests/output_parsers/test_json.py
 
+use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::output_parsers::{
-    BaseCumulativeTransformOutputParser, BaseOutputParser, SimpleJsonOutputParser, StringOrMessage,
+    BaseCumulativeTransformOutputParser, BaseOutputParser, SimpleJsonOutputParser,
 };
 use agent_chain_core::utils::json::{
     parse_and_check_json_markdown, parse_json_markdown, parse_partial_json,
@@ -420,11 +421,7 @@ async fn test_partial_text_json_output_parser() {
     let parser = SimpleJsonOutputParser::new();
     let tokens = streamed_tokens();
 
-    let input_stream = futures::stream::iter(
-        tokens
-            .into_iter()
-            .map(|s| StringOrMessage::Text(s.to_string())),
-    );
+    let input_stream = futures::stream::iter(tokens.into_iter().map(|s| BaseMessage::from(s)));
 
     let results: Vec<Value> = parser
         .transform(Box::pin(input_stream), None)
@@ -452,11 +449,7 @@ async fn test_partial_text_json_output_parser_diff() {
     let parser = SimpleJsonOutputParser::new().with_diff();
     let tokens = streamed_tokens();
 
-    let input_stream = futures::stream::iter(
-        tokens
-            .into_iter()
-            .map(|s| StringOrMessage::Text(s.to_string())),
-    );
+    let input_stream = futures::stream::iter(tokens.into_iter().map(|s| BaseMessage::from(s)));
 
     let results: Vec<Value> = parser
         .transform(Box::pin(input_stream), None)
@@ -484,11 +477,7 @@ async fn test_partial_text_json_output_parser_async() {
     let parser = SimpleJsonOutputParser::new();
     let tokens = streamed_tokens();
 
-    let input_stream = futures::stream::iter(
-        tokens
-            .into_iter()
-            .map(|s| StringOrMessage::Text(s.to_string())),
-    );
+    let input_stream = futures::stream::iter(tokens.into_iter().map(|s| BaseMessage::from(s)));
 
     let results: Vec<Value> = parser
         .atransform(Box::pin(input_stream), None)
@@ -510,11 +499,7 @@ async fn test_partial_text_json_output_parser_diff_async() {
     let parser = SimpleJsonOutputParser::new().with_diff();
     let tokens = streamed_tokens();
 
-    let input_stream = futures::stream::iter(
-        tokens
-            .into_iter()
-            .map(|s| StringOrMessage::Text(s.to_string())),
-    );
+    let input_stream = futures::stream::iter(tokens.into_iter().map(|s| BaseMessage::from(s)));
 
     let results: Vec<Value> = parser
         .atransform(Box::pin(input_stream), None)
@@ -576,11 +561,7 @@ async fn test_partial_text_json_output_parser_with_json_code_block() {
 
     let parser = SimpleJsonOutputParser::new();
 
-    let input_stream = futures::stream::iter(
-        tokens
-            .into_iter()
-            .map(|s| StringOrMessage::Text(s.to_string())),
-    );
+    let input_stream = futures::stream::iter(tokens.into_iter().map(|s| BaseMessage::from(s)));
 
     let results: Vec<Value> = parser
         .transform(Box::pin(input_stream), None)
