@@ -3,14 +3,14 @@
 //! This module contains utility types like `AnyMessage` and helper functions
 //! for working with messages. Mirrors `langchain_core.messages.utils`.
 
-use super::ai::AIMessage;
+use super::ai::{AIMessage, AIMessageChunk};
 use super::base::{BaseMessage, BaseMessageChunk};
-use super::chat::ChatMessage;
-use super::function::FunctionMessage;
-use super::human::HumanMessage;
+use super::chat::{ChatMessage, ChatMessageChunk};
+use super::function::{FunctionMessage, FunctionMessageChunk};
+use super::human::{HumanMessage, HumanMessageChunk};
 use super::modifier::RemoveMessage;
-use super::system::SystemMessage;
-use super::tool::ToolMessage;
+use super::system::{SystemMessage, SystemMessageChunk};
+use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
 
 /// Type alias for any message type, matching LangChain's AnyMessage.
 /// This is equivalent to BaseMessage but provides naming consistency with Python.
@@ -20,6 +20,96 @@ pub type AnyMessage = BaseMessage;
 ///
 /// This corresponds to `MessageLikeRepresentation` in LangChain Python.
 pub type MessageLikeRepresentation = serde_json::Value;
+
+// ============================================================================
+// msg_to_chunk / chunk_to_msg
+// ============================================================================
+
+/// Convert a `BaseMessage` to the corresponding `BaseMessageChunk`.
+///
+/// This corresponds to `_msg_to_chunk` in LangChain Python.
+fn msg_to_chunk(message: &BaseMessage) -> BaseMessageChunk {
+    match message {
+        BaseMessage::Human(m) => BaseMessageChunk::Human(
+            HumanMessageChunk::builder()
+                .content(m.content.clone())
+                .maybe_id(m.id.clone())
+                .maybe_name(m.name.clone())
+                .additional_kwargs(m.additional_kwargs.clone())
+                .response_metadata(m.response_metadata.clone())
+                .build(),
+        ),
+        BaseMessage::AI(m) => {
+            let mut chunk = AIMessageChunk::builder()
+                .content(m.content.clone())
+                .maybe_id(m.id.clone())
+                .maybe_name(m.name.clone())
+                .tool_calls(m.tool_calls.clone())
+                .invalid_tool_calls(m.invalid_tool_calls.clone())
+                .maybe_usage_metadata(m.usage_metadata.clone())
+                .additional_kwargs(m.additional_kwargs.clone())
+                .response_metadata(m.response_metadata.clone())
+                .build();
+            // Populate tool_call_chunks from tool_calls so they merge properly
+            chunk.init_tool_calls();
+            BaseMessageChunk::AI(chunk)
+        }
+        BaseMessage::System(m) => BaseMessageChunk::System(
+            SystemMessageChunk::builder()
+                .content(m.content.clone())
+                .maybe_id(m.id.clone())
+                .maybe_name(m.name.clone())
+                .additional_kwargs(m.additional_kwargs.clone())
+                .response_metadata(m.response_metadata.clone())
+                .build(),
+        ),
+        BaseMessage::Tool(m) => BaseMessageChunk::Tool(
+            ToolMessageChunk::builder()
+                .content(m.content.clone())
+                .tool_call_id(m.tool_call_id.clone())
+                .maybe_id(m.id.clone())
+                .maybe_name(m.name.clone())
+                .status(m.status.clone())
+                .maybe_artifact(m.artifact.clone())
+                .additional_kwargs(m.additional_kwargs.clone())
+                .response_metadata(m.response_metadata.clone())
+                .build(),
+        ),
+        BaseMessage::Chat(m) => BaseMessageChunk::Chat(
+            ChatMessageChunk::builder()
+                .content(m.content.clone())
+                .role(m.role.clone())
+                .maybe_id(m.id.clone())
+                .maybe_name(m.name.clone())
+                .additional_kwargs(m.additional_kwargs.clone())
+                .response_metadata(m.response_metadata.clone())
+                .build(),
+        ),
+        BaseMessage::Function(m) => BaseMessageChunk::Function(
+            FunctionMessageChunk::builder()
+                .content(m.content.clone())
+                .name(m.name.clone())
+                .maybe_id(m.id.clone())
+                .additional_kwargs(m.additional_kwargs.clone())
+                .response_metadata(m.response_metadata.clone())
+                .build(),
+        ),
+        BaseMessage::Remove(_) => {
+            panic!("Cannot convert RemoveMessage to chunk")
+        }
+    }
+}
+
+/// Convert a `BaseMessageChunk` to the corresponding `BaseMessage`.
+///
+/// This corresponds to `_chunk_to_msg` in LangChain Python.
+fn chunk_to_msg(chunk: &BaseMessageChunk) -> BaseMessage {
+    chunk.to_message()
+}
+
+// ============================================================================
+// get_buffer_string
+// ============================================================================
 
 /// Convert a sequence of messages to a buffer string.
 ///
@@ -47,7 +137,13 @@ pub fn get_buffer_string(messages: &[BaseMessage], human_prefix: &str, ai_prefix
                 BaseMessage::Function(_) => "Function",
                 BaseMessage::Remove(_) => "Remove",
             };
-            format!("{}: {}", role, m.content())
+            let mut message = format!("{}: {}", role, m.text());
+            if let BaseMessage::AI(ai_msg) = m
+                && let Some(function_call) = ai_msg.additional_kwargs.get("function_call")
+            {
+                message.push_str(&function_call.to_string());
+            }
+            message
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -122,6 +218,10 @@ pub fn messages_from_dict(messages: &[serde_json::Value]) -> Result<Vec<BaseMess
     messages.iter().map(message_from_dict).collect()
 }
 
+// ============================================================================
+// convert_to_messages / convert_to_message
+// ============================================================================
+
 /// Convert message-like representations to messages.
 ///
 /// This function can convert from:
@@ -143,59 +243,196 @@ pub fn convert_to_messages(messages: &[serde_json::Value]) -> Result<Vec<BaseMes
 
 pub fn convert_to_message(message: &serde_json::Value) -> Result<BaseMessage, String> {
     if let Some(_msg_type) = message.get("type").and_then(|t| t.as_str()) {
-        // Already a message dict
-        message_from_dict(message)
-    } else if let Some(role) = message.get("role").and_then(|r| r.as_str()) {
-        // OpenAI-style dict with "role" and "content"
-        let content = message
+        // Check if it has a "data" key — if so it's a serialized message dict
+        if message.get("data").is_some() {
+            return message_from_dict(message);
+        }
+        // Otherwise treat it like a role-based dict (type acts like role)
+        let msg_kwargs = message.as_object().ok_or("Expected object")?;
+        let msg_type = msg_kwargs
+            .get("type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("");
+        let content = msg_kwargs
             .get("content")
             .and_then(|c| c.as_str())
             .unwrap_or("");
-        create_message_from_role(role, content)
-    } else if let Some(s) = message.as_str() {
+        let name = msg_kwargs.get("name").and_then(|n| n.as_str());
+        let tool_call_id = msg_kwargs.get("tool_call_id").and_then(|t| t.as_str());
+        let tool_calls = msg_kwargs.get("tool_calls").and_then(|t| t.as_array());
+        let id = msg_kwargs.get("id").and_then(|i| i.as_str());
+        return create_message_from_role(msg_type, content, name, tool_call_id, tool_calls, id);
+    }
+
+    if let Some(obj) = message.as_object() {
+        // Dict with "role" and "content" keys
+        let msg_type = obj
+            .get("role")
+            .and_then(|r| r.as_str())
+            .or_else(|| obj.get("type").and_then(|t| t.as_str()));
+
+        if let Some(msg_type) = msg_type {
+            let content = obj.get("content").and_then(|c| c.as_str()).unwrap_or("");
+            let name = obj.get("name").and_then(|n| n.as_str());
+            let tool_call_id = obj.get("tool_call_id").and_then(|t| t.as_str());
+            let tool_calls = obj.get("tool_calls").and_then(|t| t.as_array());
+            let id = obj.get("id").and_then(|i| i.as_str());
+            return create_message_from_role(msg_type, content, name, tool_call_id, tool_calls, id);
+        }
+    }
+
+    if let Some(s) = message.as_str() {
         // Plain string -> HumanMessage
-        Ok(BaseMessage::Human(
+        return Ok(BaseMessage::Human(
             HumanMessage::builder().content(s).build(),
-        ))
-    } else if let Some(arr) = message.as_array() {
+        ));
+    }
+
+    if let Some(arr) = message.as_array() {
         // 2-tuple: [role, content]
         if arr.len() == 2 {
             let role = arr[0].as_str().ok_or("First element must be role string")?;
             let content = arr[1]
                 .as_str()
                 .ok_or("Second element must be content string")?;
-            create_message_from_role(role, content)
+            return create_message_from_role(role, content, None, None, None, None);
         } else {
-            Err("Array message must have exactly 2 elements [role, content]".to_string())
+            return Err("Array message must have exactly 2 elements [role, content]".to_string());
         }
+    }
+
+    Err(format!("Cannot convert to message: {:?}", message))
+}
+
+// ============================================================================
+// create_message_from_role
+// ============================================================================
+
+/// Create a message from a message type string and content.
+///
+/// This corresponds to `_create_message_from_message_type` in LangChain Python.
+fn create_message_from_role(
+    role: &str,
+    content: &str,
+    name: Option<&str>,
+    tool_call_id: Option<&str>,
+    tool_calls: Option<&Vec<serde_json::Value>>,
+    id: Option<&str>,
+) -> Result<BaseMessage, String> {
+    // Parse tool_calls from OpenAI format to ToolCall structs
+    let parsed_tool_calls: Vec<ToolCall> = if let Some(tcs) = tool_calls {
+        tcs.iter()
+            .filter_map(|tc| {
+                if let Some(function) = tc.get("function") {
+                    let args_raw = function
+                        .get("arguments")
+                        .and_then(|a| a.as_str())
+                        .unwrap_or("{}");
+                    let args = serde_json::from_str(args_raw)
+                        .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+                    Some(ToolCall {
+                        name: function
+                            .get("name")
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        args,
+                        id: tc.get("id").and_then(|i| i.as_str()).map(|s| s.to_string()),
+                        call_type: Some("tool_call".to_string()),
+                    })
+                } else {
+                    // Already in LangChain format
+                    serde_json::from_value::<ToolCall>(tc.clone()).ok()
+                }
+            })
+            .collect()
     } else {
-        Err(format!("Cannot convert to message: {:?}", message))
+        Vec::new()
+    };
+
+    match role {
+        "human" | "user" => Ok(BaseMessage::Human(
+            HumanMessage::builder()
+                .content(content)
+                .maybe_name(name.map(|n| n.to_string()))
+                .maybe_id(id.map(|i| i.to_string()))
+                .build(),
+        )),
+        "ai" | "assistant" => Ok(BaseMessage::AI(
+            AIMessage::builder()
+                .content(content)
+                .maybe_name(name.map(|n| n.to_string()))
+                .maybe_id(id.map(|i| i.to_string()))
+                .tool_calls(parsed_tool_calls)
+                .build(),
+        )),
+        "system" | "developer" => Ok(BaseMessage::System(
+            SystemMessage::builder()
+                .content(content)
+                .maybe_name(name.map(|n| n.to_string()))
+                .maybe_id(id.map(|i| i.to_string()))
+                .build(),
+        )),
+        "function" => {
+            let fn_name = name.ok_or("Function messages require a name")?;
+            Ok(BaseMessage::Function(
+                FunctionMessage::builder()
+                    .name(fn_name)
+                    .content(content)
+                    .maybe_id(id.map(|i| i.to_string()))
+                    .build(),
+            ))
+        }
+        "tool" => {
+            let tc_id = tool_call_id.ok_or("Tool messages require a tool_call_id")?;
+            Ok(BaseMessage::Tool(
+                ToolMessage::builder()
+                    .content(content)
+                    .tool_call_id(tc_id)
+                    .maybe_name(name.map(|n| n.to_string()))
+                    .maybe_id(id.map(|i| i.to_string()))
+                    .build(),
+            ))
+        }
+        "remove" => {
+            let msg_id = id.unwrap_or("");
+            Ok(BaseMessage::Remove(
+                RemoveMessage::builder().id(msg_id).build(),
+            ))
+        }
+        _ => Ok(BaseMessage::Chat(
+            ChatMessage::builder()
+                .content(content)
+                .role(role)
+                .maybe_name(name.map(|n| n.to_string()))
+                .maybe_id(id.map(|i| i.to_string()))
+                .build(),
+        )),
     }
 }
 
-/// Create a message from a role string and content.
-fn create_message_from_role(role: &str, content: &str) -> Result<BaseMessage, String> {
-    match role {
-        "human" | "user" => Ok(BaseMessage::Human(
-            HumanMessage::builder().content(content).build(),
-        )),
-        "ai" | "assistant" => Ok(BaseMessage::AI(
-            AIMessage::builder().content(content).build(),
-        )),
-        "system" | "developer" => Ok(BaseMessage::System(
-            SystemMessage::builder().content(content).build(),
-        )),
-        "function" => Err("Function messages require a name".to_string()),
-        "tool" => Err("Tool messages require a tool_call_id".to_string()),
-        _ => Ok(BaseMessage::Chat(
-            ChatMessage::builder().content(content).role(role).build(),
-        )),
-    }
+// ============================================================================
+// filter_messages
+// ============================================================================
+
+/// Options for excluding tool calls from filtered messages.
+///
+/// This corresponds to the `exclude_tool_calls` parameter in LangChain Python's
+/// `filter_messages`.
+#[derive(Debug, Clone)]
+pub enum ExcludeToolCalls {
+    /// Exclude all AIMessages with tool calls and all ToolMessages.
+    All,
+    /// Exclude ToolMessages with matching tool_call_ids and filter matching
+    /// tool_calls from AIMessages (excluding the whole AIMessage if no
+    /// tool_calls remain).
+    Ids(Vec<String>),
 }
 
 /// Filter messages based on name, type, or ID.
 ///
 /// This corresponds to `filter_messages` in LangChain Python.
+#[allow(clippy::too_many_arguments)]
 pub fn filter_messages(
     messages: &[BaseMessage],
     include_names: Option<&[&str]>,
@@ -204,62 +441,120 @@ pub fn filter_messages(
     exclude_types: Option<&[&str]>,
     include_ids: Option<&[&str]>,
     exclude_ids: Option<&[&str]>,
+    exclude_tool_calls: Option<&ExcludeToolCalls>,
 ) -> Vec<BaseMessage> {
-    messages
-        .iter()
-        .filter(|msg| {
-            // Check exclusions first
-            if let Some(exclude_names) = exclude_names
-                && let Some(name) = msg.name()
-                && exclude_names.contains(&name.as_str())
-            {
-                return false;
+    let mut filtered: Vec<BaseMessage> = Vec::new();
+
+    for msg in messages {
+        // Check exclusions first
+        if let Some(exclude_names) = exclude_names
+            && let Some(name) = msg.name()
+            && exclude_names.contains(&name.as_str())
+        {
+            continue;
+        }
+
+        if let Some(exclude_types) = exclude_types
+            && exclude_types.contains(&msg.message_type())
+        {
+            continue;
+        }
+
+        if let Some(exclude_ids) = exclude_ids
+            && let Some(id) = msg.id()
+            && exclude_ids.contains(&id.as_str())
+        {
+            continue;
+        }
+
+        // Handle exclude_tool_calls
+        let mut msg = msg.clone();
+        match exclude_tool_calls {
+            Some(ExcludeToolCalls::All) => {
+                if let BaseMessage::AI(ref ai_msg) = msg
+                    && !ai_msg.tool_calls.is_empty()
+                {
+                    continue;
+                }
+                if matches!(msg, BaseMessage::Tool(_)) {
+                    continue;
+                }
             }
-
-            if let Some(exclude_types) = exclude_types
-                && exclude_types.contains(&msg.message_type())
-            {
-                return false;
+            Some(ExcludeToolCalls::Ids(ids)) => {
+                if let BaseMessage::AI(ref ai_msg) = msg
+                    && !ai_msg.tool_calls.is_empty()
+                {
+                    let remaining_tool_calls: Vec<ToolCall> = ai_msg
+                        .tool_calls
+                        .iter()
+                        .filter(|tc| tc.id.as_ref().is_none_or(|id| !ids.contains(id)))
+                        .cloned()
+                        .collect();
+                    if remaining_tool_calls.is_empty() {
+                        continue;
+                    }
+                    if remaining_tool_calls.len() != ai_msg.tool_calls.len() {
+                        msg = BaseMessage::AI(
+                            AIMessage::builder()
+                                .content(ai_msg.content.clone())
+                                .maybe_id(ai_msg.id.clone())
+                                .maybe_name(ai_msg.name.clone())
+                                .tool_calls(remaining_tool_calls)
+                                .invalid_tool_calls(ai_msg.invalid_tool_calls.clone())
+                                .maybe_usage_metadata(ai_msg.usage_metadata.clone())
+                                .additional_kwargs(ai_msg.additional_kwargs.clone())
+                                .response_metadata(ai_msg.response_metadata.clone())
+                                .build(),
+                        );
+                    }
+                }
+                if let BaseMessage::Tool(ref tool_msg) = msg
+                    && ids.contains(&tool_msg.tool_call_id)
+                {
+                    continue;
+                }
             }
+            None => {}
+        }
 
-            if let Some(exclude_ids) = exclude_ids
-                && let Some(id) = msg.id()
-                && exclude_ids.contains(&id.as_str())
-            {
-                return false;
-            }
+        // Check inclusions (default to including if no criteria given)
+        let no_include_criteria =
+            include_names.is_none() && include_types.is_none() && include_ids.is_none();
 
-            // Check inclusions (default to including if no criteria given)
-            // Match Python logic: include if no inclusion criteria are given,
-            // OR if any specified inclusion criterion matches
-            let no_include_criteria =
-                include_names.is_none() && include_types.is_none() && include_ids.is_none();
+        let matches_include_names = include_names.is_some_and(|names| {
+            msg.name()
+                .is_some_and(|name| names.contains(&name.as_str()))
+        });
 
-            let matches_include_names = include_names.is_some_and(|names| {
-                msg.name()
-                    .is_some_and(|name| names.contains(&name.as_str()))
-            });
+        let matches_include_types =
+            include_types.is_some_and(|types| types.contains(&msg.message_type()));
 
-            let matches_include_types =
-                include_types.is_some_and(|types| types.contains(&msg.message_type()));
+        let matches_include_ids =
+            include_ids.is_some_and(|ids| msg.id().is_some_and(|id| ids.contains(&id.as_str())));
 
-            let matches_include_ids = include_ids
-                .is_some_and(|ids| msg.id().is_some_and(|id| ids.contains(&id.as_str())));
+        if no_include_criteria
+            || matches_include_names
+            || matches_include_types
+            || matches_include_ids
+        {
+            filtered.push(msg);
+        }
+    }
 
-            no_include_criteria
-                || matches_include_names
-                || matches_include_types
-                || matches_include_ids
-        })
-        .cloned()
-        .collect()
+    filtered
 }
+
+// ============================================================================
+// merge_message_runs
+// ============================================================================
 
 /// Merge consecutive messages of the same type.
 ///
 /// Note: ToolMessages are not merged, as each has a distinct tool call ID.
 ///
 /// This corresponds to `merge_message_runs` in LangChain Python.
+/// Uses chunk-based merging to properly merge tool_calls, response_metadata,
+/// additional_kwargs, and content blocks (not just string concatenation).
 pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Vec<BaseMessage> {
     if messages.is_empty() {
         return Vec::new();
@@ -268,53 +563,90 @@ pub fn merge_message_runs(messages: &[BaseMessage], chunk_separator: &str) -> Ve
     let mut merged: Vec<BaseMessage> = Vec::new();
 
     for msg in messages {
-        if merged.is_empty() {
+        let last = if merged.is_empty() {
+            None
+        } else {
+            merged.pop()
+        };
+
+        let Some(last) = last else {
             merged.push(msg.clone());
             continue;
-        }
-
-        let last = merged.last().expect("merged is not empty");
+        };
 
         // Don't merge ToolMessages or messages of different types
         if matches!(msg, BaseMessage::Tool(_))
-            || std::mem::discriminant(last) != std::mem::discriminant(msg)
+            || std::mem::discriminant(&last) != std::mem::discriminant(msg)
         {
+            merged.push(last);
             merged.push(msg.clone());
         } else {
-            // Same type, merge content
-            let last = merged.pop().expect("merged is not empty");
-            let merged_content = format!("{}{}{}", last.content(), chunk_separator, msg.content());
+            // Same type — use chunk-based merging
+            let last_chunk = msg_to_chunk(&last);
+            let mut curr_chunk = msg_to_chunk(msg);
 
-            let new_msg = match (last, msg) {
-                (BaseMessage::Human(_), BaseMessage::Human(_)) => {
-                    BaseMessage::Human(HumanMessage::builder().content(&merged_content).build())
-                }
-                (BaseMessage::AI(_), BaseMessage::AI(_)) => {
-                    BaseMessage::AI(AIMessage::builder().content(&merged_content).build())
-                }
-                (BaseMessage::System(_), BaseMessage::System(_)) => {
-                    BaseMessage::System(SystemMessage::builder().content(&merged_content).build())
-                }
-                (BaseMessage::Chat(c), BaseMessage::Chat(_)) => BaseMessage::Chat(
-                    ChatMessage::builder()
-                        .content(&merged_content)
-                        .role(&c.role)
-                        .build(),
-                ),
-                (BaseMessage::Function(f), BaseMessage::Function(_)) => BaseMessage::Function(
-                    FunctionMessage::builder()
-                        .name(&f.name)
-                        .content(&merged_content)
-                        .build(),
-                ),
-                _ => {
-                    // Shouldn't happen due to discriminant check, but handle gracefully
-                    merged.push(msg.clone());
-                    continue;
-                }
-            };
+            // Clear response_metadata on the current chunk before merge
+            // (matching Python behavior)
+            match &mut curr_chunk {
+                BaseMessageChunk::AI(c) => c.response_metadata.clear(),
+                BaseMessageChunk::Human(c) => c.response_metadata.clear(),
+                BaseMessageChunk::System(c) => c.response_metadata.clear(),
+                BaseMessageChunk::Tool(c) => c.response_metadata.clear(),
+                BaseMessageChunk::Chat(c) => c.response_metadata.clear(),
+                BaseMessageChunk::Function(c) => c.response_metadata.clear(),
+            }
 
-            merged.push(new_msg);
+            // Insert chunk_separator between string contents when both are non-empty
+            if !chunk_separator.is_empty() {
+                let last_content = last_chunk.content();
+                let curr_content = curr_chunk.content();
+                if !last_content.is_empty() && !curr_content.is_empty() {
+                    // Check if both are plain strings (not JSON arrays)
+                    let last_is_str =
+                        serde_json::from_str::<Vec<serde_json::Value>>(last_content).is_err();
+                    let curr_is_str =
+                        serde_json::from_str::<Vec<serde_json::Value>>(curr_content).is_err();
+                    if last_is_str && curr_is_str {
+                        // Append separator to the last chunk's content before merge
+                        match &mut curr_chunk {
+                            BaseMessageChunk::AI(c) => {
+                                c.content = format!("{}{}", chunk_separator, c.content);
+                            }
+                            BaseMessageChunk::Human(c) => {
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
+                            }
+                            BaseMessageChunk::System(c) => {
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
+                            }
+                            BaseMessageChunk::Chat(c) => {
+                                if let super::content::MessageContent::Text(ref mut s) = c.content {
+                                    *s = format!("{}{}", chunk_separator, s);
+                                }
+                            }
+                            BaseMessageChunk::Function(c) => {
+                                c.content = format!("{}{}", chunk_separator, c.content);
+                            }
+                            BaseMessageChunk::Tool(c) => {
+                                c.content = format!("{}{}", chunk_separator, c.content);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let mut merged_chunk = last_chunk + curr_chunk;
+
+            // For AI chunks, re-parse tool_call_chunks into tool_calls
+            // (matching Python where init_tool_calls runs on every construction)
+            if let BaseMessageChunk::AI(ref mut ai_chunk) = merged_chunk {
+                ai_chunk.init_tool_calls();
+            }
+
+            merged.push(chunk_to_msg(&merged_chunk));
         }
     }
 
@@ -461,6 +793,7 @@ pub enum TextFormat {
 ///
 /// * `messages` - Slice of messages to convert.
 /// * `text_format` - How to format string or text block contents.
+/// * `include_id` - Whether to include message IDs in the output.
 ///
 /// # Returns
 ///
@@ -470,18 +803,28 @@ pub enum TextFormat {
 pub fn convert_to_openai_messages(
     messages: &[BaseMessage],
     text_format: TextFormat,
+    include_id: bool,
 ) -> Vec<serde_json::Value> {
-    messages
-        .iter()
-        .map(|msg| convert_single_to_openai_message(msg, text_format))
-        .collect()
+    let mut oai_messages = Vec::new();
+    for msg in messages {
+        oai_messages.extend(convert_single_to_openai_message(
+            msg,
+            text_format,
+            include_id,
+        ));
+    }
+    oai_messages
 }
 
 /// Convert a single message to OpenAI format.
+///
+/// Returns a Vec because some content blocks (tool_result) can produce
+/// additional ToolMessages that need to be appended.
 fn convert_single_to_openai_message(
     message: &BaseMessage,
     text_format: TextFormat,
-) -> serde_json::Value {
+    include_id: bool,
+) -> Vec<serde_json::Value> {
     let role = get_message_openai_role(message);
     let mut oai_msg = serde_json::json!({ "role": role });
 
@@ -499,39 +842,237 @@ fn convert_single_to_openai_message(
     if let BaseMessage::AI(ai_msg) = message
         && !ai_msg.tool_calls.is_empty()
     {
-        let tool_calls: Vec<serde_json::Value> = ai_msg
-            .tool_calls
-            .iter()
-            .map(|tc| {
-                serde_json::json!({
-                    "type": "function",
-                    "id": tc.id,
-                    "function": {
-                        "name": tc.name,
-                        "arguments": serde_json::to_string(&tc.args).unwrap_or_default(),
-                    }
-                })
-            })
-            .collect();
-        oai_msg["tool_calls"] = serde_json::json!(tool_calls);
+        oai_msg["tool_calls"] = serde_json::json!(convert_to_openai_tool_calls(&ai_msg.tool_calls));
     }
 
-    // Handle content based on text_format
-    let content = message.content();
-    match text_format {
-        TextFormat::String => {
-            oai_msg["content"] = serde_json::json!(content);
+    // Add refusal from additional_kwargs if present
+    if let Some(additional_kwargs) = message.additional_kwargs()
+        && let Some(refusal) = additional_kwargs.get("refusal")
+    {
+        oai_msg["refusal"] = refusal.clone();
+    }
+
+    // Add message ID if requested
+    if include_id && let Some(id) = message.id() {
+        oai_msg["id"] = serde_json::json!(id);
+    }
+
+    // Handle content
+    // Try to get content as list (for multimodal messages)
+    let raw_content = message.content();
+    let content_list: Option<Vec<serde_json::Value>> = serde_json::from_str(raw_content).ok();
+
+    let mut tool_messages: Vec<serde_json::Value> = Vec::new();
+
+    if let Some(blocks) = content_list {
+        // Content is a list of blocks — process each block
+        let mut content_blocks: Vec<serde_json::Value> = Vec::new();
+
+        for block in &blocks {
+            let block_type = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+
+            match block_type {
+                "text" => {
+                    content_blocks.push(serde_json::json!({
+                        "type": "text",
+                        "text": block.get("text").and_then(|t| t.as_str()).unwrap_or(""),
+                    }));
+                }
+                "image_url" => {
+                    content_blocks.push(serde_json::json!({
+                        "type": "image_url",
+                        "image_url": block.get("image_url").cloned().unwrap_or_default(),
+                    }));
+                }
+                "input_audio" => {
+                    content_blocks.push(block.clone());
+                }
+                "tool_use" => {
+                    // Anthropic tool_use block — convert to OpenAI tool_call if not
+                    // already in tool_calls
+                    if let BaseMessage::AI(ai_msg) = message {
+                        let block_id = block.get("id").and_then(|i| i.as_str()).unwrap_or("");
+                        let already_in_tool_calls = ai_msg
+                            .tool_calls
+                            .iter()
+                            .any(|tc| tc.id.as_deref() == Some(block_id));
+                        if !already_in_tool_calls {
+                            let tool_calls_arr = oai_msg
+                                .get("tool_calls")
+                                .and_then(|v| v.as_array())
+                                .cloned()
+                                .unwrap_or_default();
+                            let mut new_tool_calls = tool_calls_arr;
+                            new_tool_calls.push(serde_json::json!({
+                                "type": "function",
+                                "id": block_id,
+                                "function": {
+                                    "name": block.get("name").and_then(|n| n.as_str()).unwrap_or(""),
+                                    "arguments": serde_json::to_string(
+                                        block.get("input").unwrap_or(&serde_json::json!({}))
+                                    ).unwrap_or_default(),
+                                }
+                            }));
+                            oai_msg["tool_calls"] = serde_json::json!(new_tool_calls);
+                        }
+                    }
+                }
+                "tool_result" => {
+                    // Anthropic tool_result — convert to ToolMessage
+                    let tool_use_id = block
+                        .get("tool_use_id")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("");
+                    let tool_content = block.get("content").and_then(|c| c.as_str()).unwrap_or("");
+                    let is_error = block
+                        .get("is_error")
+                        .and_then(|e| e.as_bool())
+                        .unwrap_or(false);
+                    let status = if is_error { "error" } else { "success" };
+                    let tool_msg = ToolMessage::builder()
+                        .content(tool_content)
+                        .tool_call_id(tool_use_id)
+                        .status(super::tool::ToolStatus::from(status.to_string()))
+                        .build();
+                    // Recursively convert tool message to OpenAI format
+                    tool_messages.extend(convert_single_to_openai_message(
+                        &BaseMessage::Tool(tool_msg),
+                        text_format,
+                        include_id,
+                    ));
+                }
+                "image" | "source" => {
+                    // Anthropic image format
+                    if let Some(source) = block.get("source") {
+                        let media_type = source
+                            .get("media_type")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("");
+                        let src_type = source.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                        let data = source.get("data").and_then(|d| d.as_str()).unwrap_or("");
+                        content_blocks.push(serde_json::json!({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": format!("data:{};{},{}", media_type, src_type, data),
+                            }
+                        }));
+                    }
+                }
+                "thinking" | "reasoning" => {
+                    content_blocks.push(block.clone());
+                }
+                _ => {
+                    // Pass through unknown blocks
+                    if let Some(s) = block.as_str() {
+                        content_blocks.push(serde_json::json!({"type": "text", "text": s}));
+                    } else {
+                        content_blocks.push(block.clone());
+                    }
+                }
+            }
         }
-        TextFormat::Block => {
-            if content.is_empty() {
-                oai_msg["content"] = serde_json::json!([]);
-            } else {
-                oai_msg["content"] = serde_json::json!([{ "type": "text", "text": content }]);
+
+        // Apply text_format to the result
+        match text_format {
+            TextFormat::String => {
+                if content_blocks
+                    .iter()
+                    .all(|b| b.get("type").and_then(|t| t.as_str()) == Some("text"))
+                {
+                    // All text blocks — join into a single string
+                    let joined: String = content_blocks
+                        .iter()
+                        .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    oai_msg["content"] = serde_json::json!(joined);
+                } else {
+                    oai_msg["content"] = serde_json::json!(content_blocks);
+                }
+            }
+            TextFormat::Block => {
+                oai_msg["content"] = serde_json::json!(content_blocks);
+            }
+        }
+    } else {
+        // Content is a plain string
+        match text_format {
+            TextFormat::String => {
+                oai_msg["content"] = serde_json::json!(raw_content);
+            }
+            TextFormat::Block => {
+                if raw_content.is_empty() {
+                    oai_msg["content"] = serde_json::json!([]);
+                } else {
+                    oai_msg["content"] =
+                        serde_json::json!([{ "type": "text", "text": raw_content }]);
+                }
             }
         }
     }
 
-    oai_msg
+    // If content is non-empty or there are no tool_messages, include the main message
+    let has_content = oai_msg.get("content").is_some_and(|c| {
+        if let Some(s) = c.as_str() {
+            !s.is_empty()
+        } else if let Some(arr) = c.as_array() {
+            !arr.is_empty()
+        } else {
+            true
+        }
+    });
+
+    if has_content || tool_messages.is_empty() {
+        let mut result = vec![oai_msg];
+        result.extend(tool_messages);
+        result
+    } else {
+        tool_messages
+    }
+}
+
+/// Convert ToolCall list to OpenAI tool_calls format.
+fn convert_to_openai_tool_calls(tool_calls: &[ToolCall]) -> Vec<serde_json::Value> {
+    tool_calls
+        .iter()
+        .map(|tc| {
+            serde_json::json!({
+                "type": "function",
+                "id": tc.id,
+                "function": {
+                    "name": tc.name,
+                    "arguments": serde_json::to_string(&tc.args).unwrap_or_default(),
+                }
+            })
+        })
+        .collect()
+}
+
+// ============================================================================
+// _is_message_type / _default_text_splitter
+// ============================================================================
+
+/// Check if a message matches any of the given type strings.
+///
+/// This corresponds to `_is_message_type` in LangChain Python.
+fn is_message_type(message: &BaseMessage, types: &[String]) -> bool {
+    types.iter().any(|t| t == message.message_type())
+}
+
+/// Default text splitter that splits on newlines, keeping the separator.
+///
+/// This corresponds to `_default_text_splitter` in LangChain Python.
+fn default_text_splitter(text: &str) -> Vec<String> {
+    let splits: Vec<&str> = text.split('\n').collect();
+    if splits.len() <= 1 {
+        return vec![text.to_string()];
+    }
+    let mut result: Vec<String> = splits[..splits.len() - 1]
+        .iter()
+        .map(|s| format!("{}\n", s))
+        .collect();
+    result.push(splits.last().unwrap_or(&"").to_string());
+    result
 }
 
 // ============================================================================
@@ -550,9 +1091,10 @@ pub enum TrimStrategy {
 
 /// Configuration for trimming messages.
 #[derive(Debug, Clone)]
-pub struct TrimMessagesConfig<F>
+pub struct TrimMessagesConfig<F, S = fn(&str) -> Vec<String>>
 where
     F: Fn(&[BaseMessage]) -> usize,
+    S: Fn(&str) -> Vec<String>,
 {
     /// Maximum token count of trimmed messages.
     pub max_tokens: usize,
@@ -565,6 +1107,18 @@ where
     /// Whether to keep the SystemMessage if there is one at index 0.
     /// Only valid with strategy="last".
     pub include_system: bool,
+    /// The message type(s) to end on. If specified, every message after the last
+    /// occurrence of this type is ignored. Can be specified as string names
+    /// (e.g. "system", "human", "ai", ...).
+    pub end_on: Option<Vec<String>>,
+    /// The message type(s) to start on. Should only be specified if
+    /// strategy="last". If specified, every message before the first occurrence
+    /// of this type is ignored (after trimming to max_tokens).
+    pub start_on: Option<Vec<String>>,
+    /// Custom text splitter function for partial message splitting.
+    /// When `allow_partial` is true, this function is used to split text content
+    /// into chunks. Defaults to splitting on newlines.
+    pub text_splitter: Option<S>,
 }
 
 impl<F> TrimMessagesConfig<F>
@@ -579,6 +1133,9 @@ where
             strategy: TrimStrategy::Last,
             allow_partial: false,
             include_system: false,
+            end_on: None,
+            start_on: None,
+            text_splitter: None,
         }
     }
 
@@ -599,6 +1156,35 @@ where
         self.include_system = include_system;
         self
     }
+
+    /// Set the message type(s) to end on.
+    pub fn with_end_on(mut self, end_on: Vec<String>) -> Self {
+        self.end_on = Some(end_on);
+        self
+    }
+
+    /// Set the message type(s) to start on.
+    pub fn with_start_on(mut self, start_on: Vec<String>) -> Self {
+        self.start_on = Some(start_on);
+        self
+    }
+
+    /// Set a custom text splitter function for partial message splitting.
+    pub fn with_text_splitter<S2: Fn(&str) -> Vec<String>>(
+        self,
+        text_splitter: S2,
+    ) -> TrimMessagesConfig<F, S2> {
+        TrimMessagesConfig {
+            max_tokens: self.max_tokens,
+            token_counter: self.token_counter,
+            strategy: self.strategy,
+            allow_partial: self.allow_partial,
+            include_system: self.include_system,
+            end_on: self.end_on,
+            start_on: self.start_on,
+            text_splitter: Some(text_splitter),
+        }
+    }
 }
 
 /// Trim messages to be below a token count.
@@ -613,35 +1199,60 @@ where
 /// List of trimmed messages.
 ///
 /// This corresponds to `trim_messages` in LangChain Python.
-pub fn trim_messages<F>(
+pub fn trim_messages<F, S>(
     messages: &[BaseMessage],
-    config: &TrimMessagesConfig<F>,
+    config: &TrimMessagesConfig<F, S>,
 ) -> Vec<BaseMessage>
 where
     F: Fn(&[BaseMessage]) -> usize,
+    S: Fn(&str) -> Vec<String>,
 {
     if messages.is_empty() {
         return Vec::new();
     }
 
+    // Validate arguments
+    if config.start_on.is_some() && config.strategy == TrimStrategy::First {
+        panic!("start_on parameter is only valid with strategy='last'");
+    }
+    if config.include_system && config.strategy == TrimStrategy::First {
+        panic!("include_system parameter is only valid with strategy='last'");
+    }
+
     match config.strategy {
-        TrimStrategy::First => trim_messages_first(messages, config),
+        TrimStrategy::First => trim_messages_first(messages, config, false),
         TrimStrategy::Last => trim_messages_last(messages, config),
     }
 }
 
-/// Trim messages from the beginning.
-fn trim_messages_first<F>(
+/// Trim messages from the beginning (strategy="first").
+///
+/// When `reverse_partial` is true, partial content is taken from the end
+/// of the content (used when the overall strategy is "last" and messages
+/// have been reversed).
+fn trim_messages_first<F, S>(
     messages: &[BaseMessage],
-    config: &TrimMessagesConfig<F>,
+    config: &TrimMessagesConfig<F, S>,
+    reverse_partial: bool,
 ) -> Vec<BaseMessage>
 where
     F: Fn(&[BaseMessage]) -> usize,
+    S: Fn(&str) -> Vec<String>,
 {
-    let messages: Vec<BaseMessage> = messages.to_vec();
+    let mut messages: Vec<BaseMessage> = messages.to_vec();
+
+    if messages.is_empty() {
+        return messages;
+    }
 
     // Check if all messages already fit
     if (config.token_counter)(&messages) <= config.max_tokens {
+        // When all messages fit, only apply end_on filtering if needed
+        if let Some(ref end_on) = config.end_on {
+            while !messages.is_empty() && !is_message_type(messages.last().unwrap(), end_on) {
+                messages.pop();
+            }
+        }
         return messages;
     }
 
@@ -658,33 +1269,119 @@ where
         }
     }
 
-    let idx = left;
+    let mut idx = left;
 
     // Handle partial messages if allowed
     if config.allow_partial && idx < messages.len() {
-        // Try to include part of the next message's content
-        if let Some(partial_msg) = try_partial_message_first(&messages, idx, config) {
-            let mut result = messages[..idx].to_vec();
-            result.push(partial_msg);
-            return result;
+        let mut included_partial = false;
+
+        // First try list content (multimodal blocks)
+        let excluded_content = messages[idx].content();
+        if let Ok(mut content_blocks) =
+            serde_json::from_str::<Vec<serde_json::Value>>(excluded_content)
+        {
+            if content_blocks.len() > 1 {
+                if reverse_partial {
+                    content_blocks.reverse();
+                }
+                let num_blocks = content_blocks.len();
+                for remove_count in 1..num_blocks {
+                    let mut partial_blocks = content_blocks[..num_blocks - remove_count].to_vec();
+                    if reverse_partial {
+                        partial_blocks.reverse();
+                    }
+                    let partial_content =
+                        serde_json::to_string(&partial_blocks).unwrap_or_default();
+                    let partial_msg = create_message_with_content(&messages[idx], &partial_content);
+                    let mut test = messages[..idx].to_vec();
+                    test.push(partial_msg);
+                    if (config.token_counter)(&test) <= config.max_tokens {
+                        messages = test;
+                        idx += 1;
+                        included_partial = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Then try text splitting
+        if !included_partial {
+            let content = messages[idx].content();
+            if !content.is_empty() {
+                let mut split_texts = if let Some(ref splitter) = config.text_splitter {
+                    splitter(content)
+                } else {
+                    default_text_splitter(content)
+                };
+                if split_texts.len() > 1 {
+                    if reverse_partial {
+                        split_texts.reverse();
+                    }
+                    // Binary search for max splits
+                    let mut s_left = 0;
+                    let mut s_right = split_texts.len();
+                    while s_left < s_right {
+                        let mid = (s_left + s_right).div_ceil(2);
+                        let partial_content: String = split_texts[..mid].concat();
+                        let partial_msg =
+                            create_message_with_content(&messages[idx], &partial_content);
+                        let mut test = messages[..idx].to_vec();
+                        test.push(partial_msg);
+                        if (config.token_counter)(&test) <= config.max_tokens {
+                            s_left = mid;
+                        } else {
+                            s_right = mid - 1;
+                        }
+                    }
+                    if s_left > 0 {
+                        let mut content_splits = split_texts[..s_left].to_vec();
+                        if reverse_partial {
+                            content_splits.reverse();
+                        }
+                        let partial_content: String = content_splits.concat();
+                        let partial_msg =
+                            create_message_with_content(&messages[idx], &partial_content);
+                        let end = idx;
+                        messages = messages[..end].to_vec();
+                        messages.push(partial_msg);
+                        idx += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    // Apply end_on filtering
+    if let Some(ref end_on) = config.end_on {
+        while idx > 0 && !is_message_type(&messages[idx - 1], end_on) {
+            idx -= 1;
         }
     }
 
     messages[..idx].to_vec()
 }
 
-/// Trim messages from the end.
-fn trim_messages_last<F>(
+/// Trim messages from the end (strategy="last").
+fn trim_messages_last<F, S>(
     messages: &[BaseMessage],
-    config: &TrimMessagesConfig<F>,
+    config: &TrimMessagesConfig<F, S>,
 ) -> Vec<BaseMessage>
 where
     F: Fn(&[BaseMessage]) -> usize,
+    S: Fn(&str) -> Vec<String>,
 {
     let mut messages: Vec<BaseMessage> = messages.to_vec();
 
     if messages.is_empty() {
         return messages;
+    }
+
+    // Apply end_on filtering first (for "last" strategy, done before trimming)
+    if let Some(ref end_on) = config.end_on {
+        while !messages.is_empty() && !is_message_type(messages.last().unwrap(), end_on) {
+            messages.pop();
+        }
     }
 
     // Handle system message preservation
@@ -705,19 +1402,28 @@ where
         config.max_tokens
     };
 
-    // Reverse and use first strategy
+    // Reverse and use first strategy logic
     messages.reverse();
 
-    // Create a temporary config with adjusted max_tokens
+    // Build a temporary config for first-strategy on reversed messages
+    // Pass start_on as end_on (since we reversed)
+    // Wrap the text_splitter reference in a closure so it fits the generic param
+    let splitter_wrapper: Option<Box<dyn Fn(&str) -> Vec<String> + '_>> = config
+        .text_splitter
+        .as_ref()
+        .map(|s| Box::new(move |text: &str| s(text)) as Box<dyn Fn(&str) -> Vec<String>>);
     let reverse_config = TrimMessagesConfig {
         max_tokens: remaining_tokens,
         token_counter: &config.token_counter,
         strategy: TrimStrategy::First,
         allow_partial: config.allow_partial,
         include_system: false,
+        end_on: config.start_on.clone(),
+        start_on: None,
+        text_splitter: splitter_wrapper,
     };
 
-    let mut result = trim_messages_first(&messages, &reverse_config);
+    let mut result = trim_messages_first(&messages, &reverse_config, true);
 
     // Reverse back
     result.reverse();
@@ -728,74 +1434,6 @@ where
     }
 
     result
-}
-
-/// Try to create a partial message from the first strategy.
-fn try_partial_message_first<F>(
-    messages: &[BaseMessage],
-    idx: usize,
-    config: &TrimMessagesConfig<F>,
-) -> Option<BaseMessage>
-where
-    F: Fn(&[BaseMessage]) -> usize,
-{
-    if idx >= messages.len() {
-        return None;
-    }
-
-    let excluded = &messages[idx];
-    let content = excluded.content();
-
-    if content.is_empty() {
-        return None;
-    }
-
-    // Try to split on newlines (default text splitter)
-    let splits: Vec<&str> = content.split('\n').collect();
-    if splits.len() <= 1 {
-        return None;
-    }
-
-    // Reassemble splits with the newline separator
-    let splits_with_sep: Vec<String> = splits
-        .iter()
-        .enumerate()
-        .map(|(i, s)| {
-            if i < splits.len() - 1 {
-                format!("{}\n", s)
-            } else {
-                s.to_string()
-            }
-        })
-        .collect();
-
-    let base_messages = &messages[..idx];
-
-    // Binary search for max splits we can include
-    let mut left = 0;
-    let mut right = splits_with_sep.len();
-
-    while left < right {
-        let mid = (left + right + 1).div_ceil(2);
-        let partial_content: String = splits_with_sep[..mid].concat();
-        let partial_msg = create_message_with_content(excluded, &partial_content);
-
-        let mut test_messages = base_messages.to_vec();
-        test_messages.push(partial_msg);
-
-        if (config.token_counter)(&test_messages) <= config.max_tokens {
-            left = mid;
-        } else {
-            right = mid - 1;
-        }
-    }
-
-    if left > 0 {
-        let partial_content: String = splits_with_sep[..left].concat();
-        Some(create_message_with_content(excluded, &partial_content))
-    } else {
-        None
-    }
 }
 
 /// Create a message of the same type with different content.
