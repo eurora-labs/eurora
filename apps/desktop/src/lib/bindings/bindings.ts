@@ -68,7 +68,7 @@ version: string;
  */
 body: string | null }
 
-const ARGS_MAP = { 'auth':'{"get_login_token":[],"is_authenticated":[],"poll_for_login":[]}', 'chat':'{"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"conversation_title_changed":["conversation"],"create":[],"create_empty_conversation":[],"current_conversation_changed":["conversation"],"get_messages":["conversation_id","limit","offset"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_for_update":[],"check_grpc_server_connection":["server_address"],"install_update":[],"list_activities":[],"quit":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"get_login_token":[],"is_authenticated":[],"poll_for_login":[]}', 'chat':'{"send_query":["conversation_id","channel","query"]}', 'context_chip':'{"get":[]}', 'conversation':'{"conversation_title_changed":["conversation"],"create":[],"create_empty_conversation":[],"current_conversation_changed":["conversation"],"get_messages":["conversation_id","limit","offset"],"list":["limit","offset"],"new_conversation_added":["conversation"],"switch_conversation":["conversation_id"]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {get_login_token: () => Promise<LoginToken>, 
 is_authenticated: () => Promise<boolean>, 
 poll_for_login: () => Promise<boolean>},
@@ -94,11 +94,13 @@ get_general_settings: () => Promise<GeneralSettings>,
 get_telemetry_settings: () => Promise<TelemetrySettings>, 
 set_general_settings: (generalSettings: GeneralSettings) => Promise<GeneralSettings>, 
 set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<TelemetrySettings>},
-"system": {check_for_update: () => Promise<UpdateInfo | null>, 
+"system": {check_accessibility_permission: () => Promise<boolean>, 
+check_for_update: () => Promise<UpdateInfo | null>, 
 check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
 install_update: () => Promise<null>, 
 list_activities: () => Promise<ContextChip[]>, 
-quit: () => Promise<null>},
+quit: () => Promise<null>, 
+request_accessibility_permission: () => Promise<null>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>},
 "timeline": {list: () => Promise<string[]>, 
