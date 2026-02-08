@@ -67,7 +67,7 @@ impl JsonOutputParser {
     }
 
     /// Get the JSON schema if available.
-    fn get_schema(&self) -> Option<&Value> {
+    pub fn get_schema(&self) -> Option<&Value> {
         self.schema.as_ref()
     }
 }
