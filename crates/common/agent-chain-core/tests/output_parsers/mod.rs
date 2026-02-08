@@ -9,4 +9,5 @@ mod test_json;
 mod test_json_parser;
 mod test_list;
 mod test_list_parser;
+mod test_openai_functions;
 mod test_string_parser;
