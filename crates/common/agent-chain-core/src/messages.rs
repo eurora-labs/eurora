@@ -90,6 +90,7 @@ pub use content::{
     MessageContent,
     NonStandardAnnotation,
     NonStandardContentBlock,
+    PlainTextBlockConfig,
     PlainTextContentBlock,
     ReasoningContentBlock,
     ServerToolCall,

@@ -8,6 +8,7 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
+use super::base::get_msg_title_repr;
 use super::content::ContentBlock;
 use super::tool::{
     InvalidToolCall, ToolCall, ToolCallChunk, default_tool_chunk_parser, default_tool_parser,
@@ -423,24 +424,28 @@ impl AIMessage {
     /// Get a pretty representation of the message.
     ///
     /// This corresponds to `pretty_repr` in LangChain Python.
-    pub fn pretty_repr(&self, _html: bool) -> String {
-        let title = "AI Message";
-        let sep_len = (80 - title.len() - 2) / 2;
-        let sep: String = "=".repeat(sep_len);
-        let header = format!("{} {} {}", sep, title, sep);
+    /// Calls the base message `pretty_repr` logic, then appends tool call info.
+    pub fn pretty_repr(&self, html: bool) -> String {
+        // Build the base representation (matches BaseMessage.pretty_repr in Python)
+        let title = get_msg_title_repr("Ai Message", html);
+        let name_line = if let Some(name) = &self.name {
+            format!("\nName: {}", name)
+        } else {
+            String::new()
+        };
+        let base = format!("{}{}\n\n{}", title, name_line, self.content);
 
-        let mut lines = vec![header];
-
-        if let Some(name) = &self.name {
-            lines.push(format!("Name: {}", name));
-        }
-
-        lines.push(String::new());
-        lines.push(self.content.clone());
-
+        // Append tool call formatting
+        let mut lines = Vec::new();
         format_tool_calls_repr(&self.tool_calls, &self.invalid_tool_calls, &mut lines);
 
-        lines.join("\n").trim().to_string()
+        if lines.is_empty() {
+            base.trim().to_string()
+        } else {
+            format!("{}\n{}", base.trim(), lines.join("\n"))
+                .trim()
+                .to_string()
+        }
     }
 
     /// Get the message type as a string.
@@ -450,6 +455,38 @@ impl AIMessage {
 }
 
 /// Helper function to format tool calls for pretty_repr.
+///
+/// This matches Python's `_format_tool_args` function which is shared
+/// between `tool_calls` and `invalid_tool_calls` formatting.
+fn format_tool_args(
+    name: &str,
+    id: Option<&str>,
+    error: Option<&str>,
+    args: &str,
+    args_is_dict: bool,
+    args_dict: Option<&serde_json::Map<String, serde_json::Value>>,
+) -> Vec<String> {
+    let id_str = id.unwrap_or("None");
+    let mut lines = vec![
+        format!("  {} ({})", name, id_str),
+        format!(" Call ID: {}", id_str),
+    ];
+    if let Some(err) = error {
+        lines.push(format!("  Error: {}", err));
+    }
+    lines.push("  Args:".to_string());
+    if args_is_dict {
+        if let Some(dict) = args_dict {
+            for (arg, value) in dict {
+                lines.push(format!("    {}: {}", arg, value));
+            }
+        }
+    } else {
+        lines.push(format!("    {}", args));
+    }
+    lines
+}
+
 fn format_tool_calls_repr(
     tool_calls: &[ToolCall],
     invalid_tool_calls: &[InvalidToolCall],
@@ -458,32 +495,36 @@ fn format_tool_calls_repr(
     if !tool_calls.is_empty() {
         lines.push("Tool Calls:".to_string());
         for tc in tool_calls {
-            lines.push(format!("  {} ({:?})", tc.name, tc.id));
-            lines.push(format!(" Call ID: {:?}", tc.id));
-            lines.push("  Args:".to_string());
-            if let serde_json::Value::Object(args) = &tc.args {
-                for (arg, value) in args {
-                    lines.push(format!("    {}: {}", arg, value));
-                }
-            } else {
-                lines.push(format!("    {}", tc.args));
-            }
+            let (args_is_dict, args_dict, args_str) =
+                if let serde_json::Value::Object(ref map) = tc.args {
+                    (true, Some(map), String::new())
+                } else {
+                    (false, None, tc.args.to_string())
+                };
+            lines.extend(format_tool_args(
+                &tc.name,
+                tc.id.as_deref(),
+                None,
+                &args_str,
+                args_is_dict,
+                args_dict,
+            ));
         }
     }
     if !invalid_tool_calls.is_empty() {
         lines.push("Invalid Tool Calls:".to_string());
         for itc in invalid_tool_calls {
             let name = itc.name.as_deref().unwrap_or("Tool");
-            let id = itc.id.as_deref().unwrap_or("unknown");
-            lines.push(format!("  {} ({})", name, id));
-            lines.push(format!(" Call ID: {}", id));
-            if let Some(error) = &itc.error {
-                lines.push(format!("  Error: {}", error));
-            }
-            lines.push("  Args:".to_string());
-            if let Some(args) = &itc.args {
-                lines.push(format!("    {}", args));
-            }
+            let id = itc.id.as_deref();
+            let args_str = itc.args.as_deref().unwrap_or("");
+            lines.extend(format_tool_args(
+                name,
+                id,
+                itc.error.as_deref(),
+                args_str,
+                false,
+                None,
+            ));
         }
     }
 }
@@ -931,6 +972,113 @@ impl AIMessageChunk {
 
         self.tool_calls = new_tool_calls;
         self.invalid_tool_calls = new_invalid_tool_calls;
+
+        // When chunk_position is "last" and output_version is "v1" and content is a list,
+        // replace tool_call_chunk blocks in content with full tool_call blocks.
+        // This corresponds to the end of Python's init_tool_calls validator.
+        if self.chunk_position == Some(ChunkPosition::Last)
+            && !self.tool_call_chunks.is_empty()
+            && self
+                .response_metadata
+                .get("output_version")
+                .and_then(|v| v.as_str())
+                == Some("v1")
+        {
+            if let Ok(mut content_list) =
+                serde_json::from_str::<Vec<serde_json::Value>>(&self.content)
+            {
+                // Build a map of id -> tool_call for replacement
+                let id_to_tc: HashMap<String, serde_json::Value> = self
+                    .tool_calls
+                    .iter()
+                    .filter_map(|tc| {
+                        tc.id.as_ref().map(|id| {
+                            let mut tc_val = serde_json::json!({
+                                "type": "tool_call",
+                                "name": tc.name,
+                                "args": tc.args,
+                                "id": id,
+                            });
+                            tc_val
+                                .as_object_mut()
+                                .map(|m| (id.clone(), serde_json::Value::Object(m.clone())))
+                        })
+                    })
+                    .flatten()
+                    .collect();
+
+                let mut changed = false;
+                for block in &mut content_list {
+                    if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
+                        if block_type == "tool_call_chunk" {
+                            if let Some(call_id) = block.get("id").and_then(|i| i.as_str()) {
+                                if let Some(tc) = id_to_tc.get(call_id) {
+                                    let mut replacement = tc.clone();
+                                    // Preserve "extras" from the original block
+                                    if let Some(extras) = block.get("extras") {
+                                        replacement["extras"] = extras.clone();
+                                    }
+                                    *block = replacement;
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if changed {
+                    self.content =
+                        serde_json::to_string(&content_list).unwrap_or(self.content.clone());
+                }
+            }
+        }
+    }
+
+    /// Parse server tool call chunks when aggregation is complete.
+    ///
+    /// When `chunk_position` is "last" and `output_version` is "v1",
+    /// this parses `server_tool_call_chunk` blocks that have string args
+    /// into proper `server_tool_call` blocks with parsed JSON args.
+    ///
+    /// This corresponds to `init_server_tool_calls` model validator in Python.
+    pub fn init_server_tool_calls(&mut self) {
+        if self.chunk_position != Some(ChunkPosition::Last) {
+            return;
+        }
+
+        if self
+            .response_metadata
+            .get("output_version")
+            .and_then(|v| v.as_str())
+            != Some("v1")
+        {
+            return;
+        }
+
+        if let Ok(mut content_list) = serde_json::from_str::<Vec<serde_json::Value>>(&self.content)
+        {
+            let mut changed = false;
+            for block in &mut content_list {
+                if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
+                    if block_type == "server_tool_call" || block_type == "server_tool_call_chunk" {
+                        if let Some(args_str) = block.get("args").and_then(|a| a.as_str()) {
+                            if let Ok(args) = serde_json::from_str::<serde_json::Value>(args_str) {
+                                if args.is_object() {
+                                    block["type"] =
+                                        serde_json::Value::String("server_tool_call".to_string());
+                                    block["args"] = args;
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if changed {
+                self.content = serde_json::to_string(&content_list).unwrap_or(self.content.clone());
+            }
+        }
     }
 
     /// Concatenate this chunk with another chunk.
@@ -958,24 +1106,28 @@ impl AIMessageChunk {
     /// Get a pretty representation of the message.
     ///
     /// This corresponds to `pretty_repr` in LangChain Python.
-    pub fn pretty_repr(&self, _html: bool) -> String {
-        let title = "AIMessageChunk";
-        let sep_len = (80 - title.len() - 2) / 2;
-        let sep: String = "=".repeat(sep_len);
-        let header = format!("{} {} {}", sep, title, sep);
+    /// Calls the base message `pretty_repr` logic, then appends tool call info.
+    pub fn pretty_repr(&self, html: bool) -> String {
+        // Build the base representation (matches BaseMessage.pretty_repr in Python)
+        let title = get_msg_title_repr("Aimessagechunk Message", html);
+        let name_line = if let Some(name) = &self.name {
+            format!("\nName: {}", name)
+        } else {
+            String::new()
+        };
+        let base = format!("{}{}\n\n{}", title, name_line, self.content);
 
-        let mut lines = vec![header];
-
-        if let Some(name) = &self.name {
-            lines.push(format!("Name: {}", name));
-        }
-
-        lines.push(String::new());
-        lines.push(self.content.clone());
-
+        // Append tool call formatting
+        let mut lines = Vec::new();
         format_tool_calls_repr(&self.tool_calls, &self.invalid_tool_calls, &mut lines);
 
-        lines.join("\n").trim().to_string()
+        if lines.is_empty() {
+            base.trim().to_string()
+        } else {
+            format!("{}\n{}", base.trim(), lines.join("\n"))
+                .trim()
+                .to_string()
+        }
     }
 }
 
@@ -1253,6 +1405,7 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
     // Initialize tool calls from chunks if this is the last chunk
     if result.chunk_position == Some(ChunkPosition::Last) {
         result.init_tool_calls();
+        result.init_server_tool_calls();
     }
 
     result
@@ -1371,7 +1524,7 @@ pub fn subtract_usage(
     match (left, right) {
         (None, None) => UsageMetadata::default(),
         (Some(l), None) => l.clone(),
-        (None, Some(_)) => UsageMetadata::default(),
+        (None, Some(r)) => r.clone(),
         (Some(l), Some(r)) => {
             let left_json = serde_json::to_value(l).unwrap_or_default();
             let right_json = serde_json::to_value(r).unwrap_or_default();
@@ -1598,10 +1751,10 @@ mod tests {
         assert_eq!(result.input_tokens, 10);
         assert_eq!(result.output_tokens, 20);
 
-        // Left None, Right Some - should return default (zeroes)
+        // Left None, Right Some - should return right (matches Python: `left or right`)
         let result = subtract_usage(None, Some(&usage));
-        assert_eq!(result.input_tokens, 0);
-        assert_eq!(result.output_tokens, 0);
+        assert_eq!(result.input_tokens, 10);
+        assert_eq!(result.output_tokens, 20);
     }
 
     #[test]
