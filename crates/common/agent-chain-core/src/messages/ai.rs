@@ -922,6 +922,7 @@ impl AIMessageChunk {
                         args: Some(tc.args.to_string()),
                         id: tc.id.clone(),
                         index: None,
+                        chunk_type: Some("tool_call_chunk".to_string()),
                     })
                     .collect();
             }
@@ -932,6 +933,7 @@ impl AIMessageChunk {
                         args: tc.args.clone(),
                         id: tc.id.clone(),
                         index: None,
+                        chunk_type: Some("tool_call_chunk".to_string()),
                     }));
             }
             return;
@@ -1307,6 +1309,7 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
                         args,
                         id,
                         index,
+                        chunk_type: Some("tool_call_chunk".to_string()),
                     }
                 })
                 .collect(),

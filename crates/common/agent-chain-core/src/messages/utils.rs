@@ -338,6 +338,7 @@ fn create_message_from_role(
                             .to_string(),
                         args,
                         id: tc.get("id").and_then(|i| i.as_str()).map(|s| s.to_string()),
+                        call_type: Some("tool_call".to_string()),
                     })
                 } else {
                     // Already in LangChain format
