@@ -2,9 +2,9 @@
 //!
 //! Ported from `langchain/libs/core/tests/unit_tests/outputs/test_run_info.py`
 //!
-//! Note: Several Python tests involve Pydantic-specific functionality that doesn't
-//! directly translate to Rust (e.g., model_dump, model_validate_json, BaseModel inheritance).
-//! In Rust, we use Serde for serialization which has different semantics.
+//! Pydantic-specific functionality is mapped to Rust equivalents:
+//! model_dump/model_validate -> serde serialization/deserialization,
+//! model_copy -> Clone, BaseModel inheritance -> derive macros.
 
 use agent_chain_core::outputs::RunInfo;
 use uuid::Uuid;
@@ -147,8 +147,26 @@ mod run_info_tests {
         assert!(str_repr.contains("run_id"));
     }
 
-    // Note: test_hash_consistency - RunInfo doesn't derive Hash by default.
-    // This is a deliberate difference from Python.
+    /// Test that hash is consistent for same run_id.
+    #[test]
+    fn test_hash_consistency() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let run_id = Uuid::new_v4();
+        let run_info1 = RunInfo::new(run_id);
+        let run_info2 = RunInfo::new(run_id);
+
+        let mut hasher1 = DefaultHasher::new();
+        run_info1.hash(&mut hasher1);
+        let hash1 = hasher1.finish();
+
+        let mut hasher2 = DefaultHasher::new();
+        run_info2.hash(&mut hasher2);
+        let hash2 = hasher2.finish();
+
+        assert_eq!(hash1, hash2);
+    }
 
     /// Test that UUID version is preserved.
     #[test]
@@ -192,5 +210,76 @@ mod run_info_tests {
         let run_info = RunInfo::default();
         // Default uses new_random, so should be v4 UUID
         assert_eq!(run_info.run_id.get_version_num(), 4);
+    }
+}
+
+/// Test suite for RunInfo serde coercion behavior.
+/// Equivalent to Python's TestRunInfoPydanticCoercion.
+mod run_info_serde_coercion_tests {
+    use super::*;
+
+    /// Test that serde coerces a string UUID to a Uuid when deserializing.
+    #[test]
+    fn test_creation_from_string_uuid() {
+        let uuid_str = "12345678-1234-5678-1234-567812345678";
+        let data = serde_json::json!({ "run_id": uuid_str });
+        let run_info: RunInfo =
+            serde_json::from_value(data).expect("should deserialize from string UUID");
+        assert_eq!(run_info.run_id.to_string(), uuid_str);
+    }
+
+    /// Test deserialization from a dict containing a UUID value.
+    #[test]
+    fn test_deserialize_from_value() {
+        let run_id = Uuid::new_v4();
+        let data = serde_json::json!({ "run_id": run_id.to_string() });
+        let run_info: RunInfo =
+            serde_json::from_value(data).expect("should deserialize from value");
+        assert_eq!(run_info.run_id, run_id);
+    }
+
+    /// Test deserialization from a dict containing a string UUID.
+    #[test]
+    fn test_deserialize_with_string_uuid() {
+        let uuid_str = "12345678-1234-5678-1234-567812345678";
+        let data = serde_json::json!({ "run_id": uuid_str });
+        let run_info: RunInfo =
+            serde_json::from_value(data).expect("should deserialize from string UUID");
+        assert_eq!(run_info.run_id.to_string(), uuid_str);
+    }
+
+    /// Test that RunInfo has the expected fields when serialized.
+    #[test]
+    fn test_serialized_fields() {
+        let run_id = Uuid::new_v4();
+        let run_info = RunInfo::new(run_id);
+        let value = serde_json::to_value(&run_info).expect("should serialize");
+        let fields: Vec<&String> = value
+            .as_object()
+            .expect("should be object")
+            .keys()
+            .collect();
+        assert!(fields.contains(&&"run_id".to_string()));
+    }
+
+    /// Test RunInfo clone produces equivalent object.
+    #[test]
+    fn test_clone() {
+        let run_id = Uuid::new_v4();
+        let original = RunInfo::new(run_id);
+        let cloned = original.clone();
+        assert_eq!(cloned.run_id, original.run_id);
+        assert_eq!(cloned, original);
+    }
+
+    /// Test RunInfo clone produces an independent object.
+    #[test]
+    fn test_clone_independence() {
+        let run_id = Uuid::new_v4();
+        let original = RunInfo::new(run_id);
+        let mut cloned = original.clone();
+        assert_eq!(cloned, original);
+        cloned.run_id = Uuid::new_v4();
+        assert_ne!(cloned, original);
     }
 }
