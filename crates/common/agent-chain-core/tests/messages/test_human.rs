@@ -2,9 +2,10 @@
 //!
 //! Converted from `langchain/libs/core/tests/unit_tests/messages/test_human.py`
 
+use agent_chain_core::load::Serializable;
 use agent_chain_core::messages::{
     ContentBlock, ContentPart, HumanMessage, HumanMessageChunk, ImageContentBlock, ImageSource,
-    MessageContent, TextContentBlock,
+    MessageContent, SystemMessageChunk, TextContentBlock,
 };
 
 // ============================================================================
@@ -697,4 +698,102 @@ fn test_chunk_content_blocks_empty_list() {
     let msg: HumanMessage = chunk.into();
     let blocks = msg.content_blocks();
     assert!(blocks.is_empty());
+}
+
+// ============================================================================
+// TestHumanMessageChunk — list content with index-based merging
+// ============================================================================
+
+#[test]
+fn test_chunk_add_with_list_content_with_index() {
+    let chunk1 = HumanMessageChunk::builder()
+        .content(MessageContent::Parts(vec![ContentPart::Other(
+            serde_json::json!({"type": "text", "text": "Hello", "index": 0}),
+        )]))
+        .build();
+    let chunk2 = HumanMessageChunk::builder()
+        .content(MessageContent::Parts(vec![ContentPart::Other(
+            serde_json::json!({"type": "text", "text": " world", "index": 0}),
+        )]))
+        .build();
+    let result = chunk1 + chunk2;
+    match &result.content {
+        MessageContent::Parts(parts) => {
+            // Items with same 'index' key are merged into a single part
+            assert_eq!(
+                parts.len(),
+                1,
+                "expected 1 merged part, got {}",
+                parts.len()
+            );
+            // The merge produces {"type":"text","text":"Hello world","index":0}.
+            // When deserialized back to ContentPart, this matches the Text variant
+            // (the index field is a streaming artifact consumed during merging).
+            match &parts[0] {
+                ContentPart::Text { text } => assert_eq!(text, "Hello world"),
+                ContentPart::Other(v) => assert_eq!(v["text"], "Hello world"),
+                other => panic!("expected Text or Other content part, got {:?}", other),
+            }
+        }
+        other => panic!("expected Parts content, got {:?}", other),
+    }
+}
+
+// ============================================================================
+// TestHumanMessageChunk — cross-type chunk addition
+// ============================================================================
+
+#[test]
+fn test_chunk_add_different_chunk_type() {
+    let chunk1 = HumanMessageChunk::builder()
+        .content("Hello")
+        .id("1".to_string())
+        .build();
+    let chunk2 = SystemMessageChunk::builder().content(" world").build();
+    let result = chunk1 + chunk2;
+    assert!(
+        matches!(&result, HumanMessageChunk { .. }),
+        "result should be HumanMessageChunk"
+    );
+    assert_eq!(result.content.as_text(), "Hello world");
+}
+
+// ============================================================================
+// TestHumanMessageSerializableNamespace
+// ============================================================================
+
+#[test]
+fn test_is_lc_serializable() {
+    assert!(HumanMessage::is_lc_serializable());
+}
+
+#[test]
+fn test_get_lc_namespace() {
+    let namespace = HumanMessage::get_lc_namespace();
+    assert_eq!(
+        namespace,
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string()
+        ]
+    );
+}
+
+#[test]
+fn test_instance_is_lc_serializable() {
+    assert!(HumanMessage::is_lc_serializable());
+}
+
+#[test]
+fn test_instance_get_lc_namespace() {
+    let _msg = HumanMessage::builder().content("Hello").build();
+    assert_eq!(
+        HumanMessage::get_lc_namespace(),
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string()
+        ]
+    );
 }

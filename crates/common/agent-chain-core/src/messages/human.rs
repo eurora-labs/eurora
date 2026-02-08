@@ -10,6 +10,8 @@ use std::collections::HashMap;
 
 use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
 use super::content::{ContentBlock, ContentPart, KNOWN_BLOCK_TYPES, MessageContent};
+use super::system::SystemMessageChunk;
+use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
 
 /// A human message in the conversation.
@@ -536,5 +538,48 @@ impl std::iter::Sum for HumanMessageChunk {
 impl From<HumanMessageChunk> for HumanMessage {
     fn from(chunk: HumanMessageChunk) -> Self {
         chunk.to_message()
+    }
+}
+
+impl std::ops::Add<SystemMessageChunk> for HumanMessageChunk {
+    type Output = HumanMessageChunk;
+
+    fn add(self, other: SystemMessageChunk) -> HumanMessageChunk {
+        let other_as_human = HumanMessageChunk {
+            content: other.content,
+            id: other.id,
+            name: other.name,
+            additional_kwargs: other.additional_kwargs,
+            response_metadata: other.response_metadata,
+        };
+        self.concat(&other_as_human)
+    }
+}
+
+impl Serializable for HumanMessage {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
+    }
+}
+
+impl Serializable for HumanMessageChunk {
+    fn is_lc_serializable() -> bool {
+        true
+    }
+
+    fn get_lc_namespace() -> Vec<String> {
+        vec![
+            "langchain".to_string(),
+            "schema".to_string(),
+            "messages".to_string(),
+        ]
     }
 }
