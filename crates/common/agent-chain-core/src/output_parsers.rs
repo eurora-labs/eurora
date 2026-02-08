@@ -63,9 +63,7 @@ pub use format_instructions::{
 pub use string::StrOutputParser;
 
 // Re-export transform types
-pub use transform::{
-    BaseCumulativeTransformOutputParser, BaseTransformOutputParser, StringOrMessage,
-};
+pub use transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
 // Re-export JSON parser
 pub use json::{JsonOutputParser, SimpleJsonOutputParser};
@@ -73,7 +71,7 @@ pub use json::{JsonOutputParser, SimpleJsonOutputParser};
 // Re-export list parsers
 pub use list::{
     CommaSeparatedListOutputParser, ListOutputParser, MarkdownListOutputParser,
-    NumberedListOutputParser, drop_last_n,
+    NumberedListOutputParser, ParseMatch, drop_last_n,
 };
 
 // Re-export XML parser

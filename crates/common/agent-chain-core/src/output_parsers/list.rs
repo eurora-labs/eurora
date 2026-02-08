@@ -13,15 +13,32 @@ use crate::error::Result;
 use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
 
+/// A single match from `parse_iter`, carrying the captured group text
+/// and the byte offset where the overall match ends in the input.
+///
+/// Mirrors the `re.Match` objects returned by Python's
+/// `ListOutputParser.parse_iter`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseMatch {
+    /// The text captured by the first group (equivalent to `m.group(1)`).
+    pub group: String,
+    /// The byte offset where the overall regex match ends in the input
+    /// (equivalent to `m.end()`).
+    pub end: usize,
+}
+
 /// Parse the output of a model to a list.
 ///
 /// This is a base trait for list output parsers.
 pub trait ListOutputParser: BaseOutputParser<Output = Vec<String>> {
-    /// Parse the output iteratively, yielding strings.
+    /// Parse the output iteratively, yielding match results.
     ///
-    /// Returns a vector of matched strings. Used for streaming parsing.
+    /// Returns a vector of [`ParseMatch`] values carrying the captured text
+    /// and the end position of each match. Used for streaming parsing where
+    /// the caller needs to know how much of the input has been consumed.
+    ///
     /// The default implementation returns an empty vector.
-    fn parse_iter(&self, _text: &str) -> Vec<String> {
+    fn parse_iter(&self, _text: &str) -> Vec<ParseMatch> {
         Vec::new()
     }
 }
@@ -188,10 +205,17 @@ impl BaseOutputParser for NumberedListOutputParser {
 impl BaseTransformOutputParser for NumberedListOutputParser {}
 
 impl ListOutputParser for NumberedListOutputParser {
-    fn parse_iter(&self, text: &str) -> Vec<String> {
+    fn parse_iter(&self, text: &str) -> Vec<ParseMatch> {
         let re = self.get_regex();
         re.captures_iter(text)
-            .filter_map(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+            .filter_map(|cap| {
+                let overall = cap.get(0)?;
+                let group = cap.get(1)?;
+                Some(ParseMatch {
+                    group: group.as_str().trim().to_string(),
+                    end: overall.end(),
+                })
+            })
             .collect()
     }
 }
@@ -265,12 +289,22 @@ impl BaseOutputParser for MarkdownListOutputParser {
 impl BaseTransformOutputParser for MarkdownListOutputParser {}
 
 impl ListOutputParser for MarkdownListOutputParser {
-    fn parse_iter(&self, text: &str) -> Vec<String> {
+    fn parse_iter(&self, text: &str) -> Vec<ParseMatch> {
         let re = self.get_regex();
+        let mut offset = 0;
         text.lines()
             .filter_map(|line| {
-                re.captures(line)
-                    .and_then(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+                let line_start = offset;
+                // +1 accounts for the newline character (or 0 at end of text)
+                offset += line.len() + 1;
+                re.captures(line).and_then(|cap| {
+                    let group = cap.get(1)?;
+                    let overall = cap.get(0)?;
+                    Some(ParseMatch {
+                        group: group.as_str().trim().to_string(),
+                        end: line_start + overall.end(),
+                    })
+                })
             })
             .collect()
     }

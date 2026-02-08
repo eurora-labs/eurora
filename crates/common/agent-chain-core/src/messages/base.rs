@@ -586,6 +586,18 @@ impl From<RemoveMessage> for BaseMessage {
     }
 }
 
+impl From<&str> for BaseMessage {
+    fn from(text: &str) -> Self {
+        BaseMessage::Human(HumanMessage::builder().content(text).build())
+    }
+}
+
+impl From<String> for BaseMessage {
+    fn from(text: String) -> Self {
+        BaseMessage::Human(HumanMessage::builder().content(text).build())
+    }
+}
+
 /// Content type for merge operations.
 ///
 /// Represents message content that can be either a string or a list of values.
